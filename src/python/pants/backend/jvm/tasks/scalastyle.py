@@ -145,7 +145,7 @@ class Scalastyle(LintTaskMixin, NailgunTask):
           def to_java_boolean(x):
             return str(x).lower()
 
-          cp = ScalaPlatform.global_instance().style_classpath(self.context.products)
+          cp = ScalaPlatform.global_instance().style_classpath(self.context.products, self.context._scheduler)
           scalastyle_args = [
             '-c', scalastyle_config,
             '-v', to_java_boolean(scalastyle_verbose),

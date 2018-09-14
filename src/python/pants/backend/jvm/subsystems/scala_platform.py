@@ -156,9 +156,9 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     """Returns classpath entries for the scalac tool."""
     return self._tool_classpath('scalac', products, scheduler)
 
-  def style_classpath(self, products):
+  def style_classpath(self, products, scheduler):
     """Returns classpath as paths for scalastyle."""
-    classpath_entries = self._tool_classpath('scalastyle', products)
+    classpath_entries = self._tool_classpath('scalastyle', products, scheduler)
     return [classpath_entry.path for classpath_entry in classpath_entries]
 
   @property
