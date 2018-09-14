@@ -80,6 +80,10 @@ class JvmRun(JvmTask):
     else:
       binary = target
 
+    # Some targets will not have extra_jvm_options in their payload,
+    # so we can't access it with target.payload.extra_jvm_options
+    extra_jvm_options = target.payload.get_field_value("extra_jvm_options")
+
     # We can't throw if binary isn't a JvmBinary, because perhaps we were called on a
     # python_binary, in which case we have to no-op and let python_run do its thing.
     # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
@@ -92,7 +96,7 @@ class JvmRun(JvmTask):
           classpath=self.classpath([target]),
           main=self.get_options().main or binary.main,
           executor=executor,
-          jvm_options=self.jvm_options,
+          jvm_options=self.jvm_options + extra_jvm_options,
           args=self.args,
           cwd=working_dir,
           synthetic_jar_dir=self.workdir,
