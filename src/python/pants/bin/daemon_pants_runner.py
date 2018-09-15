@@ -335,6 +335,8 @@ class DaemonPantsRunner(ProcessManager):
       if self._maybe_bootstrap_options is not None:
         tmp_exiter.apply_options(self._maybe_bootstrap_options)
       # We are catching an exception from the nailgunned_stdio() call -- we log it, but also
-      # re-raise the exception to differentiate it from an erroneous result of the LocalPantsRunner
+      # re-raise the exception to differentiate it from the result of the LocalPantsRunner
       # invocation.
-      tmp_exiter.handle_unhandled_exception(add_newline=True, re_raise=True)
+      exception_message = tmp_exiter.format_unhandled_exception(add_newline=True)
+      tmp_exiter.log_exception(exception_message)
+      raise
