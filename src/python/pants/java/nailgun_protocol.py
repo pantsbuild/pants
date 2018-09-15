@@ -8,8 +8,6 @@ import os
 import struct
 from builtins import bytes, object, str, zip
 
-from future.utils import binary_type
-
 
 STDIO_DESCRIPTORS = (0, 1, 2)
 
@@ -248,7 +246,7 @@ class NailgunProtocol(object):
     if not isinstance(obj, int):
       raise TypeError("cannot encode non-integer object in encode_int(): object was {} (type '{}')."
                       .format(obj, type(obj)))
-    return binary_type(str(obj).encode('ascii'))
+    return str(obj).encode('ascii')
 
   @classmethod
   def send_exit_with_code(cls, sock, code):
@@ -258,8 +256,10 @@ class NailgunProtocol(object):
 
   @classmethod
   def encode_env_var_value(cls, obj):
-    """Encode the input so that it can be used as the value of an environment variable."""
-    return binary_type(str(obj).encode('utf-8'))
+    """Encode `obj` so that it can be used as an environment variable in a subsequent NailgunClient
+    execution.
+    """
+    return str(obj).encode('utf-8')
 
   @classmethod
   def isatty_to_env(cls, stdin, stdout, stderr):
