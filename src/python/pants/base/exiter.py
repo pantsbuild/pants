@@ -83,7 +83,8 @@ class Exiter(object):
     """
     self.exit(result=1, msg=msg)
 
-  def handle_unhandled_exception(self, exc_class=None, exc=None, tb=None, add_newline=False):
+  def handle_unhandled_exception(self, exc_class=None, exc=None, tb=None, add_newline=False,
+                                 re_raise=False):
     """Default sys.excepthook implementation for unhandled exceptions."""
     exc_class = exc_class or sys.exc_info()[0]
     exc = exc or sys.exc_info()[1]
@@ -98,6 +99,9 @@ class Exiter(object):
 
     # Always output the unhandled exception details into a log file.
     self._log_exception(format_msg())
+
+    if re_raise:
+      raise exc
     self.exit_and_fail(format_msg(self._should_print_backtrace))
 
   def _log_exception(self, msg):

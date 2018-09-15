@@ -334,4 +334,4 @@ class DaemonPantsRunner(ProcessManager):
       # log dir from the (bootstrap) options, or the Exiter won't log anything at all.
       if self._maybe_bootstrap_options is not None:
         tmp_exiter.apply_options(self._maybe_bootstrap_options)
-      tmp_exiter.handle_unhandled_exception(add_newline=True)
+      tmp_exiter.handle_unhandled_exception(add_newline=True, re_raise=True)
