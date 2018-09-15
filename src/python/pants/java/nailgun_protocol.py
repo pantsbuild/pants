@@ -248,7 +248,7 @@ class NailgunProtocol(object):
     if not isinstance(obj, int):
       raise TypeError("cannot encode non-integer object in encode_int(): object was {} (type '{}')."
                       .format(obj, type(obj)))
-    return str(obj).encode('ascii')
+    return binary_type(str(obj).encode('ascii'))
 
   @classmethod
   def send_exit_with_code(cls, sock, code):
@@ -259,7 +259,7 @@ class NailgunProtocol(object):
   @classmethod
   def encode_env_var_value(cls, obj):
     """Encode the input so that it can be used as the value of an environment variable."""
-    return binary_type(str(obj))
+    return binary_type(str(obj).encode('utf-8'))
 
   @classmethod
   def isatty_to_env(cls, stdin, stdout, stderr):
