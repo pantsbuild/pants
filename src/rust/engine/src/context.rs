@@ -109,7 +109,7 @@ impl Core {
       fs_pool: fs_pool.clone(),
       runtime: runtime,
       store: store,
-      // FIXME: Errors in initialization should definitely be exposed as python
+      // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs: PosixFS::new(build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);

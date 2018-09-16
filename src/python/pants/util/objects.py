@@ -72,8 +72,8 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       except TypeError as e:
         raise cls.make_type_error(e)
 
-      # TODO(cosmicexplorer): Make this kind of exception pattern (filter for
-      # errors then display them all at once) more ergonomic.
+      # TODO: Make this kind of exception pattern (filter for errors then display them all at once)
+      # more ergonomic.
       type_failure_msgs = []
       for field_name, field_constraint in fields_with_constraints.items():
         field_value = getattr(this_object, field_name)

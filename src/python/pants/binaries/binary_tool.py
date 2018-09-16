@@ -20,7 +20,7 @@ from pants.util.memo import memoized_method, memoized_property
 logger = logging.getLogger(__name__)
 
 
-# TODO(cosmicexplorer): Add integration tests for this file.
+# TODO: Add integration tests for this file.
 class BinaryToolBase(Subsystem):
   """Base class for subsytems that configure binary tools.
 
