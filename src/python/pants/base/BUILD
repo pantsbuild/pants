@@ -144,6 +144,8 @@ python_library(
   name = 'specs',
   sources = ['specs.py'],
   dependencies = [
+    'src/python/pants/util:collections',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ],

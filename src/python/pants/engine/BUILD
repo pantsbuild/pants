@@ -74,6 +74,7 @@ python_library(
     ':struct',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
+    'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
     'src/python/pants/util:objects',
