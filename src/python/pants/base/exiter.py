@@ -119,7 +119,8 @@ Exception message: {exc_msg}
     # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
     faulthandler.register(signal.SIGUSR2, trace_stream, chain=True)
 
-  def set_except_hook(self, trace_stream=None):
+  def set_except_hook(self, trace_stream=None, workdir=None):
     """Sets the global exception hook."""
     self._setup_faulthandler(trace_stream or sys.stderr)
+    self._workdir = workdir or self._workdir
     sys.excepthook = self.handle_unhandled_exception

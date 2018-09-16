@@ -8,7 +8,6 @@ import socket
 import unittest
 
 import mock
-from future.utils import text_type
 
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
@@ -191,7 +190,7 @@ class TestNailgunProtocol(unittest.TestCase):
     chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock)
     self.assertEqual(
       (chunk_type, payload),
-      (ChunkType.EXIT, text_type(NailgunProtocol.encode_int(return_code)))
+      (ChunkType.EXIT, NailgunProtocol.encode_int(return_code))
     )
 
   def test_send_unicode_chunk(self):
