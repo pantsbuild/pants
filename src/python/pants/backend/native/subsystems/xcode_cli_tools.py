@@ -128,7 +128,7 @@ class XCodeCLITools(Subsystem):
 
     all_inc_dirs = base_inc_dirs
     for d in base_inc_dirs:
-      # TODO: what does this directory do?
+      # TODO: figure out what this directory does and why it's not already found by this compiler.
       secure_inc_dir = os.path.join(d, 'secure')
       if is_readable_dir(secure_inc_dir):
         all_inc_dirs.append(secure_inc_dir)
