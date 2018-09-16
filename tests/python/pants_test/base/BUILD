@@ -225,6 +225,7 @@ python_tests(
     '3rdparty/python:future',
     'src/python/pants/bin',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test/option:testing',
   ],
 )

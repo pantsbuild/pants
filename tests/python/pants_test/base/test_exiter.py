@@ -4,24 +4,17 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 import os
-import re
-import unittest
-from builtins import open
+from builtins import open, str
 
 from pants.base.exiter import Exiter
 from pants.util.contextutil import temporary_dir
 from pants_test.option.util.fakes import create_options
+from pants_test.test_base import TestBase
 
 
-class ExiterTest(unittest.TestCase):
-
-  def test_log_exception_no_workdir(self):
-    exiter = Exiter()
-    expected_rx_str = re.escape(
-      'no workdir or self._workdir was set to log exceptions to. message was: test')
-    with self.assertRaisesRegexp(Exception, expected_rx_str):
-      exiter.log_exception('test')
+class ExiterTest(TestBase):
 
   def _assert_exception_log_contents(self, exiter, workdir=None):
     log_string = 'test-data'
@@ -38,6 +31,17 @@ class ExiterTest(unittest.TestCase):
       self.assertIn('args: [', args)
       self.assertIn('pid: {}'.format(os.getpid()), pid)
       self.assertIn(log_string, msg)
+
+  def test_log_exception_no_workdir(self):
+    with self.captured_logging(level=logging.ERROR) as captured:
+      exiter = Exiter()
+      exiter.log_exception('test')
+    all_errors = list(captured.errors())
+    self.assertTrue(len(all_errors) == 1)
+    single_error = all_errors[0]
+    expected_msg = (
+      'pants.base.exiter: Problem logging original exception: no workdir or self._workdir was set to log exceptions to. message was: test')
+    self.assertEqual(expected_msg, str(single_error))
 
   def test_log_exception_given_workdir(self):
     with temporary_dir() as workdir:
