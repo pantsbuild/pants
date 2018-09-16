@@ -20,8 +20,9 @@ class Cookies(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(Cookies, cls).register_options(register)
-    register('--path', advanced=True, fingerprint=True, default='~/.pants.cookies',
-             help='Path to file that stores persistent cookies.')
+    register('--path', advanced=True, fingerprint=True, default=None,
+             help='Path to file that stores persistent cookies. '
+                  'Defaults to <pants bootstrap dir>/auth/cookies.')
 
   def update(self, cookies):
     """Add specified cookies to our cookie jar, and persists it.
@@ -49,7 +50,12 @@ class Cookies(Subsystem):
     return cookie_jar
 
   def _get_cookie_file(self):
-    return os.path.realpath(os.path.expanduser(self.get_options().path))
+    path = self.get_options().path
+    if path is None:
+      path = os.path.join(self.get_options().pants_bootstrapdir, 'auth', 'cookies')
+    else:
+      path = os.path.realpath(os.path.expanduser(path))
+    return path
 
   @memoized_property
   def _lock(self):
