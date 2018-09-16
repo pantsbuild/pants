@@ -6,6 +6,8 @@ python_library(
   dependencies = [
     '3rdparty/python:requests',
     'src/python/pants/subsystem',
+    'src/python/pants/process',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )

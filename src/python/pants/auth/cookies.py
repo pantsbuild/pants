@@ -8,8 +8,10 @@ import os
 
 from future.moves.http.cookiejar import LWPCookieJar
 
+from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir_for
+from pants.util.memo import memoized_property
 
 
 class Cookies(Subsystem):
@@ -29,7 +31,8 @@ class Cookies(Subsystem):
     cookie_jar = self.get_cookie_jar()
     for cookie in cookies:
       cookie_jar.set_cookie(cookie)
-    cookie_jar.save()
+    with self._lock:
+      cookie_jar.save()
 
   def get_cookie_jar(self):
     """Returns our cookie jar."""
@@ -40,9 +43,17 @@ class Cookies(Subsystem):
     else:
       safe_mkdir_for(cookie_file)
       # Save an empty cookie jar so we can change the file perms on it before writing data to it.
-      cookie_jar.save()
+      with self._lock:
+        cookie_jar.save()
       os.chmod(cookie_file, 0o600)
     return cookie_jar
 
   def _get_cookie_file(self):
     return os.path.realpath(os.path.expanduser(self.get_options().path))
+
+  @memoized_property
+  def _lock(self):
+    """An identity-keyed inter-process lock around the cookie file."""
+    lockfile = '{}.lock'.format(self._get_cookie_file())
+    safe_mkdir_for(lockfile)
+    return OwnerPrintingInterProcessFileLock(lockfile)
