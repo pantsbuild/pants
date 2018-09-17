@@ -75,8 +75,7 @@ class TestBasicAuth(TestBase):
 
   def test_basic_auth_from_netrc(self):
     with temporary_dir(cleanup=False) as tmphomedir:
-      with open(os.path.join(tmphomedir, '.netrc'), 'w') as fp:
-        fp.write('machine localhost\nlogin {}\npassword {}'.format(
-          'test_user', 'test_password').encode('ascii'))
+      with open(os.path.join(tmphomedir, '.netrc'), 'wb') as fp:
+        fp.write('machine localhost\nlogin test_user\npassword test_password'.encode('ascii'))
       with environment_as(HOME=tmphomedir):
         self._do_test_basic_auth(creds=None)

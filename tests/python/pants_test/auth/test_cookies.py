@@ -27,5 +27,5 @@ class TestCookies(TestBase):
       self.assertFalse(os.path.exists(cookie_file))
       cookies.update([])
       self.assertTrue(os.path.exists(cookie_file))
-      file_permissions = oct(os.stat(cookie_file).st_mode)
-      self.assertEqual('0100600', file_permissions)
+      file_permissions = os.stat(cookie_file).st_mode
+      self.assertEqual(int('0100600', 8), file_permissions)
