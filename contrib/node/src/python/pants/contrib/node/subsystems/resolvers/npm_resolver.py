@@ -13,11 +13,14 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd
+from pants.util.dirutil import absolute_symlink
+from pants.util.fileutil import safe_temp_edit
 
 from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_NPM,
                                                             PACKAGE_MANAGER_YARNPKG)
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.targets.node_package import NodePackage
 from pants.contrib.node.tasks.node_resolve import NodeResolve
 
 
@@ -99,14 +102,64 @@ class NpmResolver(Subsystem, NodeResolverBase):
           raise TaskError(
             'Cannot find yarn.lock. Did you forget to put it in target sources?')
 
-      result, command = node_task.install_module(
-        target=target, install_optional=install_optional,
-        production_only=production_only, force=force, frozen_lockfile=frozen_lockfile,
-        workunit_name=target.address.reference(),
-        workunit_labels=[WorkUnitLabel.COMPILER])
-      if result != 0:
-        raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
-                        .format(target.address.reference(), command, result))
+      # Install all dependencies except for `file:` dependencies
+      # `file:` dependencies are special dependencies that point to a local path to a pants node target
+      # `file:` dependencies are already in the build graph and should be already be installed by this point
+
+      # Copy the package.json and then remove the file: dependencies from package.json
+      # Run the install and symlink the file: dependencies using their node_paths
+      # Afterwards, restore the original package.json to not cause diff changes when resolve_locally=True
+      with safe_temp_edit('package.json') as package_json:
+        with open(package_json, 'r') as package_json_file:
+          json_data = json.load(package_json_file)
+          source_deps = { k : v for k,v in json_data.get('dependencies', {}).items() if v.startswith('file:')}
+          third_party_deps = { k : v for k,v in json_data.get('dependencies', {}).items() if not v.startswith('file:')}
+          json_data['dependencies'] = third_party_deps
+
+        # TODO(6489): Currently the file: dependencies need to be duplicated in BUILD.
+        # After this issue is closed, only dependencies need to be specified in package.json
+        for package_name, file_path in source_deps.items():
+          if self._get_target_from_package_name(target, package_name, file_path) is None:
+            raise TaskError('Local dependency in package.json not found in the build graph. '
+                            'Check your BUILD file for missing dependencies. ["{}": {}]'.format(package_name, file_path))
+        mode = 'w' if PY3 else 'wb'
+        with open(package_json, mode) as package_json_file:
+          json.dump(json_data, package_json_file, indent=2, separators=(',', ': '))
+        result, command = node_task.install_module(
+          target=target, install_optional=install_optional,
+          production_only=production_only, force=force, frozen_lockfile=frozen_lockfile,
+          workunit_name=target.address.reference(),
+          workunit_labels=[WorkUnitLabel.COMPILER])
+        if result != 0:
+          raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
+                          .format(target.address.reference(), command, result))
+        if source_deps:
+          self._link_source_dependencies(target, results_dir, node_paths, source_deps)
+
+  def _link_source_dependencies(self, target, results_dir, node_paths, source_deps):
+    for package_name, file_path in source_deps.items():
+      dep = self._get_target_from_package_name(target, package_name, file_path)
+      # Symlink each target
+      dep_path = node_paths.node_path(dep)
+      node_module_dir = os.path.join(results_dir, 'node_modules')
+      absolute_symlink(dep_path, os.path.join(node_module_dir, dep.package_name))
+      # If there are any bin, we need to symlink those as well
+      bin_field = dep.payload.bin_executables
+      if dep.payload.bin_executables:
+        bin_dir = os.path.join(node_module_dir, '.bin')
+        if isinstance(bin_field, dict):
+          for bin_name, rel_bin_path in bin_field.items():
+            bin_path = os.path.join(dep_path, rel_bin_path)
+            absolute_symlink(bin_path, os.path.join(bin_dir, bin_name))
+        else:
+          # If there is only a single bin it, could just be a string and not a map.
+          # In this case, the package_name is the bin name
+          bin_path = os.path.join(dep_path, bin_field)
+          absolute_symlink(bin_path, os.path.join(bin_dir, dep.package_name))
+
+  @staticmethod
+  def _filter_node_packages(dependencies):
+    return (target for target in dependencies if isinstance(target, NodePackage))
 
   @staticmethod
   def _emit_package_descriptor(node_task, target, results_dir, node_paths):
