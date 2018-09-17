@@ -10,6 +10,7 @@ target(
     ':node_run',
     ':node_test',
     ':javascript_style',
+    ':node_install',
   ]
 )
 
@@ -124,5 +125,17 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
+  ]
+)
+
+python_library(
+  name='node_install',
+  sources=['node_install.py'],
+  dependencies=[
+    ':node_paths',
+    ':node_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:contextutil',
   ]
 )

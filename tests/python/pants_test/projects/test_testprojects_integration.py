@@ -34,11 +34,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
       # TODO(Eric Ayers): I don't understand why this fails
       'testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand:compile-prep-command',
-      # TODO(#6455): this produces a resolution error in (currently) the test_shard_6() method with
-      # "Could not satisfy all requirements for hello_again==...", but the missing requirement is
-      # the one we're trying to satisfy, from the setup.py for the python_dist() target in the same
-      # directory!
-      'examples/src/python/example/python_distribution/hello/pants_setup_requires:bin',
     ]
 
     # Targets that are intended to fail
@@ -104,6 +99,8 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/3rdparty/org/pantsbuild/testprojects:testprojects',
       # Already tested in 'PantsRequirementIntegrationTest' and 'SetupPyIntegrationTest'.
       'testprojects/pants-plugins/*',
+      'testprojects/src/python/python_distribution/ctypes:ctypes_test',
+      'testprojects/src/python/python_distribution/ctypes_with_third_party:ctypes_test',
     ]
 
     targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 +
@@ -127,8 +124,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
   def run_shard(self, shard):
     targets = self.targets_for_shard(shard)
     pants_run = self.pants_test(targets + ['--jvm-platform-default-platform=java7',
-                                           '--gen-protoc-import-from-root'],
-                                extra_env={'PEX_VERBOSE': '9'})
+                                           '--gen-protoc-import-from-root'])
     self.assert_success(pants_run)
 
   def test_self(self):

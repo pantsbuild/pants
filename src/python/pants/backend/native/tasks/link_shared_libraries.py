@@ -88,7 +88,7 @@ class LinkSharedLibraries(NativeTask):
 
   @memoized_property
   def platform(self):
-    # FIXME: convert this to a v2 engine dependency injection.
+    # TODO: convert this to a v2 engine dependency injection.
     return Platform.create()
 
   def _retrieve_single_product_at_target_base(self, product_mapping, target):
@@ -114,7 +114,7 @@ class LinkSharedLibraries(NativeTask):
         if vt.valid:
           shared_library = self._retrieve_shared_lib_from_cache(vt)
         else:
-          # FIXME: We need to partition links based on proper dependency edges and not
+          # TODO: We need to partition links based on proper dependency edges and not
           # perform a link to every native_external_library for all targets in the closure.
           # https://github.com/pantsbuild/pants/issues/6178
           link_request = self._make_link_request(

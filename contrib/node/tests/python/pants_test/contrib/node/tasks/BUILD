@@ -125,3 +125,13 @@ python_tests(
   timeout=180,
   tags={'integration'},
 )
+
+python_tests(
+  name='node_install_integration',
+  sources=['test_node_install_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  timeout=180,
+  tags={'integration'},
+)

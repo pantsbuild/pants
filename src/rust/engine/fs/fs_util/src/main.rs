@@ -216,7 +216,15 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             cas_address.to_owned(),
             1,
             chunk_size,
-            Duration::from_secs(30),
+            // This deadline is really only in place because otherwise DNS failures
+            // leave this hanging forever.
+            //
+            // Make fs_util have a very long deadline (because it's not configurable,
+            // like it is inside pants) until we switch to Tower (where we can more
+            // carefully control specific components of timeouts).
+            //
+            // See https://github.com/pantsbuild/pants/pull/6433 for more context.
+            Duration::from_secs(30 * 60),
           ),
           true,
         )

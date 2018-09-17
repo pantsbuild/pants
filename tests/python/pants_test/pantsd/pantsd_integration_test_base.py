@@ -84,7 +84,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
           recursively_update(pantsd_config, extra_config)
         print('>>> config: \n{}\n'.format(pantsd_config))
         checker = PantsDaemonMonitor(pid_dir)
-        self.assert_success_runner(workdir, pantsd_config, ['kill-pantsd'])
+        self.assert_runner(workdir, pantsd_config, ['kill-pantsd'])
         try:
           yield workdir, pantsd_config, checker
         finally:
@@ -92,7 +92,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
           for line in read_pantsd_log(workdir):
             print(line)
           banner('END pantsd.log')
-          self.assert_success_runner(
+          self.assert_runner(
             workdir,
             pantsd_config,
             ['kill-pantsd'],
@@ -101,14 +101,20 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
           checker.assert_stopped()
 
   @contextmanager
-  def pantsd_successful_run_context(self, log_level='info', extra_config=None, extra_env=None):
+  def pantsd_successful_run_context(self, *args, **kwargs):
+    with self.pantsd_run_context(*args, success=True, **kwargs) as context:
+      yield context
+
+  @contextmanager
+  def pantsd_run_context(self, log_level='info', extra_config=None, extra_env=None, success=True):
     with self.pantsd_test_context(log_level, extra_config) as (workdir, pantsd_config, checker):
       yield (
         functools.partial(
-          self.assert_success_runner,
+          self.assert_runner,
           workdir,
           pantsd_config,
           extra_env=extra_env,
+          success=success,
         ),
         checker,
         workdir,
@@ -122,7 +128,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     else:
       return 0
 
-  def assert_success_runner(self, workdir, config, cmd, extra_config={}, extra_env={}, expected_runs=1):
+  def assert_runner(self, workdir, config, cmd, extra_config={}, extra_env={}, expected_runs=1, success=True):
     combined_config = config.copy()
     recursively_update(combined_config, extra_config)
     print(bold(cyan('\nrunning: ./pants {} (config={}) (extra_env={})'
@@ -149,5 +155,8 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
           runs_created,
         )
     )
-    self.assert_success(run)
+    if success:
+      self.assert_success(run)
+    else:
+      self.assert_failure(run)
     return run

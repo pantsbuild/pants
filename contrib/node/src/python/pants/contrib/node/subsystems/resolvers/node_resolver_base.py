@@ -15,7 +15,7 @@ from pants.util.meta import AbstractClass
 
 class NodeResolverBase(AbstractClass):
   @abstractmethod
-  def resolve_target(self, node_task, target, results_dir, node_paths):
+  def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False, **kwargs):
     """Resolve a NodePackage target."""
 
   @classmethod

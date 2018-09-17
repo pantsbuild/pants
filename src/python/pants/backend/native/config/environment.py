@@ -187,7 +187,7 @@ class LLVMCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
 class GCCCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
 
 
-# FIXME: make this an @rule, after we can automatically produce LibcDev and other subsystems in the
+# TODO: make this an @rule, after we can automatically produce LibcDev and other subsystems in the
 # v2 engine (see #5788).
 class HostLibcDev(datatype(['crti_object', 'fingerprint'])):
 
