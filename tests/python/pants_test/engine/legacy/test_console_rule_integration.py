@@ -18,19 +18,25 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
 
   # TODO: Running this command a second time with the daemon will result in no output because
   # of product caching. See #6146.
-  @ensure_daemon
   def test_v2_list(self):
-    result = self.do_command(
-      '--no-v1',
-      '--v2',
-      'list',
-      '::',
-      success=True
-    )
+    with self.pantsd_successful_run_context() as (runner, checker, workdir, pantsd_config):
+      def run_list():
+        command = [
+          '--no-v1',
+          '--v2',
+          'list',
+          'testprojects/src/scala/org/pantsbuild/testproject/compilation_failure::',
+            ]
 
-    output_lines = result.stdout_data.splitlines()
-    self.assertGreater(len(output_lines), 1000)
-    self.assertIn('3rdparty/python:psutil', output_lines)
+        result = runner(command)
+        checker.assert_started()
+        return result
+
+      first_run = run_list()
+      first_run_output_lines = first_run.stdout_data.splitlines()
+      second_run = run_list()
+      second_run_output_lines = second_run.stdout_data.splitlines()
+      self.assertEqual(first_run_output_lines, second_run_output_lines)
 
   @ensure_daemon
   def test_v2_goal_validation(self):
