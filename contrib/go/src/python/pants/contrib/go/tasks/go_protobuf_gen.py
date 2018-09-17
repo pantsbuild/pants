@@ -36,6 +36,8 @@ class GoProtobufGen(SimpleCodegenTask):
 
     register('--import-target', type=target_option, fingerprint=True,
              help='Target that will be added as a dependency of protoc-generated Go code.')
+    register('--protoc-plugins', type=list, fingerprint=True,
+             help='List of protoc plugins to activate.  E.g., grpc.')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -75,7 +77,12 @@ class GoProtobufGen(SimpleCodegenTask):
 
     outdir = os.path.join(target_workdir, 'src', 'go')
     safe_mkdir(outdir)
-    target_cmd.append('--go_out={}'.format(outdir))
+    protoc_plugins = self.get_options().protoc_plugins + list(target.protoc_plugins)
+    if protoc_plugins:
+      go_out = 'plugins={}:{}'.format('+'.join(protoc_plugins), outdir)
+    else:
+      go_out = outdir
+    target_cmd.append('--go_out={}'.format(go_out))
 
     all_sources = list(target.sources_relative_to_buildroot())
     for source in all_sources:

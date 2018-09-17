@@ -2,8 +2,8 @@
 # To re-generate run: `pants buildgen.go --materialize --remote`
 
 go_remote_libraries(
-  rev='a47340a8e42c4ceb44c00c2a05199e24b24fcaef',
+  rev='4b56f30a1fd96a133a036b62cdd2a249883dd89b',
   packages=[
-    'proto',
+    'googleapis/rpc/status',
   ]
 )
