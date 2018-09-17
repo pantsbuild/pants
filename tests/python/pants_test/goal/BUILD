@@ -24,6 +24,7 @@ python_tests(
   dependencies=[
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/auth',
     'src/python/pants/build_graph',
     'src/python/pants/goal:products',
     'src/python/pants/goal:run_tracker',
