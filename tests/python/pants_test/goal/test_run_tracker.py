@@ -11,6 +11,7 @@ from builtins import open
 
 from future.moves.urllib.parse import parse_qs
 
+from pants.auth.cookies import Cookies
 from pants.goal.run_tracker import RunTracker
 from pants.util.contextutil import temporary_file_path
 from pants_test.test_base import TestBase
@@ -42,6 +43,7 @@ class RunTrackerTest(TestBase):
     server_thread.daemon = True
     server_thread.start()
 
+    self.context(for_subsystems=[Cookies])
     self.assertTrue(RunTracker.post_stats('http://{}:{}/upload'.format(host, port), stats))
 
     server.shutdown()

@@ -8,7 +8,7 @@ import base64
 import os
 import threading
 
-from future.moves.http.server import BaseHTTPServer
+from future.moves.http.server import BaseHTTPRequestHandler, HTTPServer
 
 from pants.auth.basic_auth import BasicAuth, BasicAuthCreds
 from pants.auth.cookies import Cookies
@@ -16,7 +16,7 @@ from pants.util.contextutil import environment_as, temporary_dir
 from pants_test.test_base import TestBase
 
 
-class RequestHandlerForTest(BaseHTTPServer.BaseHTTPRequestHandler):
+class RequestHandlerForTest(BaseHTTPRequestHandler):
   def do_GET(self):
     auth_header = self.headers.get('Authorization')
     assert auth_header is not None
@@ -31,7 +31,7 @@ class RequestHandlerForTest(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
 def _run_test_server():
-  httpd = BaseHTTPServer.HTTPServer(('localhost', 0), RequestHandlerForTest)
+  httpd = HTTPServer(('localhost', 0), RequestHandlerForTest)
   thread = threading.Thread(target=httpd.serve_forever)
   thread.daemon = True
   thread.start()

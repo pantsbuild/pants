@@ -62,7 +62,7 @@ class RunTracker(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (StatsDBFactory, Cookies)
+    return super(RunTracker, cls).subsystem_dependencies() + (StatsDBFactory, Cookies)
 
   @classmethod
   def register_options(cls, register):
