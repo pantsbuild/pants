@@ -448,7 +448,7 @@ class RscCompile(ZincCompile):
 
         def add_for_target(self, *args, **kwargs):
           self.runtime_classpath_product.add_for_target(*args, **kwargs)
-          self.rsc_classpath.add_for_target(*args, **kwargs)
+          self.rsc_classpath_product.add_for_target(*args, **kwargs)
 
       full_key = self._compile_against_rsc_key_for_target(compile_target)
       zinc_jobs.append(
@@ -549,7 +549,7 @@ class RscCompile(ZincCompile):
           timeout_seconds=15*60,
           description='run {} for {}'.format(tool_name, tgt)
         )
-        res = self.context.execute_process_synchronously(
+        res = self.context.execute_process_synchronously_without_raising(
           epr,
           self.name(),
           [WorkUnitLabel.TOOL])
