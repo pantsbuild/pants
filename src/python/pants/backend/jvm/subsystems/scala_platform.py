@@ -140,7 +140,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
   def _tool_classpath(self, tool, products, scheduler):
     """Return the proper classpath based on products and scala version."""
     classpath = self.tool_classpath_from_products(products,
-                                                  self._key_for_tool_version(tool, self.version),
+                                                  self.versioned_tool_name(tool, self.version),
                                                   scope=self.options_scope)
     classpath = tuple(fast_relpath(c, get_buildroot()) for c in classpath)
 
