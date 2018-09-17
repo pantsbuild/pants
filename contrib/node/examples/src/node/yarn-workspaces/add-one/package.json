@@ -1,0 +1,15 @@
+{
+  "name": "add-one",
+  "version": "1.0.0",
+  "description": "Pantsbuild framework library for Node.js apps",
+  "main": "index.js",
+  "author": "pantsbuild",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "numeral": "^2.0.6"
+  }
+}

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import re
 import shutil
 from abc import abstractmethod
 
@@ -35,3 +36,21 @@ class NodeResolverBase(AbstractClass):
       dest = os.path.join(results_dir, os.path.relpath(source, source_relative_to))
       safe_mkdir(os.path.dirname(dest))
       shutil.copyfile(os.path.join(buildroot, source), dest)
+
+  def _get_target_from_package_name(self, target, package_name, file_path):
+    """Get a target from its dependency tree given a package name and relative file path
+
+    Returns `None` if the target does not exist.
+
+    :param NodePackage target: A subclass of NodePackage
+    :param string package_name: A package.json name that is required to be the same as the target name
+    :param string file_path: Relative filepath from target to the package in the format 'file:<address_path>'
+    """
+    pattern = re.compile('^file:(.*)$')
+    address_path = pattern.match(file_path).group(1)
+
+    dep_spec_path = os.path.normpath(os.path.join(target.address.spec_path, address_path))
+    for dep in target.dependencies:
+      if dep.package_name == package_name and dep.address.spec_path == dep_spec_path:
+        return dep
+    return None

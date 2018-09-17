@@ -9,6 +9,7 @@ import os
 import random
 import shutil
 from builtins import open
+from contextlib import contextmanager
 from uuid import uuid4
 
 from pants.util.contextutil import temporary_file
@@ -20,6 +21,16 @@ def atomic_copy(src, dst):
     shutil.copyfile(src, tmp_dst.name)
     os.chmod(tmp_dst.name, os.stat(src).st_mode)
     os.rename(tmp_dst.name, dst)
+
+
+@contextmanager
+def safe_temp_edit(filename):
+  with temporary_file() as tmp_file:
+    try:
+      shutil.copyfile(filename, tmp_file.name)
+      yield filename
+    finally:
+      shutil.copyfile(tmp_file.name, filename)
 
 
 def create_size_estimators():
