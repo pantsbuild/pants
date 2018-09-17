@@ -8,6 +8,7 @@ python_library(
     '3rdparty/python:packaging',
     '3rdparty/python:setuptools',
     ':templates',
+    'src/python/pants/auth',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',

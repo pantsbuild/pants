@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.payload import Payload
+from pants.base.payload_field import PrimitivesSetField
 from pants.build_graph.target import Target
 
 from pants.contrib.go.targets.go_local_source import GoLocalSource
@@ -20,6 +21,7 @@ class GoProtobufLibrary(Target):
                address=None,
                payload=None,
                sources=None,
+               protoc_plugins=None,
                **kwargs):
     """
     :param sources: protobuf source files
@@ -29,15 +31,26 @@ class GoProtobufLibrary(Target):
     payload = payload or Payload()
     payload.add_field('sources',
                       self.create_sources_field(sources, address.spec_path, key_arg='sources'))
+    payload.add_field('protoc_plugins',
+                      PrimitivesSetField(protoc_plugins or []))
 
     super(GoProtobufLibrary, self).__init__(payload=payload, address=address, **kwargs)
 
   @classmethod
   def alias(cls):
-    return "go_protobuf_library"
+    return 'go_protobuf_library'
+
+  @property
+  def protoc_plugins(self):
+    """The names of protoc plugins to use when generating code from this target.
+
+    :rtype: list of strings.
+    """
+    return self.payload.protoc_plugins
 
 
 class GoProtobufGenLibrary(GoTarget):
+  """A target encapsulating the generated .go sources."""
 
   def __init__(self, sources=None, address=None, payload=None, **kwargs):
     payload = payload or Payload()

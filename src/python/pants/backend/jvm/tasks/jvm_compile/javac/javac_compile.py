@@ -60,7 +60,7 @@ class JavacCompile(JvmCompile):
 
   @classmethod
   def get_fatal_warnings_enabled_args_default(cls):
-    return ('-Werror')
+    return ('-Werror',)
 
   @classmethod
   def get_fatal_warnings_disabled_args_default(cls):
@@ -222,7 +222,7 @@ class JavacCompile(JvmCompile):
       output_files=output_files,
       description='Compiling {} with javac'.format(ctx.target.address.spec),
     )
-    exec_result = self.context.execute_process_synchronously(
+    exec_result = self.context.execute_process_synchronously_without_raising(
       exec_process_request,
       'javac',
       (WorkUnitLabel.TASK, WorkUnitLabel.JVM),

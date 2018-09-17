@@ -74,6 +74,11 @@ page(
 )
 
 page(
+  name='login',
+  source='login.md'
+)
+
+page(
   name='pex',
   source='pex.md',
 )

@@ -33,14 +33,14 @@ class NativeCompileRequest(datatype([
 ])): pass
 
 
-# FIXME(#5950): perform all process execution in the v2 engine!
+# TODO(#5950): perform all process execution in the v2 engine!
 class ObjectFiles(datatype(['root_dir', 'filenames'])):
 
   def file_paths(self):
     return [os.path.join(self.root_dir, fname) for fname in self.filenames]
 
 
-# FIXME: this is a temporary hack -- we could introduce something like a "NativeRequirement" with
+# TODO: this is a temporary hack -- we could introduce something like a "NativeRequirement" with
 # dependencies, header, object file, library name (more?) instead of using multiple products.
 class NativeTargetDependencies(datatype(['native_deps'])): pass
 
@@ -160,7 +160,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
     # Unique file names are required because we just dump object files into a single directory, and
     # the compiler will silently just produce a single object file if provided non-unique filenames.
-    # FIXME: add some shading to file names so we can remove this check.
+    # TODO: add some shading to file names so we can remove this check.
     # NB: It shouldn't matter if header files have the same name, but this will raise an error in
     # that case as well. We won't need to do any shading of header file names.
     seen_filenames = defaultdict(list)
@@ -178,7 +178,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
     return [os.path.join(get_buildroot(), rel_root, src) for src in target_relative_sources]
 
-  # FIXME(#5951): expand `Executable` to cover argv generation (where an `Executable` is subclassed
+  # TODO(#5951): expand `Executable` to cover argv generation (where an `Executable` is subclassed
   # to modify or extend the argument list, as declaratively as possible) to remove
   # `extra_compile_args(self)`!
   @abstractmethod

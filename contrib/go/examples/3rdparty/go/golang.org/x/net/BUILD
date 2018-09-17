@@ -2,7 +2,7 @@
 # To re-generate run: `pants buildgen.go --materialize --remote`
 
 go_remote_libraries(
-  rev='release-branch.go1.6',
+  rev='release-branch.go1.8',
   packages=[
     'http2',
   ]

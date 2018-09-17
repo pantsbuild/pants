@@ -123,7 +123,7 @@ class LLVM(NativeTool):
       extra_args=[])
 
 
-# FIXME(#5663): use this over the XCode linker!
+# TODO(#5663): use this over the XCode linker!
 @rule(Linker, [Select(Platform), Select(LLVM)])
 def get_lld(platform, llvm):
   return llvm.linker(platform)

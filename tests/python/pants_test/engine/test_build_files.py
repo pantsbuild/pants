@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import re
 import unittest
 
 from pants.base.project_tree import Dir, File
@@ -39,28 +40,38 @@ class ParseAddressFamilyTest(unittest.TestCase):
 
 
 class AddressesFromAddressFamiliesTest(unittest.TestCase):
+
+  def _address_mapper(self):
+    return AddressMapper(JsonParser(TestTable()))
+
+  def _snapshot(self):
+    return Snapshot(
+      DirectoryDigest('xx', 2),
+      (Path('root/BUILD', File('root/BUILD')),))
+
+  def _resolve_build_file_addresses(self, specs, address_family, snapshot, address_mapper):
+    return run_rule(addresses_from_address_families, address_mapper, specs, {
+      (Snapshot, PathGlobs): lambda _: snapshot,
+      (AddressFamily, Dir): lambda _: address_family,
+    })
+
   def test_duplicated(self):
     """Test that matching the same Spec twice succeeds."""
     address = SingleAddress('a', 'a')
-    address_mapper = AddressMapper(JsonParser(TestTable()))
     snapshot = Snapshot(DirectoryDigest('xx', 2),
                         (Path('a/BUILD', File('a/BUILD')),))
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
+    specs = Specs([address, address])
 
-    bfas = run_rule(addresses_from_address_families, address_mapper, Specs([address, address]), {
-        (Snapshot, PathGlobs): lambda _: snapshot,
-        (AddressFamily, Dir): lambda _: address_family,
-      })
+    bfas = self._resolve_build_file_addresses(
+      specs, address_family, snapshot, self._address_mapper())
 
     self.assertEqual(len(bfas.dependencies), 1)
     self.assertEqual(bfas.dependencies[0].spec, 'a:a')
 
   def test_tag_filter(self):
     """Test that targets are filtered based on `tags`."""
-    spec = SiblingAddresses('root')
-    address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot(DirectoryDigest('xx', 2),
-                        (Path('root/BUILD', File('root/BUILD')),))
+    specs = Specs([SiblingAddresses('root')], tags=['+integration'])
     address_family = AddressFamily('root',
       {'a': ('root/BUILD', TargetAdaptor()),
        'b': ('root/BUILD', TargetAdaptor(tags={'integration'})),
@@ -68,50 +79,57 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
       }
     )
 
-    targets = run_rule(
-      addresses_from_address_families, address_mapper, Specs([spec], tags=['+integration']), {
-      (Snapshot, PathGlobs): lambda _: snapshot,
-      (AddressFamily, Dir): lambda _: address_family,
-    })
+    targets = self._resolve_build_file_addresses(
+      specs, address_family, self._snapshot(), self._address_mapper())
 
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:b')
 
+  def test_fails_on_nonexistent_specs(self):
+    """Test that specs referring to nonexistent targets raise a ResolveError."""
+    address_family = AddressFamily('root', {'a': ('root/BUILD', TargetAdaptor())})
+    specs = Specs([SingleAddress('root', 'b'), SingleAddress('root', 'a')])
+
+    expected_rx_str = re.escape(
+      """"b" was not found in namespace "root". Did you mean one of:
+  :a""")
+    with self.assertRaisesRegexp(ResolveError, expected_rx_str):
+      self._resolve_build_file_addresses(
+        specs, address_family, self._snapshot(), self._address_mapper())
+
+    # Ensure that we still catch nonexistent targets later on in the list of command-line specs.
+    specs = Specs([SingleAddress('root', 'a'), SingleAddress('root', 'b')])
+    with self.assertRaisesRegexp(ResolveError, expected_rx_str):
+      self._resolve_build_file_addresses(
+        specs, address_family, self._snapshot(), self._address_mapper())
+
   def test_exclude_pattern(self):
     """Test that targets are filtered based on exclude patterns."""
-    spec = SiblingAddresses('root')
-    address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot(DirectoryDigest('xx', 2),
-                        (Path('root/BUILD', File('root/BUILD')),))
+    specs = Specs([SiblingAddresses('root')], exclude_patterns=tuple(['.exclude*']))
     address_family = AddressFamily('root',
-      {'exclude_me': ('root/BUILD', TargetAdaptor()),
-       'not_me': ('root/BUILD', TargetAdaptor()),
-      }
+                                   {'exclude_me': ('root/BUILD', TargetAdaptor()),
+                                    'not_me': ('root/BUILD', TargetAdaptor()),
+                                   }
     )
-    targets = run_rule(
-      addresses_from_address_families, address_mapper, Specs([spec], exclude_patterns=tuple(['.exclude*'])),{
-      (Snapshot, PathGlobs): lambda _: snapshot,
-      (AddressFamily, Dir): lambda _: address_family,
-    })
+
+    targets = self._resolve_build_file_addresses(
+      specs, address_family, self._snapshot(), self._address_mapper())
+
     self.assertEqual(len(targets.dependencies), 1)
     self.assertEqual(targets.dependencies[0].spec, 'root:not_me')
 
   def test_exclude_pattern_with_single_address(self):
     """Test that single address targets are filtered based on exclude patterns."""
-    spec = SingleAddress('root', 'not_me')
-    address_mapper = AddressMapper(JsonParser(TestTable()))
-    snapshot = Snapshot(DirectoryDigest('xx', 2),
-                        (Path('root/BUILD', File('root/BUILD')),))
+    specs = Specs([SingleAddress('root', 'not_me')], exclude_patterns=tuple(['root.*']))
     address_family = AddressFamily('root',
-      {
-       'not_me': ('root/BUILD', TargetAdaptor()),
-      }
+                                   {
+                                     'not_me': ('root/BUILD', TargetAdaptor()),
+                                   }
     )
-    targets = run_rule(
-      addresses_from_address_families, address_mapper, Specs([spec], exclude_patterns=tuple(['root.*'])),{
-      (Snapshot, PathGlobs): lambda _: snapshot,
-      (AddressFamily, Dir): lambda _: address_family,
-    })
+
+    targets = self._resolve_build_file_addresses(
+      specs, address_family, self._snapshot(), self._address_mapper())
+
     self.assertEqual(len(targets.dependencies), 0)
 
 

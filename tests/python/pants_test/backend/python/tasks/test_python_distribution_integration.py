@@ -13,7 +13,6 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import is_executable
 from pants.util.process_handler import subprocess
-from pants.version import VERSION as pants_version
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -24,7 +23,6 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
   fasthello_tests = 'examples/tests/python/example/python_distribution/hello/test_fasthello'
   fasthello_install_requires_dir = 'testprojects/src/python/python_distribution/fasthello_with_install_requires'
   hello_setup_requires = 'examples/src/python/example/python_distribution/hello/setup_requires'
-  pants_setup_requires = 'examples/src/python/example/python_distribution/hello/pants_setup_requires'
 
   def _assert_native_greeting(self, output):
     self.assertIn('Hello from C!', output)
@@ -213,12 +211,3 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       # Check that the pex runs.
       output = subprocess.check_output(pex).decode('utf-8')
       self.assertEqual('Hello, world!\n', output)
-
-  def test_pants_requirement_setup_requires_version(self):
-    """Ensure that a pants_requirement() can be successfully used in setup_requires."""
-    pants_run = self.run_pants(['-q', 'run', '{}:bin'.format(self.pants_setup_requires)])
-    self.assert_success(pants_run)
-    # This testproject prints its own version string here, which is the current pants version plus
-    # the pants fingerprint (as defined in this project's setup.py).
-    self.assertRegexpMatches(pants_run.stdout_data,
-                             r'\A{}\+([a-z0-9\.])+\n\Z'.format(re.escape(pants_version)))
