@@ -887,7 +887,7 @@ class Target(AbstractTarget):
         # Received a literal sources list: convert to a FilesetWithSpec via Files.
         deprecated_conditional(
           lambda: True,
-          '1.12.0.dev0',
+          '1.11.0.dev0',
           ('Passing collections as the value of the sources argument to create_sources_field is '
            'deprecated, and now takes a slow path. Instead, class {} should have its sources '
            'argument populated by the engine, either by using the standard parsing pipeline, or by '
