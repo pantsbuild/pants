@@ -4,6 +4,22 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.10.0rc1 (09/17/2018)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix encoding of workunits under pantsd (#6505)
+  `PR #6505 <https://github.com/pantsbuild/pants/pull/6505>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix formatting in notes (#6482)
+  `PR #6482 <https://github.com/pantsbuild/pants/pull/6482>`_
+
+
 1.10.0rc0 (09/10/2018)
 ----------------------
 
