@@ -8,7 +8,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 # TODO: These tests duplicate the unit tests in `test_paths.py`, and should be removed in
-# their favor once #4401 lands and allows unit tests to cover the v2 engine.
+# their favor. However, they also surface some errors which the unit tests don't -- see #6480.
 class PathsIntegrationTest(PantsRunIntegrationTest):
   def test_paths_single(self):
     pants_run = self.run_pants(['paths',

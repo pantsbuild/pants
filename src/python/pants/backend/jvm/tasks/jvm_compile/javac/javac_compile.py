@@ -39,6 +39,7 @@ class JavacCompile(JvmCompile):
   """Compile Java code using Javac."""
 
   _name = 'java'
+  compiler_name = 'javac'
 
   @staticmethod
   def _write_javac_plugin_info(resources_dir, javac_plugin_target):
@@ -112,10 +113,6 @@ class JavacCompile(JvmCompile):
     with safe_open(processor_info_file, 'w') as f:
       for processor in processors:
         f.write('{}\n'.format(processor.strip()))
-
-  def execute(self):
-    if JvmPlatform.global_instance().get_options().compiler == 'javac':
-      return super(JavacCompile, self).execute()
 
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, fatal_warnings, zinc_file_manager,

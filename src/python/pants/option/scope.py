@@ -11,7 +11,7 @@ GLOBAL_SCOPE = ''
 GLOBAL_SCOPE_CONFIG_SECTION = 'GLOBAL'
 
 
-# FIXME: convert this to a datatype?
+# TODO: convert this to a datatype?
 class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls'])):
   """Information about a scope."""
 

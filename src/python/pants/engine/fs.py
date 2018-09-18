@@ -124,8 +124,7 @@ class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest',
 FilesContent = Collection.of(FileContent)
 
 
-# TODO(cosmicexplorer): don't recreate this in python, get this from
-# fs::EMPTY_DIGEST somehow.
+# TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.
 _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 
 

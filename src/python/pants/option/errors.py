@@ -50,4 +50,4 @@ OptionNameDash = mk_registration_error('Option name must begin with a dash.')
 OptionNameDoubleDash = mk_registration_error('Long option name must begin with a double-dash.')
 RecursiveSubsystemOption = mk_registration_error("Subsystem option cannot specify 'recursive'. "
                                                  "Subsystem options are always recursive.")
-Shadowing = mk_registration_error('Option shadows an option in scope {outer_scope}')
+Shadowing = mk_registration_error('Option shadows an option in {outer_scope}')

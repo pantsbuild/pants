@@ -133,7 +133,7 @@ if [[ "${python_three:-false}" == "true" ]]; then
   # TODO(John Sirois): Allow `<4` when the issues with `3.7` are fixed. See:
   #   https://github.com/pantsbuild/pants/issues/6363
   export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.4,<3.7"]'
-  # FIXME: Clear interpreters, otherwise this constraint does not end up applying due to a cache
+  # TODO: Clear interpreters, otherwise this constraint does not end up applying due to a cache
   # bug between the `./pants binary` and further runs.
   ./pants.pex clean-all
 fi

@@ -32,7 +32,7 @@ class ExternalUrlGenerator(BinaryToolUrlGenerator):
     return 'ExternalUrlGenerator(<example __str__()>)'
 
 
-# TODO(cosmicexplorer): test requests with an archiver!
+# TODO: test requests with an archiver!
 class BinaryUtilTest(TestBase):
   """Tests binary_util's binaries_baseurls handling."""
 

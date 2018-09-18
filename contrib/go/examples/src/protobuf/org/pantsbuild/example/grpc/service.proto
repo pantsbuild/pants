@@ -1,0 +1,21 @@
+// Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+syntax = "proto3";
+
+package org.pantsbuild.example.grpc;
+
+option go_package = "pantsbuild/example/grpc";
+
+
+message SnowReportRequest {
+  string zipcode = 1;
+}
+
+message SnowReportReply {
+  bool has_snow = 1;
+}
+
+service SnowReport {
+  rpc Report (SnowReportRequest) returns (SnowReportReply) {}
+}

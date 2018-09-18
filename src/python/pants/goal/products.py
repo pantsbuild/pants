@@ -64,7 +64,7 @@ class UnionProducts(object):
 
     :API: public
     """
-    # FIXME: This is a temporary helper for use until the classpath has been split.
+    # TODO: This is a temporary helper for use until the classpath has been split.
     for target in targets:
       self.add_for_target(target, products)
 

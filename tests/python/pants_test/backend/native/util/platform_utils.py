@@ -14,7 +14,7 @@ def platform_specific(normalized_os_name):
 
   def decorator(test_fn):
     def wrapper(self, *args, **kwargs):
-      # FIXME: This should be drawn from the v2 engine somehow.
+      # TODO: This should be drawn from the v2 engine somehow.
       platform = Platform.create()
 
       if platform.normalized_os_name == normalized_os_name:
