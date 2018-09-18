@@ -206,9 +206,15 @@ class Zinc(object):
         os.path.join(self._zinc_factory.get_options().pants_workdir, '.jdk'),
         get_buildroot())
 
-      if os.path.exists(jdk_home_symlink):
+      # Create the symlink if it does not exist
+      if not os.path.exists(jdk_home_symlink):
+        os.symlink(underlying_dist.home, jdk_home_symlink)
+      # Recreate if the symlink exists but does not match `underlying_dist.home`.
+      elif os.readlink(jdk_home_symlink) != underlying_dist.home:
+        print("removing {}".format(jdk_home_symlink))
         os.remove(jdk_home_symlink)
-      os.symlink(underlying_dist.home, jdk_home_symlink)
+        os.symlink(underlying_dist.home, jdk_home_symlink)
+
       return Distribution(home_path=jdk_home_symlink)
     else:
       return underlying_dist
