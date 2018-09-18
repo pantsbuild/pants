@@ -731,7 +731,6 @@ class JvmCompile(NailgunTaskBase):
                             zinc_file_manager,
                             counter)
 
-        # This might be missing the analysis file?
         ctx.classes_dir = ClasspathEntry(ctx.classes_dir.path, directory_digest)
 
         self._record_target_stats(tgt,
