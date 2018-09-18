@@ -845,9 +845,6 @@ class JvmCompile(NailgunTaskBase):
     # Double check the cache before beginning compilation
     hit_cache = self.check_cache(vts, counter)
 
-    # TODO: Load from store when https://github.com/pantsbuild/pants/issues/6429 is complete.
-    directory_digest = None
-
     if not hit_cache:
       # Compute the compile classpath for this target.
       dependency_cp_entries = self._zinc.compile_classpath_entries(
@@ -863,7 +860,7 @@ class JvmCompile(NailgunTaskBase):
         # Purge existing analysis file in non-incremental mode.
         safe_delete(ctx.analysis_file)
         # Work around https://github.com/pantsbuild/pants/issues/3670
-        safe_rmtree(ctx.classes_dir)
+        safe_rmtree(ctx.classes_dir.path)
 
       dep_context = DependencyContext.global_instance()
       tgt, = vts.targets
@@ -879,6 +876,9 @@ class JvmCompile(NailgunTaskBase):
                           compiler_option_sets,
                           zinc_file_manager,
                           counter)
+
+      ctx.classes_dir = ClasspathEntry(ctx.classes_dir.path, directory_digest)
+
       self._record_target_stats(tgt,
                                 len(dependency_cp_entries),
                                 len(ctx.sources),
@@ -895,6 +895,6 @@ class JvmCompile(NailgunTaskBase):
     # Update the products with the latest classes.
     output_classpath_product.add_for_target(
       ctx.target,
-      [(conf, self._classpath_for_context(ctx), directory_digest) for conf in self._confs],
+      [(conf, self._classpath_for_context(ctx)) for conf in self._confs],
     )
     self.register_extra_products_from_contexts([ctx.target], all_compile_contexts)
