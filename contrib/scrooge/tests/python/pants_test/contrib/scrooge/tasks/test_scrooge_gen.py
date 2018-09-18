@@ -133,7 +133,6 @@ class ScroogeGenTest(NailgunTaskTestBase):
       self.assertEqual(call_kwargs['provides'], None)
       self.assertEqual(call_kwargs['derived_from'], target)
       self.assertEqual(call_kwargs['strict_deps'], True)
-      self.assertEqual(call_kwargs['fatal_warnings'], False)
 
       sources = call_kwargs['sources']
       self.assertEqual(sources.files, ())
