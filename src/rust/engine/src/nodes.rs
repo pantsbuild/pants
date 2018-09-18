@@ -910,10 +910,11 @@ impl Node for NodeKey {
         typstr(&s.selector.product)
       ),
       &NodeKey::Task(ref s) => format!(
-        "Task({}, {}, {})",
+        "Task({}, {}, {}, {})",
         externs::project_str(&externs::val_for(&s.task.func.0), "__name__"),
         keystr(&s.params.expect_single()),
-        typstr(&s.product)
+        typstr(&s.product),
+        s.task.cacheable,
       ),
       &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
     }
@@ -927,6 +928,13 @@ impl Node for NodeKey {
       | NodeResult::ProcessResult(_)
       | NodeResult::Snapshot(_)
       | NodeResult::Value(_) => None,
+    }
+  }
+
+  fn cacheable(&self) -> bool {
+    match self {
+      &NodeKey::Task(ref s) => s.task.cacheable,
+      _ => false,
     }
   }
 }

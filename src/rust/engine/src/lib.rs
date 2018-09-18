@@ -458,9 +458,10 @@ pub extern "C" fn tasks_task_begin(
   tasks_ptr: *mut Tasks,
   func: Function,
   output_type: TypeConstraint,
+  cacheable: bool,
 ) {
   with_tasks(tasks_ptr, |tasks| {
-    tasks.task_begin(func, output_type);
+    tasks.task_begin(func, output_type, cacheable);
   })
 }
 
