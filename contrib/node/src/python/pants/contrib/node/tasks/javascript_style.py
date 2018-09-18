@@ -132,7 +132,7 @@ class JavascriptStyleBase(NodeTask):
     if ignore_patterns:
       # Wrap ignore-patterns in quotes to avoid conflict with shell glob pattern
       args.extend([arg for ignore_args in ignore_patterns
-                   for arg in ['--ignore-pattern', '"{}"'.format(ignore_args)]])
+                   for arg in ['--ignore-pattern', '{}'.format(ignore_args)]])
     if other_args:
       args.extend(other_args)
     args.extend(files)
