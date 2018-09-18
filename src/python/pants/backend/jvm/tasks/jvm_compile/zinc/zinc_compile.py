@@ -590,6 +590,8 @@ class BaseZincCompile(JvmCompile):
 class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code to classfiles using Zinc."""
 
+  compiler_name = 'zinc'
+
   @classmethod
   def product_types(cls):
     return ['runtime_classpath', 'zinc_analysis', 'zinc_args']
@@ -603,7 +605,3 @@ class ZincCompile(BaseZincCompile):
 
   def select_source(self, source_file_path):
     return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
-
-  def execute(self):
-    if JvmPlatform.global_instance().get_options().compiler == 'zinc':
-      return super(ZincCompile, self).execute()
