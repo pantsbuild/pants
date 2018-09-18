@@ -225,7 +225,7 @@ class Scheduler(object):
   def _register_task(self, output_constraint, rule):
     """Register the given TaskRule with the native scheduler."""
     func = Function(self._to_key(rule.func))
-    self._native.lib.tasks_task_begin(self._tasks, func, output_constraint)
+    self._native.lib.tasks_task_begin(self._tasks, func, output_constraint, rule.cacheable)
     for selector in rule.input_selectors:
       selector_type = type(selector)
       product_constraint = self._to_constraint(selector.product)
