@@ -3,6 +3,11 @@
 
 This document describes releases leading up to the ``1.9.x`` ``stable`` series.
 
+1.9.0 (09/17/2018)
+------------------
+
+The first stable release of the 1.9.x series, with no changes since `rc3`.
+
 1.9.0rc3 (09/10/2018)
 ---------------------
 
