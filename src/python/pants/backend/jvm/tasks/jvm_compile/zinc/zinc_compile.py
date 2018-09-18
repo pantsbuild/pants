@@ -209,6 +209,11 @@ class BaseZincCompile(JvmCompile):
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args,
                                    self._args)
     if self.execution_strategy == self.HERMETIC:
+      # TODO: Make incremental compiles work. See:
+      # hermetically https://github.com/pantsbuild/pants/issues/6517
+      if self.get_options().incremental:
+        raise TaskError("Hermetic zinc execution does not currently support incremental compiles. "
+                        "Please use --no-compile-zinc-incremental.")
       try:
         fast_relpath(self.get_options().pants_workdir, get_buildroot())
       except ValueError:
@@ -431,7 +436,6 @@ class BaseZincCompile(JvmCompile):
       req = ExecuteProcessRequest(
         argv=argv,
         input_files=merged_input_digest,
-        output_files=(analysis_cache,),
         output_directories=(classes_dir,),
         description="zinc compile for {}".format(ctx.target.address.spec),
         # TODO: These should always be unicodes

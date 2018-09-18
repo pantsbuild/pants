@@ -388,8 +388,6 @@ class JvmCompile(NailgunTaskBase):
         classpath_product,
       )
 
-      # TODO: Pass around DirectoryDigests in these ClasspathEntries
-      # See https://github.com/pantsbuild/pants/issues/6429
       if not self.get_options().use_classpath_jars:
         # Once compilation has completed, replace the classpath entry for each target with
         # its jar'd representation.
@@ -420,13 +418,11 @@ class JvmCompile(NailgunTaskBase):
     invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
     valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
 
+    if self.execution_strategy == self.HERMETIC:
+      self._set_direcotry_digests_for_valid_target_classpath_directories(valid_targets, compile_contexts)
+
     for valid_target in valid_targets:
       cc = self.select_runtime_context(compile_contexts[valid_target])
-
-      if self.execution_strategy == self.HERMETIC:
-        new_classpath_entry = ClasspathEntry(cc.classes_dir.path,
-          self._get_directory_digest_of_dependencies(cc))
-        cc.classes_dir = new_classpath_entry
 
       classpath_product.add_for_target(
         valid_target,
@@ -473,14 +469,23 @@ class JvmCompile(NailgunTaskBase):
     with open(path, 'w') as f:
       f.write(text)
 
-  def _get_directory_digest_of_dependencies(self, compile_context):
-    relative_classes_dir = fast_relpath(compile_context.classes_dir.path, get_buildroot())
-    relative_analysis_file = fast_relpath(compile_context.analysis_file, get_buildroot())
-    snapshot = self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
-        PathGlobs(tuple([relative_classes_dir + '/**', relative_analysis_file])),
-        get_buildroot(),
-      ),))[0]
-    return snapshot.directory_digest
+  def _set_direcotry_digests_for_valid_target_classpath_directories(self, valid_targets, compile_contexts):
+    snapshots = self.context._scheduler.capture_snapshots(
+      tuple(PathGlobsAndRoot(PathGlobs(
+        [self._get_relative_classes_dir_from_target(target, compile_contexts)]
+      ), get_buildroot()) for target in valid_targets))
+    [self._set_direcotry_digest_for_compile_context(
+      snapshot.directory_digest, target, compile_contexts)
+      for target, snapshot in list(zip(valid_targets, snapshots))]
+
+  def _get_relative_classes_dir_from_target(self, target, compile_contexts):
+    cc = self.select_runtime_context(compile_contexts[target])
+    return fast_relpath(cc.classes_dir.path, get_buildroot()) + '/**'
+
+  def _set_direcotry_digest_for_compile_context(self, directory_digest, target, compile_contexts):
+    cc = self.select_runtime_context(compile_contexts[target])
+    new_classpath_entry = ClasspathEntry(cc.classes_dir.path, directory_digest)
+    cc.classes_dir = new_classpath_entry
 
   def _compile_vts(self, vts, ctx, upstream_analysis, dependency_classpath, progress_message, settings,
                    compiler_option_sets, zinc_file_manager, counter):

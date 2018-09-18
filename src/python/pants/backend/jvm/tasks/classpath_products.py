@@ -187,7 +187,8 @@ class ClasspathProducts(object):
     """Adds classpath path elements to the products of the provided target.
 
     :param target: The target for which to add the classpath elements.
-    :param classpath_elements: List of strings or pants.backend.jvm.tasks.ClasspathEntry
+    :param classpath_elements: List of tuples, either (conf, filename) or
+                               (conf, pants.backend.jvm.tasks.ClasspathEntry)
     """
     self._add_elements_for_target(target, self._wrap_path_elements(classpath_elements))
 
@@ -219,7 +220,10 @@ class ClasspathProducts(object):
 
   def remove_for_target(self, target, classpath_elements):
     """Removes the given entries for the target."""
-    self._classpaths.remove_for_target(target, self._wrap_path_elements(classpath_elements))
+    products_to_remove = []
+    for element in self._wrap_path_elements(classpath_elements):
+      products_to_remove.append((element[0], element[1].path))
+    self._classpaths.remove_for_target(target, products_to_remove)
 
   def get_for_target(self, target):
     """Gets the classpath products for the given target.
@@ -335,6 +339,8 @@ class ClasspathProducts(object):
   def _wrap_path_elements(self, classpath_elements):
     wrapped_path_elements = []
     for element in classpath_elements:
+      if len(element) != 2:
+        raise ValueError('Input must be a list of tuples containing two elements.')
       if isinstance(element[1], ClasspathEntry):
         wrapped_path_elements.append(element)
       else:
