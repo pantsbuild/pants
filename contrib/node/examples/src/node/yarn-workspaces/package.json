@@ -14,7 +14,6 @@
   },
   "scripts": {
     "test-adder": "cd ./adder && yarnpkg start",
-    "test-add-one": "cd ./add-one && yarnpkg start",
     "test-add-two": "cd ./add-two && yarnpkg test"
   }
 }

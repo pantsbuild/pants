@@ -15,14 +15,6 @@ node_test(
 )
 
 node_test(
-  name='test-add-one',
-  script_name='test-add-one',
-  dependencies=[
-    ':yarn-workspaces'
-  ]
-)
-
-node_test(
   name='test-add-two',
   script_name='test-add-two',
   dependencies=[
