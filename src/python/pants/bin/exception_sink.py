@@ -8,10 +8,15 @@ import datetime
 from builtins import object
 
 from pants.util.dirutil import is_writable_dir
+from pants.util.memo import memoized_classproperty
 
 
 class ExceptionSink(object):
-  """A mutable object representing where exceptions should be logged to."""
+  """A mutable singleton object representing where exceptions should be logged to."""
+
+  @memoized_classproperty
+  def instance(cls):
+    return cls()
 
   def __init__(self):
     self._cached_destination = None
