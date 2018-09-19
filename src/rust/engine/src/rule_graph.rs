@@ -804,11 +804,18 @@ pub fn type_str(type_id: TypeId) -> String {
 }
 
 pub fn params_str(params: &ParamTypes) -> String {
-  params
-    .iter()
-    .map(|type_id| type_str(*type_id))
-    .collect::<Vec<_>>()
-    .join("+")
+  match params.len() {
+    0 => "()".to_string(),
+    1 => type_str(*params.iter().next().unwrap()),
+    _ => format!(
+      "({})",
+      params
+        .iter()
+        .map(|type_id| type_str(*type_id))
+        .collect::<Vec<_>>()
+        .join("+")
+    ),
+  }
 }
 
 fn val_name(val: &Value) -> String {
@@ -854,10 +861,7 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
     &EntryWithDeps::Inner(InnerEntry {
       rule: Rule::Task(ref task_rule),
       ref params,
-    }) => {
-      // TODO: `for`, not `of`
-      format!("{} of {}", task_display(task_rule), params_str(params))
-    }
+    }) => format!("{} for {}", task_display(task_rule), params_str(params)),
     &EntryWithDeps::Inner(InnerEntry {
       rule: Rule::Intrinsic(ref intrinsic),
       ref params,
@@ -889,11 +893,7 @@ fn task_display(task: &Task) -> String {
     .map(|c| select_str(c))
     .collect::<Vec<_>>()
     .join(", ");
-  clause_portion = if task.clause.len() <= 1 {
-    format!("({},)", clause_portion)
-  } else {
-    format!("({})", clause_portion)
-  };
+  clause_portion = format!("[{}]", clause_portion);
   let mut get_portion = task
     .gets
     .iter()
@@ -1059,15 +1059,18 @@ impl RuleGraph {
       .rule_dependency_edges
       .iter()
       .filter_map(|(k, deps)| match k {
-        &EntryWithDeps::Inner(_) => Some(format!(
-          "    \"{}\" -> {{{}}}",
-          entry_with_deps_str(k),
-          deps
+        &EntryWithDeps::Inner(_) => {
+          let mut deps_strs = deps
             .all_dependencies()
             .map(|d| format!("\"{}\"", entry_str(d)))
-            .collect::<Vec<String>>()
-            .join(" ")
-        )),
+            .collect::<Vec<String>>();
+          deps_strs.sort();
+          Some(format!(
+            "    \"{}\" -> {{{}}}",
+            entry_with_deps_str(k),
+            deps_strs.join(" ")
+          ))
+        }
         _ => None,
       })
       .collect::<Vec<String>>();
