@@ -11,8 +11,6 @@ pub struct Types {
   pub construct_link: Function,
   pub construct_process_result: Function,
   pub address: TypeConstraint,
-  pub has_products: TypeConstraint,
-  pub has_variants: TypeConstraint,
   pub path_globs: TypeConstraint,
   pub directory_digest: TypeConstraint,
   pub snapshot: TypeConstraint,

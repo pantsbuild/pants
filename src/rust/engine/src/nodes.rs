@@ -133,26 +133,16 @@ impl Select {
   }
 
   ///
-  /// Looks for has-a or is-a relationships between the given value and the requested product.
+  /// Looks for an is-a relationship between the given value and the requested product.
   ///
-  /// Returns the resulting product Value for success, or the original Value for failure.
+  /// Returns the original product Value for either success or failure.
   ///
-  fn select_literal(&self, context: &Context, candidate: Value) -> Result<Value, Value> {
-    // Check whether the subject is-a instance of the product.
+  fn select_literal(&self, candidate: Value) -> Result<Value, Value> {
     if externs::satisfied_by(&self.selector.product, &candidate) {
-      return Ok(candidate);
+      Ok(candidate)
+    } else {
+      Err(candidate)
     }
-
-    // Else, check whether it has-a instance of the product.
-    // TODO: returning only the first item of a particular type.
-    if externs::satisfied_by(&context.core.types.has_products, &candidate) {
-      for child in externs::project_multi(&candidate, "products") {
-        if externs::satisfied_by(&self.selector.product, &child) {
-          return Ok(child);
-        }
-      }
-    }
-    Err(candidate)
   }
 
   fn snapshot(
@@ -307,8 +297,7 @@ impl WrappedNode for Select {
 
   fn run(self, context: Context) -> NodeFuture<Value> {
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Ok(value) = self.select_literal(&context, externs::val_for(self.params.expect_single()))
-    {
+    if let Ok(value) = self.select_literal(externs::val_for(self.params.expect_single())) {
       return ok(value);
     }
 
@@ -316,7 +305,7 @@ impl WrappedNode for Select {
     self
       .gen_node(&context)
       .and_then(move |value| {
-        self.select_literal(&context, value).map_err(|value| {
+        self.select_literal(value).map_err(|value| {
           throw(&format!(
             "{} returned a result value that did not satisfy its constraints: {:?}",
             rule_graph::entry_str(&self.entry),

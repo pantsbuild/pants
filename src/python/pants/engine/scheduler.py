@@ -21,10 +21,9 @@ from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Select, constraint_for
-from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
-from pants.util.objects import Collection, SubclassesOf, datatype
+from pants.util.objects import Collection, datatype
 from pants.util.strutil import pluralize
 
 
@@ -103,9 +102,6 @@ class Scheduler(object):
     self._native = native
     self.include_trace_on_error = include_trace_on_error
 
-    # TODO: The only (?) case where we use inheritance rather than exact type unions.
-    has_products_constraint = SubclassesOf(HasProducts)
-
     # Validate and register all provided and intrinsic tasks.
     rule_index = RuleIndex.create(list(rules))
     self._root_subject_types = sorted(rule_index.roots, key=repr)
@@ -132,9 +128,7 @@ class Scheduler(object):
       construct_file=File,
       construct_link=Link,
       construct_process_result=FallibleExecuteProcessResult,
-      constraint_has_products=has_products_constraint,
       constraint_address=constraint_for(Address),
-      constraint_variants=constraint_for(Variants),
       constraint_path_globs=constraint_for(PathGlobs),
       constraint_directory_digest=constraint_for(DirectoryDigest),
       constraint_snapshot=constraint_for(Snapshot),
