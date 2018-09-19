@@ -11,6 +11,7 @@ use itertools::Itertools;
 use protobuf;
 use std::ffi::OsString;
 use std::fmt;
+use std::iter::Iterator;
 use std::path::PathBuf;
 use std::sync::Arc;
 use {File, PathStat, PosixFS, Store};
@@ -163,7 +164,7 @@ impl Snapshot {
     // `Directory` structure. Only `Dir+Dir` collisions are legal.
     let path_stats = {
       let mut uniq_paths: IndexMap<PathBuf, PathStat> = IndexMap::new();
-      for path_stat in Itertools::flatten(snapshots.iter().map(|s| s.path_stats.iter().cloned())) {
+      for path_stat in Iterator::flatten(snapshots.iter().map(|s| s.path_stats.iter().cloned())) {
         match uniq_paths.entry(path_stat.path().to_owned()) {
           indexmap::map::Entry::Occupied(e) => match (&path_stat, e.get()) {
             (&PathStat::Dir { .. }, &PathStat::Dir { .. }) => (),
@@ -221,7 +222,7 @@ impl Snapshot {
         let mut out_dir = bazel_protos::remote_execution::Directory::new();
 
         // Merge FileNodes.
-        let file_nodes = Itertools::flatten(
+        let file_nodes = Iterator::flatten(
           directories
             .iter_mut()
             .map(|directory| directory.take_files().into_iter()),
@@ -253,7 +254,7 @@ impl Snapshot {
 
         // Group and recurse for DirectoryNodes.
         let sorted_child_directories = {
-          let mut merged_directories = Itertools::flatten(
+          let mut merged_directories = Iterator::flatten(
             directories
               .iter_mut()
               .map(|directory| directory.take_directories().into_iter()),
