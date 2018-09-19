@@ -101,7 +101,6 @@ class NodeResolve(NodeTask):
                             topological_order=True,
                             invalidate_dependents=True) as invalidation_check:
         with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
-          # import pdb; pdb.set_trace()
           for vt in invalidation_check.all_vts:
             target = vt.target
             if not vt.valid:

@@ -20,7 +20,8 @@ class NodeModule(NodePackage):
 
   def __init__(
     self, package_manager=None, sources=None, build_script=None, output_dir='dist',
-    dev_dependency=False, style_ignore_path='.eslintignore', address=None, payload=None, **kwargs):
+    dev_dependency=False, style_ignore_path='.eslintignore', address=None, payload=None, 
+    bin_executables=None, **kwargs):
     """
     :param sources: Javascript and other source code files that make up this module; paths are
                     relative to the BUILD file's directory.
@@ -39,6 +40,9 @@ class NodeModule(NodePackage):
       this value to True.
     :param style_ignore_path: relative path to file specifying patterns of files to ignore. The syntax
       supported is the same as the .eslintignore/.gitignore syntax.
+    :param bin_executables: A map of executable names to local file name. If a single executable is
+                            specified (a string), the package name will be the executable name
+                            and the value will be the local file name per package.json rules.
     """
     # TODO(John Sirois): Support devDependencies, etc.  The devDependencies case is not
     # clear-cut since pants controlled builds would provide devDependencies as needed to perform
@@ -53,7 +57,8 @@ class NodeModule(NodePackage):
       'package_manager': PrimitiveField(package_manager),
       'output_dir': PrimitiveField(output_dir),
       'dev_dependency': PrimitiveField(dev_dependency),
-      'style_ignore_path': PrimitiveField(style_ignore_path)
+      'style_ignore_path': PrimitiveField(style_ignore_path),
+      'bin_executables': PrimitiveField(bin_executables)
     })
     super(NodeModule, self).__init__(address=address, payload=payload, **kwargs)
 

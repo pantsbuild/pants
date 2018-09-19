@@ -7,9 +7,12 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "mocha ./test/add-one-test.js"
   },
   "dependencies": {
+    "mocha": "^5.2.0",
     "numeral": "^2.0.6"
-  }
+  },
+  "bin": "cli.js"
 }
