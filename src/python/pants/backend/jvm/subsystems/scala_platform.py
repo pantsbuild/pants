@@ -9,15 +9,10 @@ from collections import namedtuple
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
-from pants.base.build_environment import get_buildroot
 from pants.build_graph.address import Address
 from pants.build_graph.injectables_mixin import InjectablesMixin
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import fast_relpath
-from pants.util.memo import memoized_method
 
 
 # full_version - the full scala version to use.
@@ -137,28 +132,17 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     register_custom_tool('scala-repl')
     register_custom_tool('scalastyle')
 
-  def _tool_classpath(self, tool, products, scheduler):
+  def _tool_classpath(self, tool, products):
     """Return the proper classpath based on products and scala version."""
-    classpath = self.tool_classpath_from_products(products,
-                                                  self.versioned_tool_name(tool, self.version),
-                                                  scope=self.options_scope)
-    classpath = tuple(fast_relpath(c, get_buildroot()) for c in classpath)
+    return self.tool_classpath_from_products(products,
+                                             self.versioned_tool_name(tool, self.version),
+                                             scope=self.options_scope)
 
-    return self._memoized_scalac_classpath(classpath, scheduler)
+  def compiler_classpath(self, products):
+    return self._tool_classpath('scalac', products)
 
-  @memoized_method
-  def _memoized_scalac_classpath(self, scala_path, scheduler):
-    snapshots = scheduler.capture_snapshots(tuple(PathGlobsAndRoot(PathGlobs([path]), get_buildroot()) for path in scala_path))
-    return [ClasspathEntry(path, snapshot) for path, snapshot in list(zip(scala_path, snapshots))]
-
-  def compiler_classpath_entries(self, products, scheduler):
-    """Returns classpath entries for the scalac tool."""
-    return self._tool_classpath('scalac', products, scheduler)
-
-  def style_classpath(self, products, scheduler):
-    """Returns classpath as paths for scalastyle."""
-    classpath_entries = self._tool_classpath('scalastyle', products, scheduler)
-    return [classpath_entry.path for classpath_entry in classpath_entries]
+  def style_classpath(self, products):
+    return self._tool_classpath('scalastyle', products)
 
   @property
   def version(self):
