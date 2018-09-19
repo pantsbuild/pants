@@ -2,6 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name='exception_sink',
+  sources=['test_exception_sink.py'],
+  dependencies=[
+    'src/python/pants/bin',
+  ],
+)
+
+python_tests(
   name='loader_integration',
   sources=['test_loader_integration.py'],
   dependencies=[

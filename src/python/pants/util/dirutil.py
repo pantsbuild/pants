@@ -535,5 +535,13 @@ def check_no_overlapping_paths(paths):
 
 
 def is_readable_dir(path):
-  """Returns whether a path names an existing directory that we can read."""
-  return os.path.isdir(path) and os.access(path, os.R_OK)
+  """Returns whether a path names an existing directory we can list and read files from."""
+  return os.path.isdir(path) and os.access(path, os.R_OK) and os.access(path, os.X_OK)
+
+
+def is_writable_dir(path):
+  """Returns whether a path names an existing directory that we can create and modify files in.
+
+  We call is_readable_dir(), so this definition of "writable" is a superset of that.
+  """
+  return is_readable_dir(path) and os.access(path, os.W_OK)
