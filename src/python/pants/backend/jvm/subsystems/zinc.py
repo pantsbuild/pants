@@ -49,12 +49,12 @@ class Zinc(object):
   class Factory(Subsystem, JvmToolMixin):
     options_scope = 'zinc'
 
-
     @classmethod
     def subsystem_dependencies(cls):
       return super(Zinc.Factory, cls).subsystem_dependencies() + (DependencyContext,
                                                                   Java,
                                                                   ScalaPlatform)
+
     @classmethod
     def register_options(cls, register):
       super(Zinc.Factory, cls).register_options(register)
