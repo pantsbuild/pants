@@ -220,10 +220,7 @@ class ClasspathProducts(object):
 
   def remove_for_target(self, target, classpath_elements):
     """Removes the given entries for the target."""
-    products_to_remove = []
-    for element in self._wrap_path_elements(classpath_elements):
-      products_to_remove.append((element[0], element[1].path))
-    self._classpaths.remove_for_target(target, products_to_remove)
+    self._classpaths.remove_for_target(target, self._wrap_path_elements(classpath_elements))
 
   def get_for_target(self, target):
     """Gets the classpath products for the given target.
