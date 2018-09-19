@@ -196,7 +196,7 @@ class Zinc(object):
     """
     return self._zinc_factory._zinc(self._products)
 
-  @property
+  @memoized_property
   def dist(self):
     """Return the `Distribution` selected for Zinc based on execution strategy.
 
