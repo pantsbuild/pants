@@ -16,17 +16,14 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
 
-  # TODO: Running this command a second time with the daemon will result in no output because
-  # of product caching. See #6146.
+  # TODO: This test is known to fail until we implement the last part of #6146.
   def test_v2_list(self):
     with self.pantsd_successful_run_context() as (runner, checker, workdir, pantsd_config):
       def run_list():
-        command = [
-          '--no-v1',
-          '--v2',
-          'list',
-          'testprojects/src/scala/org/pantsbuild/testproject/compilation_failure::',
-            ]
+        command = ['--no-v1',
+                   '--v2',
+                   'list',
+                   '::',]
 
         result = runner(command)
         checker.assert_started()

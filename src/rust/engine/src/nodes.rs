@@ -872,6 +872,7 @@ impl NodeKey {
   }
 }
 
+#[allow(dead_code)]
 impl Node for NodeKey {
   type Context = Context;
 
