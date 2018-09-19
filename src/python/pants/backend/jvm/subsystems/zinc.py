@@ -44,15 +44,17 @@ class Zinc(object):
   ZINC_BOOTSTRAPPER_TOOL_NAME = 'zinc-bootstrapper'
   ZINC_EXTRACTOR_TOOL_NAME = 'zinc-extractor'
 
+  _lock = Lock()
+
   class Factory(Subsystem, JvmToolMixin):
     options_scope = 'zinc'
+
 
     @classmethod
     def subsystem_dependencies(cls):
       return super(Zinc.Factory, cls).subsystem_dependencies() + (DependencyContext,
                                                                   Java,
                                                                   ScalaPlatform)
-
     @classmethod
     def register_options(cls, register):
       super(Zinc.Factory, cls).register_options(register)
@@ -209,7 +211,7 @@ class Zinc(object):
 
       # Since this code can be run in multi-threading mode due to multiple
       # zinc workers, we need to make sure the file operations below is atomic.
-      with Lock():
+      with self._lock:
         # Create the symlink if it does not exist
         if not os.path.exists(jdk_home_symlink):
           os.symlink(underlying_dist.home, jdk_home_symlink)
