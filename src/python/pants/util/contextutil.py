@@ -388,7 +388,7 @@ def hard_exit_handler():
 
 
 @contextmanager
-def with_overwritten_file_content(file_path, method_to_run):
+def with_overwritten_file_content(file_path):
   """A helper that resets a file after the method runs.
 
    It will read a file, save the content, try to run the method passed to it, then write the
@@ -401,7 +401,7 @@ def with_overwritten_file_content(file_path, method_to_run):
     file_original_content = f.read()
 
   try:
-    method_to_run(file_path)
+    yield
 
   finally:
     with open(file_path, 'w') as f:

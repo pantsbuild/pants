@@ -341,7 +341,7 @@ class ClasspathProducts(object):
       if isinstance(element[1], ClasspathEntry):
         wrapped_path_elements.append(element)
       else:
-        wrapped_path_elements.append((element[0], ClasspathEntry(*element[1:])))
+        wrapped_path_elements.append((element[0], ClasspathEntry(element[1])))
     return wrapped_path_elements
 
   def _add_elements_for_target(self, target, elements):
