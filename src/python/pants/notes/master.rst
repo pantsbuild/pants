@@ -7,11 +7,26 @@ not undergo the vetting associated with ``stable`` releases.
 1.11.0.dev0 (09/14/2018)
 ------------------------
 
+API Changes
+~~~~~~~~~~~
+
+* Upgrade Node.js to 8.11.3 and Yarn to 1.6.0 (#6512)
+  `PR #6512 <https://github.com/pantsbuild/pants/pull/6512>`_
+
 New features
 ~~~~~~~~~~~~
 
 * Add extra_jvm_options to jvm_binary targets (#6310)
   `PR #6310 <https://github.com/pantsbuild/pants/pull/6310>`_
+
+* [compile.rsc] Add strategy for compiling with Rsc and Zinc (#6408)
+  `PR #6408 <https://github.com/pantsbuild/pants/pull/6408>`_
+
+* Add support for HTTP basic auth. (#6495)
+  `PR #6495 <https://github.com/pantsbuild/pants/pull/6495>`_
+
+* gRPC support for golang protobufs. (#6507)
+  `PR #6507 <https://github.com/pantsbuild/pants/pull/6507>`_
 
 Bugfixes
 ~~~~~~~~
@@ -25,6 +40,12 @@ Bugfixes
 * Apply  workaround similer to #6409 to bootstrapper (#6498)
   `PR #6498 <https://github.com/pantsbuild/pants/pull/6498>`_
 
+* Fix encoding of workunits under pantsd (#6505)
+  `PR #6505 <https://github.com/pantsbuild/pants/pull/6505>`_
+
+* refactor command line target spec resolution and check that all target roots exist (#6480)
+  `PR #6480 <https://github.com/pantsbuild/pants/pull/6480>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -37,6 +58,14 @@ Refactoring, Improvements, and Tooling
 * Add bootstrapper jar to compile the compile-bridge. (#6462)
   `PR #6462 <https://github.com/pantsbuild/pants/pull/6462>`_
 
+* [Hermetic zinc compile] Memoize scalac classpath snapshots (#6491)
+  `PR #6491 <https://github.com/pantsbuild/pants/pull/6491>`_
+
+* remove FIXME and (cosmicexplorer) comments (#6479)
+  `PR #6479 <https://github.com/pantsbuild/pants/pull/6479>`_
+
+* Consume the bootstrapper and modify zinc to allow remote exec (#6463)
+  `PR #6463 <https://github.com/pantsbuild/pants/pull/6463>`_
 
 1.10.0rc0 (09/10/2018)
 ----------------------
