@@ -5,10 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from threading import Lock
-
 from builtins import object
 from hashlib import sha1
+from threading import Lock
 
 from future.utils import text_type
 
