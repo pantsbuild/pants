@@ -129,28 +129,6 @@ class TargetTest(TestBase):
     self.assertEqual(short_id,
                      'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.foo')
 
-  def test_implicit_sources(self):
-    options = {Target.Arguments.options_scope: {'implicit_sources': True}}
-    init_subsystem(Target.Arguments, options)
-    target = self.make_target(':a', ImplicitSourcesTestingTarget)
-    # Note explicit key_arg.
-    sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar',
-                                          key_arg='sources')
-    self.assertEqual(sources.filespec, {'globs': ['src/foo/bar/*.foo']})
-
-    target = self.make_target(':b', ImplicitSourcesTestingTargetMulti)
-    # Note no explicit key_arg, which should behave just like key_arg='sources'.
-    sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar')
-    self.assertEqual(sources.filespec, {
-      'globs': ['src/foo/bar/*.foo', 'src/foo/bar/*.bar'],
-      'exclude': [{'globs': ['src/foo/bar/*.baz', 'src/foo/bar/*.qux']}],
-    })
-
-    # Ensure that we don't use implicit sources when creating resources fields.
-    resources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar',
-                                            key_arg='resources')
-    self.assertEqual(resources.filespec, {'globs': []})
-
   def test_create_sources_field_with_string_fails(self):
     target = self.make_target(':a-target', Target)
 
