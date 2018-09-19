@@ -9,9 +9,9 @@
   },
   "devDependencies": {
     "babel-eslint": "^8.1.2",
-    "eslint": "^5.6.0"
+    "eslint": "^4.14.0"
   },
   "dependencies": {
-    "eslint-plugin-mocha": "^5.2.0"
+    "eslint-plugin-mocha": "^4.12.1"
   }
 }

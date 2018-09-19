@@ -1,5 +1,5 @@
-let assert = require('assert'),
-  AddTwo = require('../index.js');
+const assert = require('assert');
+const AddTwo = require('../index.js');
 
 describe('AddTwo', function () {
   it('adds two correctly', function () {
