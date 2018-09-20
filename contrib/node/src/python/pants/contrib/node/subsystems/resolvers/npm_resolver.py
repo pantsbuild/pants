@@ -20,7 +20,6 @@ from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_NPM,
                                                             PACKAGE_MANAGER_YARNPKG)
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_module import NodeModule
-from pants.contrib.node.targets.node_package import NodePackage
 from pants.contrib.node.tasks.node_resolve import NodeResolve
 
 
@@ -101,7 +100,6 @@ class NpmResolver(Subsystem, NodeResolverBase):
         if not os.path.exists('yarn.lock') and frozen_lockfile:
           raise TaskError(
             'Cannot find yarn.lock. Did you forget to put it in target sources?')
-
       # Install all dependencies except for `file:` dependencies
       # `file:` dependencies are special dependencies that point to a local path to a pants node target
       # `file:` dependencies are already in the build graph and should be already be installed by this point
@@ -156,10 +154,6 @@ class NpmResolver(Subsystem, NodeResolverBase):
           # In this case, the package_name is the bin name
           bin_path = os.path.join(dep_path, bin_field)
           absolute_symlink(bin_path, os.path.join(bin_dir, dep.package_name))
-
-  @staticmethod
-  def _filter_node_packages(dependencies):
-    return (target for target in dependencies if isinstance(target, NodePackage))
 
   @staticmethod
   def _emit_package_descriptor(node_task, target, results_dir, node_paths):
