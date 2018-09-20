@@ -678,6 +678,8 @@ class JvmCompile(NailgunTaskBase):
       jobs.extend(
         self.create_compile_jobs(compile_target, compile_contexts, invalid_dependencies, ivts,
           counter, classpath_product))
+
+    counter.size = len(jobs)
     return jobs
 
   def create_compile_jobs(self, compile_target, all_compile_contexts, invalid_dependencies, ivts,

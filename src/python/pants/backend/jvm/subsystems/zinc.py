@@ -384,10 +384,7 @@ class Zinc(object):
 
   def compile_classpath_entries(self, classpath_product_key, target, extra_cp_entries=None):
     classpath_product = self._products.get_data(classpath_product_key)
-    if DependencyContext.global_instance().defaulted_property(target, lambda x: x.strict_deps):
-      dependencies = target.strict_dependencies(DependencyContext.global_instance())
-    else:
-      dependencies = DependencyContext.global_instance().all_dependencies(target)
+    dependencies = DependencyContext.global_instance().dependencies_respecting_strict_deps(target)
 
     all_extra_cp_entries = list(self._compiler_plugins_cp_entries())
     if extra_cp_entries:

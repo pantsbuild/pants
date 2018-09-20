@@ -50,6 +50,10 @@ class RscCompileIntegration(BaseCompileIT):
           'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/rsc',
           'outline/META-INF/semanticdb/out.semanticdb')
         self.assertTrue(os.path.exists(path))
+        path = os.path.join(
+          workdir,
+          'compile/rsc/current/.scala-library-synthetic/current/rsc/index/scala-library-synthetics.jar')
+        self.assertTrue(os.path.exists(path))
 
   def test_executing_multi_target_binary(self):
     with temporary_dir() as cache_dir:

@@ -180,8 +180,14 @@ class ExecutionGraph(object):
     self._job_priority = self._compute_job_priorities(job_list)
 
   def format_dependee_graph(self):
+    def entry(key):
+      dependees = self._dependees[key]
+      if dependees:
+        return "{} -> {{\n  {}\n}}".format(key, ',\n  '.join(dependees))
+      else:
+        return "{} -> {{}}".format(key)
     return "\n".join([
-      "{} -> {{\n  {}\n}}".format(key, ',\n  '.join(self._dependees[key]))
+      entry(key)
       for key in self._job_keys_as_scheduled
     ])
 

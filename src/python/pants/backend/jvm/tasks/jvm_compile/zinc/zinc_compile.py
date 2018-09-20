@@ -286,7 +286,6 @@ class BaseZincCompile(JvmCompile):
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     absolute_classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
-
     if self.get_options().capture_classpath:
       self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir)
 
