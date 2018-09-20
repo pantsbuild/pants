@@ -78,6 +78,27 @@ class RulesetValidatorTest(unittest.TestCase):
                      """).strip(),
                                     str(cm.exception))
 
+  def test_ruleset_with_ambiguity(self):
+    rules = [
+        TaskRule(A, [Select(C), Select(B)], noop),
+        TaskRule(A, [Select(B), Select(C)], noop),
+        RootRule(B),
+        RootRule(C),
+        # TODO: Without a rule triggering the selection of A, we don't detect ambiguity here.
+        TaskRule(D, [Select(A)], noop),
+      ]
+    with self.assertRaises(Exception) as cm:
+      create_scheduler(rules)
+
+    self.assert_equal_with_printing(dedent("""
+                     Rules with errors: 1
+                       (D, [Select(A)], noop):
+                         ambiguous rules for Select(A) with parameter types (B+C):
+                           (A, [Select(B), Select(C)], noop) for (B+C)
+                           (A, [Select(C), Select(B)], noop) for (B+C)
+                     """).strip(),
+      str(cm.exception))
+
   def test_ruleset_with_rule_with_two_missing_selects(self):
     rules = _suba_root_rules + [TaskRule(A, [Select(B), Select(C)], noop)]
     with self.assertRaises(Exception) as cm:

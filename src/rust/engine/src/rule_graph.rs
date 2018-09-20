@@ -1000,10 +1000,11 @@ impl RuleGraph {
         diagnostics.dedup_by(|l, r| l.reason == r.reason);
         let errors = diagnostics
           .into_iter()
-          .map(|d| {
+          .map(|mut d| {
             if d.details.is_empty() {
               d.reason.clone()
             } else {
+              d.details.sort();
               format!("{}:\n      {}", d.reason, d.details.join("\n      "))
             }
           })
