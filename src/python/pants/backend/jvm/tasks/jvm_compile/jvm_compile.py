@@ -219,7 +219,7 @@ class JvmCompile(NailgunTaskBase):
 
   @memoized_property
   def _zinc(self):
-    return Zinc.Factory.global_instance().create(self.context.products)
+    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
 
   def _zinc_tool_classpath(self, toolname):
     return self._zinc.tool_classpath_from_products(self.context.products,
