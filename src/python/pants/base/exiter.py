@@ -4,10 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import datetime
 import faulthandler
 import logging
-import os
 import signal
 import sys
 import traceback
@@ -15,7 +13,7 @@ from builtins import object, str
 
 from future.utils import PY2
 
-from pants.util.dirutil import safe_open
+from pants.base.exception_sink import ExceptionSink
 
 
 logger = logging.getLogger(__name__)
@@ -103,18 +101,8 @@ class Exiter(object):
 
   def _log_exception(self, msg):
     if self._workdir:
-      try:
-        output_path = os.path.join(self._workdir, 'logs', 'exceptions.log')
-        with safe_open(output_path, 'a') as exception_log:
-          exception_log.write('timestamp: {}\n'.format(datetime.datetime.now().isoformat()))
-          exception_log.write('args: {}\n'.format(sys.argv))
-          exception_log.write('pid: {}\n'.format(os.getpid()))
-          exception_log.write(msg)
-          exception_log.write('\n')
-      except Exception as e:
-        # This is all error recovery logic so we catch all exceptions from the logic above because
-        # we don't want to hide the original error.
-        logger.error('Problem logging original exception: {}'.format(e))
+      ExceptionSink.set_destination(self._workdir)
+    ExceptionSink.log_exception(msg)
 
   def _setup_faulthandler(self, trace_stream):
     faulthandler.enable(trace_stream)
