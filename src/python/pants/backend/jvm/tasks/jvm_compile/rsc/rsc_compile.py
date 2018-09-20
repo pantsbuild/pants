@@ -91,7 +91,7 @@ class RscCompile(ZincCompile):
 
   def __init__(self, *args, **kwargs):
     super(RscCompile, self).__init__(*args, **kwargs)
-    self._jar_classpath_product = ClasspathProducts(self.get_options().pants_workdir)
+    self._metacp_jars_classpath_product = ClasspathProducts(self.get_options().pants_workdir)
 
   @classmethod
   def implementation_version(cls):
@@ -196,11 +196,13 @@ class RscCompile(ZincCompile):
           rsc_cc.target,
           [(conf, rsc_cc.rsc_mjar_file) for conf in self._confs])
       elif self._metacpable(target):
-        # TODO fill this in so that jar library calls will work when the v1 cache is valid
-        # find context for the jar classpath entry
-        # scan its directory for jars and add those as entries to the classpath product
-        #self._jar_classpath_product
-        pass
+        # Walk the metacp results dir and add classpath entries for all the files there.
+        # TODO exercise this with a test.
+        for root, dirs, files in os.walk(rsc_cc.rsc_index_dir):
+          self.context.products.get_data('rsc_classpath').add_for_target(
+            rsc_cc.target,
+            [(conf, os.path.join(root, f)) for conf in self._confs for f in files]
+          )
       else:
         pass
 
@@ -253,7 +255,6 @@ class RscCompile(ZincCompile):
                           ivts,
                           counter,
                           runtime_classpath_product):
-    jars = self._jar_classpath_product
 
     def work_for_vts_rsc(vts, ctx):
       # Double check the cache before beginning compilation
@@ -277,7 +278,7 @@ class RscCompile(ZincCompile):
 
         jar_deps = [t for t in DependencyContext.global_instance().dependencies_respecting_strict_deps(target)
                     if isinstance(t, JarLibrary)]
-        jar_classpath_abs = [y[1] for y in jars.get_for_targets(
+        metacp_jar_classpath_abs = [y[1] for y in self._metacp_jars_classpath_product.get_for_targets(
           jar_deps
         )]
         jar_jar_paths = {y[1] for y in self.context.products.get_data('rsc_classpath').get_for_targets(jar_deps)}
@@ -286,7 +287,7 @@ class RscCompile(ZincCompile):
 
 
         classpath_rel = fast_relpath_collection(classpath_abs)
-        jar_classpath_rel = fast_relpath_collection(jar_classpath_abs)
+        metacp_jar_classpath_rel = fast_relpath_collection(metacp_jar_classpath_abs)
         cp_entries.extend(classpath_rel)
 
         ctx.ensure_output_dirs_exist()
@@ -338,58 +339,14 @@ class RscCompile(ZincCompile):
             output_dir=rsc_index_dir)
           metacp_stdout = stdout_contents(metacp_wu)
           metacp_result = json.loads(metacp_stdout)
-          metai_classpath = []
 
-          def desandboxify_pantsd_loc(path):
-            # TODO come up with a cleaner way to maybe relpath paths.
-            try:
-              path = fast_relpath(path, get_buildroot())
-            except Exception:
-              pass
-            pattern = 'process-execution[^{}]+/'.format(re.escape(os.path.sep))
-            return re.split(pattern, path)[-1]
 
-          # TODO when these are generated once, we won't need to collect them here.
-          metai_classpath.append(desandboxify_pantsd_loc(metacp_result["scalaLibrarySynthetics"]))
-          # NB The json is absolute pathed pointing into either the buildroot or
-          #    the temp directory of the hermetic build. This relativizes the keys.
-          status_elements = {
-            desandboxify_pantsd_loc(k): v
-            for k,v in metacp_result["status"].items()
-          }
-
-          for cp_entry in classpath_rel:
-            metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
-          for cp_entry in jvm_lib_jars_abs:
-            metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
+          metai_classpath = self._collect_metai_classpath(
+            metacp_result, classpath_rel, jvm_lib_jars_abs)
 
           # Step 1.5: metai Index the semanticdbs
           # -------------------------------------
-          # TODO have metai write to a different spot than metacp
-          # Currently, the metai step depends on the fact that materializing
-          # ignores existing files. It should write the files to a different
-          # location, either by providing inputs from a different location,
-          # or invoking a script that does the copying
-          args = [
-            '--verbose',
-            os.pathsep.join(metai_classpath)
-          ]
-          self._runtool(
-            'scala.meta.cli.Metai',
-            'metai',
-            args,
-            distribution,
-            tgt=tgt,
-            input_files=metai_classpath,
-            output_dir=rsc_index_dir
-          )
-
-          # scala rsc results +
-          # java metacp results +
-          #---- jar metacp results----
-          # - collect jar metacp results
-          # - add it to metai_classpath
-
+          self._run_metai_tool(distribution, metai_classpath, rsc_index_dir, tgt)
 
           # Step 2: Outline Scala sources into SemanticDB
           # ---------------------------------------------
@@ -398,7 +355,7 @@ class RscCompile(ZincCompile):
           safe_mkdir(os.path.join(rsc_outline_dir, 'META-INF/semanticdb'))
           target_sources = ctx.sources
           args = [
-            '-cp', os.pathsep.join(metai_classpath + jar_classpath_rel),
+            '-cp', os.pathsep.join(metai_classpath + metacp_jar_classpath_rel),
             '-out', rsc_out,
           ] + target_sources
           self._runtool(
@@ -409,26 +366,15 @@ class RscCompile(ZincCompile):
             tgt=tgt,
             # TODO pass the input files from the target snapshot instead of the below
             # input_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
-            input_files=target_sources + metai_classpath + jar_classpath_rel,
+            input_files=target_sources + metai_classpath + metacp_jar_classpath_rel,
             output_dir=rsc_outline_dir)
           rsc_classpath = [rsc_outline_dir]
 
           # Step 2.5: Postprocess the rsc outputs
           # TODO: This is only necessary as a workaround for https://github.com/twitter/rsc/issues/199.
           # Ideally, Rsc would do this on its own.
-          args = [
-            '--verbose',
-            os.pathsep.join(rsc_classpath)
-          ]
-          self._runtool(
-            'scala.meta.cli.Metai',
-            'metai',
-            args,
-            distribution,
-            tgt=tgt,
-            input_files=[rsc_out],
-            output_dir=rsc_outline_dir
-          )
+          self._run_metai_tool(distribution, rsc_classpath, rsc_outline_dir, tgt)
+
 
           # Step 3: Convert SemanticDB into an mjar
           # ---------------------------------------
@@ -498,7 +444,7 @@ class RscCompile(ZincCompile):
       self.context.log.info(
         counter_str,
         'Metacp-ing ',
-        items_to_report_element(cp_entries, '{} jar'.format(self.name())),
+        items_to_report_element(cp_entries, 'jar'),
         ' in ',
         items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
         ' (',
@@ -539,55 +485,18 @@ class RscCompile(ZincCompile):
           output_dir=rsc_index_dir)
         metacp_stdout = stdout_contents(metacp_wu)
         metacp_result = json.loads(metacp_stdout)
-        metai_classpath = []
 
-        def desandboxify_pantsd_loc(path):
-          # TODO come up with a cleaner way to maybe relpath paths.
-          try:
-            path = fast_relpath(path, get_buildroot())
-          except Exception:
-            pass
-          pattern = 'process-execution[^{}]+/'.format(re.escape(os.path.sep))
-          return re.split(pattern, path)[-1]
-
-        # TODO when these are generated once, we won't need to collect them here.
-        metai_classpath.append(desandboxify_pantsd_loc(metacp_result["scalaLibrarySynthetics"]))
-        # NB The json is absolute pathed pointing into either the buildroot or
-        #    the temp directory of the hermetic build. This relativizes the keys.
-        status_elements = {
-          desandboxify_pantsd_loc(k): v
-          for k,v in metacp_result["status"].items()
-        }
-
-        for cp_entry in classpath_rel:
-          metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
-        for cp_entry in jvm_lib_jars_abs:
-          metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
+        metai_classpath = self._collect_metai_classpath(
+          metacp_result, classpath_rel, jvm_lib_jars_abs)
 
         # Step 1.5: metai Index the semanticdbs
         # -------------------------------------
-        # TODO have metai write to a different spot than metacp
-        # Currently, the metai step depends on the fact that materializing
-        # ignores existing files. It should write the files to a different
-        # location, either by providing inputs from a different location,
-        # or invoking a script that does the copying
-        args = [
-          '--verbose',
-          os.pathsep.join(metai_classpath)
-        ]
-        self._runtool(
-          'scala.meta.cli.Metai',
-          'metai',
-          args,
-          distribution,
-          tgt=tgt,
-          input_files=metai_classpath,
-          output_dir=rsc_index_dir
-        )
+        self._run_metai_tool(distribution, metai_classpath, rsc_index_dir, tgt)
+
         abs_output = [(conf, os.path.join(get_buildroot(), x))
                       for conf in self._confs for x in metai_classpath]
 
-        jars.add_for_target(
+        self._metacp_jars_classpath_product.add_for_target(
           ctx.target,
           abs_output,
         )
@@ -823,3 +732,49 @@ class RscCompile(ZincCompile):
         if runjava_wu is None:
           raise Exception('couldnt find work unit for underlying execution')
         return runjava_wu
+
+  def _run_metai_tool(self, distribution, metai_classpath, rsc_index_dir, tgt):
+    # TODO have metai write to a different spot than metacp
+    # Currently, the metai step depends on the fact that materializing
+    # ignores existing files. It should write the files to a different
+    # location, either by providing inputs from a different location,
+    # or invoking a script that does the copying
+    args = [
+      '--verbose',
+      os.pathsep.join(metai_classpath)
+    ]
+    self._runtool(
+      'scala.meta.cli.Metai',
+      'metai',
+      args,
+      distribution,
+      tgt=tgt,
+      input_files=metai_classpath,
+      output_dir=rsc_index_dir
+    )
+
+  def _collect_metai_classpath(self, metacp_result, classpath_rel, jvm_lib_jars_abs):
+    metai_classpath = []
+    def desandboxify_pantsd_loc(path):
+      # TODO come up with a cleaner way to maybe relpath paths.
+      try:
+        path = fast_relpath(path, get_buildroot())
+      except Exception:
+        pass
+      pattern = 'process-execution[^{}]+/'.format(re.escape(os.path.sep))
+      return re.split(pattern, path)[-1]
+
+    # TODO when these are generated once, we won't need to collect them here.
+    metai_classpath.append(desandboxify_pantsd_loc(metacp_result["scalaLibrarySynthetics"]))
+    # NB The json is absolute pathed pointing into either the buildroot or
+    #    the temp directory of the hermetic build. This relativizes the keys.
+    status_elements = {
+      desandboxify_pantsd_loc(k): v
+      for k,v in metacp_result["status"].items()
+    }
+
+    for cp_entry in classpath_rel:
+      metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
+    for cp_entry in jvm_lib_jars_abs:
+      metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
+    return metai_classpath
