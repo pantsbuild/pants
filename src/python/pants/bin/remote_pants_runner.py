@@ -96,7 +96,7 @@ class RemotePantsRunner(object):
     """Minimal backoff strategy for daemon restarts."""
     time.sleep(attempt + (attempt - 1))
 
-  def _run_pants_with_retry(self, port, retries=3):
+  def _run_pants_with_retry(self, pid, port, retries=3):
     """Runs pants remotely with retry and recovery for nascent executions."""
     attempt = 1
     while 1:
@@ -119,13 +119,13 @@ class RemotePantsRunner(object):
         # another lifecycle operation is happening concurrently (incl teardown). To account for
         # this, we won't begin attempting restarts until at least 1 second has passed (1 attempt).
         if attempt > 1:
-          port = self._restart_pantsd()
+          pid, port = self._restart_pantsd()
         attempt += 1
       except NailgunClient.NailgunError as e:
         # Ensure a newline.
         logger.fatal('')
         logger.fatal('lost active connection to pantsd!')
-        raise_with_traceback(self.Terminated('abruptly lost active connection to pantsd runner: {!r}'.format(e)))
+        raise_with_traceback(self._extract_remote_exception(pid, e))
 
   def _connect_and_execute(self, port):
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
@@ -150,6 +150,15 @@ class RemotePantsRunner(object):
     # Exit.
     self._exiter.exit(result)
 
+  def _extract_remote_exception(self, pantsd_pid, nailgun_error):
+    """Given a NailgunError, returns a Terminated exception with additional info (where possible).
+
+    This method will include the entire exception log for either the `pid` in the NailgunError, or
+    failing that, the `pid` of the pantsd instance.
+    """
+    # TODO: Enrich.
+    return self.Terminated('abruptly lost active connection to pantsd runner: {!r}'.format(nailgun_error))
+
   def _restart_pantsd(self):
     return PantsDaemon.Factory.restart(bootstrap_options=self._bootstrap_options)
 
@@ -158,5 +167,5 @@ class RemotePantsRunner(object):
 
   def run(self, args=None):
     self._setup_logging()
-    port = self._maybe_launch_pantsd()
-    self._run_pants_with_retry(port)
+    pid, port = self._maybe_launch_pantsd()
+    self._run_pants_with_retry(pid, port)

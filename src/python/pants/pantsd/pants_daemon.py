@@ -81,8 +81,8 @@ class PantsDaemon(FingerprintedProcessManager):
       """Creates and launches a daemon instance if one does not already exist.
 
       :param Options bootstrap_options: The bootstrap options, if available.
-      :returns: The pailgun port number of the running pantsd instance.
-      :rtype: int
+      :returns: The pailgun pid and port numbers of the running pantsd instance.
+      :rtype: tuple
       """
       stub_pantsd = cls.create(bootstrap_options, full_init=False)
       with stub_pantsd.lifecycle_lock:
@@ -91,15 +91,18 @@ class PantsDaemon(FingerprintedProcessManager):
           pantsd = cls.create(bootstrap_options)
           return pantsd.launch()
         else:
-          return stub_pantsd.read_named_socket('pailgun', int)
+          # We're already launched.
+          pid = stub_pantsd.await_pid(10)
+          port = stub_pantsd.read_named_socket('pailgun', int)
+          return pid, port
 
     @classmethod
     def restart(cls, bootstrap_options=None):
       """Restarts a running daemon instance.
 
       :param Options bootstrap_options: The bootstrap options, if available.
-      :returns: The pailgun port number of the new pantsd instance.
-      :rtype: int
+      :returns: The pailgun pid and port numbers of the running pantsd instance.
+      :rtype: tuple
       """
       pantsd = cls.create(bootstrap_options)
       with pantsd.lifecycle_lock:
@@ -402,11 +405,11 @@ class PantsDaemon(FingerprintedProcessManager):
     self._logger.debug('launching pantsd')
     self.daemon_spawn()
     # Wait up to 60 seconds for pantsd to write its pidfile.
-    self.await_pid(60)
+    pantsd_pid = self.await_pid(60)
     listening_port = self.read_named_socket('pailgun', int)
     self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
                        .format(self.pid, listening_port))
-    return listening_port
+    return pantsd_pid, listening_port
 
   def terminate(self, include_watchman=True):
     """Terminates pantsd and watchman.
