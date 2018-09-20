@@ -15,7 +15,6 @@ class NodePathsBase(AbstractClass):
 
   def __init__(self):
     self._paths_by_target = {}
-    self._targets_by_paths = {}
 
   def resolved(self, target, node_path):
     """Identifies the given target as resolved to the given path.
@@ -25,7 +24,6 @@ class NodePathsBase(AbstractClass):
     :param string node_path: The path the given `target` was resolved to.
     """
     self._paths_by_target[target] = node_path
-    self._targets_by_paths[node_path] = target
 
   def node_path(self, target):
     """Returns the path of the resolved root for the given NpmPackage.
@@ -35,15 +33,6 @@ class NodePathsBase(AbstractClass):
     :rtype string
     """
     return self._paths_by_target.get(target)
-
-  def target(self, node_path):
-    """Returns the target given a node_path.
-
-    Returns `None` if the target has not been resolved to a chroot.
-
-    :rtype string
-    """
-    return self._targets_by_paths.get(node_path)
 
   @property
   def all_node_paths(self):
