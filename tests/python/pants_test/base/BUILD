@@ -206,6 +206,19 @@ python_tests(
 )
 
 python_tests(
+  name = 'exception_sink',
+  sources = ['test_exception_sink.py'],
+  dependencies = [
+    '3rdparty/python:future',
+    'src/python/pants/base:exception_sink',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:test_base',
+  ],
+)
+
+python_tests(
   name = 'exiter',
   sources = ['test_exiter.py'],
   dependencies = [

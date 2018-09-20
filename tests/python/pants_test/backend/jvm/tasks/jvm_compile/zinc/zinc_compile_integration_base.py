@@ -125,34 +125,26 @@ class BaseZincCompileIntegrationTest(object):
         self.assertIn('is not supported, and is subject to change/removal', pants_run.stdout_data)
 
   def test_zinc_fatal_warning(self):
-    def test_combination(target, default_fatal_warnings, expect_success, extra_args=[]):
+    def test_combination(target, expect_success, extra_args=[]):
       with self.temporary_workdir() as workdir:
         with self.temporary_cachedir() as cachedir:
-          if default_fatal_warnings:
-            arg = '--scala-fatal-warnings'
-          else:
-            arg = '--no-scala-fatal-warnings'
           pants_run = self.run_test_compile(
               workdir,
               cachedir,
               'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:{}'.format(
                 target),
-              extra_args=[arg] + extra_args)
+              extra_args=extra_args)
 
           if expect_success:
             self.assert_success(pants_run)
           else:
             self.assert_failure(pants_run)
-    test_combination('defaultfatal', default_fatal_warnings=True, expect_success=False)
-    test_combination('defaultfatal', default_fatal_warnings=False, expect_success=True)
-    test_combination('fatal', default_fatal_warnings=True, expect_success=False)
-    test_combination('fatal', default_fatal_warnings=False, expect_success=False)
-    test_combination('nonfatal', default_fatal_warnings=True, expect_success=True)
-    test_combination('nonfatal', default_fatal_warnings=False, expect_success=True)
+    test_combination('fatal', expect_success=False)
+    test_combination('nonfatal', expect_success=True)
 
-    test_combination('fatal', default_fatal_warnings=True, expect_success=True,
+    test_combination('fatal', expect_success=True,
       extra_args=['--compile-zinc-fatal-warnings-enabled-args=[\'-C-Werror\']'])
-    test_combination('fatal', default_fatal_warnings=False, expect_success=False,
+    test_combination('fatal', expect_success=False,
       extra_args=['--compile-zinc-fatal-warnings-disabled-args=[\'-S-Xfatal-warnings\']'])
 
   @unittest.expectedFailure

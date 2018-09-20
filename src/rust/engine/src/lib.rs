@@ -44,12 +44,15 @@ extern crate fs;
 extern crate futures;
 extern crate graph;
 extern crate hashing;
+extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate process_execution;
 extern crate resettable;
+#[macro_use]
+extern crate smallvec;
 extern crate tokio;
 
 use std::ffi::CStr;
@@ -82,8 +85,7 @@ use types::Types;
 enum RawStateTag {
   Return = 1,
   Throw = 2,
-  Noop = 3,
-  Invalidated = 4,
+  Invalidated = 3,
 }
 
 #[repr(C)]
@@ -100,10 +102,6 @@ impl RawNode {
     let (state_tag, state_value) = match state {
       Ok(v) => (RawStateTag::Return as u8, v),
       Err(Failure::Throw(exc, _)) => (RawStateTag::Throw as u8, exc),
-      Err(Failure::Noop(noop)) => (
-        RawStateTag::Noop as u8,
-        externs::create_exception(&format!("{:?}", noop)),
-      ),
       Err(Failure::Invalidated) => (
         RawStateTag::Invalidated as u8,
         externs::create_exception("Exhausted retries due to changed files."),
@@ -224,8 +222,6 @@ pub extern "C" fn scheduler_create(
   construct_link: Function,
   construct_process_result: Function,
   type_address: TypeConstraint,
-  type_has_products: TypeConstraint,
-  type_has_variants: TypeConstraint,
   type_path_globs: TypeConstraint,
   type_directory_digest: TypeConstraint,
   type_snapshot: TypeConstraint,
@@ -265,8 +261,6 @@ pub extern "C" fn scheduler_create(
     construct_link: construct_link,
     construct_process_result: construct_process_result,
     address: type_address,
-    has_products: type_has_products,
-    has_variants: type_has_variants,
     path_globs: type_path_globs,
     directory_digest: type_directory_digest,
     snapshot: type_snapshot,
@@ -436,21 +430,7 @@ pub extern "C" fn tasks_add_get(tasks_ptr: *mut Tasks, product: TypeConstraint, 
 #[no_mangle]
 pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeConstraint) {
   with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select(product, None);
-  })
-}
-
-#[no_mangle]
-pub extern "C" fn tasks_add_select_variant(
-  tasks_ptr: *mut Tasks,
-  product: TypeConstraint,
-  variant_key_buf: Buffer,
-) {
-  let variant_key = variant_key_buf
-    .to_string()
-    .expect("Failed to decode key for select_variant");
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select(product, Some(variant_key));
+    tasks.add_select(product);
   })
 }
 

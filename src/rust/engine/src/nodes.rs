@@ -10,7 +10,7 @@ use futures::future::{self, Future};
 
 use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
-use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
+use core::{throw, Failure, Key, Params, TypeConstraint, Value};
 use externs;
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
@@ -32,17 +32,6 @@ fn ok<O: Send + 'static>(value: O) -> NodeFuture<O> {
 
 fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
   future::err(failure).to_boxed()
-}
-
-///
-/// A helper to indicate that the value represented by the Failure was required, and thus
-/// fatal if not present.
-///
-fn was_required(failure: Failure) -> Failure {
-  match failure {
-    Failure::Noop(noop) => throw(&format!("No source of required dependency: {:?}", noop)),
-    f => f,
-  }
 }
 
 impl VFS<Failure> for Context {
@@ -89,69 +78,53 @@ pub trait WrappedNode: Into<NodeKey> {
 }
 
 ///
-/// A Node that selects a product for a subject.
+/// A Node that selects a product for some Params.
 ///
 /// A Select can be satisfied by multiple sources, but fails if multiple sources produce a value.
-/// The 'variants' field represents variant configuration that is propagated to dependencies. When
-/// a task needs to consume a product as configured by the variants map, it can pass variant_key,
-/// which matches a 'variant' value to restrict the names of values selected by a SelectNode.
+/// The 'params' represent a series of type-keyed parameters that will be used by Nodes in the
+/// subgraph below this Select.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
-  pub subject: Key,
-  pub variants: Variants,
+  pub params: Params,
   pub selector: selectors::Select,
-  entries: rule_graph::Entries,
+  entry: rule_graph::Entry,
 }
 
 impl Select {
-  pub fn new(
-    product: TypeConstraint,
-    subject: Key,
-    variants: Variants,
-    edges: &rule_graph::RuleEdges,
-  ) -> Select {
-    let selector = selectors::Select::without_variant(product);
-    let select_key = rule_graph::SelectKey::JustSelect(selector.clone());
-    Select {
-      selector: selector,
-      subject: subject,
-      variants: variants,
-      entries: edges.entries_for(&select_key),
-    }
+  pub fn new(product: TypeConstraint, params: Params, edges: &rule_graph::RuleEdges) -> Select {
+    Self::new_with_selector(selectors::Select::new(product), params, edges)
   }
 
   pub fn new_with_entries(
     product: TypeConstraint,
-    subject: Key,
-    variants: Variants,
-    entries: rule_graph::Entries,
+    params: Params,
+    entry: rule_graph::Entry,
   ) -> Select {
-    let selector = selectors::Select::without_variant(product);
+    let selector = selectors::Select::new(product);
     Select {
-      selector: selector,
-      subject: subject,
-      variants: variants,
-      entries: entries,
+      selector,
+      params,
+      entry,
     }
   }
 
   pub fn new_with_selector(
     selector: selectors::Select,
-    subject: Key,
-    variants: Variants,
+    params: Params,
     edges: &rule_graph::RuleEdges,
   ) -> Select {
     let select_key = rule_graph::SelectKey::JustSelect(selector.clone());
+    // TODO: Is it worth propagating an error here?
+    // TODO: Need to filter the parameters to what is actually used by this Entry.
+    let entry = edges
+      .entry_for(&select_key)
+      .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, selector))
+      .clone();
     Select {
-      selector: selector,
-      subject: subject,
-      variants: variants,
-      entries: edges
-        .entries_for(&select_key)
-        .into_iter()
-        .filter(|e| e.matches_subject_type(subject.type_id().clone()))
-        .collect(),
+      selector,
+      params,
+      entry,
     }
   }
 
@@ -159,100 +132,16 @@ impl Select {
     &self.selector.product
   }
 
-  fn select_literal_single<'a>(
-    &self,
-    candidate: &'a Value,
-    variant_value: &Option<String>,
-  ) -> bool {
-    if !externs::satisfied_by(&self.selector.product, candidate) {
-      return false;
-    }
-    match variant_value {
-      &Some(ref vv) if externs::project_str(candidate, "name") != *vv =>
-        // There is a variant value, and it doesn't match.
-        false,
-      _ =>
-        true,
-    }
-  }
-
   ///
-  /// Looks for has-a or is-a relationships between the given value and the requested product.
+  /// Looks for an is-a relationship between the given value and the requested product.
   ///
-  /// Returns the resulting product value, or None if no match was made.
+  /// Returns the original product Value for either success or failure.
   ///
-  fn select_literal(
-    &self,
-    context: &Context,
-    candidate: Value,
-    variant_value: &Option<String>,
-  ) -> Option<Value> {
-    // Check whether the subject is-a instance of the product.
-    if self.select_literal_single(&candidate, variant_value) {
-      return Some(candidate);
-    }
-
-    // Else, check whether it has-a instance of the product.
-    // TODO: returning only the first literal configuration of a given type/variant. Need to
-    // define mergeability for products.
-    if externs::satisfied_by(&context.core.types.has_products, &candidate) {
-      for child in externs::project_multi(&candidate, "products") {
-        if self.select_literal_single(&child, variant_value) {
-          return Some(child);
-        }
-      }
-    }
-    None
-  }
-
-  ///
-  /// Given the results of configured Task nodes, select a single successful value, or fail.
-  ///
-  fn choose_task_result(
-    &self,
-    context: &Context,
-    results: Vec<Result<Value, Failure>>,
-    variant_value: &Option<String>,
-  ) -> Result<Value, Failure> {
-    let mut matches = Vec::new();
-    let mut max_noop = Noop::NoTask;
-    for result in results {
-      match result {
-        Ok(value) => {
-          if let Some(v) = self.select_literal(&context, value, variant_value) {
-            matches.push(v);
-          }
-        }
-        Err(err) => {
-          match err {
-            Failure::Noop(noop) => {
-              // Record the highest priority Noop value.
-              if noop > max_noop {
-                max_noop = noop;
-              }
-              continue;
-            }
-            i @ Failure::Invalidated => return Err(i),
-            f @ Failure::Throw(..) => return Err(f),
-          }
-        }
-      }
-    }
-
-    if matches.len() > 1 {
-      // TODO: Multiple successful tasks are not currently supported. We could allow for this
-      // by adding support for "mergeable" products. see:
-      //   https://github.com/pantsbuild/pants/issues/2526
-      return Err(throw("Conflicting values produced for subject and type."));
-    }
-
-    match matches.pop() {
-      Some(matched) =>
-        // Exactly one value was available.
-        Ok(matched),
-      None =>
-        // Propagate the highest priority Noop value.
-        Err(Failure::Noop(max_noop)),
+  fn select_literal(&self, candidate: Value) -> Result<Value, Value> {
+    if externs::satisfied_by(&self.selector.product, &candidate) {
+      Ok(candidate)
+    } else {
+      Err(candidate)
     }
   }
 
@@ -268,12 +157,8 @@ impl Select {
       .expect("Expected edges to exist for Snapshot intrinsic.");
     // Compute PathGlobs for the subject.
     let context = context.clone();
-    Select::new(
-      context.core.types.path_globs,
-      self.subject,
-      self.variants.clone(),
-      &edges,
-    ).run(context.clone())
+    Select::new(context.core.types.path_globs, self.params.clone(), &edges)
+      .run(context.clone())
       .and_then(move |path_globs_val| context.get(Snapshot(externs::key_for(path_globs_val))))
       .to_boxed()
   }
@@ -292,8 +177,7 @@ impl Select {
     let context = context.clone();
     Select::new(
       context.core.types.process_request,
-      self.subject,
-      self.variants.clone(),
+      self.params.clone(),
       edges,
     ).run(context.clone())
       .and_then(|process_request_val| {
@@ -305,25 +189,24 @@ impl Select {
   }
 
   ///
-  /// Return Futures for each Task/Node that might be able to compute the given product for the
-  /// given subject and variants.
+  /// Return the Future for the Task that should compute the given product for the
+  /// given Params.
   ///
-  fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
+  /// TODO: This could take `self` by value and avoid cloning.
+  ///
+  fn gen_node(&self, context: &Context) -> NodeFuture<Value> {
     if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
-      return vec![future::ok(value.clone()).to_boxed()];
+      return future::ok(value.clone()).to_boxed();
     }
 
-    self
-      .entries
-      .iter()
-      .map(
-        |entry| match context.core.rule_graph.rule_for_inner(entry) {
+    match &self.entry {
+      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
+        match inner.rule() {
           &rule_graph::Rule::Task(ref task) => context.get(Task {
-            subject: self.subject,
+            params: self.params.clone(),
             product: *self.product(),
-            variants: self.variants.clone(),
             task: task.clone(),
-            entry: Arc::new(entry.clone()),
+            entry: Arc::new(self.entry.clone()),
           }),
           &rule_graph::Rule::Intrinsic(Intrinsic {
             kind: IntrinsicKind::Snapshot,
@@ -331,7 +214,7 @@ impl Select {
           }) => {
             let context = context.clone();
             self
-              .snapshot(&context, &entry)
+              .snapshot(&context, &self.entry)
               .map(move |snapshot| Snapshot::store_snapshot(&context.core, &snapshot))
               .to_boxed()
           }
@@ -342,13 +225,12 @@ impl Select {
             let edges = &context
               .core
               .rule_graph
-              .edges_for_inner(entry)
+              .edges_for_inner(&self.entry)
               .expect("Expected edges to exist for FilesContent intrinsic.");
             let context = context.clone();
             Select::new(
               context.core.types.directory_digest,
-              self.subject,
-              self.variants.clone(),
+              self.params.clone(),
               edges,
             ).run(context.clone())
               .and_then(|directory_digest_val| {
@@ -381,7 +263,7 @@ impl Select {
           }) => {
             let context = context.clone();
             self
-              .execute_process(&context, &entry)
+              .execute_process(&context, &self.entry)
               .map(move |result| {
                 externs::unsafe_call(
                   &context.core.types.construct_process_result,
@@ -395,9 +277,16 @@ impl Select {
               })
               .to_boxed()
           }
-        },
-      )
-      .collect::<Vec<NodeFuture<Value>>>()
+        }
+      }
+      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Root(_))
+      | &rule_graph::Entry::Param(_)
+      | &rule_graph::Entry::Singleton { .. } => {
+        // TODO: gen_node should be inlined, and should use these Entry types to skip
+        // any runtime checks of python objects.
+        panic!("Not a runtime-executable entry! {:?}", self.entry)
+      }
+    }
   }
 }
 
@@ -407,43 +296,22 @@ impl WrappedNode for Select {
   type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
-    // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
-
-    // If there is a variant_key, see whether it has been configured; if not, no match.
-    let variant_value: Option<String> = match self.selector.variant_key {
-      Some(ref variant_key) => {
-        let variant_value = self.variants.find(variant_key);
-        if variant_value.is_none() {
-          return err(Failure::Noop(Noop::NoVariant));
-        }
-        variant_value.map(|v| v.to_string())
-      }
-      None => None,
-    };
-
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Some(literal_value) =
-      self.select_literal(&context, externs::val_for(&self.subject), &variant_value)
-    {
-      return ok(literal_value);
+    if let Ok(value) = self.select_literal(externs::val_for(self.params.expect_single())) {
+      return ok(value);
     }
 
-    // Else, attempt to use the configured tasks to compute the value.
-    let deps_future = future::join_all(
-      self
-        .gen_nodes(&context)
-        .into_iter()
-        .map(|node_future| {
-          // Don't fail the join if one fails.
-          node_future.then(future::ok)
+    // Attempt to use the configured Task to compute the value.
+    self
+      .gen_node(&context)
+      .and_then(move |value| {
+        self.select_literal(value).map_err(|value| {
+          throw(&format!(
+            "{} returned a result value that did not satisfy its constraints: {:?}",
+            rule_graph::entry_str(&self.entry),
+            value
+          ))
         })
-        .collect::<Vec<_>>(),
-    );
-
-    let variant_value = variant_value.map(|s| s.to_string());
-    deps_future
-      .and_then(move |dep_results| {
-        future::result(self.choose_task_result(&context, dep_results, &variant_value))
       })
       .to_boxed()
   }
@@ -790,9 +658,8 @@ impl From<Snapshot> for NodeKey {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
-  subject: Key,
+  params: Params,
   product: TypeConstraint,
-  variants: Variants,
   task: tasks::Task,
   entry: Arc<rule_graph::Entry>,
 }
@@ -805,20 +672,29 @@ impl Task {
   ) -> NodeFuture<Vec<Value>> {
     let get_futures = gets
       .into_iter()
-      .map(|get| {
-        let externs::Get(product, subject) = get;
-        let entries = context
+      .map(|externs::Get(product, subject)| {
+        // TODO: The subject of the get is a new parameter, but params from the context should be
+        // included as well. Additionally, params should be filtered to what is used by the Entry.
+        //   see https://github.com/pantsbuild/pants/issues/6478
+        let params = Params::new_single(subject);
+        let select_key = rule_graph::SelectKey::JustGet(selectors::Get {
+          product: product,
+          subject: *subject.type_id(),
+        });
+        let entry = context
           .core
           .rule_graph
           .edges_for_inner(entry)
           .expect("edges for task exist.")
-          .entries_for(&rule_graph::SelectKey::JustGet(selectors::Get {
-            product: product,
-            subject: *subject.type_id(),
-          }));
-        Select::new_with_entries(product, subject, Variants::default(), entries)
-          .run(context.clone())
-          .map_err(was_required)
+          .entry_for(&select_key)
+          .unwrap_or_else(|| {
+            panic!(
+              "{:?} did not declare a dependency on {:?}",
+              entry, select_key
+            )
+          })
+          .clone();
+        Select::new_with_entries(product, params, entry).run(context.clone())
       })
       .collect::<Vec<_>>();
     future::join_all(get_futures).to_boxed()
@@ -861,16 +737,13 @@ impl WrappedNode for Task {
         .rule_graph
         .edges_for_inner(&self.entry)
         .expect("edges for task exist.");
-      let subject = self.subject;
-      let variants = self.variants;
+      let params = self.params;
       future::join_all(
         self
           .task
           .clause
           .into_iter()
-          .map(|s| {
-            Select::new_with_selector(s, subject, variants.clone(), edges).run(context.clone())
-          })
+          .map(|s| Select::new_with_selector(s, params.clone(), edges).run(context.clone()))
           .collect::<Vec<_>>(),
       )
     };
@@ -915,7 +788,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
   fn color(&mut self, entry: &Entry<NodeKey>) -> String {
     let max_colors = 12;
     match entry.peek() {
-      None | Some(Err(Failure::Noop(_))) => "white".to_string(),
+      None => "white".to_string(),
       Some(Err(Failure::Throw(..))) => "4".to_string(),
       Some(Err(Failure::Invalidated)) => "12".to_string(),
       Some(Ok(_)) => {
@@ -936,7 +809,6 @@ impl NodeTracer<NodeKey> for Tracer {
   fn is_bottom(result: Option<Result<NodeResult, Failure>>) -> bool {
     match result {
       Some(Err(Failure::Invalidated)) => false,
-      Some(Err(Failure::Noop(..))) => true,
       Some(Err(Failure::Throw(..))) => false,
       Some(Ok(_)) => true,
       None => {
@@ -961,7 +833,6 @@ impl NodeTracer<NodeKey> for Tracer {
           .collect::<Vec<_>>()
           .join("\n")
       ),
-      Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
       Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
     }
   }
@@ -1046,13 +917,13 @@ impl Node for NodeKey {
       &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
       &NodeKey::Select(ref s) => format!(
         "Select({}, {})",
-        keystr(&s.subject),
+        keystr(&s.params.expect_single()),
         typstr(&s.selector.product)
       ),
       &NodeKey::Task(ref s) => format!(
         "Task({}, {}, {})",
         externs::project_str(&externs::val_for(&s.task.func.0), "__name__"),
-        keystr(&s.subject),
+        keystr(&s.params.expect_single()),
         typstr(&s.product)
       ),
       &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
@@ -1077,7 +948,7 @@ impl NodeError for Failure {
   }
 
   fn cyclic() -> Failure {
-    Failure::Noop(Noop::Cycle)
+    throw("Dep graph contained a cycle.")
   }
 }
 

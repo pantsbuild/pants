@@ -8,8 +8,6 @@ import ast
 from abc import abstractproperty
 from builtins import str
 
-import six
-
 from pants.util.meta import AbstractClass
 from pants.util.objects import Exactly, datatype
 
@@ -110,23 +108,3 @@ class Select(datatype(['product', 'optional']), Selector):
     return '{}({}{})'.format(type(self).__name__,
                              type_or_constraint_repr(self.product),
                              ', optional=True' if self.optional else '')
-
-
-class SelectVariant(datatype(['product', 'variant_key']), Selector):
-  """Selects the matching Product and variant name for the Subject provided to the constructor.
-
-  For example: a SelectVariant with a variant_key of "thrift" and a product of type ApacheThrift
-  will only match when a consumer passes a variant value for "thrift" that matches the name of an
-  ApacheThrift value.
-  """
-  optional = False
-
-  def __new__(cls, product, variant_key):
-    if not isinstance(variant_key, six.string_types):
-      raise ValueError('Expected variant_key to be a string, but was {!r}'.format(variant_key))
-    return super(SelectVariant, cls).__new__(cls, product, variant_key)
-
-  def __repr__(self):
-    return '{}({}, {})'.format(type(self).__name__,
-                               type_or_constraint_repr(self.product),
-                               repr(self.variant_key))

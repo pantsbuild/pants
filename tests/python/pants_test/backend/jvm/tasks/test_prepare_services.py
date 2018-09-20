@@ -10,6 +10,7 @@ from builtins import open
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.prepare_services import PrepareServices
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.java.jar.exclude import Exclude
 from pants.util.contextutil import temporary_dir
 from pants_test.task_test_base import TaskTestBase
@@ -19,6 +20,13 @@ class PrepareServicesTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return PrepareServices
+
+  @classmethod
+  def alias_groups(cls):
+    """
+    :API: public
+    """
+    return BuildFileAliases(targets={'java_library': JavaLibrary})
 
   def test_find_all_relevant_resources_targets(self):
     jvm_target = self.make_target('jvm:target', target_type=JvmTarget)
@@ -97,11 +105,20 @@ class PrepareServicesTest(TaskTestBase):
 
   def test_prepare_resources(self):
     task = self.create_task(self.context())
-    target = self.make_target('java:target',
-                              target_type=JavaLibrary,
-                              services={'ServiceInterfaceA': ['ServiceImplA1, ServiceImplA2'],
-                                        'ServiceInterfaceB': [],
-                                        'ServiceInterfaceC': ['ServiceImplC1']})
+    self.add_to_build_file(
+      'java',
+      '''
+java_library(
+  name = "target",
+  services = {
+    "ServiceInterfaceA": ["ServiceImplA1, ServiceImplA2"],
+    "ServiceInterfaceB": [],
+    "ServiceInterfaceC": ["ServiceImplC1"],
+  },
+)
+'''
+    )
+    target = self.target('java:target')
     with temporary_dir() as chroot:
       task.prepare_resources(target, chroot)
       resource_files = {}

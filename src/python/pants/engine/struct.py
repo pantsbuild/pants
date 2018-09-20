@@ -4,14 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from abc import abstractproperty
 from collections import MutableMapping, MutableSequence
 
 from future.utils import binary_type, text_type
 
 from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
-from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, SuperclassesOf
 
 
@@ -307,28 +305,3 @@ class StructWithDeps(Struct):
 
     :rtype: list
     """
-
-
-class HasProducts(AbstractClass):
-  """A mixin for a class that has a collection of products which it would like to expose."""
-
-  @abstractproperty
-  def products(self):
-    """Returns a collection of products held by this class."""
-
-
-class Variants(Struct):
-  """A struct that holds default variant values.
-
-  Variants are key-value pairs representing uniquely identifying parameters for a Node.
-
-  Default variants are usually configured on a Target to be used whenever they are
-  not specified by a caller.
-  """
-
-  def __init__(self, default=None, **kwargs):
-    """
-    :param dict default: A dict of default variant values.
-    """
-    # TODO: enforce the type of variants using the Addressable framework.
-    super(Variants, self).__init__(default=default, **kwargs)
