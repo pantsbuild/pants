@@ -74,7 +74,6 @@ python_library(
   sources = ['exception_sink.py'],
   dependencies = [
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:memo',
   ],
 )
 

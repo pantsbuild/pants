@@ -101,8 +101,8 @@ class Exiter(object):
 
   def _log_exception(self, msg):
     if self._workdir:
-      ExceptionSink.instance.set_destination(self._workdir)
-    ExceptionSink.instance.log_exception(msg)
+      ExceptionSink.set_destination(self._workdir)
+    ExceptionSink.log_exception(msg)
 
   def _setup_faulthandler(self, trace_stream):
     faulthandler.enable(trace_stream)

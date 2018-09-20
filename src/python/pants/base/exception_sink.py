@@ -11,7 +11,6 @@ import sys
 from builtins import object
 
 from pants.util.dirutil import is_writable_dir, safe_open
-from pants.util.memo import memoized_classproperty
 
 
 logger = logging.getLogger(__name__)
@@ -20,35 +19,38 @@ logger = logging.getLogger(__name__)
 class ExceptionSink(object):
   """A mutable singleton object representing where exceptions should be logged to."""
 
-  @memoized_classproperty
-  def instance(cls):
-    return cls()
+  _destination = os.getcwd()
 
-  def __init__(self, destination=None):
-    # TODO: what assumptions can we make about the current directory of a process? Does it have to
-    # exist / be readable / writable?
-    if destination is None:
-      destination = os.getcwd()
-    self._destination = destination
+  def __new__(cls, *args, **kwargs):
+    raise TypeError('Instances of {} are not allowed to be constructed!'
+                    .format(cls.__name__))
 
   class ExceptionSinkError(Exception): pass
 
-  def set_destination(self, dir_path):
+  @classmethod
+  def set_destination(cls, dir_path):
     if not is_writable_dir(dir_path):
       # TODO: when this class sets up excepthooks, raising this should be safe, because we always
       # have a destination to log to (os.getcwd() if not otherwise set).
-      raise self.ExceptionSinkError(
+      raise cls.ExceptionSinkError(
         "The provided exception sink path at '{}' is not a writable directory."
         .format(dir_path))
-    self._destination = dir_path
+    cls._destination = dir_path
 
-  def get_destination(self):
-    return self._destination
+  @classmethod
+  def get_destination(cls):
+    return cls._destination
 
-  def _exceptions_log_path(self):
-    return os.path.join(self.get_destination(), 'logs', 'exceptions.log')
+  @classmethod
+  def _exceptions_log_path(cls, for_pid=None):
+    intermediate_filename_component = '.{}'.format(for_pid) if for_pid else ''
+    return os.path.join(
+      cls.get_destination(),
+      'logs',
+      'exceptions{}.log'.format(intermediate_filename_component))
 
-  def _iso_timestamp_for_now(self):
+  @classmethod
+  def _iso_timestamp_for_now(cls):
     return datetime.datetime.now().isoformat()
 
   # NB: This includes a trailing newline, but no leading newline.
@@ -59,19 +61,27 @@ pid: {pid}
 {message}
 """
 
-  def _format_exception_message(self, msg):
-    return self._EXCEPTION_LOG_FORMAT.format(
-      timestamp=self._iso_timestamp_for_now(),
+  @classmethod
+  def _format_exception_message(cls, msg, pid):
+    return cls._EXCEPTION_LOG_FORMAT.format(
+      timestamp=cls._iso_timestamp_for_now(),
       args=sys.argv,
-      pid=os.getpid(),
+      pid=pid,
       message=msg,
     )
 
-  def log_exception(self, msg):
+  @classmethod
+  def log_exception(cls, msg):
     try:
-      with safe_open(self._exceptions_log_path(), 'a') as exception_log:
-        fatal_error_log_entry = self._format_exception_message(msg)
-        exception_log.write(fatal_error_log_entry)
+      pid = os.getpid()
+      fatal_error_log_entry = cls._format_exception_message(msg, pid)
+      # We care more about this log than the shared log, so completely write to it first. This
+      # avoids any errors with concurrent modification of the shared log affecting the per-pid log.
+      with safe_open(cls._exceptions_log_path(for_pid=pid), 'a') as pid_error_log:
+        pid_error_log.write(fatal_error_log_entry)
+      # TODO: we should probably guard this against concurrent modification somehow.
+      with safe_open(cls._exceptions_log_path(), 'a') as shared_error_log:
+        shared_error_log.write(fatal_error_log_entry)
     except Exception as e:
       # TODO: If there is an error in writing to the exceptions log, we may want to consider trying
       # to write to another location (e.g. the cwd, if that is not already the destination).
