@@ -319,7 +319,7 @@ class Zinc(object):
       output_files=(self._relative_to_buildroot(bridge_jar),),
       output_directories=(self._relative_to_buildroot(self._compiler_bridge_cache_dir),),
       description='bootstrap compiler bridge.',
-      jdk_home=self.dist.home,
+      jdk_home=self.underlying_dist.home,
     )
     return context.execute_process_synchronously_or_raise(req, 'zinc-subsystem', [WorkUnitLabel.COMPILER])
 
