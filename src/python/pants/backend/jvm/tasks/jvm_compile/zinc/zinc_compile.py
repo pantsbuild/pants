@@ -432,6 +432,7 @@ class BaseZincCompile(JvmCompile):
         output_directories=(classes_dir,),
         description="zinc compile for {}".format(ctx.target.address.spec),
         # TODO: These should always be unicodes
+        # Since this is always hermetic, we need to use `underlying_dist`
         jdk_home=text_type(self._zinc.underlying_dist.home),
       )
       res = self.context.execute_process_synchronously_without_raising(req, self.name(), [WorkUnitLabel.COMPILER])
