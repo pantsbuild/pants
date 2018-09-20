@@ -131,10 +131,6 @@ class Rule(AbstractClass):
   def output_constraint(self):
     """An output Constraint type for the rule."""
 
-  @abstractproperty
-  def input_selectors(self):
-    """Collection of input selectors."""
-
 
 class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', 'func']), Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied.
@@ -191,10 +187,6 @@ class SingletonRule(datatype(['output_constraint', 'value']), Rule):
     # Create.
     return super(SingletonRule, cls).__new__(cls, constraint, value)
 
-  @property
-  def input_selectors(self):
-    return tuple()
-
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__, type_or_constraint_repr(self.output_constraint), self.value)
 
@@ -206,9 +198,6 @@ class RootRule(datatype(['output_constraint']), Rule):
   particular type might be when a value is provided as a root subject at the beginning
   of an execution.
   """
-
-  def input_selectors(self):
-    return []
 
 
 class RuleIndex(datatype(['rules', 'roots'])):

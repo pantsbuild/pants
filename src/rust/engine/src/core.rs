@@ -3,7 +3,6 @@
 
 use fnv::FnvHasher;
 
-use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, hash};
@@ -11,39 +10,49 @@ use std::{fmt, hash};
 use externs;
 use handles::Handle;
 
+use smallvec::SmallVec;
+
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
 ///
-/// Variants represent a string->string map. For hashability purposes, they're stored
-/// as sorted string tuples.
+/// Params represent a TypeId->Key map.
+///
+/// For efficiency and hashability, they're stored as sorted Keys (with distinct TypeIds), and
+/// wrapped in an `Arc` that allows us to copy-on-write for param contents.
 ///
 #[repr(C)]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Variants(pub Vec<(String, String)>);
+pub struct Params(SmallVec<[Key; 4]>);
 
-impl Variants {
-  ///
-  /// Merges right over self (by key, and then sorted by key).
-  ///
-  /// TODO: Unused: see https://github.com/pantsbuild/pants/issues/4020
-  ///
-  #[allow(dead_code)]
-  pub fn merge(&self, right: Variants) -> Variants {
-    // Merge.
-    let mut left: HashMap<_, _, FNV> = self.0.iter().cloned().collect();
-    left.extend(right.0);
-    // Convert back to a vector and sort.
-    let mut result: Vec<(String, String)> = left.into_iter().collect();
-    result.sort();
-    Variants(result)
+impl Params {
+  pub fn new_single(param: Key) -> Params {
+    Params(smallvec![param])
   }
 
-  pub fn find(&self, key: &str) -> Option<&str> {
+  ///
+  /// TODO: This is a compatibility API to assist in the transition from "every Node has exactly
+  /// one Subject" to "every Node has zero or more Params". See:
+  ///   https://github.com/pantsbuild/pants/issues/6478
+  ///
+  pub fn expect_single(&self) -> &Key {
+    if self.0.len() != 1 {
+      panic!(
+        "Expect Params to contain exactly one value... contained: {:?}",
+        self.0
+      );
+    }
+    &self.0[0]
+  }
+
+  ///
+  /// Returns the given TypeId if it is represented in this set of Params.
+  ///
+  pub fn find(&self, type_id: TypeId) -> Option<&Key> {
     self
       .0
-      .iter()
-      .find(|&&(ref k, _)| k == key)
-      .map(|&(_, ref v)| v.as_str())
+      .binary_search_by(|probe| probe.type_id().cmp(&type_id))
+      .ok()
+      .map(|idx| &self.0[idx])
   }
 }
 
@@ -52,7 +61,7 @@ pub type Id = u64;
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(pub Id);
 
 // On the python side, the 0th type id is used as an anonymous id
@@ -156,29 +165,8 @@ pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
   /// A root requestor should usually immediately retry their request.
   Invalidated,
-  /// There was no valid combination of rules to satisfy a request.
-  Noop(Noop),
   /// A rule raised an exception.
   Throw(Value, String),
-}
-
-// NB: enum members are listed in ascending priority order based on how likely they are
-// to be useful to users.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
-pub enum Noop {
-  NoTask,
-  NoVariant,
-  Cycle,
-}
-
-impl fmt::Debug for Noop {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    f.write_str(match self {
-      &Noop::Cycle => "Dep graph contained a cycle.",
-      &Noop::NoTask => "No task was available to compute the value.",
-      &Noop::NoVariant => "A matching variant key was not configured in variants.",
-    })
-  }
 }
 
 pub fn throw(msg: &str) -> Failure {
@@ -187,6 +175,6 @@ pub fn throw(msg: &str) -> Failure {
     format!(
       "Traceback (no traceback):\n  <pants native internals>\nException: {}",
       msg
-    ).to_string(),
+    ),
   )
 }

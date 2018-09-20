@@ -77,9 +77,11 @@ fs = { path = "fs" }
 futures = "^0.1.16"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
-lazy_static = "1"
+itertools = "0.7.2"
+lazy_static = "0.2.2"
 log = "0.4"
 process_execution = { path = "process_execution" }
 resettable = { path = "resettable" }
+smallvec = "0.6"
 tokio = "0.1"
 tempfile = "3"

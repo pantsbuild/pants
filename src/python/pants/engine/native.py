@@ -171,7 +171,6 @@ Tasks* tasks_create(void);
 void tasks_task_begin(Tasks*, Function, TypeConstraint);
 void tasks_add_get(Tasks*, TypeConstraint, TypeId);
 void tasks_add_select(Tasks*, TypeConstraint);
-void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
 void tasks_task_end(Tasks*);
 void tasks_singleton_add(Tasks*, Handle, TypeConstraint);
 void tasks_destroy(Tasks*);
@@ -186,8 +185,6 @@ Scheduler* scheduler_create(Tasks*,
                             Function,
                             Function,
                             Function,
-                            TypeConstraint,
-                            TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
@@ -802,9 +799,7 @@ class Native(object):
                     construct_file,
                     construct_link,
                     construct_process_result,
-                    constraint_has_products,
                     constraint_address,
-                    constraint_variants,
                     constraint_path_globs,
                     constraint_directory_digest,
                     constraint_snapshot,
@@ -836,8 +831,6 @@ class Native(object):
         func(construct_process_result),
         # TypeConstraints.
         tc(constraint_address),
-        tc(constraint_has_products),
-        tc(constraint_variants),
         tc(constraint_path_globs),
         tc(constraint_directory_digest),
         tc(constraint_snapshot),

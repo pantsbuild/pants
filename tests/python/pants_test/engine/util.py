@@ -16,7 +16,7 @@ from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
-from pants.engine.struct import HasProducts, Struct
+from pants.engine.struct import Struct
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.memo import memoized
 from pants.util.objects import SubclassesOf
@@ -105,14 +105,10 @@ def create_scheduler(rules, validate=True, native=None):
   )
 
 
-class Target(Struct, HasProducts):
+class Target(Struct):
   def __init__(self, name=None, configurations=None, **kwargs):
     super(Target, self).__init__(name=name, **kwargs)
     self.configurations = configurations
-
-  @property
-  def products(self):
-    return self.configurations
 
   @addressable_list(SubclassesOf(Struct))
   def configurations(self):
