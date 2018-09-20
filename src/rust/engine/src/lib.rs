@@ -51,6 +51,8 @@ extern crate lazy_static;
 extern crate log;
 extern crate process_execution;
 extern crate resettable;
+#[macro_use]
+extern crate smallvec;
 extern crate tokio;
 
 use std::ffi::CStr;

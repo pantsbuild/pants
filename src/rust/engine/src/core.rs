@@ -10,6 +10,8 @@ use std::{fmt, hash};
 use externs;
 use handles::Handle;
 
+use smallvec::SmallVec;
+
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
 ///
@@ -18,15 +20,13 @@ pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 /// For efficiency and hashability, they're stored as sorted Keys (with distinct TypeIds), and
 /// wrapped in an `Arc` that allows us to copy-on-write for param contents.
 ///
-/// TODO: Consider replacing the Arc<Vec<_>> with a [smallvec](https://crates.io/crates/smallvec).
-///
 #[repr(C)]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Params(Arc<Vec<Key>>);
+pub struct Params(SmallVec<[Key; 4]>);
 
 impl Params {
   pub fn new_single(param: Key) -> Params {
-    Params(Arc::new(vec![param]))
+    Params(smallvec![param])
   }
 
   ///
