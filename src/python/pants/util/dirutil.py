@@ -112,6 +112,20 @@ def safe_file_dump(filename, payload, binary_mode=True):
     f.write(payload)
 
 
+def maybe_read_file(filename, binary_mode=True):
+  """Read and return the contents of a file in a single file.read().
+
+  :param string filename: The filename of the file to read.
+  :param bool binary_mode: Read from file as bytes or unicode.
+  :returns: The contents of the file, or opening the file fails for any reason
+  :rtype: string
+  """
+  try:
+    return read_file(filename, binary_mode=binary_mode)
+  except IOError:
+    return None
+
+
 def read_file(filename, binary_mode=True):
   """Read and return the contents of a file in a single file.read().
 

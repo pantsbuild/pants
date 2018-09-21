@@ -42,7 +42,7 @@ class ExceptionSink(object):
     return cls._destination
 
   @classmethod
-  def _exceptions_log_path(cls, for_pid=None):
+  def exceptions_log_path(cls, for_pid=None):
     intermediate_filename_component = '.{}'.format(for_pid) if for_pid else ''
     return os.path.join(
       cls.get_destination(),
@@ -77,10 +77,10 @@ pid: {pid}
       fatal_error_log_entry = cls._format_exception_message(msg, pid)
       # We care more about this log than the shared log, so completely write to it first. This
       # avoids any errors with concurrent modification of the shared log affecting the per-pid log.
-      with safe_open(cls._exceptions_log_path(for_pid=pid), 'a') as pid_error_log:
+      with safe_open(cls.exceptions_log_path(for_pid=pid), 'a') as pid_error_log:
         pid_error_log.write(fatal_error_log_entry)
       # TODO: we should probably guard this against concurrent modification somehow.
-      with safe_open(cls._exceptions_log_path(), 'a') as shared_error_log:
+      with safe_open(cls.exceptions_log_path(), 'a') as shared_error_log:
         shared_error_log.write(fatal_error_log_entry)
     except Exception as e:
       # TODO: If there is an error in writing to the exceptions log, we may want to consider trying

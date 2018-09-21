@@ -13,11 +13,13 @@ from contextlib import contextmanager
 
 from future.utils import raise_with_traceback
 
+from pants.base.exception_sink import ExceptionSink
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.util.collections import combined_dict
+from pants.util.dirutil import maybe_read_file
 
 
 logger = logging.getLogger(__name__)
@@ -156,8 +158,20 @@ class RemotePantsRunner(object):
     This method will include the entire exception log for either the `pid` in the NailgunError, or
     failing that, the `pid` of the pantsd instance.
     """
-    # TODO: Enrich.
-    return self.Terminated('abruptly lost active connection to pantsd runner: {!r}'.format(nailgun_error))
+    sources = [pantsd_pid]
+    if nailgun_error.pid is not None:
+      sources = [abs(nailgun_error.pid)] + sources
+
+    exception_text = None
+    for source in sources:
+      log_path = ExceptionSink.exceptions_log_path(for_pid=source)
+      exception_text = maybe_read_file(log_path, binary_mode=False)
+      if exception_text:
+        break
+
+    exception_suffix = '\nRemote exception:\n{}'.format(exception_text) if exception_text else ''
+    return self.Terminated('abruptly lost active connection to pantsd runner: {!r}{}'.format(
+      nailgun_error, exception_suffix))
 
   def _restart_pantsd(self):
     return PantsDaemon.Factory.restart(bootstrap_options=self._bootstrap_options)
