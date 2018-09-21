@@ -100,15 +100,17 @@ def safe_mkdir_for_all(paths):
       created_dirs.add(dir_to_make)
 
 
-def safe_file_dump(filename, payload, binary_mode=True):
+def safe_file_dump(filename, payload, binary_mode=True, mode='w'):
   """Write a string to a file.
 
   :param string filename: The filename of the file to write to.
   :param string payload: The string to write to the file.
   :param bool binary_mode: Write to file as bytes or unicode.
+  :param string mode: A mode argument for the python `open` builtin.
   """
-  mode = 'wb' if binary_mode else 'w'
-  with safe_open(filename, mode) as f:
+  if binary_mode:
+    mode = mode + 'b'
+  with safe_open(filename, mode=mode) as f:
     f.write(payload)
 
 
