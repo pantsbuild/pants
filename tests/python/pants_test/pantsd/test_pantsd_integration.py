@@ -412,6 +412,32 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
+  def test_pantsd_killed_run(self):
+    with self.pantsd_test_context() as (workdir, config, checker):
+      # Launch a run that will wait for a file to be created (but do not create that file).
+      file_to_make = os.path.join(workdir, 'some_magic_file')
+      waiter_handle = self.run_pants_with_workdir_without_waiting(
+        ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
+        workdir,
+        config,
+      )
+
+      # Wait for the python run to be running.
+      time.sleep(15)
+      checker.assert_started()
+
+      # Locate the single "parent" pantsd-runner process, and kill it.
+      pantsd_runner_processes = [p for p in checker.runner_process_context.current_processes()
+                                 if p.ppid() == 1]
+      self.assertEquals(1, len(pantsd_runner_processes))
+      pantsd_runner_processes[0].terminate()
+      waiter_run = waiter_handle.join()
+      
+      # Ensure that we saw the failure in the client's stdout, and that we got a remote exception.
+      self.assert_failure(waiter_run)
+      self.assertIn('abruptly lost active connection to pantsd runner', waiter_run.stderr_data)
+      self.assertIn('Remote exception:', waiter_run.stderr_data)
+
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
     # isn't stripped.
