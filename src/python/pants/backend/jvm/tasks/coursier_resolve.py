@@ -23,6 +23,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier.coursier_subsystem import CoursierSubsystem
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.backend.jvm.tasks.resolve_shared import ResolveBase
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
@@ -37,7 +38,7 @@ class CoursierResultNotFound(Exception):
   pass
 
 
-class CoursierMixin(NailgunTask):
+class CoursierMixin(NailgunTask, ResolveBase):
   """
   Experimental 3rdparty resolver using coursier.
 
@@ -478,7 +479,8 @@ class CoursierMixin(NailgunTask):
           for coord in coord_candidates:
             transitive_resolved_jars = get_transitive_resolved_jars(coord, coord_to_resolved_jars)
             if transitive_resolved_jars:
-              compile_classpath.add_jars_for_targets([t], conf, transitive_resolved_jars)
+              jars_and_directory_digests = self.jars_and_directory_digests_for_jars(transitive_resolved_jars)
+              compile_classpath.add_jars_for_targets([t], conf, jars_and_directory_digests)
 
   def _populate_results_dir(self, vts_results_dir, results):
     mode = 'w' if PY3 else 'wb'

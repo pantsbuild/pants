@@ -80,7 +80,7 @@ class ClasspathUtilTest(TestBase):
     classpath_products.add_for_target(a, [('default', path1)])
     classpath_products.add_for_target(a, [('non-default', path2)])
     classpath_products.add_for_target(b, [('default', path2)])
-    classpath_products.add_jars_for_targets([b], 'default', [resolved_jar])
+    classpath_products.add_jars_for_targets([b], 'default', [(resolved_jar, None)])
     classpath_products.add_excludes_for_targets([a])
 
     # (a, path2) filtered because of conf

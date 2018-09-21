@@ -26,9 +26,10 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
     jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
     with open_zip(jar_artifact.pants_path, 'w') as jar:
       jar.writestr('foo/Foo.class', '')
-    classpath_products.add_jars_for_targets(targets=[binary_target],
-                                            conf='default',
-                                            resolved_jars=[jar_artifact])
+    classpath_products.add_jars_for_targets(
+      targets=[binary_target],
+      conf='default',
+      resolved_jars_and_directory_digests=[(jar_artifact, None)])
 
     self.add_to_runtime_classpath(context, binary_target, {'Bar.class': '', 'bar.txt': ''})
 
@@ -79,9 +80,10 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
       # This file should not be included in the binary jar since org.pantsbuild is deploy excluded.
       jar.writestr('baz/Baz.class', '')
 
-    classpath_products.add_jars_for_targets(targets=[foo_jar_lib],
-                                            conf='default',
-                                            resolved_jars=[foo_artifact, baz_artifact])
+    classpath_products.add_jars_for_targets(
+      targets=[foo_jar_lib],
+      conf='default',
+      resolved_jars_and_directory_digests=[(foo_artifact, None), (baz_artifact, None)])
 
     self.add_to_runtime_classpath(context, binary_target, {'Bar.class': '', 'bar.txt': ''})
 

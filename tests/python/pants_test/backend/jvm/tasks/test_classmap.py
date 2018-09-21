@@ -59,9 +59,10 @@ class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
     self.add_to_runtime_classpath(task_context, self.target_c, idict('c1.class', 'c2.class'))
 
     classpath_products = self.ensure_classpath_products(task_context)
-    classpath_products.add_jars_for_targets(targets=[self.target_b],
-                                            conf='default',
-                                            resolved_jars=[self.jar_artifact])
+    classpath_products.add_jars_for_targets(
+      targets=[self.target_b],
+      conf='default',
+      resolved_jars_and_directory_digests=[(self.jar_artifact, None)])
     yield task_context
 
   def test_classmap_none(self):

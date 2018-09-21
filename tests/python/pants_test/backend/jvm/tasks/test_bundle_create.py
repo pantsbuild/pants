@@ -97,12 +97,13 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     after context is re-created.
     """
     classpath_products = self.ensure_consolidated_classpath_products(task_context)
-    classpath_products.add_jars_for_targets(targets=[self.jar_lib],
-                                            conf='default',
-                                            resolved_jars=[self.jar_artifact,
-                                                           self.zip_artifact,
-                                                           self.bundle_artifact,
-                                                           self.tar_gz_artifact])
+    classpath_products.add_jars_for_targets(
+      targets=[self.jar_lib],
+      conf='default',
+      resolved_jars_and_directory_digests=[(self.jar_artifact, None),
+                                            (self.zip_artifact, None),
+                                            (self.bundle_artifact, None),
+                                            (self.tar_gz_artifact, None)])
 
     self.add_consolidated_bundle(task_context, self.binary_target,
                                   {'Foo.class': '', 'foo.txt': '', 'foo/file': ''})
@@ -140,9 +141,10 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     missing_jar_artifact = self.create_artifact(org='org.example', name='foo', rev='2.0.0',
                                                 materialize=False)
     classpath_products = self.ensure_consolidated_classpath_products(self.task_context)
-    classpath_products.add_jars_for_targets(targets=[self.binary_target],
-                                            conf='default',
-                                            resolved_jars=[missing_jar_artifact])
+    classpath_products.add_jars_for_targets(
+      targets=[self.binary_target],
+      conf='default',
+      resolved_jars_and_directory_digests=[(missing_jar_artifact, None)])
 
     with self.assertRaises(MissingClasspathEntryError):
       self.execute(self.task_context)
