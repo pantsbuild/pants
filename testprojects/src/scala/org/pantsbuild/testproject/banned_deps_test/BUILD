@@ -1,38 +1,64 @@
+# Target that bans a package in a third party dependency
 scala_library(
-    name = "banpackages",
-    sources = ["Main.scala"],
-    dependency_constraints =
+    name="ban_packages",
+    sources=["Main.scala"],
+    dependency_constraints=
         DependencyConstraints(
-            direct = [
+            direct=[
                 DependencyConstraint.JvmPackageConstraint("scopt"),
             ],
-            transitive = [
+            transitive=[
                 DependencyConstraint.JvmPackageConstraint("never.Triggered"),
             ],
         ),
-    dependencies = [
+    dependencies=[
         "3rdparty/jvm/com/github/scopt",
     ],
 )
 
+# Target that bans a tag in another target
 scala_library(
-    name = "bantags",
-    sources = ["Main.scala"],
-    dependency_constraints =
+    name="nodeps",
+    sources=["Main.scala"],
+    tags=["deprecated"],
+)
+
+scala_library(
+    name="ban_tags",
+    sources=["Main.scala"],
+    dependency_constraints=
         DependencyConstraints(
-            direct = [
+            direct=[
             ],
-            transitive = [
+            transitive=[
                 DependencyConstraint.Tag("deprecated"),
             ],
         ),
-    dependencies = [
+    dependencies=[
         ":nodeps",
     ],
 )
 
+# Ban test dependencies
+junit_tests(
+    name="testlib",
+    sources=["Spec.scala"],
+    dependency_constraints =
+    DependencyConstraints(
+        direct=[
+        ],
+        transitive=[
+            DependencyConstraint.Tag("deprecated"),
+        ],
+    ),
+)
+
 scala_library(
-    name = "nodeps",
-    sources = ["Main.scala"],
-    tags = ["deprecated"],
+    name="ban_testdeps",
+    sources=["Main.scala"],
+    dependecies=[":testlib"],
+    dependency_constraints=DependencyConstraints(
+        direct=[DependencyConstraint.JvmTestDependencies],
+        transitive=[]
+    )
 )
