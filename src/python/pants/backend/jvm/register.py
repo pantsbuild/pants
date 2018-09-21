@@ -34,6 +34,8 @@ from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
+from pants.backend.jvm.tasks.check_banned_deps import DependencyConstraints, DependencyConstraint, \
+  CheckBannedDeps
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.classmap import ClassmapTask
@@ -129,6 +131,8 @@ def build_file_aliases():
       'shading_exclude_package': Shading.create_exclude_package,
       'shading_keep_package': Shading.create_keep_package,
       'shading_zap_package': Shading.create_zap_package,
+      'DependencyConstraints': DependencyConstraints,
+      'DependencyConstraint': DependencyConstraint,
     },
     context_aware_object_factories={
       'bundle': Bundle,
@@ -230,3 +234,4 @@ def register_goals():
   task(name='test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
   task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
   task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)
+  task(name='check-banned-deps', action=CheckBannedDeps).install('compile')
