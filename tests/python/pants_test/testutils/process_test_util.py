@@ -42,7 +42,7 @@ def no_lingering_process_by_command(name):
   existing processes outside of the scope of the contextmanager."""
   context = TrackedProcessesContext(name, set(_safe_iter_matching_processes(name)))
   yield context
-  delta_processes = context.current_processes
+  delta_processes = context.current_processes()
   if delta_processes:
     raise ProcessStillRunning(
       '{} {} processes lingered after tests:\n{}'

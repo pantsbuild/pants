@@ -98,15 +98,19 @@ class RemotePantsRunner(object):
     """Minimal backoff strategy for daemon restarts."""
     time.sleep(attempt + (attempt - 1))
 
-  def _run_pants_with_retry(self, pid, port, retries=3):
-    """Runs pants remotely with retry and recovery for nascent executions."""
+  def _run_pants_with_retry(self, pantsd_handle, retries=3):
+    """Runs pants remotely with retry and recovery for nascent executions.
+
+    :param PantsDaemon.Handle pantsd_handle: A Handle for the daemon to connect to.
+    """
     attempt = 1
     while 1:
       logger.debug(
-        'connecting to pantsd on port {} (attempt {}/{})'.format(port, attempt, retries)
+        'connecting to pantsd on port {} (attempt {}/{})'
+        .format(pantsd_handle.port, attempt, retries)
       )
       try:
-        return self._connect_and_execute(port)
+        return self._connect_and_execute(pantsd_handle.port)
       except self.RECOVERABLE_EXCEPTIONS as e:
         if attempt > retries:
           raise self.Fallback(e)
@@ -114,20 +118,20 @@ class RemotePantsRunner(object):
         self._backoff(attempt)
         logger.warn(
           'pantsd was unresponsive on port {}, retrying ({}/{})'
-          .format(port, attempt, retries)
+          .format(pantsd_handle.port, attempt, retries)
         )
 
         # One possible cause of the daemon being non-responsive during an attempt might be if a
         # another lifecycle operation is happening concurrently (incl teardown). To account for
         # this, we won't begin attempting restarts until at least 1 second has passed (1 attempt).
         if attempt > 1:
-          pid, port = self._restart_pantsd()
+          pantsd_handle = self._restart_pantsd()
         attempt += 1
       except NailgunClient.NailgunError as e:
         # Ensure a newline.
         logger.fatal('')
         logger.fatal('lost active connection to pantsd!')
-        raise_with_traceback(self._extract_remote_exception(pid, e))
+        raise_with_traceback(self._extract_remote_exception(pantsd_handle.pid, e))
 
   def _connect_and_execute(self, port):
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
@@ -181,5 +185,5 @@ class RemotePantsRunner(object):
 
   def run(self, args=None):
     self._setup_logging()
-    pid, port = self._maybe_launch_pantsd()
-    self._run_pants_with_retry(pid, port)
+    pantsd_handle = self._maybe_launch_pantsd()
+    self._run_pants_with_retry(pantsd_handle)

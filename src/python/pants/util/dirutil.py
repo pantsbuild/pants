@@ -100,16 +100,31 @@ def safe_mkdir_for_all(paths):
       created_dirs.add(dir_to_make)
 
 
-def safe_file_dump(filename, payload, binary_mode=True, mode='w'):
+def safe_file_dump(filename, payload, binary_mode=None, mode=None):
   """Write a string to a file.
+
+  This method is "safe" to the extent that `safe_open` is "safe". See the explanation on the method
+  doc there.
+
+  TODO: The `binary_mode` flag should be deprecated and removed from existing callsites. Once
+  `binary_mode` is removed, mode can directly default to `wb`.
+    see https://github.com/pantsbuild/pants/issues/6543
 
   :param string filename: The filename of the file to write to.
   :param string payload: The string to write to the file.
-  :param bool binary_mode: Write to file as bytes or unicode.
-  :param string mode: A mode argument for the python `open` builtin.
+  :param bool binary_mode: Write to file as bytes or unicode. Mutually exclusive with mode.
+  :param string mode: A mode argument for the python `open` builtin. Mutually exclusive with
+    binary_mode.
   """
-  if binary_mode:
-    mode = mode + 'b'
+  if binary_mode is not None and mode is not None:
+    raise AssertionError('Only one of `binary_mode` and `mode` may be specified.')
+
+  if mode is None:
+    if binary_mode is False:
+      mode = 'w'
+    else:
+      mode = 'wb'
+
   with safe_open(filename, mode=mode) as f:
     f.write(payload)
 

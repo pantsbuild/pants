@@ -66,7 +66,7 @@ pid: {pid}
   def log_exception(cls, msg):
     try:
       pid = os.getpid()
-      fatal_error_log_entry = cls._format_exception_message(msg, pid).encode('utf-8')
+      fatal_error_log_entry = cls._format_exception_message(msg, pid)
       # We care more about this log than the shared log, so completely write to it first. This
       # avoids any errors with concurrent modification of the shared log affecting the per-pid log.
       safe_file_dump(cls.exceptions_log_path(for_pid=pid), fatal_error_log_entry, mode='w')

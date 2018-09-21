@@ -32,6 +32,7 @@ from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.collections import combined_dict
 from pants.util.contextutil import stdio_as
 from pants.util.memo import memoized_property
+from pants.util.objects import datatype
 from pants.util.strutil import ensure_text
 
 
@@ -75,14 +76,21 @@ class PantsDaemon(FingerprintedProcessManager):
   class RuntimeFailure(Exception):
     """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
+  class Handle(datatype([('pid', int), ('port', int)])):
+    """A handle to a "probably running" pantsd instance.
+
+    We attempt to verify that the pantsd instance is still running when we create a Handle, but
+    after it has been created it is entirely process that the pantsd instance perishes.
+    """
+
   class Factory(object):
     @classmethod
     def maybe_launch(cls, bootstrap_options=None):
       """Creates and launches a daemon instance if one does not already exist.
 
       :param Options bootstrap_options: The bootstrap options, if available.
-      :returns: The pailgun pid and port numbers of the running pantsd instance.
-      :rtype: tuple
+      :returns: A Handle for the running pantsd instance.
+      :rtype: PantsDaemon.Handle
       """
       stub_pantsd = cls.create(bootstrap_options, full_init=False)
       with stub_pantsd.lifecycle_lock:
@@ -92,17 +100,18 @@ class PantsDaemon(FingerprintedProcessManager):
           return pantsd.launch()
         else:
           # We're already launched.
-          pid = stub_pantsd.await_pid(10)
-          port = stub_pantsd.read_named_socket('pailgun', int)
-          return pid, port
+          return PantsDaemon.Handle(
+              stub_pantsd.await_pid(10),
+              stub_pantsd.read_named_socket('pailgun', int)
+            )
 
     @classmethod
     def restart(cls, bootstrap_options=None):
       """Restarts a running daemon instance.
 
       :param Options bootstrap_options: The bootstrap options, if available.
-      :returns: The pailgun pid and port numbers of the running pantsd instance.
-      :rtype: tuple
+      :returns: A Handle for the pantsd instance.
+      :rtype: PantsDaemon.Handle
       """
       pantsd = cls.create(bootstrap_options)
       with pantsd.lifecycle_lock:
@@ -397,8 +406,8 @@ class PantsDaemon(FingerprintedProcessManager):
 
     N.B. This should always be called under care of `self.lifecycle_lock`.
 
-    :returns: The port that pantsd is listening on.
-    :rtype: int
+    :returns: A Handle for the pantsd instance.
+    :rtype: PantsDaemon.Handle
     """
     self.terminate(include_watchman=False)
     self.watchman_launcher.maybe_launch()
@@ -409,7 +418,7 @@ class PantsDaemon(FingerprintedProcessManager):
     listening_port = self.read_named_socket('pailgun', int)
     self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
                        .format(self.pid, listening_port))
-    return pantsd_pid, listening_port
+    return self.Handle(pantsd_pid, listening_port)
 
   def terminate(self, include_watchman=True):
     """Terminates pantsd and watchman.
