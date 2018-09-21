@@ -48,6 +48,7 @@ class JvmTarget(Target, Jarable):
                javac_plugin_args=None,
                scalac_plugins=None,
                scalac_plugin_args=None,
+               dependency_constraints=None,
                **kwargs):
     """
     :API: public
@@ -88,6 +89,8 @@ class JvmTarget(Target, Jarable):
     :param dict javac_plugin_args: Map from javac plugin name to list of arguments for that plugin.
     :param scalac_plugins: names of compiler plugins to use when compiling this target with scalac.
     :param dict scalac_plugin_args: Map from scalac plugin name to list of arguments for that plugin.
+    :param dependency_constraints: Names of the packages and classes that are not allowed
+           in the target or its dependencies.
     """
 
     self.address = address  # Set in case a TargetDefinitionException is thrown early
@@ -106,6 +109,7 @@ class JvmTarget(Target, Jarable):
       'javac_plugin_args': PrimitiveField(javac_plugin_args),
       'scalac_plugins': PrimitivesSetField(scalac_plugins or []),
       'scalac_plugin_args': PrimitiveField(scalac_plugin_args),
+      'dependency_constraints': dependency_constraints,
     })
 
     super(JvmTarget, self).__init__(address=address, payload=payload, **kwargs)

@@ -86,6 +86,10 @@ class JvmDependencyAnalyzer(object):
 
     return targets_with_class
 
+  def classes_for_targets(self, targets):
+    """All the class names relevant for a target"""
+    return reduce(set.union, (self._target_classes(target) for target in targets))
+
   @memoized_method
   def _target_classes(self, target):
     """Set of target's provided classes.
