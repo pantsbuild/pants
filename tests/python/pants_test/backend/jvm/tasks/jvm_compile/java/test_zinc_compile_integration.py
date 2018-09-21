@@ -8,9 +8,10 @@ import os
 from builtins import open
 from unittest import skipIf
 
+from pants.base.build_environment import get_buildroot
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import temporary_dir, with_overwritten_file_content
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 
@@ -212,6 +213,29 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         pants_run = self.run_test_compile(workdir, cachedir, target_spec, clean_all=True)
         self.assertEqual(0, pants_run.returncode)
 
+  def test_failed_hermetic_incremental_compile(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir]},
+        'compile.zinc': {
+          'execution_strategy': 'hermetic',
+          'use_classpath_jars': False,
+          'incremental': True,
+        }
+      }
+
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          [
+            '-q',
+            'run',
+            'examples/src/scala/org/pantsbuild/example/hello/exe',
+          ],
+          workdir,
+          config,
+        )
+        self.assert_failure(pants_run)
+
   def test_hermetic_binary_with_dependencies(self):
     with temporary_dir() as cache_dir:
       config = {
@@ -219,6 +243,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         'compile.zinc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
+          'incremental': False,
         }
       }
 
@@ -246,3 +271,104 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         ]:
           path = os.path.join(compile_dir, path_suffix)
           self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
+
+  def test_hermetic_binary_cache_with_dependencies(self):
+    file_abs_path = os.path.join(get_buildroot(),
+      'examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala')
+
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir]},
+        'compile.zinc': {
+          'execution_strategy': 'hermetic',
+          'use_classpath_jars': False,
+          'incremental': False,
+        }
+      }
+
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          [
+            '-q',
+            'run',
+            'examples/src/scala/org/pantsbuild/example/hello/exe',
+          ],
+          workdir,
+          config,
+        )
+        self.assert_success(pants_run)
+        self.assertIn(
+          'Num args passed: 0. Stand by for welcome...\nHello, Resource World!',
+          pants_run.stdout_data,
+        )
+
+        compile_dir = os.path.join(workdir, 'compile', 'zinc', 'current')
+
+        for path_suffix in [
+          'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class',
+          'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
+        ]:
+          path = os.path.join(compile_dir, path_suffix)
+          self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
+
+        with with_overwritten_file_content(file_abs_path):
+
+          new_temp_test = '''package org.pantsbuild.example.hello.exe
+                              
+                              import java.io.{BufferedReader, InputStreamReader}
+                              
+                              import org.pantsbuild.example.hello.welcome
+                              
+                              // A simple jvm binary to illustrate Scala BUILD targets
+                              
+                              object Exe {
+                                /** Test that resources are properly namespaced. */
+                                def getWorld: String = {
+                                  val is =
+                                    this.getClass.getClassLoader.getResourceAsStream(
+                                      "org/pantsbuild/example/hello/world.txt"
+                                    )
+                                  try {
+                                    new BufferedReader(new InputStreamReader(is)).readLine()
+                                  } finally {
+                                    is.close()
+                                  }
+                                }
+                              
+                                def main(args: Array[String]) {
+                                  println("Num args passed: " + args.size + ". Stand by for welcome...")
+                                  if (args.size <= 0) {
+                                    println("Hello, and welcome to " + getWorld + "!")
+                                  } else {
+                                    val w = welcome.WelcomeEverybody(args)
+                                    w.foreach(s => println(s))
+                                  }
+                                }
+                              }'''
+
+          with open(file_abs_path, 'w') as f:
+            f.write(new_temp_test)
+
+          pants_run = self.run_pants_with_workdir(
+            [
+              '-q',
+              'run',
+              'examples/src/scala/org/pantsbuild/example/hello/exe',
+            ],
+            workdir,
+            config,
+          )
+          self.assert_success(pants_run)
+          self.assertIn(
+            'Num args passed: 0. Stand by for welcome...\nHello, and welcome to Resource World!',
+            pants_run.stdout_data,
+          )
+
+          compile_dir = os.path.join(workdir, 'compile', 'zinc', 'current')
+
+          for path_suffix in [
+            'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class',
+            'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
+          ]:
+            path = os.path.join(compile_dir, path_suffix)
+            self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))

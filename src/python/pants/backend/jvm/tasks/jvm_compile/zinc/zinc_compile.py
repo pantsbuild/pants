@@ -209,6 +209,11 @@ class BaseZincCompile(JvmCompile):
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args,
                                    self._args)
     if self.execution_strategy == self.HERMETIC:
+      # TODO: Make incremental compiles work. See:
+      # hermetically https://github.com/pantsbuild/pants/issues/6517
+      if self.get_options().incremental:
+        raise TaskError("Hermetic zinc execution does not currently support incremental compiles. "
+                        "Please use --no-compile-zinc-incremental.")
       try:
         fast_relpath(self.get_options().pants_workdir, get_buildroot())
       except ValueError:
@@ -239,8 +244,8 @@ class BaseZincCompile(JvmCompile):
 
     if zinc_analysis is not None:
       for compile_context in compile_contexts:
-        zinc_analysis[compile_context.target] = (compile_context.classes_dir,
-        compile_context.jar_file,
+        zinc_analysis[compile_context.target] = (compile_context.classes_dir.path,
+        compile_context.jar_file.path,
         compile_context.analysis_file)
 
     if zinc_args is not None:
@@ -270,11 +275,11 @@ class BaseZincCompile(JvmCompile):
     """Override write_extra_resources to produce plugin and annotation processor files."""
     target = compile_context.target
     if isinstance(target, ScalacPlugin):
-      self._write_scalac_plugin_info(compile_context.classes_dir, target)
+      self._write_scalac_plugin_info(compile_context.classes_dir.path, target)
     elif isinstance(target, JavacPlugin):
-      self._write_javac_plugin_info(compile_context.classes_dir, target)
+      self._write_javac_plugin_info(compile_context.classes_dir.path, target)
     elif isinstance(target, AnnotationProcessor) and target.processors:
-      processor_info_file = os.path.join(compile_context.classes_dir, _PROCESSOR_INFO_FILE)
+      processor_info_file = os.path.join(compile_context.classes_dir.path, _PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
 
   def _write_processor_info(self, processor_info_file, processors):
@@ -285,10 +290,10 @@ class BaseZincCompile(JvmCompile):
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
-    absolute_classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
+    absolute_classpath = (ctx.classes_dir.path,) + tuple(ce.path for ce in dependency_classpath)
 
     if self.get_options().capture_classpath:
-      self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir)
+      self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir.path)
 
     # TODO: Allow use of absolute classpath entries with hermetic execution,
     # specifically by using .jdk dir for Distributions:
@@ -301,7 +306,7 @@ class BaseZincCompile(JvmCompile):
       # TODO: Support workdirs not nested under buildroot by path-rewriting.
       return fast_relpath(path, get_buildroot())
 
-    classes_dir = ctx.classes_dir
+    classes_dir = ctx.classes_dir.path
     analysis_cache = ctx.analysis_file
 
     analysis_cache = relative_to_exec_root(analysis_cache)
@@ -339,7 +344,7 @@ class BaseZincCompile(JvmCompile):
     #   triggering the plugin search mechanism, which does the memoizing).
     scalac_plugin_search_classpath = (
       (set(absolute_classpath) | set(self.scalac_plugin_classpath_elements())) -
-      {ctx.classes_dir, ctx.jar_file}
+      {ctx.classes_dir.path, ctx.jar_file.path}
     )
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
@@ -429,7 +434,6 @@ class BaseZincCompile(JvmCompile):
       req = ExecuteProcessRequest(
         argv=argv,
         input_files=merged_input_digest,
-        output_files=(analysis_cache,),
         output_directories=(classes_dir,),
         description="zinc compile for {}".format(ctx.target.address.spec),
         # TODO: These should always be unicodes

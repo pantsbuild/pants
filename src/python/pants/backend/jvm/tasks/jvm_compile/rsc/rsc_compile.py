@@ -15,6 +15,7 @@ from six import text_type
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import Job
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
@@ -510,8 +511,8 @@ class RscCompile(ZincCompile):
       CompileContext(
         target=target,
         analysis_file=os.path.join(zinc_dir, 'z.analysis'),
-        classes_dir=os.path.join(zinc_dir, 'classes'),
-        jar_file=os.path.join(zinc_dir, 'z.jar'),
+        classes_dir=ClasspathEntry(os.path.join(zinc_dir, 'classes'), None),
+        jar_file=ClasspathEntry(os.path.join(zinc_dir, 'z.jar'), None),
         log_dir=os.path.join(zinc_dir, 'logs'),
         zinc_args_file=os.path.join(zinc_dir, 'zinc_args'),
         sources=sources,
