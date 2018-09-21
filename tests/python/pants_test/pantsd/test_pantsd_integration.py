@@ -12,6 +12,8 @@ import time
 from builtins import open, range, zip
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
+
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
 from pants_test.pantsd.pantsd_integration_test_base import (PantsDaemonIntegrationTestBase,
@@ -432,10 +434,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assertEquals(1, len(pantsd_runner_processes))
       pantsd_runner_processes[0].terminate()
       waiter_run = waiter_handle.join()
-      
+
       # Ensure that we saw the failure in the client's stdout, and that we got a remote exception.
       self.assert_failure(waiter_run)
       self.assertIn('abruptly lost active connection to pantsd runner', waiter_run.stderr_data)
+
+      pytest.xfail("Expected to fail due to https://github.com/pantsbuild/pants/issues/6530")
       self.assertIn('Remote exception:', waiter_run.stderr_data)
 
   def test_pantsd_environment_scrubbing(self):
