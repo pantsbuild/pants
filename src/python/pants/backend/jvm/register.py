@@ -34,8 +34,8 @@ from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
-from pants.backend.jvm.tasks.check_banned_deps import DependencyConstraints, DependencyConstraint, \
-  CheckBannedDeps
+from pants.backend.jvm.tasks.check_banned_deps import (CheckBannedDeps, DependencyConstraint,
+                                                       DependencyConstraints)
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.classmap import ClassmapTask
