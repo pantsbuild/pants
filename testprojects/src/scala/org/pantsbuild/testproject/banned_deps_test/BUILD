@@ -42,23 +42,15 @@ scala_library(
 # Ban test dependencies
 junit_tests(
     name="testlib",
-    sources=["Spec.scala"],
-    dependency_constraints =
-    DependencyConstraints(
-        direct=[
-        ],
-        transitive=[
-            DependencyConstraint.Tag("deprecated"),
-        ],
-    ),
+    sources=["Spec.scala"]
 )
 
 scala_library(
     name="ban_testdeps",
     sources=["Main.scala"],
-    dependecies=[":testlib"],
+    dependencies=[":testlib"],
     dependency_constraints=DependencyConstraints(
-        direct=[DependencyConstraint.JvmTestDependencies],
+        direct=[DependencyConstraint.TestDependencies()],
         transitive=[]
     )
 )

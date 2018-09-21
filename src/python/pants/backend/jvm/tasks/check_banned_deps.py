@@ -1,8 +1,7 @@
-# coding=utf-8
-# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
-# Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 from abc import abstractmethod
+
+from pants.backend.jvm.targets.junit_tests import JUnitTests
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.task.task import Task
 from pants.base.payload_field import combine_hashes, PayloadField, stable_json_hash
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
@@ -46,12 +45,12 @@ class DependencyConstraints(PayloadField):
     return target.dependencies
 
 class DependencyConstraint(object):
-  """Umbrella to hold the Constraint class hierarchy."""
-  class BannedDependencyException(Exception):
-    pass
+  """Umbrella to hold the Constraint class hierarchy.
 
-  @abstractmethod
-  def _compute_fingerprint(self):
+  Has no functionality, but allows targets to use syntax like
+    `DependencyConstraint.JvmPackageConstraint("com.google")`
+  """
+  class BannedDependencyException(Exception):
     pass
 
   class Constraint(PayloadField):
@@ -89,8 +88,8 @@ class DependencyConstraint(object):
     def __init__(self, banned_tag_name):
       self.banned_tag_name = banned_tag_name
 
-    def _has_bad_tag(self, t):
-      return self.banned_tag_name in t.tags
+    def _has_bad_tag(self, target):
+      return self.banned_tag_name in target.tags
 
     def check_target(self, target, task_context, classes_relevant_to_target):
       relevant_targets = DependencyConstraints.relevant_targets(target)
@@ -105,6 +104,27 @@ class DependencyConstraint(object):
 
     def _compute_fingerprint(self):
       return stable_json_hash(self.banned_tag_name)
+
+  class TestDependencies(Constraint):
+    """Check that this target does not depend on test targets"""
+    def __init__(self):
+      self.name = "test_dependencies"
+
+    def _is_test_dependency(self, dependency):
+      return isinstance(dependency, (PythonTests, JUnitTests))
+
+    def check_target(self, target, task_context, classes_relevant_to_target):
+      relevant_targets = DependencyConstraints.relevant_targets(target)
+      forbidden_targets = [t for t in relevant_targets if self._is_test_dependency(t)]
+      if forbidden_targets:
+        raise DependencyConstraint.BannedDependencyException(
+          'Target {} has test dependencies on targets ({})'.format(
+            target.target_base,
+            ", ".join([t.target_base for t in forbidden_targets])
+          ))
+
+    def _compute_fingerprint(self):
+      return stable_json_hash(self.name)
 
 class CheckBannedDeps(Task):
   """
