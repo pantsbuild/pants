@@ -36,8 +36,13 @@ def full_pantsd_log(workdir):
 
 
 class PantsDaemonMonitor(ProcessManager):
-  def __init__(self, metadata_base_dir=None):
+  def __init__(self, runner_process_context, metadata_base_dir=None):
+    """
+    :param runner_process_context: A TrackedProcessContext that can be used to inspect live
+      pantsd-runner instances created in this context.
+    """
     super(PantsDaemonMonitor, self).__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
+    self.runner_process_context = runner_process_context
 
   def _log(self):
     print(magenta(
@@ -65,7 +70,7 @@ class PantsDaemonMonitor(ProcessManager):
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
   @contextmanager
   def pantsd_test_context(self, log_level='info', extra_config=None, expected_runs=1):
-    with no_lingering_process_by_command('pantsd-runner'):
+    with no_lingering_process_by_command('pantsd-runner') as runner_process_context:
       with self.temporary_workdir() as workdir_base:
         pid_dir = os.path.join(workdir_base, '.pids')
         workdir = os.path.join(workdir_base, '.workdir.pants.d')
@@ -83,7 +88,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         if extra_config:
           recursively_update(pantsd_config, extra_config)
         print('>>> config: \n{}\n'.format(pantsd_config))
-        checker = PantsDaemonMonitor(pid_dir)
+        checker = PantsDaemonMonitor(runner_process_context, pid_dir)
         self.assert_runner(workdir, pantsd_config, ['kill-pantsd'])
         try:
           yield workdir, pantsd_config, checker
