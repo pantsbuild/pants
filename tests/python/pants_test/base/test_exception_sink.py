@@ -26,17 +26,6 @@ class TestExceptionSink(TestBase):
   def test_unset_destination(self):
     self.assertEqual(os.getcwd(), self._gen_sink_subclass().get_destination())
 
-  def test_set_invalid_destination(self):
-    sink = self._gen_sink_subclass()
-    err_rx = re.escape(
-      "The provided exception sink path at '/does/not/exist' is not a writable directory.")
-    with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
-      sink.set_destination('/does/not/exist')
-    err_rx = re.escape(
-      "The provided exception sink path at '/' is not a writable directory.")
-    with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
-      sink.set_destination('/')
-
   def test_retrieve_destination(self):
     sink = self._gen_sink_subclass()
 

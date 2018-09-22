@@ -59,6 +59,7 @@ class Exiter(object):
     """
     self._should_print_backtrace = options.for_global_scope().print_exception_stacktrace
     self._workdir = options.for_global_scope().pants_workdir
+    ExceptionSink.set_destination(self._workdir)
 
   def exit(self, result=0, msg=None, out=None):
     """Exits the runtime.
@@ -100,8 +101,6 @@ class Exiter(object):
     self.exit_and_fail(format_msg(self._should_print_backtrace))
 
   def _log_exception(self, msg):
-    if self._workdir:
-      ExceptionSink.set_destination(self._workdir)
     ExceptionSink.log_exception(msg)
 
   def _setup_faulthandler(self, trace_stream):

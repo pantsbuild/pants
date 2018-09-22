@@ -10,7 +10,7 @@ import os
 import sys
 from builtins import object
 
-from pants.util.dirutil import is_writable_dir, safe_open
+from pants.util.dirutil import safe_file_dump
 
 
 logger = logging.getLogger(__name__)
@@ -25,16 +25,8 @@ class ExceptionSink(object):
     raise TypeError('Instances of {} are not allowed to be constructed!'
                     .format(cls.__name__))
 
-  class ExceptionSinkError(Exception): pass
-
   @classmethod
   def set_destination(cls, dir_path):
-    if not is_writable_dir(dir_path):
-      # TODO: when this class sets up excepthooks, raising this should be safe, because we always
-      # have a destination to log to (os.getcwd() if not otherwise set).
-      raise cls.ExceptionSinkError(
-        "The provided exception sink path at '{}' is not a writable directory."
-        .format(dir_path))
     cls._destination = dir_path
 
   @classmethod
@@ -42,7 +34,7 @@ class ExceptionSink(object):
     return cls._destination
 
   @classmethod
-  def _exceptions_log_path(cls, for_pid=None):
+  def exceptions_log_path(cls, for_pid=None):
     intermediate_filename_component = '.{}'.format(for_pid) if for_pid else ''
     return os.path.join(
       cls.get_destination(),
@@ -77,11 +69,9 @@ pid: {pid}
       fatal_error_log_entry = cls._format_exception_message(msg, pid)
       # We care more about this log than the shared log, so completely write to it first. This
       # avoids any errors with concurrent modification of the shared log affecting the per-pid log.
-      with safe_open(cls._exceptions_log_path(for_pid=pid), 'a') as pid_error_log:
-        pid_error_log.write(fatal_error_log_entry)
+      safe_file_dump(cls.exceptions_log_path(for_pid=pid), fatal_error_log_entry, mode='w')
       # TODO: we should probably guard this against concurrent modification somehow.
-      with safe_open(cls._exceptions_log_path(), 'a') as shared_error_log:
-        shared_error_log.write(fatal_error_log_entry)
+      safe_file_dump(cls.exceptions_log_path(), fatal_error_log_entry, mode='a')
     except Exception as e:
       # TODO: If there is an error in writing to the exceptions log, we may want to consider trying
       # to write to another location (e.g. the cwd, if that is not already the destination).
