@@ -38,7 +38,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     entry_path = safe_mkdtemp(dir=target_dir)
     classpath_dir = safe_mkdtemp(dir=target_dir)
     for rel_path, content in files_dict.items():
-      safe_file_dump(os.path.join(entry_path, rel_path), content)
+      safe_file_dump(os.path.join(entry_path, rel_path), content, binary_mode=False)
 
     # Create Jar to mimic consolidate classpath behavior.
     jarpath = os.path.join(classpath_dir, 'output-0.jar')
@@ -71,12 +71,12 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                           JarDependency(org='org.gnu', name='gary', rev='4.0.0',
                                                         ext='tar.gz')])
 
-    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content')
+    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content', binary_mode=False)
     self.resources_target = self.make_target('//resources:foo-resources', Resources,
                                              sources=['foo/file'])
 
     # This is so that payload fingerprint can be computed.
-    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content')
+    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content', binary_mode=False)
     self.java_lib_target = self.make_target('//foo:foo-library', JavaLibrary, sources=['Foo.java'])
 
     self.binary_target = self.make_target(spec='//foo:foo-binary',
@@ -178,9 +178,9 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
   def _check_products(self, products, product_fullname):
     self.assertIsNotNone(products)
     product_data = products.get(self.app_target)
-    product_basedir = product_data.keys()[0]
+    product_basedir = list(product_data.keys())[0]
     self.assertIn(self.pants_workdir, product_basedir)
-    self.assertEquals(product_data[product_basedir], [product_fullname])
+    self.assertEqual(product_data[product_basedir], [product_fullname])
     product_path = os.path.join(product_basedir, product_fullname)
     return product_path
 

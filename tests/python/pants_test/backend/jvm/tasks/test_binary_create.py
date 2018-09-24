@@ -6,11 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
-from pants.java.jar.exclude import Exclude
-from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import open_zip
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 
@@ -22,9 +18,8 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
     return BinaryCreate
 
   def test_jvm_binaries_products(self):
-    binary_target = self.make_target(spec='//bar:bar-binary',
-                                     target_type=JvmBinary,
-                                     source='Bar.java')
+    self.add_to_build_file('bar', 'jvm_binary(name = "bar-binary", source = "Bar.java")')
+    binary_target = self.target('//bar:bar-binary')
     context = self.context(target_roots=[binary_target])
     classpath_products = self.ensure_classpath_products(context)
 
@@ -43,7 +38,7 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
     self.assertIsNotNone(jvm_binary_products)
     product_data = jvm_binary_products.get(binary_target)
     dist_root = os.path.join(self.build_root, 'dist')
-    self.assertEquals({dist_root: ['bar-binary.jar']}, product_data)
+    self.assertEqual({dist_root: ['bar-binary.jar']}, product_data)
 
     with open_zip(os.path.join(dist_root, 'bar-binary.jar')) as jar:
       self.assertEqual(sorted(['META-INF/',
@@ -55,16 +50,25 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
                        sorted(jar.namelist()))
 
   def test_jvm_binaries_deploy_excludes(self):
-    foo_jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',
-                                   target_type=JarLibrary,
-                                   jars=[JarDependency(org='org.example', name='foo', rev='1.0.0')])
-    binary_target = self.make_target(spec='//bar:bar-binary',
-                                     target_type=JvmBinary,
-                                     source='Bar.java',
-                                     dependencies=[foo_jar_lib],
-                                     deploy_excludes=[Exclude(org='org.pantsbuild')])
+    self.add_to_build_file(
+      '3rdparty/jvm/org/example',
+      'jar_library(name = "foo", jars = [jar(org = "org.example", name = "foo", rev = "1.0.0")])',
+    )
+    foo_jar_lib = self.target('3rdparty/jvm/org/example:foo')
+
+    self.add_to_build_file(
+      'bar',
+      '''jvm_binary(
+  name = "bar-binary",
+  source = "Bar.java",
+  dependencies = ["3rdparty/jvm/org/example:foo"],
+  deploy_excludes = [exclude(org = "org.pantsbuild")],
+)'''
+    )
+    binary_target = self.target('//bar:bar-binary')
     context = self.context(target_roots=[binary_target])
     classpath_products = self.ensure_classpath_products(context)
+
 
     foo_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
     with open_zip(foo_artifact.pants_path, 'w') as jar:
@@ -86,7 +90,7 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
     self.assertIsNotNone(jvm_binary_products)
     product_data = jvm_binary_products.get(binary_target)
     dist_root = os.path.join(self.build_root, 'dist')
-    self.assertEquals({dist_root: ['bar-binary.jar']}, product_data)
+    self.assertEqual({dist_root: ['bar-binary.jar']}, product_data)
 
     with open_zip(os.path.join(dist_root, 'bar-binary.jar')) as jar:
       self.assertEqual(sorted(['META-INF/',

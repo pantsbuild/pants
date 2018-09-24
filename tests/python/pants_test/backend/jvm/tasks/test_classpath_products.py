@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
@@ -19,8 +20,8 @@ from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import relativize_paths
-from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.test_base import TestBase
 from pants_test.testutils.file_test_util import check_file_content, contains_exact_files
 
 
@@ -30,7 +31,7 @@ def resolved_example_jar_at(path, org='com.example', name='lib'):
                      pants_path=path)
 
 
-class ClasspathProductsTest(BaseTest):
+class ClasspathProductsTest(TestBase):
   def setUp(self):
     super(ClasspathProductsTest, self).setUp()
     init_subsystem(Target.Arguments)
@@ -276,7 +277,7 @@ class ClasspathProductsTest(BaseTest):
                                                            cache_path='somewhere',
                                                            pants_path=None)])
     self.assertEqual(
-      'Jar: org:name:::jar has no specified path.',
+      'Jar: org:name: has no specified path.',
       str(cm.exception))
 
   def test_get_product_target_mappings_for_targets_respect_excludes(self):
@@ -539,13 +540,13 @@ class ClasspathProductsTest(BaseTest):
       classpath_products, targets, libs_dir, save_classpath_file=True,
       internal_classpath_only=False, excludes=excludes)
     # check canonical path returned
-    self.assertEquals(expected_canonical_classpath,
+    self.assertEqual(expected_canonical_classpath,
                       relativize_paths(canonical_classpath, libs_dir))
 
     # check canonical path created contain the exact set of files, no more, no less
     self.assertTrue(contains_exact_files(libs_dir,
                                          expected_canonical_classpath +
-                                         expected_classspath_files.keys()))
+                                         list(expected_classspath_files.keys())))
 
     # check the content of classpath.txt
     for classpath_file in expected_classspath_files:
