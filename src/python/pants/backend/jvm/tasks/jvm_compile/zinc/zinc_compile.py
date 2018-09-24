@@ -198,7 +198,7 @@ class BaseZincCompile(JvmCompile):
 
   @memoized_property
   def _zinc(self):
-    return Zinc.Factory.global_instance().create(self.context.products)
+    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
 
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
@@ -295,9 +295,6 @@ class BaseZincCompile(JvmCompile):
     if self.get_options().capture_classpath:
       self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir.path)
 
-    # TODO: Allow use of absolute classpath entries with hermetic execution,
-    # specifically by using .jdk dir for Distributions:
-    # https://github.com/pantsbuild/pants/issues/6430
     self._verify_zinc_classpath(absolute_classpath, allow_dist=(self.execution_strategy != self.HERMETIC))
     # TODO: Investigate upstream_analysis for hermetic compiles
     self._verify_zinc_classpath(upstream_analysis.keys())
@@ -329,7 +326,7 @@ class BaseZincCompile(JvmCompile):
       zinc_args.append('-no-color')
 
     compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
-    zinc_args.extend(['-compiled-bridge-jar', compiler_bridge_classpath_entry.path])
+    zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
@@ -437,7 +434,8 @@ class BaseZincCompile(JvmCompile):
         output_directories=(classes_dir,),
         description="zinc compile for {}".format(ctx.target.address.spec),
         # TODO: These should always be unicodes
-        jdk_home=text_type(self._zinc.dist.home),
+        # Since this is always hermetic, we need to use `underlying_dist`
+        jdk_home=text_type(self._zinc.underlying_dist.home),
       )
       res = self.context.execute_process_synchronously_without_raising(req, self.name(), [WorkUnitLabel.COMPILER])
       # TODO: Materialize as a batch in do_compile or somewhere
