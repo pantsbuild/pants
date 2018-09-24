@@ -17,7 +17,7 @@ class ResolveBase(object):
     """Get DirectoryDigests for jars and return them zipped with the jars.
 
     :param jars: List of pants.java.jar.jar_dependency_utils.ResolveJar
-    :return: List of tuples of ResolveJar and pants.engine.fs.DirectoryDigest
+    :return: List of ResolveJars.
     """
     snapshots = self.context._scheduler.capture_snapshots(
       tuple(PathGlobsAndRoot(
