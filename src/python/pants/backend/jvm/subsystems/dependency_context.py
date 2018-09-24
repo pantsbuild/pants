@@ -72,10 +72,10 @@ class DependencyContext(Subsystem, DependencyContextBase):
     return prop
 
   def dependencies_respecting_strict_deps(self, target):
-    if DependencyContext.global_instance().defaulted_property(target, lambda x: x.strict_deps):
-      dependencies = target.strict_dependencies(DependencyContext.global_instance())
+    if self.defaulted_property(target, lambda x: x.strict_deps):
+      dependencies = target.strict_dependencies(self)
     else:
-      dependencies = DependencyContext.global_instance().all_dependencies(target)
+      dependencies = self.all_dependencies(target)
     return dependencies
 
 

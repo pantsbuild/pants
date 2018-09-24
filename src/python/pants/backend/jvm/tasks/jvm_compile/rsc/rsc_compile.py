@@ -29,7 +29,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecute
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
-from pants.util.dirutil import fast_relpath, safe_mkdir
+from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
 
 
 #
@@ -44,12 +44,7 @@ logger = logging.getLogger(__name__)
 
 def fast_relpath_collection(collection):
   buildroot = get_buildroot()
-  def f(c, buildroot):
-    try:
-      return fast_relpath(c, buildroot)
-    except Exception:
-      return c
-  return [f(c, buildroot) for c in collection]
+  return [fast_relpath_optional(c, buildroot) or c for c in collection]
 
 
 def stdout_contents(wu):
