@@ -5,10 +5,14 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import re
 from abc import abstractmethod
+from builtins import str
 
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
+from pants.util.filtering import create_filters, wrap_filters
+from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -182,12 +186,50 @@ class AscendantAddresses(datatype(['directory']), Spec):
     ]
 
 
-class Specs(datatype([('dependencies', tuple), ('tags', tuple), ('exclude_patterns', tuple)])):
-  """A collection of Specs representing Spec subclasses, tags and regex filters."""
+class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
+  """Contains filters for the output of a Specs match.
+
+  This class is separated out from `Specs` to allow for both stuctural equality of the `tags` and
+  `exclude_patterns`, and for caching of their compiled forms using `@memoized_property` (which uses
+  the hash of the class instance in its key, and results in a very large key when used with `Specs`
+  directly).
+  """
+
+  def __new__(cls, tags=None, exclude_patterns=tuple()):
+    return super(SpecsMatcher, cls).__new__(
+      cls,
+      tags=tuple(tags or []),
+      exclude_patterns=tuple(exclude_patterns))
+
+  @memoized_property
+  def _exclude_compiled_regexps(self):
+    return [re.compile(pattern) for pattern in set(self.exclude_patterns or [])]
+
+  def _excluded_by_pattern(self, address):
+    return any(p.search(address.spec) is not None for p in self._exclude_compiled_regexps)
+
+  @memoized_property
+  def _target_tag_matches(self):
+    def filter_for_tag(tag):
+      return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
+    return wrap_filters(create_filters(self.tags, filter_for_tag))
+
+  def matches_target_address_pair(self, address, target):
+    """
+    :param Address address: An Address to match
+    :param HydratedTarget target: The Target for the address.
+
+    :return: True if the given Address/HydratedTarget are included by this matcher.
+    """
+    return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
+
+
+class Specs(datatype([('dependencies', tuple), ('matcher', SpecsMatcher)])):
+  """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
 
   def __new__(cls, dependencies, tags=None, exclude_patterns=tuple()):
     return super(Specs, cls).__new__(
       cls,
       dependencies=tuple(dependencies),
-      tags=tuple(tags or []),
-      exclude_patterns=tuple(exclude_patterns))
+      matcher=SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns),
+    )

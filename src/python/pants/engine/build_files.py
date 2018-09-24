@@ -7,8 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import collections
 import functools
 import logging
-import re
-from builtins import next, str
+from builtins import next
 from os.path import dirname, join
 
 import six
@@ -26,8 +25,6 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
-from pants.util.filtering import create_filters, wrap_filters
-from pants.util.memo import memoized_property
 from pants.util.objects import TypeConstraintError, datatype
 
 
@@ -209,72 +206,6 @@ def _hydrate(item_type, spec_path, **kwargs):
   return item
 
 
-class _MappedSpecs(datatype([
-    ('address_families', tuple), # List[AddressFamily]
-    ('specs', Specs),
-])):
-  """Wraps up logic to resolve specs into individual target addresses, or error out."""
-
-  def __new__(cls, address_families, specs):
-    return super(_MappedSpecs, cls).__new__(cls, tuple(address_families), specs)
-
-  @memoized_property
-  def _exclude_compiled_regexps(self):
-    return [re.compile(pattern) for pattern in set(self.specs.exclude_patterns or [])]
-
-  def _excluded_by_pattern(self, address):
-    return any(p.search(address.spec) is not None for p in self._exclude_compiled_regexps)
-
-  @memoized_property
-  def _target_tag_matches(self):
-    def filter_for_tag(tag):
-      return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
-    return wrap_filters(create_filters(self.specs.tags, filter_for_tag))
-
-  def _matches_target_address_pair(self, address, target):
-    return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
-
-  @memoized_property
-  def _address_family_by_directory(self):
-    return {af.namespace: af for af in self.address_families}
-
-  def _matching_addresses_for_spec(self, spec):
-    # NB: if a spec is provided which expands to some number of targets, but those targets match
-    # --exclude-target-regexp, we do NOT fail! This is why we wait to apply the tag and exclude
-    # patterns until we gather all the targets the spec would have matched without them.
-    try:
-      addr_families_for_spec = spec.matching_address_families(self._address_family_by_directory)
-    except Spec.AddressFamilyResolutionError as e:
-      raise raise_from(ResolveError(e), e)
-
-    try:
-      all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(addr_families_for_spec)
-    except Spec.AddressResolutionError as e:
-      raise raise_from(AddressLookupError(e), e)
-    except SingleAddress._SingleAddressResolutionError as e:
-      _raise_did_you_mean(e.single_address_family, e.name, source=e)
-
-    all_matching_addresses = [
-      addr for (addr, tgt) in all_addr_tgt_pairs
-      if self._matches_target_address_pair(addr, tgt)
-    ]
-    # NB: This may be empty, as the result of filtering by tag and exclude patterns!
-    return all_matching_addresses
-
-  def all_matching_addresses(self):
-    """Return all addresses the given specs resolve to, within the given address families.
-
-    :raises: :class:`ResolveError` if:
-     - there were no matching AddressFamilies, or
-     - the Spec matches no addresses for SingleAddresses.
-    :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
-    """
-    matched_addresses = []
-    for spec in self.specs.dependencies:
-      matched_addresses.extend(self._matching_addresses_for_spec(spec))
-    return matched_addresses
-
-
 @rule(BuildFileAddresses, [Select(AddressMapper), Select(Specs)])
 def addresses_from_address_families(address_mapper, specs):
   """Given an AddressMapper and list of Specs, return matching BuildFileAddresses.
@@ -288,13 +219,32 @@ def addresses_from_address_families(address_mapper, specs):
   snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
   dirnames = {dirname(f.stat.path) for f in snapshot.files}
   address_families = yield [Get(AddressFamily, Dir(d)) for d in dirnames]
+  address_family_by_directory = {af.namespace: af for af in address_families}
 
-  # all_matching_addresses() could be a free function as well -- it just seemed to make it easier to
-  # follow to package it up into a datatype here.
-  mapped_specs = _MappedSpecs(address_families, specs)
-  deduplicated_addresses = OrderedSet(mapped_specs.all_matching_addresses())
+  matched_addresses = OrderedSet()
+  for spec in specs.dependencies:
+    # NB: if a spec is provided which expands to some number of targets, but those targets match
+    # --exclude-target-regexp, we do NOT fail! This is why we wait to apply the tag and exclude
+    # patterns until we gather all the targets the spec would have matched without them.
+    try:
+      addr_families_for_spec = spec.matching_address_families(address_family_by_directory)
+    except Spec.AddressFamilyResolutionError as e:
+      raise raise_from(ResolveError(e), e)
 
-  yield BuildFileAddresses(tuple(deduplicated_addresses))
+    try:
+      all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(addr_families_for_spec)
+    except Spec.AddressResolutionError as e:
+      raise raise_from(AddressLookupError(e), e)
+    except SingleAddress._SingleAddressResolutionError as e:
+      _raise_did_you_mean(e.single_address_family, e.name, source=e)
+
+    matched_addresses.update(
+      addr for (addr, tgt) in all_addr_tgt_pairs
+      if specs.matcher.matches_target_address_pair(addr, tgt)
+    )
+
+  # NB: This may be empty, as the result of filtering by tag and exclude patterns!
+  yield BuildFileAddresses(tuple(matched_addresses))
 
 
 def _spec_to_globs(address_mapper, specs):
