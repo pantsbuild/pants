@@ -105,8 +105,8 @@ impl Tasks {
         input: types.process_request,
       },
     ].into_iter()
-      .map(|i| (i.product, i))
-      .collect();
+    .map(|i| (i.product, i))
+    .collect();
   }
 
   pub fn singleton_add(&mut self, value: Value, product: TypeConstraint) {

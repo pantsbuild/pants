@@ -5,16 +5,28 @@
 #![cfg_attr(
   feature = "cargo-clippy",
   deny(
-    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
-    single_match_else, unseparated_literal_suffix, used_underscore_binding
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
   )
 )]
 // It is often more clear to show that nothing is being moved.
 #![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
 // Subjective style.
-#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
@@ -169,8 +181,7 @@ impl<N: Node> InnerGraph<N> {
         } else {
           None
         }
-      })
-      .collect();
+      }).collect();
     // And their transitive dependencies, which will be dirtied.
     let transitive_ids: Vec<_> = self
       .walk(root_ids.iter().cloned().collect(), Direction::Incoming)
@@ -586,8 +597,7 @@ impl<N: Node> Graph<N> {
             .get(context, dep_id)
             .map(|(_, generation)| generation)
             .to_boxed()
-        })
-        .collect::<Vec<_>>(),
+        }).collect::<Vec<_>>(),
     ).to_boxed()
   }
 
@@ -1038,8 +1048,7 @@ mod tests {
           .map(move |mut v| {
             v.push(token);
             v
-          })
-          .to_boxed()
+          }).to_boxed()
       } else {
         future::ok(vec![token]).to_boxed()
       }
@@ -1075,8 +1084,7 @@ mod tests {
         .map(|&T(node_id, context_id)| {
           // We cast to isize to allow comparison to -1.
           (node_id as isize, context_id)
-        })
-        .unzip();
+        }).unzip();
       // Confirm monotonically ordered.
       let mut previous: isize = -1;
       for node_id in node_ids {

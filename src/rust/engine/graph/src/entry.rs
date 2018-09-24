@@ -156,7 +156,8 @@ impl<N: Node> Entry<N> {
     match *state {
       EntryState::Completed {
         ref result, dirty, ..
-      } if !dirty =>
+      }
+        if !dirty =>
       {
         Some(result.clone())
       }
@@ -207,8 +208,7 @@ impl<N: Node> Entry<N> {
                   context2.graph().clear_deps(entry_id, run_token);
                   Ok(false)
                 }
-              })
-              .to_boxed()
+              }).to_boxed()
           } else {
             future::ok(false).to_boxed()
           };
@@ -232,8 +232,7 @@ impl<N: Node> Entry<N> {
                     .graph()
                     .complete(&context2, entry_id, run_token, Some(res));
                   Ok(())
-                })
-                .to_boxed()
+                }).to_boxed()
             }
           })
         }));
@@ -294,7 +293,8 @@ impl<N: Node> Entry<N> {
           generation,
           dirty,
           ..
-        } if !dirty =>
+        }
+          if !dirty =>
         {
           return future::result(result.clone())
             .map(move |res| (res, generation))

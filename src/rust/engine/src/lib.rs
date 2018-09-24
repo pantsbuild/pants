@@ -5,16 +5,28 @@
 #![cfg_attr(
   feature = "cargo-clippy",
   deny(
-    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
-    single_match_else, unseparated_literal_suffix, used_underscore_binding
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
   )
 )]
 // It is often more clear to show that nothing is being moved.
 #![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
 // Subjective style.
-#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 // We only use unsafe pointer derefrences in our no_mangle exposed API, but it is nicer to list
@@ -326,8 +338,7 @@ pub extern "C" fn scheduler_metrics(
             externs::store_bytes(metric.as_bytes()),
             externs::store_i64(value),
           ])
-        })
-        .collect::<Vec<_>>();
+        }).collect::<Vec<_>>();
       externs::store_tuple(&values).into()
     })
   })
@@ -630,8 +641,7 @@ pub extern "C" fn capture_snapshots(
       let path_globs =
         nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
       path_globs.map(|path_globs| (path_globs, root))
-    })
-    .collect();
+    }).collect();
 
   let path_globs_and_roots = match path_globs_and_roots_result {
     Ok(v) => v,
@@ -651,12 +661,11 @@ pub extern "C" fn capture_snapshots(
           scheduler
             .capture_snapshot_from_arbitrary_root(root, path_globs)
             .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-        })
-        .collect::<Vec<_>>(),
+        }).collect::<Vec<_>>(),
     )
   }).map(|values| externs::store_tuple(&values))
-    .wait()
-    .into()
+  .wait()
+  .into()
 }
 
 #[no_mangle]
@@ -698,8 +707,7 @@ pub extern "C" fn materialize_directories(
       let dir_digest =
         nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
       dir_digest.map(|dir_digest| (dir, dir_digest))
-    })
-    .collect();
+    }).collect();
 
   let dir_and_digests = match directories_paths_and_digests_results {
     Ok(d) => d,
@@ -717,8 +725,8 @@ pub extern "C" fn materialize_directories(
         .collect::<Vec<_>>(),
     )
   }).map(|_| ())
-    .wait()
-    .into()
+  .wait()
+  .into()
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

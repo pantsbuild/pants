@@ -223,8 +223,7 @@ impl Scheduler {
                 }
               }
             })
-        })
-        .collect::<Vec<_>>(),
+        }).collect::<Vec<_>>(),
     );
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
@@ -292,8 +291,7 @@ impl Scheduler {
           &fs::OneOffStoreFileByDigest::new(store, posix_fs),
           path_stats,
         )
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 }
 
