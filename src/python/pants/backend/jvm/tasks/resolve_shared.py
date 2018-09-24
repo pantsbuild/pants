@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.build_environment import get_buildroot
-from pants.engine.fs import PathGlobsAndRoot, PathGlobs
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.jar.jar_dependency_utils import ResolvedJar
 from pants.util.dirutil import fast_relpath
 
