@@ -664,7 +664,7 @@ impl<'t> GraphMaker<'t> {
       // in the graph and biases toward receiving values from dependencies (which do not affect our
       // identity) rather than dependents.
       let mut rules_by_kind: HashMap<EntryWithDeps, (usize, &Entry)> = HashMap::new();
-      for satisfiable_entry in satisfiable_entries.iter() {
+      for satisfiable_entry in &satisfiable_entries {
         if let &Entry::WithDeps(ref wd) = satisfiable_entry {
           rules_by_kind
             .entry(wd.simplified(BTreeSet::new()))
