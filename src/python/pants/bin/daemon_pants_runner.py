@@ -17,6 +17,7 @@ from future.utils import raise_with_traceback
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
@@ -266,7 +267,7 @@ class DaemonPantsRunner(ProcessManager):
     # the `pantsd.log`. This ensures that in the event of e.g. a hung but detached pantsd-runner
     # process that the stacktrace output lands deterministically in a known place vs to a stray
     # terminal window.
-    self._exiter.set_except_hook(sys.stderr)
+    ExceptionSink.set_trace_stream(sys.stderr)
 
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args

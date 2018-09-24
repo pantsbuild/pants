@@ -8,6 +8,7 @@ import logging
 from builtins import object
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exception_sink import ExceptionSink
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
@@ -89,9 +90,6 @@ class LocalPantsRunner(object):
     )
     global_options = options.for_global_scope()
 
-    # Apply exiter options.
-    exiter.apply_options(options)
-
     # Option values are usually computed lazily on demand,
     # but command line options are eagerly computed for validation.
     for scope in options.scope_to_flags.keys():
@@ -157,6 +155,12 @@ class LocalPantsRunner(object):
     self._run_start_time = start_time
 
   def run(self):
+    # Apply exiter options.
+    # TODO: this is messy. Is it less surprising to have the Exiter modified during construction, or
+    # in the run() method we do here?
+    ExceptionSink.set_destination(self._global_options.pants_workdir)
+    self._exiter.should_print_backtrace = self._global_options.print_exception_stacktrace
+    ExceptionSink.set_exiter(self._exiter)
     with hard_exit_handler(), maybe_profiled(self._profile_path):
       self._run()
 

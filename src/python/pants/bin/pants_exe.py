@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import time
 
+from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import Exiter
 from pants.bin.pants_runner import PantsRunner
 from pants.util.contextutil import maybe_profiled
@@ -31,10 +32,12 @@ def main():
   start_time = time.time()
 
   exiter = Exiter()
-  exiter.set_except_hook()
+  ExceptionSink.set_exiter(exiter)
 
   with maybe_profiled(os.environ.get('PANTSC_PROFILE')):
     try:
       PantsRunner(exiter, start_time=start_time).run()
     except KeyboardInterrupt:
+      # TODO: ExceptionSink could probably take care of this too, as well as converting SIGINT into
+      # KeyboardInterrupt where necessary.
       exiter.exit_and_fail('Interrupted by user.')

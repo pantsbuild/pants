@@ -84,14 +84,18 @@ class RemotePantsRunner(object):
     """Sets up basic stdio logging for the thin client."""
     log_level = logging.getLevelName(self._bootstrap_options.for_global_scope().level.upper())
 
+    err_stream = sys.stderr
+
     formatter = logging.Formatter('%(levelname)s] %(message)s')
-    handler = logging.StreamHandler(sys.stderr)
+    handler = logging.StreamHandler(err_stream)
     handler.setLevel(log_level)
     handler.setFormatter(formatter)
 
     root = logging.getLogger()
     root.setLevel(log_level)
     root.addHandler(handler)
+
+    return err_stream
 
   @staticmethod
   def _backoff(attempt):
@@ -162,12 +166,14 @@ class RemotePantsRunner(object):
     This method will include the entire exception log for either the `pid` in the NailgunError, or
     failing that, the `pid` of the pantsd instance.
     """
-    sources = [pantsd_pid]
+    source_pids = [pantsd_pid]
     if nailgun_error.pid is not None:
-      sources = [abs(nailgun_error.pid)] + sources
+      source_pids = [abs(nailgun_error.pid)] + source_pids
 
+    # TODO: flesh out format_merged_fatal_error_message_for_pids() in ExceptionSink to iterate over
+    # all the previous destinations!
     exception_text = None
-    for source in sources:
+    for source in source_pids:
       log_path = ExceptionSink.exceptions_log_path(for_pid=source)
       exception_text = maybe_read_file(log_path, binary_mode=False)
       if exception_text:
@@ -184,6 +190,13 @@ class RemotePantsRunner(object):
     return PantsDaemon.Factory.maybe_launch(bootstrap_options=self._bootstrap_options)
 
   def run(self, args=None):
-    self._setup_logging()
+    err_stream = self._setup_logging()
+
+    # Redirect fatal error logging to the current workdir, set the stream to log stacktraces to on
+    # SIGUSR2, and recognize the provided Exiter.
+    ExceptionSink.set_destination(self._bootstrap_options.for_global_scope().pants_workdir)
+    ExceptionSink.set_trace_stream(err_stream)
+    ExceptionSink.set_exiter(self._exiter)
+
     pantsd_handle = self._maybe_launch_pantsd()
     self._run_pants_with_retry(pantsd_handle)

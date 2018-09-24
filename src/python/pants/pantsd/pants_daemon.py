@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
@@ -363,7 +364,8 @@ class PantsDaemon(FingerprintedProcessManager):
     # Switch log output to the daemon's log stream from here forward.
     self._close_stdio()
     with self._pantsd_logging() as log_stream:
-      self._exiter.set_except_hook(log_stream)
+      ExceptionSink.set_trace_stream(log_stream)
+      ExceptionSink.set_exiter(self._exiter)
       self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
       self._native.set_panic_handler()

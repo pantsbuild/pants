@@ -33,6 +33,17 @@ class TestExceptionSink(TestBase):
       sink.set_destination(tmpdir)
       self.assertEqual(tmpdir, sink.get_destination())
 
+  def test_set_invalid_destination(self):
+    sink = self._gen_sink_subclass()
+    err_rx = re.escape(
+      "The provided exception sink path at '/does/not/exist' is not writable or could not be created")
+    with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
+      sink.set_destination('/does/not/exist')
+    err_rx = re.escape(
+      "The provided exception sink path at '/' is not writable or could not be created")
+    with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
+      sink.set_destination('/')
+
   def test_log_exception(self):
     sink = self._gen_sink_subclass()
     pid = os.getpid()
