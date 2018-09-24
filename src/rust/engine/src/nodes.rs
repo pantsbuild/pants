@@ -838,6 +838,9 @@ impl NodeTracer<NodeKey> for Tracer {
   }
 }
 
+///
+/// There is large variance in the sizes of the members of this enum, so a few of them are boxed.
+///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NodeKey {
   DigestFile(DigestFile),
