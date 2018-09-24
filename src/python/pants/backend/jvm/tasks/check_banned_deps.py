@@ -7,17 +7,18 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from abc import abstractmethod
 
 from pants.backend.jvm.targets.junit_tests import JUnitTests
-from pants.backend.python.targets.python_tests import PythonTests
-from pants.task.task import Task
-from pants.base.payload_field import combine_hashes, PayloadField, stable_json_hash
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
+from pants.base.payload_field import PayloadField, combine_hashes, stable_json_hash
+from pants.task.task import Task
+
 
 class DependencyConstraints(PayloadField):
   """
   Representation of a list of constraints.
   For now, it only handles jvm-style dependency constraints in the classpath.
   """
+
   def __init__(self, direct=None, transitive=None):
     """
     We keep the direct/transitive separation since that might be useful
@@ -29,7 +30,7 @@ class DependencyConstraints(PayloadField):
     self._constraints = direct + transitive
 
   def _compute_fingerprint(self):
-     return combine_hashes([c.fingerprint() for c in self._constraints])
+    return combine_hashes([c.fingerprint() for c in self._constraints])
 
   def check_all(self, target, task_context):
     # TODO Eventually, the next three lines should be moved out of here,
@@ -50,6 +51,7 @@ class DependencyConstraints(PayloadField):
     """
     return target.dependencies
 
+
 class DependencyConstraint(object):
   """Umbrella to hold the Constraint class hierarchy.
 
@@ -61,11 +63,13 @@ class DependencyConstraint(object):
 
   class Constraint(PayloadField):
     """Representation of a constraint on the target's dependencies."""
+
     @abstractmethod
     def check_target(self, target, task_context, classes_relevant_to_target):
       pass
 
   class JvmPackageConstraint(Constraint):
+
     def __init__(self, name):
       self.banned_package_name = name
 
@@ -91,6 +95,7 @@ class DependencyConstraint(object):
 
   class Tag(Constraint):
     """Representation of the ban of a tag"""
+
     def __init__(self, banned_tag_name):
       self.banned_tag_name = banned_tag_name
 
@@ -113,11 +118,12 @@ class DependencyConstraint(object):
 
   class TestDependencies(Constraint):
     """Check that this target does not depend on test targets"""
+
     def __init__(self):
       self.name = "test_dependencies"
 
     def _is_test_dependency(self, dependency):
-      return isinstance(dependency, (PythonTests, JUnitTests))
+      return isinstance(dependency, JUnitTests)
 
     def check_target(self, target, task_context, classes_relevant_to_target):
       relevant_targets = DependencyConstraints.relevant_targets(target)
@@ -131,6 +137,7 @@ class DependencyConstraint(object):
 
     def _compute_fingerprint(self):
       return stable_json_hash(self.name)
+
 
 class CheckBannedDeps(Task):
   """

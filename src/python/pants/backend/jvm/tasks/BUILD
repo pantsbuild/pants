@@ -10,6 +10,7 @@ target(
     ':bootstrap_jvm_tools',
     ':bundle_create',
     ':consolidate_classpath',
+    ":check_banned_deps",
     ':check_published_deps',
     ':checkstyle',
     ':classmap',
@@ -136,6 +137,18 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
     'src/python/pants/util:objects',
+  ],
+)
+
+python_library(
+  name = 'check_banned_deps',
+  sources = ['check_banned_deps.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    ':jvm_dependency_analyzer',
+    'src/python/pants/task',
+    'src/python/pants/base:payload_field',
+    'src/python/pants/base:build_environment',
   ],
 )
 
