@@ -180,12 +180,11 @@ impl Select {
       self.params.clone(),
       edges,
     ).run(context.clone())
-      .and_then(|process_request_val| {
-        ExecuteProcess::lift(&process_request_val)
-          .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
-      })
-      .and_then(move |process_request| context.get(process_request))
-      .to_boxed()
+    .and_then(|process_request_val| {
+      ExecuteProcess::lift(&process_request_val)
+        .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
+    }).and_then(move |process_request| context.get(process_request))
+    .to_boxed()
   }
 
   ///
@@ -233,29 +232,25 @@ impl Select {
               self.params.clone(),
               edges,
             ).run(context.clone())
-              .and_then(|directory_digest_val| {
-                lift_digest(&directory_digest_val).map_err(|str| throw(&str))
-              })
-              .and_then(move |digest| {
-                let store = context.core.store.clone();
-                context
-                  .core
-                  .store
-                  .load_directory(digest)
-                  .map_err(|str| throw(&str))
-                  .and_then(move |maybe_directory| {
-                    maybe_directory
-                      .ok_or_else(|| format!("Could not find directory with digest {:?}", digest))
-                      .map_err(|str| throw(&str))
-                  })
-                  .and_then(move |directory| {
-                    store
-                      .contents_for_directory(&directory)
-                      .map_err(|str| throw(&str))
-                  })
-                  .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
-              })
-              .to_boxed()
+            .and_then(|directory_digest_val| {
+              lift_digest(&directory_digest_val).map_err(|str| throw(&str))
+            }).and_then(move |digest| {
+              let store = context.core.store.clone();
+              context
+                .core
+                .store
+                .load_directory(digest)
+                .map_err(|str| throw(&str))
+                .and_then(move |maybe_directory| {
+                  maybe_directory
+                    .ok_or_else(|| format!("Could not find directory with digest {:?}", digest))
+                    .map_err(|str| throw(&str))
+                }).and_then(move |directory| {
+                  store
+                    .contents_for_directory(&directory)
+                    .map_err(|str| throw(&str))
+                }).map(move |files_content| Snapshot::store_files_content(&context, &files_content))
+            }).to_boxed()
           }
           &rule_graph::Rule::Intrinsic(Intrinsic {
             kind: IntrinsicKind::ProcessExecution,
@@ -274,8 +269,7 @@ impl Select {
                     Snapshot::store_directory(&context.core, &result.0.output_directory),
                   ],
                 )
-              })
-              .to_boxed()
+              }).to_boxed()
           }
         }
       }
@@ -312,8 +306,7 @@ impl WrappedNode for Select {
             value
           ))
         })
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 }
 
@@ -480,8 +473,7 @@ impl WrappedNode for DigestFile {
           .store
           .store_file_bytes(c.content, true)
           .map_err(|e| throw(&e))
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 }
 
@@ -510,8 +502,7 @@ impl WrappedNode for Scandir {
       .then(move |listing_res| match listing_res {
         Ok(listing) => Ok(Arc::new(listing)),
         Err(e) => Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 }
 
@@ -538,8 +529,7 @@ impl Snapshot {
       .and_then(move |path_stats| {
         fs::Snapshot::from_path_stats(context.core.store.clone(), &context, path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
-      })
-      .map_err(|e| throw(&e))
+      }).map_err(|e| throw(&e))
       .to_boxed()
   }
 
@@ -692,11 +682,9 @@ impl Task {
               "{:?} did not declare a dependency on {:?}",
               entry, select_key
             )
-          })
-          .clone();
+          }).clone();
         Select::new_with_entries(product, params, entry).run(context.clone())
-      })
-      .collect::<Vec<_>>();
+      }).collect::<Vec<_>>();
     future::join_all(get_futures).to_boxed()
   }
 
@@ -754,8 +742,7 @@ impl WrappedNode for Task {
       .then(move |deps_result| match deps_result {
         Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
         Err(failure) => Err(failure),
-      })
-      .then(move |task_result| match task_result {
+      }).then(move |task_result| match task_result {
         Ok(val) => {
           if externs::satisfied_by(&context.core.types.generator, &val) {
             Self::generate(context, entry, val)
@@ -764,8 +751,7 @@ impl WrappedNode for Task {
           }
         }
         Err(failure) => err(failure),
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 }
 

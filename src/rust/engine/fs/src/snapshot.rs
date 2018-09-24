@@ -104,8 +104,7 @@ impl Snapshot {
                   file_node.set_digest((&digest).into());
                   file_node.set_is_executable(is_executable);
                   Ok(file_node)
-                })
-                .to_boxed(),
+                }).to_boxed(),
             );
           }
           PathStat::Dir { .. } => {
@@ -118,8 +117,7 @@ impl Snapshot {
                   directory_node.set_name(osstring_as_utf8(first_component).unwrap());
                   directory_node.set_digest((&digest).into());
                   directory_node
-                })
-                .to_boxed(),
+                }).to_boxed(),
             );
           }
         }
@@ -135,8 +133,7 @@ impl Snapshot {
             dir_node.set_name(osstring_as_utf8(first_component)?);
             dir_node.set_digest((&digest).into());
             Ok(dir_node)
-          })
-            .to_boxed(),
+          }).to_boxed(),
         );
       }
     }
@@ -147,8 +144,7 @@ impl Snapshot {
         directory.set_directories(protobuf::RepeatedField::from_vec(dirs));
         directory.set_files(protobuf::RepeatedField::from_vec(files));
         store.record_directory(&directory, true)
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 
   ///
@@ -187,8 +183,7 @@ impl Snapshot {
       .map(move |root_digest| Snapshot {
         digest: root_digest,
         path_stats: path_stats,
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 
   ///
@@ -215,8 +210,7 @@ impl Snapshot {
             maybe_directory
               .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest))
           })
-      })
-      .collect::<Vec<_>>();
+      }).collect::<Vec<_>>();
     join_all(directories)
       .and_then(move |mut directories| {
         let mut out_dir = bazel_protos::remote_execution::Directory::new();
@@ -281,15 +275,12 @@ impl Snapshot {
                   child_dir.set_digest((&merged_digest).into());
                   child_dir
                 })
-            })
-            .collect::<Vec<_>>(),
+            }).collect::<Vec<_>>(),
         ).and_then(move |child_directories| {
           out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
           store.record_directory(&out_dir, true)
-        })
-          .to_boxed()
-      })
-      .to_boxed()
+        }).to_boxed()
+      }).to_boxed()
   }
 }
 
@@ -321,8 +312,7 @@ fn paths_of_child_dir(paths: Vec<PathStat>) -> Vec<PathStat> {
           stat: stat,
         },
       })
-    })
-    .collect()
+    }).collect()
 }
 
 fn osstring_as_utf8(path: OsString) -> Result<String, String> {
@@ -536,7 +526,7 @@ mod tests {
       store,
       vec![containing_roland.digest(), containing_wrong_roland.digest()],
     ).wait()
-      .expect_err("Want error merging");
+    .expect_err("Want error merging");
 
     assert!(
       err.contains("roland"),
@@ -695,8 +685,7 @@ mod tests {
           StrictGlobMatching::Ignore,
           GlobExpansionConjunction::AllMatch,
         ).unwrap(),
-      )
-      .wait()
+      ).wait()
       .unwrap();
     v.sort_by(|a, b| a.path().cmp(b.path()));
     v

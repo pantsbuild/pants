@@ -21,8 +21,7 @@ fn main() -> Result<(), String> {
         .takes_value(true)
         .help("Port that the CAS should listen to.")
         .default_value("0"),
-    )
-    .get_matches();
+    ).get_matches();
 
   let cas = StubCAS::empty_with_port(
     matches
