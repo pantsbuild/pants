@@ -329,7 +329,7 @@ class BaseZincCompile(JvmCompile):
       zinc_args.append('-no-color')
 
     compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
-    zinc_args.extend(['-compiled-bridge-jar', compiler_bridge_classpath_entry.path])
+    zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
