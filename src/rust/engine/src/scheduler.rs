@@ -211,7 +211,10 @@ impl Scheduler {
                   // Otherwise (if it is a success, some other type of Failure, or if we've run
                   // out of retries) recover to complete the join, which will cause the results to
                   // propagate to the user.
-                  debug!("Root {} completed.", NodeKey::Select(root).format());
+                  debug!(
+                    "Root {} completed.",
+                    NodeKey::Select(Box::new(root)).format()
+                  );
                   Ok(other.map(|res| {
                     res
                       .try_into()

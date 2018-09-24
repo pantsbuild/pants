@@ -319,7 +319,7 @@ impl WrappedNode for Select {
 
 impl From<Select> for NodeKey {
   fn from(n: Select) -> Self {
-    NodeKey::Select(n)
+    NodeKey::Select(Box::new(n))
   }
 }
 
@@ -424,7 +424,7 @@ impl WrappedNode for ExecuteProcess {
 
 impl From<ExecuteProcess> for NodeKey {
   fn from(n: ExecuteProcess) -> Self {
-    NodeKey::ExecuteProcess(n)
+    NodeKey::ExecuteProcess(Box::new(n))
   }
 }
 
@@ -771,7 +771,7 @@ impl WrappedNode for Task {
 
 impl From<Task> for NodeKey {
   fn from(n: Task) -> Self {
-    NodeKey::Task(n)
+    NodeKey::Task(Box::new(n))
   }
 }
 
@@ -838,15 +838,18 @@ impl NodeTracer<NodeKey> for Tracer {
   }
 }
 
+///
+/// There is large variance in the sizes of the members of this enum, so a few of them are boxed.
+///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NodeKey {
   DigestFile(DigestFile),
-  ExecuteProcess(ExecuteProcess),
+  ExecuteProcess(Box<ExecuteProcess>),
   ReadLink(ReadLink),
   Scandir(Scandir),
-  Select(Select),
+  Select(Box<Select>),
   Snapshot(Snapshot),
-  Task(Task),
+  Task(Box<Task>),
 }
 
 impl NodeKey {
