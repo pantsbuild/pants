@@ -76,8 +76,8 @@ class DuplicateDetectorTest(JvmTaskTestBase):
     task = self.create_task(context)
 
     classpath = self.get_runtime_classpath(context)
-    classpath.add_jars_for_targets([self.test_jarlib], 'default', [(self.test_resolved_jar, None)])
-    classpath.add_jars_for_targets([self.dups_jarlib], 'default', [(self.dups_resolved_jar, None)])
+    classpath.add_jars_for_targets([self.test_jarlib], 'default', [self.test_resolved_jar])
+    classpath.add_jars_for_targets([self.dups_jarlib], 'default', [self.dups_resolved_jar])
     return task, jvm_binary
 
   def test_duplicate_found_external(self):
@@ -160,7 +160,7 @@ class DuplicateDetectorTest(JvmTaskTestBase):
 
     classpath = self.get_runtime_classpath(context)
     classpath.add_for_target(jvm_binary, [('default', self.classes_dir)])
-    classpath.add_jars_for_targets([self.test_jarlib], 'default', [(self.test_resolved_jar, None)])
+    classpath.add_jars_for_targets([self.test_jarlib], 'default', [self.test_resolved_jar])
 
     conflicts_by_binary = task.execute()
 
@@ -183,8 +183,8 @@ class DuplicateDetectorTest(JvmTaskTestBase):
     task = self.create_task(context)
 
     classpath = self.get_runtime_classpath(context)
-    classpath.add_jars_for_targets([self.no_dups_jarlib], 'default', [(self.no_dups_resolved_jar, None)])
-    classpath.add_jars_for_targets([self.unicode_jarlib], 'default', [(self.unicode_resolved_jar, None)])
+    classpath.add_jars_for_targets([self.no_dups_jarlib], 'default', [self.no_dups_resolved_jar])
+    classpath.add_jars_for_targets([self.unicode_jarlib], 'default', [self.unicode_resolved_jar])
 
     conflicts_by_binary = task.execute()
     self.assertEqual({}, conflicts_by_binary)
@@ -200,7 +200,7 @@ class DuplicateDetectorTest(JvmTaskTestBase):
 
     classpath = self.get_runtime_classpath(context)
     classpath.add_for_target(jvm_binary, [('default', self.classes_dir)])
-    classpath.add_jars_for_targets([self.test_jarlib], 'default', [(self.test_resolved_jar, None)])
+    classpath.add_jars_for_targets([self.test_jarlib], 'default', [self.test_resolved_jar])
 
     with self.assertRaises(TaskError):
       task.execute()

@@ -38,7 +38,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     entry_path = safe_mkdtemp(dir=target_dir)
     classpath_dir = safe_mkdtemp(dir=target_dir)
     for rel_path, content in files_dict.items():
-      safe_file_dump(os.path.join(entry_path, rel_path), content, binary_mode=False)
+      safe_file_dump(os.path.join(entry_path, rel_path), content)
 
     # Create Jar to mimic consolidate classpath behavior.
     jarpath = os.path.join(classpath_dir, 'output-0.jar')
@@ -71,12 +71,12 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                           JarDependency(org='org.gnu', name='gary', rev='4.0.0',
                                                         ext='tar.gz')])
 
-    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content', binary_mode=False)
+    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content')
     self.resources_target = self.make_target('//resources:foo-resources', Resources,
                                              sources=['foo/file'])
 
     # This is so that payload fingerprint can be computed.
-    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content', binary_mode=False)
+    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content')
     self.java_lib_target = self.make_target('//foo:foo-library', JavaLibrary, sources=['Foo.java'])
 
     self.binary_target = self.make_target(spec='//foo:foo-binary',
@@ -97,13 +97,12 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     after context is re-created.
     """
     classpath_products = self.ensure_consolidated_classpath_products(task_context)
-    classpath_products.add_jars_for_targets(
-      targets=[self.jar_lib],
-      conf='default',
-      resolved_jars_and_directory_digests=[(self.jar_artifact, None),
-                                            (self.zip_artifact, None),
-                                            (self.bundle_artifact, None),
-                                            (self.tar_gz_artifact, None)])
+    classpath_products.add_jars_for_targets(targets=[self.jar_lib],
+                                            conf='default',
+                                            resolved_jars=[self.jar_artifact,
+                                                           self.zip_artifact,
+                                                           self.bundle_artifact,
+                                                           self.tar_gz_artifact])
 
     self.add_consolidated_bundle(task_context, self.binary_target,
                                   {'Foo.class': '', 'foo.txt': '', 'foo/file': ''})
@@ -141,10 +140,9 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     missing_jar_artifact = self.create_artifact(org='org.example', name='foo', rev='2.0.0',
                                                 materialize=False)
     classpath_products = self.ensure_consolidated_classpath_products(self.task_context)
-    classpath_products.add_jars_for_targets(
-      targets=[self.binary_target],
-      conf='default',
-      resolved_jars_and_directory_digests=[(missing_jar_artifact, None)])
+    classpath_products.add_jars_for_targets(targets=[self.binary_target],
+                                            conf='default',
+                                            resolved_jars=[missing_jar_artifact])
 
     with self.assertRaises(MissingClasspathEntryError):
       self.execute(self.task_context)
@@ -180,9 +178,9 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
   def _check_products(self, products, product_fullname):
     self.assertIsNotNone(products)
     product_data = products.get(self.app_target)
-    product_basedir = list(product_data.keys())[0]
+    product_basedir = product_data.keys()[0]
     self.assertIn(self.pants_workdir, product_basedir)
-    self.assertEqual(product_data[product_basedir], [product_fullname])
+    self.assertEquals(product_data[product_basedir], [product_fullname])
     product_path = os.path.join(product_basedir, product_fullname)
     return product_path
 

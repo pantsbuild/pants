@@ -179,8 +179,8 @@ class IvyTaskMixin(TaskBase, ResolveBase):
     classpath_products.add_excludes_for_targets(targets)
     for conf in confs:
       for target, resolved_jars in result.resolved_jars_for_each_target(conf, targets):
-        jars_and_directory_digests = self.jars_and_directory_digests_for_jars(resolved_jars)
-        classpath_products.add_jars_for_targets([target], conf, jars_and_directory_digests)
+        jars_to_add = self.add_directory_digests_for_jars(resolved_jars)
+        classpath_products.add_jars_for_targets([target], conf, jars_to_add)
 
     return result
 

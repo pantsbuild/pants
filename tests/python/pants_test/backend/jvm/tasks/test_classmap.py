@@ -6,12 +6,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from contextlib import contextmanager
 
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classmap import ClassmapTask
 from pants.build_graph.target import Target
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import open_zip
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
 class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
@@ -23,28 +26,16 @@ class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
     super(ClassmapTaskTest, self).setUp()
     init_subsystem(Target.Arguments)
 
-    self.add_to_build_file(
-      'a',
-      'java_library(sources=["a1.java", "a2.java"])',
-    )
+    self.target_a = self.make_target('a', target_type=JavaLibrary, sources=['a1.java', 'a2.java'])
 
     self.jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
     with open_zip(self.jar_artifact.pants_path, 'w') as jar:
       jar.writestr('foo/Foo.class', '')
+    self.target_b = self.make_target('b', target_type=JarLibrary,
+                                     jars=[JarDependency(org='org.example', name='foo', rev='1.0.0')])
 
-    self.add_to_build_file(
-      'b',
-      'jar_library(jars=[jar(org="org.example", name="foo", rev="1.0.0")])',
-    )
-
-    self.add_to_build_file(
-      'c',
-      'java_library(dependencies=["a", "b"])',
-    )
-
-    self.target_a = self.target('a')
-    self.target_b = self.target('b')
-    self.target_c = self.target('c')
+    self.target_c = self.make_target('c', dependencies=[self.target_a, self.target_b],
+                                     target_type=JavaLibrary)
 
   @contextmanager
   def prepare_context(self, options=None):
@@ -59,10 +50,9 @@ class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
     self.add_to_runtime_classpath(task_context, self.target_c, idict('c1.class', 'c2.class'))
 
     classpath_products = self.ensure_classpath_products(task_context)
-    classpath_products.add_jars_for_targets(
-      targets=[self.target_b],
-      conf='default',
-      resolved_jars_and_directory_digests=[(self.jar_artifact, None)])
+    classpath_products.add_jars_for_targets(targets=[self.target_b],
+                                            conf='default',
+                                            resolved_jars=[self.jar_artifact])
     yield task_context
 
   def test_classmap_none(self):

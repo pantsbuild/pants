@@ -479,8 +479,8 @@ class CoursierMixin(NailgunTask, ResolveBase):
           for coord in coord_candidates:
             transitive_resolved_jars = get_transitive_resolved_jars(coord, coord_to_resolved_jars)
             if transitive_resolved_jars:
-              jars_and_directory_digests = self.jars_and_directory_digests_for_jars(transitive_resolved_jars)
-              compile_classpath.add_jars_for_targets([t], conf, jars_and_directory_digests)
+              jars_to_add = self.add_directory_digests_for_jars(transitive_resolved_jars)
+              compile_classpath.add_jars_for_targets([t], conf, jars_to_add)
 
   def _populate_results_dir(self, vts_results_dir, results):
     mode = 'w' if PY3 else 'wb'

@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from builtins import str
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
@@ -20,8 +19,8 @@ from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import relativize_paths
+from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.test_base import TestBase
 from pants_test.testutils.file_test_util import check_file_content, contains_exact_files
 
 
@@ -31,7 +30,7 @@ def resolved_example_jar_at(path, org='com.example', name='lib'):
                      pants_path=path)
 
 
-class ClasspathProductsTest(TestBase):
+class ClasspathProductsTest(BaseTest):
   def setUp(self):
     super(ClasspathProductsTest, self).setUp()
     init_subsystem(Target.Arguments)
@@ -92,7 +91,7 @@ class ClasspathProductsTest(TestBase):
 
     classpath_product = ClasspathProducts(self.pants_workdir)
     with self.assertRaises(TaskError) as cm:
-      classpath_product.add_jars_for_targets([a], 'default', [((resolved_example_jar_at('/dev/null')), None)])
+      classpath_product.add_jars_for_targets([a], 'default', [(resolved_example_jar_at('/dev/null'))])
 
     self.assertEqual(
       'Classpath entry /dev/null for target a:a is located outside the working directory "{}".'.format(self.pants_workdir),
@@ -154,9 +153,9 @@ class ClasspathProductsTest(TestBase):
     com_example_jar_path = self._example_jar_path()
     org_example_jar_path = self.path('ivy/jars/org.example/lib/123.4.jar')
     classpath_product.add_jars_for_targets([a], 'default',
-                                          [(resolved_example_jar_at(com_example_jar_path), None),
-                                           (resolved_example_jar_at(org_example_jar_path,
-                                                                    org='org.example'), None)])
+                                          [resolved_example_jar_at(com_example_jar_path),
+                                           resolved_example_jar_at(org_example_jar_path,
+                                                                   org='org.example')])
     self.add_excludes_for_targets(classpath_product, b)
 
     classpath = classpath_product.get_for_target(a)
@@ -273,11 +272,11 @@ class ClasspathProductsTest(TestBase):
     classpath_products = ClasspathProducts(self.pants_workdir)
     with self.assertRaises(TaskError) as cm:
       classpath_products.add_jars_for_targets([b], 'default',
-                                              [(ResolvedJar(M2Coordinate(org='org', name='name'),
+                                              [ResolvedJar(M2Coordinate(org='org', name='name'),
                                                            cache_path='somewhere',
-                                                           pants_path=None), None)])
+                                                           pants_path=None)])
     self.assertEqual(
-      'Jar: org:name: has no specified path.',
+      'Jar: org:name:::jar has no specified path.',
       str(cm.exception))
 
   def test_get_product_target_mappings_for_targets_respect_excludes(self):
@@ -420,7 +419,7 @@ class ClasspathProductsTest(TestBase):
 
     classpath_products.add_for_target(a, [('default', self._create_file('a.jar')),
                                           ('default', self._create_file('resources'))])
-    classpath_products.add_jars_for_targets([a], 'default', [(resolved_jar, None)])
+    classpath_products.add_jars_for_targets([a], 'default', [resolved_jar])
 
     with temporary_dir() as base_dir:
       self._test_canonical_classpath_helper(classpath_products,
@@ -481,7 +480,7 @@ class ClasspathProductsTest(TestBase):
     resolved_jar = ResolvedJar(M2Coordinate(org='org', name='x', rev='1.0'),
                                cache_path='somewhere',
                                pants_path=os.path.join(self.pants_workdir, jar_path))
-    classpath_products.add_jars_for_targets([a], 'default', [(resolved_jar, None)])
+    classpath_products.add_jars_for_targets([a], 'default', [resolved_jar])
 
     with temporary_dir() as base_dir:
       with self.assertRaises(MissingClasspathEntryError):
@@ -502,8 +501,8 @@ class ClasspathProductsTest(TestBase):
 
     classpath_products = ClasspathProducts(self.pants_workdir)
     # Both target a and target b depend on the same jar library
-    classpath_products.add_jars_for_targets([target_a], 'default', [(resolved_jar, None)])
-    classpath_products.add_jars_for_targets([target_b], 'default', [(resolved_jar, None)])
+    classpath_products.add_jars_for_targets([target_a], 'default', [resolved_jar])
+    classpath_products.add_jars_for_targets([target_b], 'default', [resolved_jar])
 
     with temporary_dir() as base_dir:
       # Only target a generates symlink to jar library, target b skips creating the
@@ -540,13 +539,13 @@ class ClasspathProductsTest(TestBase):
       classpath_products, targets, libs_dir, save_classpath_file=True,
       internal_classpath_only=False, excludes=excludes)
     # check canonical path returned
-    self.assertEqual(expected_canonical_classpath,
+    self.assertEquals(expected_canonical_classpath,
                       relativize_paths(canonical_classpath, libs_dir))
 
     # check canonical path created contain the exact set of files, no more, no less
     self.assertTrue(contains_exact_files(libs_dir,
                                          expected_canonical_classpath +
-                                         list(expected_classspath_files.keys())))
+                                         expected_classspath_files.keys()))
 
     # check the content of classpath.txt
     for classpath_file in expected_classspath_files:
@@ -568,10 +567,9 @@ class ClasspathProductsTest(TestBase):
                                          example_jar_path,
                                          conf=None):
     resolved_jar = resolved_example_jar_at(example_jar_path)
-    classpath_product.add_jars_for_targets(
-      targets=[target],
-      conf=conf or 'default',
-      resolved_jars_and_directory_digests=[(resolved_jar, None)])
+    classpath_product.add_jars_for_targets(targets=[target],
+                                           conf=conf or 'default',
+                                           resolved_jars=[resolved_jar])
     return resolved_jar
 
   @staticmethod
