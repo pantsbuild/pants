@@ -2,16 +2,28 @@
 #![cfg_attr(
   feature = "cargo-clippy",
   deny(
-    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
-    single_match_else, unseparated_literal_suffix, used_underscore_binding
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
   )
 )]
 // It is often more clear to show that nothing is being moved.
 #![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
 // Subjective style.
-#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
@@ -390,8 +402,7 @@ impl fuse::Filesystem for BuildResultFS {
           .map_err(|err| {
             error!("Error loading file by digest {}: {}", digest_str, err);
             libc::EINVAL
-          })
-          .and_then(|maybe_inode| {
+          }).and_then(|maybe_inode| {
             maybe_inode
               .and_then(|inode| self.file_attr_for(inode))
               .ok_or(libc::ENOENT)
@@ -424,11 +435,9 @@ impl fuse::Filesystem for BuildResultFS {
               .map_err(|err| {
                 error!("Error reading directory {:?}: {}", parent_digest, err);
                 libc::EINVAL
-              })?
-              .and_then(|directory| self.node_for_digest(&directory, filename))
+              })?.and_then(|directory| self.node_for_digest(&directory, filename))
               .ok_or(libc::ENOENT)
-          })
-          .and_then(|node| match node {
+          }).and_then(|node| match node {
             Node::Directory(directory_node) => {
               let digest_result: Result<Digest, String> = directory_node.get_digest().into();
               let digest = digest_result.map_err(|err| {
@@ -448,8 +457,7 @@ impl fuse::Filesystem for BuildResultFS {
                 .map_err(|err| {
                   error!("Error loading file by digest {}: {}", filename, err);
                   libc::EINVAL
-                })
-                .and_then(|maybe_inode| {
+                }).and_then(|maybe_inode| {
                   maybe_inode
                     .and_then(|inode| self.file_attr_for(inode))
                     .ok_or(libc::ENOENT)
@@ -514,24 +522,21 @@ impl fuse::Filesystem for BuildResultFS {
             let end = std::cmp::min(offset as usize + size as usize, bytes.len());
             let mut reply = reply.lock().unwrap();
             reply.take().unwrap().data(&bytes.slice(begin, end));
-          })
-          .map(|v| {
+          }).map(|v| {
             if v.is_none() {
               let maybe_reply = reply2.lock().unwrap().take();
               if let Some(reply) = maybe_reply {
                 reply.error(libc::ENOENT);
               }
             }
-          })
-          .or_else(|err| {
+          }).or_else(|err| {
             error!("Error loading bytes for {:?}: {}", digest, err);
             let maybe_reply = reply2.lock().unwrap().take();
             if let Some(reply) = maybe_reply {
               reply.error(libc::EINVAL);
             }
             Ok(())
-          })
-          .wait();
+          }).wait();
         result.expect("Error from read future which should have been handled in the future ");
       }
       _ => reply.error(libc::ENOENT),
@@ -613,19 +618,16 @@ fn main() {
         .long("local-store-path")
         .default_value_os(default_store_path.as_ref())
         .required(false),
-    )
-    .arg(
+    ).arg(
       clap::Arg::with_name("server-address")
         .takes_value(true)
         .long("server-address")
         .required(false),
-    )
-    .arg(
+    ).arg(
       clap::Arg::with_name("mount-path")
         .required(true)
         .takes_value(true),
-    )
-    .get_matches();
+    ).get_matches();
 
   let mount_path = args.value_of("mount-path").unwrap();
   let store_path = args.value_of("local-store-path").unwrap();

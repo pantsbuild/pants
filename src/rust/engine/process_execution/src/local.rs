@@ -57,8 +57,7 @@ impl CommandRunner {
           .into_string()
           .map_err(|e| format!("Error stringifying output_directories: {:?}", e))
           .map(|s| format!("{}/**", s))
-      })
-      .collect();
+      }).collect();
 
     let output_dirs_future = posix_fs
       .expand(try_future!(PathGlobs::create(
@@ -66,8 +65,7 @@ impl CommandRunner {
         &[],
         StrictGlobMatching::Ignore,
         GlobExpansionConjunction::AllMatch,
-      )))
-      .map_err(|e| format!("Error stating output dirs: {}", e));
+      ))).map_err(|e| format!("Error stating output dirs: {}", e));
 
     let output_files_future = posix_fs
       .path_stats(output_file_paths.into_iter().collect())
@@ -86,8 +84,7 @@ impl CommandRunner {
           &fs::OneOffStoreFileByDigest::new(store, posix_fs),
           paths.into_iter().filter_map(|v| v).collect(),
         )
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 }
 
@@ -204,8 +201,7 @@ impl ChildResults {
           };
           Ok((stdout, stderr, exit_code)) as Result<_, E>
         },
-      )
-      .map(|(stdout, stderr, exit_code)| ChildResults {
+      ).map(|(stdout, stderr, exit_code)| ChildResults {
         stdout: stdout.into(),
         stderr: stderr.into(),
         exit_code,
@@ -222,12 +218,10 @@ impl super::CommandRunner for CommandRunner {
       tempfile::Builder::new()
         .prefix("process-execution")
         .tempdir_in(&self.work_dir)
-        .map_err(|err| {
-          format!(
-            "Error making tempdir for local process execution: {:?}",
-            err
-          )
-        })
+        .map_err(|err| format!(
+          "Error making tempdir for local process execution: {:?}",
+          err
+        ))
     );
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();
@@ -447,8 +441,7 @@ mod tests {
           parts.next().unwrap().to_string(),
           parts.next().unwrap_or("").to_string(),
         )
-      })
-      .filter(|x| x.0 != "PATH")
+      }).filter(|x| x.0 != "PATH")
       .collect();
 
     assert_eq!(env, got_env);

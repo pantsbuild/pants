@@ -11,7 +11,7 @@ use futures::sync::oneshot;
 
 use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
-use core::{Failure, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
 use fs::{self, GlobMatching, PosixFS};
 use graph::{EntryId, Graph, Node, NodeContext};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
@@ -107,11 +107,11 @@ impl Scheduler {
   ) -> Result<(), String> {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      &selectors::Select::without_variant(product),
+      &selectors::Select::new(product),
     )?;
     request
       .roots
-      .push(Select::new(product, subject, Variants::default(), &edges));
+      .push(Select::new(product, Params::new_single(subject), &edges));
     Ok(())
   }
 
@@ -211,7 +211,10 @@ impl Scheduler {
                   // Otherwise (if it is a success, some other type of Failure, or if we've run
                   // out of retries) recover to complete the join, which will cause the results to
                   // propagate to the user.
-                  debug!("Root {} completed.", NodeKey::Select(root).format());
+                  debug!(
+                    "Root {} completed.",
+                    NodeKey::Select(Box::new(root)).format()
+                  );
                   Ok(other.map(|res| {
                     res
                       .try_into()
@@ -220,8 +223,7 @@ impl Scheduler {
                 }
               }
             })
-        })
-        .collect::<Vec<_>>(),
+        }).collect::<Vec<_>>(),
     );
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
@@ -258,7 +260,7 @@ impl Scheduler {
       .roots
       .iter()
       .zip(results.into_iter())
-      .map(|(s, r)| (&s.subject, &s.selector.product, r))
+      .map(|(s, r)| (s.params.expect_single(), &s.selector.product, r))
       .collect()
   }
 
@@ -289,8 +291,7 @@ impl Scheduler {
           &fs::OneOffStoreFileByDigest::new(store, posix_fs),
           path_stats,
         )
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 }
 

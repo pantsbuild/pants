@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import configparser
 import itertools
 import json
 import os
@@ -17,6 +16,8 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from io import StringIO
 from textwrap import dedent
+
+from backports import configparser
 
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources

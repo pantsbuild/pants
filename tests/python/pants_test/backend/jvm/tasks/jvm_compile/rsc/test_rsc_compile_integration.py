@@ -30,7 +30,10 @@ class RscCompileIntegration(BaseCompileIT):
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir]},
         'jvm-platform': {'compiler': 'rsc'},
-        'compile.rsc': {'execution_strategy': 'hermetic'}
+        'compile.rsc': {
+          'execution_strategy': 'hermetic',
+          'incremental': False,
+        }
       }
 
       with self.temporary_workdir() as workdir:

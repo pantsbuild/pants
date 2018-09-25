@@ -257,8 +257,8 @@ matrix:
         # set -z to run the platform-specific tests.
         - ./build-support/bin/travis-ci.sh -ez
 
-    # Rust Clippy on Linux with nightly Rust
-    - name: &clippy_shard "[ALLOWED TO BE RED] Rust Clippy on Linux with nightly Rust"
+    # Rust Clippy on Linux
+    - name: "Rust Clippy on Linux"
       os: linux
       dist: trusty
       sudo: required
@@ -275,9 +275,6 @@ matrix:
         - ulimit -n 8192
       script:
         - ./build-support/bin/travis-ci.sh -bs
-
-  allow_failures:
-    - name: *clippy_shard
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/

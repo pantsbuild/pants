@@ -7,9 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import unittest
 from builtins import object
 
-from future.utils import PY3
-
-from pants.engine.selectors import Select, SelectVariant
+from pants.engine.selectors import Select
 
 
 class AClass(object):
@@ -21,13 +19,5 @@ class SelectorsTest(unittest.TestCase):
     self.assert_repr("Select(AClass)", Select(AClass))
     self.assert_repr("Select(AClass, optional=True)", Select(AClass, optional=True))
 
-  def test_variant_repr(self):
-    self.assert_repr("SelectVariant(AClass, {unicode_literal}'field')".format(unicode_literal='' if PY3 else 'u'),
-                     SelectVariant(AClass, 'field'))
-
   def assert_repr(self, expected, selector):
     self.assertEqual(expected, repr(selector))
-
-  def test_select_variant_requires_string_key(self):
-    with self.assertRaises(ValueError):
-      SelectVariant(AClass, None)

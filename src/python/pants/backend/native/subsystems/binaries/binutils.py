@@ -8,7 +8,7 @@ import os
 
 from pants.backend.native.config.environment import Assembler, Linker
 from pants.binaries.binary_tool import NativeTool
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Select
 
 
@@ -49,5 +49,4 @@ def create_binutils_rules():
   return [
     get_as,
     get_ld,
-    RootRule(Binutils),
   ]

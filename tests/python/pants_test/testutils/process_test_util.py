@@ -8,6 +8,8 @@ from contextlib import contextmanager
 
 import psutil
 
+from pants.util.objects import datatype
+
 
 class ProcessStillRunning(AssertionError):
   """Raised when a process shouldn't be running but is."""
@@ -38,12 +40,18 @@ def _make_process_table(processes):
 def no_lingering_process_by_command(name):
   """Asserts that no process exists for a given command with a helpful error, excluding
   existing processes outside of the scope of the contextmanager."""
-  before_processes = set(_safe_iter_matching_processes(name))
-  yield
-  after_processes = set(_safe_iter_matching_processes(name))
-  delta_processes = after_processes.difference(before_processes)
+  context = TrackedProcessesContext(name, set(_safe_iter_matching_processes(name)))
+  yield context
+  delta_processes = context.current_processes()
   if delta_processes:
     raise ProcessStillRunning(
       '{} {} processes lingered after tests:\n{}'
       .format(len(delta_processes), name, _make_process_table(delta_processes))
     )
+
+
+class TrackedProcessesContext(datatype(['name', 'before_processes'])):
+  def current_processes(self):
+    """Returns the current set of matching processes created since the context was entered."""
+    after_processes = set(_safe_iter_matching_processes(self.name))
+    return after_processes.difference(self.before_processes)

@@ -5,16 +5,28 @@
 #![cfg_attr(
   feature = "cargo-clippy",
   deny(
-    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
-    single_match_else, unseparated_literal_suffix, used_underscore_binding
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
   )
 )]
 // It is often more clear to show that nothing is being moved.
 #![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
 // Subjective style.
-#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 // We only use unsafe pointer derefrences in our no_mangle exposed API, but it is nicer to list
@@ -44,12 +56,15 @@ extern crate fs;
 extern crate futures;
 extern crate graph;
 extern crate hashing;
+extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate process_execution;
 extern crate resettable;
+#[macro_use]
+extern crate smallvec;
 extern crate tokio;
 
 use std::ffi::CStr;
@@ -82,8 +97,7 @@ use types::Types;
 enum RawStateTag {
   Return = 1,
   Throw = 2,
-  Noop = 3,
-  Invalidated = 4,
+  Invalidated = 3,
 }
 
 #[repr(C)]
@@ -100,10 +114,6 @@ impl RawNode {
     let (state_tag, state_value) = match state {
       Ok(v) => (RawStateTag::Return as u8, v),
       Err(Failure::Throw(exc, _)) => (RawStateTag::Throw as u8, exc),
-      Err(Failure::Noop(noop)) => (
-        RawStateTag::Noop as u8,
-        externs::create_exception(&format!("{:?}", noop)),
-      ),
       Err(Failure::Invalidated) => (
         RawStateTag::Invalidated as u8,
         externs::create_exception("Exhausted retries due to changed files."),
@@ -224,8 +234,6 @@ pub extern "C" fn scheduler_create(
   construct_link: Function,
   construct_process_result: Function,
   type_address: TypeConstraint,
-  type_has_products: TypeConstraint,
-  type_has_variants: TypeConstraint,
   type_path_globs: TypeConstraint,
   type_directory_digest: TypeConstraint,
   type_snapshot: TypeConstraint,
@@ -265,8 +273,6 @@ pub extern "C" fn scheduler_create(
     construct_link: construct_link,
     construct_process_result: construct_process_result,
     address: type_address,
-    has_products: type_has_products,
-    has_variants: type_has_variants,
     path_globs: type_path_globs,
     directory_digest: type_directory_digest,
     snapshot: type_snapshot,
@@ -332,8 +338,7 @@ pub extern "C" fn scheduler_metrics(
             externs::store_bytes(metric.as_bytes()),
             externs::store_i64(value),
           ])
-        })
-        .collect::<Vec<_>>();
+        }).collect::<Vec<_>>();
       externs::store_tuple(&values).into()
     })
   })
@@ -436,21 +441,7 @@ pub extern "C" fn tasks_add_get(tasks_ptr: *mut Tasks, product: TypeConstraint, 
 #[no_mangle]
 pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeConstraint) {
   with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select(product, None);
-  })
-}
-
-#[no_mangle]
-pub extern "C" fn tasks_add_select_variant(
-  tasks_ptr: *mut Tasks,
-  product: TypeConstraint,
-  variant_key_buf: Buffer,
-) {
-  let variant_key = variant_key_buf
-    .to_string()
-    .expect("Failed to decode key for select_variant");
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select(product, Some(variant_key));
+    tasks.add_select(product);
   })
 }
 
@@ -650,8 +641,7 @@ pub extern "C" fn capture_snapshots(
       let path_globs =
         nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
       path_globs.map(|path_globs| (path_globs, root))
-    })
-    .collect();
+    }).collect();
 
   let path_globs_and_roots = match path_globs_and_roots_result {
     Ok(v) => v,
@@ -671,12 +661,11 @@ pub extern "C" fn capture_snapshots(
           scheduler
             .capture_snapshot_from_arbitrary_root(root, path_globs)
             .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-        })
-        .collect::<Vec<_>>(),
+        }).collect::<Vec<_>>(),
     )
   }).map(|values| externs::store_tuple(&values))
-    .wait()
-    .into()
+  .wait()
+  .into()
 }
 
 #[no_mangle]
@@ -718,8 +707,7 @@ pub extern "C" fn materialize_directories(
       let dir_digest =
         nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
       dir_digest.map(|dir_digest| (dir, dir_digest))
-    })
-    .collect();
+    }).collect();
 
   let dir_and_digests = match directories_paths_and_digests_results {
     Ok(d) => d,
@@ -737,8 +725,8 @@ pub extern "C" fn materialize_directories(
         .collect::<Vec<_>>(),
     )
   }).map(|_| ())
-    .wait()
-    .into()
+  .wait()
+  .into()
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

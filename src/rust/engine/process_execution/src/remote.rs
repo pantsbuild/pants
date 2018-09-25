@@ -256,15 +256,14 @@ impl CommandRunner {
         .write_to_bytes()
         .map_err(|e| format!("Error serializing proto {:?}", e)),
     ).and_then(move |command_bytes| store.store_file_bytes(Bytes::from(command_bytes), true))
-      .map_err(|e| format!("Error saving digest to local store: {:?}", e))
-      .and_then(move |digest| {
-        // TODO: Tune when we upload the proto.
-        store2
-          .ensure_remote_has_recursive(vec![digest])
-          .map_err(|e| format!("Error uploading proto {:?}", e))
-          .map(|_| ())
-      })
-      .to_boxed()
+    .map_err(|e| format!("Error saving digest to local store: {:?}", e))
+    .and_then(move |digest| {
+      // TODO: Tune when we upload the proto.
+      store2
+        .ensure_remote_has_recursive(vec![digest])
+        .map_err(|e| format!("Error uploading proto {:?}", e))
+        .map(|_| ())
+    }).to_boxed()
   }
 
   fn extract_execute_response(
@@ -402,16 +401,14 @@ impl CommandRunner {
             "Error fetching stdout digest ({:?}): {:?}",
             stdout_digest, error
           ))
-        })
-        .and_then(move |maybe_value| {
+        }).and_then(move |maybe_value| {
           maybe_value.ok_or_else(|| {
             ExecutionError::Fatal(format!(
               "Couldn't find stdout digest ({:?}), when fetching.",
               stdout_digest
             ))
           })
-        })
-        .to_boxed()
+        }).to_boxed()
     } else {
       let stdout_raw = Bytes::from(execute_response.get_result().get_stdout_raw());
       let stdout_copy = stdout_raw.clone();
@@ -420,8 +417,7 @@ impl CommandRunner {
         .store_file_bytes(stdout_raw, true)
         .map_err(move |error| {
           ExecutionError::Fatal(format!("Error storing raw stdout: {:?}", error))
-        })
-        .map(|_| stdout_copy)
+        }).map(|_| stdout_copy)
         .to_boxed()
     }
   }
@@ -445,16 +441,14 @@ impl CommandRunner {
             "Error fetching stderr digest ({:?}): {:?}",
             stderr_digest, error
           ))
-        })
-        .and_then(move |maybe_value| {
+        }).and_then(move |maybe_value| {
           maybe_value.ok_or_else(|| {
             ExecutionError::Fatal(format!(
               "Couldn't find stderr digest ({:?}), when fetching.",
               stderr_digest
             ))
           })
-        })
-        .to_boxed()
+        }).to_boxed()
     } else {
       let stderr_raw = Bytes::from(execute_response.get_result().get_stderr_raw());
       let stderr_copy = stderr_raw.clone();
@@ -463,8 +457,7 @@ impl CommandRunner {
         .store_file_bytes(stderr_raw, true)
         .map_err(move |error| {
           ExecutionError::Fatal(format!("Error storing raw stderr: {:?}", error))
-        })
-        .map(|_| stderr_copy)
+        }).map(|_| stderr_copy)
         .to_boxed()
     }
   }
@@ -498,8 +491,7 @@ impl CommandRunner {
               node
             });
             store.record_directory(&directory, true)
-          })
-          .to_boxed();
+          }).to_boxed();
       }
       directory_digests.push(digest.map_err(|err| {
         ExecutionError::Fatal(format!("Error saving remote output directory: {}", err))
@@ -523,8 +515,7 @@ impl CommandRunner {
             is_executable: output_file.get_is_executable(),
           },
         ))
-      })
-      .collect();
+      }).collect();
 
     let path_stats = try_future!(path_stats_result.map_err(ExecutionError::Fatal));
 
@@ -563,18 +554,16 @@ impl CommandRunner {
         "Error when storing the output file directory info in the remote CAS: {:?}",
         error
       ))
-    })
-      .join(future::join_all(directory_digests))
-      .and_then(|(files_digest, mut directory_digests)| {
-        directory_digests.push(files_digest);
-        fs::Snapshot::merge_directories(store, directory_digests).map_err(|err| {
-          ExecutionError::Fatal(format!(
-            "Error when merging output files and directories: {}",
-            err
-          ))
-        })
+    }).join(future::join_all(directory_digests))
+    .and_then(|(files_digest, mut directory_digests)| {
+      directory_digests.push(files_digest);
+      fs::Snapshot::merge_directories(store, directory_digests).map_err(|err| {
+        ExecutionError::Fatal(format!(
+          "Error when merging output files and directories: {}",
+          err
+        ))
       })
-      .to_boxed()
+    }).to_boxed()
   }
 }
 
@@ -603,8 +592,7 @@ fn make_execute_request(
       p.to_str()
         .map(|s| s.to_owned())
         .ok_or_else(|| format!("Non-UTF8 output file path: {:?}", p))
-    })
-    .collect::<Result<Vec<String>, String>>()?;
+    }).collect::<Result<Vec<String>, String>>()?;
   output_files.sort();
   command.set_output_files(protobuf::RepeatedField::from_vec(output_files));
 
@@ -615,8 +603,7 @@ fn make_execute_request(
       p.to_str()
         .map(|s| s.to_owned())
         .ok_or_else(|| format!("Non-UTF8 output directory path: {:?}", p))
-    })
-    .collect::<Result<Vec<String>, String>>()?;
+    }).collect::<Result<Vec<String>, String>>()?;
   output_directories.sort();
   command.set_output_directories(protobuf::RepeatedField::from_vec(output_directories));
 
@@ -786,7 +773,8 @@ mod tests {
           "cc4ddd3085aaffbe0abce22f53b30edbb59896bb4a4f0d76219e48070cd0afe1",
         ).unwrap(),
         72,
-      )).into(),
+      ))
+        .into(),
     );
     want_action.set_input_root_digest((&input_directory.digest()).into());
 
@@ -797,7 +785,8 @@ mod tests {
           "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
         ).unwrap(),
         140,
-      )).into(),
+      ))
+        .into(),
     );
 
     assert_eq!(
@@ -837,7 +826,8 @@ mod tests {
           "f373f421b328ddeedfba63542845c0423d7730f428dd8e916ec6a38243c98448",
         ).unwrap(),
         38,
-      )).into(),
+      ))
+        .into(),
     );
     want_action.set_input_root_digest((&input_directory.digest()).into());
 
@@ -848,7 +838,8 @@ mod tests {
           "b1fb7179ce496995a4e3636544ec000dca1b951f1f6216493f6c7608dc4dd910",
         ).unwrap(),
         140,
-      )).into(),
+      ))
+        .into(),
     );
 
     assert_eq!(
@@ -874,7 +865,7 @@ mod tests {
           description: "wrong command".to_string(),
           jdk_home: None,
         }).unwrap()
-          .2,
+        .2,
         vec![],
       ))
     };
@@ -934,7 +925,7 @@ mod tests {
           StderrType::Raw(testdata_empty.string()),
           0,
         ).op
-          .unwrap()
+        .unwrap()
       ),
       Ok(FallibleExecuteProcessResult {
         stdout: testdata.bytes(),
@@ -958,7 +949,7 @@ mod tests {
           StderrType::Digest(testdata.digest()),
           0,
         ).op
-          .unwrap()
+        .unwrap()
       ),
       Ok(FallibleExecuteProcessResult {
         stdout: testdata_empty.bytes(),

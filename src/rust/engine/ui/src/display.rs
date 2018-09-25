@@ -2,16 +2,28 @@
 #![cfg_attr(
   feature = "cargo-clippy",
   deny(
-    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
-    single_match_else, unseparated_literal_suffix, used_underscore_binding
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
   )
 )]
 // It is often more clear to show that nothing is being moved.
 #![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
 // Subjective style.
-#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
@@ -131,8 +143,7 @@ impl EngineDisplay {
         "{goto_origin}{clear}",
         goto_origin = cursor::Goto(cursor_start.0, cursor_start.1),
         clear = clear::AfterCursor,
-      ))
-      .expect("could not write to terminal");
+      )).expect("could not write to terminal");
   }
 
   // Flush terminal output.
@@ -166,8 +177,7 @@ impl EngineDisplay {
         blue = color::Fg(color::Blue),
         divider = divider,
         reset = color::Fg(color::Reset)
-      ))
-      .expect("could not write to terminal");
+      )).expect("could not write to terminal");
   }
 
   // Renders one frame of the log portion of the screen.
@@ -183,8 +193,8 @@ impl EngineDisplay {
         padding = self.padding,
         log_entry = log_entry
       ).graphemes(true)
-        .take(self.terminal_size.0 as usize)
-        .collect();
+      .take(self.terminal_size.0 as usize)
+      .collect();
 
       self
         .write(&format!(
@@ -192,8 +202,7 @@ impl EngineDisplay {
           pos = cursor::Goto(1, cursor_start.1 + n as u16),
           clear_line = clear::CurrentLine,
           entry = line_shortened_log_entry
-        ))
-        .expect("could not write to terminal");
+        )).expect("could not write to terminal");
     }
 
     if counter > 0 {
@@ -229,8 +238,7 @@ impl EngineDisplay {
           "{pos}{entry}",
           pos = cursor::Goto(1, cursor_start.1 + start_row as u16 + n as u16),
           entry = line_shortened_output
-        ))
-        .expect("could not write to terminal");
+        )).expect("could not write to terminal");
     }
   }
 
@@ -275,8 +283,7 @@ impl EngineDisplay {
         hide_cursor = termion::cursor::Hide,
         cursor_init = cursor::Goto(cursor_start.0, cursor_start.1),
         clear_after_cursor = clear::AfterCursor
-      ))
-      .expect("could not write to terminal");
+      )).expect("could not write to terminal");
   }
 
   // Adds a worker/thread to the visual representation.
@@ -311,7 +318,6 @@ impl EngineDisplay {
         park_cursor = cursor::Goto(1, current_pos.1 - action_count),
         clear_after_cursor = clear::AfterCursor,
         reveal_cursor = termion::cursor::Show
-      ))
-      .expect("could not write to terminal");
+      )).expect("could not write to terminal");
   }
 }

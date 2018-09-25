@@ -616,6 +616,9 @@ class TestBase(unittest.TestCase):
     def warnings(self):
       return self._messages_for_level('WARNING')
 
+    def errors(self):
+      return self._messages_for_level('ERROR')
+
   @contextmanager
   def captured_logging(self, level=None):
     root_logger = logging.getLogger()

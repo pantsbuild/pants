@@ -13,8 +13,7 @@ pub fn list_dir(path: &Path) -> Vec<String> {
         .file_name()
         .to_string_lossy()
         .to_string()
-    })
-    .collect();
+    }).collect();
   v.sort();
   v
 }
@@ -31,5 +30,7 @@ pub fn is_executable(path: &Path) -> bool {
   std::fs::metadata(path)
     .expect("Getting file metadata")
     .permissions()
-    .mode() & 0o100 == 0o100
+    .mode()
+    & 0o100
+    == 0o100
 }
