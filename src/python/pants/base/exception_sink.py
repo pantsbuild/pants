@@ -38,8 +38,7 @@ class ExceptionSink(object):
 
   class ExceptionSinkError(Exception): pass
 
-  # TODO (in response to the above): we can avoid a single entry point and make everything work with
-  # great ease if we can ensure all set_* methods are idempotent!
+  # TODO: ensure all set_* methods are idempotent!
   @classmethod
   def set_destination(cls, dir_path):
     cls._destination = cls._check_or_create_new_destination(dir_path)
