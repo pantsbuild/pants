@@ -172,7 +172,7 @@ Exception message: {exception_message}{maybe_newline}
       exc, tb, add_newline,
       should_print_backtrace=cls._exiter.should_print_backtrace)
 
-    cls._exiter.exit(result=1, msg=stderr_printed_error)
+    cls._exiter.exit(result=1, msg=stderr_printed_error, out=cls._trace_stream)
 
 
 # NB: setup global state such as signal handlers and sys.excepthook with probably-safe values.
