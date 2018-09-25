@@ -24,6 +24,29 @@ def equal_args(*args, **kwargs):
   return key
 
 
+class InstanceKey(object):
+  """An equality wrapper for an arbirary object instance.
+
+  This wrapper leverages `id` and `is` for fast `__hash__` and `__eq__` but both of these rely on
+  the object in question not being gc'd since both `id` and `is` rely on the instance address which
+  can be recycled; so we retain a strong reference to the instance to ensure no recycling can occur.
+  """
+
+  def __init__(self, instance):
+    self._instance = instance
+    self._hash = id(instance)
+
+  def __hash__(self):
+    return self._hash
+
+  def __eq__(self, other):
+    if self._instance is other:
+      return True
+    if isinstance(other, InstanceKey):
+      return self._instance is other._instance
+    return False
+
+
 def per_instance(*args, **kwargs):
   """A memoized key factory that works like `equal_args` except that the first parameter's identity
   is used when forming the key.
@@ -31,14 +54,7 @@ def per_instance(*args, **kwargs):
   This is a useful key factory when you want to enforce memoization happens per-instance for an
   instance method in a class hierarchy that defines a custom `__hash__`/`__eq__`.
   """
-  # For methods, the cache should be per-instance, so we take the id of the self/cls argument
-  # instead of relying on `==` since different instances may evaluate as `==`.  Additionally, we
-  # pair the id with the instance to ensure the instance is not GC'd since `id` allows for re-use
-  # of ids under GC.
-  instance = args[0]
-  unique_retained_instance = (id(instance), instance)
-
-  instance_and_rest = (unique_retained_instance,) + args[1:]
+  instance_and_rest = (InstanceKey(args[0]),) + args[1:]
   return equal_args(*instance_and_rest, **kwargs)
 
 
