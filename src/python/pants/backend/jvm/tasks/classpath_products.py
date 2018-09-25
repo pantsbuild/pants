@@ -196,12 +196,15 @@ class ClasspathProducts(object):
     """Adds jar classpath elements to the products of the provided targets.
 
     The resolved jars are added in a way that works with excludes.
+    :param targets: The targets to add the jars for.
+    :param conf: The configuration.
+    :param resolved_jars: A list of ResolvedJars.
     """
     classpath_entries = []
     for jar in resolved_jars:
       if not jar.pants_path:
         raise TaskError('Jar: {!s} has no specified path.'.format(jar.coordinate))
-      cp_entry = ArtifactClasspathEntry(jar.pants_path, jar.coordinate, jar.cache_path)
+      cp_entry = ArtifactClasspathEntry(jar.pants_path, jar.coordinate, jar.cache_path, jar.directory_digest)
       classpath_entries.append((conf, cp_entry))
 
     for target in targets:
