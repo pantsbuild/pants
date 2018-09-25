@@ -32,8 +32,6 @@ class ExceptionSink(object):
   # Where to log stacktraces to in a SIGUSR2 handler.
   _trace_stream = None
 
-  _all_destinations = []
-
   def __new__(cls, *args, **kwargs):
     raise TypeError('Instances of {} are not allowed to be constructed!'
                     .format(cls.__name__))
@@ -45,7 +43,6 @@ class ExceptionSink(object):
   @classmethod
   def set_destination(cls, dir_path):
     cls._destination = cls._check_or_create_new_destination(dir_path)
-    cls._all_destinations.append(cls._destination)
 
   @classmethod
   def get_destination(cls):
@@ -116,10 +113,6 @@ pid: {pid}
       message=msg,
     )
 
-  # @classmethod
-  # def format_merged_fatal_error_message_for_pids(cls, pids):
-  #   exception_text = None
-  #   for log_dest in cls._all_destinations:
   @classmethod
   def log_exception(cls, msg):
     try:
