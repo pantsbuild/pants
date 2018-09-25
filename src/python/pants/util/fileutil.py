@@ -25,6 +25,7 @@ def atomic_copy(src, dst):
 
 @contextmanager
 def safe_temp_edit(filename):
+  """Safely modify a file within context that automatically reverts any changes afterwards"""
   with temporary_file() as tmp_file:
     try:
       shutil.copyfile(filename, tmp_file.name)

@@ -18,3 +18,12 @@ python_tests(
     'tests/python/pants_test:test_base'
   ]
 )
+
+python_tests(
+  name='node_module',
+  sources=['test_node_module.py'],
+  dependencies=[
+    'contrib/node/src/python/pants/contrib/node/targets:node_module',
+    'tests/python/pants_test:test_base'
+  ]
+)

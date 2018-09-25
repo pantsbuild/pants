@@ -38,7 +38,11 @@ class NodeResolverBase(AbstractClass):
       shutil.copyfile(os.path.join(buildroot, source), dest)
 
   def _get_target_from_package_name(self, target, package_name, file_path):
-    """Get a target from its dependency tree given a package name and relative file path
+    """Get a target from its dependency tree given a package name and relative file path.
+
+    This will only traverse direct dependencies of the passed target. It is not necessary
+    to traverse further than that because transitive dependencies will be resolved under the
+    direct dependencies and every direct dependencies is symlinked to the target.
 
     Returns `None` if the target does not exist.
 

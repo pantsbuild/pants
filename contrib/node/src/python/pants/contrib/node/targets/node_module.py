@@ -43,6 +43,8 @@ class NodeModule(NodePackage):
     :param bin_executables: A map of executable names to local file name. If a single executable is
                             specified (a string), the package name will be the executable name
                             and the value will be the local file name per package.json rules.
+    :type bin_executables: `dict`, where key is package name and value is file path
+                           `string`, file path and defaults package name to name of package
     """
     # TODO(John Sirois): Support devDependencies, etc.  The devDependencies case is not
     # clear-cut since pants controlled builds would provide devDependencies as needed to perform
