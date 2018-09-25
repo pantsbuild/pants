@@ -25,7 +25,7 @@ def equal_args(*args, **kwargs):
 
 
 class InstanceKey(object):
-  """An equality wrapper for an arbirary object instance.
+  """An equality wrapper for an arbitrary object instance.
 
   This wrapper leverages `id` and `is` for fast `__hash__` and `__eq__` but both of these rely on
   the object in question not being gc'd since both `id` and `is` rely on the instance address which
