@@ -52,17 +52,23 @@ class PantsDaemonMonitor(ProcessManager):
   def assert_started(self, timeout=.1):
     self._process = None
     self._pid = self.await_pid(timeout)
-    self.assert_running()
+    self._check_pantsd_is_alive()
+    return self._pid
+
+  def _check_pantsd_is_alive(self):
+    self._log()
+    assert self._pid is not None and self.is_alive(), 'cannot assert that pantsd is running. Try calling assert_started before calling this method.'
     return self._pid
 
   def assert_running(self):
-    self._log()
-    assert self._pid is not None and self.is_alive(), 'pantsd should be running!'
-    return self._pid
+    if not self._pid:
+      return self.assert_started()
+    else:
+      return self._check_pantsd_is_alive()
 
   def assert_stopped(self):
     self._log()
-    assert self._pid is not None, 'cant assert stoppage on an unknown pid!'
+    assert self._pid is not None, 'cannot assert pantsd stoppage. Try calling assert_started before calling this method.'
     assert self.is_dead(), 'pantsd should be stopped!'
     return self._pid
 
