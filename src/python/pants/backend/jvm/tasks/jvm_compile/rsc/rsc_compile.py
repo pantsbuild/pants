@@ -414,7 +414,7 @@ class RscCompile(ZincCompile):
       # We need a solution for that.
       # Probably something to do with https://github.com/pantsbuild/pants/pull/6346
       # TODO perhaps determine the platform of the jar and use that here.
-      # picks the cached distribution
+      # https://github.com/pantsbuild/pants/issues/6547
       distribution = JvmPlatform.preferred_jvm_distribution([], strict=True)
       jvm_lib_jars_abs = distribution.find_libs(['rt.jar', 'dt.jar', 'jce.jar', 'tools.jar'])
       cp_entries.extend(jvm_lib_jars_abs)
