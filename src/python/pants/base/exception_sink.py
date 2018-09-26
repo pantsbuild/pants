@@ -45,8 +45,7 @@ class ExceptionSink(object):
   # TODO: see the bottom of this file where we call reset_log_location() and friends in order to
   # properly setup global state.
   # TODO: document all of these fields!
-  _log_dir = None
-  _pid = None
+  _log_location = None
   # We need an exiter in order to know what to do after we log a fatal exception.
   _exiter = None
   # Where to log stacktraces to in a SIGUSR2 handler.
@@ -69,7 +68,7 @@ class ExceptionSink(object):
 
   # TODO: ensure all set_* methods are idempotent!
   @classmethod
-  def reset_log_location(cls, log_location_request):
+  def reset_log_location(cls, log_location):
     """
     Class state:
     - Will leak the old file handles without closing them.
@@ -78,21 +77,27 @@ class ExceptionSink(object):
     - May raise ExceptionSinkError if the directory is not writable.
     - Will register signal handlers for fatal handlers (clobbering old values).
     """
+
     # TODO: check for noop on both of the arguments!
-    # Ensure the directory is suitable for writing to, or raise.
-    log_dir = cls._check_or_create_new_destination(
-      log_location_request.log_dir)
-    pid = log_location_request.pid
+    if log_location.log_dir is None:
+      if log_location.pid is None:
+        raise cls.ExceptionSinkError(
+          "No-op call to reset_log_location(): argument was {!r}."
+          .format(log_location))
+    else:
+      # Ensure the directory is suitable for writing to, or raise.
+      cls._check_or_create_new_destination(log_location.log_dir)
+    if log_location.pid is None:
+      log_location = log_location.copy(pid=os.getpid())
 
     pid_specific_error_stream, shared_error_stream = cls._recapture_fatal_error_log_streams(
-      log_dir, pid)
+      log_location)
 
     # NB: mutate process-global state!
     cls._register_global_fatal_signal_handlers(pid_specific_error_stream)
 
     # NB: mutate the class variables!
-    cls._log_dir = log_dir
-    cls._pid = pid
+    cls._log_location = log_location
     cls._pid_specific_error_fileobj = pid_specific_error_stream
     cls._shared_error_fileobj = shared_error_stream
 
@@ -129,12 +134,12 @@ class ExceptionSink(object):
     cls._interactive_output_stream = interactive_output_stream
 
   @classmethod
-  def exceptions_log_path(cls, log_location_request):
-    if log_location_request.pid is None:
+  def exceptions_log_path(cls, log_location):
+    if log_location.pid is None:
       intermediate_filename_component = ''
     else:
-      intermediate_filename_component = '.{}'.format(log_location_request.pid)
-    in_dir = log_location_request.log_dir or cls._log_dir
+      intermediate_filename_component = '.{}'.format(log_location.pid)
+    in_dir = log_location.log_dir or cls._log_location.log_dir
     return os.path.join(
       in_dir,
       'logs',
@@ -143,7 +148,7 @@ class ExceptionSink(object):
   @classmethod
   def log_exception(cls, msg):
     try:
-      fatal_error_log_entry = cls._format_exception_message(msg, cls._pid)
+      fatal_error_log_entry = cls._format_exception_message(msg, cls._log_location.pid)
       # We care more about this log than the shared log, so write to it first.
       cls._pid_specific_error_fileobj.write(fatal_error_log_entry)
       cls._pid_specific_error_fileobj.flush()
@@ -165,24 +170,22 @@ class ExceptionSink(object):
         "The provided exception sink path at '{}' is not writable or could not be created: {}."
         .format(destination, str(e)),
         e)
-    return destination
 
   @classmethod
-  def _recapture_fatal_error_log_streams(cls, to_dir, for_pid):
+  def _recapture_fatal_error_log_streams(cls, log_location):
     # NB: We do not close old file descriptors! This is bounded by the number of times any method is
     # called, which should be few and finite.
     # We recapture both log streams each time.
-    assert(isinstance(for_pid, int))
     # NB: We truncate the pid-specific error log file.
-    pid_specific_log_path = cls.exceptions_log_path(LogLocation(to_dir, for_pid))
-    shared_log_path = cls.exceptions_log_path(LogLocation(to_dir))
+    pid_specific_log_path = cls.exceptions_log_path(log_location)
+    shared_log_path = cls.exceptions_log_path(log_location.copy(pid=None))
     try:
       pid_specific_error_stream = safe_open(pid_specific_log_path, mode='w')
       shared_error_stream = safe_open(shared_log_path, mode='a')
     except Exception as e:
       raise cls.ExceptionSinkError(
-        "Error opening fatal error log streams in {} for pid {}: {}"
-        .format(to_dir, for_pid, str(e)))
+        "Error opening fatal error log streams for log location {!r}: {}"
+        .format(log_location, str(e)))
 
     # TODO: determine whether any further validation of the streams (try writing to them here?) is
     # useful/necessary for faulthandler (it seems it just doesn't write to e.g. closed file

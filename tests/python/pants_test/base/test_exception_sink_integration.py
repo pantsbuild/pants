@@ -13,8 +13,6 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
-  def test_dumps_traceback_on_fatal_signal(self):
-    """???"""
 
   def _assert_log_matches(self, pid, file_contents):
     # TODO: ensure there's only one log entry in this file so we can avoid more complicated checks!
@@ -61,6 +59,9 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
       shared_log_file = ExceptionSink.exceptions_log_path(
         LogLocation(log_dir=tmpdir, pid=None))
       self._assert_log_matches(pants_run.pid, read_file(shared_log_file))
+
+  def test_dumps_traceback_on_fatal_signal(self):
+    """???"""
 
   def test_reset_exiter(self):
     """???"""
