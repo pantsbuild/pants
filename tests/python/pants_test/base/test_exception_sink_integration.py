@@ -75,21 +75,18 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
       waiter_handle = self.run_pants_with_workdir_without_waiting(
         ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
         tmpdir)
-      time.sleep(2)
-      # waiter_handle.process.terminate()
-      waiter_handle.process.kill()
+      time.sleep(15)
+      # TODO: need to test at least SIGABRT or one of the other signals faulthandler is covering as
+      # well (which only have a backtrace)!
+      waiter_handle.process.terminate()
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
-
-      # raise Exception('stdout:\n{}\nstderr:\n{}'
-      #                 .format(waiter_run.stdout_data, waiter_run.stderr_data))
-
-      # raise Exception(os.listdir(os.path.join(tmpdir, 'logs')))
 
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, waiter_run)
       # TODO: the methods below are wrong for this signal error log (as opposed to an uncaught
       # exception), but also, the log file is empty for some reason. Solving this should solve the
       # xfailed test.
+      self.assertNotEqual('', read_file(shared_log_file))
       self.assertNotEqual('', read_file(pid_specific_log_file))
       self._assert_unhandled_exception_log_matches(waiter_run.pid, read_file(pid_specific_log_file))
       self._assert_unhandled_exception_log_matches(waiter_run.pid, read_file(shared_log_file))

@@ -77,15 +77,6 @@ class ExceptionSink(object):
   # Integer code to exit with on an unhandled exception.
   UNHANDLED_EXCEPTION_EXIT_CODE = 1
 
-  # faulthandler.enable() installs handlers for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL, but we
-  # also want to dump a traceback when receiving these other usually-fatal signals.
-  # TODO: the DaemonPantsRunner calls its DaemonExiter to override these signals -- we must be able
-  # to be aware of that!
-  GRACEFUL_EXIT_SIGNALS = [
-    signal.SIGTERM,
-    signal.SIGQUIT,
-  ]
-
   def __new__(cls, *args, **kwargs):
     raise TypeError('Instances of {} are not allowed to be constructed!'
                     .format(cls.__name__))
@@ -125,8 +116,9 @@ class ExceptionSink(object):
     # Log a timestamped exception and exit gracefully on non-fatal signals.
     # TODO: ascertain whether the the signal handler method used here is signal-safe for our
     # purposes.
-    for signum in cls.GRACEFUL_EXIT_SIGNALS:
-      signal.signal(signum, cls._handle_signal_gracefully)
+    # faulthandler.enable() installs handlers for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL, but we
+    # also want to dump a traceback when receiving these other usually-fatal signals.
+    signal.signal(signal.SIGTERM, cls._handle_signal_gracefully)
 
     # NB: mutate the class variables!
     cls._log_location = new_log_location
@@ -310,6 +302,7 @@ Signal {signum} was raised. Exiting with failure.
     signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
       formatted_traceback=formatted_traceback)
+    # This method catches any exceptions raised within it.
     cls.log_exception(signal_error_log_entry)
     # NB: We always print the traceback to the terminal in this case.
     cls._exit_with_failure(signal_error_log_entry)
