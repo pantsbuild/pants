@@ -70,6 +70,9 @@ XXX
         self.assertRegexpMatches(cur_pid_file.read(), err_rx)
       with open(shared_error_log_path, 'r') as shared_log_file:
         self.assertRegexpMatches(shared_log_file.read(), err_rx)
+      # Test that try_find_exception_logs_for_pids() can find the pid file for the current pid.
+      log_contents = assert_single_element(sink.try_find_exception_logs_for_pids([os.getpid()]))
+      self.assertRegexpMatches(log_contents, err_rx)
 
   def test_backup_logging_on_fatal_error(self):
     sink = self._gen_sink_subclass()
