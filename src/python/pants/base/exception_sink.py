@@ -13,11 +13,30 @@ import sys
 import traceback
 from builtins import object, str
 
+from future.utils import binary_type
+
 from pants.base.exiter import Exiter
-from pants.util.dirutil import maybe_read_file, safe_mkdir, safe_open
+from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.objects import Exactly, datatype
 
 
 logger = logging.getLogger(__name__)
+
+
+class LogLocation(datatype([
+    ('log_dir', Exactly(binary_type, type(None))),
+    ('pid', Exactly(int, long, type(None))),
+])):
+
+  # TODO: link the datatype default values ticket!
+  def __new__(cls, log_dir=None, pid=None):
+    if log_dir is not None:
+      log_dir = binary_type(log_dir)
+    return super(LogLocation, cls).__new__(cls, log_dir=log_dir, pid=pid)
+
+  @classmethod
+  def from_options_for_current_process(cls, options):
+    return cls(log_dir=options.pants_workdir, pid=os.getpid())
 
 
 class ExceptionSink(object):
@@ -50,7 +69,7 @@ class ExceptionSink(object):
 
   # TODO: ensure all set_* methods are idempotent!
   @classmethod
-  def reset_log_location(cls, containing_directory, pid):
+  def reset_log_location(cls, log_location_request):
     """
     Class state:
     - Will leak the old file handles without closing them.
@@ -60,18 +79,19 @@ class ExceptionSink(object):
     - Will register signal handlers for fatal handlers (clobbering old values).
     """
     # TODO: check for noop on both of the arguments!
-    assert(isinstance(pid, int))
     # Ensure the directory is suitable for writing to, or raise.
-    containing_directory = cls._check_or_create_new_destination(containing_directory)
+    log_dir = cls._check_or_create_new_destination(
+      log_location_request.log_dir)
+    pid = log_location_request.pid
 
     pid_specific_error_stream, shared_error_stream = cls._recapture_fatal_error_log_streams(
-      containing_directory, pid)
+      log_dir, pid)
 
     # NB: mutate process-global state!
     cls._register_global_fatal_signal_handlers(pid_specific_error_stream)
 
     # NB: mutate the class variables!
-    cls._log_dir = containing_directory
+    cls._log_dir = log_dir
     cls._pid = pid
     cls._pid_specific_error_fileobj = pid_specific_error_stream
     cls._shared_error_fileobj = shared_error_stream
@@ -109,15 +129,16 @@ class ExceptionSink(object):
     cls._interactive_output_stream = interactive_output_stream
 
   @classmethod
-  def try_find_exception_logs_for_pids(cls, pids):
-    """
-    This is a non-mutating method which does not raise IOError.
-    """
-    for pid in pids:
-      log_path = cls._exceptions_log_path(cls._log_dir, for_pid=pid)
-      maybe_exception_text = maybe_read_file(log_path, binary_mode=False)
-      if maybe_exception_text:
-        yield maybe_exception_text
+  def exceptions_log_path(cls, log_location_request):
+    if log_location_request.pid is None:
+      intermediate_filename_component = ''
+    else:
+      intermediate_filename_component = '.{}'.format(log_location_request.pid)
+    in_dir = log_location_request.log_dir or cls._log_dir
+    return os.path.join(
+      in_dir,
+      'logs',
+      'exceptions{}.log'.format(intermediate_filename_component))
 
   @classmethod
   def log_exception(cls, msg):
@@ -153,8 +174,8 @@ class ExceptionSink(object):
     # We recapture both log streams each time.
     assert(isinstance(for_pid, int))
     # NB: We truncate the pid-specific error log file.
-    pid_specific_log_path = cls._exceptions_log_path(to_dir, for_pid=for_pid)
-    shared_log_path = cls._exceptions_log_path(to_dir)
+    pid_specific_log_path = cls.exceptions_log_path(LogLocation(to_dir, for_pid))
+    shared_log_path = cls.exceptions_log_path(LogLocation(to_dir))
     try:
       pid_specific_error_stream = safe_open(pid_specific_log_path, mode='w')
       shared_error_stream = safe_open(shared_log_path, mode='a')
@@ -176,18 +197,6 @@ class ExceptionSink(object):
       faulthandler.disable()
     # Send a stacktrace to this file if interrupted by a fatal error.
     faulthandler.enable(file=error_stream, all_threads=True)
-
-  @staticmethod
-  def _exceptions_log_path(in_dir, for_pid=None):
-    if for_pid is None:
-      intermediate_filename_component = ''
-    else:
-      assert(isinstance(for_pid, int))
-      intermediate_filename_component = '.{}'.format(for_pid)
-    return os.path.join(
-      in_dir,
-      'logs',
-      'exceptions{}.log'.format(intermediate_filename_component))
 
   @classmethod
   def _iso_timestamp_for_now(cls):
@@ -261,7 +270,7 @@ Exception message: {exception_message}{maybe_newline}
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
 # Sets fatal signal handlers with reasonable defaults to catch errors early in startup.
-ExceptionSink.reset_log_location(os.getcwd(), os.getpid())
+ExceptionSink.reset_log_location(LogLocation(log_dir=os.getcwd(), pid=os.getpid()))
 # Sets except hook.
 ExceptionSink.reset_exiter(Exiter(print_backtraces=True))
 # Sets a SIGUSR2 handler.

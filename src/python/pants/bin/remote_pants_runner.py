@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-import os
 import signal
 import sys
 import time
@@ -14,12 +13,13 @@ from contextlib import contextmanager
 
 from future.utils import raise_with_traceback
 
-from pants.base.exception_sink import ExceptionSink
+from pants.base.exception_sink import ExceptionSink, LogLocation
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.util.collections import combined_dict
+from pants.util.dirutil import maybe_read_file
 
 
 logger = logging.getLogger(__name__)
@@ -170,14 +170,12 @@ class RemotePantsRunner(object):
     if nailgun_error.pid is not None:
       source_pids = [abs(nailgun_error.pid)] + source_pids
 
-    # TODO: flesh out format_merged_fatal_error_message_for_pids() in ExceptionSink to iterate over
-    # all the previous destinations!
-    # TODO: rename assert_single_element() so that it can be used here to return none instead of
-    # ValueError for > 1 element! Or make a new method!
-    try:
-      exception_text = next(iter(ExceptionSink.try_find_exception_logs_for_pids(source_pids)))
-    except StopIteration:
-      exception_text = None
+    exception_text = None
+    for pid in source_pids:
+      log_path = ExceptionSink.exceptions_log_path(LogLocation(pid=pid))
+      exception_text = maybe_read_file(log_path, binary_mode=False)
+      if exception_text:
+        break
 
     exception_suffix = '\nRemote exception:\n{}'.format(exception_text) if exception_text else ''
     return self.Terminated('abruptly lost active connection to pantsd runner: {!r}{}'.format(
@@ -192,8 +190,8 @@ class RemotePantsRunner(object):
   def run(self, args=None):
     # Redirect fatal error logging to the current workdir, set the stream to log stacktraces to on
     # SIGUSR2, and recognize the provided Exiter.
-    ExceptionSink.reset_log_location(self._bootstrap_options.for_global_scope().pants_workdir,
-                                     os.getpid())
+    ExceptionSink.reset_log_location(LogLocation.from_options_for_current_process(
+      log_dir=self._bootstrap_options.for_global_scope()))
     ExceptionSink.reset_interactive_output_stream(self._setup_stderr_logging())
     ExceptionSink.reset_exiter(self._exiter)
 

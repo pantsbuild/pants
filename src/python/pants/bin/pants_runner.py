@@ -9,7 +9,7 @@ import os
 import sys
 from builtins import object
 
-from pants.base.exception_sink import ExceptionSink
+from pants.base.exception_sink import ExceptionSink, LogLocation
 from pants.bin.remote_pants_runner import RemotePantsRunner
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
@@ -34,8 +34,8 @@ class PantsRunner(object):
   def run(self):
     options_bootstrapper = OptionsBootstrapper(env=self._env, args=self._args)
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
-    ExceptionSink.reset_log_location(bootstrap_options.for_global_scope().pants_workdir,
-                                     os.getpid())
+    ExceptionSink.reset_log_location(LogLocation.from_options_for_current_process(
+      bootstrap_options.for_global_scope()))
 
     if bootstrap_options.for_global_scope().enable_pantsd:
       try:
