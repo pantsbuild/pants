@@ -36,6 +36,7 @@ class LogLocation(datatype([
 
   @classmethod
   def from_options_for_current_process(cls, options):
+    """???"""
     return cls(log_dir=options.pants_workdir, pid=os.getpid())
 
 
@@ -44,7 +45,6 @@ class ExceptionSink(object):
 
   # TODO: see the bottom of this file where we call reset_log_location() and friends in order to
   # properly setup global state.
-  # TODO: document all of these fields!
   _log_location = None
   # We need an exiter in order to know what to do after we log a fatal exception.
   _exiter = None
@@ -59,6 +59,15 @@ class ExceptionSink(object):
 
   # Integer code to exit with on an unhandled exception.
   UNHANDLED_EXCEPTION_EXIT_CODE = 1
+
+  # faulthandler.enable() installs handlers for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL, but we
+  # also want to dump a traceback when receiving these other usually-fatal signals.
+  # TODO: the DaemonPantsRunner calls its DaemonExiter to override these signals -- we must be able
+  # to be aware of that!
+  GRACEFUL_EXIT_SIGNALS = [
+    signal.SIGTERM,
+    signal.SIGQUIT,
+  ]
 
   def __new__(cls, *args, **kwargs):
     raise TypeError('Instances of {} are not allowed to be constructed!'
@@ -94,7 +103,13 @@ class ExceptionSink(object):
       log_location)
 
     # NB: mutate process-global state!
-    cls._register_global_fatal_signal_handlers(pid_specific_error_stream)
+    # Send a stacktrace to this file if interrupted by a fatal error.
+    faulthandler.enable(file=pid_specific_error_stream, all_threads=True)
+    # Log a timestamped exception and exit gracefully on non-fatal signals.
+    # TODO: ascertain whether the the signal handler method used here is signal-safe for our
+    # purposes.
+    for signum in cls.GRACEFUL_EXIT_SIGNALS:
+      signal.signal(signum, cls._handle_signal_gracefully)
 
     # NB: mutate the class variables!
     cls._log_location = log_location
@@ -192,15 +207,6 @@ class ExceptionSink(object):
     # descriptors, so probably not).
     return (pid_specific_error_stream, shared_error_stream)
 
-  @staticmethod
-  def _register_global_fatal_signal_handlers(error_stream):
-    # This is a purely side-effecting method.
-    # TODO: is this check/disable step required?
-    if faulthandler.is_enabled():
-      faulthandler.disable()
-    # Send a stacktrace to this file if interrupted by a fatal error.
-    faulthandler.enable(file=error_stream, all_threads=True)
-
   @classmethod
   def _iso_timestamp_for_now(cls):
     return datetime.datetime.now().isoformat()
@@ -246,6 +252,13 @@ Exception message: {exception_message}{maybe_newline}
       maybe_newline=maybe_newline)
 
   @classmethod
+  def _exit_with_failure(cls, terminal_msg):
+    # Exit with failure, printing a message to the terminal (or whatever the interactive stream is).
+    cls._exiter.exit(result=cls.UNHANDLED_EXCEPTION_EXIT_CODE,
+                     msg=terminal_msg,
+                     out=cls._interactive_output_stream)
+
+  @classmethod
   def _log_unhandled_exception_and_exit(cls, exc_class=None, exc=None, tb=None, add_newline=False):
     """Default sys.excepthook implementation for unhandled exceptions."""
     exc_class = exc_class or sys.exc_info()[0]
@@ -264,10 +277,24 @@ Exception message: {exception_message}{maybe_newline}
       exc, tb, add_newline,
       should_print_backtrace=cls._exiter.should_print_backtrace)
 
-    # Exit with failure, printing a message to the terminal (or whatever the interactive stream is).
-    cls._exiter.exit(result=cls.UNHANDLED_EXCEPTION_EXIT_CODE,
-                     msg=stderr_printed_error,
-                     out=cls._interactive_output_stream)
+    cls._exit_with_failure(stderr_printed_error)
+
+  _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\
+Signal {signum} was raised. Exiting with failure.
+{formatted_traceback}
+"""
+
+  @classmethod
+  def _handle_signal_gracefully(cls, signum, frame):
+    tb = frame.f_exc_traceback
+    should_print_backtrace = tb is not None
+    formatted_traceback = cls._format_traceback(tb, should_print_backtrace=should_print_backtrace)
+    signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
+      signum=signum,
+      formatted_traceback=formatted_traceback)
+    cls.log_exception(signal_error_log_entry)
+    # NB: We always print the traceback to the terminal in this case.
+    cls._exit_with_failure(signal_error_log_entry)
 
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module

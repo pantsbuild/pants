@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
+import time
 
 from pants.base.exception_sink import ExceptionSink, LogLocation
 from pants.util.contextutil import temporary_dir
@@ -14,7 +15,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
 
-  def _assert_log_matches(self, pid, file_contents):
+  def _assert_unhandled_exception_log_matches(self, pid, file_contents):
     # TODO: ensure there's only one log entry in this file so we can avoid more complicated checks!
     # Search for the log header entry.
     self.assertRegexpMatches(file_contents, """\
@@ -39,6 +40,15 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
   ResolveError: "this-target-does-not-exist" was not found in namespace "". Did you mean one of:
 """, file_contents)
 
+  def _get_log_file_paths(self, workdir, pants_run):
+    pid_specific_log_file = ExceptionSink.exceptions_log_path(
+        LogLocation(log_dir=workdir, pid=pants_run.pid))
+
+    shared_log_file = ExceptionSink.exceptions_log_path(
+      LogLocation(log_dir=workdir, pid=None))
+
+    return (pid_specific_log_file, shared_log_file)
+
   def test_logs_unhandled_exception(self):
     with temporary_dir() as tmpdir:
       pants_run = self.run_pants_with_workdir([
@@ -52,16 +62,25 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
       self.assertIn(' ResolveError: "this-target-does-not-exist" was not found in namespace "". Did you mean one of:',
                     pants_run.stderr_data)
 
-      # TODO: Check that the exception AND a backtrace are logged to both of these!
-      pid_specific_log_file = ExceptionSink.exceptions_log_path(
-        LogLocation(log_dir=tmpdir, pid=pants_run.pid))
-      self._assert_log_matches(pants_run.pid, read_file(pid_specific_log_file))
-      shared_log_file = ExceptionSink.exceptions_log_path(
-        LogLocation(log_dir=tmpdir, pid=None))
-      self._assert_log_matches(pants_run.pid, read_file(shared_log_file))
+      pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
+      self._assert_unhandled_exception_log_matches(pants_run.pid, read_file(pid_specific_log_file))
+      self._assert_unhandled_exception_log_matches(pants_run.pid, read_file(shared_log_file))
 
   def test_dumps_traceback_on_fatal_signal(self):
-    """???"""
+    with temporary_dir() as tmpdir:
+      waiter_handle = self.run_pants_with_workdir_without_waiting(['goals'], tmpdir)
+      time.sleep(2)
+      waiter_handle.process.terminate()
+      waiter_run = waiter_handle.join()
+      self.assert_failure(waiter_run)
+
+      pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, waiter_run)
+      # TODO: the methods below are wrong for this signal error log (as opposed to an uncaught
+      # exception), but also, the log file is empty for some reason. Solving this should solve the
+      # xfailed test.
+      self.assertNotEqual('', read_file(pid_specific_log_file))
+      self._assert_unhandled_exception_log_matches(waiter_run.pid, read_file(pid_specific_log_file))
+      self._assert_unhandled_exception_log_matches(waiter_run.pid, read_file(shared_log_file))
 
   def test_reset_exiter(self):
     """???"""

@@ -24,24 +24,27 @@ class TestExceptionSink(TestBase):
     class AnonymousSink(ExceptionSink): pass
     return AnonymousSink
 
-  def test_unset_destination(self):
-    self.assertEqual(os.getcwd(), self._gen_sink_subclass()._log_dir)
+  def test_default_log_location(self):
+    default_log_location = self._gen_sink_subclass()._log_location
+    self.assertEqual(LogLocation(log_dir=os.getcwd(), pid=os.getpid()),
+                     default_log_location)
 
-  def test_retrieve_destination(self):
+  def test_reset_log_location(self):
     sink = self._gen_sink_subclass()
 
     with temporary_dir() as tmpdir:
       sink.reset_log_location(LogLocation(tmpdir, os.getpid()))
-      self.assertEqual(tmpdir, sink._log_dir)
+      self.assertEqual(LogLocation(tmpdir, os.getpid()),
+                       sink._log_location)
 
-  def test_set_invalid_destination(self):
+  def test_set_invalid_log_location(self):
     sink = self._gen_sink_subclass()
     err_rx = re.escape(
       "The provided exception sink path at '/does/not/exist' is not writable or could not be created: [Errno 13]")
     with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
       sink.reset_log_location(LogLocation('/does/not/exist', os.getpid()))
     err_rx = '{}.*{}'.format(
-      re.escape("Error opening fatal error log streams in / for pid "),
+      re.escape("Error opening fatal error log streams for log location LogLocation(log_dir='/', pid="),
       re.escape(": [Errno 13] Permission denied: '/logs'"))
     with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
       sink.reset_log_location(LogLocation('/', os.getpid()))
@@ -70,9 +73,6 @@ XXX
         self.assertRegexpMatches(cur_pid_file.read(), err_rx)
       with open(shared_error_log_path, 'r') as shared_log_file:
         self.assertRegexpMatches(shared_log_file.read(), err_rx)
-      # Test that try_find_exception_logs_for_pids() can find the pid file for the current pid.
-      log_contents = assert_single_element(sink.try_find_exception_logs_for_pids([os.getpid()]))
-      self.assertRegexpMatches(log_contents, err_rx)
 
   def test_backup_logging_on_fatal_error(self):
     sink = self._gen_sink_subclass()
