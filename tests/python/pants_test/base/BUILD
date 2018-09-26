@@ -220,6 +220,17 @@ python_tests(
 )
 
 python_tests(
+  name = 'exception_sink_integration',
+  sources = ['test_exception_sink_integration.py'],
+  dependencies = [
+    '3rdparty/python:future',
+    '3rdparty/python:mock',
+    'src/python/pants/base:exception_sink',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name = 'exiter',
   sources = ['test_exiter.py'],
   dependencies = [
