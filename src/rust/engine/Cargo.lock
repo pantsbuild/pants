@@ -1039,6 +1039,9 @@ dependencies = [
 [[package]]
 name = "resettable"
 version = "0.0.1"
+dependencies = [
+ "parking_lot 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "rustc-demangle"

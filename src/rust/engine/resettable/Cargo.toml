@@ -5,3 +5,4 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+parking_lot = "0.6"
