@@ -14,7 +14,7 @@ import traceback
 from builtins import object, str
 
 from pants.base.exiter import Exiter
-from pants.util.dirutil import safe_file_dump, safe_mkdir
+from pants.util.dirutil import maybe_read_file, safe_mkdir, safe_open
 
 
 logger = logging.getLogger(__name__)
@@ -23,14 +23,24 @@ logger = logging.getLogger(__name__)
 class ExceptionSink(object):
   """A mutable singleton object representing where exceptions should be logged to."""
 
-  # TODO: see the bottom of this file where we call set_destination() and friends in order to
+  # TODO: see the bottom of this file where we call reset_log_location() and friends in order to
   # properly setup global state.
-  # TODO: ???
-  _destination = None
+  # TODO: document all of these fields!
+  _log_dir = None
+  _pid = None
   # We need an exiter in order to know what to do after we log a fatal exception.
   _exiter = None
   # Where to log stacktraces to in a SIGUSR2 handler.
-  _trace_stream = None
+  _interactive_output_stream = None
+
+  # NB: These file descriptors are kept under the assumption that pants won't randomly close them
+  # later -- we want the signal handler to be able to do no work (and to let faulthandler figure out
+  # signal safety).
+  _pid_specific_error_fileobj = None
+  _shared_error_fileobj = None
+
+  # Integer code to exit with on an unhandled exception.
+  UNHANDLED_EXCEPTION_EXIT_CODE = 1
 
   def __new__(cls, *args, **kwargs):
     raise TypeError('Instances of {} are not allowed to be constructed!'
@@ -40,56 +50,144 @@ class ExceptionSink(object):
 
   # TODO: ensure all set_* methods are idempotent!
   @classmethod
-  def set_destination(cls, dir_path):
-    cls._destination = cls._check_or_create_new_destination(dir_path)
+  def reset_log_location(cls, containing_directory, pid):
+    """
+    Class state:
+    - Will leak the old file handles without closing them.
+    OS state:
+    - May create a new directory.
+    - May raise ExceptionSinkError if the directory is not writable.
+    - Will register signal handlers for fatal handlers (clobbering old values).
+    """
+    # TODO: check for noop on both of the arguments!
+    assert(isinstance(pid, int))
+    # Ensure the directory is suitable for writing to, or raise.
+    containing_directory = cls._check_or_create_new_destination(containing_directory)
+
+    pid_specific_error_stream, shared_error_stream = cls._recapture_fatal_error_log_streams(
+      containing_directory, pid)
+
+    # NB: mutate process-global state!
+    cls._register_global_fatal_signal_handlers(pid_specific_error_stream)
+
+    # NB: mutate the class variables!
+    cls._log_dir = containing_directory
+    cls._pid = pid
+    cls._pid_specific_error_fileobj = pid_specific_error_stream
+    cls._shared_error_fileobj = shared_error_stream
 
   @classmethod
-  def get_destination(cls):
-    return cls._destination
-
-  @classmethod
-  def exceptions_log_path(cls, for_pid=None, in_dir=None):
-    if not in_dir:
-      in_dir = cls.get_destination()
-    intermediate_filename_component = '.{}'.format(for_pid) if for_pid else ''
-    return os.path.join(
-      in_dir,
-      'logs',
-      'exceptions{}.log'.format(intermediate_filename_component))
-
-  @classmethod
-  def set_exiter(cls, exiter):
+  def reset_exiter(cls, exiter):
+    """
+    Class state:
+    - Will leak the old Exiter instance.
+    Python state:
+    - Will register sys.excepthook, clobbering any previous value.
+    """
     assert(isinstance(exiter, Exiter))
+    # NB: mutate the class variables! This is done before mutating the exception hook, because the
+    # uncaught exception handler uses cls._exiter to exit.
     cls._exiter = exiter
+    # NB: mutate process-global state!
     sys.excepthook = cls._log_unhandled_exception_and_exit
 
   @classmethod
-  def set_trace_stream(cls, trace_stream):
-    # TODO: validate trace_stream somehow!
-    # TODO: do we need to keep a reference to this? I think not.
-    cls._trace_stream = trace_stream
-
-    # TODO: move /all/ signal handling into a SignalHandler class defined in this file which is not
-    # a singleton and can be subclassed (like Exiter). Since signals are global, it is useful to
-    # be able to look at all the signal handlers which are set in one place.
-    if faulthandler.is_enabled():
-      faulthandler.disable()
-    faulthandler.enable(trace_stream)
+  def reset_interactive_output_stream(cls, interactive_output_stream):
+    """
+    Class state:
+    - Will leak the old output stream.
+    OS state:
+    - Will register a handler for SIGUSR2, clobbering any previous value.
+    """
+    # TODO: chain=True will log tracebacks to previous values of the trace stream as well -- what
+    # happens if those file objects are eventually closed? Does faulthandler just ignore them?
     # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
-    faulthandler.register(signal.SIGUSR2, trace_stream, chain=True)
+    # NB: mutate process-global state!
+    faulthandler.register(signal.SIGUSR2, interactive_output_stream, chain=True)
+    # We don't *necessarily* need to keep a reference to this, but we do here for clarity.
+    # NB: mutate the class variables!
+    cls._interactive_output_stream = interactive_output_stream
+
+  @classmethod
+  def try_find_exception_logs_for_pids(cls, pids):
+    """
+    This is a non-mutating method which does not raise IOError.
+    """
+    for pid in pids:
+      log_path = cls._exceptions_log_path(cls._log_dir, for_pid=pid)
+      maybe_exception_text = maybe_read_file(log_path, binary_mode=False)
+      if maybe_exception_text:
+        yield maybe_exception_text
+
+  @classmethod
+  def log_exception(cls, msg):
+    try:
+      fatal_error_log_entry = cls._format_exception_message(msg, cls._pid)
+      # We care more about this log than the shared log, so write to it first.
+      cls._pid_specific_error_fileobj.write(fatal_error_log_entry)
+      cls._pid_specific_error_fileobj.flush()
+      # TODO: we should probably guard this against concurrent modification by other pants
+      # subprocesses somehow.
+      cls._shared_error_fileobj.write(fatal_error_log_entry)
+      cls._shared_error_fileobj.flush()
+    except Exception as e:
+      logger.error(
+        'Problem logging original exception: {}. The original error message was:\n{}'
+        .format(e, msg))
 
   @classmethod
   def _check_or_create_new_destination(cls, destination):
     try:
       safe_mkdir(destination)
     except Exception as e:
-      # NB: When this class sets up excepthooks, raising this should be safe, because we always
-      # have a destination to log to (os.getcwd() if not otherwise set).
       raise cls.ExceptionSinkError(
         "The provided exception sink path at '{}' is not writable or could not be created: {}."
         .format(destination, str(e)),
         e)
     return destination
+
+  @classmethod
+  def _recapture_fatal_error_log_streams(cls, to_dir, for_pid):
+    # NB: We do not close old file descriptors! This is bounded by the number of times any method is
+    # called, which should be few and finite.
+    # We recapture both log streams each time.
+    assert(isinstance(for_pid, int))
+    # NB: We truncate the pid-specific error log file.
+    pid_specific_log_path = cls._exceptions_log_path(to_dir, for_pid=for_pid)
+    shared_log_path = cls._exceptions_log_path(to_dir)
+    try:
+      pid_specific_error_stream = safe_open(pid_specific_log_path, mode='w')
+      shared_error_stream = safe_open(shared_log_path, mode='a')
+    except Exception as e:
+      raise cls.ExceptionSinkError(
+        "Error opening fatal error log streams in {} for pid {}: {}"
+        .format(to_dir, for_pid, str(e)))
+
+    # TODO: determine whether any further validation of the streams (try writing to them here?) is
+    # useful/necessary for faulthandler (it seems it just doesn't write to e.g. closed file
+    # descriptors, so probably not).
+    return (pid_specific_error_stream, shared_error_stream)
+
+  @staticmethod
+  def _register_global_fatal_signal_handlers(error_stream):
+    # This is a purely side-effecting method.
+    # TODO: is this check/disable step required?
+    if faulthandler.is_enabled():
+      faulthandler.disable()
+    # Send a stacktrace to this file if interrupted by a fatal error.
+    faulthandler.enable(file=error_stream, all_threads=True)
+
+  @staticmethod
+  def _exceptions_log_path(in_dir, for_pid=None):
+    if for_pid is None:
+      intermediate_filename_component = ''
+    else:
+      assert(isinstance(for_pid, int))
+      intermediate_filename_component = '.{}'.format(for_pid)
+    return os.path.join(
+      in_dir,
+      'logs',
+      'exceptions{}.log'.format(intermediate_filename_component))
 
   @classmethod
   def _iso_timestamp_for_now(cls):
@@ -109,23 +207,7 @@ pid: {pid}
       timestamp=cls._iso_timestamp_for_now(),
       args=sys.argv,
       pid=pid,
-      message=msg,
-    )
-
-  @classmethod
-  def log_exception(cls, msg):
-    try:
-      pid = os.getpid()
-      fatal_error_log_entry = cls._format_exception_message(msg, pid)
-      # We care more about this log than the shared log, so completely write to it first. This
-      # avoids any errors with concurrent modification of the shared log affecting the per-pid log.
-      safe_file_dump(cls.exceptions_log_path(for_pid=pid), fatal_error_log_entry, mode='w')
-      # TODO: we should probably guard this against concurrent modification somehow.
-      safe_file_dump(cls.exceptions_log_path(), fatal_error_log_entry, mode='a')
-    except Exception as e:
-      # TODO: If there is an error in writing to the exceptions log, we may want to consider trying
-      # to write to another location (e.g. the cwd, if that is not already the destination).
-      logger.error('Problem logging original exception: {}'.format(e))
+      message=msg)
 
   @classmethod
   def _format_traceback(cls, tb, should_print_backtrace):
@@ -149,8 +231,7 @@ Exception message: {exception_message}{maybe_newline}
       exception_type=type(exc),
       backtrace=cls._format_traceback(tb, should_print_backtrace=should_print_backtrace),
       exception_message=exception_message,
-      maybe_newline=maybe_newline,
-    )
+      maybe_newline=maybe_newline)
 
   @classmethod
   def _log_unhandled_exception_and_exit(cls, exc_class=None, exc=None, tb=None, add_newline=False):
@@ -171,13 +252,17 @@ Exception message: {exception_message}{maybe_newline}
       exc, tb, add_newline,
       should_print_backtrace=cls._exiter.should_print_backtrace)
 
-    cls._exiter.exit(result=1, msg=stderr_printed_error, out=cls._trace_stream)
+    # Exit with failure, printing a message to the terminal (or whatever the interactive stream is).
+    cls._exiter.exit(result=cls.UNHANDLED_EXCEPTION_EXIT_CODE,
+                     msg=stderr_printed_error,
+                     out=cls._interactive_output_stream)
 
 
-# NB: setup global state such as signal handlers and sys.excepthook with probably-safe values.
-# Get the current directory at class initialization time -- this is probably (definitely?) a
-# writable directory. Using this directory as a fallback increases the chances that if an
-# exception occurs early in initialization that we still record it somewhere.
-ExceptionSink.set_destination(os.getcwd())
-ExceptionSink.set_exiter(Exiter(print_backtraces=True))
-ExceptionSink.set_trace_stream(sys.stderr)
+# Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
+# import time.
+# Sets fatal signal handlers with reasonable defaults to catch errors early in startup.
+ExceptionSink.reset_log_location(os.getcwd(), os.getpid())
+# Sets except hook.
+ExceptionSink.reset_exiter(Exiter(print_backtraces=True))
+# Sets a SIGUSR2 handler.
+ExceptionSink.reset_interactive_output_stream(sys.stderr)

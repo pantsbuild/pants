@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import os
 import signal
 import sys
 import time
@@ -19,7 +20,6 @@ from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.util.collections import combined_dict
-from pants.util.dirutil import maybe_read_file
 
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ class RemotePantsRunner(object):
       signal.signal(signal.SIGINT, existing_sigint_handler)
       signal.signal(signal.SIGQUIT, existing_sigquit_handler)
 
-  def _setup_logging(self):
+  def _setup_stderr_logging(self):
     """Sets up basic stdio logging for the thin client."""
     log_level = logging.getLevelName(self._bootstrap_options.for_global_scope().level.upper())
 
@@ -172,12 +172,12 @@ class RemotePantsRunner(object):
 
     # TODO: flesh out format_merged_fatal_error_message_for_pids() in ExceptionSink to iterate over
     # all the previous destinations!
-    exception_text = None
-    for source in source_pids:
-      log_path = ExceptionSink.exceptions_log_path(for_pid=source)
-      exception_text = maybe_read_file(log_path, binary_mode=False)
-      if exception_text:
-        break
+    # TODO: rename assert_single_element() so that it can be used here to return none instead of
+    # ValueError for > 1 element! Or make a new method!
+    try:
+      exception_text = next(iter(ExceptionSink.try_find_exception_logs_for_pids(source_pids)))
+    except StopIteration:
+      exception_text = None
 
     exception_suffix = '\nRemote exception:\n{}'.format(exception_text) if exception_text else ''
     return self.Terminated('abruptly lost active connection to pantsd runner: {!r}{}'.format(
@@ -190,13 +190,12 @@ class RemotePantsRunner(object):
     return PantsDaemon.Factory.maybe_launch(bootstrap_options=self._bootstrap_options)
 
   def run(self, args=None):
-    err_stream = self._setup_logging()
-
     # Redirect fatal error logging to the current workdir, set the stream to log stacktraces to on
     # SIGUSR2, and recognize the provided Exiter.
-    ExceptionSink.set_destination(self._bootstrap_options.for_global_scope().pants_workdir)
-    ExceptionSink.set_trace_stream(err_stream)
-    ExceptionSink.set_exiter(self._exiter)
+    ExceptionSink.reset_log_location(self._bootstrap_options.for_global_scope().pants_workdir,
+                                     os.getpid())
+    ExceptionSink.reset_interactive_output_stream(self._setup_stderr_logging())
+    ExceptionSink.reset_exiter(self._exiter)
 
     pantsd_handle = self._maybe_launch_pantsd()
     self._run_pants_with_retry(pantsd_handle)

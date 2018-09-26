@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import os
 from builtins import object
 
 from pants.base.build_environment import get_buildroot
@@ -156,11 +157,12 @@ class LocalPantsRunner(object):
 
   def run(self):
     # Apply exiter options.
+    ExceptionSink.reset_log_location(self._global_options.pants_workdir,
+                                     os.getpid())
     # TODO: this is messy. Is it less surprising to have the Exiter modified during construction, or
     # in the run() method we do here?
-    ExceptionSink.set_destination(self._global_options.pants_workdir)
     self._exiter.should_print_backtrace = self._global_options.print_exception_stacktrace
-    ExceptionSink.set_exiter(self._exiter)
+    ExceptionSink.reset_exiter(self._exiter)
     with hard_exit_handler(), maybe_profiled(self._profile_path):
       self._run()
 

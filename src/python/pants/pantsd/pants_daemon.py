@@ -364,8 +364,8 @@ class PantsDaemon(FingerprintedProcessManager):
     # Switch log output to the daemon's log stream from here forward.
     self._close_stdio()
     with self._pantsd_logging() as log_stream:
-      ExceptionSink.set_trace_stream(log_stream)
-      ExceptionSink.set_exiter(self._exiter)
+      ExceptionSink.reset_interactive_output_stream(log_stream)
+      ExceptionSink.reset_exiter(self._exiter)
       self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
       self._native.set_panic_handler()

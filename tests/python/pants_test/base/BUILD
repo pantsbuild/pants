@@ -210,6 +210,7 @@ python_tests(
   sources = ['test_exception_sink.py'],
   dependencies = [
     '3rdparty/python:future',
+    '3rdparty/python:mock',
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',

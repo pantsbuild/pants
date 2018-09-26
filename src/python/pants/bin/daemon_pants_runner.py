@@ -267,7 +267,7 @@ class DaemonPantsRunner(ProcessManager):
     # the `pantsd.log`. This ensures that in the event of e.g. a hung but detached pantsd-runner
     # process that the stacktrace output lands deterministically in a known place vs to a stray
     # terminal window.
-    ExceptionSink.set_trace_stream(sys.stderr)
+    ExceptionSink.reset_interactive_output_stream(sys.stderr)
 
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args

@@ -9,10 +9,11 @@ import os
 import re
 from builtins import open, str
 
+import mock
+
 from pants.base.exception_sink import ExceptionSink
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import touch
 from pants_test.test_base import TestBase
 
 
@@ -24,32 +25,33 @@ class TestExceptionSink(TestBase):
     return AnonymousSink
 
   def test_unset_destination(self):
-    self.assertEqual(os.getcwd(), self._gen_sink_subclass().get_destination())
+    self.assertEqual(os.getcwd(), self._gen_sink_subclass()._log_dir)
 
   def test_retrieve_destination(self):
     sink = self._gen_sink_subclass()
 
     with temporary_dir() as tmpdir:
-      sink.set_destination(tmpdir)
-      self.assertEqual(tmpdir, sink.get_destination())
+      sink.reset_log_location(tmpdir, os.getpid())
+      self.assertEqual(tmpdir, sink._log_dir)
 
   def test_set_invalid_destination(self):
     sink = self._gen_sink_subclass()
     err_rx = re.escape(
-      "The provided exception sink path at '/does/not/exist' is not writable or could not be created")
+      "The provided exception sink path at '/does/not/exist' is not writable or could not be created: [Errno 13]")
     with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
-      sink.set_destination('/does/not/exist')
-    err_rx = re.escape(
-      "The provided exception sink path at '/' is not writable or could not be created")
+      sink.reset_log_location('/does/not/exist', os.getpid())
+    err_rx = '{}.*{}'.format(
+      re.escape("Error opening fatal error log streams in / for pid "),
+      re.escape(": [Errno 13] Permission denied: '/logs'"))
     with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
-      sink.set_destination('/')
+      sink.reset_log_location('/', os.getpid())
 
   def test_log_exception(self):
     sink = self._gen_sink_subclass()
     pid = os.getpid()
     with temporary_dir() as tmpdir:
       # Check that tmpdir exists, and log an exception into that directory.
-      sink.set_destination(tmpdir)
+      sink.reset_log_location(tmpdir, os.getpid())
       sink.log_exception('XXX')
       # This should have created two log files, one specific to the current pid.
       self.assertEqual(os.listdir(tmpdir), ['logs'])
@@ -73,15 +75,10 @@ XXX
     sink = self._gen_sink_subclass()
     with self.captured_logging(level=logging.ERROR) as captured:
       with temporary_dir() as tmpdir:
-        exc_log_path = os.path.join(tmpdir, 'logs', 'exceptions.log')
-        touch(exc_log_path)
-        # Make the exception log file unreadable.
-        os.chmod(exc_log_path, 0)
-        sink.set_destination(tmpdir)
-        sink.log_exception('XXX')
+        sink.reset_log_location(tmpdir, os.getpid())
+        with mock.patch.object(sink, '_format_exception_message', autospec=sink) as mock_write:
+          mock_write.side_effect = Exception('fake write failure')
+          sink.log_exception('XXX')
     single_error_logged = str(assert_single_element(captured.errors()))
-    expected_rx_str = (
-      re.escape("pants.base.exception_sink: Problem logging original exception: [Errno 13] Permission denied: '") +
-      '.*' +
-      re.escape("/logs/exceptions.log'"))
-    self.assertRegexpMatches(single_error_logged, expected_rx_str)
+    err_rx = re.escape("pants.base.exception_sink: Problem logging original exception: fake write failure. The original error message was:\nXXX")
+    self.assertRegexpMatches(single_error_logged, err_rx)

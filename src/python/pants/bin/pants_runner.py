@@ -34,7 +34,8 @@ class PantsRunner(object):
   def run(self):
     options_bootstrapper = OptionsBootstrapper(env=self._env, args=self._args)
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
-    ExceptionSink.set_destination(bootstrap_options.for_global_scope().pants_workdir)
+    ExceptionSink.reset_log_location(bootstrap_options.for_global_scope().pants_workdir,
+                                     os.getpid())
 
     if bootstrap_options.for_global_scope().enable_pantsd:
       try:
