@@ -296,18 +296,20 @@ class Zinc(object):
     return fast_relpath(path, get_buildroot())
 
   def _run_bootstrapper(self, bridge_jar, context):
-    bootstrapper = self._zinc_factory._compiler_bootstrapper(self._products)
+    bootstrapper = self._relative_to_buildroot(
+      self._zinc_factory._compiler_bootstrapper(self._products),
+    )
     bootstrapper_args = [
-      '--out', bridge_jar,
-      '--compiler-interface', self.compiler_interface,
-      '--compiler-bridge-src', self.compiler_bridge,
-      '--scala-compiler', self.scala_compiler,
-      '--scala-library', self.scala_library,
-      '--scala-reflect', self.scala_reflect,
+      '--out', self._relative_to_buildroot(bridge_jar),
+      '--compiler-interface', self._relative_to_buildroot(self.compiler_interface),
+      '--compiler-bridge-src', self._relative_to_buildroot(self.compiler_bridge),
+      '--scala-compiler', self._relative_to_buildroot(self.scala_compiler),
+      '--scala-library', self._relative_to_buildroot(self.scala_library),
+      '--scala-reflect', self._relative_to_buildroot(self.scala_reflect),
     ]
     input_jar_snapshots = context._scheduler.capture_snapshots((PathGlobsAndRoot(
-      PathGlobs(tuple([self._relative_to_buildroot(jar) for jar in bootstrapper_args[1::2]])),
-      text_type(get_buildroot())
+      PathGlobs(tuple([bootstrapper] + bootstrapper_args[1::2])),
+      text_type(get_buildroot()),
     ),))
     argv = tuple(['.jdk/bin/java'] +
                  ['-cp', bootstrapper, Zinc.ZINC_BOOTSTRAPER_MAIN] +
@@ -317,7 +319,6 @@ class Zinc(object):
       argv=argv,
       input_files=input_jar_snapshots[0].directory_digest,
       output_files=(self._relative_to_buildroot(bridge_jar),),
-      output_directories=(self._relative_to_buildroot(self._compiler_bridge_cache_dir),),
       description='bootstrap compiler bridge.',
       # Since this is always hermetic, we need to use `underlying_dist`
       jdk_home=self.underlying_dist.home,
