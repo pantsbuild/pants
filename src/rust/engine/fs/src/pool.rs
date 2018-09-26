@@ -1,10 +1,9 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::sync::RwLock;
-
 use futures::future::IntoFuture;
 use futures_cpupool::{self, CpuFuture, CpuPool};
+use parking_lot::RwLock;
 
 ///
 /// A wrapper around a CpuPool, to add the ability to drop the pool before forking,
@@ -46,7 +45,7 @@ impl ResettablePool {
     R::Item: Send + 'static,
     R::Error: Send + 'static,
   {
-    let pool_opt = self.pool.read().unwrap();
+    let pool_opt = self.pool.read();
     let pool = pool_opt
       .as_ref()
       .unwrap_or_else(|| panic!("A CpuPool cannot be used inside the fork context."));
@@ -60,7 +59,7 @@ impl ResettablePool {
   where
     F: FnOnce() -> T,
   {
-    let mut pool = self.pool.write().unwrap();
+    let mut pool = self.pool.write();
     *pool = None;
     let t = f();
     *pool = Some(Self::new_pool(self.name_prefix.clone()));

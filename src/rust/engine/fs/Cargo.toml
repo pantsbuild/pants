@@ -22,6 +22,7 @@ itertools = "0.7.2"
 lazy_static = "1"
 lmdb = "0.7.2"
 log = "0.4"
+parking_lot = "0.6"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
 resettable = { path = "../resettable" }
 sha2 = "0.7"
