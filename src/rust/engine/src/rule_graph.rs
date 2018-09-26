@@ -801,17 +801,15 @@ pub fn type_str(type_id: TypeId) -> String {
 }
 
 pub fn params_str(params: &ParamTypes) -> String {
-  match params.len() {
+  let mut param_names = params
+    .iter()
+    .map(|type_id| type_str(*type_id))
+    .collect::<Vec<_>>();
+  param_names.sort();
+  match param_names.len() {
     0 => "()".to_string(),
-    1 => type_str(*params.iter().next().unwrap()),
-    _ => format!(
-      "({})",
-      params
-        .iter()
-        .map(|type_id| type_str(*type_id))
-        .collect::<Vec<_>>()
-        .join("+")
-    ),
+    1 => param_names.iter().next().unwrap().to_string(),
+    _ => format!("({})", param_names.join("+")),
   }
 }
 
