@@ -10,5 +10,6 @@ bytes = "0.4.5"
 futures = "^0.1.16"
 grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "bfd7333281c0422028502ccc7f78c57c27fdec08", features = ["secure"] }
 hashing = { path = "../../hashing" }
+parking_lot = "0.6"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
 testutil = { path = ".." }

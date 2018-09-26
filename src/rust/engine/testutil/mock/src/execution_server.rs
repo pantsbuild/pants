@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
@@ -10,6 +10,7 @@ use std::time::Instant;
 use bazel_protos;
 use futures::{Future, Sink};
 use grpcio;
+use parking_lot::Mutex;
 use protobuf;
 
 ///
@@ -119,7 +120,6 @@ impl Drop for TestServer {
       .mock_execution
       .operation_responses
       .lock()
-      .unwrap()
       .len();
     assert_eq!(
       remaining_expected_responses,
@@ -132,17 +132,9 @@ impl Drop for TestServer {
           .mock_execution
           .operation_responses
           .lock()
-          .unwrap()
           .clone(),
       )),
-      MockResponder::display_all(
-        &self
-          .mock_responder
-          .received_messages
-          .deref()
-          .lock()
-          .unwrap()
-      )
+      MockResponder::display_all(&self.mock_responder.received_messages.deref().lock())
     )
   }
 }
@@ -162,7 +154,7 @@ impl MockResponder {
   }
 
   fn log<T: protobuf::Message + Sized>(&self, message: T) {
-    self.received_messages.lock().unwrap().push((
+    self.received_messages.lock().push((
       message.descriptor().name().to_string(),
       Box::new(message),
       Instant::now(),
@@ -181,12 +173,8 @@ impl MockResponder {
     &self,
     sink: grpcio::UnarySink<super::bazel_protos::operations::Operation>,
   ) {
-    if let Some(MockOperation { op, duration }) = self
-      .mock_execution
-      .operation_responses
-      .lock()
-      .unwrap()
-      .pop_front()
+    if let Some(MockOperation { op, duration }) =
+      self.mock_execution.operation_responses.lock().pop_front()
     {
       if let Some(d) = duration {
         sleep(d);
@@ -211,13 +199,7 @@ impl MockResponder {
     ctx: &grpcio::RpcContext,
     sink: grpcio::ServerStreamingSink<super::bazel_protos::operations::Operation>,
   ) {
-    match self
-      .mock_execution
-      .operation_responses
-      .lock()
-      .unwrap()
-      .pop_front()
-    {
+    match self.mock_execution.operation_responses.lock().pop_front() {
       Some(MockOperation { op, duration }) => {
         if let Some(d) = duration {
           sleep(d);
