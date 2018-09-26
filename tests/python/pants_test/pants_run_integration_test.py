@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import configparser
 import glob
 import os
 import shutil
@@ -14,6 +13,7 @@ from contextlib import contextmanager
 from operator import eq, ne
 from threading import Lock
 
+from backports import configparser
 from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
