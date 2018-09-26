@@ -15,7 +15,10 @@ from six import text_type
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import Job
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
@@ -25,8 +28,9 @@ from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
+from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
-from pants.util.dirutil import fast_relpath, safe_mkdir
+from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
 
 
 #
@@ -41,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 def fast_relpath_collection(collection):
   buildroot = get_buildroot()
-  return [fast_relpath(c, buildroot) for c in collection]
+  return [fast_relpath_optional(c, buildroot) or c for c in collection]
 
 
 def stdout_contents(wu):
@@ -81,9 +85,13 @@ class RscCompile(ZincCompile):
   _name = 'rsc' # noqa
   compiler_name = 'rsc'
 
+  def __init__(self, *args, **kwargs):
+    super(RscCompile, self).__init__(*args, **kwargs)
+    self._metacp_jars_classpath_product = ClasspathProducts(self.get_options().pants_workdir)
+
   @classmethod
   def implementation_version(cls):
-    return super(RscCompile, cls).implementation_version() + [('RscCompile', 7)]
+    return super(RscCompile, cls).implementation_version() + [('RscCompile', 170)]
 
   @classmethod
   def register_options(cls, register):
@@ -175,14 +183,33 @@ class RscCompile(ZincCompile):
     # See: #6504
     for target in targets:
       rsc_cc, compile_cc = compile_contexts[target]
-      if target.has_sources('.java'):
+      if self._only_zinc_compileable(target):
         self.context.products.get_data('rsc_classpath').add_for_target(
           compile_cc.target,
           [(conf, compile_cc.jar_file) for conf in self._confs])
-      elif target.has_sources('.scala'):
-        pass
+      elif self._rsc_compilable(target):
+        self.context.products.get_data('rsc_classpath').add_for_target(
+          rsc_cc.target,
+          [(conf, rsc_cc.rsc_mjar_file) for conf in self._confs])
+      elif self._metacpable(target):
+        # Walk the metacp results dir and add classpath entries for all the files there.
+        # TODO exercise this with a test.
+        for root, dirs, files in os.walk(rsc_cc.rsc_index_dir):
+          self.context.products.get_data('rsc_classpath').add_for_target(
+            rsc_cc.target,
+            [(conf, os.path.join(root, f)) for conf in self._confs for f in files]
+          )
       else:
         pass
+
+  def _metacpable(self, target):
+    return isinstance(target, JarLibrary)
+
+  def _rsc_compilable(self, target):
+    return target.has_sources('.scala')
+
+  def _only_zinc_compileable(self, target):
+    return target.has_sources('.java')
 
   def create_empty_extra_products(self):
     super(RscCompile, self).create_empty_extra_products()
@@ -194,12 +221,23 @@ class RscCompile(ZincCompile):
     else:
       classpath_product.update(compile_classpath)
 
+  def select(self, target):
+    # Require that targets are marked for JVM compilation, to differentiate from
+    # targets owned by the scalajs contrib module.
+    if self._metacpable(target):
+      return True
+    if not isinstance(target, JvmTarget):
+      return False
+    return self._only_zinc_compileable(target) or self._rsc_compilable(target)
+
   def _rsc_key_for_target(self, compile_target):
-    if compile_target.has_sources('.java'):
+    if self._only_zinc_compileable(compile_target):
       # rsc outlining with java dependencies depend on the java's zinc compile
       return self._compile_against_rsc_key_for_target(compile_target)
-    elif compile_target.has_sources('.scala'):
+    elif self._rsc_compilable(compile_target):
       return "rsc({})".format(compile_target.address.spec)
+    elif self._metacpable(compile_target):
+      return "metacp({})".format(compile_target.address.spec)
     else:
       raise TaskError('unexpected target for compiling with rsc .... {}'.format(compile_target))
 
@@ -217,6 +255,7 @@ class RscCompile(ZincCompile):
     def work_for_vts_rsc(vts, ctx):
       # Double check the cache before beginning compilation
       hit_cache = self.check_cache(vts, counter)
+      target = ctx.target
 
       if not hit_cache:
         cp_entries = []
@@ -232,11 +271,35 @@ class RscCompile(ZincCompile):
           'rsc_classpath',
           ctx.target,
           extra_cp_entries=self._extra_compile_time_classpath)
+
+        jar_deps = [t for t in DependencyContext.global_instance().dependencies_respecting_strict_deps(target)
+                    if isinstance(t, JarLibrary)]
+        metacp_jar_classpath_abs = [y[1] for y in self._metacp_jars_classpath_product.get_for_targets(
+          jar_deps
+        )]
+        jar_jar_paths = {y[1] for y in self.context.products.get_data('rsc_classpath').get_for_targets(jar_deps)}
+
+        classpath_abs = [c for c in classpath_abs if c not in jar_jar_paths]
+
+
         classpath_rel = fast_relpath_collection(classpath_abs)
+        metacp_jar_classpath_rel = fast_relpath_collection(metacp_jar_classpath_abs)
         cp_entries.extend(classpath_rel)
 
         ctx.ensure_output_dirs_exist()
-        
+
+        counter_val = str(counter()).rjust(counter.format_length(), b' ')
+        counter_str = '[{}/{}] '.format(counter_val, counter.size)
+        self.context.log.info(
+          counter_str,
+          'Rsc-ing ',
+          items_to_report_element(ctx.sources, '{} source'.format(self.name())),
+          ' in ',
+          items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
+          ' (',
+          ctx.target.address.spec,
+          ').')
+
         tgt, = vts.targets
         with Timer() as timer:
           # Step 1: Convert classpath to SemanticDB
@@ -251,11 +314,8 @@ class RscCompile(ZincCompile):
             '--include-scala-library-synthetics', # TODO generate these once and cache them
             # NB: We need to add these extra dependencies in order to be able
             #     to find symbols used by the scalac jars.
-            '--dependency-classpath', os.pathsep.join(scalac_classpath_path_entries),
+            '--dependency-classpath', os.pathsep.join(scalac_classpath_path_entries + list(jar_jar_paths)),
             # NB: The directory to dump the semanticdb jars generated by metacp.
-            # TODO: break this out into a separate job so that we can apply
-            #       it once per 3rdparty target.
-            #       https://github.com/pantsbuild/pants/issues/6515
             '--out', rsc_index_dir,
             os.pathsep.join(cp_entries),
           ]
@@ -269,51 +329,14 @@ class RscCompile(ZincCompile):
             output_dir=rsc_index_dir)
           metacp_stdout = stdout_contents(metacp_wu)
           metacp_result = json.loads(metacp_stdout)
-          metai_classpath = []
-          
-          def desandboxify_pantsd_loc(path):
-            # TODO come up with a cleaner way to maybe relpath paths.
-            try:
-              path = fast_relpath(path, get_buildroot())
-            except Exception:
-              pass
-            pattern = 'process-execution[^{}]+/'.format(re.escape(os.path.sep))
-            return re.split(pattern, path)[-1]
 
-          # TODO when these are generated once, we won't need to collect them here.  
-          metai_classpath.append(desandboxify_pantsd_loc(metacp_result["scalaLibrarySynthetics"]))
-          # NB The json is absolute pathed pointing into either the buildroot or
-          #    the temp directory of the hermetic build. This relativizes the keys.
-          status_elements = {
-            desandboxify_pantsd_loc(k): v
-            for k,v in metacp_result["status"].items()
-          }
 
-          for cp_entry in classpath_rel:
-            metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
-          for cp_entry in jvm_lib_jars_abs:
-            metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
+          metai_classpath = self._collect_metai_classpath(
+            metacp_result, classpath_rel, jvm_lib_jars_abs)
 
           # Step 1.5: metai Index the semanticdbs
           # -------------------------------------
-          # TODO have metai write to a different spot than metacp
-          # Currently, the metai step depends on the fact that materializing
-          # ignores existing files. It should write the files to a different
-          # location, either by providing inputs from a different location,
-          # or invoking a script that does the copying
-          args = [
-            '--verbose',
-            os.pathsep.join(metai_classpath)
-          ]
-          self._runtool(
-            'scala.meta.cli.Metai',
-            'metai',
-            args,
-            distribution,
-            tgt=tgt,
-            input_files=metai_classpath,
-            output_dir=rsc_index_dir
-          )
+          self._run_metai_tool(distribution, metai_classpath, rsc_index_dir, tgt)
 
           # Step 2: Outline Scala sources into SemanticDB
           # ---------------------------------------------
@@ -322,7 +345,7 @@ class RscCompile(ZincCompile):
           safe_mkdir(os.path.join(rsc_outline_dir, 'META-INF/semanticdb'))
           target_sources = ctx.sources
           args = [
-            '-cp', os.pathsep.join(metai_classpath),
+            '-cp', os.pathsep.join(metai_classpath + metacp_jar_classpath_rel),
             '-out', rsc_out,
           ] + target_sources
           self._runtool(
@@ -333,26 +356,19 @@ class RscCompile(ZincCompile):
             tgt=tgt,
             # TODO pass the input files from the target snapshot instead of the below
             # input_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
-            input_files=target_sources + metai_classpath,
+            input_files=target_sources + metai_classpath + metacp_jar_classpath_rel,
             output_dir=rsc_outline_dir)
           rsc_classpath = [rsc_outline_dir]
 
           # Step 2.5: Postprocess the rsc outputs
           # TODO: This is only necessary as a workaround for https://github.com/twitter/rsc/issues/199.
           # Ideally, Rsc would do this on its own.
-          args = [
-            '--verbose',
-            os.pathsep.join(rsc_classpath)
-          ]
-          self._runtool(
-            'scala.meta.cli.Metai',
-            'metai',
-            args,
-            distribution,
-            tgt=tgt,
-            input_files=[rsc_out],
-            output_dir=rsc_outline_dir
-          )
+          self._run_metai_tool(distribution,
+            rsc_classpath,
+            rsc_outline_dir,
+            tgt,
+            extra_input_files=(rsc_out,))
+
 
           # Step 3: Convert SemanticDB into an mjar
           # ---------------------------------------
@@ -367,10 +383,9 @@ class RscCompile(ZincCompile):
             args,
             distribution,
             tgt=tgt,
-            input_files=[
+            input_files=(
               rsc_out,
-              os.path.join(rsc_outline_dir, 'META-INF', 'semanticdb.semanticdbx')
-            ],
+            ),
             output_dir=os.path.dirname(rsc_mjar_file)
             )
           self.context.products.get_data('rsc_classpath').add_for_target(
@@ -391,6 +406,98 @@ class RscCompile(ZincCompile):
       # Update the products with the latest classes.
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)
 
+    def work_for_vts_rsc_jar_library(vts, ctx):
+
+      cp_entries = []
+
+      # Include the current machine's jdk lib jars. This'll blow up remotely.
+      # We need a solution for that.
+      # Probably something to do with https://github.com/pantsbuild/pants/pull/6346
+      # TODO perhaps determine the platform of the jar and use that here.
+      # https://github.com/pantsbuild/pants/issues/6547
+      distribution = JvmPlatform.preferred_jvm_distribution([], strict=True)
+      jvm_lib_jars_abs = distribution.find_libs(['rt.jar', 'dt.jar', 'jce.jar', 'tools.jar'])
+      cp_entries.extend(jvm_lib_jars_abs)
+
+      # TODO use compile_classpath
+      classpath_abs = [
+        path for (conf, path) in
+        self.context.products.get_data('rsc_classpath').get_for_target(ctx.target)
+      ]
+      dependency_classpath = self._zinc.compile_classpath(
+        'compile_classpath',
+        ctx.target,
+        extra_cp_entries=self._extra_compile_time_classpath)
+      classpath_rel = fast_relpath_collection(classpath_abs)
+      cp_entries.extend(classpath_rel)
+
+      counter_val = str(counter()).rjust(counter.format_length(), b' ')
+      counter_str = '[{}/{}] '.format(counter_val, counter.size)
+      self.context.log.info(
+        counter_str,
+        'Metacp-ing ',
+        items_to_report_element(cp_entries, 'jar'),
+        ' in ',
+        items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
+        ' (',
+        ctx.target.address.spec,
+        ').')
+
+      ctx.ensure_output_dirs_exist()
+
+      tgt, = vts.targets
+      with Timer() as timer:
+      # Step 1: Convert classpath to SemanticDB
+        # ---------------------------------------
+        scalac_classpath_path_entries_abs = self.tool_classpath('workaround-metacp-dependency-classpath')
+        scalac_classpath_path_entries = fast_relpath_collection(scalac_classpath_path_entries_abs)
+        rsc_index_dir = fast_relpath(ctx.rsc_index_dir, get_buildroot())
+        args = [
+          '--verbose',
+          # NB: Without this setting, rsc will be missing some symbols
+          #     from the scala library.
+          '--include-scala-library-synthetics', # TODO generate these once and cache them
+          # NB: We need to add these extra dependencies in order to be able
+          #     to find symbols used by the scalac jars.
+          '--dependency-classpath', os.pathsep.join(dependency_classpath + scalac_classpath_path_entries),
+          # NB: The directory to dump the semanticdb jars generated by metacp.
+          '--out', rsc_index_dir,
+          os.pathsep.join(cp_entries),
+        ]
+        metacp_wu = self._runtool(
+          'scala.meta.cli.Metacp',
+          'metacp',
+          args,
+          distribution,
+          tgt=tgt,
+          input_files=(scalac_classpath_path_entries + classpath_rel),
+          output_dir=rsc_index_dir)
+        metacp_stdout = stdout_contents(metacp_wu)
+        metacp_result = json.loads(metacp_stdout)
+
+        metai_classpath = self._collect_metai_classpath(
+          metacp_result, classpath_rel, jvm_lib_jars_abs)
+
+        # Step 1.5: metai Index the semanticdbs
+        # -------------------------------------
+        self._run_metai_tool(distribution, metai_classpath, rsc_index_dir, tgt)
+
+        abs_output = [(conf, os.path.join(get_buildroot(), x))
+                      for conf in self._confs for x in metai_classpath]
+
+        self._metacp_jars_classpath_product.add_for_target(
+          ctx.target,
+          abs_output,
+        )
+
+      self._record_target_stats(tgt,
+          len(abs_output),
+          len([]),
+          timer.elapsed,
+          False,
+          'metacp'
+        )
+
     rsc_jobs = []
     zinc_jobs = []
 
@@ -400,9 +507,9 @@ class RscCompile(ZincCompile):
 
     # Create the rsc job.
     # Currently, rsc only supports outlining scala.
-    if compile_target.has_sources('.java'):
+    if self._only_zinc_compileable(compile_target):
       pass
-    elif compile_target.has_sources('.scala'):
+    elif self._rsc_compilable(compile_target):
       rsc_key = self._rsc_key_for_target(compile_target)
       rsc_jobs.append(
         Job(
@@ -415,12 +522,33 @@ class RscCompile(ZincCompile):
           self._size_estimator(compile_context_pair[0].sources),
         )
       )
+    elif self._metacpable(compile_target):
+      rsc_key = self._rsc_key_for_target(compile_target)
+      rsc_jobs.append(
+        Job(
+          rsc_key,
+          functools.partial(
+            work_for_vts_rsc_jar_library,
+            ivts,
+            compile_context_pair[0]),
+          [self._rsc_key_for_target(target) for target in invalid_dependencies],
+          self._size_estimator(compile_context_pair[0].sources),
+          on_success=ivts.update,
+          on_failure=ivts.force_invalidate,
+        )
+      )
+    else:
+      raise TaskError("Unexpected target for rsc compile {} with type {}"
+        .format(compile_target, type(compile_target)))
 
     # Create the zinc compile jobs.
     # - Scala zinc compile jobs depend on the results of running rsc on the scala target.
     # - Java zinc compile jobs depend on the zinc compiles of their dependencies, because we can't
     #   generate mjars that make javac happy at this point.
-    if compile_target.has_sources('.scala'):
+
+    invalid_dependencies_without_jar_metacps = [t for t in invalid_dependencies
+      if not self._metacpable(t)]
+    if self._rsc_compilable(compile_target):
       full_key = self._compile_against_rsc_key_for_target(compile_target)
       zinc_jobs.append(
         Job(
@@ -433,8 +561,12 @@ class RscCompile(ZincCompile):
             counter,
             compile_contexts,
             runtime_classpath_product),
-          [self._rsc_key_for_target(compile_target)] + [self._rsc_key_for_target(target)
-                                                           for target in invalid_dependencies],
+          [
+            self._rsc_key_for_target(compile_target)
+          ] + [
+            self._rsc_key_for_target(target)
+            for target in invalid_dependencies_without_jar_metacps
+          ],
           self._size_estimator(compile_context_pair[1].sources),
           # NB: right now, only the last job will write to the cache, because we don't
           #     do multiple cache entries per target-task tuple.
@@ -442,7 +574,7 @@ class RscCompile(ZincCompile):
           on_failure=ivts.force_invalidate,
         )
       )
-    elif compile_target.has_sources('.java'):
+    elif self._only_zinc_compileable(compile_target):
       # write to both rsc classpath and runtime classpath
       class CompositeProductAdder(object):
         def __init__(self, runtime_classpath_product, rsc_classpath_product):
@@ -467,7 +599,9 @@ class RscCompile(ZincCompile):
             CompositeProductAdder(
               runtime_classpath_product,
               self.context.products.get_data('rsc_classpath'))),
-          [self._compile_against_rsc_key_for_target(target) for target in invalid_dependencies],
+          [
+            self._compile_against_rsc_key_for_target(target)
+            for target in invalid_dependencies_without_jar_metacps],
           self._size_estimator(compile_context_pair[1].sources),
           # NB: right now, only the last job will write to the cache, because we don't
           #     do multiple cache entries per target-task tuple.
@@ -587,3 +721,54 @@ class RscCompile(ZincCompile):
         if runjava_wu is None:
           raise Exception('couldnt find work unit for underlying execution')
         return runjava_wu
+
+  def _run_metai_tool(self,
+                      distribution,
+                      metai_classpath,
+                      rsc_index_dir,
+                      tgt,
+                      extra_input_files=()):
+    # TODO have metai write to a different spot than metacp
+    # Currently, the metai step depends on the fact that materializing
+    # ignores existing files. It should write the files to a different
+    # location, either by providing inputs from a different location,
+    # or invoking a script that does the copying
+    args = [
+      '--verbose',
+      os.pathsep.join(metai_classpath)
+    ]
+    self._runtool(
+      'scala.meta.cli.Metai',
+      'metai',
+      args,
+      distribution,
+      tgt=tgt,
+      input_files=tuple(metai_classpath) + tuple(extra_input_files),
+      output_dir=rsc_index_dir
+    )
+
+  def _collect_metai_classpath(self, metacp_result, classpath_rel, jvm_lib_jars_abs):
+    metai_classpath = []
+    def desandboxify_pantsd_loc(path):
+      # TODO come up with a cleaner way to maybe relpath paths.
+      try:
+        path = fast_relpath(path, get_buildroot())
+      except Exception:
+        pass
+      pattern = 'process-execution[^{}]+/'.format(re.escape(os.path.sep))
+      return re.split(pattern, path)[-1]
+
+    # TODO when these are generated once, we won't need to collect them here.
+    metai_classpath.append(desandboxify_pantsd_loc(metacp_result["scalaLibrarySynthetics"]))
+    # NB The json is absolute pathed pointing into either the buildroot or
+    #    the temp directory of the hermetic build. This relativizes the keys.
+    status_elements = {
+      desandboxify_pantsd_loc(k): v
+      for k,v in metacp_result["status"].items()
+    }
+
+    for cp_entry in classpath_rel:
+      metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
+    for cp_entry in jvm_lib_jars_abs:
+      metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
+    return metai_classpath

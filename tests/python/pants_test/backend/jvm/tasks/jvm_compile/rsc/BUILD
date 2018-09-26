@@ -11,3 +11,15 @@ python_tests(
   timeout = 400,
   tags = {'integration'},
 )
+
+
+python_tests(
+  name = 'rsc_compile',
+  sources = ['test_rsc_compile.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/backend/jvm/tasks/jvm_compile',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/rsc',
+    'tests/python/pants_test:task_test_base',
+  ],
+)
