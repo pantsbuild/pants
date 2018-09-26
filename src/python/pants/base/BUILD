@@ -75,6 +75,7 @@ python_library(
   dependencies = [
     '3rdparty/python:faulthandler',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
     'src/python/pants/util:objects',
     ':exiter',
   ],

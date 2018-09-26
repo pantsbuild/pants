@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from future.utils import raise_with_traceback
 
-from pants.base.exception_sink import ExceptionSink, LogLocation
+from pants.base.exception_sink import ExceptionSink, GetLogLocationRequest, LogLocation
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
@@ -172,7 +172,7 @@ class RemotePantsRunner(object):
 
     exception_text = None
     for pid in source_pids:
-      log_path = ExceptionSink.exceptions_log_path(LogLocation(pid=pid))
+      log_path = ExceptionSink.exceptions_log_path(GetLogLocationRequest(pid=pid))
       exception_text = maybe_read_file(log_path, binary_mode=False)
       if exception_text:
         break

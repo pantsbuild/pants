@@ -33,35 +33,43 @@ class TestExceptionSink(TestBase):
     sink = self._gen_sink_subclass()
 
     with temporary_dir() as tmpdir:
-      sink.reset_log_location(LogLocation(tmpdir, os.getpid()))
-      self.assertEqual(LogLocation(tmpdir, os.getpid()),
-                       sink._log_location)
+      new_log_location = LogLocation(os.getpid(), tmpdir)
+      sink.reset_log_location(new_log_location)
+      self.assertEqual(new_log_location, sink._log_location)
 
   def test_set_invalid_log_location(self):
     sink = self._gen_sink_subclass()
     err_rx = re.escape(
       "The provided exception sink path at '/does/not/exist' is not writable or could not be created: [Errno 13]")
     with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
-      sink.reset_log_location(LogLocation('/does/not/exist', os.getpid()))
-    err_rx = '{}.*{}'.format(
-      re.escape("Error opening fatal error log streams for log location LogLocation(log_dir='/', pid="),
-      re.escape(": [Errno 13] Permission denied: '/logs'"))
+      sink.reset_log_location(LogLocation(os.getpid(), '/does/not/exist'))
+    err_rx = '.*'.join([
+      re.escape("Error opening fatal error log streams for log location LogLocation(pid="),
+      re.escape(", log_dir='/'): [Errno 13] Permission denied: '/logs'"),
+    ])
     with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
-      sink.reset_log_location(LogLocation('/', os.getpid()))
+      sink.reset_log_location(LogLocation(os.getpid(), '/'))
 
   def test_log_exception(self):
     sink = self._gen_sink_subclass()
     pid = os.getpid()
     with temporary_dir() as tmpdir:
+      new_log_location = LogLocation(pid=pid, log_dir=tmpdir)
       # Check that tmpdir exists, and log an exception into that directory.
-      sink.reset_log_location(LogLocation(tmpdir))
+      sink.reset_log_location(new_log_location)
       sink.log_exception('XXX')
       # This should have created two log files, one specific to the current pid.
       self.assertEqual(os.listdir(tmpdir), ['logs'])
-      cur_process_error_log_path = ExceptionSink.exceptions_log_path(LogLocation(tmpdir, pid=pid))
+
+      cur_process_error_log_path = ExceptionSink.exceptions_log_path(new_log_location.as_request)
       self.assertTrue(os.path.isfile(cur_process_error_log_path))
-      shared_error_log_path = ExceptionSink.exceptions_log_path(LogLocation(tmpdir))
+
+      shared_error_log_path = ExceptionSink.exceptions_log_path(new_log_location.as_request
+                                                                .copy(pid=None))
       self.assertTrue(os.path.isfile(shared_error_log_path))
+      # Ensure we're creating two separate files.
+      self.assertNotEqual(cur_process_error_log_path, shared_error_log_path)
+
       # We only logged a single error, so the files should both contain only that single log entry.
       err_rx = """\
 timestamp: ([^\n]+)
@@ -78,7 +86,7 @@ XXX
     sink = self._gen_sink_subclass()
     with self.captured_logging(level=logging.ERROR) as captured:
       with temporary_dir() as tmpdir:
-        sink.reset_log_location(LogLocation(tmpdir, os.getpid()))
+        sink.reset_log_location(LogLocation(os.getpid(), tmpdir))
         with mock.patch.object(sink, '_format_exception_message', autospec=sink) as mock_write:
           mock_write.side_effect = Exception('fake write failure')
           sink.log_exception('XXX')
