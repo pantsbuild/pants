@@ -74,15 +74,19 @@ impl CommandRunner {
     output_files_future
       .join(output_dirs_future)
       .and_then(|(output_files_stats, output_dirs_stats)| {
-        let paths: Vec<_> = output_files_stats
+        let mut paths: Vec<_> = output_files_stats
           .into_iter()
-          .chain(output_dirs_stats.into_iter().map(Some))
+          .filter_map(|v| v)
+          .chain(output_dirs_stats.into_iter())
           .collect();
+        // Sort both for consistent results and to allow deduping.
+        paths.sort_by(|l, r| l.path().cmp(r.path()));
+        paths.dedup();
 
         fs::Snapshot::from_path_stats(
           store.clone(),
           &fs::OneOffStoreFileByDigest::new(store, posix_fs),
-          paths.into_iter().filter_map(|v| v).collect(),
+          paths,
         )
       }).to_boxed()
   }
@@ -667,6 +671,37 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::containing_roland().digest(),
+      }
+    )
+  }
+
+  #[test]
+  fn output_overlapping_file_and_dir() {
+    let result = run_command_locally(ExecuteProcessRequest {
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        format!(
+          "/bin/mkdir cats && echo -n {} > cats/roland",
+          TestData::roland().string()
+        ),
+      ],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: vec![PathBuf::from("cats/roland")].into_iter().collect(),
+      output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
+      timeout: Duration::from_millis(1000),
+      description: "bash".to_string(),
+      jdk_home: None,
+    });
+
+    assert_eq!(
+      result.unwrap(),
+      FallibleExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: TestDirectory::nested().digest(),
       }
     )
   }

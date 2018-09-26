@@ -46,6 +46,17 @@ impl Snapshot {
   ) -> BoxFuture<Snapshot, String> {
     let mut sorted_path_stats = path_stats.clone();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
+
+    // The helper assumes that if a Path has multiple children, it must be a directory.
+    // Proactively error if we run into identically named files, because otherwise we will treat
+    // them like empty directories.
+    sorted_path_stats.dedup_by(|a, b| a.path() == b.path());
+    if sorted_path_stats.len() != path_stats.len() {
+      return future::err(format!(
+        "Snapshots must be constructed from unique path stats; got duplicates in {:?}",
+        path_stats
+      )).to_boxed();
+    }
     Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
       .map(|digest| Snapshot { digest, path_stats })
       .to_boxed()
