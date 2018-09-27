@@ -237,12 +237,14 @@ pid: {pid}
       pid=pid,
       message=msg)
 
+  _traceback_omitted_default_text = '(backtrace omitted)'
+
   @classmethod
   def _format_traceback(cls, tb, should_print_backtrace):
     if should_print_backtrace:
       traceback_string = ''.join(traceback.format_tb(tb))
     else:
-      traceback_string = '(backtrace omitted)'
+      traceback_string = cls._traceback_omitted_default_text
     return traceback_string
 
   _UNHANDLED_EXCEPTION_LOG_FORMAT = """\

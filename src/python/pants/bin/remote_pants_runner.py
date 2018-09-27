@@ -191,7 +191,7 @@ class RemotePantsRunner(object):
     # Redirect fatal error logging to the current workdir, set the stream to log stacktraces to on
     # SIGUSR2, and recognize the provided Exiter.
     ExceptionSink.reset_log_location(LogLocation.from_options_for_current_process(
-      log_dir=self._bootstrap_options.for_global_scope()))
+      self._bootstrap_options.for_global_scope()))
     ExceptionSink.reset_interactive_output_stream(self._setup_stderr_logging())
     ExceptionSink.reset_exiter(self._exiter)
 
