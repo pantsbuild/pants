@@ -237,11 +237,12 @@ class NailgunProtocol(object):
 
   @classmethod
   def encode_int(cls, obj):
-    """Verify the object is an int, and encode it to the right type of string for nailgun.
+    """Verify the object is an int, and ASCII-encode it.
 
     :param int obj: An integer to be encoded.
     :raises: :class:`TypeError` if `obj` is not an integer.
-    :return: A representation of the int `obj` suitable to pass as the `payload` to send_exit().
+    :return: A binary representation of the int `obj` suitable to pass as the `payload` to
+             send_exit().
     """
     if not isinstance(obj, int):
       raise TypeError("cannot encode non-integer object in encode_int(): object was {} (type '{}')."
