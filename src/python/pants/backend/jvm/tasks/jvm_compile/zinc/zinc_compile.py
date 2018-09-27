@@ -351,8 +351,6 @@ class BaseZincCompile(JvmCompile):
                           relative_to_exec_root(v)
                         ) for k, v in upstream_analysis.items())])
 
-    zinc_args.extend(self._zinc.rebase_map_args)
-
     zinc_args.extend(args)
     zinc_args.extend(self._get_zinc_arguments(settings))
     zinc_args.append('-transactional')

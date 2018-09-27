@@ -112,7 +112,6 @@ class AnalysisExtraction(NailgunTask):
         '-classpath', ':'.join(target_classpath),
         '-analysis-map', ','.join('{}:{}'.format(k, v) for k, v in upstream_analysis),
       ]
-    args.extend(self._zinc.rebase_map_args)
 
     result = self.runjava(classpath=self._zinc.extractor,
                           main=Zinc.ZINC_EXTRACT_MAIN,

@@ -383,21 +383,6 @@ class Zinc(object):
       ),
     ))[0]
 
-  # TODO: Make rebase map work without needing to pass in absolute paths:
-  # https://github.com/pantsbuild/pants/issues/6434
-  @memoized_property
-  def rebase_map_args(self):
-    """We rebase known stable paths in zinc analysis to make it portable across machines."""
-    rebases = {
-        self.dist.real_home: '/dev/null/remapped_by_pants/java_home/',
-        get_buildroot(): '/dev/null/remapped_by_pants/buildroot/',
-        self._zinc_factory.get_options().pants_workdir: '/dev/null/remapped_by_pants/workdir/',
-      }
-    return (
-        '-rebase-map',
-        ','.join('{}:{}'.format(src, dst) for src, dst in rebases.items())
-      )
-
   @memoized_method
   def _compiler_plugins_cp_entries(self):
     """Any additional global compiletime classpath entries for compiler plugins."""
