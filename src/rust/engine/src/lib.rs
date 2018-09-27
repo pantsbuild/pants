@@ -48,6 +48,7 @@ extern crate hashing;
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
+extern crate parking_lot;
 extern crate process_execution;
 extern crate resettable;
 extern crate tokio;

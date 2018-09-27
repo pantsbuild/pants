@@ -79,6 +79,7 @@ graph = { path = "graph" }
 hashing = { path = "hashing" }
 lazy_static = "1"
 log = "0.4"
+parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 resettable = { path = "resettable" }
 tokio = "0.1"

@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use futures::future::{self, Future};
 use futures::sync::oneshot;
@@ -15,6 +15,7 @@ use core::{Failure, Key, TypeConstraint, TypeId, Value, Variants};
 use fs::{self, GlobMatching, PosixFS};
 use graph::{EntryId, Graph, Node, NodeContext};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
+use parking_lot::Mutex;
 use rule_graph;
 use selectors;
 
@@ -41,12 +42,12 @@ impl Session {
   }
 
   fn extend(&self, new_roots: &[Root]) {
-    let mut roots = self.roots.lock().unwrap();
+    let mut roots = self.roots.lock();
     roots.extend(new_roots.iter().cloned());
   }
 
   fn root_nodes(&self) -> Vec<NodeKey> {
-    let roots = self.roots.lock().unwrap();
+    let roots = self.roots.lock();
     roots.iter().map(|r| r.clone().into()).collect()
   }
 }

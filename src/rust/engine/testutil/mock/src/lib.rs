@@ -22,6 +22,7 @@ extern crate bytes;
 extern crate futures;
 extern crate grpcio;
 extern crate hashing;
+extern crate parking_lot;
 extern crate protobuf;
 extern crate testutil;
 

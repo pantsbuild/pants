@@ -16,13 +16,15 @@
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
 extern crate futures;
+extern crate parking_lot;
 
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use futures::future::Future;
 use futures::task::{self, Task};
 use futures::{Async, Poll};
+use parking_lot::Mutex;
 
 struct Inner {
   waiters: VecDeque<Task>,
@@ -75,7 +77,7 @@ pub struct Permit {
 impl Drop for Permit {
   fn drop(&mut self) {
     let task = {
-      let mut inner = self.inner.lock().unwrap();
+      let mut inner = self.inner.lock();
       inner.available_permits += 1;
       if let Some(task) = inner.waiters.pop_front() {
         task
@@ -98,7 +100,7 @@ impl Future for PermitFuture {
   fn poll(&mut self) -> Poll<Permit, ()> {
     let inner = self.inner.take().expect("cannot poll PermitFuture twice");
     let acquired = {
-      let mut inner = inner.lock().unwrap();
+      let mut inner = inner.lock();
       if inner.available_permits == 0 {
         inner.waiters.push_back(task::current());
         false

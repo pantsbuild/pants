@@ -22,6 +22,7 @@ extern crate boxfuture;
 extern crate fnv;
 extern crate futures;
 extern crate hashing;
+extern crate parking_lot;
 extern crate petgraph;
 
 mod entry;
@@ -36,12 +37,12 @@ use std::fs::{File, OpenOptions};
 use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use fnv::FnvHasher;
 
 use futures::future::{self, Future};
+use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
@@ -488,7 +489,7 @@ impl<N: Node> Graph<N> {
   }
 
   pub fn len(&self) -> usize {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.nodes.len()
   }
 
@@ -502,7 +503,7 @@ impl<N: Node> Graph<N> {
   {
     let maybe_entry_and_id = {
       // Get or create the destination, and then insert the dep and return its state.
-      let mut inner = self.inner.lock().unwrap();
+      let mut inner = self.inner.lock();
       if inner.draining {
         None
       } else {
@@ -542,7 +543,7 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     let maybe_entry_and_id = {
-      let mut inner = self.inner.lock().unwrap();
+      let mut inner = self.inner.lock();
       if inner.draining {
         None
       } else {
@@ -569,7 +570,7 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    let mut inner = self.inner.lock().unwrap();
+    let mut inner = self.inner.lock();
     let dep_ids = inner
       .pg
       .neighbors_directed(entry_id, Direction::Outgoing)
@@ -595,7 +596,7 @@ impl<N: Node> Graph<N> {
   /// Clears the dependency edges of the given EntryId if the RunToken matches.
   ///
   fn clear_deps(&self, entry_id: EntryId, run_token: RunToken) {
-    let mut inner = self.inner.lock().unwrap();
+    let mut inner = self.inner.lock();
     // If the RunToken mismatches, return.
     if let Some(entry) = inner.entry_for_id(entry_id) {
       if entry.run_token() != run_token {
@@ -639,7 +640,7 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     let (entry, entry_id, dep_generations) = {
-      let mut inner = self.inner.lock().unwrap();
+      let mut inner = self.inner.lock();
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
@@ -655,7 +656,7 @@ impl<N: Node> Graph<N> {
       )
     };
     if let Some(mut entry) = entry {
-      let mut inner = self.inner.lock().unwrap();
+      let mut inner = self.inner.lock();
       entry.complete(
         context,
         entry_id,
@@ -671,17 +672,17 @@ impl<N: Node> Graph<N> {
   /// Clears the state of all Nodes in the Graph by dropping their state fields.
   ///
   pub fn clear(&self) {
-    let mut inner = self.inner.lock().unwrap();
+    let mut inner = self.inner.lock();
     inner.clear()
   }
 
   pub fn invalidate_from_roots<P: Fn(&N) -> bool>(&self, predicate: P) -> InvalidationResult {
-    let mut inner = self.inner.lock().unwrap();
+    let mut inner = self.inner.lock();
     inner.invalidate_from_roots(predicate)
   }
 
   pub fn trace<T: NodeTracer<N>>(&self, roots: &[N], path: &Path) -> Result<(), String> {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.trace::<T>(roots, path)
   }
 
@@ -691,22 +692,22 @@ impl<N: Node> Graph<N> {
     roots: &[N],
     path: &Path,
   ) -> io::Result<()> {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.visualize(visualizer, roots, path)
   }
 
   pub fn heavy_hitters(&self, roots: &[N], k: usize) -> Vec<(String, Duration)> {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.heavy_hitters(roots, k)
   }
 
   pub fn reachable_digest_count(&self, roots: &[N]) -> usize {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.reachable_digest_count(roots)
   }
 
   pub fn all_digests(&self) -> Vec<hashing::Digest> {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.all_digests()
   }
 
@@ -718,7 +719,7 @@ impl<N: Node> Graph<N> {
   where
     F: FnOnce() -> T,
   {
-    let _inner = self.inner.lock().unwrap();
+    let _inner = self.inner.lock();
     f()
   }
 
@@ -732,7 +733,7 @@ impl<N: Node> Graph<N> {
   /// as we'd like them to while `draining:True`.
   ///
   pub fn mark_draining(&self, draining: bool) -> Result<(), ()> {
-    let mut inner = self.inner.lock().unwrap();
+    let mut inner = self.inner.lock();
     if inner.draining == draining {
       Err(())
     } else {
@@ -775,17 +776,19 @@ impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
 
 #[cfg(test)]
 mod tests {
+  extern crate parking_lot;
   extern crate rand;
 
   use std::cmp;
   use std::collections::{HashMap, HashSet};
-  use std::sync::{mpsc, Arc, Mutex};
+  use std::sync::{mpsc, Arc};
   use std::thread;
   use std::time::Duration;
 
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::{self, Future};
   use hashing::Digest;
+  use parking_lot::Mutex;
 
   use self::rand::Rng;
 
@@ -1188,7 +1191,7 @@ mod tests {
     }
 
     fn ran(&self, node: TNode) {
-      let mut runs = self.runs.lock().unwrap();
+      let mut runs = self.runs.lock();
       runs.push(node);
     }
 
@@ -1203,7 +1206,7 @@ mod tests {
     }
 
     fn runs(&self) -> Vec<TNode> {
-      self.runs.lock().unwrap().clone()
+      self.runs.lock().clone()
     }
   }
 

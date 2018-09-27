@@ -12,9 +12,10 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
+use parking_lot::Mutex;
 use pool::ResettablePool;
 
 // This is the maximum size any particular local LMDB store file is allowed to grow to.
@@ -452,7 +453,6 @@ impl Store {
         Arc::try_unwrap(accumulator)
           .expect("Arc should have been unwrappable")
           .into_inner()
-          .unwrap()
       })
       .to_boxed()
   }
@@ -468,7 +468,7 @@ impl Store {
       .and_then(move |maybe_directory| match maybe_directory {
         Some(directory) => {
           {
-            let mut accumulator = accumulator.lock().unwrap();
+            let mut accumulator = accumulator.lock();
             accumulator.insert(digest, EntryType::Directory);
             for file in directory.get_files() {
               accumulator.insert(try_future!(file.get_digest().into()), EntryType::File);
@@ -570,7 +570,7 @@ impl Store {
     self
       .contents_for_directory_helper(directory, PathBuf::new(), accumulator.clone())
       .map(|()| {
-        let map = Arc::try_unwrap(accumulator).unwrap().into_inner().unwrap();
+        let map = Arc::try_unwrap(accumulator).unwrap().into_inner();
         let mut vec: Vec<FileContent> = map
           .into_iter()
           .map(|(path, content)| FileContent { path, content })
@@ -604,7 +604,7 @@ impl Store {
               maybe_bytes
                 .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
                 .map(move |bytes| {
-                  let mut contents = contents_wrapped_copy.lock().unwrap();
+                  let mut contents = contents_wrapped_copy.lock();
                   contents.insert(path, bytes);
                 })
             })
@@ -1971,7 +1971,7 @@ mod remote {
         Ok(testdata.digest())
       );
 
-      let blobs = cas.blobs.lock().unwrap();
+      let blobs = cas.blobs.lock();
       assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
     }
 
@@ -1990,10 +1990,10 @@ mod remote {
         Ok(big_file_digest())
       );
 
-      let blobs = cas.blobs.lock().unwrap();
+      let blobs = cas.blobs.lock();
       assert_eq!(blobs.get(&fingerprint), Some(&all_the_henries));
 
-      let write_message_sizes = cas.write_message_sizes.lock().unwrap();
+      let write_message_sizes = cas.write_message_sizes.lock();
       assert_eq!(
         write_message_sizes.len(),
         98,
@@ -2018,7 +2018,7 @@ mod remote {
         Ok(empty_file.digest())
       );
 
-      let blobs = cas.blobs.lock().unwrap();
+      let blobs = cas.blobs.lock();
       assert_eq!(
         blobs.get(&empty_file.fingerprint()),
         Some(&empty_file.bytes())
@@ -2656,7 +2656,7 @@ mod tests {
       .wait()
       .expect("Error storing file locally");
 
-    assert_eq!(cas.blobs.lock().unwrap().get(&testdata.fingerprint()), None);
+    assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
     new_store(dir.path(), cas.address())
       .ensure_remote_has_recursive(vec![testdata.digest()])
@@ -2664,7 +2664,7 @@ mod tests {
       .expect("Error uploading file");
 
     assert_eq!(
-      cas.blobs.lock().unwrap().get(&testdata.fingerprint()),
+      cas.blobs.lock().get(&testdata.fingerprint()),
       Some(&testdata.bytes())
     );
   }
@@ -2686,8 +2686,8 @@ mod tests {
       .wait()
       .expect("Error storing file locally");
 
-    assert_eq!(cas.blobs.lock().unwrap().get(&testdata.fingerprint()), None);
-    assert_eq!(cas.blobs.lock().unwrap().get(&testdir.fingerprint()), None);
+    assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
+    assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
     new_store(dir.path(), cas.address())
       .ensure_remote_has_recursive(vec![testdir.digest()])
@@ -2695,11 +2695,11 @@ mod tests {
       .expect("Error uploading directory");
 
     assert_eq!(
-      cas.blobs.lock().unwrap().get(&testdir.fingerprint()),
+      cas.blobs.lock().get(&testdir.fingerprint()),
       Some(&testdir.bytes())
     );
     assert_eq!(
-      cas.blobs.lock().unwrap().get(&testdata.fingerprint()),
+      cas.blobs.lock().get(&testdata.fingerprint()),
       Some(&testdata.bytes())
     );
   }
@@ -2726,21 +2726,21 @@ mod tests {
       .wait()
       .expect("Error uploading file");
 
-    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 1);
+    assert_eq!(cas.write_message_sizes.lock().len(), 1);
     assert_eq!(
-      cas.blobs.lock().unwrap().get(&testdata.fingerprint()),
+      cas.blobs.lock().get(&testdata.fingerprint()),
       Some(&testdata.bytes())
     );
-    assert_eq!(cas.blobs.lock().unwrap().get(&testdir.fingerprint()), None);
+    assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
     new_store(dir.path(), cas.address())
       .ensure_remote_has_recursive(vec![testdir.digest()])
       .wait()
       .expect("Error uploading directory");
 
-    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 3);
+    assert_eq!(cas.write_message_sizes.lock().len(), 3);
     assert_eq!(
-      cas.blobs.lock().unwrap().get(&testdir.fingerprint()),
+      cas.blobs.lock().get(&testdir.fingerprint()),
       Some(&testdir.bytes())
     );
   }
@@ -2772,26 +2772,26 @@ mod tests {
       .wait()
       .expect("Error uploading big file");
 
-    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 1);
+    assert_eq!(cas.write_message_sizes.lock().len(), 1);
     assert_eq!(
-      cas.blobs.lock().unwrap().get(&roland.fingerprint()),
+      cas.blobs.lock().get(&roland.fingerprint()),
       Some(&roland.bytes())
     );
-    assert_eq!(cas.blobs.lock().unwrap().get(&catnip.fingerprint()), None);
-    assert_eq!(cas.blobs.lock().unwrap().get(&testdir.fingerprint()), None);
+    assert_eq!(cas.blobs.lock().get(&catnip.fingerprint()), None);
+    assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
     new_store(dir.path(), cas.address())
       .ensure_remote_has_recursive(vec![testdir.digest(), catnip.digest()])
       .wait()
       .expect("Error uploading directory");
 
-    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 3);
+    assert_eq!(cas.write_message_sizes.lock().len(), 3);
     assert_eq!(
-      cas.blobs.lock().unwrap().get(&catnip.fingerprint()),
+      cas.blobs.lock().get(&catnip.fingerprint()),
       Some(&catnip.bytes())
     );
     assert_eq!(
-      cas.blobs.lock().unwrap().get(&testdir.fingerprint()),
+      cas.blobs.lock().get(&testdir.fingerprint()),
       Some(&testdir.bytes())
     );
   }
@@ -2811,9 +2811,9 @@ mod tests {
       .wait()
       .expect("Error uploading directory");
 
-    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 1);
+    assert_eq!(cas.write_message_sizes.lock().len(), 1);
     assert_eq!(
-      cas.blobs.lock().unwrap().get(&extra_big_file_fingerprint()),
+      cas.blobs.lock().get(&extra_big_file_fingerprint()),
       Some(&extra_big_file_bytes())
     );
 
@@ -2822,9 +2822,9 @@ mod tests {
       .wait()
       .expect("Error uploading directory");
 
-    assert_eq!(cas.write_message_sizes.lock().unwrap().len(), 1);
+    assert_eq!(cas.write_message_sizes.lock().len(), 1);
     assert_eq!(
-      cas.blobs.lock().unwrap().get(&extra_big_file_fingerprint()),
+      cas.blobs.lock().get(&extra_big_file_fingerprint()),
       Some(&extra_big_file_bytes())
     );
   }
@@ -2836,7 +2836,7 @@ mod tests {
 
     let testdata = TestData::roland();
 
-    assert_eq!(cas.blobs.lock().unwrap().get(&testdata.fingerprint()), None);
+    assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
     let error = new_store(dir.path(), cas.address())
       .ensure_remote_has_recursive(vec![testdata.digest()])
@@ -2860,8 +2860,8 @@ mod tests {
       .wait()
       .expect("Error storing directory locally");
 
-    assert_eq!(cas.blobs.lock().unwrap().get(&testdir.fingerprint()), None);
-    assert_eq!(cas.blobs.lock().unwrap().get(&testdir.fingerprint()), None);
+    assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
+    assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
     let error = new_store(dir.path(), cas.address())
       .ensure_remote_has_recursive(vec![testdir.digest()])

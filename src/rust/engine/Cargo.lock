@@ -32,6 +32,7 @@ name = "async_semaphore"
 version = "0.0.1"
 dependencies = [
  "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parking_lot 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -121,6 +122,7 @@ dependencies = [
  "hashing 0.0.1",
  "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parking_lot 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "testutil 0.0.1",
@@ -259,6 +261,7 @@ dependencies = [
  "hashing 0.0.1",
  "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parking_lot 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "process_execution 0.0.1",
  "resettable 0.0.1",
  "tempfile 3.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -361,6 +364,7 @@ dependencies = [
  "lmdb 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "mock 0.0.1",
+ "parking_lot 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "resettable 0.0.1",
  "serde 1.0.75 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -381,6 +385,7 @@ dependencies = [
  "fs 0.0.1",
  "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
+ "parking_lot 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.75 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.75 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -473,6 +478,7 @@ dependencies = [
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
+ "parking_lot 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -752,6 +758,7 @@ dependencies = [
  "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=bfd7333281c0422028502ccc7f78c57c27fdec08)",
  "hashing 0.0.1",
+ "parking_lot 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "testutil 0.0.1",
 ]
@@ -1035,6 +1042,9 @@ dependencies = [
 [[package]]
 name = "resettable"
 version = "0.0.1"
+dependencies = [
+ "parking_lot 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "rustc-demangle"

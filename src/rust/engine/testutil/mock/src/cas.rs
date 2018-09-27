@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use bazel_protos;
 use futures;
@@ -8,6 +8,7 @@ use grpcio;
 use bytes::Bytes;
 use futures::{Future, IntoFuture, Stream};
 use hashing::{Digest, Fingerprint};
+use parking_lot::Mutex;
 use testutil::data::{TestData, TestDirectory};
 
 ///
@@ -120,7 +121,7 @@ impl StubCAS {
   }
 
   pub fn read_request_count(&self) -> usize {
-    *self.read_request_count.lock().unwrap()
+    *self.read_request_count.lock()
   }
 }
 
@@ -164,7 +165,7 @@ impl StubCASResponder {
         Some("StubCAS is configured to always fail".to_owned()),
       ));
     }
-    let blobs = self.blobs.lock().unwrap();
+    let blobs = self.blobs.lock();
     let maybe_bytes = blobs.get(&fingerprint);
     match maybe_bytes {
       Some(bytes) => Ok(
@@ -208,7 +209,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
     sink: grpcio::ServerStreamingSink<bazel_protos::bytestream::ReadResponse>,
   ) {
     {
-      let mut request_count = self.read_request_count.lock().unwrap();
+      let mut request_count = self.read_request_count.lock();
       *request_count += 1;
     }
     match self.read_internal(&req) {
@@ -271,10 +272,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               )));
             }
             want_next_offset += req.get_data().len() as i64;
-            write_message_sizes
-              .lock()
-              .unwrap()
-              .push(req.get_data().len());
+            write_message_sizes.lock().push(req.get_data().len());
             bytes.extend(req.get_data());
           }
           Ok((maybe_resource_name, bytes))
@@ -340,7 +338,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               }
 
               {
-                let mut blobs = blobs.lock().unwrap();
+                let mut blobs = blobs.lock();
                 blobs.insert(fingerprint, bytes);
               }
 
@@ -385,7 +383,7 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
       ));
       return;
     }
-    let blobs = self.blobs.lock().unwrap();
+    let blobs = self.blobs.lock();
     let mut response = bazel_protos::remote_execution::FindMissingBlobsResponse::new();
     for digest in req.get_blob_digests() {
       let hashing_digest_result: Result<Digest, String> = digest.into();

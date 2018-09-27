@@ -51,6 +51,7 @@ extern crate lmdb;
 extern crate log;
 #[cfg(test)]
 extern crate mock;
+extern crate parking_lot;
 extern crate protobuf;
 extern crate resettable;
 extern crate serde;
