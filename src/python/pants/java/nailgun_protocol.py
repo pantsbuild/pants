@@ -256,8 +256,10 @@ class NailgunProtocol(object):
 
   @classmethod
   def encode_env_var_value(cls, obj):
-    """Encode `obj` so that it can be used as an environment variable in a subsequent NailgunClient
-    execution.
+    """Convert `obj` into a UTF-8 encoded binary string.
+
+    The result of this method be used as the value of an environment variable in a subsequent
+    NailgunClient execution.
     """
     return str(obj).encode('utf-8')
 
