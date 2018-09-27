@@ -24,7 +24,7 @@ from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
-from pants.util.contextutil import HardSystemExit, hermetic_environment_as, stdio_as
+from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
 
@@ -32,7 +32,10 @@ class DaemonExiter(Exiter):
   """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
 
   def __init__(self, socket):
-    super(DaemonExiter, self).__init__()
+    # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
+    # sys.exit behavior.
+    # TODO: test this behavior!
+    super(DaemonExiter, self).__init__(exiter=os._exit)
     self._socket = socket
     self._finalizer = None
 
@@ -40,7 +43,7 @@ class DaemonExiter(Exiter):
     """Sets a finalizer that will be called before exiting."""
     self._finalizer = finalizer
 
-  def exit(self, result=0, msg=None):
+  def exit(self, result=0, msg=None, *args, **kwargs):
     """Exit the runtime."""
     if self._finalizer:
       try:
@@ -65,9 +68,7 @@ class DaemonExiter(Exiter):
       # Shutdown the connected socket.
       teardown_socket(self._socket)
     finally:
-      # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
-      # sys.exit behavior (via `pants.util.contextutil.hard_exit_handler()`).
-      raise HardSystemExit()
+      super(DaemonExiter, self).exit(result=result, msg=msg, *args, **kwargs)
 
 
 class DaemonPantsRunner(ProcessManager):

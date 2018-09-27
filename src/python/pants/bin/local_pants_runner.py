@@ -9,6 +9,7 @@ from builtins import object
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, LogLocation
+from pants.base.exiter import Exiter
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
@@ -19,10 +20,25 @@ from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
-from pants.util.contextutil import hard_exit_handler, maybe_profiled
+from pants.util.contextutil import maybe_profiled
 
 
 logger = logging.getLogger(__name__)
+
+
+class RunTrackingExiter(Exiter):
+  """???"""
+
+  def __init__(self, base_exiter, run_tracker):
+    super(RunTrackingExiter, self).__init__()
+    self._base_exiter = base_exiter
+    self._run_tracker = run_tracker
+
+  def exit(self, *args, **kwargs):
+    # Drop the return code here, we are already being given a return code. end() is documented to
+    # be a no-op in further invocations.
+    self._run_tracker.end()
+    self._base_exiter.exit(*args, **kwargs)
 
 
 class LocalPantsRunner(object):
@@ -155,13 +171,7 @@ class LocalPantsRunner(object):
     self._run_start_time = start_time
 
   def run(self):
-    ExceptionSink.reset_log_location(
-      LogLocation.from_options_for_current_process(self._global_options))
-    # TODO: this is messy. Is it less surprising to have the Exiter modified during construction, or
-    # in the run() method we do here?
-    self._exiter.should_print_backtrace = self._global_options.print_exception_stacktrace
-    ExceptionSink.reset_exiter(self._exiter)
-    with hard_exit_handler(), maybe_profiled(self._profile_path):
+    with maybe_profiled(self._profile_path):
       self._run()
 
   def _maybe_run_v1(self, run_tracker, reporting):
@@ -218,6 +228,17 @@ class LocalPantsRunner(object):
     run_tracker = RunTracker.global_instance()
     reporting = Reporting.global_instance()
     reporting.initialize(run_tracker, self._run_start_time)
+
+    # Mutate the exiter object to ensure run_tracker is ended on uncaught signals.
+    # TODO: this is messy. Is it less surprising to have the Exiter modified during construction, or
+    # in the _run() method as we do here?
+    self._exiter = RunTrackingExiter(self._exiter, run_tracker)
+    self._exiter.should_print_backtrace = self._global_options.print_exception_stacktrace
+    # Reset all the logging to point to the current process.
+    current_run_log_location = LogLocation.from_options_for_current_process(self._global_options)
+    ExceptionSink.reset_log_location(current_run_log_location)
+    # Register the exiter we just mutated above.
+    ExceptionSink.reset_exiter(self._exiter)
 
     try:
       # Capture a repro of the 'before' state for this build, if needed.
