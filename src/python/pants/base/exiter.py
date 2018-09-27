@@ -83,32 +83,21 @@ class Exiter(object):
     """
     self.exit(result=1, msg=msg)
 
-  def format_unhandled_exception(self, exc=None, exc_class=None, tb=None, add_newline=False):
+  def handle_unhandled_exception(self, exc_class=None, exc=None, tb=None, add_newline=False):
+    """Default sys.excepthook implementation for unhandled exceptions."""
     exc_class = exc_class or sys.exc_info()[0]
     exc = exc or sys.exc_info()[1]
     tb = tb or sys.exc_info()[2]
 
-    return """Exception caught: ({exc_class})
-{traceback}
-Exception message: {exc_msg}
-{newline}""".format(exc_class=(exc_class or type(exc)),
-                    traceback=(self._format_tb(tb) if tb else ''),
-                    exc_msg=(str(exc) if exc else 'none'),
-                    newline=('\n' if add_newline else ''))
-
-  def handle_unhandled_exception(self, exc_class=None, exc=None, tb=None, add_newline=False):
-    """Default sys.excepthook implementation for unhandled exceptions."""
-
-    exception_message = self.format_unhandled_exception(
-      exc=exc, exc_class=exc_class,
-      tb=(tb if self._should_print_backtrace else None),
-      add_newline=self._should_print_backtrace)
+    def format_msg(print_backtrace=True):
+      msg = 'Exception caught: ({})\n'.format(type(exc))
+      msg += '{}\n'.format(''.join(self._format_tb(tb))) if print_backtrace else '\n'
+      msg += 'Exception message: {}\n'.format(str(exc) if exc else 'none')
+      msg += '\n' if add_newline else ''
+      return msg
 
     # Always output the unhandled exception details into a log file.
     self._log_exception(format_msg())
-
-    if re_raise:
-      raise exc
     self.exit_and_fail(format_msg(self._should_print_backtrace))
 
   def _log_exception(self, msg):
@@ -119,8 +108,7 @@ Exception message: {exc_msg}
     # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
     faulthandler.register(signal.SIGUSR2, trace_stream, chain=True)
 
-  def set_except_hook(self, trace_stream=None, workdir=None):
+  def set_except_hook(self, trace_stream=None):
     """Sets the global exception hook."""
     self._setup_faulthandler(trace_stream or sys.stderr)
-    self._workdir = workdir or self._workdir
     sys.excepthook = self.handle_unhandled_exception

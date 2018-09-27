@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import time
 
-from pants.base.build_environment import get_buildroot
 from pants.base.exiter import Exiter
 from pants.bin.pants_runner import PantsRunner
 from pants.util.contextutil import maybe_profiled
@@ -32,7 +31,7 @@ def main():
   start_time = time.time()
 
   exiter = Exiter()
-  exiter.set_except_hook(workdir=os.path.join(get_buildroot(), '.pants.d'))
+  exiter.set_except_hook()
 
   with maybe_profiled(os.environ.get('PANTSC_PROFILE')):
     try:

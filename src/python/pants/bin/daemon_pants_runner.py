@@ -30,16 +30,6 @@ from pants.util.socket import teardown_socket
 class DaemonExiter(Exiter):
   """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
 
-  @classmethod
-  def create(cls, socket, options=None):
-    exiter_instance = cls(socket)
-    # We want to be able to log error to an exceptions.log, and we need to get the location of the
-    # log dir from the (bootstrap) options, or the Exiter won't log anything at all.
-    if options is not None:
-      exiter_instance.apply_options(options)
-
-    return exiter_instance
-
   def __init__(self, socket):
     super(DaemonExiter, self).__init__()
     self._socket = socket
@@ -144,11 +134,7 @@ class DaemonPantsRunner(ProcessManager):
     self._options_bootstrapper = options_bootstrapper
     self._deferred_exception = deferred_exc
 
-    self._maybe_bootstrap_options = (
-      self._options_bootstrapper.get_bootstrap_options()
-      if self._options_bootstrapper
-      else None)
-    self._exiter = DaemonExiter.create(socket, options=self._maybe_bootstrap_options)
+    self._exiter = DaemonExiter(socket)
 
   def _make_identity(self):
     """Generate a ProcessManager identity for a given pants run.
@@ -295,48 +281,33 @@ class DaemonPantsRunner(ProcessManager):
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
     NailgunProtocol.send_pid(self._socket, os.getpgrp() * -1)
 
-    try:
-      # Invoke a Pants run with stdio redirected and a proxied environment.
-      with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
-           hermetic_environment_as(**self._env):
-        try:
-          # Setup the Exiter's finalizer.
-          self._exiter.set_finalizer(finalizer)
+    # Invoke a Pants run with stdio redirected and a proxied environment.
+    with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
+         hermetic_environment_as(**self._env):
+      try:
+        # Setup the Exiter's finalizer.
+        self._exiter.set_finalizer(finalizer)
 
-          # Clean global state.
-          clean_global_runtime_state(reset_subsystem=True)
+        # Clean global state.
+        clean_global_runtime_state(reset_subsystem=True)
 
-          # Re-raise any deferred exceptions, if present.
-          self._raise_deferred_exc()
+        # Re-raise any deferred exceptions, if present.
+        self._raise_deferred_exc()
 
-          # Otherwise, conduct a normal run.
-          runner = LocalPantsRunner.create(
-            self._exiter,
-            self._args,
-            self._env,
-            self._target_roots,
-            self._graph_helper,
-            self._options_bootstrapper
-          )
-          runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
-          runner.run()
-        except KeyboardInterrupt:
-          self._exiter.exit(1, msg='Interrupted by user.\n')
-        except Exception:
-          self._exiter.handle_unhandled_exception(add_newline=True)
-        else:
-          self._exiter.exit(0)
-    except Exception:
-      # self._exiter is a DaemonExiter and does some nailgun interaction, which is gone by this
-      # point, so we must make another.
-      tmp_exiter = Exiter()
-      # We want to be able to log error to an exceptions.log, and we need to get the location of the
-      # log dir from the (bootstrap) options, or the Exiter won't log anything at all.
-      if self._maybe_bootstrap_options is not None:
-        tmp_exiter.apply_options(self._maybe_bootstrap_options)
-      # We are catching an exception from the nailgunned_stdio() call -- we log it, but also
-      # re-raise the exception to differentiate it from the result of the LocalPantsRunner
-      # invocation.
-      exception_message = tmp_exiter.format_unhandled_exception(add_newline=True)
-      tmp_exiter.log_exception(exception_message)
-      raise
+        # Otherwise, conduct a normal run.
+        runner = LocalPantsRunner.create(
+          self._exiter,
+          self._args,
+          self._env,
+          self._target_roots,
+          self._graph_helper,
+          self._options_bootstrapper
+        )
+        runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
+        runner.run()
+      except KeyboardInterrupt:
+        self._exiter.exit(1, msg='Interrupted by user.\n')
+      except Exception:
+        self._exiter.handle_unhandled_exception(add_newline=True)
+      else:
+        self._exiter.exit(0)
