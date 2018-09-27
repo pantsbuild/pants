@@ -36,6 +36,7 @@ extern crate env_logger;
 extern crate fs;
 extern crate futures;
 extern crate hashing;
+extern crate parking_lot;
 extern crate protobuf;
 extern crate serde;
 #[macro_use]
@@ -48,11 +49,12 @@ use clap::{App, Arg, SubCommand};
 use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, UploadSummary};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
+use parking_lot::Mutex;
 use protobuf::Message;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -449,7 +451,7 @@ fn expand_files(store: Store, digest: Digest) -> Result<Option<Vec<String>>, Str
     .wait()
     .map(|maybe| {
       maybe.map(|()| {
-        let mut v = Arc::try_unwrap(files).unwrap().into_inner().unwrap();
+        let mut v = Arc::try_unwrap(files).unwrap().into_inner();
         v.sort();
         v
       })
@@ -467,7 +469,7 @@ fn expand_files_helper(
     .and_then(|maybe_dir| match maybe_dir {
       Some(dir) => {
         {
-          let mut files_unlocked = files.lock().unwrap();
+          let mut files_unlocked = files.lock();
           for file in dir.get_files() {
             files_unlocked.push(format!("{}{}", prefix, file.name));
           }

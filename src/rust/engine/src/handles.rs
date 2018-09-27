@@ -2,9 +2,9 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::os::raw;
-use std::sync::Mutex;
 
 use externs;
+use parking_lot::Mutex;
 
 pub type RawHandle = *const raw::c_void;
 
@@ -39,10 +39,7 @@ impl Eq for Handle {}
 
 impl Drop for Handle {
   fn drop(&mut self) {
-    DROPPING_HANDLES
-      .lock()
-      .unwrap()
-      .push(DroppingHandle(self.0));
+    DROPPING_HANDLES.lock().push(DroppingHandle(self.0));
   }
 }
 
@@ -80,7 +77,7 @@ lazy_static! {
 ///
 pub fn maybe_drop_handles() {
   let handles: Option<Vec<_>> = {
-    let mut q = DROPPING_HANDLES.lock().unwrap();
+    let mut q = DROPPING_HANDLES.lock();
     if q.len() > MIN_DRAIN_HANDLES {
       Some(q.drain(..).collect::<Vec<_>>())
     } else {

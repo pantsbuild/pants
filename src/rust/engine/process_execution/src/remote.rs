@@ -1341,7 +1341,7 @@ mod tests {
       })
     );
     {
-      let blobs = cas.blobs.lock().unwrap();
+      let blobs = cas.blobs.lock();
       assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
     }
   }
@@ -1592,7 +1592,7 @@ mod tests {
       };
       run_command_remote(mock_server.address(), execute_request).unwrap();
 
-      let messages = mock_server.mock_responder.received_messages.lock().unwrap();
+      let messages = mock_server.mock_responder.received_messages.lock();
       assert!(messages.len() == 2);
       assert!(
         messages.get(1).unwrap().2.sub(messages.get(0).unwrap().2) >= Duration::from_millis(500)
@@ -1625,7 +1625,7 @@ mod tests {
       };
       run_command_remote(mock_server.address(), execute_request).unwrap();
 
-      let messages = mock_server.mock_responder.received_messages.lock().unwrap();
+      let messages = mock_server.mock_responder.received_messages.lock();
       assert!(messages.len() == 4);
       assert!(
         messages.get(1).unwrap().2.sub(messages.get(0).unwrap().2) >= Duration::from_millis(500)

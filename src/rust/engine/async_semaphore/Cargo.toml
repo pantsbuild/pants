@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 futures = "^0.1.16"
+parking_lot = "0.6"

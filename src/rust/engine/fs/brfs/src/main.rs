@@ -39,6 +39,7 @@ extern crate hashing;
 extern crate libc;
 #[macro_use]
 extern crate log;
+extern crate parking_lot;
 extern crate protobuf;
 #[cfg(test)]
 extern crate tempfile;
@@ -48,11 +49,12 @@ extern crate time;
 
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
+use parking_lot::Mutex;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
 use std::ffi::{CString, OsStr, OsString};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 const TTL: time::Timespec = time::Timespec { sec: 0, nsec: 0 };
 
@@ -520,18 +522,18 @@ impl fuse::Filesystem for BuildResultFS {
           .load_file_bytes_with(digest, move |bytes| {
             let begin = std::cmp::min(offset as usize, bytes.len());
             let end = std::cmp::min(offset as usize + size as usize, bytes.len());
-            let mut reply = reply.lock().unwrap();
+            let mut reply = reply.lock();
             reply.take().unwrap().data(&bytes.slice(begin, end));
           }).map(|v| {
             if v.is_none() {
-              let maybe_reply = reply2.lock().unwrap().take();
+              let maybe_reply = reply2.lock().take();
               if let Some(reply) = maybe_reply {
                 reply.error(libc::ENOENT);
               }
             }
           }).or_else(|err| {
             error!("Error loading bytes for {:?}: {}", digest, err);
-            let maybe_reply = reply2.lock().unwrap().take();
+            let maybe_reply = reply2.lock().take();
             if let Some(reply) = maybe_reply {
               reply.error(libc::EINVAL);
             }

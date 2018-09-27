@@ -80,6 +80,7 @@ hashing = { path = "hashing" }
 itertools = "0.7.2"
 lazy_static = "0.2.2"
 log = "0.4"
+parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 resettable = { path = "resettable" }
 smallvec = "0.6"

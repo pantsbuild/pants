@@ -27,7 +27,11 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-use std::sync::{Arc, RwLock};
+extern crate parking_lot;
+
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 
 ///
 /// Resettable is a lazily computed value which can be reset, so that it can be lazily computed
@@ -65,7 +69,7 @@ where
   /// be sure that dropping it will actually deallocate the resource.  
   ///
   pub fn get(&self) -> T {
-    let val_opt = self.val.read().unwrap();
+    let val_opt = self.val.read();
     let val = val_opt
       .as_ref()
       .unwrap_or_else(|| panic!("A Resettable value cannot be used while it is shutdown."));
@@ -79,7 +83,7 @@ where
   where
     F: FnOnce() -> O,
   {
-    let mut val = self.val.write().unwrap();
+    let mut val = self.val.write();
     *val = None;
     let t = f();
     *val = Some((self.make)());
