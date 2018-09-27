@@ -15,6 +15,11 @@ from pants.util.meta import AbstractClass
 
 
 class NodeResolverBase(AbstractClass):
+
+  @property
+  def file_regex(self):
+    return re.compile('^file:(.*)$')
+
   @abstractmethod
   def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False, **kwargs):
     """Resolve a NodePackage target."""
@@ -38,7 +43,7 @@ class NodeResolverBase(AbstractClass):
       shutil.copyfile(os.path.join(buildroot, source), dest)
 
   def _get_target_from_package_name(self, target, package_name, file_path):
-    """Get a target from its dependency tree given a package name and relative file path.
+    """Get a dependent target given the package name and relative file path.
 
     This will only traverse direct dependencies of the passed target. It is not necessary
     to traverse further than that because transitive dependencies will be resolved under the
@@ -50,7 +55,7 @@ class NodeResolverBase(AbstractClass):
     :param string package_name: A package.json name that is required to be the same as the target name
     :param string file_path: Relative filepath from target to the package in the format 'file:<address_path>'
     """
-    pattern = re.compile('^file:(.*)$')
+    pattern = self.file_regex
     address_path = pattern.match(file_path).group(1)
 
     dep_spec_path = os.path.normpath(os.path.join(target.address.spec_path, address_path))

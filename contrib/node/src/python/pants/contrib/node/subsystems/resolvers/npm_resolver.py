@@ -13,7 +13,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd
-from pants.util.dirutil import absolute_symlink
+from pants.util.dirutil import relative_symlink
 from pants.util.fileutil import safe_temp_edit
 
 from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_NPM,
@@ -135,25 +135,19 @@ class NpmResolver(Subsystem, NodeResolverBase):
           self._link_source_dependencies(target, results_dir, node_paths, source_deps)
 
   def _link_source_dependencies(self, target, results_dir, node_paths, source_deps):
+
     for package_name, file_path in source_deps.items():
+      # Package name should always the same as the target name
       dep = self._get_target_from_package_name(target, package_name, file_path)
       # Symlink each target
       dep_path = node_paths.node_path(dep)
       node_module_dir = os.path.join(results_dir, 'node_modules')
-      absolute_symlink(dep_path, os.path.join(node_module_dir, dep.package_name))
+      relative_symlink(dep_path, os.path.join(node_module_dir, dep.package_name))
       # If there are any bin, we need to symlink those as well
-      bin_field = dep.payload.bin_executables
-      if dep.payload.bin_executables:
-        bin_dir = os.path.join(node_module_dir, '.bin')
-        if isinstance(bin_field, dict):
-          for bin_name, rel_bin_path in bin_field.items():
-            bin_path = os.path.join(dep_path, rel_bin_path)
-            absolute_symlink(bin_path, os.path.join(bin_dir, bin_name))
-        else:
-          # If there is only a single bin it, could just be a string and not a map.
-          # In this case, the package_name is the bin name
-          bin_path = os.path.join(dep_path, bin_field)
-          absolute_symlink(bin_path, os.path.join(bin_dir, dep.package_name))
+      bin_dir = os.path.join(node_module_dir, '.bin')
+      for bin_name, rel_bin_path in dep.bin_executables.items():
+        bin_path = os.path.join(dep_path, rel_bin_path)
+        relative_symlink(bin_path, os.path.join(bin_dir, bin_name))
 
   @staticmethod
   def _emit_package_descriptor(node_task, target, results_dir, node_paths):

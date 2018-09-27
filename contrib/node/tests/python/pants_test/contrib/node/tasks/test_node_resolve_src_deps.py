@@ -8,7 +8,6 @@ import os
 from textwrap import dedent
 
 from pants.base.exceptions import TaskError
-from pants.util.contextutil import pushd
 from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
@@ -261,17 +260,19 @@ class NodeResolveSourceDepsTest(TaskTestBase):
     link_dep_path = os.path.join(app_node_modules_path, 'dep')
     self.assertTrue(os.path.exists(app_node_modules_path))
     self.assertTrue(os.path.islink(link_dep_path))
- 
-    with pushd(app_node_modules_path):
-      self.assertEqual(os.path.abspath(os.readlink(link_dep_path)), dep_node_path)
+
+    expected = os.path.relpath(dep_node_path, app_node_modules_path)
+    self.assertEqual(os.readlink(link_dep_path), expected)
  
     # Verify that 'app/node_modules/.bin' has a correct symlink to 'dep'
     app_bin_dep_path = os.path.join(dep_node_path, 'cli.js')
-    link_dep_bin_path = os.path.join(app_node_path, 'node_modules', '.bin', 'dep')
-    
+    dep_bin_path = os.path.join(app_node_path, 'node_modules', '.bin')
+    link_dep_bin_path = os.path.join(dep_bin_path, 'dep')
+
     self.assertTrue(os.path.islink(link_dep_bin_path))
-    with pushd(dep_node_path):
-      self.assertEqual(os.path.abspath(os.readlink(link_dep_bin_path)), app_bin_dep_path)
+    relative_path = os.readlink(link_dep_bin_path)
+    expected = os.path.relpath(app_bin_dep_path, dep_bin_path)
+    self.assertEqual(relative_path, expected)
  
   def test_resolve_symlink_bin_dict(self):
     dep = self._create_dep(provide_bin=True, use_bin_dict=True)
@@ -285,11 +286,12 @@ class NodeResolveSourceDepsTest(TaskTestBase):
  
     # Verify that 'app/node_modules/.bin' has a correct symlink to 'dep_cli'
     app_bin_dep_path = os.path.join(dep_node_path, 'cli.js')
-    link_dep_bin_path = os.path.join(app_node_path, 'node_modules', '.bin', 'dep_cli')
+    dep_bin_path = os.path.join(app_node_path, 'node_modules', '.bin')
+    link_dep_bin_path = os.path.join(dep_bin_path, 'dep_cli')
     self.assertTrue(os.path.islink(link_dep_bin_path))
- 
-    with pushd(dep_node_path):
-      self.assertEqual(os.path.abspath(os.readlink(link_dep_bin_path)), app_bin_dep_path)
+    relative_path = os.readlink(link_dep_bin_path)
+    expected = os.path.relpath(app_bin_dep_path, dep_bin_path)
+    self.assertEqual(relative_path, expected)
  
   def test_resolve_transitive_deps(self):
     trans_dep = self._create_trans_dep()
