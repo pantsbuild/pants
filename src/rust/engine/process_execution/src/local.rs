@@ -2,10 +2,7 @@ extern crate log;
 extern crate tempfile;
 
 use boxfuture::{BoxFuture, Boxable};
-use fs::{
-  self, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStatGetter, Snapshot,
-  StrictGlobMatching,
-};
+use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, Snapshot, StrictGlobMatching};
 use futures::{future, Future, Stream};
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -50,39 +47,33 @@ impl CommandRunner {
     output_file_paths: BTreeSet<PathBuf>,
     output_dir_paths: BTreeSet<PathBuf>,
   ) -> BoxFuture<Snapshot, String> {
-    let output_dirs_glob_strings: Result<Vec<String>, String> = output_dir_paths
+    let output_paths: Result<Vec<String>, String> = output_dir_paths
       .into_iter()
       .map(|p| {
-        p.into_os_string()
-          .into_string()
-          .map_err(|e| format!("Error stringifying output_directories: {:?}", e))
-          .map(|s| format!("{}/**", s))
+        let mut s = p.into_os_string();
+        s.push("/**");
+        s
+      }).chain(output_file_paths.into_iter().map(|p| p.into_os_string()))
+      .map(|s| {
+        s.into_string()
+          .map_err(|e| format!("Error stringifying output paths: {:?}", e))
       }).collect();
 
-    let output_dirs_future = posix_fs
-      .expand(try_future!(PathGlobs::create(
-        &try_future!(output_dirs_glob_strings),
-        &[],
-        StrictGlobMatching::Ignore,
-        GlobExpansionConjunction::AllMatch,
-      ))).map_err(|e| format!("Error stating output dirs: {}", e));
+    let output_globs = try_future!(PathGlobs::create(
+      &try_future!(output_paths),
+      &[],
+      StrictGlobMatching::Ignore,
+      GlobExpansionConjunction::AllMatch,
+    ));
 
-    let output_files_future = posix_fs
-      .path_stats(output_file_paths.into_iter().collect())
-      .map_err(|e| format!("Error stating output files: {}", e));
-
-    output_files_future
-      .join(output_dirs_future)
-      .and_then(|(output_files_stats, output_dirs_stats)| {
-        let paths: Vec<_> = output_files_stats
-          .into_iter()
-          .chain(output_dirs_stats.into_iter().map(Some))
-          .collect();
-
+    posix_fs
+      .expand(output_globs)
+      .map_err(|err| format!("Error expanding output globs: {}", err))
+      .and_then(|path_stats| {
         fs::Snapshot::from_path_stats(
           store.clone(),
           &fs::OneOffStoreFileByDigest::new(store, posix_fs),
-          paths.into_iter().filter_map(|v| v).collect(),
+          path_stats,
         )
       }).to_boxed()
   }
@@ -667,6 +658,37 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::containing_roland().digest(),
+      }
+    )
+  }
+
+  #[test]
+  fn output_overlapping_file_and_dir() {
+    let result = run_command_locally(ExecuteProcessRequest {
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        format!(
+          "/bin/mkdir cats && echo -n {} > cats/roland",
+          TestData::roland().string()
+        ),
+      ],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: vec![PathBuf::from("cats/roland")].into_iter().collect(),
+      output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
+      timeout: Duration::from_millis(1000),
+      description: "bash".to_string(),
+      jdk_home: None,
+    });
+
+    assert_eq!(
+      result.unwrap(),
+      FallibleExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: TestDirectory::nested().digest(),
       }
     )
   }
