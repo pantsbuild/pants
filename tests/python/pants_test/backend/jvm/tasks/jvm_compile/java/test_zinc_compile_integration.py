@@ -236,6 +236,33 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         )
         self.assert_failure(pants_run)
 
+  def test_failed_compile_with_hermetic(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir]},
+        'compile.zinc': {
+          'execution_strategy': 'hermetic',
+          'use_classpath_jars': False,
+          'incremental': False,
+        }
+      }
+
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          [
+            '-q',
+            'compile',
+            'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
+          ],
+          workdir,
+          config,
+        )
+        self.assert_failure(pants_run)
+        self.assertIn(
+          'Failed jobs: compile(testprojects/src/java/org/pantsbuild/testproject/dummies:'
+          'compilation_failure_target)',
+          pants_run.stdout_data)
+
   def test_hermetic_binary_with_dependencies(self):
     with temporary_dir() as cache_dir:
       config = {

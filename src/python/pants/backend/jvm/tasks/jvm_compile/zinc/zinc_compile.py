@@ -437,7 +437,8 @@ class BaseZincCompile(JvmCompile):
         # Since this is always hermetic, we need to use `underlying_dist`
         jdk_home=text_type(self._zinc.underlying_dist.home),
       )
-      res = self.context.execute_process_synchronously_without_raising(req, self.name(), [WorkUnitLabel.COMPILER])
+      res = self.context.execute_process_synchronously_or_raise(req, self.name(), [WorkUnitLabel.COMPILER])
+
       # TODO: Materialize as a batch in do_compile or somewhere
       self.context._scheduler.materialize_directories((
         DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
