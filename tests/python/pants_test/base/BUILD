@@ -215,8 +215,10 @@ python_tests(
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:osutil',
     'tests/python/pants_test:test_base',
   ],
+  tags={'platform_specific_behavior'},
 )
 
 python_tests(

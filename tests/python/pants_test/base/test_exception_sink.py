@@ -14,6 +14,7 @@ import mock
 from pants.base.exception_sink import ExceptionSink, LogLocation
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
+from pants.util.osutil import get_normalized_os_name
 from pants_test.test_base import TestBase
 
 
@@ -38,15 +39,24 @@ class TestExceptionSink(TestBase):
       self.assertEqual(new_log_location, sink._log_location)
 
   def test_set_invalid_log_location(self):
+    self.assertFalse(os.path.isdir('/does/not/exist'))
     sink = self._gen_sink_subclass()
     err_rx = re.escape(
       "The provided exception sink path at '/does/not/exist' is not writable or could not be created: [Errno 13]")
     with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
       sink.reset_log_location(LogLocation(os.getpid(), '/does/not/exist'))
-    err_rx = '.*'.join([
-      re.escape("Error opening fatal error log streams for log location LogLocation(pid="),
-      re.escape(", log_dir='/'): [Errno 13] Permission denied: '/logs'"),
-    ])
+
+
+    # OSX errors out at creating a new directory with safe_mkdir(), Linux errors out trying to
+    # create the directory for its log files with safe_open().
+    # TODO: figure out why this is the case!
+    if get_normalized_os_name() == 'darwin':
+      err_rx = re.escape("The provided exception sink path at '/' is not writable or could not be created: [Errno 21] Is a directory: '/'.")
+    else:
+      err_rx = '.*'.join([
+        re.escape("Error opening fatal error log streams for log location LogLocation(pid="),
+        re.escape(", log_dir='/'): [Errno 13] Permission denied: '/logs'"),
+      ])
     with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
       sink.reset_log_location(LogLocation(os.getpid(), '/'))
 
