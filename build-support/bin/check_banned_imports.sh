@@ -6,3 +6,10 @@ if [ -n "${bad_files}" ]; then
     echo >&2 "${bad_files}"
     exit 1
 fi
+
+bad_files="$(find src/rust/engine -name '*.rs' | xargs egrep -l "^use std::sync::.*(Mutex|RwLock)")"
+if [ -n "${bad_files}" ]; then
+    echo >&2 "Found forbidden imports. Instead of \`std::sync::(Mutex|RwLock)\` you should use \`parking_lot::(Mutex|RwLock)\`. Bad files:"
+    echo >&2 "${bad_files}"
+    exit 1
+fi
