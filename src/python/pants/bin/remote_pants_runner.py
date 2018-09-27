@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from future.utils import raise_with_traceback
 
 from pants.base.exception_sink import ExceptionSink, GetLogLocationRequest, LogLocation
+from pants.base.exiter import Exiter
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
@@ -23,6 +24,75 @@ from pants.util.dirutil import maybe_read_file
 
 
 logger = logging.getLogger(__name__)
+
+
+class RemoteExiter(Exiter):
+
+  def __init__(self, base_exiter):
+    assert(isinstance(base_exiter, Exiter))
+    super(RemoteExiter, self).__init__()
+    self._base_exiter = base_exiter
+    self._pantsd_handle = None
+    self._nailgun_client = None
+
+  # TODO: figure out whether it's useful to log whether these mutators were or weren't called.
+  def register_pantsd_handle(self, pantsd_handle):
+    assert(self._pantsd_handle is None)
+    assert(isinstance(pantsd_handle, PantsDaemon.Handle))
+    self._pantsd_handle = pantsd_handle
+
+  def register_nailgun_client(self, nailgun_client):
+    assert(self._nailgun_client is None)
+    assert(isinstance(nailgun_client, NailgunClient))
+    self._nailgun_client = nailgun_client
+
+  def _extract_remote_exception(self):
+    """Given a NailgunError, returns a Terminated exception with additional info (where possible).
+
+    This method will include the entire exception log for either the `pid` in the NailgunError, or
+    failing that, the `pid` of the pantsd instance.
+    """
+    source_pids = []
+
+    assert(self._pantsd_handle is not None)
+    source_pids.append(self._pantsd_handle.pid)
+
+    # This may not have been registered yet, so None.
+    if self._nailgun_client:
+      # .pid is an @property which may change, so save it.
+      client_pid = self._nailgun_client.pid
+      if client_pid:
+        source_pids.append(client_pid)
+
+    exception_text = None
+    for pid in source_pids:
+      log_path = ExceptionSink.exceptions_log_path(GetLogLocationRequest(pid=pid))
+      exception_text = maybe_read_file(log_path, binary_mode=False)
+      if exception_text:
+        break
+
+    return exception_text
+
+  def exit(self, result=0, msg=None, *args, **kwargs):
+    terminal_message = msg
+    try:
+      # Ensure any connected pantsd-runner processes die when the remote client does.
+      # TODO: this works to kill all connected processes because the process pid is negated -- we
+      # need to extend ChunkType to cover a real pid as well!
+      # TODO: is this the right signal to send?
+      self._nailgun_client.kill(signal.SIGTERM)
+    except Exception as e:
+      terminal_message = ('{}\nAdditional error killing nailgun client upon exit: {}'
+                          .format((terminal_message or ''), e))
+
+    # Ensure the remote exception is at the bottom of the output.
+    remote_error_message = self._extract_remote_exception()
+    if remote_error_message:
+      ExceptionSink.log_exception(remote_error_message)
+      terminal_message = ('{}\nRemote exception:\n{}'
+                          .format((terminal_message or ''), remote_error_message))
+
+    self._base_exiter.exit(result=result, msg=terminal_message, *args, **kwargs)
 
 
 class RemotePantsRunner(object):
@@ -63,8 +133,18 @@ class RemotePantsRunner(object):
   def _trapped_signals(self, client):
     """A contextmanager that overrides the SIGINT (control-c) and SIGQUIT (control-\) handlers
     and handles them remotely."""
+    # TODO: if this control-c is done at the wrong time (before the pantsd-runner process begins and
+    # sets the pid in the client), the pantsd-runner process will just send input to the terminal
+    # without respecting control-c or anything else until it exits.
     def handle_control_c(signum, frame):
-      client.send_control_c()
+      # TODO: this should exit immediately here or wait on the remote process to die after sending
+      # the remote control-c to avoid command-line control-c misbehavior!
+      try:
+        client.send_control_c()
+      except Exception as e:
+        msg = 'Error sending control-c to remote client: {}'.format(e)
+        logger.error(msg)
+        ExceptionSink.log_exception(msg)
 
     existing_sigint_handler = signal.signal(signal.SIGINT, handle_control_c)
     # N.B. SIGQUIT will abruptly kill the pantsd-runner, which will shut down the other end
@@ -133,9 +213,15 @@ class RemotePantsRunner(object):
         attempt += 1
       except NailgunClient.NailgunError as e:
         # Ensure a newline.
-        logger.fatal('')
-        logger.fatal('lost active connection to pantsd!')
-        raise_with_traceback(self._extract_remote_exception(pantsd_handle.pid, e))
+        error_log_msg = '\nlost active connection to pantsd!'
+        ExceptionSink.log_exception(error_log_msg)
+        logger.fatal(error_log_msg)
+
+        wrapped_exc = self.Terminated('abruptly lost active connection to pantsd runner: {!r}'
+                                      .format(e),
+                                      e)
+        # TODO: figure out if we can remove raise_with_traceback() here.
+        raise_with_traceback(wrapped_exc)
 
   def _connect_and_execute(self, port):
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
@@ -153,33 +239,15 @@ class RemotePantsRunner(object):
                            exit_on_broken_pipe=True,
                            expects_pid=True)
 
+    # TODO: ???
+    self._exiter.register_nailgun_client(client)
+
     with self._trapped_signals(client), STTYSettings.preserved():
       # Execute the command on the pailgun.
       result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
 
     # Exit.
     self._exiter.exit(result)
-
-  def _extract_remote_exception(self, pantsd_pid, nailgun_error):
-    """Given a NailgunError, returns a Terminated exception with additional info (where possible).
-
-    This method will include the entire exception log for either the `pid` in the NailgunError, or
-    failing that, the `pid` of the pantsd instance.
-    """
-    source_pids = [pantsd_pid]
-    if nailgun_error.pid is not None:
-      source_pids = [abs(nailgun_error.pid)] + source_pids
-
-    exception_text = None
-    for pid in source_pids:
-      log_path = ExceptionSink.exceptions_log_path(GetLogLocationRequest(pid=pid))
-      exception_text = maybe_read_file(log_path, binary_mode=False)
-      if exception_text:
-        break
-
-    exception_suffix = '\nRemote exception:\n{}'.format(exception_text) if exception_text else ''
-    return self.Terminated('abruptly lost active connection to pantsd runner: {!r}{}'.format(
-      nailgun_error, exception_suffix))
 
   def _restart_pantsd(self):
     return PantsDaemon.Factory.restart(bootstrap_options=self._bootstrap_options)
@@ -193,7 +261,11 @@ class RemotePantsRunner(object):
     ExceptionSink.reset_log_location(LogLocation.from_options_for_current_process(
       self._bootstrap_options.for_global_scope()))
     ExceptionSink.reset_interactive_output_stream(self._setup_stderr_logging())
+    # Mutate the exiter to be able to track pids.
+    self._exiter = RemoteExiter(self._exiter)
     ExceptionSink.reset_exiter(self._exiter)
 
     pantsd_handle = self._maybe_launch_pantsd()
+    # Add the logs for this pantsd process to our logs when exiting.
+    self._exiter.register_pantsd_handle(pantsd_handle)
     self._run_pants_with_retry(pantsd_handle)

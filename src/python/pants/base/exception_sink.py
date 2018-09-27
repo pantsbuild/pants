@@ -37,11 +37,11 @@ class GetLogLocationRequest(datatype([
 
 
 class LogLocation(datatype([
-    # TODO: link the datatype default values ticket!
     ('pid', Exactly(int, long)),
     ('log_dir', Exactly(binary_type, type(None))),
 ])):
 
+  # TODO: link the datatype default values ticket!
   def __new__(cls, pid, log_dir=None):
     if log_dir is not None:
       log_dir = binary_type(log_dir)
@@ -77,6 +77,14 @@ class ExceptionSink(object):
   # Integer code to exit with on an unhandled exception.
   UNHANDLED_EXCEPTION_EXIT_CODE = 1
 
+  # faulthandler.enable() installs handlers for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL, but we
+  # also want to dump a traceback when receiving these other usually-fatal signals.
+  GRACEFULLY_HANDLED_SIGNALS = [
+    signal.SIGTERM,
+    signal.SIGINT,
+    signal.SIGQUIT,
+  ]
+
   def __new__(cls, *args, **kwargs):
     raise TypeError('Instances of {} are not allowed to be constructed!'
                     .format(cls.__name__))
@@ -111,14 +119,15 @@ class ExceptionSink(object):
       new_log_location)
 
     # NB: mutate process-global state!
+    if faulthandler.is_enabled():
+      faulthandler.disable()
     # Send a stacktrace to this file if interrupted by a fatal error.
     faulthandler.enable(file=pid_specific_error_stream, all_threads=True)
     # Log a timestamped exception and exit gracefully on non-fatal signals.
     # TODO: ascertain whether the the signal handler method used here is signal-safe for our
     # purposes.
-    # faulthandler.enable() installs handlers for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL, but we
-    # also want to dump a traceback when receiving these other usually-fatal signals.
-    signal.signal(signal.SIGTERM, cls._handle_signal_gracefully)
+    for signum in cls.GRACEFULLY_HANDLED_SIGNALS:
+      signal.signal(signum, cls._handle_signal_gracefully)
 
     # NB: mutate the class variables!
     cls._log_location = new_log_location

@@ -116,6 +116,10 @@ class NailgunClient(object):
     """Indicates an error upon initial connect to the nailgun server."""
     DESCRIPTION = 'Problem connecting to nailgun server'
 
+  class NailgunInvalidStateError(NailgunError):
+    """???"""
+    DESCRIPTION = 'A pid was required for some operation, but the session was not initialized yet.'
+
   class NailgunExecutionError(NailgunError):
     """Indicates an error upon initial command execution on the nailgun server."""
     DESCRIPTION = 'Problem executing command on nailgun server'
@@ -184,9 +188,24 @@ class NailgunClient(object):
 
   def send_control_c(self):
     """Sends SIGINT to a nailgun server using pid information from the active session."""
-    if self._session and self._session.remote_pid is not None:
+    self.kill(signal.SIGINT)
+
+  def kill(self, signal):
+    """
+    :raises: :class:`NailgunClient.NailgunInvalidStateError`
+    """
+    assert(isinstance(signal, int))
+    pid = self.pid
+    if pid is None:
+      raise self.NailgunInvalidStateError(
+        address=self._address_string,
+        pid=pid,
+        wrapped_exc=ValueError('the pid was not yet initialized'),
+        traceback=sys.exc_info()[2],
+      )
+    else:
       try:
-        os.kill(self._session.remote_pid, signal.SIGINT)
+        os.kill(pid, signal)
       except (OSError, IOError) as e:
         # Ignore "No such process" errors.
         if e.errno != errno.ESRCH:

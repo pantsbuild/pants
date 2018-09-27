@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import sys
 from builtins import object
 
 from pants.base.build_environment import get_buildroot
@@ -243,6 +244,8 @@ class LocalPantsRunner(object):
     ExceptionSink.reset_log_location(current_run_log_location)
     # Register the exiter we just mutated above.
     ExceptionSink.reset_exiter(self._exiter)
+    # TODO: ???
+    ExceptionSink.reset_interactive_output_stream(sys.stderr)
 
     try:
       # Capture a repro of the 'before' state for this build, if needed.
