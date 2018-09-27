@@ -27,9 +27,13 @@ logger = logging.getLogger(__name__)
 
 
 class RunTrackingExiter(Exiter):
-  """???"""
+  """An Exiter that calls .end() on a provided RunTracker on system exit."""
 
+  # TODO: is the base_exiter here using the prototype pattern or something? Either way, document
+  # what it's doing here, system exiting logic *must* be simple to follow.
   def __init__(self, base_exiter, run_tracker):
+    assert(isinstance(base_exiter, Exiter))
+    assert(isinstance(run_tracker, RunTracker))
     super(RunTrackingExiter, self).__init__()
     self._base_exiter = base_exiter
     self._run_tracker = run_tracker

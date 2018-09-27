@@ -438,6 +438,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assertIn('abruptly lost active connection to pantsd runner', waiter_run.stderr_data)
       self.assertIn('Remote exception:', waiter_run.stderr_data)
       # TODO: check anything further?
+      self.assertIn("""\
+Signal {signum} was raised. Exiting with failure.
+(backtrace omitted)
+""".format(signum=signal.SIGTERM), waiter_run.stderr_data)
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
