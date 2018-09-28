@@ -11,7 +11,7 @@ import time
 
 from pants.base.exception_sink import ExceptionSink, GetLogLocationRequest
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import read_file
+from pants.util.dirutil import read_file, safe_mkdir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -76,56 +76,47 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
       self._assert_unhandled_exception_log_matches(pants_run.pid, read_file(pid_specific_log_file))
       self._assert_unhandled_exception_log_matches(pants_run.pid, read_file(shared_log_file))
 
+  def _assert_graceful_signal_log_matches(self, pid, signum, contents):
+    self.assertRegexpMatches(contents, """\
+timestamp: ([^\n]+)
+args: ([^\n]+)
+pid: {pid}
+Signal {signum} was raised\\. Exiting with failure\\.
+\\(backtrace omitted\\)
+""".format(pid=pid, signum=signum))
+
   def test_dumps_traceback_on_fatal_signal(self):
     with temporary_dir() as tmpdir:
+      # The path is required to end in '.pants.d'. This is validated in
+      # GoalRunner#is_valid_workdir().
+      workdir = os.path.join(tmpdir, '.pants.d')
+      safe_mkdir(workdir)
       file_to_make = os.path.join(tmpdir, 'some_file')
       waiter_handle = self.run_pants_with_workdir_without_waiting([
         '--no-enable-pantsd',
         'run', 'testprojects/src/python/coordinated_runs:waiter',
         '--', file_to_make,
-      ], tmpdir)
-      time.sleep(15)
+      ], workdir)
+      time.sleep(5)
       # TODO: need to test at least SIGABRT or one of the other signals faulthandler is covering as
       # well (which only have a backtrace)!
+      # Send a SIGTERM to the local pants process.
       waiter_handle.process.terminate()
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
 
-      pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, waiter_run)
-      self.assertRegexpMatches(waiter_run.stderr_data, """\
-Signal {signum} was raised\\. Exiting with failure\\.
-\\(backtrace omitted\\)
-""".format(pid=waiter_run.pid,
-           signum=signal.SIGTERM))
+      pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
+      self.assertRegexpMatches(waiter_run.stderr_data, re.escape("""\
+Signal {signum} was raised. Exiting with failure.
+(backtrace omitted)
+""".format(signum=signal.SIGTERM)))
       # TODO: the methods below are wrong for this signal error log (as opposed to an uncaught
       # exception), but also, the log file is empty for some reason. Solving this should solve the
       # xfailed test.
-      self.assertNotEqual('', read_file(shared_log_file))
-      self.assertNotEqual('', read_file(pid_specific_log_file))
-      self._assert_unhandled_exception_log_matches(waiter_run.pid, read_file(pid_specific_log_file))
-      self._assert_unhandled_exception_log_matches(waiter_run.pid, read_file(shared_log_file))
-
-  def test_idk(self):
-    workdir = os.path.join(os.getcwd(), '.pants.d')
-    file_to_make = os.path.join(os.getcwd(), 'some_file')
-    waiter_handle = self.run_pants_with_workdir_without_waiting(
-      ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
-      workdir)
-    time.sleep(15)
-    # TODO: need to test at least SIGABRT or one of the other signals faulthandler is covering as
-    # well (which only have a backtrace)!
-    waiter_handle.process.terminate()
-    waiter_run = waiter_handle.join()
-    self.assert_failure(waiter_run)
-
-    pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
-    # TODO: the methods below are wrong for this signal error log (as opposed to an uncaught
-    # exception), but also, the log file is empty for some reason. Solving this should solve the
-    # xfailed test.
-    self.assertNotEqual('', read_file(shared_log_file))
-    self.assertNotEqual('', read_file(pid_specific_log_file))
-    self._assert_unhandled_exception_log_matches(waiter_run.pid, read_file(pid_specific_log_file))
-    self._assert_unhandled_exception_log_matches(waiter_run.pid, read_file(shared_log_file))
+      self._assert_graceful_signal_log_matches(
+        waiter_run.pid, signal.SIGTERM, read_file(pid_specific_log_file))
+      self._assert_graceful_signal_log_matches(
+        waiter_run.pid, signal.SIGTERM, read_file(shared_log_file))
 
   def test_reset_exiter(self):
     """???"""

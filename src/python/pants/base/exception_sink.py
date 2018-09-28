@@ -106,7 +106,6 @@ class ExceptionSink(object):
     - May raise ExceptionSinkError if the directory is not writable.
     - Will register signal handlers for fatal handlers (clobbering old values).
     """
-
     # TODO: check for noop on both of the arguments!
     if new_log_location.log_dir is None:
       if new_log_location.pid is None:
@@ -184,20 +183,44 @@ class ExceptionSink(object):
       'exceptions{}.log'.format(intermediate_filename_component))
 
   @classmethod
+  def _try_write_with_flush(cls, fileobj, payload):
+    # The attribute 'closed' may not be on all file objects, see:
+    # https://docs.python.org/2.4/lib/bltin-file-objects.html
+    is_probably_writable = not getattr(fileobj, 'closed', False)
+    if not is_probably_writable:
+      raise cls.ExceptionSinkError(
+        "Attempted write to closed filebj {}:\n{}"
+        .format(fileobj, payload))
+    else:
+      fileobj.write(payload)
+      fileobj.flush()
+
+  @classmethod
   def log_exception(cls, msg):
+    """
+
+    NB: Doesn't raise.
+    """
+
+    fatal_error_log_entry = cls._format_exception_message(msg, cls._log_location.pid)
+
+    # We care more about this log than the shared log, so write to it first.
     try:
-      fatal_error_log_entry = cls._format_exception_message(msg, cls._log_location.pid)
-      # We care more about this log than the shared log, so write to it first.
-      cls._pid_specific_error_fileobj.write(fatal_error_log_entry)
-      cls._pid_specific_error_fileobj.flush()
-      # TODO: we should probably guard this against concurrent modification by other pants
-      # subprocesses somehow.
-      cls._shared_error_fileobj.write(fatal_error_log_entry)
-      cls._shared_error_fileobj.flush()
+      cls._try_write_with_flush(cls._pid_specific_error_fileobj, fatal_error_log_entry)
     except Exception as e:
       logger.error(
-        'Problem logging original exception: {}. The original error message was:\n{}'
-        .format(e, msg))
+        "Error logging the message '{}' to the pid-specific file handle for {}:\n{}"
+        .format(msg, cls._log_location, e))
+
+    # Write to the shared log.
+    try:
+      # TODO: we should probably guard this against concurrent modification by other pants
+      # subprocesses somehow.
+      cls._try_write_with_flush(cls._shared_error_fileobj, fatal_error_log_entry)
+    except Exception as e:
+      logger.error(
+        "Error logging the message '{}' to the shared file handle for {}:\n{}"
+        .format(msg, cls._log_location, e))
 
   @classmethod
   def _check_or_create_new_destination(cls, destination):
@@ -316,8 +339,8 @@ Signal {signum} was raised. Exiting with failure.
   def handle_signal_gracefully(cls, signum, frame):
     if signum in cls.KEYBOARD_INTERRUPT_SIGNALS:
       raise KeyboardInterrupt('User interrupted execution with control-c!')
-    # TODO: determine what the appropriate signal-safe behavior (to avoid writing to our file
-    # descriptors re-entrantly). This isn't correct.
+    # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
+    # descriptors re-entrantly, which raises an IOError). This is a best-effort solution.
     if cls._is_handling_signal:
       return
     cls._is_handling_signal = True
