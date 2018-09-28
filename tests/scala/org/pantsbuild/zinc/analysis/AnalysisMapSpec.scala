@@ -3,6 +3,8 @@
 
 package org.pantsbuild.zinc.analysis
 
+import java.io.File
+
 import sbt.io.IO
 
 import org.junit.runner.RunWith
@@ -22,5 +24,11 @@ class AnalysisMapSpec extends WordSpec with MustMatchers {
     }
     // TODO: needs more testing with spoofed analysis:
     //   see https://github.com/pantsbuild/pants/issues/4756
+  }
+
+  "AnalysisOptions" should {
+    "create a new set of options with a default rebaseMap" in {
+      AnalysisOptions().rebaseMap must be(Map(new File(System.getProperty("user.dir")) -> new File("/proc/self/cwd")))
+    }
   }
 }
