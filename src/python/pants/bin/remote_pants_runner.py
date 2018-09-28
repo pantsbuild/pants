@@ -171,6 +171,8 @@ class RemotePantsRunner(object):
     # TODO: if this control-c is done at the wrong time (before the pantsd-runner process begins and
     # sets the pid in the client), the pantsd-runner process will just send input to the terminal
     # without respecting control-c or anything else until it exits.
+    # TODO: this ^C fix should probably be done in the ExceptionSink, or at least the process-global
+    # signal handler registration should all be done in one place.
     def handle_control_c(signum, frame):
       err_msg = None
       try:
