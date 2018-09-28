@@ -183,9 +183,8 @@ class RemotePantsRunner(object):
         ExceptionSink.log_exception(err_msg)
         logger.error(err_msg)
 
-        # TODO: this should exit immediately here or wait on the remote process to die after sending
-        # the remote control-c to avoid command-line control-c misbehavior!
-        # TODO: don't do this yet!
+        # TODO: this could probably wait on the remote process to die (somehow) after sending the
+        # remote control-c, to avoid command-line control-c misbehavior!
         ExceptionSink.handle_signal_gracefully(signum, frame)
 
     existing_sigint_handler = signal.signal(signal.SIGINT, handle_control_c)
