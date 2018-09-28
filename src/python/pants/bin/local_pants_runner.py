@@ -11,6 +11,7 @@ from builtins import object
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, LogLocation
 from pants.base.exiter import Exiter
+from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
@@ -39,11 +40,23 @@ class RunTrackingExiter(Exiter):
     self._base_exiter = base_exiter
     self._run_tracker = run_tracker
 
-  def exit(self, *args, **kwargs):
-    # Drop the return code here, we are already being given a return code. end() is documented to
-    # be a no-op in further invocations.
-    self._run_tracker.end()
-    self._base_exiter.exit(*args, **kwargs)
+  def exit(self, result=0, msg=None, *args, **kwargs):
+    try:
+      if result == 0:
+        # RunTracker takes care of making sure we don't make a failure into a success, just the
+        # other way around.
+        self._run_tracker.set_root_outcome(WorkUnit.SUCCESS)
+      else:
+        self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
+      # Drop the return code here, we are already being given a return code. end() is documented to
+      # be a no-op in further invocations.
+      self._run_tracker.end()
+    except Exception as e:
+      msg = '{}\nError finalizing run tracker outcome: {}'.format((msg or ''), e)
+      ExceptionSink.log_exception(msg)
+      logger.error(msg)
+    finally:
+      self._base_exiter.exit(result=result, msg=msg, *args, **kwargs)
 
 
 class LocalPantsRunner(object):
@@ -145,8 +158,7 @@ class LocalPantsRunner(object):
       target_roots,
       graph_session,
       daemon_graph_session is not None,
-      profile_path,
-    )
+      profile_path)
 
   def __init__(self, build_root, exiter, options, build_config, target_roots, graph_session,
                is_daemon, profile_path):

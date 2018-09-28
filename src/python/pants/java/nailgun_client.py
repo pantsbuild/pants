@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import errno
 import logging
 import os
-import signal
 import socket
 import sys
 from builtins import object, str
@@ -198,31 +197,6 @@ class NailgunClient(object):
       )
     else:
       return sock
-
-  def send_control_c(self):
-    """Sends SIGINT to a nailgun server using pid information from the active session."""
-    self.kill(signal.SIGINT)
-
-  def kill(self, signal):
-    """
-    :raises: :class:`NailgunClient.NailgunInvalidStateError`
-    """
-    assert(isinstance(signal, int))
-    pid = self.pid
-    if pid is None:
-      raise self.NailgunInvalidStateError(
-        address=self._address_string,
-        pid=pid,
-        wrapped_exc=ValueError('the pid was not yet initialized'),
-        traceback=sys.exc_info()[2],
-      )
-    else:
-      try:
-        os.kill(pid, signal)
-      except (OSError, IOError) as e:
-        # Ignore "No such process" errors.
-        if e.errno != errno.ESRCH:
-          raise
 
   def execute(self, main_class, cwd=None, *args, **environment):
     """Executes the given main_class with any supplied args in the given environment.

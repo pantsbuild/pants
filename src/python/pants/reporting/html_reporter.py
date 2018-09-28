@@ -430,7 +430,13 @@ class HtmlReporter(Reporter):
 
   def _emit(self, s):
     """Append content to the main report file."""
-    if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+    report_file_probably_writable = (
+      # Make sure we're not immediately after a clean-all.
+      os.path.isfile(self.report_path()) and
+      # Make sure we're not closed already.
+      # TODO: determine whether we should throw if already closed (probably not?).
+      (not getattr(self._report_file, 'closed', True)))
+    if report_file_probably_writable:
       self._report_file.write(s)
       self._report_file.flush()  # We must flush in the same thread as the write.
 

@@ -413,6 +413,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(waiter_handle.join())
 
   def test_pantsd_killed_run(self):
+    self.maxDiff = None
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
       file_to_make = os.path.join(workdir, 'some_magic_file')
@@ -432,22 +433,20 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assertEquals(1, len(pantsd_runner_processes))
       parent_runner_process = pantsd_runner_processes[0]
       parent_runner_pid = parent_runner_process.pid
+      # Send SIGTERM
       parent_runner_process.terminate()
       waiter_run = waiter_handle.join()
 
       # Ensure that we saw the failure in the client's stdout, and that we got a remote exception.
       self.assert_failure(waiter_run)
-      self.assertIn("""\
-Signal 15 was raised. Exiting with failure.
-(backtrace omitted)
-""", waiter_run.stderr_data)
       self.assertRegexpMatches(waiter_run.stderr_data, """\
 Remote exception:
 timestamp: ([^\n]+)
 args: \\[([^\n]+)
 pid: {pid}
-Signal 15 was raised\\. Exiting with failure\\.
-""".format(pid=parent_runner_pid))
+Signal {signum} was raised\\. Exiting with failure\\.
+\\(backtrace omitted\\)
+""".format(pid=parent_runner_pid, signum=signal.SIGTERM))
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env

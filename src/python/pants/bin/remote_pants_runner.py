@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-import os
 import signal
 import sys
 import time
@@ -22,6 +21,7 @@ from pants.java.nailgun_protocol import NailgunProtocol
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.util.collections import combined_dict
 from pants.util.dirutil import maybe_read_file
+from pants.util.osutil import safe_kill
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,17 @@ class RemoteExiter(Exiter):
     self._pantsd_handle = None
     self._client_pid = None
     self._client_pgrp = None
+
+  _STR_FMT = """\
+RemoteExiter(base_exiter={base}, pantsd_handle={handle}, client_pid={pid}, client_pgrp={pgrp})"""
+
+  def __str__(self):
+    return self._STR_FMT.format(base=self._base_exiter,
+                                handle=self._pantsd_handle,
+                                pid=self._client_pid,
+                                pgrp=self._client_pgrp)
+
+  class RemotePantsRunnerExiterError(Exception): pass
 
   # TODO: figure out whether it's useful to log whether these mutators were or weren't called.
   def register_pantsd_handle(self, pantsd_handle):
@@ -53,7 +64,7 @@ class RemoteExiter(Exiter):
     assert(isinstance(client_pgrp, (int, long)) and client_pgrp < 0)
     self._client_pgrp = client_pgrp
 
-  def _extract_remote_exception(self):
+  def _extract_remote_fatal_errors(self):
     """Given a NailgunError, returns a Terminated exception with additional info (where possible).
 
     This method will include the entire exception log for either the `pid` in the NailgunError, or
@@ -68,40 +79,55 @@ class RemoteExiter(Exiter):
     if self._client_pid:
       source_pids.append(self._client_pid)
 
-    exception_text = None
     for pid in source_pids:
       log_path = ExceptionSink.exceptions_log_path(GetLogLocationRequest(pid=pid))
       exception_text = maybe_read_file(log_path, binary_mode=False)
       if exception_text:
-        break
+        yield exception_text
 
-    return exception_text
+  def broadcast_signal_to_client(self, signum):
+    try:
+      # First try killing the process group id from the PGRP chunk of the nailgun connection.
+      # TODO: is this the right signal to send?
+      if self._client_pgrp:
+        safe_kill(self._client_pgrp, signum)
+      # Now try killing the client pid, in case the pgrp alone didn't work.
+      # TODO: determine whether this is necessary if the pgrp kill was successful.
+      if self._client_pid:
+        safe_kill(self._client_pid, signum)
+    except Exception as e:
+      raise self.RemotePantsRunnerExiterError(
+        'Error broadcasting signal {signum} to remote client with exiter {exiter}: {err}'
+        .format(signum=signum,
+                exiter=str(self),
+                err=str(e)),
+        e)
 
   def exit(self, result=0, msg=None, *args, **kwargs):
-    # NB: We use (terminal_message or '') in this method instead of mutating `msg` in order to
-    # preserve an `msg=None` argument value.
-    terminal_message = msg
+    accumulated_extra_error_messages = []
 
     # Ensure any connected pantsd-runner processes die when the remote client does.
     try:
-      # TODO: is this the right signal to send?
-      # TODO: self._client_pgrp should have been filled by now!
-      if self._client_pgrp:
-        os.kill(self._client_pgrp, signal.SIGTERM)
+      self.broadcast_signal_to_client(signal.SIGTERM)
     except Exception as e:
-      terminal_message = ('{}\nAdditional error killing nailgun client upon exit: {}'
-                          .format((terminal_message or ''), e))
+      accumulated_extra_error_messages.append(str(e))
 
-    # Ensure the remote exception is at the bottom of the output.
     try:
-      remote_error_message = self._extract_remote_exception()
-      if remote_error_message:
-        ExceptionSink.log_exception(remote_error_message)
-        terminal_message = ('{}\nRemote exception:\n{}'
-                            .format((terminal_message or ''), remote_error_message))
+      # Try to gather any exception logs for remote processes attached to this run.
+      remote_fatal_errors = list(self._extract_remote_fatal_errors())
+      if remote_fatal_errors:
+        accumulated_extra_error_messages.append(
+          'Remote exception:\n{}'.format('\n'.join(remote_fatal_errors)))
     except Exception as e:
-      terminal_message = ('{}\nAdditional error finding remote client error logs: {}'
-                          .format((terminal_message or ''), e))
+      accumulated_extra_error_messages.append(
+        'Error while shutting down the remote client: {}'.format(e))
+
+    terminal_message = msg
+    if accumulated_extra_error_messages:
+      joined_error_messages = '\n\n'.join(accumulated_extra_error_messages)
+      ExceptionSink.log_exception(joined_error_messages)
+      logger.error(joined_error_messages)
+      terminal_message = '{}\n{}'.format(joined_error_messages, (terminal_message or ''))
 
     self._base_exiter.exit(result=result, msg=terminal_message, *args, **kwargs)
 
@@ -148,17 +174,19 @@ class RemotePantsRunner(object):
     # sets the pid in the client), the pantsd-runner process will just send input to the terminal
     # without respecting control-c or anything else until it exits.
     def handle_control_c(signum, frame):
+      err_msg = None
       try:
-        client.send_control_c()
+        self._exiter.broadcast_signal_to_client(signal.SIGINT)
       except Exception as e:
-        msg = 'Error sending control-c to remote client: {}'.format(e)
-        logger.error(msg)
-        ExceptionSink.log_exception(msg)
-      finally:
+        err_msg = ('Error sending control-c to remote client with exiter {}: {}'
+                   .format(self._exiter, e))
+        ExceptionSink.log_exception(err_msg)
+        logger.error(err_msg)
+
         # TODO: this should exit immediately here or wait on the remote process to die after sending
         # the remote control-c to avoid command-line control-c misbehavior!
         # TODO: don't do this yet!
-        ExceptionSink._handle_signal_gracefully(signum, frame)
+        ExceptionSink.handle_signal_gracefully(signum, frame)
 
     existing_sigint_handler = signal.signal(signal.SIGINT, handle_control_c)
     # N.B. SIGQUIT will abruptly kill the pantsd-runner, which will shut down the other end

@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import errno
 import logging
 import os
 from functools import reduce
@@ -50,6 +51,32 @@ def all_normalized_os_names():
 
 def known_os_names():
   return reduce(set.union, OS_ALIASES.values())
+
+
+# From kill(2) on OSX 10.13:
+#     [EINVAL]           Sig is not a valid, supported signal number.
+#
+#     [EPERM]            The sending process is not the super-user and its effective user id does not match the effective user-id of the receiving process.  When signaling a process group, this error is returned if
+#                        any members of the group could not be signaled.
+#
+#     [ESRCH]            No process or process group can be found corresponding to that specified by pid.
+#
+#     [ESRCH]            The process id was given as 0, but the sending process does not have a process group.
+def safe_kill(pid, signum):
+  """???"""
+  assert(isinstance(pid, int))
+  assert(isinstance(signum, int))
+  try:
+    os.kill(pid, signum)
+  except (IOError, OSError) as e:
+    if e.errno in [errno.ESRCH, errno.EPERM]:
+      pass
+    elif e.errno == errno.EINVAL:
+      raise ValueError("Invalid signal number {}: {}"
+                       .format(signum, e),
+                       e)
+    else:
+      raise
 
 
 # TODO: use this as the default value for the global --binaries-path-by-id option!

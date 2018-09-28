@@ -81,6 +81,10 @@ class ExceptionSink(object):
   # also want to dump a traceback when receiving these other usually-fatal signals.
   GRACEFULLY_HANDLED_SIGNALS = [
     signal.SIGTERM,
+  ]
+
+  # These signals are converted into a KeyboardInterrupt exception.
+  KEYBOARD_INTERRUPT_SIGNALS = [
     signal.SIGINT,
     signal.SIGQUIT,
   ]
@@ -126,8 +130,9 @@ class ExceptionSink(object):
     # Log a timestamped exception and exit gracefully on non-fatal signals.
     # TODO: ascertain whether the the signal handler method used here is signal-safe for our
     # purposes.
-    for signum in cls.GRACEFULLY_HANDLED_SIGNALS:
-      signal.signal(signum, cls._handle_signal_gracefully)
+    all_handled_signals = cls.GRACEFULLY_HANDLED_SIGNALS + cls.KEYBOARD_INTERRUPT_SIGNALS
+    for signum in all_handled_signals:
+      signal.signal(signum, cls.handle_signal_gracefully)
 
     # NB: mutate the class variables!
     cls._log_location = new_log_location
@@ -305,8 +310,17 @@ Signal {signum} was raised. Exiting with failure.
 {formatted_traceback}
 """
 
+  _is_handling_signal = False
+
   @classmethod
-  def _handle_signal_gracefully(cls, signum, frame):
+  def handle_signal_gracefully(cls, signum, frame):
+    if signum in cls.KEYBOARD_INTERRUPT_SIGNALS:
+      raise KeyboardInterrupt('User interrupted execution with control-c!')
+    # TODO: determine what the appropriate signal-safe behavior (to avoid writing to our file
+    # descriptors re-entrantly). This isn't correct.
+    if cls._is_handling_signal:
+      return
+    cls._is_handling_signal = True
     tb = frame.f_exc_traceback
     should_print_backtrace = tb is not None
     formatted_traceback = cls._format_traceback(tb, should_print_backtrace=should_print_backtrace)

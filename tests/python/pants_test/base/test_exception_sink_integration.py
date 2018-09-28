@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+import signal
 import time
 
 from pants.base.exception_sink import ExceptionSink, GetLogLocationRequest
@@ -15,6 +16,10 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
+
+  @classmethod
+  def hermetic(cls):
+    return True
 
   def _assert_unhandled_exception_log_matches(self, pid, file_contents):
     # TODO: ensure there's only one log entry in this file so we can avoid more complicated checks!
@@ -44,9 +49,11 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
   def _get_log_file_paths(self, workdir, pants_run):
     pid_specific_log_file = ExceptionSink.exceptions_log_path(
       GetLogLocationRequest(pid=pants_run.pid, log_dir=workdir))
+    self.assertTrue(os.path.isfile(pid_specific_log_file))
 
     shared_log_file = ExceptionSink.exceptions_log_path(
       GetLogLocationRequest(log_dir=workdir))
+    self.assertTrue(os.path.isfile(shared_log_file))
 
     self.assertNotEqual(pid_specific_log_file, shared_log_file)
 
@@ -72,9 +79,11 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
   def test_dumps_traceback_on_fatal_signal(self):
     with temporary_dir() as tmpdir:
       file_to_make = os.path.join(tmpdir, 'some_file')
-      waiter_handle = self.run_pants_with_workdir_without_waiting(
-        ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
-        tmpdir)
+      waiter_handle = self.run_pants_with_workdir_without_waiting([
+        '--no-enable-pantsd',
+        'run', 'testprojects/src/python/coordinated_runs:waiter',
+        '--', file_to_make,
+      ], tmpdir)
       time.sleep(15)
       # TODO: need to test at least SIGABRT or one of the other signals faulthandler is covering as
       # well (which only have a backtrace)!
@@ -83,6 +92,11 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
       self.assert_failure(waiter_run)
 
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, waiter_run)
+      self.assertRegexpMatches(waiter_run.stderr_data, """\
+Signal {signum} was raised\\. Exiting with failure\\.
+\\(backtrace omitted\\)
+""".format(pid=waiter_run.pid,
+           signum=signal.SIGTERM))
       # TODO: the methods below are wrong for this signal error log (as opposed to an uncaught
       # exception), but also, the log file is empty for some reason. Solving this should solve the
       # xfailed test.
