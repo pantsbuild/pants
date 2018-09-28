@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import sys
+from builtins import open
 
 from test_pants_plugin.subsystems.lifecycle_stubs import LifecycleStubs
 
@@ -42,4 +43,10 @@ class LifecycleStubTask(Task):
     if exit_msg:
       new_exiter = MessagingExiter(exit_msg)
       ExceptionSink.reset_exiter(new_exiter)
+
+    output_file = self._lifecycle_stubs.new_interactive_stream_output_file
+    if output_file:
+      file_stream = open(output_file, 'wb')
+      ExceptionSink.reset_interactive_output_stream(file_stream)
+
     raise Exception('erroneous!')

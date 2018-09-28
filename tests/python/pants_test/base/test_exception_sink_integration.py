@@ -12,7 +12,7 @@ import time
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, GetLogLocationRequest
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import read_file, safe_mkdir
+from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -119,18 +119,24 @@ Signal {signum} was raised. Exiting with failure.
       self._assert_graceful_signal_log_matches(
         waiter_run.pid, signal.SIGTERM, read_file(shared_log_file))
 
-  def test_reset_exiter(self):
-    """Test that when reset_exiter() is used that sys.excepthook uses the new Exiter."""
+  def _lifecycle_stub_cmdline(self):
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.
     testproject_backend_src_dir = os.path.join(
       get_buildroot(), 'testprojects/pants-plugins/src/python')
     testproject_backend_pkg_name = 'test_pants_plugin'
     lifecycle_stub_cmdline = [
+      '--no-enable-pantsd',
       "--pythonpath=+['{}']".format(testproject_backend_src_dir),
       "--backend-packages=+['{}']".format(testproject_backend_pkg_name),
       # This task will always raise an exception.
       'lifecycle-stub-goal',
     ]
+
+    return lifecycle_stub_cmdline
+
+  def test_reset_exiter(self):
+    """Test that when reset_exiter() is used that sys.excepthook uses the new Exiter."""
+    lifecycle_stub_cmdline = self._lifecycle_stub_cmdline()
 
     # The normal Exiter will print the exception message on an unhandled exception.
     normal_exiter_run = self.run_pants(lifecycle_stub_cmdline)
@@ -148,3 +154,18 @@ Signal {signum} was raised. Exiting with failure.
 
   def test_reset_interactive_output_stream(self):
     """???"""
+    lifecycle_stub_cmdline = self._lifecycle_stub_cmdline()
+
+    pants_run = self.run_pants(lifecycle_stub_cmdline)
+    self.assert_failure(pants_run)
+    self.assertIn('erroneous!', pants_run.stderr_data)
+
+    with temporary_dir() as tmpdir:
+      some_file = os.path.join(tmpdir, 'some_file')
+      safe_file_dump(some_file, b'', binary_mode=True)
+      pants_run = self.run_pants([
+        "--lifecycle-stubs-new-interactive-stream-output-file={}".format(some_file),
+      ] + lifecycle_stub_cmdline)
+      self.assert_failure(pants_run)
+      self.assertNotIn('erroneous!', pants_run.stderr_data)
+      self.assertIn('erroneous!', read_file(some_file))

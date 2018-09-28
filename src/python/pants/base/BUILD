@@ -237,5 +237,6 @@ python_library(
   sources=['exiter.py'],
   dependencies=[
     '3rdparty/python:future',
+    'src/python/pants/util:fileutil',
   ]
 )

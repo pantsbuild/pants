@@ -314,10 +314,15 @@ Exception message: {exception_message}{maybe_newline}
     exc = exc or sys.exc_info()[1]
     tb = tb or sys.exc_info()[2]
 
-    # Always output the unhandled exception details into a log file, including the traceback.
-    exception_log_entry = cls._format_unhandled_exception_log(exc, tb, add_newline,
+    extra_err_msg = None
+    try:
+      # Always output the unhandled exception details into a log file, including the traceback.
+      exception_log_entry = cls._format_unhandled_exception_log(exc, tb, add_newline,
                                                               should_print_backtrace=True)
-    cls.log_exception(exception_log_entry)
+      cls.log_exception(exception_log_entry)
+    except Exception as e:
+      extra_err_msg = 'Additional error logging unhandled exception {}: {}'.format(exc, e)
+      logger.error(extra_err_msg)
 
     # Generate an unhandled exception report fit to be printed to the terminal (respecting the
     # Exiter's _should_print_backtrace field).
@@ -325,7 +330,8 @@ Exception message: {exception_message}{maybe_newline}
     stderr_printed_error = cls._format_unhandled_exception_log(
       exc, tb, add_newline,
       should_print_backtrace=cls._exiter.should_print_backtrace)
-
+    if extra_err_msg:
+      stderr_printed_error = '{}\n{}'.format(stderr_printed_error, extra_err_msg)
     cls._exit_with_failure(stderr_printed_error)
 
   _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\

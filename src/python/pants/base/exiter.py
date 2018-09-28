@@ -10,6 +10,8 @@ from builtins import object
 
 from future.utils import PY2
 
+from pants.util.fileutil import is_fileobj_definitely_closed
+
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +55,16 @@ class Exiter(object):
                 (Optional)
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
+    # print('msg/base={}'.format(msg), file=sys.stderr)
     if msg:
       if PY2:
-        msg = msg.encode('utf-8')  # sys.stderr expects bytes in Py2, unicode in Py3
-      print(msg, file=out or sys.stderr)
+        # sys.stderr expects bytes in Py2, unicode in Py3
+        msg = msg.encode('utf-8')
+      out = out or sys.stderr
+      if not is_fileobj_definitely_closed(out):
+        print(msg, file=out)
+        # NB: Ensure we write everything out in case it's not an unbuffered stream like stderr.
+        out.flush()
     self._exit(result)
 
   def exit_and_fail(self, msg=None):

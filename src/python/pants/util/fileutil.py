@@ -60,3 +60,8 @@ def safe_hardlink_or_copy(source, dest, overwrite=False):
       do_copy()
     else:
       raise
+
+
+def is_fileobj_definitely_closed(fileobj):
+  """???"""
+  return getattr(fileobj, 'closed', False)
