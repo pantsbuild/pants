@@ -63,5 +63,9 @@ def safe_hardlink_or_copy(source, dest, overwrite=False):
 
 
 def is_fileobj_definitely_closed(fileobj):
-  """???"""
+  """Return whether fileobj points to a file object which is definitely closed.
+
+  Some file objects don't have a 'closed' attribute, so this method tries to just find file objects
+  which do declare that to attempt to avoid writing to closed file descriptors whenever possible.
+  """
   return getattr(fileobj, 'closed', False)

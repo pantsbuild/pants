@@ -24,6 +24,13 @@ class NailgunClientSession(NailgunProtocol):
 
   def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False,
                remote_pid_callback=None, remote_pgrp_callback=None):
+    """
+    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
+                encountered
+    :param remote_pid_callback: Callback to run when a pid chunk is received from a remote client.
+    :param remote_pgrp_callback: Callback to run when a pgrp (process group) chunk is received from
+                                 a remote client.
+    """
     self._sock = sock
     self._input_writer = None if not in_file else NailgunStreamWriter(
       (in_file.fileno(),),
@@ -136,7 +143,7 @@ class NailgunClient(object):
 
   def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
                workdir=None, exit_on_broken_pipe=False, expects_pid=False,
-               remote_pid_callback=None, remote_pgrp_callback=None):
+               **session_opts):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to '127.0.0.1')
@@ -147,8 +154,8 @@ class NailgunClient(object):
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
     :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
-    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are encountered
     :param bool expect_pid: Whether or not to expect a PID from the server (only true for pantsd)
+    :param dict **session_opts: Keyword arguments to forward to :class:`NailgunClientSession`.
     """
     self._host = host
     self._port = port
@@ -158,11 +165,9 @@ class NailgunClient(object):
     self._stdout = out or sys.stdout
     self._stderr = err or sys.stderr
     self._workdir = workdir or os.path.abspath(os.path.curdir)
-    self._exit_on_broken_pipe = exit_on_broken_pipe
     self._expects_pid = expects_pid
+    self._session_opts = session_opts
     self._session = None
-    self._remote_pid_callback = remote_pid_callback
-    self._remote_pgrp_callback = remote_pgrp_callback
 
   @property
   def pid(self):
@@ -214,9 +219,7 @@ class NailgunClient(object):
                                          self._stdin,
                                          self._stdout,
                                          self._stderr,
-                                         self._exit_on_broken_pipe,
-                                         remote_pid_callback=self._remote_pid_callback,
-                                         remote_pgrp_callback=self._remote_pgrp_callback)
+                                         **self._session_opts)
     try:
       return self._session.execute(cwd, main_class, *args, **environment)
     except socket.error as e:

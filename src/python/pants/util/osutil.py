@@ -63,8 +63,8 @@ def known_os_names():
 #
 #     [ESRCH]            The process id was given as 0, but the sending process does not have a process group.
 def safe_kill(pid, signum):
-  """???"""
-  assert(isinstance(pid, int))
+  """Kill a process with the specified signal, catching nonfatal errors."""
+  assert(isinstance(pid, (int, long)))
   assert(isinstance(signum, int))
   try:
     os.kill(pid, signum)

@@ -412,7 +412,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
-  def test_pantsd_killed_run(self):
+  def test_pantsd_parent_runner_killed(self):
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
       file_to_make = os.path.join(workdir, 'some_magic_file')
@@ -423,7 +423,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       )
 
       # Wait for the python run to be running.
-      time.sleep(15)
+      time.sleep(5)
       checker.assert_started()
 
       # Locate the single "parent" pantsd-runner process, and kill it.
@@ -446,6 +446,34 @@ pid: {pid}
 Signal {signum} was raised\\. Exiting with failure\\.
 \\(backtrace omitted\\)
 """.format(pid=parent_runner_pid, signum=signal.SIGTERM))
+
+  def test_pantsd_control_c(self):
+    with self.pantsd_test_context() as (workdir, config, checker):
+      # Launch a run that will wait for a file to be created (but do not create that file).
+      file_to_make = os.path.join(workdir, 'some_magic_file')
+      waiter_handle = self.run_pants_with_workdir_without_waiting(
+        ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
+        workdir,
+        config,
+      )
+
+      time.sleep(5)
+      checker.assert_started()
+
+      # Get all the pantsd-runner processes while they're still around.
+      pantsd_runner_processes = checker.runner_process_context.current_processes()
+      # This should kill the pantsd-runner processes through the RemotePantsRunner SIGINT handler.
+      os.kill(waiter_handle.process.pid, signal.SIGINT)
+      waiter_run = waiter_handle.join()
+      self.assert_failure(waiter_run)
+      self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
+
+      time.sleep(1)
+      for proc in pantsd_runner_processes:
+        # TODO: we could be checking the return codes of the subprocesses, but psutil is currently
+        # limited on non-Windows hosts -- see https://psutil.readthedocs.io/en/latest/#processes.
+        # The pantsd-runner processes should be dead, and they should have exited with 1.
+        self.assertFalse(proc.is_running())
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env

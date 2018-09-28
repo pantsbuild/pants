@@ -8,6 +8,7 @@ import os
 import re
 import signal
 import time
+from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, GetLogLocationRequest
@@ -86,7 +87,8 @@ Signal {signum} was raised\\. Exiting with failure\\.
 \\(backtrace omitted\\)
 """.format(pid=pid, signum=signum))
 
-  def test_dumps_traceback_on_fatal_signal(self):
+  @contextmanager
+  def _make_waiter_handle(self):
     with temporary_dir() as tmpdir:
       # The path is required to end in '.pants.d'. This is validated in
       # GoalRunner#is_valid_workdir().
@@ -98,26 +100,62 @@ Signal {signum} was raised\\. Exiting with failure\\.
         'run', 'testprojects/src/python/coordinated_runs:waiter',
         '--', file_to_make,
       ], workdir)
+      yield (workdir, waiter_handle)
+
+  @contextmanager
+  def _send_signal_to_waiter_handle(self, signum):
+    # This needs to be a contextmanager as well, because workdir may be temporary.
+    with self._make_waiter_handle() as (workdir, waiter_handle):
+      # Wait for the python run to be running.
       time.sleep(5)
-      # TODO: need to test at least SIGABRT or one of the other signals faulthandler is covering as
-      # well (which only have a backtrace)!
-      # Send a SIGTERM to the local pants process.
-      waiter_handle.process.terminate()
+      os.kill(waiter_handle.process.pid, signum)
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
+      # Return the (failed) pants execution result.
+      yield (workdir, waiter_run)
 
+  def test_dumps_logs_on_terminate(self):
+    # Send a SIGTERM to the local pants process.
+    with self._send_signal_to_waiter_handle(signal.SIGTERM) as (workdir, waiter_run):
+      signal_err_rx = re.escape(
+        "Signal {signum} was raised. Exiting with failure.\n(backtrace omitted)\n"
+        .format(signum=signal.SIGTERM))
+      self.assertRegexpMatches(waiter_run.stderr_data, signal_err_rx)
+      # Check that the logs show a graceful exit by SIGTERM.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
-      self.assertRegexpMatches(waiter_run.stderr_data, re.escape("""\
-Signal {signum} was raised. Exiting with failure.
-(backtrace omitted)
-""".format(signum=signal.SIGTERM)))
-      # TODO: the methods below are wrong for this signal error log (as opposed to an uncaught
-      # exception), but also, the log file is empty for some reason. Solving this should solve the
-      # xfailed test.
       self._assert_graceful_signal_log_matches(
         waiter_run.pid, signal.SIGTERM, read_file(pid_specific_log_file))
       self._assert_graceful_signal_log_matches(
-        waiter_run.pid, signal.SIGTERM, read_file(shared_log_file))
+          waiter_run.pid, signal.SIGTERM, read_file(shared_log_file))
+
+  def test_dumps_traceback_on_sigabrt(self):
+    # SIGABRT sends a traceback to the log file for the current process thanks to
+    # faulthandler.enable().
+    with self._send_signal_to_waiter_handle(signal.SIGABRT) as (workdir, waiter_run):
+      # Nothing was sent to stderr, because this is a fatal signal and we exited immediately.
+      self.assertEqual('', waiter_run.stderr_data)
+      # Check that the logs show an abort signal and the beginning of a traceback.
+      pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
+      aborted_tb_rx = r"Fatal Python error: Aborted\n\nThread [^\n]+ \(most recent call first\):"
+      self.assertRegexpMatches(read_file(pid_specific_log_file), aborted_tb_rx)
+      # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
+      self.assertEqual('', read_file(shared_log_file))
+
+  def test_prints_traceback_on_sigusr2(self):
+    with self._make_waiter_handle() as (workdir, waiter_handle):
+      time.sleep(5)
+      # Send SIGUSR2, then sleep so the signal handler from faulthandler.register() can run.
+      os.kill(waiter_handle.process.pid, signal.SIGUSR2)
+      time.sleep(1)
+      # This target will wait forever, so kill the process and ensure its output is correct.
+      os.kill(waiter_handle.process.pid, signal.SIGKILL)
+      waiter_run = waiter_handle.join()
+      self.assert_failure(waiter_run)
+      self.assertRegexpMatches(waiter_run.stderr_data, r"Thread [^\n]+ \(most recent call first\):")
+
+  def test_sigint_keyboardinterrupt(self):
+    with self._send_signal_to_waiter_handle(signal.SIGINT) as (workdir, waiter_run):
+      self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
 
   def _lifecycle_stub_cmdline(self):
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.

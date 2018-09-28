@@ -28,6 +28,9 @@ class ChunkType(object):
   WORKING_DIR = b'D'
   COMMAND = b'C'
   # PGRP and PID are custom extensions to the Nailgun protocol spec for transmitting pid info.
+  # PGRP is used to allow the client process to try killing the nailgun server and everything in its
+  # process group when the thin client receives a signal. PID is used to retrieve logs for fatal
+  # errors from the remote process at that PID.
   PGRP = b'G'
   PID = b'P'
   STDIN = b'0'
@@ -246,7 +249,7 @@ class NailgunProtocol(object):
 
   @classmethod
   def send_pgrp(cls, sock, pgrp):
-    """???"""
+    """Send the PGRP chunk over the specified socket."""
     assert(isinstance(pgrp, int) and pgrp < 0)
     encoded_int = cls.encode_int(pgrp)
     cls.write_chunk(sock, ChunkType.PGRP, encoded_int)

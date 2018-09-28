@@ -122,8 +122,6 @@ class ExceptionSink(object):
       new_log_location)
 
     # NB: mutate process-global state!
-    if faulthandler.is_enabled():
-      faulthandler.disable()
     # Send a stacktrace to this file if interrupted by a fatal error.
     faulthandler.enable(file=pid_specific_error_stream, all_threads=True)
     # Log a timestamped exception and exit gracefully on non-fatal signals.

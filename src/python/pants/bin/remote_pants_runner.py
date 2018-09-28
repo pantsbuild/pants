@@ -11,8 +11,6 @@ import time
 from builtins import object, str
 from contextlib import contextmanager
 
-from future.utils import raise_with_traceback
-
 from pants.base.exception_sink import ExceptionSink, GetLogLocationRequest, LogLocation
 from pants.base.exiter import Exiter
 from pants.console.stty_utils import STTYSettings
@@ -258,11 +256,8 @@ class RemotePantsRunner(object):
         ExceptionSink.log_exception(error_log_msg)
         logger.fatal(error_log_msg)
 
-        wrapped_exc = self.Terminated('abruptly lost active connection to pantsd runner: {!r}'
-                                      .format(e),
-                                      e)
-        # TODO: figure out if we can remove raise_with_traceback() here.
-        raise_with_traceback(wrapped_exc)
+        raise self.Terminated('abruptly lost active connection to pantsd runner: {!r}'.format(e),
+                              e)
 
   def _connect_and_execute(self, port):
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
@@ -280,7 +275,10 @@ class RemotePantsRunner(object):
       err=self._stderr,
       exit_on_broken_pipe=True,
       expects_pid=True,
-      # TODO: ???
+      # The pid and pgrp fields are populated when the nailgun connection receives PID and PGRP
+      # chunks. This can occur at any time, or not at all, and we drop these values when the session
+      # completes, so we use callbacks to avoid having to check for None or keep them around longer
+      # than we need to.
       remote_pid_callback=(lambda pid: self._exiter.register_client_pid(pid)),
       remote_pgrp_callback=(lambda pgrp: self._exiter.register_client_pgrp(pgrp)))
 
