@@ -55,7 +55,6 @@ class Exiter(object):
                 (Optional)
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
-    # print('msg/base={}'.format(msg), file=sys.stderr)
     if msg:
       if PY2:
         # sys.stderr expects bytes in Py2, unicode in Py3
