@@ -10,7 +10,7 @@ import signal
 import sys
 import termios
 import time
-from builtins import open, str, zip
+from builtins import open, zip
 from contextlib import contextmanager
 
 from future.utils import raise_with_traceback
@@ -59,7 +59,7 @@ class DaemonExiter(Exiter):
         NailgunProtocol.send_stderr(self._socket, msg)
 
       # Send an Exit chunk with the result.
-      NailgunProtocol.send_exit(self._socket, str(result).encode('ascii'))
+      NailgunProtocol.send_exit_with_code(self._socket, result)
 
       # Shutdown the connected socket.
       teardown_socket(self._socket)
@@ -279,8 +279,7 @@ class DaemonPantsRunner(ProcessManager):
 
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
-    pid = str(os.getpgrp() * -1).encode('ascii')
-    NailgunProtocol.send_pid(self._socket, pid)
+    NailgunProtocol.send_pid(self._socket, os.getpgrp() * -1)
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
     with self.nailgunned_stdio(self._socket, self._env) as finalizer,\

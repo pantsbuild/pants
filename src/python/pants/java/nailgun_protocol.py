@@ -232,7 +232,37 @@ class NailgunProtocol(object):
   @classmethod
   def send_pid(cls, sock, pid):
     """Send the PID chunk over the specified socket."""
-    cls.write_chunk(sock, ChunkType.PID, pid)
+    encoded_pid = cls.encode_int(pid)
+    cls.write_chunk(sock, ChunkType.PID, encoded_pid)
+
+  @classmethod
+  def encode_int(cls, obj):
+    """Verify the object is an int, and ASCII-encode it.
+
+    :param int obj: An integer to be encoded.
+    :raises: :class:`TypeError` if `obj` is not an integer.
+    :return: A binary representation of the int `obj` suitable to pass as the `payload` to
+             send_exit().
+    """
+    if not isinstance(obj, int):
+      raise TypeError("cannot encode non-integer object in encode_int(): object was {} (type '{}')."
+                      .format(obj, type(obj)))
+    return str(obj).encode('ascii')
+
+  @classmethod
+  def send_exit_with_code(cls, sock, code):
+    """Send the Exit chunk over the specified socket, containing an integer return code."""
+    encoded_exit_status = cls.encode_int(code)
+    cls.send_exit(sock, payload=encoded_exit_status)
+
+  @classmethod
+  def encode_env_var_value(cls, obj):
+    """Convert `obj` into a UTF-8 encoded binary string.
+
+    The result of this method be used as the value of an environment variable in a subsequent
+    NailgunClient execution.
+    """
+    return str(obj).encode('utf-8')
 
   @classmethod
   def isatty_to_env(cls, stdin, stdout, stderr):
@@ -246,7 +276,7 @@ class NailgunProtocol(object):
     def gen_env_vars():
       for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
         is_atty = fd.isatty()
-        yield (cls.TTY_ENV_TMPL.format(fd_id), str(int(is_atty)).encode('utf-8'))
+        yield (cls.TTY_ENV_TMPL.format(fd_id), cls.encode_env_var_value(int(is_atty)))
         if is_atty:
           yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or b'')
     return dict(gen_env_vars())
