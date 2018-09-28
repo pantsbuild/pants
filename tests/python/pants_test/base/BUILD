@@ -230,6 +230,8 @@ python_tests(
     'src/python/pants/util:osutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
+  timeout = 360,
 )
 
 python_tests(
