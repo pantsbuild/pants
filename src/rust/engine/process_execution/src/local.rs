@@ -279,6 +279,7 @@ impl super::CommandRunner for CommandRunner {
             stderr: child_results.stderr,
             exit_code: child_results.exit_code,
             output_directory: snapshot.digest,
+            execution_attempts: vec![],
           }).to_boxed()
       }).then(move |result| {
         // Force workdir not to get dropped until after we've ingested the outputs

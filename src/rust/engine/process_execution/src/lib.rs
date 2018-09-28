@@ -46,14 +46,17 @@ extern crate sha2;
 extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;
+extern crate time;
 extern crate tokio_codec;
 extern crate tokio_process;
 
 use boxfuture::BoxFuture;
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::AddAssign;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_semaphore::AsyncSemaphore;
 
@@ -115,6 +118,28 @@ pub struct FallibleExecuteProcessResult {
   // It's unclear whether this should be a Snapshot or a digest of a Directory. A Directory digest
   // is handy, so let's try that out for now.
   pub output_directory: hashing::Digest,
+
+  pub execution_attempts: Vec<ExecutionStats>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ExecutionStats {
+  uploaded_bytes: usize,
+  uploaded_file_count: usize,
+  upload: Duration,
+  remote_queue: Option<Duration>,
+  remote_input_fetch: Option<Duration>,
+  remote_execution: Option<Duration>,
+  remote_output_store: Option<Duration>,
+  was_cache_hit: bool,
+}
+
+impl AddAssign<fs::UploadSummary> for ExecutionStats {
+  fn add_assign(&mut self, summary: fs::UploadSummary) {
+    self.uploaded_file_count += summary.uploaded_file_count;
+    self.uploaded_bytes += summary.uploaded_file_bytes;
+    self.upload += summary.upload_wall_time;
+  }
 }
 
 pub trait CommandRunner: Send + Sync {
