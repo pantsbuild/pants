@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import datetime
 import os
-import signal
 import sys
 import termios
 import time
@@ -228,12 +227,6 @@ class DaemonPantsRunner(ProcessManager):
       ) as finalizer:
         yield finalizer
 
-  def _setup_sigint_handler(self):
-    """Sets up a control-c signal handler for the daemon runner context."""
-    def handle_control_c(signum, frame):
-      raise KeyboardInterrupt('remote client sent control-c!')
-    signal.signal(signal.SIGINT, handle_control_c)
-
   def _raise_deferred_exc(self):
     """Raises deferred exceptions from the daemon's synchronous path in the post-fork client."""
     if self._deferred_exception:
@@ -278,12 +271,10 @@ class DaemonPantsRunner(ProcessManager):
     # Set context in the process title.
     set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
 
-    # Setup a SIGINT signal handler.
-    self._setup_sigint_handler()
-
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
-    NailgunProtocol.send_pid(self._socket, os.getpgrp() * -1)
+    NailgunProtocol.send_pid(self._socket, os.getpid())
+    NailgunProtocol.send_pgrp(self._socket, os.getpgrp() * -1)
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
     with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
@@ -305,7 +296,7 @@ class DaemonPantsRunner(ProcessManager):
           self._env,
           self._target_roots,
           self._graph_helper,
-          self._options_bootstrapper
+          self._options_bootstrapper,
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
         runner.run()

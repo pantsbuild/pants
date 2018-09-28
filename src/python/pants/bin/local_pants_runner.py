@@ -145,7 +145,7 @@ class LocalPantsRunner(object):
       target_roots,
       graph_session,
       daemon_graph_session is not None,
-      profile_path
+      profile_path,
     )
 
   def __init__(self, build_root, exiter, options, build_config, target_roots, graph_session,

@@ -35,6 +35,7 @@ class RemoteExiter(Exiter):
     self._base_exiter = base_exiter
     self._pantsd_handle = None
     self._client_pid = None
+    self._client_pgrp = None
 
   # TODO: figure out whether it's useful to log whether these mutators were or weren't called.
   def register_pantsd_handle(self, pantsd_handle):
@@ -44,8 +45,13 @@ class RemoteExiter(Exiter):
 
   def register_client_pid(self, client_pid):
     assert(self._client_pid is None)
-    assert(isinstance(client_pid, (int, long)))
+    assert(isinstance(client_pid, (int, long)) and client_pid > 0)
     self._client_pid = client_pid
+
+  def register_client_pgrp(self, client_pgrp):
+    assert(self._client_pgrp is None)
+    assert(isinstance(client_pgrp, (int, long)) and client_pgrp < 0)
+    self._client_pgrp = client_pgrp
 
   def _extract_remote_exception(self):
     """Given a NailgunError, returns a Terminated exception with additional info (where possible).
@@ -72,24 +78,30 @@ class RemoteExiter(Exiter):
     return exception_text
 
   def exit(self, result=0, msg=None, *args, **kwargs):
+    # NB: We use (terminal_message or '') in this method instead of mutating `msg` in order to
+    # preserve an `msg=None` argument value.
     terminal_message = msg
+
+    # Ensure any connected pantsd-runner processes die when the remote client does.
     try:
-      # Ensure any connected pantsd-runner processes die when the remote client does.
-      # TODO: this works to kill all connected processes because the process pid is negated -- we
-      # need to extend ChunkType to cover a real pid as well!
       # TODO: is this the right signal to send?
-      # TODO: self._client_pid should have been filled by now!
-      os.kill(self._client_pid, signal.SIGTERM)
+      # TODO: self._client_pgrp should have been filled by now!
+      if self._client_pgrp:
+        os.kill(self._client_pgrp, signal.SIGTERM)
     except Exception as e:
       terminal_message = ('{}\nAdditional error killing nailgun client upon exit: {}'
                           .format((terminal_message or ''), e))
 
     # Ensure the remote exception is at the bottom of the output.
-    remote_error_message = self._extract_remote_exception()
-    if remote_error_message:
-      ExceptionSink.log_exception(remote_error_message)
-      terminal_message = ('{}\nRemote exception:\n{}'
-                          .format((terminal_message or ''), remote_error_message))
+    try:
+      remote_error_message = self._extract_remote_exception()
+      if remote_error_message:
+        ExceptionSink.log_exception(remote_error_message)
+        terminal_message = ('{}\nRemote exception:\n{}'
+                            .format((terminal_message or ''), remote_error_message))
+    except Exception as e:
+      terminal_message = ('{}\nAdditional error finding remote client error logs: {}'
+                          .format((terminal_message or ''), e))
 
     self._base_exiter.exit(result=result, msg=terminal_message, *args, **kwargs)
 
@@ -136,14 +148,17 @@ class RemotePantsRunner(object):
     # sets the pid in the client), the pantsd-runner process will just send input to the terminal
     # without respecting control-c or anything else until it exits.
     def handle_control_c(signum, frame):
-      # TODO: this should exit immediately here or wait on the remote process to die after sending
-      # the remote control-c to avoid command-line control-c misbehavior!
       try:
         client.send_control_c()
       except Exception as e:
         msg = 'Error sending control-c to remote client: {}'.format(e)
         logger.error(msg)
         ExceptionSink.log_exception(msg)
+      finally:
+        # TODO: this should exit immediately here or wait on the remote process to die after sending
+        # the remote control-c to avoid command-line control-c misbehavior!
+        # TODO: don't do this yet!
+        ExceptionSink._handle_signal_gracefully(signum, frame)
 
     existing_sigint_handler = signal.signal(signal.SIGINT, handle_control_c)
     # N.B. SIGQUIT will abruptly kill the pantsd-runner, which will shut down the other end
@@ -231,14 +246,16 @@ class RemotePantsRunner(object):
     assert isinstance(port, int), 'port {} is not an integer!'.format(port)
 
     # Instantiate a NailgunClient.
-    client = NailgunClient(port=port,
-                           ins=self._stdin,
-                           out=self._stdout,
-                           err=self._stderr,
-                           exit_on_broken_pipe=True,
-                           expects_pid=True,
-                           # TODO: ???
-                           remote_pid_callback=(lambda pid: self._exiter.register_client_pid(pid)))
+    client = NailgunClient(
+      port=port,
+      ins=self._stdin,
+      out=self._stdout,
+      err=self._stderr,
+      exit_on_broken_pipe=True,
+      expects_pid=True,
+      # TODO: ???
+      remote_pid_callback=(lambda pid: self._exiter.register_client_pid(pid)),
+      remote_pgrp_callback=(lambda pgrp: self._exiter.register_client_pgrp(pgrp)))
 
     with self._trapped_signals(client), STTYSettings.preserved():
       # Execute the command on the pailgun.

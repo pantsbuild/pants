@@ -24,7 +24,7 @@ class NailgunClientSession(NailgunProtocol):
   """Handles a single nailgun client session."""
 
   def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False,
-               remote_pid_callback=None):
+               remote_pid_callback=None, remote_pgrp_callback=None):
     self._sock = sock
     self._input_writer = None if not in_file else NailgunStreamWriter(
       (in_file.fileno(),),
@@ -36,7 +36,9 @@ class NailgunClientSession(NailgunProtocol):
     self._stderr = err_file
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self.remote_pid = None
+    self.remote_pgrp = None
     self._remote_pid_callback = remote_pid_callback
+    self._remote_pgrp_callback = remote_pgrp_callback
 
   def _maybe_start_input_writer(self):
     if self._input_writer and not self._input_writer.is_alive():
@@ -76,6 +78,10 @@ class NailgunClientSession(NailgunProtocol):
           self.remote_pid = int(payload)
           if self._remote_pid_callback:
             self._remote_pid_callback(self.remote_pid)
+        elif chunk_type == ChunkType.PGRP:
+          self.remote_pgrp = int(payload)
+          if self._remote_pgrp_callback:
+            self._remote_pgrp_callback(self.remote_pgrp)
         elif chunk_type == ChunkType.START_READING_INPUT:
           self._maybe_start_input_writer()
         else:
@@ -135,7 +141,7 @@ class NailgunClient(object):
 
   def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
                workdir=None, exit_on_broken_pipe=False, expects_pid=False,
-               remote_pid_callback=None):
+               remote_pid_callback=None, remote_pgrp_callback=None):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to '127.0.0.1')
@@ -161,6 +167,7 @@ class NailgunClient(object):
     self._expects_pid = expects_pid
     self._session = None
     self._remote_pid_callback = remote_pid_callback
+    self._remote_pgrp_callback = remote_pgrp_callback
 
   @property
   def pid(self):
@@ -238,7 +245,8 @@ class NailgunClient(object):
                                          self._stdout,
                                          self._stderr,
                                          self._exit_on_broken_pipe,
-                                         remote_pid_callback=self._remote_pid_callback)
+                                         remote_pid_callback=self._remote_pid_callback,
+                                         remote_pgrp_callback=self._remote_pgrp_callback)
     try:
       return self._session.execute(cwd, main_class, *args, **environment)
     except socket.error as e:
