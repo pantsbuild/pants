@@ -184,16 +184,9 @@ class ExceptionSink(object):
 
   @classmethod
   def _try_write_with_flush(cls, fileobj, payload):
-    # The attribute 'closed' may not be on all file objects, see:
-    # https://docs.python.org/2.4/lib/bltin-file-objects.html
-    is_probably_writable = not getattr(fileobj, 'closed', False)
-    if not is_probably_writable:
-      raise cls.ExceptionSinkError(
-        "Attempted write to closed filebj {}:\n{}"
-        .format(fileobj, payload))
-    else:
-      fileobj.write(payload)
-      fileobj.flush()
+    """This method is here so that it can be patched to simulate write errors."""
+    fileobj.write(payload)
+    fileobj.flush()
 
   @classmethod
   def log_exception(cls, msg):
