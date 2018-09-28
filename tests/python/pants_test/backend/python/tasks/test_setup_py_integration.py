@@ -157,4 +157,6 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
         'test_pants_plugin/subsystems/',
         'test_pants_plugin/subsystems/__init__.py',
         'test_pants_plugin/subsystems/pants_test_infra.py',
+        'test_pants_plugin/subsystems/lifecycle_stubs.py',
+        'test_pants_plugin/tasks/lifecycle_stub_task.py',
       ])

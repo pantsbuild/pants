@@ -9,6 +9,7 @@ import re
 import signal
 import time
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, GetLogLocationRequest
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir
@@ -119,7 +120,31 @@ Signal {signum} was raised. Exiting with failure.
         waiter_run.pid, signal.SIGTERM, read_file(shared_log_file))
 
   def test_reset_exiter(self):
-    """???"""
+    """Test that when reset_exiter() is used that sys.excepthook uses the new Exiter."""
+    # Load the testprojects pants-plugins to get some testing tasks and subsystems.
+    testproject_backend_src_dir = os.path.join(
+      get_buildroot(), 'testprojects/pants-plugins/src/python')
+    testproject_backend_pkg_name = 'test_pants_plugin'
+    lifecycle_stub_cmdline = [
+      "--pythonpath=+['{}']".format(testproject_backend_src_dir),
+      "--backend-packages=+['{}']".format(testproject_backend_pkg_name),
+      # This task will always raise an exception.
+      'lifecycle-stub-goal',
+    ]
+
+    # The normal Exiter will print the exception message on an unhandled exception.
+    normal_exiter_run = self.run_pants(lifecycle_stub_cmdline)
+    self.assert_failure(normal_exiter_run)
+    self.assertIn('erroneous!', normal_exiter_run.stderr_data)
+    self.assertNotIn('NEW MESSAGE', normal_exiter_run.stderr_data)
+
+    # The exiter that gets added when this option is changed prints that option to stderr.
+    changed_exiter_run = self.run_pants([
+      "--lifecycle-stubs-add-exiter-message='{}'".format('NEW MESSAGE'),
+    ] + lifecycle_stub_cmdline)
+    self.assert_failure(changed_exiter_run)
+    self.assertIn('erroneous!', changed_exiter_run.stderr_data)
+    self.assertIn('NEW MESSAGE', changed_exiter_run.stderr_data)
 
   def test_reset_interactive_output_stream(self):
     """???"""
