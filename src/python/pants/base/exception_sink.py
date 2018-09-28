@@ -102,11 +102,13 @@ class ExceptionSink(object):
   def reset_log_location(cls, new_log_location):
     """
     Class state:
-    - Will leak the old file handles without closing them.
+    - Overwrites `cls._log_location`, `cls._pid_specific_error_fileobj`, and
+      `cls._shared_error_fileobj`.
     OS state:
     - May create a new directory.
-    - May raise ExceptionSinkError if the directory is not writable.
-    - Will register signal handlers for fatal handlers (clobbering old values).
+    - Overwrites signal handlers for many fatal and non-fatal signals.
+
+    :raises: :class:`ExceptionSink.ExceptionSinkError` if the directory is not writable.
     """
     # We could no-op here if the log locations are the same, but there's no reason not to have the
     # additional safety of re-acquiring file descriptors each time.
@@ -138,9 +140,9 @@ class ExceptionSink(object):
   def reset_exiter(cls, exiter):
     """
     Class state:
-    - Will leak the old Exiter instance.
+    - Overwrites `cls._exiter`.
     Python state:
-    - Will register sys.excepthook, clobbering any previous value.
+    - Overwrites sys.excepthook.
     """
     assert(isinstance(exiter, Exiter))
     # NB: mutate the class variables! This is done before mutating the exception hook, because the
@@ -153,9 +155,9 @@ class ExceptionSink(object):
   def reset_interactive_output_stream(cls, interactive_output_stream):
     """
     Class state:
-    - Will leak the old output stream.
+    - Overwrites `cls._interactive_output_stream`.
     OS state:
-    - Will register a handler for SIGUSR2, clobbering any previous value.
+    - Overwrites the SIGUSR2 handler.
     """
     # TODO: chain=True will log tracebacks to previous values of the trace stream as well -- what
     # happens if those file objects are eventually closed? Does faulthandler just ignore them?
@@ -168,6 +170,7 @@ class ExceptionSink(object):
 
   @classmethod
   def exceptions_log_path(cls, get_log_location_request):
+    """Get the path to the log specified by `get_log_location_request`."""
     if get_log_location_request.pid is None:
       intermediate_filename_component = ''
     else:
@@ -179,16 +182,10 @@ class ExceptionSink(object):
       'exceptions{}.log'.format(intermediate_filename_component))
 
   @classmethod
-  def _try_write_with_flush(cls, fileobj, payload):
-    """This method is here so that it can be patched to simulate write errors."""
-    fileobj.write(payload)
-    fileobj.flush()
-
-  @classmethod
   def log_exception(cls, msg):
-    """
+    """Try to log an error message to this process's error log and the shared error log.
 
-    NB: Doesn't raise.
+    NB: Doesn't raise (logs an error instead).
     """
 
     fatal_error_log_entry = cls._format_exception_message(msg, cls._log_location.pid)
@@ -212,6 +209,15 @@ class ExceptionSink(object):
         .format(msg, cls._log_location, e))
 
   @classmethod
+  def _try_write_with_flush(cls, fileobj, payload):
+    """This method is here so that it can be patched to simulate write errors.
+
+    This is because mock can't patch primitive objects like file objects.
+    """
+    fileobj.write(payload)
+    fileobj.flush()
+
+  @classmethod
   def _check_or_create_new_destination(cls, destination):
     try:
       safe_mkdir(destination)
@@ -226,12 +232,13 @@ class ExceptionSink(object):
     # NB: We do not close old file descriptors! This is bounded by the number of times any method is
     # called, which should be few and finite.
     # We recapture both log streams each time.
-    # NB: We truncate the pid-specific error log file.
     pid_specific_log_path = cls.exceptions_log_path(log_location.as_request)
     shared_log_path = cls.exceptions_log_path(log_location.as_request.copy(pid=None))
     assert(pid_specific_log_path != shared_log_path)
     try:
+      # Truncate the pid-specific error log file.
       pid_specific_error_stream = safe_open(pid_specific_log_path, mode='w')
+      # Append to the shared error file.
       shared_error_stream = safe_open(shared_log_path, mode='a')
     except Exception as e:
       raise cls.ExceptionSinkError(

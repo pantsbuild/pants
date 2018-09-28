@@ -26,15 +26,28 @@ logger = logging.getLogger(__name__)
 
 
 class RemoteExiter(Exiter):
+  """An Exiter that sends signals to and recovers logs from a remote process on failure."""
 
   def __init__(self, base_exiter):
+    """Wrap an existing Exiter instance and initialize all of the remote process state to None."""
     assert(isinstance(base_exiter, Exiter))
     super(RemoteExiter, self).__init__()
     self._base_exiter = base_exiter
+    # These fields are filled in at different stages of the remote client connection process, after
+    # connecting to pantsd and then after the pantsd-runner daemonizes, so these are initialized
+    # with register methods which are passed as callbacks to NailgunClient (and then to
+    # NailgunClientSession). Each of these has a register method which ensures it is initialized <=
+    # once.
+    # This is the handle to the remote pantsd process.
     self._pantsd_handle = None
+    # These are the pid and pgrp of the remote pantsd-runner process. The pid is used to collect
+    # logs of any fatal errors from that remote process. The pgrp is used to broadcast any signals
+    # sent to the entire process group of the remote pantsd-runner.
     self._client_pid = None
     self._client_pgrp = None
 
+  # We provide a __str__ implementation to make it easier to produce error messages with all the
+  # relevant state. The base_exiter is not expected to have a useful __str__ implementation.
   _STR_FMT = """\
 RemoteExiter(base_exiter={base}, pantsd_handle={handle}, client_pid={pid}, client_pgrp={pgrp})"""
 
@@ -176,6 +189,8 @@ class RemotePantsRunner(object):
     def handle_control_c(signum, frame):
       err_msg = None
       try:
+        # TODO: this could probably wait on the remote process to die (somehow) after sending the
+        # remote control-c, to avoid command-line control-c misbehavior!
         self._exiter.broadcast_signal_to_client(signal.SIGINT)
       except Exception as e:
         err_msg = ('Error sending control-c to remote client with exiter {}: {}'
@@ -183,8 +198,8 @@ class RemotePantsRunner(object):
         ExceptionSink.log_exception(err_msg)
         logger.error(err_msg)
 
-        # TODO: this could probably wait on the remote process to die (somehow) after sending the
-        # remote control-c, to avoid command-line control-c misbehavior!
+        # Delegate to the ExceptionSink signal handler after sending SIGINT.
+        # TODO: this functionality should probably be moved to Exiter.
         ExceptionSink.handle_signal_gracefully(signum, frame)
 
     existing_sigint_handler = signal.signal(signal.SIGINT, handle_control_c)
