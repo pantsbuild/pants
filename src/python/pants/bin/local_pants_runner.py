@@ -5,13 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-import sys
 from builtins import object
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink, LogLocation
-from pants.base.exiter import Exiter
-from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
@@ -26,37 +22,6 @@ from pants.util.contextutil import maybe_profiled
 
 
 logger = logging.getLogger(__name__)
-
-
-class RunTrackingExiter(Exiter):
-  """An Exiter that calls .end() on a provided RunTracker on system exit."""
-
-  # TODO: is the base_exiter here using the prototype pattern or something? Either way, document
-  # what it's doing here, system exiting logic *must* be simple to follow.
-  def __init__(self, base_exiter, run_tracker):
-    assert(isinstance(base_exiter, Exiter))
-    assert(isinstance(run_tracker, RunTracker))
-    super(RunTrackingExiter, self).__init__()
-    self._base_exiter = base_exiter
-    self._run_tracker = run_tracker
-
-  def exit(self, result=0, msg=None, *args, **kwargs):
-    try:
-      if result == 0:
-        # RunTracker takes care of making sure we don't make a failure into a success, just the
-        # other way around.
-        self._run_tracker.set_root_outcome(WorkUnit.SUCCESS)
-      else:
-        self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
-      # Drop the return code here, we are already being given a return code. end() is documented to
-      # be a no-op in further invocations.
-      self._run_tracker.end()
-    except Exception as e:
-      msg = '{}\nError finalizing run tracker outcome: {}'.format((msg or ''), e)
-      ExceptionSink.log_exception(msg)
-      logger.error(msg)
-    finally:
-      self._base_exiter.exit(result=result, msg=msg, *args, **kwargs)
 
 
 class LocalPantsRunner(object):
@@ -158,7 +123,8 @@ class LocalPantsRunner(object):
       target_roots,
       graph_session,
       daemon_graph_session is not None,
-      profile_path)
+      profile_path
+    )
 
   def __init__(self, build_root, exiter, options, build_config, target_roots, graph_session,
                is_daemon, profile_path):
@@ -245,19 +211,6 @@ class LocalPantsRunner(object):
     run_tracker = RunTracker.global_instance()
     reporting = Reporting.global_instance()
     reporting.initialize(run_tracker, self._run_start_time)
-
-    # Mutate the exiter object to ensure run_tracker is ended on uncaught signals.
-    # TODO: this is messy. Is it less surprising to have the Exiter modified during construction, or
-    # in the _run() method as we do here?
-    self._exiter = RunTrackingExiter(self._exiter, run_tracker)
-    self._exiter.should_print_backtrace = self._global_options.print_exception_stacktrace
-    # Reset all the logging to point to the current process.
-    current_run_log_location = LogLocation.from_options_for_current_process(self._global_options)
-    ExceptionSink.reset_log_location(current_run_log_location)
-    # Register the exiter we just mutated above.
-    ExceptionSink.reset_exiter(self._exiter)
-    # Set the stream to output exit messages and stacktraces to whatever the current stderr is.
-    ExceptionSink.reset_interactive_output_stream(sys.stderr)
 
     try:
       # Capture a repro of the 'before' state for this build, if needed.
