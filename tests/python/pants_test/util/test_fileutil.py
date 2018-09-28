@@ -11,7 +11,6 @@ import stat
 import unittest
 from builtins import open
 
-from future.utils import PY3
 from mock import mock
 
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
@@ -109,9 +108,7 @@ class FileutilTest(unittest.TestCase):
 
       temp_content = b'hello world'
       with safe_temp_edit(temp_file.name) as temp_edit_file:
-        mode = 'w' if PY3 else 'wb'
-
-        with open(temp_edit_file, mode) as t_f:
+        with open(temp_edit_file, 'wb') as t_f:
           t_f.write(temp_content)
 
         # Make sure the edit is actually happening in temp_file
