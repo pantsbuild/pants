@@ -296,7 +296,7 @@ class DaemonPantsRunner(ProcessManager):
           self._env,
           self._target_roots,
           self._graph_helper,
-          self._options_bootstrapper,
+          self._options_bootstrapper
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
         runner.run()

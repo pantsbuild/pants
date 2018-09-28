@@ -11,6 +11,7 @@ from pants.util.memo import memoized_property
 
 
 class LifecycleStubs(Subsystem):
+  """A subsystem used to configure workflows for lifecycle tests (Pants stopping and starting)."""
   options_scope = 'lifecycle-stubs'
 
   @classmethod

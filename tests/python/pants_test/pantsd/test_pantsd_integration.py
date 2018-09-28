@@ -447,7 +447,7 @@ Signal {signum} was raised\\. Exiting with failure\\.
 \\(backtrace omitted\\)
 """.format(pid=parent_runner_pid, signum=signal.SIGTERM))
 
-  def test_pantsd_control_c(self):
+  def _assert_pantsd_keyboardinterrupt_signal(self, signum):
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
       file_to_make = os.path.join(workdir, 'some_magic_file')
@@ -463,7 +463,7 @@ Signal {signum} was raised\\. Exiting with failure\\.
       # Get all the pantsd-runner processes while they're still around.
       pantsd_runner_processes = checker.runner_process_context.current_processes()
       # This should kill the pantsd-runner processes through the RemotePantsRunner SIGINT handler.
-      os.kill(waiter_handle.process.pid, signal.SIGINT)
+      os.kill(waiter_handle.process.pid, signum)
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
       self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
@@ -474,6 +474,12 @@ Signal {signum} was raised\\. Exiting with failure\\.
         # limited on non-Windows hosts -- see https://psutil.readthedocs.io/en/latest/#processes.
         # The pantsd-runner processes should be dead, and they should have exited with 1.
         self.assertFalse(proc.is_running())
+
+  def test_pantsd_control_c(self):
+    self._assert_pantsd_keyboardinterrupt_signal(signal.SIGINT)
+
+  def test_pantsd_sigquit(self):
+    self._assert_pantsd_keyboardinterrupt_signal(signal.SIGQUIT)
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env

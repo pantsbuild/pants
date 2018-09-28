@@ -19,10 +19,6 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
 
-  @classmethod
-  def hermetic(cls):
-    return True
-
   def _assert_unhandled_exception_log_matches(self, pid, file_contents):
     # TODO: ensure there's only one log entry in this file so we can avoid more complicated checks!
     # Search for the log header entry.
@@ -153,9 +149,10 @@ Signal {signum} was raised\\. Exiting with failure\\.
       self.assert_failure(waiter_run)
       self.assertRegexpMatches(waiter_run.stderr_data, r"Thread [^\n]+ \(most recent call first\):")
 
-  def test_sigint_keyboardinterrupt(self):
-    with self._send_signal_to_waiter_handle(signal.SIGINT) as (workdir, waiter_run):
-      self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
+  def test_keyboardinterrupt_signals(self):
+    for interrupt_signal in [signal.SIGINT, signal.SIGQUIT]:
+      with self._send_signal_to_waiter_handle(interrupt_signal) as (workdir, waiter_run):
+        self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
 
   def _lifecycle_stub_cmdline(self):
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.
@@ -205,5 +202,7 @@ Signal {signum} was raised\\. Exiting with failure\\.
         "--lifecycle-stubs-new-interactive-stream-output-file={}".format(some_file),
       ] + lifecycle_stub_cmdline)
       self.assert_failure(redirected_pants_run)
+      # The Exiter prints the final error message to whatever the interactive output stream is set
+      # to, so when it's redirected it won't be in stderr.
       self.assertNotIn('erroneous!', redirected_pants_run.stderr_data)
       self.assertIn('erroneous!', read_file(some_file))

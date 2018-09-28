@@ -97,6 +97,10 @@ RemoteExiter(base_exiter={base}, pantsd_handle={handle}, client_pid={pid}, clien
         yield exception_text
 
   def broadcast_signal_to_client(self, signum):
+    """Send the specified signal to the client's pid and/or pgrp.
+
+    This method allows sharing code between the control-c case (SIGINT) and the exit case (SIGTERM).
+    """
     try:
       # First try killing the process group id from the PGRP chunk of the nailgun connection.
       # TODO: is this the right signal to send?
