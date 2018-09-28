@@ -153,7 +153,7 @@ Signal {signum} was raised. Exiting with failure.
     self.assertIn('NEW MESSAGE', changed_exiter_run.stderr_data)
 
   def test_reset_interactive_output_stream(self):
-    """???"""
+    """Test redirecting the terminal output stream to a separate file."""
     lifecycle_stub_cmdline = self._lifecycle_stub_cmdline()
 
     pants_run = self.run_pants(lifecycle_stub_cmdline)

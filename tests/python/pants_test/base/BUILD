@@ -212,7 +212,6 @@ python_tests(
     '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/base:exception_sink',
-    'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',

@@ -12,7 +12,6 @@ from builtins import open, str
 import mock
 
 from pants.base.exception_sink import ExceptionSink, LogLocation
-from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.osutil import get_normalized_os_name
 from pants_test.test_base import TestBase
@@ -97,9 +96,18 @@ XXX
     with self.captured_logging(level=logging.ERROR) as captured:
       with temporary_dir() as tmpdir:
         sink.reset_log_location(LogLocation(os.getpid(), tmpdir))
-        with mock.patch.object(sink, '_format_exception_message', autospec=sink) as mock_write:
-          mock_write.side_effect = Exception('fake write failure')
+        with mock.patch.object(sink, '_try_write_with_flush', autospec=sink) as mock_write:
+          mock_write.side_effect = ExceptionSink.ExceptionSinkError('fake write failure')
           sink.log_exception('XXX')
-    single_error_logged = str(assert_single_element(captured.errors()))
-    err_rx = re.escape("pants.base.exception_sink: Problem logging original exception: fake write failure. The original error message was:\nXXX")
-    self.assertRegexpMatches(single_error_logged, err_rx)
+    errors = list(captured.errors())
+    self.assertEqual(2, len(errors))
+
+    def format_log_rx(log_file_type):
+      return '.*'.join(re.escape(s) for s in [
+        "pants.base.exception_sink: Error logging the message 'XXX' to the {log_file_type} file "
+        "handle for LogLocation(".format(log_file_type=log_file_type),
+        "\nfake write failure",
+      ])
+
+    self.assertRegexpMatches(str(errors[0]), format_log_rx('pid-specific'))
+    self.assertRegexpMatches(str(errors[1]), format_log_rx('shared'))
