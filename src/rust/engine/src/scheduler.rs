@@ -232,9 +232,10 @@ impl Scheduler {
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    executor.spawn(roots_res.then(move |res| match res {
-      Ok(res) => sender.send(res).map_err(|_| ()),
-      Err(_) => {
+    executor.spawn(roots_res.then(move |res| {
+      if let Ok(res) = res {
+        sender.send(res).map_err(|_| ())
+      } else {
         Scheduler::execute_helper(context, sender, roots, count - 1);
         Ok(())
       }
