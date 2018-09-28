@@ -156,16 +156,16 @@ Signal {signum} was raised. Exiting with failure.
     """Test redirecting the terminal output stream to a separate file."""
     lifecycle_stub_cmdline = self._lifecycle_stub_cmdline()
 
-    pants_run = self.run_pants(lifecycle_stub_cmdline)
-    self.assert_failure(pants_run)
-    self.assertIn('erroneous!', pants_run.stderr_data)
+    failing_pants_run = self.run_pants(lifecycle_stub_cmdline)
+    self.assert_failure(failing_pants_run)
+    self.assertIn('erroneous!', failing_pants_run.stderr_data)
 
     with temporary_dir() as tmpdir:
       some_file = os.path.join(tmpdir, 'some_file')
       safe_file_dump(some_file, b'', binary_mode=True)
-      pants_run = self.run_pants([
+      redirected_pants_run = self.run_pants([
         "--lifecycle-stubs-new-interactive-stream-output-file={}".format(some_file),
       ] + lifecycle_stub_cmdline)
-      self.assert_failure(pants_run)
-      self.assertNotIn('erroneous!', pants_run.stderr_data)
+      self.assert_failure(redirected_pants_run)
+      self.assertNotIn('erroneous!', redirected_pants_run.stderr_data)
       self.assertIn('erroneous!', read_file(some_file))

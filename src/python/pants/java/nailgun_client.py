@@ -125,10 +125,6 @@ class NailgunClient(object):
     """Indicates an error upon initial connect to the nailgun server."""
     DESCRIPTION = 'Problem connecting to nailgun server'
 
-  class NailgunInvalidStateError(NailgunError):
-    """???"""
-    DESCRIPTION = 'A pid was required for some operation, but the session was not initialized yet.'
-
   class NailgunExecutionError(NailgunError):
     """Indicates an error upon initial command execution on the nailgun server."""
     DESCRIPTION = 'Problem executing command on nailgun server'

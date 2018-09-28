@@ -413,7 +413,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(waiter_handle.join())
 
   def test_pantsd_killed_run(self):
-    self.maxDiff = None
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
       file_to_make = os.path.join(workdir, 'some_magic_file')
