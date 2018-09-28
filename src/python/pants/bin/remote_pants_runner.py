@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import os
 import signal
 import sys
 import time
@@ -33,7 +34,7 @@ class RemoteExiter(Exiter):
     super(RemoteExiter, self).__init__()
     self._base_exiter = base_exiter
     self._pantsd_handle = None
-    self._nailgun_client = None
+    self._client_pid = None
 
   # TODO: figure out whether it's useful to log whether these mutators were or weren't called.
   def register_pantsd_handle(self, pantsd_handle):
@@ -41,10 +42,10 @@ class RemoteExiter(Exiter):
     assert(isinstance(pantsd_handle, PantsDaemon.Handle))
     self._pantsd_handle = pantsd_handle
 
-  def register_nailgun_client(self, nailgun_client):
-    assert(self._nailgun_client is None)
-    assert(isinstance(nailgun_client, NailgunClient))
-    self._nailgun_client = nailgun_client
+  def register_client_pid(self, client_pid):
+    assert(self._client_pid is None)
+    assert(isinstance(client_pid, (int, long)))
+    self._client_pid = client_pid
 
   def _extract_remote_exception(self):
     """Given a NailgunError, returns a Terminated exception with additional info (where possible).
@@ -58,11 +59,8 @@ class RemoteExiter(Exiter):
     source_pids.append(self._pantsd_handle.pid)
 
     # This may not have been registered yet, so None.
-    if self._nailgun_client:
-      # .pid is an @property which may change, so save it.
-      client_pid = self._nailgun_client.pid
-      if client_pid:
-        source_pids.append(client_pid)
+    if self._client_pid:
+      source_pids.append(self._client_pid)
 
     exception_text = None
     for pid in source_pids:
@@ -80,7 +78,8 @@ class RemoteExiter(Exiter):
       # TODO: this works to kill all connected processes because the process pid is negated -- we
       # need to extend ChunkType to cover a real pid as well!
       # TODO: is this the right signal to send?
-      self._nailgun_client.kill(signal.SIGTERM)
+      # TODO: self._client_pid should have been filled by now!
+      os.kill(self._client_pid, signal.SIGTERM)
     except Exception as e:
       terminal_message = ('{}\nAdditional error killing nailgun client upon exit: {}'
                           .format((terminal_message or ''), e))
@@ -237,10 +236,9 @@ class RemotePantsRunner(object):
                            out=self._stdout,
                            err=self._stderr,
                            exit_on_broken_pipe=True,
-                           expects_pid=True)
-
-    # TODO: ???
-    self._exiter.register_nailgun_client(client)
+                           expects_pid=True,
+                           # TODO: ???
+                           remote_pid_callback=(lambda pid: self._exiter.register_client_pid(pid)))
 
     with self._trapped_signals(client), STTYSettings.preserved():
       # Execute the command on the pailgun.
