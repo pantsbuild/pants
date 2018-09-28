@@ -115,7 +115,7 @@ class FileutilTest(unittest.TestCase):
           t_f.write(temp_content)
 
         # Make sure the edit is actually happening in temp_file
-        with open(temp_file.name, 'r') as f:
+        with open(temp_file.name, 'rb') as f:
           self.assertEqual(temp_content, f.read())
 
       # Test that temp_file has been safely recovered.
