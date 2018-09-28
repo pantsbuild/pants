@@ -38,6 +38,4 @@ def main():
     try:
       PantsRunner(exiter, start_time=start_time).run()
     except KeyboardInterrupt:
-      # TODO: ExceptionSink could probably take care of this too, as well as converting SIGINT into
-      # KeyboardInterrupt where necessary.
       exiter.exit_and_fail('Interrupted by user.')

@@ -25,11 +25,12 @@ logger = logging.getLogger(__name__)
 
 
 class GetLogLocationRequest(datatype([
+    # Both fields default to None.
     ('pid', Exactly(int, long, type(None))),
     ('log_dir', Exactly(binary_type, type(None))),
 ])):
 
-  # TODO: link the datatype default values ticket!
+  # TODO: this could be made more ergonomic with default values for datatypes: see #6374.
   def __new__(cls, pid=None, log_dir=None):
     if log_dir is not None:
       log_dir = binary_type(log_dir)
@@ -37,11 +38,12 @@ class GetLogLocationRequest(datatype([
 
 
 class LogLocation(datatype([
+    # `pid` is required, but `log_dir` defaults to None.
     ('pid', Exactly(int, long)),
     ('log_dir', Exactly(binary_type, type(None))),
 ])):
 
-  # TODO: link the datatype default values ticket!
+  # TODO: this could be made more ergonomic with default values for datatypes: see #6374.
   def __new__(cls, pid, log_dir=None):
     if log_dir is not None:
       log_dir = binary_type(log_dir)
@@ -53,24 +55,24 @@ class LogLocation(datatype([
 
   @classmethod
   def from_options_for_current_process(cls, options):
-    """???"""
+    """Create a LogLocation suitable for reset_log_location() using the current pid and workdir."""
     return cls(pid=os.getpid(), log_dir=options.pants_workdir)
 
 
 class ExceptionSink(object):
   """A mutable singleton object representing where exceptions should be logged to."""
 
-  # TODO: see the bottom of this file where we call reset_log_location() and friends in order to
-  # properly setup global state.
+  # NB: see the bottom of this file where we call reset_log_location() and other mutators in order
+  # to properly setup global state.
   _log_location = None
-  # We need an exiter in order to know what to do after we log a fatal exception.
+  # We need an exiter in order to know what to do after we log a fatal exception or handle a
+  # catchable signal.
   _exiter = None
   # Where to log stacktraces to in a SIGUSR2 handler.
   _interactive_output_stream = None
 
-  # NB: These file descriptors are kept under the assumption that pants won't randomly close them
-  # later -- we want the signal handler to be able to do no work (and to let faulthandler figure out
-  # signal safety).
+  # These persistent open file descriptors are kept so the signal handler can do almost no work
+  # (and lets faulthandler figure out signal safety).
   _pid_specific_error_fileobj = None
   _shared_error_fileobj = None
 
@@ -106,15 +108,11 @@ class ExceptionSink(object):
     - May raise ExceptionSinkError if the directory is not writable.
     - Will register signal handlers for fatal handlers (clobbering old values).
     """
-    # TODO: check for noop on both of the arguments!
-    if new_log_location.log_dir is None:
-      if new_log_location.pid is None:
-        raise cls.ExceptionSinkError(
-          "No-op call to reset_new_log_location(): argument was {!r}."
-          .format(new_log_location))
-    else:
-      # Ensure the directory is suitable for writing to, or raise.
-      cls._check_or_create_new_destination(new_log_location.log_dir)
+    # We could no-op here if the log locations are the same, but there's no reason not to have the
+    # additional safety of re-acquiring file descriptors each time.
+
+    # Create the directory if possible, or raise if not writable.
+    cls._check_or_create_new_destination(new_log_location.log_dir)
     if new_log_location.pid is None:
       new_log_location = new_log_location.copy(pid=os.getpid())
 

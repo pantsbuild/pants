@@ -256,7 +256,7 @@ class LocalPantsRunner(object):
     ExceptionSink.reset_log_location(current_run_log_location)
     # Register the exiter we just mutated above.
     ExceptionSink.reset_exiter(self._exiter)
-    # TODO: ???
+    # Set the stream to output exit messages and stacktraces to whatever the current stderr is.
     ExceptionSink.reset_interactive_output_stream(sys.stderr)
 
     try:
