@@ -128,8 +128,6 @@ Signal {signum} was raised\\. Exiting with failure\\.
     # SIGABRT sends a traceback to the log file for the current process thanks to
     # faulthandler.enable().
     with self._send_signal_to_waiter_handle(signal.SIGABRT) as (workdir, waiter_run):
-      # Nothing was sent to stderr, because this is a fatal signal and we exited immediately.
-      self.assertEqual('', waiter_run.stderr_data)
       # Check that the logs show an abort signal and the beginning of a traceback.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
       aborted_tb_rx = r"Fatal Python error: Aborted\n\nThread [^\n]+ \(most recent call first\):"
