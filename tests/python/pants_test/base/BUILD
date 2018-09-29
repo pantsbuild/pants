@@ -235,17 +235,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'exiter',
-  sources = ['test_exiter.py'],
-  dependencies = [
-    '3rdparty/python:future',
-    'src/python/pants/bin',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test/option:testing',
-  ],
-)
-
-python_tests(
   name = 'exiter_integration',
   sources = [ 'test_exiter_integration.py' ],
   dependencies = [

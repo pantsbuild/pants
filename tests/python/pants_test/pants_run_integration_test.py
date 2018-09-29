@@ -23,6 +23,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
 from pants.util.objects import Exactly, datatype
+from pants.util.osutil import IntegerForPid
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants.util.strutil import ensure_binary
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
@@ -34,7 +35,7 @@ class PantsResult(datatype([
     'stdout_data',
     'stderr_data',
     'workdir',
-    ('pid', Exactly(int, long)),
+    ('pid', Exactly(*IntegerForPid)),
 ])):
   pass
 

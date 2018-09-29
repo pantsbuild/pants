@@ -15,6 +15,7 @@ from builtins import object, str
 
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.osutil import IntegerForPid
 
 
 logger = logging.getLogger(__name__)
@@ -144,7 +145,7 @@ class ExceptionSink(object):
     if for_pid is None:
       intermediate_filename_component = ''
     else:
-      assert(isinstance(for_pid, (int, long)))
+      assert(isinstance(for_pid, IntegerForPid))
       intermediate_filename_component = '.{}'.format(for_pid)
     in_dir = in_dir or cls._log_dir
     return os.path.join(
@@ -214,7 +215,7 @@ class ExceptionSink(object):
       shared_error_stream = safe_open(shared_log_path, mode='a')
     except Exception as e:
       raise cls.ExceptionSinkError(
-        "Error opening fatal error log streams for log location {!r}: {}"
+        "Error opening fatal error log streams for log location '{}': {}"
         .format(new_log_location, str(e)))
 
     # TODO: determine whether any further validation of the streams (try writing to them here?) is

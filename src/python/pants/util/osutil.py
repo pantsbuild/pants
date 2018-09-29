@@ -9,6 +9,8 @@ import logging
 import os
 from functools import reduce
 
+from future.utils import PY3
+
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,12 @@ def known_os_names():
   return reduce(set.union, OS_ALIASES.values())
 
 
+if PY3:
+  IntegerForPid = (int,)
+else:
+  IntegerForPid = (int, long)
+
+
 # From kill(2) on OSX 10.13:
 #     [EINVAL]           Sig is not a valid, supported signal number.
 #
@@ -64,7 +72,7 @@ def known_os_names():
 #     [ESRCH]            The process id was given as 0, but the sending process does not have a process group.
 def safe_kill(pid, signum):
   """Kill a process with the specified signal, catching nonfatal errors."""
-  assert(isinstance(pid, (int, long)))
+  assert(isinstance(pid, IntegerForPid))
   assert(isinstance(signum, int))
   try:
     os.kill(pid, signum)
