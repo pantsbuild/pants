@@ -490,7 +490,6 @@ class ProcessManager(ProcessMetadataManager):
     self.pre_fork(**pre_fork_opts or {})
     is_parent, is_child = fork_func()
     # No arguments reuses the same log location, but with the new pid after forking.
-    ExceptionSink.reset_log_location()
     if not is_parent and not is_child:
       return
 
@@ -501,6 +500,7 @@ class ProcessManager(ProcessMetadataManager):
       else:
         assert not is_parent
         os.chdir(self._buildroot)
+        ExceptionSink.reset_log_location()
         self.post_fork_child(**post_fork_child_opts or {})
     except Exception:
       logger.critical(traceback.format_exc())
