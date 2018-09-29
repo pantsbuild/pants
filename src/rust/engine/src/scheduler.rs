@@ -4,10 +4,10 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
+use std::time::Duration;
 
 use futures::future::{self, Future};
-use futures::sync::oneshot;
 
 use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
@@ -180,7 +180,9 @@ impl Scheduler {
 
   ///
   /// Attempts to complete all of the given roots, retrying the entire set (up to `count`
-  /// times) if any of them fail with `Failure::Invalidated`.
+  /// times) if any of them fail with `Failure::Invalidated`. Sends the result on the given
+  /// mpsc Sender, which allows the caller to poll a channel for the result without blocking
+  /// uninterruptibly on a Future.
   ///
   /// In common usage, graph entries won't be repeatedly invalidated, but in a case where they
   /// were (say by an automated process changing files under pants), we'd want to eventually
@@ -188,9 +190,10 @@ impl Scheduler {
   ///
   fn execute_helper(
     context: RootContext,
+    sender: mpsc::Sender<Vec<Result<Value, Failure>>>,
     roots: Vec<Root>,
     count: usize,
-  ) -> BoxFuture<Vec<Result<Value, Failure>>, ()> {
+  ) {
     let executor = context.core.runtime.get().executor();
     // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
     let roots_res = future::join_all(
@@ -229,10 +232,14 @@ impl Scheduler {
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    oneshot::spawn(
-      roots_res.or_else(move |_| Scheduler::execute_helper(context, roots, count - 1)),
-      &executor,
-    ).to_boxed()
+    executor.spawn(roots_res.then(move |res| {
+      if let Ok(res) = res {
+        sender.send(res).map_err(|_| ())
+      } else {
+        Scheduler::execute_helper(context, sender, roots, count - 1);
+        Ok(())
+      }
+    }));
   }
 
   ///
@@ -253,9 +260,13 @@ impl Scheduler {
     let context = RootContext {
       core: self.core.clone(),
     };
-    let results = Scheduler::execute_helper(context, request.roots.clone(), 8)
-      .wait()
-      .expect("Execution failed.");
+    let (sender, receiver) = mpsc::channel();
+    Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
+    let results = loop {
+      if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
+        break res;
+      }
+    };
 
     request
       .roots
