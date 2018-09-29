@@ -443,6 +443,8 @@ class CoursierMixin(NailgunTask, ResolveBase):
     for coord in coord_to_resolved_jars.keys():
       org_name_to_org_name_rev['{}:{}'.format(coord.org, coord.name)] = coord
 
+    jars_per_target = []
+
     for vt in invalidation_check.all_vts:
       t = vt.target
       jars_to_digest = []
@@ -460,7 +462,6 @@ class CoursierMixin(NailgunTask, ResolveBase):
 
           return transitive_jar_path_for_coord
 
-        jars_per_target = []
         for jar in t.jar_dependencies:
           # if there are override classifiers, then force use of those.
           coord_candidates = []
@@ -486,8 +487,8 @@ class CoursierMixin(NailgunTask, ResolveBase):
 
         jars_per_target.append((t, jars_to_digest))
 
-      for target, jars_to_add in self.add_directory_digests_for_jars(jars_per_target):
-        compile_classpath.add_jars_for_targets([target], conf, jars_to_add)
+    for target, jars_to_add in self.add_directory_digests_for_jars(jars_per_target):
+      compile_classpath.add_jars_for_targets([target], conf, jars_to_add)
 
   def _populate_results_dir(self, vts_results_dir, results):
     mode = 'w' if PY3 else 'wb'
