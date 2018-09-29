@@ -8,7 +8,6 @@ python_library(
     '3rdparty/python:future',
     '3rdparty/python:psutil',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:exception_sink',
     'src/python/pants/process',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',

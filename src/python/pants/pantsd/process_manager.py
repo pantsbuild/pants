@@ -16,7 +16,6 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink
 from pants.init.subprocess import Subprocess
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
@@ -500,7 +499,6 @@ class ProcessManager(ProcessMetadataManager):
       else:
         assert not is_parent
         os.chdir(self._buildroot)
-        ExceptionSink.reset_log_location()
         self.post_fork_child(**post_fork_child_opts or {})
     except Exception:
       logger.critical(traceback.format_exc())
@@ -518,8 +516,6 @@ class ProcessManager(ProcessMetadataManager):
     self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
-    # No arguments reuses the same log location, but with the new pid after forking.
-    ExceptionSink.reset_log_location()
     if pid == 0:
       try:
         os.setsid()

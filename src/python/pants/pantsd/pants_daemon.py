@@ -364,8 +364,10 @@ class PantsDaemon(FingerprintedProcessManager):
     # Switch log output to the daemon's log stream from here forward.
     self._close_stdio()
     with self._pantsd_logging() as log_stream:
+      global_bootstrap_options = self._bootstrap_options.for_global_scope()
+      ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
       ExceptionSink.reset_interactive_output_stream(log_stream)
-      # TODO: determine if this exiter reset is necessary (or even correct).
+      self._exiter.should_print_backtrace = global_bootstrap_options.print_exception_stacktrace
       ExceptionSink.reset_exiter(self._exiter)
       self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
