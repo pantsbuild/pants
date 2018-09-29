@@ -16,7 +16,7 @@ from future.utils import raise_with_traceback
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink, LogLocation
+from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
@@ -261,7 +261,6 @@ class DaemonPantsRunner(ProcessManager):
     # the `pantsd.log`. This ensures that in the event of e.g. a hung but detached pantsd-runner
     # process that the stacktrace output lands deterministically in a known place vs to a stray
     # terminal window.
-    ExceptionSink.reset_log_location(LogLocation(os.getpid(), os.getcwd()))
     ExceptionSink.reset_exiter(self._exiter)
     ExceptionSink.reset_interactive_output_stream(sys.stderr)
 

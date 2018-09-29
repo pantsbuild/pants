@@ -365,6 +365,7 @@ class PantsDaemon(FingerprintedProcessManager):
     self._close_stdio()
     with self._pantsd_logging() as log_stream:
       ExceptionSink.reset_interactive_output_stream(log_stream)
+      # TODO: determine if this exiter reset is necessary (or even correct).
       ExceptionSink.reset_exiter(self._exiter)
       self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 

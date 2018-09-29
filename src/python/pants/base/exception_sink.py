@@ -13,50 +13,11 @@ import sys
 import traceback
 from builtins import object, str
 
-from future.utils import binary_type
-
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.memo import memoized_property
-from pants.util.objects import Exactly, datatype
 
 
 logger = logging.getLogger(__name__)
-
-
-class GetLogLocationRequest(datatype([
-    # Both fields default to None.
-    ('pid', Exactly(int, long, type(None))),
-    ('log_dir', Exactly(binary_type, type(None))),
-])):
-
-  # TODO: this could be made more ergonomic with default values for datatypes: see #6374.
-  def __new__(cls, pid=None, log_dir=None):
-    if log_dir is not None:
-      log_dir = binary_type(log_dir)
-    return super(GetLogLocationRequest, cls).__new__(cls, log_dir=log_dir, pid=pid)
-
-
-class LogLocation(datatype([
-    # `pid` is required, but `log_dir` defaults to None.
-    ('pid', Exactly(int, long)),
-    ('log_dir', Exactly(binary_type, type(None))),
-])):
-
-  # TODO: this could be made more ergonomic with default values for datatypes: see #6374.
-  def __new__(cls, pid, log_dir=None):
-    if log_dir is not None:
-      log_dir = binary_type(log_dir)
-    return super(LogLocation, cls).__new__(cls, pid=pid, log_dir=log_dir)
-
-  @memoized_property
-  def as_request(self):
-    return GetLogLocationRequest(pid=self.pid, log_dir=self.log_dir)
-
-  @classmethod
-  def from_options_for_current_process(cls, options):
-    """Create a LogLocation suitable for reset_log_location() using the current pid and workdir."""
-    return cls(pid=os.getpid(), log_dir=options.pants_workdir)
 
 
 class ExceptionSink(object):
@@ -64,7 +25,7 @@ class ExceptionSink(object):
 
   # NB: see the bottom of this file where we call reset_log_location() and other mutators in order
   # to properly setup global state.
-  _log_location = None
+  _log_dir = None
   # We need an exiter in order to know what to do after we log a fatal exception or handle a
   # catchable signal.
   _exiter = None
@@ -91,18 +52,22 @@ class ExceptionSink(object):
     signal.SIGQUIT,
   ]
 
+  @classmethod
+  def _all_handled_signals(cls):
+    return cls.GRACEFULLY_HANDLED_SIGNALS + cls.KEYBOARD_INTERRUPT_SIGNALS
+
   def __new__(cls, *args, **kwargs):
     raise TypeError('Instances of {} are not allowed to be constructed!'
                     .format(cls.__name__))
 
   class ExceptionSinkError(Exception): pass
 
-  # TODO: ensure all set_* methods are idempotent!
+  # All reset_* methods are ~idempotent!
   @classmethod
-  def reset_log_location(cls, new_log_location):
+  def reset_log_location(cls, new_log_location=None):
     """
     Class state:
-    - Overwrites `cls._log_location`, `cls._pid_specific_error_fileobj`, and
+    - Overwrites `cls._log_dir`, `cls._pid_specific_error_fileobj`, and
       `cls._shared_error_fileobj`.
     OS state:
     - May create a new directory.
@@ -113,10 +78,12 @@ class ExceptionSink(object):
     # We could no-op here if the log locations are the same, but there's no reason not to have the
     # additional safety of re-acquiring file descriptors each time.
 
-    # Create the directory if possible, or raise if not writable.
-    cls._check_or_create_new_destination(new_log_location.log_dir)
-    if new_log_location.pid is None:
-      new_log_location = new_log_location.copy(pid=os.getpid())
+    if new_log_location:
+      # Create the directory if possible, or raise if not writable.
+      cls._check_or_create_new_destination(new_log_location)
+    else:
+      # Interpret a None argument to mean to just refresh the file handles for the current pid.
+      new_log_location = cls._log_dir
 
     pid_specific_error_stream, shared_error_stream = cls._recapture_fatal_error_log_streams(
       new_log_location)
@@ -127,12 +94,12 @@ class ExceptionSink(object):
     # Log a timestamped exception and exit gracefully on non-fatal signals.
     # TODO: ascertain whether the the signal handler method used here is signal-safe for our
     # purposes.
-    all_handled_signals = cls.GRACEFULLY_HANDLED_SIGNALS + cls.KEYBOARD_INTERRUPT_SIGNALS
+    all_handled_signals = cls._all_handled_signals()
     for signum in all_handled_signals:
       signal.signal(signum, cls.handle_signal_gracefully)
 
     # NB: mutate the class variables!
-    cls._log_location = new_log_location
+    cls._log_dir = new_log_location
     cls._pid_specific_error_fileobj = pid_specific_error_stream
     cls._shared_error_fileobj = shared_error_stream
 
@@ -158,6 +125,8 @@ class ExceptionSink(object):
     - Overwrites `cls._interactive_output_stream`.
     OS state:
     - Overwrites the SIGUSR2 handler.
+
+    This is where the the error message on exit will be printed to as well.
     """
     # TODO: chain=True will log tracebacks to previous values of the trace stream as well -- what
     # happens if those file objects are eventually closed? Does faulthandler just ignore them?
@@ -168,14 +137,16 @@ class ExceptionSink(object):
     # NB: mutate the class variables!
     cls._interactive_output_stream = interactive_output_stream
 
+  # TODO: make this method private when the RemotePantsRunner no longer needs it!
   @classmethod
-  def exceptions_log_path(cls, get_log_location_request):
-    """Get the path to the log specified by `get_log_location_request`."""
-    if get_log_location_request.pid is None:
+  def exceptions_log_path(cls, for_pid=None, in_dir=None):
+    """Get the path to either the shared or pid-specific fatal errors log file."""
+    if for_pid is None:
       intermediate_filename_component = ''
     else:
-      intermediate_filename_component = '.{}'.format(get_log_location_request.pid)
-    in_dir = get_log_location_request.log_dir or cls._log_location.log_dir
+      assert(isinstance(for_pid, (int, long)))
+      intermediate_filename_component = '.{}'.format(for_pid)
+    in_dir = in_dir or cls._log_dir
     return os.path.join(
       in_dir,
       'logs',
@@ -187,16 +158,16 @@ class ExceptionSink(object):
 
     NB: Doesn't raise (logs an error instead).
     """
-
-    fatal_error_log_entry = cls._format_exception_message(msg, cls._log_location.pid)
+    pid = os.getpid()
+    fatal_error_log_entry = cls._format_exception_message(msg, pid)
 
     # We care more about this log than the shared log, so write to it first.
     try:
       cls._try_write_with_flush(cls._pid_specific_error_fileobj, fatal_error_log_entry)
     except Exception as e:
       logger.error(
-        "Error logging the message '{}' to the pid-specific file handle for {}:\n{}"
-        .format(msg, cls._log_location, e))
+        "Error logging the message '{}' to the pid-specific file handle for {} at pid {}:\n{}"
+        .format(msg, cls._log_dir, pid, e))
 
     # Write to the shared log.
     try:
@@ -205,8 +176,8 @@ class ExceptionSink(object):
       cls._try_write_with_flush(cls._shared_error_fileobj, fatal_error_log_entry)
     except Exception as e:
       logger.error(
-        "Error logging the message '{}' to the shared file handle for {}:\n{}"
-        .format(msg, cls._log_location, e))
+        "Error logging the message '{}' to the shared file handle for {} at pid {}:\n{}"
+        .format(msg, cls._log_dir, pid, e))
 
   @classmethod
   def _try_write_with_flush(cls, fileobj, payload):
@@ -228,12 +199,13 @@ class ExceptionSink(object):
         e)
 
   @classmethod
-  def _recapture_fatal_error_log_streams(cls, log_location):
+  def _recapture_fatal_error_log_streams(cls, new_log_location):
     # NB: We do not close old file descriptors! This is bounded by the number of times any method is
     # called, which should be few and finite.
     # We recapture both log streams each time.
-    pid_specific_log_path = cls.exceptions_log_path(log_location.as_request)
-    shared_log_path = cls.exceptions_log_path(log_location.as_request.copy(pid=None))
+    pid = os.getpid()
+    pid_specific_log_path = cls.exceptions_log_path(for_pid=pid, in_dir=new_log_location)
+    shared_log_path = cls.exceptions_log_path(in_dir=new_log_location)
     assert(pid_specific_log_path != shared_log_path)
     try:
       # Truncate the pid-specific error log file.
@@ -243,7 +215,7 @@ class ExceptionSink(object):
     except Exception as e:
       raise cls.ExceptionSinkError(
         "Error opening fatal error log streams for log location {!r}: {}"
-        .format(log_location, str(e)))
+        .format(new_log_location, str(e)))
 
     # TODO: determine whether any further validation of the streams (try writing to them here?) is
     # useful/necessary for faulthandler (it seems it just doesn't write to e.g. closed file
@@ -321,8 +293,7 @@ Exception message: {exception_message}{maybe_newline}
       logger.error(extra_err_msg)
 
     # Generate an unhandled exception report fit to be printed to the terminal (respecting the
-    # Exiter's _should_print_backtrace field).
-    # TODO: the Exiter just prints to stderr -- is that always open? Should we manage that here too?
+    # Exiter's should_print_backtrace field).
     stderr_printed_error = cls._format_unhandled_exception_log(
       exc, tb, add_newline,
       should_print_backtrace=cls._exiter.should_print_backtrace)
@@ -361,7 +332,7 @@ Signal {signum} was raised. Exiting with failure.
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
 # Sets fatal signal handlers with reasonable defaults to catch errors early in startup.
-ExceptionSink.reset_log_location(LogLocation(pid=os.getpid(), log_dir=os.getcwd()))
+ExceptionSink.reset_log_location(os.getcwd())
 # Sets except hook.
 ExceptionSink.reset_exiter(Exiter(print_backtraces=True))
 # Sets a SIGUSR2 handler.

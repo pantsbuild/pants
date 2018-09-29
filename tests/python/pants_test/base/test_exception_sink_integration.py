@@ -11,7 +11,7 @@ import time
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink, GetLogLocationRequest
+from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -45,12 +45,10 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
 """, file_contents)
 
   def _get_log_file_paths(self, workdir, pants_run):
-    pid_specific_log_file = ExceptionSink.exceptions_log_path(
-      GetLogLocationRequest(pid=pants_run.pid, log_dir=workdir))
+    pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pants_run.pid, in_dir=workdir)
     self.assertTrue(os.path.isfile(pid_specific_log_file))
 
-    shared_log_file = ExceptionSink.exceptions_log_path(
-      GetLogLocationRequest(log_dir=workdir))
+    shared_log_file = ExceptionSink.exceptions_log_path(in_dir=workdir)
     self.assertTrue(os.path.isfile(shared_log_file))
 
     self.assertNotEqual(pid_specific_log_file, shared_log_file)
