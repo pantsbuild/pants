@@ -128,8 +128,9 @@ Signal {signum} was raised\\. Exiting with failure\\.
     with self._send_signal_to_waiter_handle(signal.SIGABRT) as (workdir, waiter_run):
       # Check that the logs show an abort signal and the beginning of a traceback.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
-      aborted_tb_rx = r"Fatal Python error: Aborted\n\nThread [^\n]+ \(most recent call first\):"
-      self.assertRegexpMatches(read_file(pid_specific_log_file), aborted_tb_rx)
+      self.assertRegexpMatches(
+        read_file(pid_specific_log_file),
+        r"Fatal Python error: Aborted\n\nThread [^\n]+ \(most recent call first\):")
       # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
       self.assertEqual('', read_file(shared_log_file))
 
@@ -143,12 +144,14 @@ Signal {signum} was raised\\. Exiting with failure\\.
       os.kill(waiter_handle.process.pid, signal.SIGKILL)
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
-      self.assertRegexpMatches(waiter_run.stderr_data, r"Thread [^\n]+ \(most recent call first\):")
+      self.assertRegexpMatches(
+        waiter_run.stderr_data,
+        r"Current thread [^\n]+ \(most recent call first\):")
 
   def test_keyboardinterrupt_signals(self):
     for interrupt_signal in [signal.SIGINT, signal.SIGQUIT]:
       with self._send_signal_to_waiter_handle(interrupt_signal) as (workdir, waiter_run):
-        self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
+        self.assertIn('Interrupted by user.\n', waiter_run.stderr_data)
 
   def _lifecycle_stub_cmdline(self):
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.
