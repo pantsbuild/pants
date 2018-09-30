@@ -440,10 +440,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Ensure that we saw the failure in the client's stdout, and that we got a remote exception.
       self.assert_failure(waiter_run)
       self.assertRegexpMatches(waiter_run.stderr_data, """\
-Remote exception:
-timestamp: ([^\n]+)
-args: \\[([^\n]+)
-pid: {pid}
 Signal {signum} was raised\\. Exiting with failure\\.
 \\(backtrace omitted\\)
 """.format(pid=parent_runner_pid, signum=signal.SIGTERM))
