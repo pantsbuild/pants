@@ -67,7 +67,7 @@ class DaemonExiter(Exiter):
       # Shutdown the connected socket.
       teardown_socket(self._socket)
     finally:
-      super(DaemonExiter, self).exit(result=result, msg=msg, *args, **kwargs)
+      super(DaemonExiter, self).exit(result=result, *args, **kwargs)
 
 
 class DaemonPantsRunner(ProcessManager):
@@ -279,6 +279,7 @@ class DaemonPantsRunner(ProcessManager):
     with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
          hermetic_environment_as(**self._env):
       try:
+        ExceptionSink.reset_interactive_output_stream(sys.stderr)
         # Setup the Exiter's finalizer.
         self._exiter.set_finalizer(finalizer)
 
@@ -300,6 +301,8 @@ class DaemonPantsRunner(ProcessManager):
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
         runner.run()
       except KeyboardInterrupt:
-        self._exiter.exit(1, msg='Interrupted by user.\n')
+        self._exiter.exit_and_fail('Interrupted by user.\n')
+      except Exception:
+        ExceptionSink._log_unhandled_exception_and_exit()
       else:
         self._exiter.exit(0)

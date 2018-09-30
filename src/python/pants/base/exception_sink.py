@@ -102,6 +102,7 @@ class ExceptionSink(object):
     # Log a timestamped exception and exit gracefully on non-fatal signals.
     for signum in cls.all_gracefully_handled_signals:
       signal.signal(signum, cls.handle_signal_gracefully)
+      signal.siginterrupt(signum, False)
 
     # NB: mutate the class variables!
     cls._log_dir = new_log_location
@@ -330,14 +331,14 @@ Signal {signum} was raised. Exiting with failure.
       return
     cls._is_handling_signal = True
     tb = frame.f_exc_traceback or sys.exc_info()[2]
-    formatted_traceback = cls._format_traceback(tb, should_print_backtrace=True)
+    formatted_traceback = cls._format_traceback(tb, should_print_backtrace=bool(tb))
     signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
       formatted_traceback=formatted_traceback)
     # This method catches any exceptions raised within it.
     cls.log_exception(signal_error_log_entry)
     formatted_traceback_for_terminal = cls._format_traceback(
-      tb, should_print_backtrace=cls._exiter.should_print_backtrace)
+      tb, should_print_backtrace=cls._exiter.should_print_backtrace and bool(tb))
     terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
       formatted_traceback=formatted_traceback_for_terminal)
