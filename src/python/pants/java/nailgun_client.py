@@ -253,16 +253,16 @@ class NailgunClient(object):
     except socket.error as e:
       raise self.NailgunError(
         address=self._address_string,
-        pid=self.maybe_last_pid(),
-        pgrp=self.maybe_last_pgrp(),
+        pid=self._maybe_last_pid(),
+        pgrp=self._maybe_last_pgrp(),
         wrapped_exc=e,
         traceback=sys.exc_info()[2]
       )
     except NailgunProtocol.ProtocolError as e:
       raise self.NailgunError(
         address=self._address_string,
-        pid=self.maybe_last_pid(),
-        pgrp=self.maybe_last_pgrp(),
+        pid=self._maybe_last_pid(),
+        pgrp=self._maybe_last_pgrp(),
         wrapped_exc=e,
         traceback=sys.exc_info()[2]
       )
