@@ -146,8 +146,7 @@ class RemotePantsRunner(object):
                            ins=self._stdin,
                            out=self._stdout,
                            err=self._stderr,
-                           exit_on_broken_pipe=True,
-                           expects_pid=True)
+                           exit_on_broken_pipe=True)
 
     with self._trapped_signals(client), STTYSettings.preserved():
       # Execute the command on the pailgun.

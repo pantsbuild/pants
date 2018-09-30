@@ -151,6 +151,7 @@ class TestNailgunClient(unittest.TestCase):
     mock_try_connect.side_effect = NailgunClient.NailgunConnectionError(
       '127.0.0.1:31337',
       31337,
+      -31336,
       Exception('oops'),
       None
     )

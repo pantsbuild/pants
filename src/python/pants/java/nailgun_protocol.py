@@ -31,6 +31,9 @@ class ChunkType(object):
   # PGRP is used to allow the client process to try killing the nailgun server and everything in its
   # process group when the thin client receives a signal. PID is used to retrieve logs for fatal
   # errors from the remote process at that PID.
+  # TODO: we should probably make ChunkType injectable and move our custom extensions to a ChunkType
+  # subclass in nailgun_client.py and differentiate clearly whether the client accepts the pailgun
+  # extensions (e.g. by calling it PailgunClient).
   PGRP = b'G'
   PID = b'P'
   STDIN = b'0'
