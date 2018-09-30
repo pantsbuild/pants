@@ -1,0 +1,9 @@
+[package]
+name = "serverset"
+version = "0.0.1"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+num-rational = "0.2.1"
+parking_lot = "0.6"
