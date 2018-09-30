@@ -212,9 +212,10 @@ class NailgunClient(object):
       sock.close()
       raise self.NailgunConnectionError(
         address=self._address_string,
-        pid=self.pid,
+        pid=self._maybe_last_pid(),
+        pgrp=self._maybe_last_pgrp(),
         wrapped_exc=e,
-        traceback=sys.exc_info()[2]
+        traceback=sys.exc_info()[2],
       )
     else:
       return sock
