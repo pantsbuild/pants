@@ -8,6 +8,8 @@ import os
 import struct
 from builtins import bytes, object, str, zip
 
+from pants.util.osutil import IntegerForPid
+
 
 STDIO_DESCRIPTORS = (0, 1, 2)
 
@@ -246,14 +248,14 @@ class NailgunProtocol(object):
   @classmethod
   def send_pid(cls, sock, pid):
     """Send the PID chunk over the specified socket."""
-    assert(isinstance(pid, int) and pid > 0)
+    assert(isinstance(pid, IntegerForPid) and pid > 0)
     encoded_int = cls.encode_int(pid)
     cls.write_chunk(sock, ChunkType.PID, encoded_int)
 
   @classmethod
   def send_pgrp(cls, sock, pgrp):
     """Send the PGRP chunk over the specified socket."""
-    assert(isinstance(pgrp, int) and pgrp < 0)
+    assert(isinstance(pgrp, IntegerForPid) and pgrp < 0)
     encoded_int = cls.encode_int(pgrp)
     cls.write_chunk(sock, ChunkType.PGRP, encoded_int)
 

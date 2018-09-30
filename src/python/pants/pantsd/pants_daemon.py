@@ -241,7 +241,6 @@ class PantsDaemon(FingerprintedProcessManager):
     self._lifecycle_lock = threading.RLock()
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._kill_switch = threading.Event()
-    self._exiter = Exiter()
 
   @memoized_property
   def watchman_launcher(self):
@@ -364,11 +363,13 @@ class PantsDaemon(FingerprintedProcessManager):
     # Switch log output to the daemon's log stream from here forward.
     self._close_stdio()
     with self._pantsd_logging() as log_stream:
+      # We don't have any stdio streams to log to anymore, but we can get tracebacks of the pantsd
+      # process by tailing the pantsd log and sending it SIGUSR2.
+      ExceptionSink.reset_interactive_output_stream(log_stream)
       global_bootstrap_options = self._bootstrap_options.for_global_scope()
       ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
-      ExceptionSink.reset_interactive_output_stream(log_stream)
-      self._exiter.should_print_backtrace = global_bootstrap_options.print_exception_stacktrace
-      ExceptionSink.reset_exiter(self._exiter)
+      exiter = Exiter(print_backtraces=global_bootstrap_options.print_exception_stacktrace)
+      ExceptionSink.reset_exiter(exiter)
       self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
       self._native.set_panic_handler()

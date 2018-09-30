@@ -15,6 +15,7 @@ from builtins import object, str
 
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.meta import classproperty
 from pants.util.osutil import IntegerForPid
 
 
@@ -53,8 +54,14 @@ class ExceptionSink(object):
     signal.SIGQUIT,
   ]
 
-  @classmethod
-  def _all_handled_signals(cls):
+  @classproperty
+  def all_gracefully_handled_signals(cls):
+    """Return all the signals which are handled when calling reset_log_location().
+
+    These signals are handled by the method handle_signal_gracefully().
+
+    NB: A very basic SIGUSR2 handler is installed by reset_interactive_output_stream().
+    """
     return cls.GRACEFULLY_HANDLED_SIGNALS + cls.KEYBOARD_INTERRUPT_SIGNALS
 
   def __new__(cls, *args, **kwargs):
@@ -93,10 +100,7 @@ class ExceptionSink(object):
     # Send a stacktrace to this file if interrupted by a fatal error.
     faulthandler.enable(file=pid_specific_error_stream, all_threads=True)
     # Log a timestamped exception and exit gracefully on non-fatal signals.
-    # TODO: ascertain whether the the signal handler method used here is signal-safe for our
-    # purposes.
-    all_handled_signals = cls._all_handled_signals()
-    for signum in all_handled_signals:
+    for signum in cls.all_gracefully_handled_signals:
       signal.signal(signum, cls.handle_signal_gracefully)
 
     # NB: mutate the class variables!
@@ -278,7 +282,7 @@ Exception message: {exception_message}{maybe_newline}
 
   @classmethod
   def _log_unhandled_exception_and_exit(cls, exc_class=None, exc=None, tb=None, add_newline=False):
-    """Default sys.excepthook implementation for unhandled exceptions."""
+    """A sys.excepthook implementation which logs the error and exits with failure."""
     exc_class = exc_class or sys.exc_info()[0]
     exc = exc or sys.exc_info()[1]
     tb = tb or sys.exc_info()[2]
@@ -311,6 +315,13 @@ Signal {signum} was raised. Exiting with failure.
 
   @classmethod
   def handle_signal_gracefully(cls, signum, frame):
+    """Signal handler for non-fatal signals which raises or logs an error and exits with failure.
+
+    NB: This method is registered for exactly the signals in
+    ExceptionSink.all_gracefully_handled_signals!
+
+    :raises: :class:`KeyboardInterrupt` if `signum` is in ExceptionSink.KEYBOARD_INTERRUPT_SIGNALS.
+    """
     if signum in cls.KEYBOARD_INTERRUPT_SIGNALS:
       raise KeyboardInterrupt('User interrupted execution with control-c!')
     # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
@@ -319,6 +330,7 @@ Signal {signum} was raised. Exiting with failure.
       return
     cls._is_handling_signal = True
     tb = frame.f_exc_traceback
+    # TODO: get the current backtrace! `tb` appears to always be None.
     should_print_backtrace = tb is not None
     formatted_traceback = cls._format_traceback(tb, should_print_backtrace=should_print_backtrace)
     signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
