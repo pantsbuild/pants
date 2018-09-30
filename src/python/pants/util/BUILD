@@ -38,7 +38,7 @@ python_library(
   sources = ['desktop.py'],
   dependencies = [
     ':osutil',
-    'src/python/pants/util:process_handler',
+    ':process_handler',
   ],
 )
 
