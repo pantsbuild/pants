@@ -261,6 +261,7 @@ class DaemonPantsRunner(ProcessManager):
     # the `pantsd.log`. This ensures that in the event of e.g. a hung but detached pantsd-runner
     # process that the stacktrace output lands deterministically in a known place vs to a stray
     # terminal window.
+    # TODO: test the above!
     ExceptionSink.reset_exiter(self._exiter)
     ExceptionSink.reset_interactive_output_stream(sys.stderr)
 
@@ -279,7 +280,6 @@ class DaemonPantsRunner(ProcessManager):
     with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
          hermetic_environment_as(**self._env):
       try:
-        ExceptionSink.reset_interactive_output_stream(sys.stderr)
         # Setup the Exiter's finalizer.
         self._exiter.set_finalizer(finalizer)
 
