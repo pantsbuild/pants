@@ -13,6 +13,7 @@ from builtins import object, str
 
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
 
 
@@ -219,6 +220,16 @@ class NailgunClient(object):
       )
     else:
       return sock
+
+  def maybe_send_signal(self, signum, include_pgrp=True):
+    """???/only send if the appropriate chunks have been received"""
+    remote_pid = self._maybe_last_pid()
+    if remote_pid is not None:
+      safe_kill(remote_pid, signum)
+    if include_pgrp:
+      remote_pgrp = self._maybe_last_pgrp()
+      if remote_pgrp:
+        safe_kill(remote_pgrp, signum)
 
   def execute(self, main_class, cwd=None, *args, **environment):
     """Executes the given main_class with any supplied args in the given environment.

@@ -329,17 +329,20 @@ Signal {signum} was raised. Exiting with failure.
     if cls._is_handling_signal:
       return
     cls._is_handling_signal = True
-    tb = frame.f_exc_traceback
-    # TODO: get the current backtrace! `tb` appears to always be None.
-    should_print_backtrace = tb is not None
-    formatted_traceback = cls._format_traceback(tb, should_print_backtrace=should_print_backtrace)
+    tb = frame.f_exc_traceback or sys.exc_info()[2]
+    formatted_traceback = cls._format_traceback(tb, should_print_backtrace=True)
     signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
       formatted_traceback=formatted_traceback)
     # This method catches any exceptions raised within it.
     cls.log_exception(signal_error_log_entry)
-    # NB: We always print the traceback to the terminal in this case.
-    cls._exit_with_failure(signal_error_log_entry)
+    formatted_traceback_for_terminal = cls._format_traceback(
+      tb, should_print_backtrace=cls._exiter.should_print_backtrace)
+    terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
+      signum=signum,
+      formatted_traceback=formatted_traceback_for_terminal)
+    cls._exit_with_failure(terminal_log_entry)
+
 
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
