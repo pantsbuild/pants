@@ -134,16 +134,16 @@ class ExceptionSink(object):
 
     This is where the the error message on exit will be printed to as well.
     """
+    # NB: mutate process-global state!
     # TODO: chain=True will log tracebacks to previous values of the trace stream as well -- what
     # happens if those file objects are eventually closed? Does faulthandler just ignore them?
     # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
-    # NB: mutate process-global state!
     faulthandler.register(signal.SIGUSR2, interactive_output_stream, chain=True)
-    # We don't *necessarily* need to keep a reference to this, but we do here for clarity.
+
     # NB: mutate the class variables!
+    # We don't *necessarily* need to keep a reference to this, but we do here for clarity.
     cls._interactive_output_stream = interactive_output_stream
 
-  # TODO: make this method private when the RemotePantsRunner no longer needs it!
   @classmethod
   def exceptions_log_path(cls, for_pid=None, in_dir=None):
     """Get the path to either the shared or pid-specific fatal errors log file."""
@@ -225,7 +225,7 @@ class ExceptionSink(object):
 
     # TODO: determine whether any further validation of the streams (try writing to them here?) is
     # useful/necessary for faulthandler (it seems it just doesn't write to e.g. closed file
-    # descriptors, so probably not).
+    # descriptors, so probably not?).
     return (pid_specific_error_stream, shared_error_stream)
 
   @classmethod
@@ -312,8 +312,6 @@ Signal {signum} was raised. Exiting with failure.
 {formatted_traceback}
 """
 
-  _is_handling_signal = False
-
   @classmethod
   def handle_signal_gracefully(cls, signum, frame):
     """Signal handler for non-fatal signals which raises or logs an error and exits with failure.
@@ -325,18 +323,19 @@ Signal {signum} was raised. Exiting with failure.
     """
     if signum in cls.KEYBOARD_INTERRUPT_SIGNALS:
       raise KeyboardInterrupt('User interrupted execution with control-c!')
-    # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
-    # descriptors re-entrantly, which raises an IOError). This is a best-effort solution.
-    if cls._is_handling_signal:
-      return
-    cls._is_handling_signal = True
     tb = frame.f_exc_traceback or sys.exc_info()[2]
+
+    # Format an entry to be written to the exception log.
     formatted_traceback = cls._format_traceback(tb, should_print_backtrace=bool(tb))
     signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
       formatted_traceback=formatted_traceback)
+    # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
+    # descriptors re-entrantly, which raises an IOError).
     # This method catches any exceptions raised within it.
     cls.log_exception(signal_error_log_entry)
+
+    # Format a message to be printed to the terminal or other interactive stream, if applicable.
     formatted_traceback_for_terminal = cls._format_traceback(
       tb, should_print_backtrace=cls._exiter.should_print_backtrace and bool(tb))
     terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(

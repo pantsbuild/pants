@@ -445,6 +445,8 @@ Signal {signum} was raised\\. Exiting with failure\\.
 """.format(pid=parent_runner_pid, signum=signal.SIGTERM))
 
   def _assert_pantsd_keyboardinterrupt_signal(self, signum):
+    # TODO: This tests that pantsd-runner processes actually die after the thin client receives the
+    # specified signal.
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
       file_to_make = os.path.join(workdir, 'some_magic_file')
@@ -465,6 +467,11 @@ Signal {signum} was raised\\. Exiting with failure\\.
       self.assert_failure(waiter_run)
       self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
 
+      # TODO: SIGTERM should be tested as well, but the expected behavior is a little different --
+      # we should test that the pantsd-runner process exits with failure (if possible -- see the
+      # caveat on psutil below), and then check the remote process's fatal error log to confirm the
+      # remote pantsd-runner receives a SIGTERM and dies.
+
       time.sleep(1)
       for proc in pantsd_runner_processes:
         # TODO: we could be checking the return codes of the subprocesses, but psutil is currently
@@ -472,12 +479,14 @@ Signal {signum} was raised\\. Exiting with failure\\.
         # The pantsd-runner processes should be dead, and they should have exited with 1.
         self.assertFalse(proc.is_running())
 
-  @unittest.skip('TODO: issue link!')
+  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
   def test_pantsd_control_c(self):
     self._assert_pantsd_keyboardinterrupt_signal(signal.SIGINT)
 
-  @unittest.skip('TODO: issue link!')
+  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
   def test_pantsd_sigquit(self):
+    # We convert a local SIGQUIT in the thin client process -> SIGINT on the remote end in
+    # RemotePantsRunner.
     self._assert_pantsd_keyboardinterrupt_signal(signal.SIGQUIT)
 
   def test_pantsd_environment_scrubbing(self):

@@ -95,7 +95,10 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
           recursively_update(pantsd_config, extra_config)
         print('>>> config: \n{}\n'.format(pantsd_config))
         checker = PantsDaemonMonitor(runner_process_context, pid_dir)
-        self.assert_runner(workdir, pantsd_config, ['kill-pantsd'])
+        # TODO(#6574): this should be 1, but when we kill pantsd with a signal it doesn't make sure
+        # to close the run tracker -- we can easily address this by moving that cleanup into the
+        # Exiter.
+        self.assert_runner(workdir, pantsd_config, ['kill-pantsd'], expected_runs=0)
         try:
           yield workdir, pantsd_config, checker
         finally:
@@ -158,16 +161,16 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     print(bold(cyan('\ncompleted in {} seconds'.format(elapsed))))
 
     # TODO: uncomment this and add an issue link!
-    # run_count = self._run_count(workdir)
-    # runs_created = self._run_count(workdir) - run_count
-    # self.assertEqual(
-    #     runs_created,
-    #     expected_runs,
-    #     'Expected {} RunTracker run to be created per pantsd run: was {}'.format(
-    #       expected_runs,
-    #       runs_created,
-    #     )
-    # )
+    run_count = self._run_count(workdir)
+    runs_created = self._run_count(workdir) - run_count
+    self.assertEqual(
+        runs_created,
+        expected_runs,
+        'Expected {} RunTracker run to be created per pantsd run: was {}'.format(
+          expected_runs,
+          runs_created,
+        )
+    )
     if success:
       self.assert_success(run)
     else:

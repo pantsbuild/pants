@@ -33,7 +33,7 @@ class DaemonExiter(Exiter):
   def __init__(self, socket):
     # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
     # sys.exit behavior.
-    # TODO: test this behavior!
+    # TODO: The behavior we're avoiding with the use of os._exit should be described and tested.
     super(DaemonExiter, self).__init__(exiter=os._exit)
     self._socket = socket
     self._finalizer = None

@@ -44,9 +44,10 @@ class TestExceptionSink(TestBase):
       sink.reset_log_location('/does/not/exist')
 
 
-    # OSX errors out at creating a new directory with safe_mkdir(), Linux errors out trying to
-    # create the directory for its log files with safe_open().
-    # TODO: figure out why this is the case!
+    # NB: This target is marked with 'platform_specific_behavior' because OSX errors out here at
+    # creating a new directory with safe_mkdir(), Linux errors out trying to create the directory
+    # for its log files with safe_open(). This may be due to differences in the filesystems.
+    # TODO: figure out why we error out at different points here!
     if get_normalized_os_name() == 'darwin':
       err_rx = re.escape("The provided exception sink path at '/' is not writable or could not be created: [Errno 21] Is a directory: '/'.")
     else:

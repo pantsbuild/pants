@@ -73,9 +73,9 @@ class NailgunClientSession(NailgunProtocol):
     """Process the outputs of the nailgun session."""
     try:
       for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True):
-        # TODO: assert that we have at this point received all the chunk types in
-        # ChunkType.REQUEST_TYPES, then require PID and PGRP (exactly once?), then require
-        # START_READING_INPUT alone, and then allow any of ChunkType.EXECUTION_TYPES.
+        # TODO(#6579): assert that we have at this point received all the chunk types in
+        # ChunkType.REQUEST_TYPES, then require PID and PGRP (exactly once?), and then allow any of
+        # ChunkType.EXECUTION_TYPES.
         if chunk_type == ChunkType.STDOUT:
           self._write_flush(self._stdout, payload)
         elif chunk_type == ChunkType.STDERR:
@@ -171,8 +171,8 @@ class NailgunClient(object):
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
     :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
+    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are encountered
     """
-    # TODO: add back the removed docstring for exit_on_broken_pipe above!
     self._host = host
     self._port = port
     self._address = (host, port)
@@ -222,7 +222,10 @@ class NailgunClient(object):
       return sock
 
   def maybe_send_signal(self, signum, include_pgrp=True):
-    """???/only send if the appropriate chunks have been received"""
+    """Send the signal `signum` send if the PID and/or PGRP chunks have been received.
+
+    No error is raised if the pid or pgrp are None or point to an already-dead process.
+    """
     remote_pid = self._maybe_last_pid()
     if remote_pid is not None:
       safe_kill(remote_pid, signum)
@@ -247,9 +250,9 @@ class NailgunClient(object):
 
     sock = self.try_connect()
 
-    # TODO: NailgunClientSession currently requires callbacks because it can't depend on having
-    # received these chunks, so we need to avoid clobbering these fields until we initialize a new
-    # session.
+    # TODO(#6579): NailgunClientSession currently requires callbacks because it can't depend on
+    # having received these chunks, so we need to avoid clobbering these fields until we initialize
+    # a new session.
     self._current_remote_pid = None
     self._current_remote_pgrp = None
     self._session = NailgunClientSession(

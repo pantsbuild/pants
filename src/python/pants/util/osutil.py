@@ -88,7 +88,7 @@ def safe_kill(pid, signum):
 
 
 # TODO: use this as the default value for the global --binaries-path-by-id option!
-# panstd testing fails saying no run trackers were created when I tried to do this.
+# pantsd testing fails saying no run trackers were created when I tried to do this.
 SUPPORTED_PLATFORM_NORMALIZED_NAMES = {
   ('linux', 'x86_64'): ('linux', 'x86_64'),
   ('linux', 'amd64'): ('linux', 'x86_64'),
