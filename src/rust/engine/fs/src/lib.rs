@@ -74,6 +74,7 @@ extern crate tempfile;
 extern crate testutil;
 #[macro_use]
 extern crate serde_derive;
+extern crate uuid;
 
 use std::cmp::min;
 use std::io::{self, Read};
