@@ -7,5 +7,6 @@ jvm_binary(
   main='org.pantsbuild.testproject.cwdexample.ExampleCwd',
   dependencies=[
     "3rdparty:guava",
+    "testprojects/3rdparty/checkstyle"
   ]
 )
