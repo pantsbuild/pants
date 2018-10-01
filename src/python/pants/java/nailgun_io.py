@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from contextlib2 import ExitStack
 
-from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.java.nailgun_protocol import ChunkType, NailgunProtocol, PailgunProtocol
 
 
 @contextmanager
@@ -86,12 +86,12 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
       reader = NailgunStreamStdinReader(sock, os.fdopen(write_fd, 'wb'))
       with reader.running():
         # Instruct the thin client to begin reading and sending stdin.
-        NailgunProtocol.send_start_reading_input(sock)
+        PailgunProtocol.send_start_reading_input(sock)
         yield read_fd
 
   def run(self):
     try:
-      for chunk_type, payload in NailgunProtocol.iter_chunks(self._socket, return_bytes=True):
+      for chunk_type, payload in PailgunProtocol.iter_chunks(self._socket, return_bytes=True):
         if self.is_stopped:
           return
 
@@ -191,14 +191,14 @@ class NailgunStreamWriter(_StoppableDaemonThread):
             # We've reached EOF.
             try:
               if self._chunk_eof_type is not None:
-                NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
+                PailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
             finally:
               try:
                 os.close(fileno)
               finally:
                 self._in_fds.remove(fileno)
           else:
-            NailgunProtocol.write_chunk(
+            PailgunProtocol.write_chunk(
               self._socket,
               self._fileno_chunk_type_map[fileno],
               data

@@ -11,7 +11,9 @@ import threading
 import time
 import unittest
 from builtins import open, range, zip
+from contextlib import contextmanager
 
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import read_pantsd_log
@@ -417,8 +419,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
-  @unittest.skip("Broken: https://github.com/pantsbuild/pants/issues/6778")
-  def test_pantsd_parent_runner_killed(self):
+  @contextmanager
+  def _pantsd_waiter(self):
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
       file_to_make = os.path.join(workdir, 'some_magic_file')
@@ -432,13 +434,15 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       time.sleep(5)
       checker.assert_started()
 
+      pantsd_runner_processes = checker.runner_process_context.current_processes()
+
+      yield waiter_handle, pantsd_runner_processes, checker
+
+  def test_pantsd_killed_run(self):
+    with self._pantsd_waiter() as (waiter_handle, pantsd_runner_processes):
       # Locate the single "parent" pantsd-runner process, and kill it.
-      pantsd_runner_processes = [p for p in checker.runner_process_context.current_processes()
-                                 if p.ppid() == 1]
-      self.assertEquals(1, len(pantsd_runner_processes))
-      parent_runner_process = pantsd_runner_processes[0]
-      # Send SIGTERM
-      parent_runner_process.terminate()
+      pantsd_runner_parents = [p for p in pantsd_runner_processes if p.ppid() == 1]
+      assert_single_element(pantsd_runner_parents).terminate()
       waiter_run = waiter_handle.join()
 
       # Ensure that we saw the pantsd-runner process's failure in the client's stderr.
@@ -485,8 +489,9 @@ Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
         # The pantsd-runner processes should be dead, and they should have exited with 1.
         self.assertFalse(proc.is_running())
 
+  # TODO: deduplicate these methods!
   @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
-  def test_pantsd_control_c(self):
+  def test_pantsd_control_c_2(self):
     self._assert_pantsd_keyboardinterrupt_signal(signal.SIGINT)
 
   @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
@@ -494,6 +499,31 @@ Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
     # We convert a local SIGQUIT in the thin client process -> SIGINT on the remote end in
     # RemotePantsRunner.
     self._assert_pantsd_keyboardinterrupt_signal(signal.SIGQUIT)
+
+  def _assert_pantsd_dead_from_signal(self, signum):
+    with self._pantsd_waiter() as (waiter_handle, pantsd_runner_processes, checker):
+      # Kill the thin client process with the given signal
+      os.kill(waiter_handle.process.pid, signum)
+      waiter_run = waiter_handle.join()
+      self.assert_failure(waiter_run)
+
+      time.sleep(1)
+      for proc in pantsd_runner_processes:
+        # TODO: we could be checking the return codes of the subprocesses, but psutil is currently
+        # limited on non-Windows hosts -- see https://psutil.readthedocs.io/en/latest/#processes.
+        # The pantsd-runner processes should be dead, and they should have exited with 1.
+        self.assertFalse(proc.is_running())
+
+      return waiter_run
+
+  def test_pantsd_control_c(self):
+    waiter_run = self._assert_pantsd_dead_from_signal(signal.SIGINT)
+    self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
+    self.assertIn('???', waiter_run.stderr_data)
+
+  def test_pantsd_terminate(self):
+    waiter_run = self._assert_pantsd_dead_from_signal(signal.SIGTERM)
+    self.assertIn('\nSignal 15 was raised. Exiting with failure.\n\n\n', waiter_run.stderr_data)
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env

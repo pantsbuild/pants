@@ -21,7 +21,7 @@ from pants.base.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
-from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.java.nailgun_protocol import PailgunChunkType, PailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import hermetic_environment_as, stdio_as
@@ -50,7 +50,7 @@ class DaemonExiter(Exiter):
         self._finalizer()
       except Exception as e:
         try:
-          NailgunProtocol.send_stderr(
+          PailgunProtocol.send_stderr(
             self._socket,
             '\nUnexpected exception in finalizer: {!r}\n'.format(e)
           )
@@ -60,10 +60,10 @@ class DaemonExiter(Exiter):
     try:
       # Write a final message to stderr if present.
       if msg:
-        NailgunProtocol.send_stderr(self._socket, msg)
+        PailgunProtocol.send_stderr(self._socket, msg)
 
       # Send an Exit chunk with the result.
-      NailgunProtocol.send_exit_with_code(self._socket, result)
+      PailgunProtocol.send_exit_with_code(self._socket, result)
 
       # Shutdown the connected socket.
       teardown_socket(self._socket)
@@ -157,7 +157,7 @@ class DaemonPantsRunner(ProcessManager):
     # character device for output redirection - eliminating the need to directly marshall any
     # interactive stdio back/forth across the socket and permitting full, correct tty control with
     # no middle-man.
-    stdin_ttyname, stdout_ttyname, stderr_ttyname = NailgunProtocol.ttynames_from_env(env)
+    stdin_ttyname, stdout_ttyname, stderr_ttyname = PailgunProtocol.ttynames_from_env(env)
     assert stdin_ttyname == stdout_ttyname == stderr_ttyname, (
       'expected all stdio ttys to be the same, but instead got: {}\n'
       'please file a bug at http://github.com/pantsbuild/pants'
@@ -175,8 +175,8 @@ class DaemonPantsRunner(ProcessManager):
   def _pipe_stdio(cls, sock, stdin_isatty, stdout_isatty, stderr_isatty, handle_stdin):
     """Handles stdio redirection in the case of pipes and/or mixed pipes and ttys."""
     stdio_writers = (
-      (ChunkType.STDOUT, stdout_isatty),
-      (ChunkType.STDERR, stderr_isatty)
+      (PailgunChunkType.STDOUT, stdout_isatty),
+      (PailgunChunkType.STDERR, stderr_isatty)
     )
     types, ttys = zip(*(stdio_writers))
 
@@ -215,7 +215,7 @@ class DaemonPantsRunner(ProcessManager):
   def nailgunned_stdio(cls, sock, env, handle_stdin=True):
     """Redirects stdio to the connected socket speaking the nailgun protocol."""
     # Determine output tty capabilities from the environment.
-    stdin_isatty, stdout_isatty, stderr_isatty = NailgunProtocol.isatty_from_env(env)
+    stdin_isatty, stdout_isatty, stderr_isatty = PailgunProtocol.isatty_from_env(env)
     is_tty_capable = all((stdin_isatty, stdout_isatty, stderr_isatty))
 
     if is_tty_capable:
@@ -292,8 +292,8 @@ class DaemonPantsRunner(ProcessManager):
 
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
-    NailgunProtocol.send_pid(self._socket, os.getpid())
-    NailgunProtocol.send_pgrp(self._socket, os.getpgrp() * -1)
+    PailgunProtocol.send_pid(self._socket, os.getpid())
+    PailgunProtocol.send_pgrp(self._socket, os.getpgrp() * -1)
 
     # Stop the services that were paused pre-fork.
     for service in self._services.services:
@@ -305,6 +305,8 @@ class DaemonPantsRunner(ProcessManager):
       try:
         # Setup the Exiter's finalizer.
         self._exiter.set_finalizer(finalizer)
+        # TODO: ???
+        # self._exiter.set_except_hook(sys.stderr)
 
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)

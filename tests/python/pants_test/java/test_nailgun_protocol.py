@@ -4,12 +4,14 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
 import socket
 import unittest
 
 import mock
 
-from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.java.nailgun_protocol import (ChunkType, NailgunProtocol, PailgunChunkType,
+                                         PailgunProtocol)
 
 
 class TestChunkType(unittest.TestCase):
@@ -26,7 +28,13 @@ class TestChunkType(unittest.TestCase):
     self.assertIsNotNone(ChunkType.EXIT)
 
 
-class TestNailgunProtocol(unittest.TestCase):
+class TestPailgunChunkType(unittest.TestCase):
+  def test_pailgun_chunktype_constants(self):
+    self.assertIsNotNone(PailgunChunkType.PGRP)
+    self.assertIsNotNone(PailgunChunkType.PID)
+
+
+class NailgunProtocolTestBase(unittest.TestCase):
   EMPTY_PAYLOAD = ''
   TEST_COMMAND = 'test'
   TEST_OUTPUT = 't e s t'
@@ -41,6 +49,9 @@ class TestNailgunProtocol(unittest.TestCase):
   def tearDown(self):
     self.client_sock.close()
     self.server_sock.close()
+
+
+class TestNailgunProtocol(NailgunProtocolTestBase):
 
   def test_send_and_parse_request(self):
     # Send a test request over the client socket.
@@ -175,24 +186,6 @@ class TestNailgunProtocol(unittest.TestCase):
       (ChunkType.EXIT, self.TEST_OUTPUT)
     )
 
-  def test_send_pgrp(self):
-    test_pgrp = -1
-    NailgunProtocol.send_pgrp(self.server_sock, test_pgrp)
-    chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock, return_bytes=True)
-    self.assertEqual(
-      (chunk_type, payload),
-      (ChunkType.PGRP, NailgunProtocol.encode_int(test_pgrp))
-    )
-
-  def test_send_pid(self):
-    test_pid = 1
-    NailgunProtocol.send_pid(self.server_sock, test_pid)
-    chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock, return_bytes=True)
-    self.assertEqual(
-      (chunk_type, payload),
-      (ChunkType.PID, NailgunProtocol.encode_int(test_pid))
-    )
-
   def test_send_exit_with_code(self):
     return_code = 1
     NailgunProtocol.send_exit_with_code(self.server_sock, return_code)
@@ -280,3 +273,43 @@ class TestNailgunProtocol(unittest.TestCase):
 
   def test_construct_chunk_bytes(self):
     NailgunProtocol.construct_chunk(ChunkType.STDOUT, b'yes')
+
+
+class TestPailgunProtocol(NailgunProtocolTestBase):
+
+  def test_send_and_parse_remote_process_initialization_sequence(self):
+    PailgunProtocol.send_pid(self.client_sock, 1)
+    PailgunProtocol.send_pgrp(self.client_sock, -1)
+    PailgunProtocol.send_start_reading_input(self.client_sock)
+
+    self.assertEqual(
+      PailgunProtocol.parse_remote_process_initialization_sequence(self.server_sock),
+      PailgunProtocol.ProcessInitialized(1, -1))
+
+  def test_invalid_remote_process_initialization_sequence(self):
+    PailgunProtocol.send_exit_with_code(self.client_sock, 1)
+    err_rx = re.escape("invalid chunk type: X (valid types: ['P'])")
+    with self.assertRaisesRegexp(NailgunProtocol.InvalidChunkType, err_rx):
+      PailgunProtocol.parse_remote_process_initialization_sequence(self.server_sock)
+
+    PailgunProtocol.send_pid(self.client_sock, 1)
+    PailgunProtocol.send_start_reading_input(self.client_sock)
+    err_rx = re.escape("invalid chunk type: S (valid types: ['G'])")
+    with self.assertRaisesRegexp(NailgunProtocol.InvalidChunkType, err_rx):
+      PailgunProtocol.parse_remote_process_initialization_sequence(self.server_sock)
+
+  def test_send_pid(self):
+    test_pid = 1
+    PailgunProtocol.send_pid(self.server_sock, test_pid)
+    chunk_type, payload = PailgunProtocol.read_chunk(self.client_sock, return_bytes=True)
+    self.assertEqual(
+      (chunk_type, payload),
+      (PailgunChunkType.PID, PailgunProtocol.encode_int(test_pid)))
+
+  def test_send_pgrp(self):
+    test_pgrp = -1
+    PailgunProtocol.send_pgrp(self.server_sock, test_pgrp)
+    chunk_type, payload = PailgunProtocol.read_chunk(self.client_sock, return_bytes=True)
+    self.assertEqual(
+      (chunk_type, payload),
+      (PailgunChunkType.PGRP, PailgunProtocol.encode_int(test_pgrp)))

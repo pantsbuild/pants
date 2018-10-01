@@ -154,16 +154,34 @@ class LocalPantsRunner(object):
     self._profile_path = profile_path
 
     self._run_start_time = None
+    self._run_tracker = None
+    self._reporting = None
+    self._repro = None
+
     self._global_options = options.for_global_scope()
 
   def set_start_time(self, start_time):
+    # Launch RunTracker as early as possible (just after Subsystem options are initialized).
+    run_tracker = RunTracker.global_instance()
+    reporting = Reporting.global_instance()
+    reporting.initialize(run_tracker, start_time)
+
+    # Capture a repro of the 'before' state for this build, if needed.
+    repro = Reproducer.global_instance().create_repro()
+    if repro:
+      repro.capture(run_tracker.run_info.get_as_dict())
+
+    # Set all these fields at once for exception-safety.
     self._run_start_time = start_time
+    self._run_tracker = run_tracker
+    self._reporting = reporting
+    self._repro = repro
 
   def run(self):
     with maybe_profiled(self._profile_path):
       self._run()
 
-  def _maybe_run_v1(self, run_tracker, reporting):
+  def _maybe_run_v1(self):
     if not self._global_options.v1:
       return 0
 
@@ -172,8 +190,8 @@ class LocalPantsRunner(object):
       self._build_root,
       self._options,
       self._build_config,
-      run_tracker,
-      reporting,
+      self._run_tracker,
+      self._reporting,
       self._graph_session,
       self._target_roots,
       self._exiter
@@ -217,25 +235,15 @@ class LocalPantsRunner(object):
     return max_code
 
   def _run(self):
-    # Launch RunTracker as early as possible (just after Subsystem options are initialized).
-    run_tracker = RunTracker.global_instance()
-    reporting = Reporting.global_instance()
-    reporting.initialize(run_tracker, self._options, self._run_start_time)
-
     try:
-      # Capture a repro of the 'before' state for this build, if needed.
-      repro = Reproducer.global_instance().create_repro()
-      if repro:
-        repro.capture(run_tracker.run_info.get_as_dict())
-
       engine_result = self._maybe_run_v2()
-      goal_runner_result = self._maybe_run_v1(run_tracker, reporting)
+      goal_runner_result = self._maybe_run_v1()
 
-      if repro:
+      if self._repro:
         # TODO: Have Repro capture the 'after' state (as a diff) as well?
-        repro.log_location_of_repro_file()
+        self._repro.log_location_of_repro_file()
     finally:
-      run_tracker_result = run_tracker.end()
+      run_tracker_result = self._run_tracker.end()
 
     final_exit_code = self._compute_final_exit_code(
       engine_result,

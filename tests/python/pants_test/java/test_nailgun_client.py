@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
 import signal
 import socket
 import unittest
@@ -11,9 +12,9 @@ from builtins import object
 
 import mock
 
-from pants.java.nailgun_client import NailgunClient, NailgunClientSession
+from pants.java.nailgun_client import PailgunClient, PailgunClientSession
 from pants.java.nailgun_io import NailgunStreamWriter
-from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.java.nailgun_protocol import NailgunProtocol, PailgunProtocol
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -33,9 +34,10 @@ class FakeFile(object):
     return
 
 
-class TestNailgunClientSession(unittest.TestCase):
+class TestPailgunClientSession(unittest.TestCase):
   BAD_CHUNK_TYPE = b';'
   TEST_PAYLOAD = b't e s t'
+  TEST_EXIT_CODE = 13
   TEST_WORKING_DIR = '/test_working_dir'
   TEST_MAIN_CLASS = 'test_main_class'
   TEST_ARGUMENTS = [b't', b'e', b's', b't']
@@ -47,7 +49,7 @@ class TestNailgunClientSession(unittest.TestCase):
     self.fake_stdout = FakeFile()
     self.fake_stderr = FakeFile()
 
-    self.nailgun_client_session = NailgunClientSession(
+    self.pailgun_client_session = PailgunClientSession(
       sock=self.client_sock,
       in_file=None,
       out_file=self.fake_stdout,
@@ -56,78 +58,103 @@ class TestNailgunClientSession(unittest.TestCase):
 
     self.mock_stdin_reader = mock.create_autospec(NailgunStreamWriter, spec_set=True)
     self.mock_stdin_reader.is_alive.side_effect = [False, True]
-    self.nailgun_client_session._input_writer = self.mock_stdin_reader
+    self.pailgun_client_session._input_writer = self.mock_stdin_reader
 
   def tearDown(self):
     self.server_sock.close()
     self.client_sock.close()
 
   def test_input_writer_start_stop(self):
-    self.nailgun_client_session._maybe_start_input_writer()
+    self.pailgun_client_session._maybe_start_input_writer()
     self.mock_stdin_reader.start.assert_called_once_with()
 
-    self.nailgun_client_session._maybe_stop_input_writer()
+    self.pailgun_client_session._maybe_stop_input_writer()
     self.mock_stdin_reader.stop.assert_called_once_with()
 
   def test_input_writer_noop(self):
-    self.nailgun_client_session._input_writer = None
-    self.nailgun_client_session._maybe_start_input_writer()
-    self.nailgun_client_session._maybe_stop_input_writer()
+    self.pailgun_client_session._input_writer = None
+    self.pailgun_client_session._maybe_start_input_writer()
+    self.pailgun_client_session._maybe_stop_input_writer()
 
   def test_process_session(self):
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b'31337')
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.START_READING_INPUT)
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDOUT, self.TEST_PAYLOAD)
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDERR, self.TEST_PAYLOAD)
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDERR, self.TEST_PAYLOAD)
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDOUT, self.TEST_PAYLOAD)
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDERR, self.TEST_PAYLOAD)
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.EXIT, b'1729')
-    self.assertEqual(self.nailgun_client_session._process_session(), 1729)
+    PailgunProtocol.send_pid(self.server_sock, 31337)
+    PailgunProtocol.send_pgrp(self.server_sock, -31336)
+    PailgunProtocol.send_start_reading_input(self.server_sock)
+    PailgunProtocol.send_stdout(self.server_sock, self.TEST_PAYLOAD)
+    PailgunProtocol.send_stderr(self.server_sock, self.TEST_PAYLOAD)
+    PailgunProtocol.send_stderr(self.server_sock, self.TEST_PAYLOAD)
+    PailgunProtocol.send_stdout(self.server_sock, self.TEST_PAYLOAD)
+    PailgunProtocol.send_stderr(self.server_sock, self.TEST_PAYLOAD)
+    PailgunProtocol.send_exit_with_code(self.server_sock, 1729)
+
+    with self.pailgun_client_session.negotiate(
+        self.TEST_WORKING_DIR,
+        self.TEST_MAIN_CLASS,
+        *self.TEST_ARGUMENTS,
+        **self.TEST_ENVIRON) as remote_process_info:
+      self.assertEqual(remote_process_info, PailgunProtocol.ProcessInitialized(31337, -31336))
+      out = self.pailgun_client_session.process_session()
+
+    self.assertEqual(out, 1729)
     self.assertEqual(self.fake_stdout.content, self.TEST_PAYLOAD * 2)
     self.assertEqual(self.fake_stderr.content, self.TEST_PAYLOAD * 3)
     self.mock_stdin_reader.start.assert_called_once_with()
     self.mock_stdin_reader.stop.assert_called_once_with()
-    self.assertEqual(self.nailgun_client_session.remote_pid, 31337)
 
   def test_process_session_bad_chunk(self):
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b'31337')
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.START_READING_INPUT)
-    NailgunProtocol.write_chunk(self.server_sock, self.BAD_CHUNK_TYPE, '')
+    PailgunProtocol.send_pid(self.server_sock, 31337)
+    PailgunProtocol.send_pgrp(self.server_sock, -31336)
+    PailgunProtocol.send_start_reading_input(self.server_sock)
+    PailgunProtocol.write_chunk(self.server_sock, self.BAD_CHUNK_TYPE, '')
 
-    with self.assertRaises(NailgunClientSession.ProtocolError):
-      self.nailgun_client_session._process_session()
+    with self.pailgun_client_session.negotiate(
+        self.TEST_WORKING_DIR,
+        self.TEST_MAIN_CLASS,
+        *self.TEST_ARGUMENTS,
+        **self.TEST_ENVIRON) as remote_process_info:
+      self.assertEqual(remote_process_info, PailgunProtocol.ProcessInitialized(31337, -31336))
+
+      err_rx = re.escape('invalid chunk type: {}'.format(self.BAD_CHUNK_TYPE))
+      with self.assertRaisesRegexp(NailgunProtocol.InvalidChunkType, err_rx):
+        self.pailgun_client_session.process_session()
 
     self.mock_stdin_reader.start.assert_called_once_with()
     self.mock_stdin_reader.stop.assert_called_once_with()
 
-  @mock.patch.object(NailgunClientSession, '_process_session', **PATCH_OPTS)
-  def test_execute(self, mock_process_session):
-    mock_process_session.return_value = self.TEST_PAYLOAD
-    out = self.nailgun_client_session.execute(
-      self.TEST_WORKING_DIR,
-      self.TEST_MAIN_CLASS,
-      *self.TEST_ARGUMENTS,
-      **self.TEST_ENVIRON
-    )
-    self.assertEqual(out, self.TEST_PAYLOAD)
-    mock_process_session.assert_called_once_with(self.nailgun_client_session)
+  def test_execute(self):
+    PailgunProtocol.send_pid(self.server_sock, 31337)
+    PailgunProtocol.send_pgrp(self.server_sock, -31336)
+    PailgunProtocol.send_start_reading_input(self.server_sock)
+    PailgunProtocol.send_exit_with_code(self.server_sock, self.TEST_EXIT_CODE)
+
+    with self.pailgun_client_session.negotiate(
+        self.TEST_WORKING_DIR,
+        self.TEST_MAIN_CLASS,
+        *self.TEST_ARGUMENTS,
+        **self.TEST_ENVIRON
+    ) as remote_process_info:
+      self.assertEqual(remote_process_info, PailgunProtocol.ProcessInitialized(31337, -31336))
+      out = self.pailgun_client_session.process_session()
+
+    self.assertEqual(out, self.TEST_EXIT_CODE)
+    self.mock_stdin_reader.start.assert_called_once_with()
+    self.mock_stdin_reader.stop.assert_called_once_with()
 
 
-class TestNailgunClient(unittest.TestCase):
+class TestPailgunClient(unittest.TestCase):
   def setUp(self):
-    self.nailgun_client = NailgunClient()
+    self.pailgun_client = PailgunClient()
 
   @mock.patch('pants.java.nailgun_client.RecvBufferedSocket', **PATCH_OPTS)
   def test_try_connect(self, mock_socket_cls):
     mock_socket = mock.Mock()
     mock_socket_cls.return_value = mock_socket
 
-    self.assertEqual(self.nailgun_client.try_connect(), mock_socket)
+    self.assertEqual(self.pailgun_client.connect_socket(), mock_socket)
 
     self.assertEqual(mock_socket_cls.call_count, 1)
     mock_socket.connect.assert_called_once_with(
-      (NailgunClient.DEFAULT_NG_HOST, NailgunClient.DEFAULT_NG_PORT)
+      (PailgunClient.DEFAULT_NG_HOST, PailgunClient.DEFAULT_NG_PORT)
     )
 
   @mock.patch('pants.java.nailgun_client.RecvBufferedSocket', **PATCH_OPTS)
@@ -136,20 +163,20 @@ class TestNailgunClient(unittest.TestCase):
     mock_socket.connect.side_effect = socket.error()
     mock_socket_cls.return_value = mock_socket
 
-    with self.assertRaises(NailgunClient.NailgunConnectionError):
-      self.nailgun_client.try_connect()
+    with self.assertRaises(PailgunClient.NailgunConnectionError):
+      self.pailgun_client.connect_socket()
 
-  @mock.patch.object(NailgunClient, 'try_connect', **PATCH_OPTS)
-  @mock.patch('pants.java.nailgun_client.NailgunClientSession', **PATCH_OPTS)
+  @mock.patch.object(PailgunClient, 'connect_socket', **PATCH_OPTS)
+  @mock.patch('pants.java.nailgun_client.PailgunClientSession', **PATCH_OPTS)
   def test_execute(self, mock_session, mock_try_connect):
-    self.nailgun_client.execute('test')
+    self.pailgun_client.execute('test')
     self.assertEqual(mock_try_connect.call_count, 1)
     self.assertEqual(mock_session.call_count, 1)
 
-  @mock.patch.object(NailgunClient, 'try_connect', **PATCH_OPTS)
-  @mock.patch('pants.java.nailgun_client.NailgunClientSession', **PATCH_OPTS)
+  @mock.patch.object(PailgunClient, 'connect_socket', **PATCH_OPTS)
+  @mock.patch('pants.java.nailgun_client.PailgunClientSession', **PATCH_OPTS)
   def test_execute_propagates_connection_error_on_connect(self, mock_session, mock_try_connect):
-    mock_try_connect.side_effect = NailgunClient.NailgunConnectionError(
+    mock_try_connect.side_effect = PailgunClient.NailgunConnectionError(
       '127.0.0.1:31337',
       31337,
       -31336,
@@ -157,54 +184,41 @@ class TestNailgunClient(unittest.TestCase):
       None
     )
 
-    with self.assertRaises(NailgunClient.NailgunConnectionError):
-      self.nailgun_client.execute('test')
+    with self.assertRaises(PailgunClient.NailgunConnectionError):
+      self.pailgun_client.execute('test')
 
-  @mock.patch.object(NailgunClient, 'try_connect', **PATCH_OPTS)
-  @mock.patch('pants.java.nailgun_client.NailgunClientSession', **PATCH_OPTS)
+  @mock.patch.object(PailgunClient, 'connect_socket', **PATCH_OPTS)
+  @mock.patch('pants.java.nailgun_client.PailgunClientSession', **PATCH_OPTS)
   def test_execute_socketerror_on_execute(self, mock_session, mock_try_connect):
-    mock_session.return_value.execute.side_effect = socket.error('oops')
+    mock_session.return_value.negotiate.side_effect = socket.error('oops')
 
-    with self.assertRaises(NailgunClient.NailgunError):
-      self.nailgun_client.execute('test')
+    with self.assertRaises(PailgunClient.NailgunError):
+      self.pailgun_client.execute('test')
 
-  @mock.patch.object(NailgunClient, 'try_connect', **PATCH_OPTS)
-  @mock.patch('pants.java.nailgun_client.NailgunClientSession', **PATCH_OPTS)
+  @mock.patch.object(PailgunClient, 'connect_socket', **PATCH_OPTS)
+  @mock.patch('pants.java.nailgun_client.PailgunClientSession', **PATCH_OPTS)
   def test_execute_protocolerror_on_execute(self, mock_session, mock_try_connect):
     mock_session.return_value.ProtocolError = NailgunProtocol.ProtocolError
-    mock_session.return_value.execute.side_effect = NailgunProtocol.ProtocolError('oops')
+    mock_session.return_value.negotiate.side_effect = NailgunProtocol.ProtocolError('oops')
 
-    with self.assertRaises(NailgunClient.NailgunError):
-      self.nailgun_client.execute('test')
+    with self.assertRaises(PailgunClient.NailgunError):
+      self.pailgun_client.execute('test')
 
   def test_repr(self):
-    self.assertIsNotNone(repr(self.nailgun_client))
+    self.assertIsNotNone(repr(self.pailgun_client))
 
   @mock.patch('os.kill', **PATCH_OPTS)
   def test_send_control_c(self, mock_kill):
-    self.nailgun_client._maybe_last_pid = lambda: 31337
-    self.nailgun_client._maybe_last_pgrp = lambda: -31336
-    self.nailgun_client.maybe_send_signal(signal.SIGINT)
-    mock_kill.assert_has_calls([
-      # The pid is killed first, then the pgrp, if include_pgrp=True.
-      mock.call(31337, signal.SIGINT),
-      mock.call(-31336, signal.SIGINT),
-    ])
+    self.pailgun_client._last_remote_process_info = PailgunProtocol.ProcessInitialized(
+      pid=31337, pgrp=-31336)
+    self.pailgun_client.send_control_c()
+    mock_kill.assert_any_call(31337, signal.SIGINT)
+    mock_kill.assert_any_call(-31336, signal.SIGINT)
 
   @mock.patch('os.kill', **PATCH_OPTS)
-  def test_send_signal_no_pgrp(self, mock_kill):
-    self.nailgun_client._maybe_last_pid = lambda: 111111
-    self.nailgun_client.maybe_send_signal(signal.SIGINT, include_pgrp=False)
-    mock_kill.assert_called_once_with(111111, signal.SIGINT)
-
-  @mock.patch('os.kill', **PATCH_OPTS)
-  def test_send_control_c_noop_none(self, mock_kill):
-    self.nailgun_client._session = None
-    self.nailgun_client.maybe_send_signal(signal.SIGINT)
-    mock_kill.assert_not_called()
-
-  @mock.patch('os.kill', **PATCH_OPTS)
-  def test_send_control_c_noop_nopid(self, mock_kill):
-    self.nailgun_client._session = mock.Mock(remote_pid=None, remote_pgrp=None)
-    self.nailgun_client.maybe_send_signal(signal.SIGINT)
-    mock_kill.assert_not_called()
+  def test_send_terminate(self, mock_kill):
+    self.pailgun_client._last_remote_process_info = PailgunProtocol.ProcessInitialized(
+      pid=31337, pgrp=-31336)
+    self.pailgun_client.send_terminate()
+    mock_kill.assert_any_call(31337, signal.SIGTERM)
+    mock_kill.assert_any_call(-31336, signal.SIGTERM)

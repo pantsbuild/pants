@@ -11,14 +11,13 @@ import re
 import select
 import threading
 import time
-from contextlib import closing
 
-from future.utils import PY3, string_types
+from future.utils import PY3, binary_type, string_types
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
 from pants.java.executor import Executor, SubprocessExecutor
-from pants.java.nailgun_client import NailgunClient
+from pants.java.nailgun_client import NailgunClient, NailgunClientSession
 from pants.pantsd.process_manager import FingerprintedProcessManager, ProcessGroup
 from pants.util.dirutil import read_file, safe_file_dump, safe_open
 
@@ -141,13 +140,21 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
 
       def run(this, stdout=None, stderr=None, stdin=None, cwd=None):
         nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr, stdin)
-        try:
-          logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
-          return nailgun.execute(main, cwd, *args)
-        except nailgun.NailgunError as e:
-          self.terminate()
-          raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'
-                           .format(ng_desc=nailgun, main=main, args=' '.join(args), msg=e))
+        with nailgun.initiate_new_client_session() as ng_session:
+          try:
+            logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
+            exe_req = NailgunClientSession.NailgunClientSessionExecutionRequest(
+              main_class=binary_type(main),
+              cwd=binary_type(cwd),
+              arguments=tuple(args),
+              environment={},
+            )
+            with ng_session.execution_sub_session_for(exe_req):
+              return ng_session.process_chunks()
+          except nailgun.NailgunError as e:
+            self.terminate()
+            raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'
+                             .format(ng_desc=nailgun, main=main, args=' '.join(args), msg=e))
 
     return Runner()
 
@@ -207,14 +214,16 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
           )
 
   def _create_ngclient(self, port, stdout, stderr, stdin):
-    return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr, workdir=get_buildroot())
+    request = NailgunClient.NailgunClientRequest(
+      port=port, ins=stdin, out=stdout, err=stderr, workdir=get_buildroot())
+    return NailgunClient(request)
 
   def ensure_connectable(self, nailgun):
     """Ensures that a nailgun client is connectable or raises NailgunError."""
     attempt_count = 1
     while 1:
       try:
-        with closing(nailgun.try_connect()) as sock:
+        with nailgun.connect_socket() as sock:
           logger.debug('Verified new ng server is connectable at {}'.format(sock.getpeername()))
           return
       except nailgun.NailgunConnectionError:

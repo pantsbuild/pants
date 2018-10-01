@@ -12,7 +12,7 @@ from socketserver import TCPServer
 
 import mock
 
-from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.java.nailgun_protocol import PailgunChunkType, PailgunProtocol
 from pants.pantsd.pailgun_server import PailgunHandler, PailgunServer
 
 
@@ -79,12 +79,12 @@ class TestPailgunHandler(unittest.TestCase):
 
   def test_handle_error(self):
     self.handler.handle_error()
-    last_chunk_type, last_payload = list(NailgunProtocol.iter_chunks(self.client_sock))[-1]
-    self.assertEqual(last_chunk_type, ChunkType.EXIT)
+    last_chunk_type, last_payload = list(PailgunProtocol.iter_chunks(self.client_sock))[-1]
+    self.assertEqual(last_chunk_type, PailgunChunkType.EXIT)
     self.assertEqual(last_payload, '1')
 
   @mock.patch.object(PailgunHandler, '_run_pants', **PATCH_OPTS)
   def test_handle_request(self, mock_run_pants):
-    NailgunProtocol.send_request(self.client_sock, '/test', './pants', 'help-advanced')
+    PailgunProtocol.send_request(self.client_sock, '/test', './pants', 'help-advanced')
     self.handler.handle_request()
     self.assertIs(mock_run_pants.called, True)

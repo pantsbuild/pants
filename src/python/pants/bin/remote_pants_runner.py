@@ -11,15 +11,16 @@ import time
 from builtins import object, str
 from contextlib import contextmanager
 
-from future.utils import PY3, raise_with_traceback
+from future.utils import PY3, binary_type, raise_with_traceback
 
 from pants.base.exception_sink import ExceptionSink
 from pants.console.stty_utils import STTYSettings
-from pants.java.nailgun_client import NailgunClient
-from pants.java.nailgun_protocol import NailgunProtocol
+from pants.java.nailgun_client import NailgunClient, NailgunClientSession, PailgunClient
+from pants.java.nailgun_protocol import PailgunProtocol
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.util.collections import combined_dict
 from pants.util.dirutil import maybe_read_file
+from pants.util.osutil import safe_kill
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ class RemotePantsRunner(object):
   PANTS_COMMAND = 'pants'
   RECOVERABLE_EXCEPTIONS = (
     NailgunClient.NailgunConnectionError,
-    NailgunClient.NailgunExecutionError
+    NailgunClient.NailgunExecutionError,
   )
 
   def __init__(self, exiter, args, env, options_bootstrapper, stdin=None, stdout=None, stderr=None):
@@ -61,11 +62,16 @@ class RemotePantsRunner(object):
     self._stderr = stderr or (sys.stderr.buffer if PY3 else sys.stderr)
 
   @contextmanager
-  def _trapped_signals(self, client):
+  def _trapped_signals(self, client_handle):
     """A contextmanager that overrides the SIGINT (control-c) and SIGQUIT (control-\\) handlers
     and handles them remotely."""
+    remote_info = client_handle.remote_process_info
+    pid = remote_info.pid
+    pgrp = remote_info.pgrp
+
     def handle_control_c(signum, frame):
-      client.maybe_send_signal(signum, include_pgrp=True)
+      safe_kill(pgrp, signum)
+      safe_kill(pid, signum)
 
     existing_sigint_handler = signal.signal(signal.SIGINT, handle_control_c)
     # N.B. SIGQUIT will abruptly kill the pantsd-runner, which will shut down the other end
@@ -73,8 +79,8 @@ class RemotePantsRunner(object):
     existing_sigquit_handler = signal.signal(signal.SIGQUIT, handle_control_c)
 
     # Retry interrupted system calls.
-    signal.siginterrupt(signal.SIGINT, False)
-    signal.siginterrupt(signal.SIGQUIT, False)
+    signal.siginterrupt(signal.SIGINT, True)
+    signal.siginterrupt(signal.SIGQUIT, True)
     try:
       yield
     finally:
@@ -136,23 +142,35 @@ class RemotePantsRunner(object):
 
   def _connect_and_execute(self, port):
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
-    ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
+    ng_env = PailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
     modified_env = combined_dict(self._env, ng_env)
     modified_env['PANTSD_RUNTRACKER_CLIENT_START_TIME'] = str(self._start_time)
 
     assert isinstance(port, int), 'port {} is not an integer!'.format(port)
 
-    # Instantiate a NailgunClient.
-    client = NailgunClient(port=port,
-                           ins=self._stdin,
-                           out=self._stdout,
-                           err=self._stderr,
-                           exit_on_broken_pipe=True,
-                           expects_pid=True)
+    # Instantiate a PailgunClient.
+    req = NailgunClient.NailgunClientRequest(
+      port=port,
+      ins=self._stdin,
+      out=self._stdout,
+      err=self._stderr,
+      exit_on_broken_pipe=True)
+    client = PailgunClient(NailgunClient(req))
 
-    with self._trapped_signals(client), STTYSettings.preserved():
-      # Execute the command on the pailgun.
-      result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
+    exe_request = NailgunClientSession.NailgunClientSessionExecutionRequest(
+      main_class=binary_type(self.PANTS_COMMAND),
+      cwd=None,
+      arguments=tuple(self._args),
+      environment=dict(**modified_env))
+
+    with client.remote_pants_session(exe_request) as handle,\
+         self._trapped_signals(handle),\
+         STTYSettings.preserved():
+      try:
+        # Execute the command on the pailgun.
+        result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
+      finally:
+        client.send_terminate()
 
     # Exit.
     self._exiter.exit(result)
