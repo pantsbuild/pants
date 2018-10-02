@@ -255,6 +255,7 @@ pub extern "C" fn scheduler_create(
   remote_execution_server: Buffer,
   remote_instance_name: Buffer,
   remote_root_ca_certs_path_buffer: Buffer,
+  remote_oauth_bearer_token_path_buffer: Buffer,
   remote_store_thread_count: u64,
   remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
@@ -311,6 +312,15 @@ pub extern "C" fn scheduler_create(
     }
   };
 
+  let remote_oauth_bearer_token_path = {
+    let path = remote_oauth_bearer_token_path_buffer.to_os_string();
+    if path.is_empty() {
+      None
+    } else {
+      Some(PathBuf::from(path))
+    }
+  };
+
   Box::into_raw(Box::new(Scheduler::new(Core::new(
     root_type_ids.clone(),
     tasks,
@@ -334,6 +344,7 @@ pub extern "C" fn scheduler_create(
       Some(remote_instance_name_string)
     },
     remote_root_ca_certs_path,
+    remote_oauth_bearer_token_path,
     remote_store_thread_count as usize,
     remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),

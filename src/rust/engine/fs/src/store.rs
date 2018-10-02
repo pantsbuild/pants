@@ -82,6 +82,7 @@ impl Store {
     cas_address: String,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
+    oauth_bearer_token: Option<String>,
     thread_count: usize,
     chunk_size_bytes: usize,
     timeout: Duration,
@@ -92,6 +93,7 @@ impl Store {
         cas_address,
         instance_name,
         root_ca_certs,
+        oauth_bearer_token,
         thread_count,
         chunk_size_bytes,
         timeout,
@@ -1608,6 +1610,7 @@ mod remote {
     upload_timeout: Duration,
     env: Resettable<Arc<grpcio::Environment>>,
     channel: Resettable<grpcio::Channel>,
+    authorization_header: Option<String>,
   }
 
   impl ByteStore {
@@ -1615,6 +1618,7 @@ mod remote {
       cas_address: String,
       instance_name: Option<String>,
       root_ca_certs: Option<Vec<u8>>,
+      oauth_bearer_token: Option<String>,
       thread_count: usize,
       chunk_size_bytes: usize,
       upload_timeout: Duration,
@@ -1644,6 +1648,7 @@ mod remote {
           bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(channel3.get()),
         )
       });
+
       ByteStore {
         byte_stream_client,
         cas_client,
@@ -1652,6 +1657,7 @@ mod remote {
         upload_timeout,
         env,
         channel,
+        authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
       }
     }
 
@@ -1664,6 +1670,18 @@ mod remote {
           .byte_stream_client
           .with_reset(|| self.channel.with_reset(|| self.env.with_reset(f)))
       })
+    }
+
+    fn call_option(&self) -> grpcio::CallOption {
+      let mut call_option = grpcio::CallOption::default();
+      if let Some(ref authorization_header) = self.authorization_header {
+        let mut builder = grpcio::MetadataBuilder::with_capacity(1);
+        builder
+          .add_str("authorization", &authorization_header)
+          .unwrap();
+        call_option = call_option.headers(builder.build());
+      }
+      call_option
     }
 
     pub fn store_bytes(&self, bytes: Bytes) -> BoxFuture<Digest, String> {
@@ -1681,7 +1699,7 @@ mod remote {
       match self
         .byte_stream_client
         .get()
-        .write_opt(grpcio::CallOption::default().timeout(self.upload_timeout))
+        .write_opt(self.call_option().timeout(self.upload_timeout))
       {
         Err(err) => future::err(format!(
           "Error attempting to connect to upload fingerprint {}: {:?}",
@@ -1745,19 +1763,22 @@ mod remote {
       digest: Digest,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
-      match self.byte_stream_client.get().read(&{
-        let mut req = bazel_protos::bytestream::ReadRequest::new();
-        req.set_resource_name(format!(
-          "{}/blobs/{}/{}",
-          self.instance_name.clone().unwrap_or_default(),
-          digest.0,
-          digest.1
-        ));
-        req.set_read_offset(0);
-        // 0 means no limit.
-        req.set_read_limit(0);
-        req
-      }) {
+      match self.byte_stream_client.get().read_opt(
+        &{
+          let mut req = bazel_protos::bytestream::ReadRequest::new();
+          req.set_resource_name(format!(
+            "{}/blobs/{}/{}",
+            self.instance_name.clone().unwrap_or_default(),
+            digest.0,
+            digest.1
+          ));
+          req.set_read_offset(0);
+          // 0 means no limit.
+          req.set_read_limit(0);
+          req
+        },
+        self.call_option(),
+      ) {
         Ok(stream) => {
           // We shouldn't have to pass around the client here, it's a workaround for
           // https://github.com/pingcap/grpc-rs/issues/123
@@ -1805,7 +1826,7 @@ mod remote {
       self
         .cas_client
         .get()
-        .find_missing_blobs(&request)
+        .find_missing_blobs_opt(&request, self.call_option())
         .map_err(|err| {
           format!(
             "Error from server in response to find_missing_blobs_request: {:?}",
@@ -1973,6 +1994,7 @@ mod remote {
         cas.address(),
         None,
         None,
+        None,
         1,
         10 * 1024,
         Duration::from_secs(5),
@@ -2047,6 +2069,7 @@ mod remote {
         "doesnotexist.example".to_owned(),
         None,
         None,
+        None,
         1,
         10 * 1024 * 1024,
         Duration::from_secs(1),
@@ -2107,6 +2130,7 @@ mod remote {
     fn new_byte_store(cas: &StubCAS) -> ByteStore {
       ByteStore::new(
         cas.address(),
+        None,
         None,
         None,
         1,
@@ -2227,6 +2251,7 @@ mod tests {
       dir,
       Arc::new(ResettablePool::new("test-pool-".to_string())),
       cas_address,
+      None,
       None,
       None,
       1,
@@ -2907,6 +2932,7 @@ mod tests {
       cas.address(),
       Some("dark-tower".to_owned()),
       None,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -2932,6 +2958,76 @@ mod tests {
       cas.address(),
       Some("dark-tower".to_owned()),
       None,
+      None,
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+    ).unwrap();
+
+    assert_eq!(
+      store_with_remote
+        .load_file_bytes_with(TestData::roland().digest(), |b| b)
+        .wait(),
+      Ok(Some(TestData::roland().bytes()))
+    )
+  }
+
+  #[test]
+  fn auth_upload() {
+    let dir = TempDir::new().unwrap();
+    let cas = StubCAS::builder()
+      .required_auth_token("Armory.Key".to_owned())
+      .build();
+
+    // 3 is enough digests to trigger a FindMissingBlobs request
+    let testdir = TestDirectory::containing_roland_and_treats();
+
+    new_local_store(dir.path())
+      .record_directory(&testdir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    new_local_store(dir.path())
+      .store_file_bytes(TestData::roland().bytes(), false)
+      .wait()
+      .expect("Error storing roland locally");
+    new_local_store(dir.path())
+      .store_file_bytes(TestData::catnip().bytes(), false)
+      .wait()
+      .expect("Error storing catnip locally");
+
+    let store_with_remote = Store::with_remote(
+      dir.path(),
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
+      cas.address(),
+      None,
+      None,
+      Some("Armory.Key".to_owned()),
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+    ).unwrap();
+
+    store_with_remote
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
+      .expect("Error uploading");
+  }
+
+  #[test]
+  fn auth_download() {
+    let dir = TempDir::new().unwrap();
+    let cas = StubCAS::builder()
+      .required_auth_token("Armory.Key".to_owned())
+      .file(&TestData::roland())
+      .build();
+
+    let store_with_remote = Store::with_remote(
+      dir.path(),
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
+      cas.address(),
+      None,
+      None,
+      Some("Armory.Key".to_owned()),
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
