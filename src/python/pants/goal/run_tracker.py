@@ -30,7 +30,6 @@ from pants.reporting.report import Report
 from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
-from pants.util.memo import memoized_method
 
 
 class RunTracker(Subsystem):
@@ -386,7 +385,6 @@ class RunTracker(Subsystem):
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
-  @memoized_method
   def end(self):
     """This pants run is over, so stop tracking it.
 
