@@ -1591,6 +1591,7 @@ mod remote {
   use std::collections::HashSet;
   use std::sync::Arc;
   use std::time::Duration;
+  use uuid;
 
   #[derive(Clone)]
   pub struct ByteStore {
@@ -1655,7 +1656,7 @@ mod remote {
       let resource_name = format!(
         "{}/uploads/{}/blobs/{}/{}",
         "",
-        "",
+        uuid::Uuid::new_v4(),
         fingerprint,
         bytes.len()
       );
