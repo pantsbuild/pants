@@ -22,30 +22,74 @@ pub struct StubCAS {
   pub blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
 }
 
-impl StubCAS {
-  pub fn with_content(
-    chunk_size_bytes: i64,
-    files: Vec<TestData>,
-    directories: Vec<TestDirectory>,
-  ) -> StubCAS {
-    let mut blobs = HashMap::new();
-    for file in files {
-      blobs.insert(file.fingerprint(), file.bytes());
+pub struct StubCASBuilder {
+  always_errors: bool,
+  chunk_size_bytes: Option<usize>,
+  content: HashMap<Fingerprint, Bytes>,
+  port: Option<u16>,
+}
+
+impl StubCASBuilder {
+  pub fn new() -> Self {
+    StubCASBuilder {
+      always_errors: false,
+      chunk_size_bytes: None,
+      content: HashMap::new(),
+      port: None,
     }
-    for directory in directories {
-      blobs.insert(directory.fingerprint(), directory.bytes());
-    }
-    StubCAS::with_unverified_content(chunk_size_bytes, blobs)
   }
 
-  ///
-  /// Wrapper around with_unverified_content_and_port
-  ///
-  pub fn with_unverified_content(
-    chunk_size_bytes: i64,
-    blobs: HashMap<Fingerprint, Bytes>,
-  ) -> StubCAS {
-    StubCAS::with_unverified_content_and_port(chunk_size_bytes, blobs, 0)
+  pub fn chunk_size_bytes(mut self, chunk_size_bytes: usize) -> Self {
+    if self.chunk_size_bytes.is_some() {
+      panic!("Can't set chunk_size_bytes twice");
+    }
+    self.chunk_size_bytes = Some(chunk_size_bytes);
+    self
+  }
+
+  pub fn port(mut self, port: u16) -> Self {
+    if self.port.is_some() {
+      panic!("Can't set port twice");
+    }
+    self.port = Some(port);
+    self
+  }
+
+  pub fn file(mut self, file: &TestData) -> Self {
+    self.content.insert(file.fingerprint(), file.bytes());
+    self
+  }
+
+  pub fn directory(mut self, directory: &TestDirectory) -> Self {
+    self
+      .content
+      .insert(directory.fingerprint(), directory.bytes());
+    self
+  }
+
+  pub fn unverified_content(mut self, fingerprint: Fingerprint, content: Bytes) -> Self {
+    self.content.insert(fingerprint, content);
+    self
+  }
+
+  pub fn always_errors(mut self) -> Self {
+    self.always_errors = true;
+    self
+  }
+
+  pub fn build(self) -> StubCAS {
+    StubCAS::new(
+      self.chunk_size_bytes.unwrap_or(1024),
+      self.content,
+      self.port.unwrap_or(0),
+      self.always_errors,
+    )
+  }
+}
+
+impl StubCAS {
+  pub fn builder() -> StubCASBuilder {
+    StubCASBuilder::new()
   }
 
   ///
@@ -57,10 +101,11 @@ impl StubCAS {
   /// * `blobs`            - Known Fingerprints and their content responses. These are not checked
   ///                        for correctness.
   /// * `port`             - The port for the CAS to listen to.
-  pub fn with_unverified_content_and_port(
-    chunk_size_bytes: i64,
+  fn new(
+    chunk_size_bytes: usize,
     blobs: HashMap<Fingerprint, Bytes>,
     port: u16,
+    always_errors: bool,
   ) -> StubCAS {
     let env = Arc::new(grpcio::Environment::new(1));
     let read_request_count = Arc::new(Mutex::new(0));
@@ -69,6 +114,7 @@ impl StubCAS {
     let responder = StubCASResponder {
       chunk_size_bytes: chunk_size_bytes,
       blobs: blobs.clone(),
+      always_errors: always_errors,
       read_request_count: read_request_count.clone(),
       write_message_sizes: write_message_sizes.clone(),
     };
@@ -90,24 +136,12 @@ impl StubCAS {
     }
   }
 
-  pub fn with_roland_and_directory(chunk_size_bytes: i64) -> StubCAS {
-    StubCAS::with_content(
-      chunk_size_bytes,
-      vec![TestData::roland()],
-      vec![TestDirectory::containing_roland()],
-    )
-  }
-
   pub fn empty() -> StubCAS {
-    StubCAS::with_unverified_content(1024, HashMap::new())
-  }
-
-  pub fn empty_with_port(port: u16) -> StubCAS {
-    StubCAS::with_unverified_content_and_port(1024, HashMap::new(), port)
+    StubCAS::builder().build()
   }
 
   pub fn always_errors() -> StubCAS {
-    StubCAS::with_unverified_content(-1, HashMap::new())
+    StubCAS::builder().always_errors().build()
   }
 
   ///
@@ -125,17 +159,14 @@ impl StubCAS {
 
 #[derive(Clone, Debug)]
 pub struct StubCASResponder {
-  chunk_size_bytes: i64,
+  chunk_size_bytes: usize,
   blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
+  always_errors: bool,
   pub read_request_count: Arc<Mutex<usize>>,
   pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
 }
 
 impl StubCASResponder {
-  fn should_always_fail(&self) -> bool {
-    self.chunk_size_bytes < 0
-  }
-
   fn read_internal(
     &self,
     req: &bazel_protos::bytestream::ReadRequest,
@@ -157,7 +188,7 @@ impl StubCASResponder {
         Some(format!("Bad digest {}: {}", digest, e)),
       )
     })?;
-    if self.should_always_fail() {
+    if self.always_errors {
       return Err(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::Internal,
         Some("StubCAS is configured to always fail".to_owned()),
@@ -231,7 +262,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
     stream: grpcio::RequestStream<bazel_protos::bytestream::WriteRequest>,
     sink: grpcio::ClientStreamingSink<bazel_protos::bytestream::WriteResponse>,
   ) {
-    let should_always_fail = self.should_always_fail();
+    let always_errors = self.always_errors;
     let write_message_sizes = self.write_message_sizes.clone();
     let blobs = self.blobs.clone();
     ctx.spawn(
@@ -325,7 +356,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
                 ));
               }
 
-              if should_always_fail {
+              if always_errors {
                 return Err(grpcio::RpcStatus::new(
                   grpcio::RpcStatusCode::Internal,
                   Some("StubCAS is configured to always fail".to_owned()),
@@ -369,7 +400,7 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
     req: bazel_protos::remote_execution::FindMissingBlobsRequest,
     sink: grpcio::UnarySink<bazel_protos::remote_execution::FindMissingBlobsResponse>,
   ) {
-    if self.should_always_fail() {
+    if self.always_errors {
       sink.fail(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::Internal,
         Some("StubCAS is configured to always fail".to_owned()),
