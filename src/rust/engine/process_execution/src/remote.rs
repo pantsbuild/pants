@@ -1314,7 +1314,9 @@ mod tests {
     };
 
     let store_dir = TempDir::new().unwrap();
-    let cas = mock::StubCAS::with_content(1024, vec![], vec![TestDirectory::containing_roland()]);
+    let cas = mock::StubCAS::builder()
+      .directory(TestDirectory::containing_roland())
+      .build();
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
@@ -1368,7 +1370,10 @@ mod tests {
     };
 
     let store_dir = TempDir::new().unwrap();
-    let cas = mock::StubCAS::with_content(1024, vec![], vec![TestDirectory::containing_roland()]);
+    let cas = mock::StubCAS::builder()
+      .file(TestData::roland())
+      .directory(TestDirectory::containing_roland())
+      .build();
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
@@ -1899,7 +1904,10 @@ mod tests {
     address: String,
     request: ExecuteProcessRequest,
   ) -> Result<FallibleExecuteProcessResult, String> {
-    let cas = mock::StubCAS::with_roland_and_directory(1024);
+    let cas = mock::StubCAS::builder()
+      .file(TestData::roland())
+      .directory(TestDirectory::containing_roland())
+      .build();
     let command_runner = create_command_runner(address, &cas);
     command_runner.run(request).wait()
   }
@@ -1921,7 +1929,10 @@ mod tests {
   fn extract_execute_response(
     operation: bazel_protos::operations::Operation,
   ) -> Result<FallibleExecuteProcessResult, ExecutionError> {
-    let cas = mock::StubCAS::with_roland_and_directory(1024);
+    let cas = mock::StubCAS::builder()
+      .file(TestData::roland())
+      .directory(TestDirectory::containing_roland())
+      .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
     command_runner.extract_execute_response(operation).wait()
   }
@@ -1929,7 +1940,10 @@ mod tests {
   fn extract_output_files_from_response(
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> Result<Digest, ExecutionError> {
-    let cas = mock::StubCAS::with_roland_and_directory(1024);
+    let cas = mock::StubCAS::builder()
+      .file(TestData::roland())
+      .directory(TestDirectory::containing_roland())
+      .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
     command_runner
       .extract_output_files(&execute_response)

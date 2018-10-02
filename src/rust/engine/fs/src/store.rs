@@ -2161,11 +2161,11 @@ mod tests {
   /// Create a StubCas with a file and a directory inside.
   ///
   pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
-    StubCAS::with_content(
-      chunk_size_bytes as i64,
-      vec![TestData::roland()],
-      vec![TestDirectory::containing_roland()],
-    )
+    StubCAS::builder()
+      .chunk_size_bytes(chunk_size_bytes)
+      .file(TestData::roland())
+      .directory(TestDirectory::containing_roland())
+      .build()
   }
 
   ///
@@ -2287,11 +2287,13 @@ mod tests {
     let recursive_testdir_directory = recursive_testdir.directory();
     let recursive_testdir_digest = recursive_testdir.digest();
 
-    let cas = StubCAS::with_content(
-      1024,
-      vec![roland.clone(), catnip.clone()],
-      vec![testdir, recursive_testdir],
-    );
+    let cas = StubCAS::builder()
+      .file(roland.clone())
+      .file(catnip.clone())
+      .directory(testdir)
+      .directory(recursive_testdir)
+      .build();
+
     new_store(dir.path(), cas.address())
       .ensure_local_has_recursive_directory(recursive_testdir_digest)
       .wait()
@@ -2427,14 +2429,11 @@ mod tests {
 
     let dir = TempDir::new().unwrap();
 
-    let cas = StubCAS::with_unverified_content(
-      1024,
-      vec![(
+    let cas = StubCAS::builder()
+      .unverified_content(
         non_canonical_directory_fingerprint.clone(),
         non_canonical_directory_bytes,
-      )].into_iter()
-      .collect(),
-    );
+      ).build();
     new_store(dir.path(), cas.address())
       .load_directory(directory_digest.clone())
       .wait()
@@ -2455,14 +2454,11 @@ mod tests {
 
     let testdata = TestData::roland();
 
-    let cas = StubCAS::with_unverified_content(
-      1024,
-      vec![(
+    let cas = StubCAS::builder()
+      .unverified_content(
         testdata.fingerprint(),
         TestDirectory::containing_roland().bytes(),
-      )].into_iter()
-      .collect(),
-    );
+      ).build();
     load_file_bytes(&new_store(dir.path(), cas.address()), testdata.digest())
       .expect_err("Want error");
 
@@ -2478,14 +2474,11 @@ mod tests {
 
     let testdir = TestDirectory::containing_dnalor();
 
-    let cas = StubCAS::with_unverified_content(
-      1024,
-      vec![(
+    let cas = StubCAS::builder()
+      .unverified_content(
         testdir.fingerprint(),
         TestDirectory::containing_roland().bytes(),
-      )].into_iter()
-      .collect(),
-    );
+      ).build();
     load_file_bytes(&new_store(dir.path(), cas.address()), testdir.digest())
       .expect_err("Want error");
 
