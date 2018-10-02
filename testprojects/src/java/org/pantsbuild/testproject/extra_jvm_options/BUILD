@@ -16,3 +16,9 @@ jvm_app(
     binary=':noopts',
     dependencies=[':noopts'],
 )
+
+from os.path import join
+python_binary(
+    name=join('python_app'),
+    source='main.py',
+)
