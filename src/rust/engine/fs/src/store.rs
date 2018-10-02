@@ -79,6 +79,7 @@ impl Store {
     path: P,
     pool: Arc<ResettablePool>,
     cas_address: String,
+    instance_name: Option<String>,
     thread_count: usize,
     chunk_size_bytes: usize,
     timeout: Duration,
@@ -87,6 +88,7 @@ impl Store {
       local: local::ByteStore::new(path, pool)?,
       remote: Some(remote::ByteStore::new(
         cas_address,
+        instance_name,
         thread_count,
         chunk_size_bytes,
         timeout,
@@ -1598,6 +1600,7 @@ mod remote {
     byte_stream_client: Resettable<Arc<bazel_protos::bytestream_grpc::ByteStreamClient>>,
     cas_client:
       Resettable<Arc<bazel_protos::remote_execution_grpc::ContentAddressableStorageClient>>,
+    instance_name: Option<String>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
     env: Resettable<Arc<grpcio::Environment>>,
@@ -1607,6 +1610,7 @@ mod remote {
   impl ByteStore {
     pub fn new(
       cas_address: String,
+      instance_name: Option<String>,
       thread_count: usize,
       chunk_size_bytes: usize,
       upload_timeout: Duration,
@@ -1630,6 +1634,7 @@ mod remote {
       ByteStore {
         byte_stream_client,
         cas_client,
+        instance_name,
         chunk_size_bytes,
         upload_timeout,
         env,
@@ -1655,7 +1660,7 @@ mod remote {
       let len = bytes.len();
       let resource_name = format!(
         "{}/uploads/{}/blobs/{}/{}",
-        "",
+        self.instance_name.clone().unwrap_or_default(),
         uuid::Uuid::new_v4(),
         fingerprint,
         bytes.len()
@@ -1729,7 +1734,12 @@ mod remote {
     ) -> BoxFuture<Option<T>, String> {
       match self.byte_stream_client.get().read(&{
         let mut req = bazel_protos::bytestream::ReadRequest::new();
-        req.set_resource_name(format!("/blobs/{}/{}", digest.0, digest.1));
+        req.set_resource_name(format!(
+          "{}/blobs/{}/{}",
+          self.instance_name.clone().unwrap_or_default(),
+          digest.0,
+          digest.1
+        ));
         req.set_read_offset(0);
         // 0 means no limit.
         req.set_read_limit(0);
@@ -1773,6 +1783,9 @@ mod remote {
       digests: Digests,
     ) -> Result<HashSet<Digest>, String> {
       let mut request = bazel_protos::remote_execution::FindMissingBlobsRequest::new();
+      if let Some(ref instance_name) = self.instance_name {
+        request.set_instance_name(instance_name.clone());
+      }
       for digest in digests {
         request.mut_blob_digests().push(digest.into());
       }
@@ -1943,7 +1956,7 @@ mod remote {
     fn write_file_multiple_chunks() {
       let cas = StubCAS::empty();
 
-      let store = ByteStore::new(cas.address(), 1, 10 * 1024, Duration::from_secs(5));
+      let store = ByteStore::new(cas.address(), None, 1, 10 * 1024, Duration::from_secs(5));
 
       let all_the_henries = big_file_bytes();
 
@@ -2012,6 +2025,7 @@ mod remote {
     fn write_connection_error() {
       let store = ByteStore::new(
         "doesnotexist.example".to_owned(),
+        None,
         1,
         10 * 1024 * 1024,
         Duration::from_secs(1),
@@ -2070,7 +2084,13 @@ mod remote {
     }
 
     fn new_byte_store(cas: &StubCAS) -> ByteStore {
-      ByteStore::new(cas.address(), 1, 10 * 1024 * 1024, Duration::from_secs(1))
+      ByteStore::new(
+        cas.address(),
+        None,
+        1,
+        10 * 1024 * 1024,
+        Duration::from_secs(1),
+      )
     }
 
     pub fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
@@ -2185,6 +2205,7 @@ mod tests {
       dir,
       Arc::new(ResettablePool::new("test-pool-".to_string())),
       cas_address,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -2832,6 +2853,71 @@ mod tests {
       ),
       "Bad error message"
     );
+  }
+
+  #[test]
+  fn instance_name_upload() {
+    let dir = TempDir::new().unwrap();
+    let cas = StubCAS::builder()
+      .instance_name("dark-tower".to_owned())
+      .build();
+
+    // 3 is enough digests to trigger a FindMissingBlobs request
+    let testdir = TestDirectory::containing_roland_and_treats();
+
+    new_local_store(dir.path())
+      .record_directory(&testdir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    new_local_store(dir.path())
+      .store_file_bytes(TestData::roland().bytes(), false)
+      .wait()
+      .expect("Error storing roland locally");
+    new_local_store(dir.path())
+      .store_file_bytes(TestData::catnip().bytes(), false)
+      .wait()
+      .expect("Error storing catnip locally");
+
+    let store_with_remote = Store::with_remote(
+      dir.path(),
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
+      cas.address(),
+      Some("dark-tower".to_owned()),
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+    ).unwrap();
+
+    store_with_remote
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
+      .expect("Error uploading");
+  }
+
+  #[test]
+  fn instance_name_download() {
+    let dir = TempDir::new().unwrap();
+    let cas = StubCAS::builder()
+      .instance_name("dark-tower".to_owned())
+      .file(&TestData::roland())
+      .build();
+
+    let store_with_remote = Store::with_remote(
+      dir.path(),
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
+      cas.address(),
+      Some("dark-tower".to_owned()),
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+    ).unwrap();
+
+    assert_eq!(
+      store_with_remote
+        .load_file_bytes_with(TestData::roland().digest(), |b| b)
+        .wait(),
+      Ok(Some(TestData::roland().bytes()))
+    )
   }
 
   #[test]

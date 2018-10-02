@@ -92,6 +92,10 @@ fn main() {
         .takes_value(true)
         .help("The host:port of the gRPC CAS server to connect to."),
     )
+      .arg(Arg::with_name("remote-instance-name")
+          .takes_value(true)
+          .long("remote-instance-name")
+          .required(false))
       .arg(
         Arg::with_name("upload-chunk-bytes")
             .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
@@ -149,6 +153,7 @@ fn main() {
     .unwrap_or_else(fs::Store::default_path);
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let server_arg = args.value_of("server");
+  let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {
       let chunk_size =
@@ -158,6 +163,7 @@ fn main() {
         local_store_path,
         pool.clone(),
         cas_server.to_owned(),
+        remote_instance_arg.clone(),
         1,
         chunk_size,
         Duration::from_secs(30),
@@ -192,6 +198,7 @@ fn main() {
   let runner: Box<process_execution::CommandRunner> = match server_arg {
     Some(address) => Box::new(process_execution::remote::CommandRunner::new(
       address.to_owned(),
+      remote_instance_arg,
       1,
       store,
     )),

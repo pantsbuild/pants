@@ -27,6 +27,7 @@ pub struct StubCASBuilder {
   chunk_size_bytes: Option<usize>,
   content: HashMap<Fingerprint, Bytes>,
   port: Option<u16>,
+  instance_name: Option<String>,
 }
 
 impl StubCASBuilder {
@@ -36,9 +37,12 @@ impl StubCASBuilder {
       chunk_size_bytes: None,
       content: HashMap::new(),
       port: None,
+      instance_name: None,
     }
   }
+}
 
+impl StubCASBuilder {
   pub fn chunk_size_bytes(mut self, chunk_size_bytes: usize) -> Self {
     if self.chunk_size_bytes.is_some() {
       panic!("Can't set chunk_size_bytes twice");
@@ -77,12 +81,21 @@ impl StubCASBuilder {
     self
   }
 
+  pub fn instance_name(mut self, instance_name: String) -> Self {
+    if self.instance_name.is_some() {
+      panic!("Can't set instance_name twice");
+    }
+    self.instance_name = Some(instance_name);
+    self
+  }
+
   pub fn build(self) -> StubCAS {
     StubCAS::new(
       self.chunk_size_bytes.unwrap_or(1024),
       self.content,
       self.port.unwrap_or(0),
       self.always_errors,
+      self.instance_name,
     )
   }
 }
@@ -106,6 +119,7 @@ impl StubCAS {
     blobs: HashMap<Fingerprint, Bytes>,
     port: u16,
     always_errors: bool,
+    instance_name: Option<String>,
   ) -> StubCAS {
     let env = Arc::new(grpcio::Environment::new(1));
     let read_request_count = Arc::new(Mutex::new(0));
@@ -113,6 +127,7 @@ impl StubCAS {
     let blobs = Arc::new(Mutex::new(blobs));
     let responder = StubCASResponder {
       chunk_size_bytes: chunk_size_bytes,
+      instance_name: instance_name,
       blobs: blobs.clone(),
       always_errors: always_errors,
       read_request_count: read_request_count.clone(),
@@ -160,6 +175,7 @@ impl StubCAS {
 #[derive(Clone, Debug)]
 pub struct StubCASResponder {
   chunk_size_bytes: usize,
+  instance_name: Option<String>,
   blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
   always_errors: bool,
   pub read_request_count: Arc<Mutex<usize>>,
@@ -167,17 +183,25 @@ pub struct StubCASResponder {
 }
 
 impl StubCASResponder {
+  fn instance_name(&self) -> String {
+    self.instance_name.clone().unwrap_or_default()
+  }
+
   fn read_internal(
     &self,
     req: &bazel_protos::bytestream::ReadRequest,
   ) -> Result<Vec<bazel_protos::bytestream::ReadResponse>, grpcio::RpcStatus> {
     let parts: Vec<_> = req.get_resource_name().splitn(4, '/').collect();
-    if parts.len() != 4 || parts.get(0) != Some(&"") || parts.get(1) != Some(&"blobs") {
+    if parts.len() != 4
+      || parts.get(0) != Some(&self.instance_name().as_ref())
+      || parts.get(1) != Some(&"blobs")
+    {
       return Err(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::InvalidArgument,
         Some(format!(
-          "Bad resource name format {} - want /blobs/some-sha256/size",
-          req.get_resource_name()
+          "Bad resource name format {} - want {}/blobs/some-sha256/size",
+          req.get_resource_name(),
+          self.instance_name(),
         )),
       ));
     }
@@ -265,6 +289,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
     let always_errors = self.always_errors;
     let write_message_sizes = self.write_message_sizes.clone();
     let blobs = self.blobs.clone();
+    let instance_name = self.instance_name();
     ctx.spawn(
       stream
         .collect()
@@ -316,6 +341,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
             Some(resource_name) => {
               let parts: Vec<_> = resource_name.splitn(6, '/').collect();
               if parts.len() != 6
+                || parts.get(0) != Some(&instance_name.as_ref())
                 || parts.get(1) != Some(&"uploads")
                 || parts.get(3) != Some(&"blobs")
               {
@@ -404,6 +430,17 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
       sink.fail(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::Internal,
         Some("StubCAS is configured to always fail".to_owned()),
+      ));
+      return;
+    }
+    if req.instance_name != self.instance_name() {
+      sink.fail(grpcio::RpcStatus::new(
+        grpcio::RpcStatusCode::NotFound,
+        Some(format!(
+          "Wrong instance_name; want {:?} got {:?}",
+          self.instance_name(),
+          req.instance_name
+        )),
       ));
       return;
     }
