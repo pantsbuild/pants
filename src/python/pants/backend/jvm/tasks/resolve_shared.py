@@ -27,7 +27,8 @@ class ResolveBase(object):
 
     jar_paths = []
     for target, jars_to_snapshot in targets_and_jars:
-      [jar_paths.append(fast_relpath(jar.pants_path, get_buildroot())) for jar in jars_to_snapshot]
+      for jar in jars_to_snapshot:
+        jar_paths.append(fast_relpath(jar.pants_path, get_buildroot()))
 
     snapshots = self.context._scheduler.capture_snapshots(
       tuple(
