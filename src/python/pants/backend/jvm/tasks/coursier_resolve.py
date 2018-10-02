@@ -22,7 +22,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier.coursier_subsystem import CoursierSubsystem
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask, NailgunTaskBase
 from pants.backend.jvm.tasks.resolve_shared import ResolveBase
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
@@ -487,7 +487,11 @@ class CoursierMixin(NailgunTask, ResolveBase):
 
         jars_per_target.append((t, jars_to_digest))
 
-    for target, jars_to_add in self.add_directory_digests_for_jars(jars_per_target):
+    # If we are not doing hermetic execution, don't capture the digests
+    if self.get_options().execution_strategy == NailgunTaskBase.HERMETIC:
+      jars_per_target = self.add_directory_digests_for_jars(jars_per_target)
+
+    for target, jars_to_add in jars_per_target:
       compile_classpath.add_jars_for_targets([target], conf, jars_to_add)
 
   def _populate_results_dir(self, vts_results_dir, results):
