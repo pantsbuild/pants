@@ -1315,7 +1315,7 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let cas = mock::StubCAS::builder()
-      .directory(TestDirectory::containing_roland())
+      .directory(&TestDirectory::containing_roland())
       .build();
     let store = fs::Store::with_remote(
       store_dir,
@@ -1371,8 +1371,8 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let cas = mock::StubCAS::builder()
-      .file(TestData::roland())
-      .directory(TestDirectory::containing_roland())
+      .file(&TestData::roland())
+      .directory(&TestDirectory::containing_roland())
       .build();
     let store = fs::Store::with_remote(
       store_dir,
@@ -1905,8 +1905,8 @@ mod tests {
     request: ExecuteProcessRequest,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let cas = mock::StubCAS::builder()
-      .file(TestData::roland())
-      .directory(TestDirectory::containing_roland())
+      .file(&TestData::roland())
+      .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner(address, &cas);
     command_runner.run(request).wait()
@@ -1930,8 +1930,8 @@ mod tests {
     operation: bazel_protos::operations::Operation,
   ) -> Result<FallibleExecuteProcessResult, ExecutionError> {
     let cas = mock::StubCAS::builder()
-      .file(TestData::roland())
-      .directory(TestDirectory::containing_roland())
+      .file(&TestData::roland())
+      .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
     command_runner.extract_execute_response(operation).wait()
@@ -1941,8 +1941,8 @@ mod tests {
     execute_response: &bazel_protos::remote_execution::ExecuteResponse,
   ) -> Result<Digest, ExecutionError> {
     let cas = mock::StubCAS::builder()
-      .file(TestData::roland())
-      .directory(TestDirectory::containing_roland())
+      .file(&TestData::roland())
+      .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
     command_runner

@@ -41,7 +41,7 @@ impl StubCASBuilder {
 
   pub fn chunk_size_bytes(mut self, chunk_size_bytes: usize) -> Self {
     if self.chunk_size_bytes.is_some() {
-      panic!("Can't set chunk_size twice");
+      panic!("Can't set chunk_size_bytes twice");
     }
     self.chunk_size_bytes = Some(chunk_size_bytes);
     self
@@ -49,18 +49,18 @@ impl StubCASBuilder {
 
   pub fn port(mut self, port: u16) -> Self {
     if self.port.is_some() {
-      panic!("Can't set chunk_size twice");
+      panic!("Can't set port twice");
     }
     self.port = Some(port);
     self
   }
 
-  pub fn file(mut self, file: TestData) -> Self {
+  pub fn file(mut self, file: &TestData) -> Self {
     self.content.insert(file.fingerprint(), file.bytes());
     self
   }
 
-  pub fn directory(mut self, directory: TestDirectory) -> Self {
+  pub fn directory(mut self, directory: &TestDirectory) -> Self {
     self
       .content
       .insert(directory.fingerprint(), directory.bytes());

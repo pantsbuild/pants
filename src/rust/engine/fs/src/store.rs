@@ -2163,8 +2163,8 @@ mod tests {
   pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
     StubCAS::builder()
       .chunk_size_bytes(chunk_size_bytes)
-      .file(TestData::roland())
-      .directory(TestDirectory::containing_roland())
+      .file(&TestData::roland())
+      .directory(&TestDirectory::containing_roland())
       .build()
   }
 
@@ -2288,10 +2288,10 @@ mod tests {
     let recursive_testdir_digest = recursive_testdir.digest();
 
     let cas = StubCAS::builder()
-      .file(roland.clone())
-      .file(catnip.clone())
-      .directory(testdir)
-      .directory(recursive_testdir)
+      .file(&roland)
+      .file(&catnip)
+      .directory(&testdir)
+      .directory(&recursive_testdir)
       .build();
 
     new_store(dir.path(), cas.address())
