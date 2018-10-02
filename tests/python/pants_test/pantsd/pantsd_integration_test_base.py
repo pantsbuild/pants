@@ -149,6 +149,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     recursively_update(combined_config, extra_config)
     print(bold(cyan('\nrunning: ./pants {} (config={}) (extra_env={})'
                     .format(' '.join(cmd), combined_config, extra_env))))
+    run_count = self._run_count(workdir)
     start_time = time.time()
     run = self.run_pants_with_workdir(
       cmd,
@@ -162,7 +163,6 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     print(bold(cyan('\ncompleted in {} seconds'.format(elapsed))))
 
     # TODO: uncomment this and add an issue link!
-    run_count = self._run_count(workdir)
     runs_created = self._run_count(workdir) - run_count
     self.assertEqual(
         runs_created,
