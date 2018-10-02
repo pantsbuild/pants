@@ -379,6 +379,9 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         'execution_strategy': 'hermetic',
         'use_classpath_jars': False,
         'incremental': False,
+      },
+      'resolver': {
+        'resolver': 'ivy',
       }
     }
 
