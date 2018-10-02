@@ -75,11 +75,13 @@ impl Store {
   /// Make a store which uses local storage, and if it is missing a value which it tries to load,
   /// will attempt to back-fill its local storage from a remote CAS.
   ///
+  #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
   pub fn with_remote<P: AsRef<Path>>(
     path: P,
     pool: Arc<ResettablePool>,
     cas_address: String,
     instance_name: Option<String>,
+    root_ca_certs: Option<Vec<u8>>,
     thread_count: usize,
     chunk_size_bytes: usize,
     timeout: Duration,
@@ -89,6 +91,7 @@ impl Store {
       remote: Some(remote::ByteStore::new(
         cas_address,
         instance_name,
+        root_ca_certs,
         thread_count,
         chunk_size_bytes,
         timeout,
@@ -1611,14 +1614,24 @@ mod remote {
     pub fn new(
       cas_address: String,
       instance_name: Option<String>,
+      root_ca_certs: Option<Vec<u8>>,
       thread_count: usize,
       chunk_size_bytes: usize,
       upload_timeout: Duration,
     ) -> ByteStore {
       let env = Resettable::new(move || Arc::new(grpcio::Environment::new(thread_count)));
       let env2 = env.clone();
-      let channel =
-        Resettable::new(move || grpcio::ChannelBuilder::new(env2.get()).connect(&cas_address));
+      let channel = Resettable::new(move || {
+        let builder = grpcio::ChannelBuilder::new(env2.get());
+        if let Some(ref root_ca_certs) = root_ca_certs {
+          let creds = grpcio::ChannelCredentialsBuilder::new()
+            .root_cert(root_ca_certs.clone())
+            .build();
+          builder.secure_connect(&cas_address, creds)
+        } else {
+          builder.connect(&cas_address)
+        }
+      });
       let channel2 = channel.clone();
       let channel3 = channel.clone();
       let byte_stream_client = Resettable::new(move || {
@@ -1956,7 +1969,14 @@ mod remote {
     fn write_file_multiple_chunks() {
       let cas = StubCAS::empty();
 
-      let store = ByteStore::new(cas.address(), None, 1, 10 * 1024, Duration::from_secs(5));
+      let store = ByteStore::new(
+        cas.address(),
+        None,
+        None,
+        1,
+        10 * 1024,
+        Duration::from_secs(5),
+      );
 
       let all_the_henries = big_file_bytes();
 
@@ -2026,6 +2046,7 @@ mod remote {
       let store = ByteStore::new(
         "doesnotexist.example".to_owned(),
         None,
+        None,
         1,
         10 * 1024 * 1024,
         Duration::from_secs(1),
@@ -2086,6 +2107,7 @@ mod remote {
     fn new_byte_store(cas: &StubCAS) -> ByteStore {
       ByteStore::new(
         cas.address(),
+        None,
         None,
         1,
         10 * 1024 * 1024,
@@ -2205,6 +2227,7 @@ mod tests {
       dir,
       Arc::new(ResettablePool::new("test-pool-".to_string())),
       cas_address,
+      None,
       None,
       1,
       10 * 1024 * 1024,
@@ -2883,6 +2906,7 @@ mod tests {
       Arc::new(ResettablePool::new("test-pool-".to_string())),
       cas.address(),
       Some("dark-tower".to_owned()),
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -2907,6 +2931,7 @@ mod tests {
       Arc::new(ResettablePool::new("test-pool-".to_string())),
       cas.address(),
       Some("dark-tower".to_owned()),
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),

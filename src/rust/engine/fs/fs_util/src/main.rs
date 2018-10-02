@@ -194,6 +194,13 @@ to this directory.",
               .long("server-address")
               .required(false)
         )
+        .arg(
+          Arg::with_name("root-ca-cert-file")
+              .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
+              .takes_value(true)
+              .long("root-ca-cert-file")
+              .required(false)
+        )
         .arg(Arg::with_name("remote-instance-name")
             .takes_value(true)
                  .long("remote-instance-name")
@@ -227,6 +234,16 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       Some(cas_address) => {
         let chunk_size =
           value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
+
+        let root_ca_certs = if let Some(path) = top_match.value_of("root-ca-cert-file") {
+          Some(
+            std::fs::read(path)
+              .map_err(|err| format!("Error reading root CA certs file {}: {}", path, err))?,
+          )
+        } else {
+          None
+        };
+
         (
           Store::with_remote(
             &store_dir,
@@ -235,6 +252,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             top_match
               .value_of("remote-instance_name")
               .map(str::to_owned),
+            root_ca_certs,
             1,
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures

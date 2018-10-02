@@ -254,6 +254,7 @@ pub extern "C" fn scheduler_create(
   remote_store_server: Buffer,
   remote_execution_server: Buffer,
   remote_instance_name: Buffer,
+  remote_root_ca_certs_path_buffer: Buffer,
   remote_store_thread_count: u64,
   remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
@@ -300,6 +301,16 @@ pub extern "C" fn scheduler_create(
   let remote_instance_name_string = remote_instance_name
     .to_string()
     .expect("remote_instance_name was not valid UTF8");
+
+  let remote_root_ca_certs_path = {
+    let path = remote_root_ca_certs_path_buffer.to_os_string();
+    if path.is_empty() {
+      None
+    } else {
+      Some(PathBuf::from(path))
+    }
+  };
+
   Box::into_raw(Box::new(Scheduler::new(Core::new(
     root_type_ids.clone(),
     tasks,
@@ -322,6 +333,7 @@ pub extern "C" fn scheduler_create(
     } else {
       Some(remote_instance_name_string)
     },
+    remote_root_ca_certs_path,
     remote_store_thread_count as usize,
     remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
