@@ -24,7 +24,7 @@ That hello world plugin show how to register your plugin to Pants and define own
 which can be executed by Pants. To achieve that look on following steps:
 - Create new Pants project so you have pants.ini file in root of your repository
 
-- Create a home directory for your plugins. In this example we will `plugins/` directory in root of repository
+- Create a home directory for your plugins. In this example we will use `plugins/` directory in root of repository
 but word "plugins" is not special for Pants
 
 - In `plugins/` directory create following files system structure:
