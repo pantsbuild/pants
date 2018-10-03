@@ -194,6 +194,10 @@ to this directory.",
               .long("server-address")
               .required(false)
         )
+        .arg(Arg::with_name("remote-instance-name")
+            .takes_value(true)
+                 .long("remote-instance-name")
+                 .required(false))
         .arg(
           Arg::with_name("chunk-bytes")
               .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
@@ -228,6 +232,9 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             &store_dir,
             pool.clone(),
             cas_address.to_owned(),
+            top_match
+              .value_of("remote-instance_name")
+              .map(str::to_owned),
             1,
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures

@@ -626,6 +626,11 @@ fn main() {
         .long("server-address")
         .required(false),
     ).arg(
+      clap::Arg::with_name("remote-instance-name")
+        .takes_value(true)
+        .long("remote-instance-name")
+        .required(false),
+    ).arg(
       clap::Arg::with_name("mount-path")
         .required(true)
         .takes_value(true),
@@ -652,6 +657,7 @@ fn main() {
       &store_path,
       pool,
       address.to_owned(),
+      args.value_of("remote-instance-name").map(str::to_owned),
       1,
       4 * 1024 * 1024,
       std::time::Duration::from_secs(5 * 60),

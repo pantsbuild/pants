@@ -53,6 +53,7 @@ impl Core {
     work_dir: PathBuf,
     remote_store_server: Option<String>,
     remote_execution_server: Option<String>,
+    remote_instance_name: Option<String>,
     remote_store_thread_count: usize,
     remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
@@ -73,6 +74,7 @@ impl Core {
           store_path,
           fs_pool.clone(),
           address,
+          remote_instance_name.clone(),
           remote_store_thread_count,
           remote_store_chunk_bytes,
           remote_store_chunk_upload_timeout,
@@ -83,6 +85,7 @@ impl Core {
     let underlying_command_runner: Box<CommandRunner> = match remote_execution_server {
       Some(address) => Box::new(process_execution::remote::CommandRunner::new(
         address,
+        remote_instance_name,
         // Allow for some overhead for bookkeeping threads (if any).
         process_execution_parallelism + 2,
         store.clone(),

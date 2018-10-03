@@ -21,6 +21,7 @@ use std::cmp::min;
 
 #[derive(Clone)]
 pub struct CommandRunner {
+  instance_name: Option<String>,
   channel: Resettable<grpcio::Channel>,
   env: Resettable<Arc<grpcio::Environment>>,
   execution_client: Resettable<Arc<bazel_protos::remote_execution_grpc::ExecutionClient>>,
@@ -98,7 +99,7 @@ impl super::CommandRunner for CommandRunner {
     let operations_client = self.operations_client.clone();
 
     let store = self.store.clone();
-    let execute_request_result = make_execute_request(&req);
+    let execute_request_result = make_execute_request(&req, &self.instance_name);
 
     let ExecuteProcessRequest {
       description,
@@ -221,7 +222,12 @@ impl CommandRunner {
   const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
   const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
 
-  pub fn new(address: String, thread_count: usize, store: Store) -> CommandRunner {
+  pub fn new(
+    address: String,
+    instance_name: Option<String>,
+    thread_count: usize,
+    store: Store,
+  ) -> CommandRunner {
     let env = Resettable::new(move || Arc::new(grpcio::Environment::new(thread_count)));
     let env2 = env.clone();
     let channel =
@@ -240,6 +246,7 @@ impl CommandRunner {
     });
 
     CommandRunner {
+      instance_name,
       channel,
       env,
       execution_client,
@@ -569,6 +576,7 @@ impl CommandRunner {
 
 fn make_execute_request(
   req: &ExecuteProcessRequest,
+  instance_name: &Option<String>,
 ) -> Result<
   (
     bazel_protos::remote_execution::Action,
@@ -629,6 +637,9 @@ fn make_execute_request(
   action.set_input_root_digest((&req.input_files).into());
 
   let mut execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
+  if let Some(instance_name) = instance_name {
+    execute_request.set_instance_name(instance_name.clone());
+  }
   execute_request.set_action_digest(digest(&action)?);
 
   Ok((action, command, execute_request))
@@ -790,7 +801,79 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req),
+      super::make_execute_request(&req, &None),
+      Ok((want_action, want_command, want_execute_request))
+    );
+  }
+
+  #[test]
+  fn make_execute_request_with_instance_name() {
+    let input_directory = TestDirectory::containing_roland();
+    let req = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "yo"]),
+      env: vec![("SOME".to_owned(), "value".to_owned())]
+        .into_iter()
+        .collect(),
+      input_files: input_directory.digest(),
+      // Intentionally poorly sorted:
+      output_files: vec!["path/to/file", "other/file"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
+      output_directories: vec!["directory/name"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
+      timeout: Duration::from_millis(1000),
+      description: "some description".to_owned(),
+      jdk_home: None,
+    };
+
+    let mut want_command = bazel_protos::remote_execution::Command::new();
+    want_command.mut_arguments().push("/bin/echo".to_owned());
+    want_command.mut_arguments().push("yo".to_owned());
+    want_command.mut_environment_variables().push({
+      let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+      env.set_name("SOME".to_owned());
+      env.set_value("value".to_owned());
+      env
+    });
+    want_command
+      .mut_output_files()
+      .push("other/file".to_owned());
+    want_command
+      .mut_output_files()
+      .push("path/to/file".to_owned());
+    want_command
+      .mut_output_directories()
+      .push("directory/name".to_owned());
+
+    let mut want_action = bazel_protos::remote_execution::Action::new();
+    want_action.set_command_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "cc4ddd3085aaffbe0abce22f53b30edbb59896bb4a4f0d76219e48070cd0afe1",
+        ).unwrap(),
+        72,
+      ))
+        .into(),
+    );
+    want_action.set_input_root_digest((&input_directory.digest()).into());
+
+    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
+    want_execute_request.set_instance_name("dark-tower".to_owned());
+    want_execute_request.set_action_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
+        ).unwrap(),
+        140,
+      ))
+        .into(),
+    );
+
+    assert_eq!(
+      super::make_execute_request(&req, &Some("dark-tower".to_owned())),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -843,7 +926,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req),
+      super::make_execute_request(&req, &None),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -855,16 +938,19 @@ mod tests {
     let mock_server = {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         "wrong-command".to_string(),
-        super::make_execute_request(&ExecuteProcessRequest {
-          argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
-          env: BTreeMap::new(),
-          input_files: fs::EMPTY_DIGEST,
-          output_files: BTreeSet::new(),
-          output_directories: BTreeSet::new(),
-          timeout: Duration::from_millis(1000),
-          description: "wrong command".to_string(),
-          jdk_home: None,
-        }).unwrap()
+        super::make_execute_request(
+          &ExecuteProcessRequest {
+            argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
+            env: BTreeMap::new(),
+            input_files: fs::EMPTY_DIGEST,
+            output_files: BTreeSet::new(),
+            output_directories: BTreeSet::new(),
+            timeout: Duration::from_millis(1000),
+            description: "wrong command".to_string(),
+            jdk_home: None,
+          },
+          &None,
+        ).unwrap()
         .2,
         vec![],
       ))
@@ -886,7 +972,9 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().2,
+        super::make_execute_request(&execute_request, &None)
+          .unwrap()
+          .2,
         vec![
           make_incomplete_operation(&op_name),
           make_successful_operation(
@@ -970,7 +1058,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&echo_roland_request())
+        super::make_execute_request(&echo_roland_request(), &None)
           .unwrap()
           .2,
         vec![make_successful_operation(
@@ -990,12 +1078,13 @@ mod tests {
       &store_dir_path,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       cas.address(),
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let cmd_runner = CommandRunner::new(mock_server.address(), 1, store);
+    let cmd_runner = CommandRunner::new(mock_server.address(), None, 1, store);
     let result = cmd_runner.run(echo_roland_request()).wait();
     assert_eq!(
       result,
@@ -1038,7 +1127,9 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().2,
+        super::make_execute_request(&execute_request, &None)
+          .unwrap()
+          .2,
         Vec::from_iter(
           iter::repeat(make_incomplete_operation(&op_name))
             .take(4)
@@ -1086,7 +1177,9 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().2,
+        super::make_execute_request(&execute_request, &None)
+          .unwrap()
+          .2,
         vec![
           make_incomplete_operation(&op_name),
           make_delayed_incomplete_operation(&op_name, delayed_operation_time),
@@ -1109,7 +1202,9 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().2,
+        super::make_execute_request(&execute_request, &None)
+          .unwrap()
+          .2,
         vec![
           make_incomplete_operation(&op_name),
           make_canceled_operation(Some(Duration::from_millis(100))),
@@ -1145,7 +1240,9 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().2,
+        super::make_execute_request(&execute_request, &None)
+          .unwrap()
+          .2,
         vec![
           make_incomplete_operation(&op_name),
           MockOperation::new({
@@ -1181,7 +1278,9 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().2,
+        super::make_execute_request(&execute_request, &None)
+          .unwrap()
+          .2,
         vec![MockOperation::new({
           let mut op = bazel_protos::operations::Operation::new();
           op.set_name(op_name.to_string());
@@ -1211,7 +1310,9 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().2,
+        super::make_execute_request(&execute_request, &None)
+          .unwrap()
+          .2,
         vec![
           make_incomplete_operation(&op_name),
           MockOperation::new({
@@ -1244,7 +1345,9 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().2,
+        super::make_execute_request(&execute_request, &None)
+          .unwrap()
+          .2,
         vec![MockOperation::new({
           let mut op = bazel_protos::operations::Operation::new();
           op.set_name(op_name.to_string());
@@ -1268,7 +1371,9 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request).unwrap().2,
+        super::make_execute_request(&execute_request, &None)
+          .unwrap()
+          .2,
         vec![
           make_incomplete_operation(&op_name),
           MockOperation::new({
@@ -1295,7 +1400,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request())
+        super::make_execute_request(&cat_roland_request(), &None)
           .unwrap()
           .2,
         vec![
@@ -1321,6 +1426,7 @@ mod tests {
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       cas.address(),
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -1330,7 +1436,7 @@ mod tests {
       .wait()
       .expect("Saving file bytes to store");
 
-    let result = CommandRunner::new(mock_server.address(), 1, store)
+    let result = CommandRunner::new(mock_server.address(), None, 1, store)
       .run(cat_roland_request())
       .wait();
     assert_eq!(
@@ -1357,7 +1463,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request())
+        super::make_execute_request(&cat_roland_request(), &None)
           .unwrap()
           .2,
         vec![
@@ -1378,12 +1484,13 @@ mod tests {
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       cas.address(),
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let error = CommandRunner::new(mock_server.address(), 1, store)
+    let error = CommandRunner::new(mock_server.address(), None, 1, store)
       .run(cat_roland_request())
       .wait()
       .expect_err("Want error");
@@ -1583,7 +1690,9 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request).unwrap().2,
+          super::make_execute_request(&execute_request, &None)
+            .unwrap()
+            .2,
           vec![
             make_incomplete_operation(&op_name),
             make_successful_operation(
@@ -1614,7 +1723,9 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request).unwrap().2,
+          super::make_execute_request(&execute_request, &None)
+            .unwrap()
+            .2,
           vec![
             make_incomplete_operation(&op_name),
             make_incomplete_operation(&op_name),
@@ -1918,12 +2029,13 @@ mod tests {
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       cas.address(),
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    CommandRunner::new(address, 1, store)
+    CommandRunner::new(address, None, 1, store)
   }
 
   fn extract_execute_response(

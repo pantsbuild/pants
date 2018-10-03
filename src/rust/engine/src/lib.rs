@@ -253,6 +253,7 @@ pub extern "C" fn scheduler_create(
   root_type_ids: TypeIdBuffer,
   remote_store_server: Buffer,
   remote_execution_server: Buffer,
+  remote_instance_name: Buffer,
   remote_store_thread_count: u64,
   remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
@@ -296,6 +297,9 @@ pub extern "C" fn scheduler_create(
   let remote_execution_server_string = remote_execution_server
     .to_string()
     .expect("remote_execution_server was not valid UTF8");
+  let remote_instance_name_string = remote_instance_name
+    .to_string()
+    .expect("remote_instance_name was not valid UTF8");
   Box::into_raw(Box::new(Scheduler::new(Core::new(
     root_type_ids.clone(),
     tasks,
@@ -312,6 +316,11 @@ pub extern "C" fn scheduler_create(
       None
     } else {
       Some(remote_execution_server_string)
+    },
+    if remote_instance_name_string.is_empty() {
+      None
+    } else {
+      Some(remote_instance_name_string)
     },
     remote_store_thread_count as usize,
     remote_store_chunk_bytes as usize,
