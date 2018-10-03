@@ -131,11 +131,9 @@ impl Store {
   /// Store a file locally.
   ///
   pub fn store_file_bytes(&self, bytes: Bytes, initial_lease: bool) -> BoxFuture<Digest, String> {
-    let len = bytes.len();
     self
       .local
       .store_bytes(EntryType::File, bytes, initial_lease)
-      .map(move |fingerprint| Digest(fingerprint, len))
       .to_boxed()
   }
 
@@ -178,10 +176,7 @@ impl Store {
         .write_to_bytes()
         .map_err(|e| format!("Error serializing directory proto {:?}: {:?}", directory, e)),
     ).and_then(move |bytes| {
-      let len = bytes.len();
-      local
-        .store_bytes(EntryType::Directory, Bytes::from(bytes), initial_lease)
-        .map(move |fingerprint| Digest(fingerprint, len))
+      local.store_bytes(EntryType::Directory, Bytes::from(bytes), initial_lease)
     }).to_boxed()
   }
 
@@ -247,7 +242,7 @@ impl Store {
     let maybe_remote = self.remote.clone();
     self
       .local
-      .load_bytes_with(entry_type, digest.0, f_local)
+      .load_bytes_with(entry_type, digest, f_local)
       .and_then(
         move |maybe_local_value| match (maybe_local_value, maybe_remote) {
           (Some(value_result), _) => future::done(value_result.map(Some)).to_boxed(),
@@ -257,11 +252,9 @@ impl Store {
             .and_then(move |maybe_bytes: Option<Bytes>| match maybe_bytes {
               Some(bytes) => future::done(f_remote(bytes.clone()))
                 .and_then(move |value| {
-                  let len = bytes.len();
                   local
                     .store_bytes(entry_type, bytes, true)
-                    .and_then(move |stored_fingerprint| {
-                      let stored_digest = Digest(stored_fingerprint, len);
+                    .and_then(move |stored_digest| {
                       if digest == stored_digest {
                         Ok(Some(value))
                       } else {
@@ -341,7 +334,7 @@ impl Store {
               let entry_type = ingested_digests[&digest];
               let remote = remote2.clone();
               local
-                .load_bytes_with(entry_type, digest.0, move |bytes| remote.store_bytes(bytes))
+                .load_bytes_with(entry_type, digest, move |bytes| remote.store_bytes(bytes))
                 .and_then(move |maybe_future| match maybe_future {
                   Some(future) => Ok(future),
                   None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
@@ -645,7 +638,7 @@ mod local {
   use std::sync::Arc;
   use std::time;
 
-  use super::super::EMPTY_FINGERPRINT;
+  use super::super::EMPTY_DIGEST;
   use super::MAX_LOCAL_STORE_SIZE_BYTES;
   use pool::ResettablePool;
 
@@ -871,7 +864,7 @@ mod local {
       entry_type: EntryType,
       bytes: Bytes,
       initial_lease: bool,
-    ) -> BoxFuture<Fingerprint, String> {
+    ) -> BoxFuture<Digest, String> {
       let dbs = match entry_type {
         EntryType::Directory => self.inner.directory_dbs.clone(),
         EntryType::File => self.inner.file_dbs.clone(),
@@ -887,6 +880,7 @@ mod local {
             hasher.input(&bytes);
             Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
           };
+          let digest = Digest(fingerprint, bytes.len());
 
           let (env, content_database, lease_database) = dbs.get()?.get(&fingerprint);
           let put_res = env.begin_rw_txn().and_then(|mut txn| {
@@ -903,12 +897,9 @@ mod local {
           });
 
           match put_res {
-            Ok(()) => Ok(fingerprint),
-            Err(KeyExist) => Ok(fingerprint),
-            Err(err) => Err(format!(
-              "Error storing fingerprint {}: {}",
-              fingerprint, err
-            )),
+            Ok(()) => Ok(digest),
+            Err(KeyExist) => Ok(digest),
+            Err(err) => Err(format!("Error storing digest {:?}: {}", digest, err)),
           }
         }).to_boxed()
     }
@@ -916,10 +907,10 @@ mod local {
     pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
       &self,
       entry_type: EntryType,
-      fingerprint: Fingerprint,
+      digest: Digest,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
-      if fingerprint == EMPTY_FINGERPRINT {
+      if digest == EMPTY_DIGEST {
         // Avoid expensive I/O for this super common case.
         // Also, this allows some client-provided operations (like merging snapshots) to work
         // without needing to first store the empty snapshot.
@@ -935,17 +926,20 @@ mod local {
         .inner
         .pool
         .spawn_fn(move || {
-          let (env, db, _) = dbs.get()?.get(&fingerprint);
+          let (env, db, _) = dbs.get()?.get(&digest.0);
           let ro_txn = env
             .begin_ro_txn()
             .map_err(|err| format!("Failed to begin read transaction: {}", err));
-          ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
-            Ok(bytes) => Ok(Some(f(Bytes::from(bytes)))),
+          ro_txn.and_then(|txn| match txn.get(db, &digest.0) {
+            Ok(bytes) => {
+              if bytes.len() == digest.1 {
+                Ok(Some(f(Bytes::from(bytes))))
+              } else {
+                Ok(None)
+              }
+            }
             Err(NotFound) => Ok(None),
-            Err(err) => Err(format!(
-              "Error loading fingerprint {}: {}",
-              fingerprint, err,
-            )),
+            Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err,)),
           })
         }).to_boxed()
     }
@@ -1062,12 +1056,10 @@ mod local {
 
   #[cfg(test)]
   pub mod tests {
-    use super::super::super::safe_create_dir_all;
     use super::{ByteStore, EntryType, ResettablePool};
     use bytes::Bytes;
     use futures::Future;
     use hashing::{Digest, Fingerprint};
-    use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
     use std::path::Path;
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -1082,7 +1074,7 @@ mod local {
         new_store(dir.path())
           .store_bytes(EntryType::File, testdata.bytes(), false)
           .wait(),
-        Ok(testdata.fingerprint())
+        Ok(testdata.digest())
       );
     }
 
@@ -1099,55 +1091,7 @@ mod local {
         new_store(dir.path())
           .store_bytes(EntryType::File, testdata.bytes(), false)
           .wait(),
-        Ok(testdata.fingerprint())
-      );
-    }
-
-    #[test]
-    fn save_file_collision_preserves_first() {
-      let dir = TempDir::new().unwrap();
-
-      let bogus_value = Bytes::new();
-      let realdata = TestData::roland();
-
-      let sharded_dir = dir
-        .path()
-        .join("files")
-        .join(&realdata.fingerprint().to_hex()[0..1]);
-      safe_create_dir_all(&sharded_dir).expect("Making temp dir");
-
-      let env = Environment::new()
-        .set_max_dbs(1)
-        .open(&sharded_dir)
-        .unwrap();
-      let database = env.create_db(Some("content"), DatabaseFlags::empty());
-      env
-        .begin_rw_txn()
-        .and_then(|mut txn| {
-          txn
-            .put(
-              database.unwrap(),
-              &realdata.fingerprint(),
-              &bogus_value,
-              WriteFlags::empty(),
-            ).and_then(|()| txn.commit())
-        }).unwrap();
-
-      assert_eq!(
-        load_file_bytes(&new_store(dir.path()), realdata.fingerprint()),
-        Ok(Some(bogus_value.clone()))
-      );
-
-      assert_eq!(
-        new_store(dir.path())
-          .store_bytes(EntryType::File, realdata.bytes(), false)
-          .wait(),
-        Ok(realdata.fingerprint())
-      );
-
-      assert_eq!(
-        load_file_bytes(&new_store(dir.path()), realdata.fingerprint()),
-        Ok(Some(bogus_value.clone()))
+        Ok(testdata.digest())
       );
     }
 
@@ -1168,7 +1112,7 @@ mod local {
     fn missing_file() {
       let dir = TempDir::new().unwrap();
       assert_eq!(
-        load_file_bytes(&new_store(dir.path()), TestData::roland().fingerprint()),
+        load_file_bytes(&new_store(dir.path()), TestData::roland().digest()),
         Ok(None)
       );
     }
@@ -1182,11 +1126,11 @@ mod local {
         &new_store(dir.path())
           .store_bytes(EntryType::Directory, testdir.bytes(), false)
           .wait(),
-        &Ok(testdir.fingerprint())
+        &Ok(testdir.digest())
       );
 
       assert_eq!(
-        load_directory_proto_bytes(&new_store(dir.path()), testdir.fingerprint()),
+        load_directory_proto_bytes(&new_store(dir.path()), testdir.digest()),
         Ok(Some(testdir.bytes()))
       );
     }
@@ -1197,7 +1141,7 @@ mod local {
       let testdir = TestDirectory::containing_roland();
 
       assert_eq!(
-        load_directory_proto_bytes(&new_store(dir.path()), testdir.fingerprint()),
+        load_directory_proto_bytes(&new_store(dir.path()), testdir.digest()),
         Ok(None)
       );
     }
@@ -1213,7 +1157,7 @@ mod local {
         .unwrap();
 
       assert_eq!(
-        load_directory_proto_bytes(&new_store(dir.path()), testdata.fingerprint()),
+        load_directory_proto_bytes(&new_store(dir.path()), testdata.digest()),
         Ok(None)
       );
     }
@@ -1232,9 +1176,12 @@ mod local {
         load_bytes(
           &store,
           EntryType::File,
-          Fingerprint::from_hex_string(
-            "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
-          ).unwrap(),
+          Digest(
+            Fingerprint::from_hex_string(
+              "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
+            ).unwrap(),
+            10
+          )
         ),
         Ok(Some(bytes))
       );
@@ -1258,7 +1205,7 @@ mod local {
         .expect("Error leasing");
       store.shrink(10).expect("Error shrinking");
       assert_eq!(
-        load_bytes(&store, EntryType::File, file_fingerprint),
+        load_bytes(&store, EntryType::File, file_digest),
         Ok(Some(bytes))
       );
     }
@@ -1271,10 +1218,12 @@ mod local {
       let fingerprint_1 = Fingerprint::from_hex_string(
         "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
       ).unwrap();
+      let digest_1 = Digest(fingerprint_1, 10);
       let bytes_2 = Bytes::from("9876543210");
       let fingerprint_2 = Fingerprint::from_hex_string(
         "7619ee8cea49187f309616e30ecf54be072259b43760f1f550a644945d5572f2",
       ).unwrap();
+      let digest_2 = Digest(fingerprint_2, 10);
       store
         .store_bytes(EntryType::File, bytes_1.clone(), false)
         .wait()
@@ -1285,10 +1234,8 @@ mod local {
         .expect("Error storing");
       store.shrink(10).expect("Error shrinking");
       let mut entries = Vec::new();
-      entries
-        .push(load_bytes(&store, EntryType::File, fingerprint_1).expect("Error loading bytes"));
-      entries
-        .push(load_bytes(&store, EntryType::File, fingerprint_2).expect("Error loading bytes"));
+      entries.push(load_bytes(&store, EntryType::File, digest_1).expect("Error loading bytes"));
+      entries.push(load_bytes(&store, EntryType::File, digest_2).expect("Error loading bytes"));
       assert_eq!(
         1,
         entries.iter().filter(|maybe| maybe.is_some()).count(),
@@ -1305,10 +1252,12 @@ mod local {
       let fingerprint_1 = Fingerprint::from_hex_string(
         "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
       ).unwrap();
+      let digest_1 = Digest(fingerprint_1, 10);
       let bytes_2 = Bytes::from("9876543210");
       let fingerprint_2 = Fingerprint::from_hex_string(
         "7619ee8cea49187f309616e30ecf54be072259b43760f1f550a644945d5572f2",
       ).unwrap();
+      let digest_2 = Digest(fingerprint_2, 10);
       store
         .store_bytes(EntryType::File, bytes_1.clone(), false)
         .wait()
@@ -1319,13 +1268,13 @@ mod local {
         .expect("Error storing");
       store.shrink(1).expect("Error shrinking");
       assert_eq!(
-        load_bytes(&store, EntryType::File, fingerprint_1),
+        load_bytes(&store, EntryType::File, digest_1),
         Ok(None),
         "Should have garbage collected {:?}",
         fingerprint_1
       );
       assert_eq!(
-        load_bytes(&store, EntryType::File, fingerprint_2),
+        load_bytes(&store, EntryType::File, digest_2),
         Ok(None),
         "Should have garbage collected {:?}",
         fingerprint_2
@@ -1351,11 +1300,10 @@ mod local {
       store.shrink(80).expect("Error shrinking");
       let mut entries = Vec::new();
       entries.push(
-        load_bytes(&store, EntryType::Directory, testdir.fingerprint())
-          .expect("Error loading bytes"),
+        load_bytes(&store, EntryType::Directory, testdir.digest()).expect("Error loading bytes"),
       );
       entries.push(
-        load_bytes(&store, EntryType::Directory, other_testdir.fingerprint())
+        load_bytes(&store, EntryType::Directory, other_testdir.digest())
           .expect("Error loading bytes"),
       );
       assert_eq!(
@@ -1387,12 +1335,12 @@ mod local {
       store.shrink(80).expect("Error shrinking");
 
       assert_eq!(
-        load_bytes(&store, EntryType::File, testdata.fingerprint()),
+        load_bytes(&store, EntryType::File, testdata.digest()),
         Ok(None),
         "File was present when it should've been garbage collected"
       );
       assert_eq!(
-        load_bytes(&store, EntryType::Directory, testdir.fingerprint()),
+        load_bytes(&store, EntryType::Directory, testdir.digest()),
         Ok(Some(testdir.bytes())),
         "Directory was missing despite lease"
       );
@@ -1418,12 +1366,12 @@ mod local {
       store.shrink(80).expect("Error shrinking");
 
       assert_eq!(
-        load_bytes(&store, EntryType::File, fourty_chars.fingerprint()),
+        load_bytes(&store, EntryType::File, fourty_chars.digest()),
         Ok(Some(fourty_chars.bytes())),
         "File was missing despite lease"
       );
       assert_eq!(
-        load_bytes(&store, EntryType::Directory, testdir.fingerprint()),
+        load_bytes(&store, EntryType::Directory, testdir.digest()),
         Ok(None),
         "Directory was present when it should've been garbage collected"
       );
@@ -1454,12 +1402,12 @@ mod local {
       assert_eq!(store.shrink(80), Ok(160));
 
       assert_eq!(
-        load_bytes(&store, EntryType::File, fourty_chars.fingerprint()),
+        load_bytes(&store, EntryType::File, fourty_chars.digest()),
         Ok(Some(fourty_chars.bytes())),
         "Leased file should still be present"
       );
       assert_eq!(
-        load_bytes(&store, EntryType::Directory, testdir.fingerprint()),
+        load_bytes(&store, EntryType::Directory, testdir.digest()),
         Ok(Some(testdir.bytes())),
         "Leased directory should still be present"
       );
@@ -1533,7 +1481,7 @@ mod local {
       let empty_file = TestData::empty();
       assert_eq!(
         store
-          .load_bytes_with(EntryType::File, empty_file.fingerprint(), |b| b)
+          .load_bytes_with(EntryType::File, empty_file.digest(), |b| b)
           .wait(),
         Ok(Some(empty_file.bytes())),
       )
@@ -1546,7 +1494,7 @@ mod local {
       let empty_dir = TestDirectory::empty();
       assert_eq!(
         store
-          .load_bytes_with(EntryType::Directory, empty_dir.fingerprint(), |b| b)
+          .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| b)
           .wait(),
         Ok(Some(empty_dir.bytes())),
       )
@@ -1556,26 +1504,23 @@ mod local {
       ByteStore::new(dir, Arc::new(ResettablePool::new("test-pool-".to_string()))).unwrap()
     }
 
-    pub fn load_file_bytes(
-      store: &ByteStore,
-      fingerprint: Fingerprint,
-    ) -> Result<Option<Bytes>, String> {
-      load_bytes(&store, EntryType::File, fingerprint)
+    pub fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
+      load_bytes(&store, EntryType::File, digest)
     }
 
     pub fn load_directory_proto_bytes(
       store: &ByteStore,
-      fingerprint: Fingerprint,
+      digest: Digest,
     ) -> Result<Option<Bytes>, String> {
-      load_bytes(&store, EntryType::Directory, fingerprint)
+      load_bytes(&store, EntryType::Directory, digest)
     }
 
     fn load_bytes(
       store: &ByteStore,
       entry_type: EntryType,
-      fingerprint: Fingerprint,
+      digest: Digest,
     ) -> Result<Option<Bytes>, String> {
-      store.load_bytes_with(entry_type, fingerprint, |b| b).wait()
+      store.load_bytes_with(entry_type, digest, |b| b).wait()
     }
   }
 }
@@ -2289,7 +2234,7 @@ mod tests {
     );
     assert_eq!(1, cas.read_request_count());
     assert_eq!(
-      local::tests::load_file_bytes(&local::tests::new_store(dir.path()), testdata.fingerprint()),
+      local::tests::load_file_bytes(&local::tests::new_store(dir.path()), testdata.digest()),
       Ok(Some(testdata.bytes())),
       "Read from local cache"
     );
@@ -2313,7 +2258,7 @@ mod tests {
     assert_eq!(
       local::tests::load_directory_proto_bytes(
         &local::tests::new_store(dir.path()),
-        testdir.fingerprint(),
+        testdir.digest(),
       ),
       Ok(Some(testdir.bytes()))
     );
@@ -2442,7 +2387,7 @@ mod tests {
     assert_eq!(
       local::tests::load_directory_proto_bytes(
         &local::tests::new_store(dir.path()),
-        testdata.fingerprint()
+        testdata.digest()
       ),
       Ok(None)
     );
@@ -2487,7 +2432,7 @@ mod tests {
     assert_eq!(
       local::tests::load_directory_proto_bytes(
         &local::tests::new_store(dir.path()),
-        non_canonical_directory_fingerprint,
+        directory_digest,
       ),
       Ok(None)
     );
@@ -2508,7 +2453,7 @@ mod tests {
       .expect_err("Want error");
 
     assert_eq!(
-      local::tests::load_file_bytes(&local::tests::new_store(dir.path()), testdata.fingerprint()),
+      local::tests::load_file_bytes(&local::tests::new_store(dir.path()), testdata.digest()),
       Ok(None)
     );
   }
@@ -2528,7 +2473,7 @@ mod tests {
       .expect_err("Want error");
 
     assert_eq!(
-      local::tests::load_file_bytes(&local::tests::new_store(dir.path()), testdir.fingerprint()),
+      local::tests::load_file_bytes(&local::tests::new_store(dir.path()), testdir.digest()),
       Ok(None)
     );
   }
@@ -2876,6 +2821,30 @@ mod tests {
       ),
       "Bad error message"
     );
+  }
+
+  #[test]
+  fn uploading_digest_with_wrong_size_is_error() {
+    let dir = TempDir::new().unwrap();
+    let cas = StubCAS::empty();
+
+    let testdata = TestData::roland();
+
+    new_local_store(dir.path())
+      .store_file_bytes(testdata.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+
+    assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
+
+    let wrong_digest = Digest(testdata.fingerprint(), testdata.len() + 1);
+
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![wrong_digest])
+      .wait()
+      .expect_err("Expect error uploading file");
+
+    assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
   }
 
   #[test]
