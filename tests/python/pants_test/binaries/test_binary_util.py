@@ -154,7 +154,8 @@ class BinaryUtilTest(TestBase):
 
       binary_path_abs = os.path.join(bootstrap_dir, binary_path)
 
-      self.assertEqual(binary_path_abs, binary_util.select(binary_request))
+      self.assertEqual(os.path.realpath(binary_path_abs),
+                       os.path.realpath(binary_util.select(binary_request)))
 
       self.assertEqual(contents, self._read_file(binary_path_abs))
 
@@ -235,9 +236,9 @@ class BinaryUtilTest(TestBase):
       "Recognized platforms are: [darwin, linux].")
     self.assertIn(expected_msg, the_raised_exception_message)
 
-  def test_select_binary_base_path_missing_version(self):
+  def test_select_binary_base_path_missing_arch(self):
     def uname_func():
-      return "darwin", "dontcare1", "999.9", "dontcare2", "x86_64"
+      return "linux", "dontcare1", "don'tcare2", "dontcare3", "quantum_computer"
 
     binary_util = self._gen_binary_util(uname_func=uname_func)
 
@@ -248,15 +249,16 @@ class BinaryUtilTest(TestBase):
     self.assertIn(BinaryUtil.MissingMachineInfo.__name__, the_raised_exception_message)
     expected_msg = (
       "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
-      "name=myname, platform_dependent=True, external_url_generator=None, archiver=None): Pants could not "
-      "resolve binaries for the current host. Update --binaries-path-by-id to find binaries for "
-      "the current host platform ({unicode_literal}\'darwin\', {unicode_literal}\'999\').\\n--binaries-path-by-id was:"
+      "name=myname, platform_dependent=True, external_url_generator=None, archiver=None): "
+      "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
+      "find binaries for the current host platform ({unicode_literal}\'linux\', "
+      "{unicode_literal}\'quantum_computer\').\\n--binaries-path-by-id was:"
     ).format(unicode_literal='u' if PY2 else '')
     self.assertIn(expected_msg, the_raised_exception_message)
 
-  def test_select_script_missing_version(self):
+  def test_select_script_missing_arch(self):
     def uname_func():
-      return "darwin", "dontcare1", "999.9", "dontcare2", "x86_64"
+      return "linux", "dontcare1", "dontcare2", "dontcare3", "quantum_computer"
 
     binary_util = self._gen_binary_util(uname_func=uname_func)
 
@@ -270,8 +272,8 @@ class BinaryUtilTest(TestBase):
       # platform_dependent=False when doing select_script()
       "name=myname, platform_dependent=False, external_url_generator=None, archiver=None): Pants "
       "could not resolve binaries for the current host. Update --binaries-path-by-id to find "
-      "binaries for the current host platform ({unicode_literal}\'darwin\', {unicode_literal}\'999\')."
-      "\\n--binaries-path-by-id was:"
+      "binaries for the current host platform ({unicode_literal}\'linux\', "
+      "{unicode_literal}\'quantum_computer\').\\n--binaries-path-by-id was:"
     ).format(unicode_literal='u' if PY2 else '')
     self.assertIn(expected_msg, the_raised_exception_message)
 

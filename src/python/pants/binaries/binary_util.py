@@ -22,7 +22,8 @@ from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
-from pants.util.osutil import SUPPORTED_PLATFORM_NORMALIZED_NAMES
+from pants.util.osutil import (SUPPORTED_PLATFORM_NORMALIZED_NAMES,
+                               get_closest_mac_host_platform_pair)
 
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,7 @@ class PantsHosted(BinaryToolUrlGenerator):
   class NoBaseUrlsError(ValueError): pass
 
   def __init__(self, binary_request, baseurls):
+    super(PantsHosted, self).__init__()
     self._binary_request = binary_request
 
     if not baseurls:
@@ -250,11 +252,12 @@ class BinaryUtil(object):
 
     @classmethod
     def create(cls):
+      # NB: create is a class method to ~force binary fetch location to be global.
       return cls._create_for_cls(BinaryUtil)
 
     @classmethod
     def _create_for_cls(cls, binary_util_cls):
-      # NB: create is a class method to ~force binary fetch location to be global.
+      # NB: We read global bootstrap options, but through our own scoped options instance.
       options = cls.global_instance().get_options()
       binary_tool_fetcher = BinaryToolFetcher(
         bootstrap_dir=options.pants_bootstrapdir,
@@ -334,17 +337,29 @@ class BinaryUtil(object):
         .format(os_id_key, ', '.join(sorted(self._ID_BY_OS.keys()))))
     try:
       os_name, arch_or_version = self._path_by_id[os_id_tuple]
-      host_platform = HostPlatform(os_name, arch_or_version)
     except KeyError:
-      # We fail early here because we need the host_platform to identify where to download binaries
-      # to.
-      raise self.MissingMachineInfo(
-        "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
-        "find binaries for the current host platform {}.\n"
-        "--binaries-path-by-id was: {}."
-        .format(os_id_tuple, self._path_by_id))
+      # In the case of MacOS, arch_or_version represents a version, and newer releases
+      # can run binaries built for older releases.
+      # It's better to allow that as a fallback, than for Pants to be broken on each new version
+      # of MacOS until we get around to adding binaries for that new version, and modifying config
+      # appropriately.
+      # If some future version of MacOS cannot run binaries built for a previous
+      # release, then we're no worse off than we were before (except that the error will be
+      # less obvious), and we can fix it by pushing appropriate binaries and modifying
+      # SUPPORTED_PLATFORM_NORMALIZED_NAMES appropriately.  This is only likely to happen with a
+      # major architecture change, so we'll have plenty of warning.
+      if os_id_tuple[0] == 'darwin':
+        os_name, arch_or_version = get_closest_mac_host_platform_pair(os_id_tuple[1])
+      else:
+        # We fail early here because we need the host_platform to identify where to download
+        # binaries to.
+        raise self.MissingMachineInfo(
+          "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
+          "find binaries for the current host platform {}.\n"
+          "--binaries-path-by-id was: {}."
+          .format(os_id_tuple, self._path_by_id))
 
-    return host_platform
+    return HostPlatform(os_name, arch_or_version)
 
   def _get_download_path(self, binary_request):
     return binary_request.get_download_path(self._host_platform())
