@@ -1,6 +1,8 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
@@ -54,6 +56,7 @@ impl Core {
     remote_store_server: Option<String>,
     remote_execution_server: Option<String>,
     remote_instance_name: Option<String>,
+    remote_root_ca_certs_path: Option<PathBuf>,
     remote_store_thread_count: usize,
     remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
@@ -65,6 +68,17 @@ impl Core {
       Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
     });
 
+    // We re-use these certs for both the execution and store service; they're generally tied together.
+    let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
+      Some(
+        File::open(&path)
+          .and_then(|f| f.bytes().collect::<Result<Vec<_>, _>>())
+          .unwrap_or_else(|err| panic!("Error reading root CA certs file {:?}: {}", path, err)),
+      )
+    } else {
+      None
+    };
+
     let store_path = Store::default_path();
 
     let store = safe_create_dir_all_ioerror(&store_path)
@@ -75,6 +89,7 @@ impl Core {
           fs_pool.clone(),
           address,
           remote_instance_name.clone(),
+          root_ca_certs.clone(),
           remote_store_thread_count,
           remote_store_chunk_bytes,
           remote_store_chunk_upload_timeout,
@@ -86,6 +101,7 @@ impl Core {
       Some(address) => Box::new(process_execution::remote::CommandRunner::new(
         address,
         remote_instance_name,
+        root_ca_certs,
         // Allow for some overhead for bookkeeping threads (if any).
         process_execution_parallelism + 2,
         store.clone(),

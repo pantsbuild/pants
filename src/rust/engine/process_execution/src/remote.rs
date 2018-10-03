@@ -225,13 +225,23 @@ impl CommandRunner {
   pub fn new(
     address: String,
     instance_name: Option<String>,
+    root_ca_certs: Option<Vec<u8>>,
     thread_count: usize,
     store: Store,
   ) -> CommandRunner {
     let env = Resettable::new(move || Arc::new(grpcio::Environment::new(thread_count)));
     let env2 = env.clone();
-    let channel =
-      Resettable::new(move || grpcio::ChannelBuilder::new(env2.get()).connect(&address));
+    let channel = Resettable::new(move || {
+      let builder = grpcio::ChannelBuilder::new(env2.get());
+      if let Some(ref root_ca_certs) = root_ca_certs {
+        let creds = grpcio::ChannelCredentialsBuilder::new()
+          .root_cert(root_ca_certs.clone())
+          .build();
+        builder.secure_connect(&address, creds)
+      } else {
+        builder.connect(&address)
+      }
+    });
     let channel2 = channel.clone();
     let channel3 = channel.clone();
     let execution_client = Resettable::new(move || {
@@ -1079,12 +1089,13 @@ mod tests {
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       cas.address(),
       None,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let cmd_runner = CommandRunner::new(mock_server.address(), None, 1, store);
+    let cmd_runner = CommandRunner::new(mock_server.address(), None, None, 1, store);
     let result = cmd_runner.run(echo_roland_request()).wait();
     assert_eq!(
       result,
@@ -1427,6 +1438,7 @@ mod tests {
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       cas.address(),
       None,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -1436,7 +1448,7 @@ mod tests {
       .wait()
       .expect("Saving file bytes to store");
 
-    let result = CommandRunner::new(mock_server.address(), None, 1, store)
+    let result = CommandRunner::new(mock_server.address(), None, None, 1, store)
       .run(cat_roland_request())
       .wait();
     assert_eq!(
@@ -1485,12 +1497,13 @@ mod tests {
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       cas.address(),
       None,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let error = CommandRunner::new(mock_server.address(), None, 1, store)
+    let error = CommandRunner::new(mock_server.address(), None, None, 1, store)
       .run(cat_roland_request())
       .wait()
       .expect_err("Want error");
@@ -2030,12 +2043,13 @@ mod tests {
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       cas.address(),
       None,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    CommandRunner::new(address, None, 1, store)
+    CommandRunner::new(address, None, None, 1, store)
   }
 
   fn extract_execute_response(

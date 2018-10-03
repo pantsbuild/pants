@@ -38,6 +38,7 @@ class ExecutionOptions(datatype([
   'process_execution_parallelism',
   'process_execution_cleanup_local_dirs',
   'remote_instance_name',
+  'remote_ca_certs_path',
 ])):
   """A collection of all options related to (remote) execution of processes.
 
@@ -56,6 +57,7 @@ class ExecutionOptions(datatype([
       process_execution_parallelism=bootstrap_options.process_execution_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
       remote_instance_name=bootstrap_options.remote_instance_name,
+      remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
     )
 
 
@@ -68,6 +70,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_parallelism=multiprocessing.cpu_count()*2,
     process_execution_cleanup_local_dirs=True,
     remote_instance_name=None,
+    remote_ca_certs_path=None,
   )
 
 
@@ -284,6 +287,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--remote-instance-name', advanced=True,
              help='Name of the remote execution instance to use. Used for routing within '
                   '--remote-execution-server and --remote-store-server.')
+    register('--remote-ca-certs-path', advanced=True,
+             help='Path to a PEM file containing CA certificates used for verifying secure '
+                  'connections to --remote-execution-server and --remote-store-server. '
+                  'If not specified, TLS will not be used.')
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.
