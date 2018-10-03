@@ -52,7 +52,8 @@ class TestBasicAuth(TestBase):
         BasicAuth.options_scope: {
           'providers': {
             'foobar': { 'url': 'http://localhost:{}'.format(self.port) }
-          }
+          },
+          'allow_insecure_urls': True
         },
         Cookies.options_scope: {
           'path': cookie_file

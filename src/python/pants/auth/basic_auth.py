@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from collections import namedtuple
 
 import requests
+import www_authenticate
 
 from pants.auth.cookies import Cookies
 from pants.subsystem.subsystem import Subsystem
@@ -16,11 +17,24 @@ class BasicAuthException(Exception):
   pass
 
 
+class BasicAuthAttemptFailed(BasicAuthException):
+  def __init__(self, url, status_code, reason):
+    msg = 'Failed to auth against {}. Status code: {}. Reason: {}.'.format(url, status_code, reason)
+    super(BasicAuthAttemptFailed, self).__init__(msg)
+    self.url = url
+
+
+class Challenged(BasicAuthAttemptFailed):
+  def __init__(self, url, status_code, reason, realm):
+    super(Challenged, self).__init__(url, status_code, reason)
+    self.realm = realm
+
+
 BasicAuthCreds = namedtuple('BasicAuthCreds', ['username', 'password'])
 
 
 class BasicAuth(Subsystem):
-  options_scope = 'basic_auth'
+  options_scope = 'basicauth'
 
   @classmethod
   def register_options(cls, register):
@@ -28,6 +42,8 @@ class BasicAuth(Subsystem):
     register('--providers', advanced=True, type=dict,
              help='Map from provider name to config dict. This dict contains the following items: '
                   '{url: <url of endpoint that accepts basic auth and sets a session cookie>}')
+    register('--allow-insecure-urls', advanced=True, type=bool, default=False,
+             help='Allow auth against non-HTTPS urls. Must only be set when testing!')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -55,16 +71,21 @@ class BasicAuth(Subsystem):
 
     url = provider_config.get('url')
     if not url:
-      raise BasicAuthException('No url found in config for provider {}.'.format(provider_config))
-    # TODO: Require url to be https, except when testing. See
-    # https://github.com/pantsbuild/pants/issues/6496.
+      raise BasicAuthException('No url found in config for provider {}.'.format(provider))
+    if not self.get_options().allow_insecure_urls and not url.startswith('https://'):
+      raise BasicAuthException('Auth url for provider {} is not secure: {}.'.format(provider, url))
 
     if creds:
       auth = requests.auth.HTTPBasicAuth(creds.username, creds.password)
     else:
       auth = None  # requests will use the netrc creds.
     response = requests.get(url, auth=auth)
+
     if response.status_code != requests.codes.ok:
-      raise BasicAuthException('Failed to auth against {}. Status code {}.'.format(
-        response, response.status_code))
+      if response.status_code == requests.codes.unauthorized:
+        parsed = www_authenticate.parse(response.headers['WWW-Authenticate'])
+        if 'Basic' in parsed:
+          raise Challenged(url, response.status_code, response.reason, parsed['Basic']['realm'])
+      raise BasicAuthException(url, response.status_code, response.reason)
+
     cookies.update(response.cookies)
