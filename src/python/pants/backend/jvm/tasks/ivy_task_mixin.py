@@ -15,12 +15,11 @@ from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, Ivy
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.tasks.resolve_shared import ResolveBase
+from pants.backend.jvm.tasks.resolve_shared import JvmResolverBase
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.task.task import TaskBase
 from pants.util.memo import memoized_property
 
 
@@ -70,7 +69,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     return type(self) == type(other) and self._confs == other._confs
 
 
-class IvyTaskMixin(TaskBase, ResolveBase):
+class IvyTaskMixin(JvmResolverBase):
   """A mixin for Tasks that execute resolves via Ivy.
 
   Must be mixed in to a task that registers a --jvm-options option (typically by
@@ -178,9 +177,9 @@ class IvyTaskMixin(TaskBase, ResolveBase):
     # appropriately.
     classpath_products.add_excludes_for_targets(targets)
     for conf in confs:
-      for target, resolved_jars in result.resolved_jars_for_each_target(conf, targets):
-        jars_to_add = self.add_directory_digests_for_jars(resolved_jars)
-        classpath_products.add_jars_for_targets([target], conf, jars_to_add)
+      resolved_jars_per_target = result.resolved_jars_for_each_target(conf, targets)
+      for target, resolved_jars in self.add_directory_digests_for_jars(resolved_jars_per_target):
+        classpath_products.add_jars_for_targets([target], conf, resolved_jars)
 
     return result
 
