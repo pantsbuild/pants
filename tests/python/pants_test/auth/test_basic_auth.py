@@ -7,10 +7,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import base64
 import os
 import threading
+from contextlib import contextmanager
 
 from future.moves.http.server import BaseHTTPRequestHandler, HTTPServer
 
-from pants.auth.basic_auth import BasicAuth, BasicAuthCreds
+from pants.auth.basic_auth import BasicAuth, BasicAuthCreds, BasicAuthException
 from pants.auth.cookies import Cookies
 from pants.util.contextutil import environment_as, temporary_dir
 from pants_test.test_base import TestBase
@@ -24,10 +25,13 @@ class RequestHandlerForTest(BaseHTTPRequestHandler):
     assert token_type == 'Basic'
     username, password = base64.b64decode(credentials).decode('utf8').split(':')
     assert username == 'test_user'
-    assert password == 'test_password'
-    self.send_response(200)
-    self.send_header('Set-Cookie', 'test_auth_key=test_auth_value; Max-Age=3600')
-    self.end_headers()
+    if password == 'test_password':
+      self.send_response(200)
+      self.send_header('Set-Cookie', 'test_auth_key=test_auth_value; Max-Age=3600')
+      self.end_headers()
+    else:
+      self.send_response(401)
+      self.end_headers()
 
 
 def _run_test_server():
@@ -44,7 +48,8 @@ class TestBasicAuth(TestBase):
     self.port, shutdown_func = _run_test_server()
     self.addCleanup(shutdown_func)
 
-  def _do_test_basic_auth(self, creds):
+  @contextmanager
+  def _test_options(self):
     with temporary_dir() as tmpcookiedir:
       cookie_file = os.path.join(tmpcookiedir, 'pants.test.cookies')
 
@@ -52,13 +57,17 @@ class TestBasicAuth(TestBase):
         BasicAuth.options_scope: {
           'providers': {
             'foobar': { 'url': 'http://localhost:{}'.format(self.port) }
-          }
+          },
+          'allow_insecure_urls': True
         },
         Cookies.options_scope: {
           'path': cookie_file
         }
       })
+      yield
 
+  def _do_test_basic_auth(self, creds):
+    with self._test_options():
       basic_auth = BasicAuth.global_instance()
       cookies = Cookies.global_instance()
 
@@ -79,3 +88,11 @@ class TestBasicAuth(TestBase):
         fp.write('machine localhost\nlogin test_user\npassword test_password'.encode('ascii'))
       with environment_as(HOME=tmphomedir):
         self._do_test_basic_auth(creds=None)
+
+  def test_basic_auth_with_bad_creds(self):
+    self._do_test_basic_auth(creds=BasicAuthCreds('test_user', 'test_password'))
+    basic_auth = BasicAuth.global_instance()
+    cookies = Cookies.global_instance()
+    bad_creds = BasicAuthCreds('test_user', 'bad_password')
+    self.assertRaises(BasicAuthException,
+      lambda: basic_auth.authenticate(provider='foobar', creds=bad_creds, cookies=cookies))
