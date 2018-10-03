@@ -374,8 +374,10 @@ class ZincCompileIntegrationTest(BaseCompileIT):
             self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
 
   def test_hermetic_binary_with_capturing_off(self):
+    capture_snapshots = False
     config = {
-      'DEFAULT': {'jvm_resolver_capture_snapshots': False},
+      'resolve.ivy': {'capture_snapshots': capture_snapshots},
+      'resolve.coursier': {'capture_snapshots': capture_snapshots},
       'compile.zinc': {
         'execution_strategy': 'hermetic',
         'use_classpath_jars': False,
@@ -396,7 +398,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
   def test_hermetic_binary_with_3rdparty_dependencies_ivy(self):
     config = {
-      'DEFAULT': {'jvm_resolver_capture_snapshots': True},
+      'resolve.ivy': {'capture_snapshots': True},
       'compile.zinc': {
         'execution_strategy': 'hermetic',
         'use_classpath_jars': False,
@@ -425,7 +427,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
   def test_hermetic_binary_with_3rdparty_dependencies_coursier(self):
     config = {
-      'DEFAULT': {'jvm_resolver_capture_snapshots': True},
+      'resolve.coursier': {'capture_snapshots': True},
       'compile.zinc': {
         'execution_strategy': 'hermetic',
         'use_classpath_jars': False,
