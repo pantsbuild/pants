@@ -14,7 +14,7 @@ dirs = "1"
 futures = "^0.1.16"
 futures-cpupool = "0.1"
 glob = "0.2.11"
-grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "bfd7333281c0422028502ccc7f78c57c27fdec08", features = ["secure"] }
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", features = ["secure"] }
 hashing = { path = "../hashing" }
 ignore = "0.3.1"
 indexmap = "1"
