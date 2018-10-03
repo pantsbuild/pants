@@ -22,7 +22,7 @@ class JvmResolverBase(TaskBase):
     super(JvmResolverBase, cls).register_options(register)
     # TODO This flag should be defaulted to True when we are doing hermetic execution,
     # and should probably go away as we move forward into that direction.
-    register('--jvm-resolver-capture-snapshots', type=bool, default=False,
+    register('--capture-snapshots', type=bool, default=False,
       help='Enable capturing snapshots to add directory digests to dependency jars.'
            'Note that this is necessary when hermetic execution is enabled.')
 
@@ -35,7 +35,7 @@ class JvmResolverBase(TaskBase):
 
     targets_and_jars=list(targets_and_jars)
 
-    if not targets_and_jars or not self.get_options().jvm_resolver_capture_snapshots:
+    if not targets_and_jars or not self.get_options().capture_snapshots:
       return targets_and_jars
 
     jar_paths = []
