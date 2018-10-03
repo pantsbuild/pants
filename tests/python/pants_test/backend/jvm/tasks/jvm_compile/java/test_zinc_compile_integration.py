@@ -373,8 +373,30 @@ class ZincCompileIntegrationTest(BaseCompileIT):
             path = os.path.join(compile_dir, path_suffix)
             self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
 
+  def test_hermetic_binary_with_capturing_off(self):
+    config = {
+      'DEFAULT': {'jvm_resolver_capture_snapshots': False},
+      'compile.zinc': {
+        'execution_strategy': 'hermetic',
+        'use_classpath_jars': False,
+        'incremental': False,
+      },
+    }
+    with self.temporary_workdir() as workdir:
+      with self.temporary_file_content("readme.txt", "yo"):
+        pants_run = self.run_pants_with_workdir(
+          [
+            'run',
+            'testprojects/src/java/org/pantsbuild/testproject/cwdexample',
+          ],
+          workdir,
+          config,
+        )
+        self.assert_failure(pants_run)
+
   def test_hermetic_binary_with_3rdparty_dependencies_ivy(self):
     config = {
+      'DEFAULT': {'jvm_resolver_capture_snapshots': True},
       'compile.zinc': {
         'execution_strategy': 'hermetic',
         'use_classpath_jars': False,
@@ -403,6 +425,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
   def test_hermetic_binary_with_3rdparty_dependencies_coursier(self):
     config = {
+      'DEFAULT': {'jvm_resolver_capture_snapshots': True},
       'compile.zinc': {
         'execution_strategy': 'hermetic',
         'use_classpath_jars': False,

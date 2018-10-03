@@ -7,11 +7,24 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.base.build_environment import get_buildroot
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.jar.jar_dependency_utils import ResolvedJar
+from pants.task.task import TaskBase
 from pants.util.dirutil import fast_relpath
 
 
-class ResolveBase(object):
+class JvmResolverBase(TaskBase):
   """Common methods for both Ivy and Coursier resolves."""
+
+  @classmethod
+  def register_options(cls, register):
+    """Register an option to make capturing snapshots optional.
+    This class is intended to be extended by Jvm resolvers (coursier and ivy), and the option name should reflect that.
+    """
+    super(JvmResolverBase, cls).register_options(register)
+    # TODO This flag should be defaulted to True when we are doing hermetic execution,
+    # and should probably go away as we move forward into that direction.
+    register('--jvm-resolver-capture-snapshots', type=bool, default=False,
+      help='Enable capturing snapshots to add directory digests to dependency jars.'
+           'Note that this is necessary when hermetic execution is enabled.')
 
   def add_directory_digests_for_jars(self, targets_and_jars):
     """For each target, get DirectoryDigests for its jars and return them zipped with the jars.
@@ -22,7 +35,7 @@ class ResolveBase(object):
 
     targets_and_jars=list(targets_and_jars)
 
-    if not targets_and_jars:
+    if not targets_and_jars or not self.get_options().jvm_resolver_capture_snapshots:
       return targets_and_jars
 
     jar_paths = []
