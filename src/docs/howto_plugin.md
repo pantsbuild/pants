@@ -18,6 +18,82 @@ Pants' `jvm` code registers in
 Pants' backend-loader code assumes your plugin has a `register.py` file
 there.
 
+Hello world plugin with own goal
+--------------------
+That hello world plugin show how to register your plugin to Pants and define own "hello-world" goal which contains 2 tasks and 
+which can be executed by Pants. To achieve that look on following steps:
+- Create new Pants project so you have pants.ini file in root of your repository
+
+- Create a home directory for your plugins. In this example we will `plugins/` directory in root of repository
+but word "plugins" is not special for Pants
+
+- In `plugins/` directory create following files system structure:
+
+      hello/
+        __init__.py
+        register.py
+        tasks/
+           __init__.py
+           your_tasks.py
+        
+        
+- `__init__.py` files can be empty - you just saying to Python that you created modules
+
+- In `your_tasks.py` place following content
+
+      from pants.task.task import Task
+          
+      class HelloTask(Task):
+          def execute(self):
+              print("Hello")
+     
+      class WorldTask(Task):
+          def execute(self):
+              print("world!")
+   [Task](https://github.com/pantsbuild/pants/blob/master/src/python/pants/task/task.py) is simple base
+   class for your tasks - you need to implement `execute` methods which will be executed by Pants
+   
+- In `register.py` place following content
+
+      from pants.goal.goal import Goal
+      from pants.goal.task_registrar import TaskRegistrar as task
+      from hello.tasks.your_tasks import HelloTask, WorldTask
+      
+      def register_goals():
+          Goal.register(name="hello-world", description="Say hello to our world")
+          task(name='hello', action=HelloTask).install('hello-world')
+          task(name='world', action=WorldTask).install('hello-world')
+          
+     Here you register new Pants goal named "hello-world" and documented with description.
+     Then you attach 2 tasks to that goal created in previous step.
+
+- In `pants.ini` place following content
+      
+      [GLOBAL]
+      pants_version: 1.9.0
+      pythonpath: ["%(buildroot)s/plugins"]
+      backend_packages: ["hello"]
+      
+     You need to put your plugins in `pythonpath` so Pants will know where to find them.
+     `backend_packages` define which plugins you want to use in your project.
+     
+- You are ready to use your plugin with "hello-world" goal, firstly try to find your goal by typing `./pants goals`.
+
+      ...
+      hello-world: Say hello to your world
+      ...
+- Now you can try to use your plugin by typing `./pants hello-world`
+
+      ...
+      Executing tasks in goals: hello-world
+      XX:XX:XX 00:00   [hello-world]
+      XX:XX:XX 00:00     [hello]Hello
+      
+      XX:XX:XX 00:00     [world]world!
+      
+      XX:XX:XX 00:00   [complete]
+                     SUCCESS
+
 Simple Configuration
 --------------------
 
