@@ -83,7 +83,7 @@ class BasicAuth(Subsystem):
 
     if response.status_code != requests.codes.ok:
       if response.status_code == requests.codes.unauthorized:
-        parsed = www_authenticate.parse(response.headers['WWW-Authenticate'])
+        parsed = www_authenticate.parse(response.headers.get('WWW-Authenticate', ''))
         if 'Basic' in parsed:
           raise Challenged(url, response.status_code, response.reason, parsed['Basic']['realm'])
       raise BasicAuthException(url, response.status_code, response.reason)
