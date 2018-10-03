@@ -1070,6 +1070,7 @@ mod tests {
           0,
         ).op
         .unwrap()
+        .unwrap()
       ),
       Ok(FallibleExecuteProcessResult {
         stdout: testdata.bytes(),
@@ -1093,6 +1094,7 @@ mod tests {
           StderrType::Digest(testdata.digest()),
           0,
         ).op
+        .unwrap()
         .unwrap()
       ),
       Ok(FallibleExecuteProcessResult {
@@ -1512,6 +1514,82 @@ mod tests {
     }
   }
 
+  //#[test] // TODO: Unignore this test when the server can actually fail with status protos.
+  fn execute_missing_file_uploads_if_known_status() {
+    let roland = TestData::roland();
+
+    let mock_server = {
+      let op_name = "cat".to_owned();
+
+      let status = grpcio::RpcStatus {
+        status: grpcio::RpcStatusCode::FailedPrecondition,
+        details: None,
+        status_proto_bytes: Some(
+          make_precondition_failure_status(vec![missing_preconditionfailure_violation(
+            &roland.digest(),
+          )]).write_to_bytes()
+          .unwrap(),
+        ),
+      };
+
+      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
+        op_name.clone(),
+        super::make_execute_request(&cat_roland_request(), &None)
+          .unwrap()
+          .2,
+        vec![
+          //make_incomplete_operation(&op_name),
+          MockOperation {
+            op: Err(status),
+            duration: None,
+          },
+          make_successful_operation(
+            "cat2",
+            StdoutType::Raw(roland.string()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
+        ],
+      ))
+    };
+
+    let store_dir = TempDir::new().unwrap();
+    let cas = mock::StubCAS::builder()
+      .directory(&TestDirectory::containing_roland())
+      .build();
+    let store = fs::Store::with_remote(
+      store_dir,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
+      cas.address(),
+      None,
+      None,
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+    ).expect("Failed to make store");
+    store
+      .store_file_bytes(roland.bytes(), false)
+      .wait()
+      .expect("Saving file bytes to store");
+
+    let result = CommandRunner::new(mock_server.address(), None, None, 1, store)
+      .run(cat_roland_request())
+      .wait();
+    assert_eq!(
+      result,
+      Ok(FallibleExecuteProcessResult {
+        stdout: roland.bytes(),
+        stderr: Bytes::from(""),
+        exit_code: 0,
+        output_directory: fs::EMPTY_DIGEST,
+      })
+    );
+    {
+      let blobs = cas.blobs.lock();
+      assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
+    }
+  }
+
   #[test]
   fn execute_missing_file_errors_if_unknown() {
     let missing_digest = TestData::roland().digest();
@@ -1638,7 +1716,10 @@ mod tests {
       .map(missing_preconditionfailure_violation)
       .collect();
 
-    let operation = make_precondition_failure_operation(missing).op.unwrap();
+    let operation = make_precondition_failure_operation(missing)
+      .op
+      .unwrap()
+      .unwrap();
 
     assert_eq!(
       extract_execute_response(operation),
@@ -1658,7 +1739,10 @@ mod tests {
       },
     ];
 
-    let operation = make_precondition_failure_operation(missing).op.unwrap();
+    let operation = make_precondition_failure_operation(missing)
+      .op
+      .unwrap()
+      .unwrap();
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
@@ -1674,7 +1758,10 @@ mod tests {
       violation
     }];
 
-    let operation = make_precondition_failure_operation(missing).op.unwrap();
+    let operation = make_precondition_failure_operation(missing)
+      .op
+      .unwrap()
+      .unwrap();
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
@@ -1686,7 +1773,10 @@ mod tests {
   fn extract_execute_response_missing_without_list() {
     let missing = vec![];
 
-    let operation = make_precondition_failure_operation(missing).op.unwrap();
+    let operation = make_precondition_failure_operation(missing)
+      .op
+      .unwrap()
+      .unwrap();
 
     match extract_execute_response(operation) {
       Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
@@ -1980,7 +2070,10 @@ mod tests {
   }
 
   fn make_canceled_operation(duration: Option<Duration>) -> MockOperation {
-    MockOperation { op: None, duration }
+    MockOperation {
+      op: Ok(None),
+      duration,
+    }
   }
 
   fn make_incomplete_operation(operation_name: &str) -> MockOperation {
@@ -1995,7 +2088,7 @@ mod tests {
     op.set_name(operation_name.to_string());
     op.set_done(false);
     MockOperation {
-      op: Some(op),
+      op: Ok(Some(op)),
       duration: Some(delay),
     }
   }
@@ -2053,21 +2146,25 @@ mod tests {
     operation.set_done(true);
     operation.set_response(make_any_proto(&{
       let mut response = bazel_protos::remote_execution::ExecuteResponse::new();
-      response.set_status({
-        let mut status = bazel_protos::status::Status::new();
-        status.set_code(grpcio::RpcStatusCode::FailedPrecondition as i32);
-        status.mut_details().push(make_any_proto(&{
-          let mut precondition_failure = bazel_protos::error_details::PreconditionFailure::new();
-          for violation in violations.into_iter() {
-            precondition_failure.mut_violations().push(violation);
-          }
-          precondition_failure
-        }));
-        status
-      });
+      response.set_status(make_precondition_failure_status(violations));
       response
     }));
     MockOperation::new(operation)
+  }
+
+  fn make_precondition_failure_status(
+    violations: Vec<bazel_protos::error_details::PreconditionFailure_Violation>,
+  ) -> bazel_protos::status::Status {
+    let mut status = bazel_protos::status::Status::new();
+    status.set_code(grpcio::RpcStatusCode::FailedPrecondition as i32);
+    status.mut_details().push(make_any_proto(&{
+      let mut precondition_failure = bazel_protos::error_details::PreconditionFailure::new();
+      for violation in violations.into_iter() {
+        precondition_failure.mut_violations().push(violation);
+      }
+      precondition_failure
+    }));
+    status
   }
 
   fn run_command_remote(

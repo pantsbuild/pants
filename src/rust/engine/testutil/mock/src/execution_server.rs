@@ -22,14 +22,14 @@ use protobuf;
 ///
 #[derive(Clone, Debug)]
 pub struct MockOperation {
-  pub op: Option<bazel_protos::operations::Operation>,
+  pub op: Result<Option<bazel_protos::operations::Operation>, grpcio::RpcStatus>,
   pub duration: Option<Duration>,
 }
 
 impl MockOperation {
   pub fn new(op: bazel_protos::operations::Operation) -> MockOperation {
     MockOperation {
-      op: Some(op),
+      op: Ok(Some(op)),
       duration: None,
     }
   }
@@ -179,9 +179,11 @@ impl MockResponder {
       if let Some(d) = duration {
         sleep(d);
       }
-      if let Some(op) = op {
+      if let Ok(Some(op)) = op {
         // Complete the channel with the op.
         sink.success(op.clone());
+      } else if let Err(status) = op {
+        sink.fail(status);
       } else {
         // Cancel the request by dropping the sink.
         drop(sink);
@@ -204,7 +206,7 @@ impl MockResponder {
         if let Some(d) = duration {
           sleep(d);
         }
-        if let Some(op) = op {
+        if let Ok(Some(op)) = op {
           ctx.spawn(
             sink
               .send((op.clone(), grpcio::WriteFlags::default()))
@@ -212,6 +214,8 @@ impl MockResponder {
               .map(|_| ())
               .map_err(|_| ()),
           )
+        } else if let Err(status) = op {
+          sink.fail(status);
         } else {
           // Cancel the request by dropping the sink.
           drop(sink)
