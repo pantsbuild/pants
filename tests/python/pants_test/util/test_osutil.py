@@ -51,7 +51,8 @@ class OsutilTest(TestBase):
     def get_macos_version(darwin_version):
       host, version = get_closest_mac_host_platform_pair(
         darwin_version, platform_name_map=platform_name_map)
-      self.assertEqual('mac', host)
+      if host is not None:
+        self.assertEqual('mac', host)
       return version
 
     self.assertEqual('10.13', get_macos_version('19'))
@@ -61,6 +62,7 @@ class OsutilTest(TestBase):
     self.assertEqual('10.10', get_macos_version('15'))
     self.assertEqual('10.10', get_macos_version('14'))
     self.assertEqual('10.9', get_macos_version('13'))
-    self.assertEqual('10.9', get_macos_version('12'))
-    self.assertEqual('10.9', get_macos_version('11'))
+    self.assertEqual('10.6', get_macos_version('12'))
+    self.assertEqual('10.6', get_macos_version('11'))
     self.assertEqual('10.6', get_macos_version('10'))
+    self.assertEqual(None, get_macos_version('9'))

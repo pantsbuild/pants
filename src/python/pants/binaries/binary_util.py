@@ -337,6 +337,7 @@ class BinaryUtil(object):
         .format(os_id_key, ', '.join(sorted(self._ID_BY_OS.keys()))))
     try:
       os_name, arch_or_version = self._path_by_id[os_id_tuple]
+      return HostPlatform(os_name, arch_or_version)
     except KeyError:
       # In the case of MacOS, arch_or_version represents a version, and newer releases
       # can run binaries built for older releases.
@@ -349,17 +350,16 @@ class BinaryUtil(object):
       # SUPPORTED_PLATFORM_NORMALIZED_NAMES appropriately.  This is only likely to happen with a
       # major architecture change, so we'll have plenty of warning.
       if os_id_tuple[0] == 'darwin':
-        os_name, arch_or_version = get_closest_mac_host_platform_pair(os_id_tuple[1])
-      else:
-        # We fail early here because we need the host_platform to identify where to download
-        # binaries to.
-        raise self.MissingMachineInfo(
-          "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
-          "find binaries for the current host platform {}.\n"
-          "--binaries-path-by-id was: {}."
-          .format(os_id_tuple, self._path_by_id))
-
-    return HostPlatform(os_name, arch_or_version)
+        os_name, version = get_closest_mac_host_platform_pair(os_id_tuple[1])
+        if os_name is not None and version is not None:
+          return HostPlatform(os_name, version)
+      # We fail early here because we need the host_platform to identify where to download
+      # binaries to.
+      raise self.MissingMachineInfo(
+        "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
+        "find binaries for the current host platform {}.\n"
+        "--binaries-path-by-id was: {}."
+        .format(os_id_tuple, self._path_by_id))
 
   def _get_download_path(self, binary_request):
     return binary_request.get_download_path(self._host_platform())
