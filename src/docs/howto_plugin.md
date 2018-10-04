@@ -60,7 +60,7 @@ but word "plugins" is not special for Pants
       from hello.tasks.your_tasks import HelloTask, WorldTask
       
       def register_goals():
-          Goal.register(name="hello-world", description="Say hello to our world")
+          Goal.register(name="hello-world", description="Say hello to your world")
           task(name='hello', action=HelloTask).install('hello-world')
           task(name='world', action=WorldTask).install('hello-world')
           
