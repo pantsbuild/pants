@@ -52,6 +52,7 @@ impl Generation {
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
+#[derive(Debug)]
 pub(crate) enum EntryState<N: Node> {
   // A node that has either been explicitly cleared, or has not yet started Running. In this state
   // there is no need for a dirty bit because the RunToken is either in its initial state, or has
@@ -122,7 +123,7 @@ impl<N: Node> EntryKey<N> {
 ///
 /// An Entry and its adjacencies.
 ///
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Entry<N: Node> {
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
@@ -189,6 +190,10 @@ impl<N: Node> Entry<N> {
         let context = context_factory.clone_for(entry_id);
         let node = n.clone();
 
+        if !node.cacheable() {
+          println!("DWH: In run for node {:?} with run_token: {:?}, generation: {:?}, previous_dep_generations: {:?}, previous_result: {:?}", node, run_token, generation, previous_dep_generations, previous_result);
+        }
+
         context_factory.spawn(future::lazy(move || {
           // If we have previous result generations, compare them to all current dependency
           // generations (which, if they are dirty, will cause recursive cleaning). If they
@@ -243,7 +248,7 @@ impl<N: Node> Entry<N> {
           start_time: Instant::now(),
           run_token,
           generation,
-          previous_result,
+          previous_result: previous_result,
           dirty: false,
         }
       }
@@ -273,6 +278,11 @@ impl<N: Node> Entry<N> {
   where
     C: NodeContext<Node = N>,
   {
+    println!("DWH: In entry get for entry_id {:?} node: {:?}, content: {:?}, cacheable: {:?}", entry_id, self.node, self.node.content(), self.node.content().cacheable());
+    if !self.node.content().cacheable() {
+      println!("DWH: In get for {:?}", self.node);
+    }
+
     {
       let mut state = self.state.lock();
 
@@ -295,7 +305,7 @@ impl<N: Node> Entry<N> {
           dirty,
           ..
         }
-          if !dirty =>
+          if !dirty && self.node.content().cacheable() =>
         {
           return future::result(result.clone())
             .map(move |res| (res, generation))
@@ -329,7 +339,7 @@ impl<N: Node> Entry<N> {
           dirty,
         } => {
           assert!(
-            dirty,
+            dirty || !self.node.content().cacheable(),
             "A clean Node should not reach this point: {:?}",
             result
           );
@@ -342,8 +352,8 @@ impl<N: Node> Entry<N> {
             entry_id,
             run_token,
             generation,
-            Some(dep_generations),
-            Some(result),
+            if self.node.content().cacheable() { Some(dep_generations) } else { None },
+            if self.node.content().cacheable() { Some(result) } else { None },
           )
         }
         EntryState::Running { .. } => {
@@ -381,6 +391,10 @@ impl<N: Node> Entry<N> {
   ) where
     C: NodeContext<Node = N>,
   {
+    if !self.node.content().cacheable() {
+      println!("DWH: In complete for {:?} with run_token: {:?}, result: {:?}", self.node, result_run_token, result);
+    }
+
     let mut state = self.state.lock();
 
     // We care about exactly one case: a Running state with the same run_token. All other states
@@ -431,6 +445,9 @@ impl<N: Node> Entry<N> {
               // Node was re-executed, but had the same result value.
               (generation, result)
             } else {
+              if !self.node.content().cacheable() {
+                println!("DWH: Incrementing generation for result {:?}", result);
+              }
               (generation.next(), result)
             }
           } else {

@@ -553,18 +553,25 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
+    println!("DWH: In create for node {:?}", node);
+
     let maybe_entry_and_id = {
       let mut inner = self.inner.lock();
       if inner.draining {
         None
       } else {
+        println!("DWH: About to ensure entry");
         let id = inner.ensure_entry(EntryKey::Valid(node));
+        println!("DWH: Did ensure entry");
         inner.entry_for_id(id).cloned().map(|entry| (entry, id))
       }
     };
+    println!("DWH: maybe_entry_and_id: {:?}", maybe_entry_and_id);
     if let Some((mut entry, entry_id)) = maybe_entry_and_id {
+      println!("DWH: In create about to get");
       entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
+      println!("DWH: In create with no entry");
       future::err(N::Error::invalidated()).to_boxed()
     }
   }

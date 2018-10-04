@@ -194,6 +194,8 @@ impl Scheduler {
     roots: Vec<Root>,
     count: usize,
   ) {
+    println!("DWH: In execute_helper with roots: {:?}", roots);
+
     let executor = context.core.runtime.get().executor();
     // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
     let roots_res = future::join_all(
@@ -206,6 +208,7 @@ impl Scheduler {
             .graph
             .create(root.clone().into(), &context)
             .then::<_, Result<Result<Value, Failure>, Failure>>(move |r| {
+              println!("DWH: In execute_helper then with {:?}", r);
               match r {
                 Err(Failure::Invalidated) if count > 0 => {
                   // A node was invalidated: fail quickly so that all roots can be retried.

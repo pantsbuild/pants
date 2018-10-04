@@ -935,7 +935,7 @@ impl Node for NodeKey {
   fn cacheable(&self) -> bool {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
-      _ => false,
+      _ => true,
     }
   }
 }
