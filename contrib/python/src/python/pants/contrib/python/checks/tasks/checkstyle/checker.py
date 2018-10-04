@@ -7,6 +7,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import re
 from collections import namedtuple
 
+from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_repos import PythonRepos
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -175,7 +178,15 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
     # If we are linting for Python 3, skip lint altogether.
     # Long-term Python 3 linting solution tracked by:
     # https://github.com/pantsbuild/pants/issues/5764
-    interpreter = self.context.products.get_data(PythonInterpreter)
+    python_tgts = self.context.targets(
+      lambda tgt: isinstance(tgt, (PythonTarget))
+    )
+    if not python_tgts:
+      return
+    interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
+                                               PythonRepos.global_instance(),
+                                               logger=self.context.log.debug)
+    interpreter = interpreter_cache.select_interpreter_for_targets(targets)
     # Check interpreter is not 'None' for test cases that do not
     # run the python interpreter selection task.
     if interpreter and interpreter.version >= (3, 0 ,0):
