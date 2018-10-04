@@ -14,7 +14,6 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 from pex.variables import Variables
 
-from pants.backend.python.pex_util import expand_and_maybe_adjust_platform
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -225,11 +224,9 @@ class PythonInterpreterCache(object):
     distributions = resolve(requirements=[requirement],
                             fetchers=self._python_repos.get_fetchers(),
                             interpreter=interpreter,
-                            platform=expand_and_maybe_adjust_platform(
-                              interpreter=interpreter,
-                              # The local interpreter cache is, by definition, composed of
-                              # interpreters for the 'current' platform.
-                              platform='current'),
+                            # The local interpreter cache is, by definition, composed of
+                            # interpreters for the 'current' platform.
+                            platform='current',
                             context=self._python_repos.get_network_context(),
                             precedence=precedence)
     if not distributions:

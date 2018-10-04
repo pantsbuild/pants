@@ -241,12 +241,6 @@ matrix:
       osx_image: xcode8.3
       stage: Test Pants
       language: generic
-      env:
-        # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
-        # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
-        # deal with this. Can be removed when this issue is resolved:
-        # https://github.com/pantsbuild/pex/issues/523
-        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>2.7.10,<3']"
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
