@@ -18,7 +18,7 @@ from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
-from pants.util.contextutil import maybe_profiled
+from pants.util.contextutil import hard_exit_handler, maybe_profiled
 
 
 logger = logging.getLogger(__name__)
@@ -154,7 +154,7 @@ class LocalPantsRunner(object):
     self._run_start_time = start_time
 
   def run(self):
-    with maybe_profiled(self._profile_path):
+    with hard_exit_handler(), maybe_profiled(self._profile_path):
       self._run()
 
   def _maybe_run_v1(self, run_tracker, reporting):

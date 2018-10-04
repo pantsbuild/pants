@@ -8,6 +8,7 @@ import os
 import re
 import signal
 import time
+import unittest
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -108,6 +109,7 @@ Signal {signum} was raised\\. Exiting with failure\\.
       # Return the (failed) pants execution result.
       yield (workdir, waiter_run)
 
+  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
   def test_dumps_logs_on_terminate(self):
     # Send a SIGTERM to the local pants process.
     with self._send_signal_to_waiter_handle(signal.SIGTERM) as (workdir, waiter_run):
@@ -122,6 +124,7 @@ Signal {signum} was raised\\. Exiting with failure\\.
       self._assert_graceful_signal_log_matches(
           waiter_run.pid, signal.SIGTERM, read_file(shared_log_file))
 
+  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
   def test_dumps_traceback_on_sigabrt(self):
     # SIGABRT sends a traceback to the log file for the current process thanks to
     # faulthandler.enable().
@@ -148,6 +151,7 @@ Signal {signum} was raised\\. Exiting with failure\\.
         waiter_run.stderr_data,
         r"Current thread [^\n]+ \(most recent call first\):")
 
+  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
   def test_keyboardinterrupt_signals(self):
     for interrupt_signal in [signal.SIGINT, signal.SIGQUIT]:
       with self._send_signal_to_waiter_handle(interrupt_signal) as (workdir, waiter_run):

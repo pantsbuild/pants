@@ -15,7 +15,6 @@ from builtins import object, str
 
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.meta import classproperty
 from pants.util.osutil import IntegerForPid
 
 
@@ -28,41 +27,17 @@ class ExceptionSink(object):
   # NB: see the bottom of this file where we call reset_log_location() and other mutators in order
   # to properly setup global state.
   _log_dir = None
-  # We need an exiter in order to know what to do after we log a fatal exception or handle a
-  # catchable signal.
+  # We need an exiter in order to know what to do after we log a fatal exception.
   _exiter = None
   # Where to log stacktraces to in a SIGUSR2 handler.
   _interactive_output_stream = None
 
-  # These persistent open file descriptors are kept so the signal handler can do almost no work
-  # (and lets faulthandler figure out signal safety).
+  # These persistent open file descriptors are kept so faulthandler can figure out signal safety.
   _pid_specific_error_fileobj = None
   _shared_error_fileobj = None
 
   # Integer code to exit with on an unhandled exception.
   UNHANDLED_EXCEPTION_EXIT_CODE = 1
-
-  # faulthandler.enable() installs handlers for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL, but we
-  # also want to dump a traceback when receiving these other usually-fatal signals.
-  GRACEFULLY_HANDLED_SIGNALS = [
-    signal.SIGTERM,
-  ]
-
-  # These signals are converted into a KeyboardInterrupt exception.
-  KEYBOARD_INTERRUPT_SIGNALS = [
-    signal.SIGINT,
-    signal.SIGQUIT,
-  ]
-
-  @classproperty
-  def all_gracefully_handled_signals(cls):
-    """Return all the signals which are handled when calling reset_log_location().
-
-    These signals are handled by the method handle_signal_gracefully().
-
-    NB: A very basic SIGUSR2 handler is installed by reset_interactive_output_stream().
-    """
-    return cls.GRACEFULLY_HANDLED_SIGNALS + cls.KEYBOARD_INTERRUPT_SIGNALS
 
   def __new__(cls, *args, **kwargs):
     raise TypeError('Instances of {} are not allowed to be constructed!'
@@ -79,7 +54,7 @@ class ExceptionSink(object):
       `cls._shared_error_fileobj`.
     OS state:
     - May create a new directory.
-    - Overwrites signal handlers for many fatal and non-fatal signals.
+    - Overwrites signal handlers for many fatal signals.
 
     :raises: :class:`ExceptionSink.ExceptionSinkError` if the directory is not writable.
     """
@@ -99,10 +74,6 @@ class ExceptionSink(object):
     # NB: mutate process-global state!
     # Send a stacktrace to this file if interrupted by a fatal error.
     faulthandler.enable(file=pid_specific_error_stream, all_threads=True)
-    # Log a timestamped exception and exit gracefully on non-fatal signals.
-    for signum in cls.all_gracefully_handled_signals:
-      signal.signal(signum, cls.handle_signal_gracefully)
-      signal.siginterrupt(signum, False)
 
     # NB: mutate the class variables!
     cls._log_dir = new_log_location
@@ -306,43 +277,6 @@ Exception message: {exception_message}{maybe_newline}
     if extra_err_msg:
       stderr_printed_error = '{}\n{}'.format(stderr_printed_error, extra_err_msg)
     cls._exit_with_failure(stderr_printed_error)
-
-  _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\
-Signal {signum} was raised. Exiting with failure.
-{formatted_traceback}
-"""
-
-  @classmethod
-  def handle_signal_gracefully(cls, signum, frame):
-    """Signal handler for non-fatal signals which raises or logs an error and exits with failure.
-
-    NB: This method is registered for exactly the signals in
-    ExceptionSink.all_gracefully_handled_signals!
-
-    :raises: :class:`KeyboardInterrupt` if `signum` is in ExceptionSink.KEYBOARD_INTERRUPT_SIGNALS.
-    """
-    if signum in cls.KEYBOARD_INTERRUPT_SIGNALS:
-      raise KeyboardInterrupt('User interrupted execution with control-c!')
-    tb = frame.f_exc_traceback or sys.exc_info()[2]
-
-    # Format an entry to be written to the exception log.
-    formatted_traceback = cls._format_traceback(tb, should_print_backtrace=bool(tb))
-    signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
-      signum=signum,
-      formatted_traceback=formatted_traceback)
-    # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
-    # descriptors re-entrantly, which raises an IOError).
-    # This method catches any exceptions raised within it.
-    cls.log_exception(signal_error_log_entry)
-
-    # Format a message to be printed to the terminal or other interactive stream, if applicable.
-    formatted_traceback_for_terminal = cls._format_traceback(
-      tb, should_print_backtrace=cls._exiter.should_print_backtrace and bool(tb))
-    terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
-      signum=signum,
-      formatted_traceback=formatted_traceback_for_terminal)
-    cls._exit_with_failure(terminal_log_entry)
-
 
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module

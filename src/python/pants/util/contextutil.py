@@ -393,3 +393,16 @@ def with_overwritten_file_content(file_path):
   finally:
     with open(file_path, 'w') as f:
       f.write(file_original_content)
+
+
+class HardSystemExit(SystemExit):
+  """A SystemExit subclass that incurs an os._exit() via special handling."""
+
+
+@contextmanager
+def hard_exit_handler():
+  """An exit helper for the daemon/fork'd context that provides for deferred os._exit(0) calls."""
+  try:
+    yield
+  except HardSystemExit:
+    os._exit(0)
