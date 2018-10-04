@@ -74,6 +74,6 @@ SUPPORTED_PLATFORM_NORMALIZED_NAMES = {
 def get_closest_mac_host_platform_pair(darwin_version_upper_bound,
                                        platform_name_map=SUPPORTED_PLATFORM_NORMALIZED_NAMES):
   """Return the (host, platform) pair for the highest known darwin version less than the bound."""
-  darwin_versions = [int(x[1]) for x in SUPPORTED_PLATFORM_NORMALIZED_NAMES if x[0] == 'darwin']
+  darwin_versions = [int(x[1]) for x in platform_name_map if x[0] == 'darwin']
   max_darwin_version = str(max(v for v in darwin_versions if v <= int(darwin_version_upper_bound)))
   return platform_name_map[('darwin', max_darwin_version)]
