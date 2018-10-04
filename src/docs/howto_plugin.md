@@ -18,16 +18,17 @@ Pants' `jvm` code registers in
 Pants' backend-loader code assumes your plugin has a `register.py` file
 there.
 
-Hello world plugin with own goal
+Hello world plugin with its own goal
 --------------------
-That hello world plugin show how to register your plugin to Pants and define own "hello-world" goal which contains 2 tasks and 
-which can be executed by Pants. To achieve that look on following steps:
-- Create new Pants project so you have pants.ini file in root of your repository
 
-- Create a home directory for your plugins. In this example we will use `plugins/` directory in root of repository
-but word "plugins" is not special for Pants
+The hello world plugin shows how to register your plugin to Pants and define its own `hello-world` goal which contains 2 tasks and 
+which can be executed by Pants. To achieve that, take a look at the following steps:
+- Create a new Pants project so you have pants.ini file in root of your repository
 
-- In `plugins/` directory create following files system structure:
+- Create a home directory for your plugins. In this example we will use `plugins/` directory in root of repository,
+but the word "plugins" is not special for Pants.
+
+- In the `plugins/` directory, create following filesystem structure:
 
       hello/
         __init__.py
@@ -37,9 +38,9 @@ but word "plugins" is not special for Pants
            your_tasks.py
         
         
-- `__init__.py` files can be empty - you just saying to Python that you created modules
+- `__init__.py` files can be empty - you're just saying to Python that you created modules.
 
-- In `your_tasks.py` place following content
+- In `your_tasks.py` place the following content:
 
       from pants.task.task import Task
           
@@ -50,10 +51,10 @@ but word "plugins" is not special for Pants
       class WorldTask(Task):
           def execute(self):
               print("world!")
-   [Task](https://github.com/pantsbuild/pants/blob/master/src/python/pants/task/task.py) is simple base
-   class for your tasks - you need to implement `execute` methods which will be executed by Pants
+   [Task](https://github.com/pantsbuild/pants/blob/master/src/python/pants/task/task.py) is a simple base
+   class for your tasks - you need to implement an `execute` method which will be executed by Pants.
    
-- In `register.py` place following content
+- In `register.py` place the following content:
 
       from pants.goal.goal import Goal
       from pants.goal.task_registrar import TaskRegistrar as task
@@ -64,25 +65,25 @@ but word "plugins" is not special for Pants
           task(name='hello', action=HelloTask).install('hello-world')
           task(name='world', action=WorldTask).install('hello-world')
           
-     Here you register new Pants goal named "hello-world" and documented with description.
-     Then you attach 2 tasks to that goal created in previous step.
+     Here you register new Pants goal named `hello-world` and documented with a description,
+     and then attach 2 tasks to the goal created in previous step.
 
-- In `pants.ini` place following content
+- In `pants.ini` place the following content:
       
       [GLOBAL]
       pants_version: 1.9.0
       pythonpath: ["%(buildroot)s/plugins"]
       backend_packages: ["hello"]
       
-     You need to put your plugins in `pythonpath` so Pants will know where to find them.
-     `backend_packages` define which plugins you want to use in your project.
+     You need to put your plugins on the `pythonpath` so Pants will know where to find them.
+     `backend_packages` defines which plugins you want to use in your project.
      
-- You are ready to use your plugin with "hello-world" goal, firstly try to find your goal by typing `./pants goals`.
+- You are ready to use your plugin with the `hello-world` goal! First try to find your goal by typing `./pants goals`:
 
       ...
       hello-world: Say hello to your world
       ...
-- Now you can try to use your plugin by typing `./pants hello-world`
+- Now you can use your plugin by typing `./pants hello-world`:
 
       ...
       Executing tasks in goals: hello-world
