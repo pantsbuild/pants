@@ -201,6 +201,13 @@ to this directory.",
               .long("root-ca-cert-file")
               .required(false)
         )
+        .arg(
+          Arg::with_name("oauth-bearer-token-file")
+              .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
+              .takes_value(true)
+              .long("oauth-bearer-token-file")
+              .required(false)
+        )
         .arg(Arg::with_name("remote-instance-name")
             .takes_value(true)
                  .long("remote-instance-name")
@@ -244,6 +251,15 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           None
         };
 
+        let oauth_bearer_token =
+          if let Some(path) = top_match.value_of("oauth-bearer-token-file") {
+            Some(std::fs::read_to_string(path).map_err(|err| {
+              format!("Error reading oauth bearer token from {:?}: {}", path, err)
+            })?)
+          } else {
+            None
+          };
+
         (
           Store::with_remote(
             &store_dir,
@@ -253,6 +269,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               .value_of("remote-instance_name")
               .map(str::to_owned),
             root_ca_certs,
+            oauth_bearer_token,
             1,
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures

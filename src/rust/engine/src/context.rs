@@ -1,8 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::fs::File;
-use std::io::Read;
+use std;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
@@ -57,6 +56,7 @@ impl Core {
     remote_execution_server: Option<String>,
     remote_instance_name: Option<String>,
     remote_root_ca_certs_path: Option<PathBuf>,
+    remote_oauth_bearer_token_path: Option<PathBuf>,
     remote_store_thread_count: usize,
     remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
@@ -71,8 +71,17 @@ impl Core {
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
-        File::open(&path)
-          .and_then(|f| f.bytes().collect::<Result<Vec<_>, _>>())
+        std::fs::read(&path)
+          .unwrap_or_else(|err| panic!("Error reading root CA certs file {:?}: {}", path, err)),
+      )
+    } else {
+      None
+    };
+
+    // We re-use this token for both the execution and store service; they're generally tied together.
+    let oauth_bearer_token = if let Some(path) = remote_oauth_bearer_token_path {
+      Some(
+        std::fs::read_to_string(&path)
           .unwrap_or_else(|err| panic!("Error reading root CA certs file {:?}: {}", path, err)),
       )
     } else {
@@ -90,6 +99,7 @@ impl Core {
           address,
           remote_instance_name.clone(),
           root_ca_certs.clone(),
+          oauth_bearer_token.clone(),
           remote_store_thread_count,
           remote_store_chunk_bytes,
           remote_store_chunk_upload_timeout,
@@ -102,6 +112,7 @@ impl Core {
         address,
         remote_instance_name,
         root_ca_certs,
+        oauth_bearer_token,
         // Allow for some overhead for bookkeeping threads (if any).
         process_execution_parallelism + 2,
         store.clone(),

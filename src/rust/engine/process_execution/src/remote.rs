@@ -29,6 +29,7 @@ enum OperationOrStatus {
 #[derive(Clone)]
 pub struct CommandRunner {
   instance_name: Option<String>,
+  authorization_header: Option<String>,
   channel: Resettable<grpcio::Channel>,
   env: Resettable<Arc<grpcio::Environment>>,
   execution_client: Resettable<Arc<bazel_protos::remote_execution_grpc::ExecutionClient>>,
@@ -62,7 +63,7 @@ impl CommandRunner {
       self
         .execution_client
         .get()
-        .execute(&execute_request)
+        .execute_opt(&execute_request, self.call_option())
         .map_err(rpcerror_to_string)
     );
     stream
@@ -127,6 +128,7 @@ impl super::CommandRunner for CommandRunner {
       Ok((action, command, execute_request)) => {
         let command_runner = self.clone();
         let command_runner2 = self.clone();
+        let command_runner3 = self.clone();
         let execute_request = Arc::new(execute_request);
         let execute_request2 = execute_request.clone();
         self
@@ -149,6 +151,7 @@ impl super::CommandRunner for CommandRunner {
               let store = store.clone();
               let operations_client = operations_client.clone();
               let command_runner2 = command_runner2.clone();
+              let command_runner3 = command_runner3.clone();
               command_runner2
                 .extract_execute_response(operation)
                 .map(future::Loop::Break)
@@ -200,7 +203,7 @@ impl super::CommandRunner for CommandRunner {
                             future::done(
                               operations_client
                                 .get()
-                                .get_operation(&operation_request)
+                                .get_operation_opt(&operation_request, command_runner3.call_option())
                                 .or_else(move |err| {
                                   rpcerror_recover_cancelled(operation_request.take_name(), err)
                                 })
@@ -243,6 +246,7 @@ impl CommandRunner {
     address: String,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
+    oauth_bearer_token: Option<String>,
     thread_count: usize,
     store: Store,
   ) -> CommandRunner {
@@ -274,12 +278,25 @@ impl CommandRunner {
 
     CommandRunner {
       instance_name,
+      authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
       channel,
       env,
       execution_client,
       operations_client,
       store,
     }
+  }
+
+  fn call_option(&self) -> grpcio::CallOption {
+    let mut call_option = grpcio::CallOption::default();
+    if let Some(ref authorization_header) = self.authorization_header {
+      let mut builder = grpcio::MetadataBuilder::with_capacity(1);
+      builder
+        .add_str("authorization", &authorization_header)
+        .unwrap();
+      call_option = call_option.headers(builder.build());
+    }
+    call_option
   }
 
   fn upload_proto<P: protobuf::Message>(&self, proto: &P) -> BoxFuture<(), String> {
@@ -1145,12 +1162,13 @@ mod tests {
       cas.address(),
       None,
       None,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let cmd_runner = CommandRunner::new(mock_server.address(), None, None, 1, store);
+    let cmd_runner = CommandRunner::new(mock_server.address(), None, None, None, 1, store);
     let result = cmd_runner.run(echo_roland_request()).wait();
     assert_eq!(
       result,
@@ -1494,6 +1512,7 @@ mod tests {
       cas.address(),
       None,
       None,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -1503,7 +1522,7 @@ mod tests {
       .wait()
       .expect("Saving file bytes to store");
 
-    let result = CommandRunner::new(mock_server.address(), None, None, 1, store)
+    let result = CommandRunner::new(mock_server.address(), None, None, None, 1, store)
       .run(cat_roland_request())
       .wait();
     assert_eq!(
@@ -1631,12 +1650,13 @@ mod tests {
       cas.address(),
       None,
       None,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let error = CommandRunner::new(mock_server.address(), None, None, 1, store)
+    let error = CommandRunner::new(mock_server.address(), None, None, None, 1, store)
       .run(cat_roland_request())
       .wait()
       .expect_err("Want error");
@@ -2196,12 +2216,13 @@ mod tests {
       cas.address(),
       None,
       None,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    CommandRunner::new(address, None, None, 1, store)
+    CommandRunner::new(address, None, None, None, 1, store)
   }
 
   fn extract_execute_response(
