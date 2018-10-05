@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::mem::drop;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -69,10 +70,16 @@ impl CommandRunner {
         .into_future()
         // If there was a response, drop the _stream to disconnect so that the server doesn't keep
         // the connection alive and continue sending on it.
-        .map(|(maybe_operation, _stream)| maybe_operation)
+        .map(|(maybe_operation, stream)| {
+          drop(stream);
+          maybe_operation
+        })
         // If there was an error, drop the _stream to disconnect so that the server doesn't keep the
         // connection alive and continue sending on it.
-        .map_err(|(error, _stream)| error)
+        .map_err(|(error, stream)| {
+          drop(stream);
+          error
+        })
         .then(|maybe_operation_result| {
           match maybe_operation_result {
             Ok(Some(operation)) => Ok(OperationOrStatus::Operation(operation)),
@@ -1515,6 +1522,8 @@ mod tests {
   }
 
   //#[test] // TODO: Unignore this test when the server can actually fail with status protos.
+  // See https://github.com/pantsbuild/pants/issues/6597
+  #[allow(dead_code)]
   fn execute_missing_file_uploads_if_known_status() {
     let roland = TestData::roland();
 
