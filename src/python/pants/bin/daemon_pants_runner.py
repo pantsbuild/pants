@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import datetime
 import os
-import signal
 import sys
 import termios
 import time
@@ -24,7 +23,7 @@ from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
-from pants.util.contextutil import HardSystemExit, hermetic_environment_as, stdio_as
+from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
 
@@ -32,7 +31,10 @@ class DaemonExiter(Exiter):
   """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
 
   def __init__(self, socket):
-    super(DaemonExiter, self).__init__()
+    # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
+    # sys.exit behavior.
+    # TODO: The behavior we're avoiding with the use of os._exit should be described and tested.
+    super(DaemonExiter, self).__init__(exiter=os._exit)
     self._socket = socket
     self._finalizer = None
 
@@ -40,7 +42,7 @@ class DaemonExiter(Exiter):
     """Sets a finalizer that will be called before exiting."""
     self._finalizer = finalizer
 
-  def exit(self, result=0, msg=None):
+  def exit(self, result=0, msg=None, *args, **kwargs):
     """Exit the runtime."""
     if self._finalizer:
       try:
@@ -65,9 +67,7 @@ class DaemonExiter(Exiter):
       # Shutdown the connected socket.
       teardown_socket(self._socket)
     finally:
-      # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
-      # sys.exit behavior (via `pants.util.contextutil.hard_exit_handler()`).
-      raise HardSystemExit()
+      super(DaemonExiter, self).exit(result=result, *args, **kwargs)
 
 
 class DaemonPantsRunner(ProcessManager):
@@ -227,12 +227,6 @@ class DaemonPantsRunner(ProcessManager):
       ) as finalizer:
         yield finalizer
 
-  def _setup_sigint_handler(self):
-    """Sets up a control-c signal handler for the daemon runner context."""
-    def handle_control_c(signum, frame):
-      raise KeyboardInterrupt('remote client sent control-c!')
-    signal.signal(signal.SIGINT, handle_control_c)
-
   def _raise_deferred_exc(self):
     """Raises deferred exceptions from the daemon's synchronous path in the post-fork client."""
     if self._deferred_exception:
@@ -276,9 +270,6 @@ class DaemonPantsRunner(ProcessManager):
 
     # Set context in the process title.
     set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
-
-    # Setup a SIGINT signal handler.
-    self._setup_sigint_handler()
 
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
