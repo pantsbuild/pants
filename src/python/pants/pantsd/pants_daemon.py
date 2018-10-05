@@ -368,8 +368,10 @@ class PantsDaemon(FingerprintedProcessManager):
       ExceptionSink.reset_interactive_output_stream(log_stream)
       global_bootstrap_options = self._bootstrap_options.for_global_scope()
       ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
-      exiter = Exiter(print_backtraces=global_bootstrap_options.print_exception_stacktrace)
-      ExceptionSink.reset_exiter(exiter)
+      pantsd_exiter = Exiter(
+        exiter=os._exit,
+        print_backtraces=global_bootstrap_options.print_exception_stacktrace)
+      ExceptionSink.reset_exiter(pantsd_exiter)
       self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
       self._native.set_panic_handler()
