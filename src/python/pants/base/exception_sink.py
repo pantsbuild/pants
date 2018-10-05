@@ -47,8 +47,9 @@ class ExceptionSink(object):
 
   # All reset_* methods are ~idempotent!
   @classmethod
-  def reset_log_location(cls, new_log_location=None):
-    """
+  def reset_log_location(cls, new_log_location):
+    """Re-acquire file handles to error logs based in the new location.
+
     Class state:
     - Overwrites `cls._log_dir`, `cls._pid_specific_error_fileobj`, and
       `cls._shared_error_fileobj`.
@@ -56,22 +57,25 @@ class ExceptionSink(object):
     - May create a new directory.
     - Overwrites signal handlers for many fatal signals.
 
-    :raises: :class:`ExceptionSink.ExceptionSinkError` if the directory is not writable.
+    :raises: :class:`ExceptionSink.ExceptionSinkError` if the directory does not exist or is not
+             writable.
     """
     # We could no-op here if the log locations are the same, but there's no reason not to have the
-    # additional safety of re-acquiring file descriptors each time.
+    # additional safety of re-acquiring file descriptors each time (and erroring out early if the
+    # location is no longer writable).
 
-    if new_log_location:
-      # Create the directory if possible, or raise if not writable.
-      cls._check_or_create_new_destination(new_log_location)
-    else:
-      # Interpret a None argument to mean to just refresh the file handles for the current pid.
-      new_log_location = cls._log_dir
+    # Create the directory if possible, or raise if not writable.
+    cls._check_or_create_new_destination(new_log_location)
 
     pid_specific_error_stream, shared_error_stream = cls._recapture_fatal_error_log_streams(
       new_log_location)
 
     # NB: mutate process-global state!
+    if faulthandler.is_enabled():
+      logger.debug('re-enabling faulthandler')
+      # Drops a ref count for the previous error stream:
+      # https://github.com/vstinner/faulthandler/blob/master/faulthandler.c
+      faulthandler.disable()
     # Send a stacktrace to this file if interrupted by a fatal error.
     faulthandler.enable(file=pid_specific_error_stream, all_threads=True)
 
@@ -106,10 +110,11 @@ class ExceptionSink(object):
     This is where the the error message on exit will be printed to as well.
     """
     # NB: mutate process-global state!
-    # TODO: chain=True will log tracebacks to previous values of the trace stream as well -- what
-    # happens if those file objects are eventually closed? Does faulthandler just ignore them?
+    if faulthandler.unregister(signal.SIGUSR2):
+      logger.debug('re-registering a SIGUSR2 handler')
     # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
-    faulthandler.register(signal.SIGUSR2, interactive_output_stream, chain=True)
+    faulthandler.register(signal.SIGUSR2, interactive_output_stream,
+                          all_threads=True, chain=False)
 
     # NB: mutate the class variables!
     # We don't *necessarily* need to keep a reference to this, but we do here for clarity.
@@ -177,8 +182,8 @@ class ExceptionSink(object):
 
   @classmethod
   def _recapture_fatal_error_log_streams(cls, new_log_location):
-    # NB: We do not close old file descriptors! This is bounded by the number of times any method is
-    # called, which should be few and finite.
+    # NB: We do not close old file descriptors under the assumption their lifetimes are managed
+    # elsewhere.
     # We recapture both log streams each time.
     pid = os.getpid()
     pid_specific_log_path = cls.exceptions_log_path(for_pid=pid, in_dir=new_log_location)
@@ -194,9 +199,6 @@ class ExceptionSink(object):
         "Error opening fatal error log streams for log location '{}': {}"
         .format(new_log_location, str(e)))
 
-    # TODO: determine whether any further validation of the streams (try writing to them here?) is
-    # useful/necessary for faulthandler (it seems it just doesn't write to e.g. closed file
-    # descriptors, so probably not?).
     return (pid_specific_error_stream, shared_error_stream)
 
   @classmethod

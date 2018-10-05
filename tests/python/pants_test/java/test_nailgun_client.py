@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import signal
 import socket
 import unittest
 from builtins import object
@@ -178,3 +179,21 @@ class TestNailgunClient(unittest.TestCase):
 
   def test_repr(self):
     self.assertIsNotNone(repr(self.nailgun_client))
+
+  @mock.patch('os.kill', **PATCH_OPTS)
+  def test_send_control_c(self, mock_kill):
+    self.nailgun_client._session = mock.Mock(remote_pid=31337)
+    self.nailgun_client.send_control_c()
+    mock_kill.assert_called_once_with(31337, signal.SIGINT)
+
+  @mock.patch('os.kill', **PATCH_OPTS)
+  def test_send_control_c_noop_none(self, mock_kill):
+    self.nailgun_client._session = None
+    self.nailgun_client.send_control_c()
+    mock_kill.assert_not_called()
+
+  @mock.patch('os.kill', **PATCH_OPTS)
+  def test_send_control_c_noop_nopid(self, mock_kill):
+    self.nailgun_client._session = mock.Mock(remote_pid=None)
+    self.nailgun_client.send_control_c()
+    mock_kill.assert_not_called()

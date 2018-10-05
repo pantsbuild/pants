@@ -8,9 +8,7 @@ import logging
 import sys
 from builtins import object
 
-from future.utils import PY2
-
-from pants.util.fileutil import is_fileobj_definitely_closed
+from pants.util.strutil import ensure_binary
 
 
 logger = logging.getLogger(__name__)
@@ -56,14 +54,19 @@ class Exiter(object):
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
     if msg:
-      if PY2:
-        # sys.stderr expects bytes in Py2, unicode in Py3
-        msg = msg.encode('utf-8')
       out = out or sys.stderr
-      if not is_fileobj_definitely_closed(out):
+      # sys.stderr expects bytes in Py2, unicode in Py3
+      msg = ensure_binary(msg)
+      try:
         print(msg, file=out)
-        # NB: Ensure we write everything out in case it's not an unbuffered stream like stderr.
+        # TODO: Determine whether this call is a no-op because the stream gets flushed on exit, or
+        # if we could lose what we just printed, e.g. if we get interrupted by a signal while
+        # exiting and the stream is buffered like stdout.
         out.flush()
+      except Exception as e:
+        # If the file is already closed, or any other error occurs, just log it and continue to
+        # exit.
+        logger.exception(e)
     self._exit(result)
 
   def exit_and_fail(self, msg=None):

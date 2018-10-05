@@ -432,17 +432,19 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                                  if p.ppid() == 1]
       self.assertEquals(1, len(pantsd_runner_processes))
       parent_runner_process = pantsd_runner_processes[0]
-      parent_runner_pid = parent_runner_process.pid
       # Send SIGTERM
       parent_runner_process.terminate()
       waiter_run = waiter_handle.join()
 
-      # Ensure that we saw the failure in the client's stdout, and that we got a remote exception.
+      # Ensure that we saw the pantsd-runner process's failure in the client's stderr.
       self.assert_failure(waiter_run)
       self.assertRegexpMatches(waiter_run.stderr_data, """\
 Signal {signum} was raised\\. Exiting with failure\\.
 \\(backtrace omitted\\)
-""".format(pid=parent_runner_pid, signum=signal.SIGTERM))
+""".format(signum=signal.SIGTERM))
+      # NB: testing stderr is an "end-to-end" test, as it requires pants knowing the correct remote
+      # pid and reading those files to print their content to stderr, so we don't necessarily need
+      # to test the log files themselves here.
 
   def _assert_pantsd_keyboardinterrupt_signal(self, signum):
     # TODO: This tests that pantsd-runner processes actually die after the thin client receives the

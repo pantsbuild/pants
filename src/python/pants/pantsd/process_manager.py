@@ -488,7 +488,6 @@ class ProcessManager(ProcessMetadataManager):
     self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
     is_parent, is_child = fork_func()
-    # No arguments reuses the same log location, but with the new pid after forking.
     if not is_parent and not is_child:
       return
 
