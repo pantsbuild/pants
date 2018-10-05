@@ -190,10 +190,6 @@ impl<N: Node> Entry<N> {
         let context = context_factory.clone_for(entry_id);
         let node = n.clone();
 
-        if !node.cacheable() {
-          println!("DWH: In run for node {:?} with run_token: {:?}, generation: {:?}, previous_dep_generations: {:?}, previous_result: {:?}", node, run_token, generation, previous_dep_generations, previous_result);
-        }
-
         context_factory.spawn(future::lazy(move || {
           // If we have previous result generations, compare them to all current dependency
           // generations (which, if they are dirty, will cause recursive cleaning). If they
@@ -278,11 +274,6 @@ impl<N: Node> Entry<N> {
   where
     C: NodeContext<Node = N>,
   {
-    println!("DWH: In entry get for entry_id {:?} node: {:?}, content: {:?}, cacheable: {:?}", entry_id, self.node, self.node.content(), self.node.content().cacheable());
-    if !self.node.content().cacheable() {
-      println!("DWH: In get for {:?}", self.node);
-    }
-
     {
       let mut state = self.state.lock();
 
@@ -391,10 +382,6 @@ impl<N: Node> Entry<N> {
   ) where
     C: NodeContext<Node = N>,
   {
-    if !self.node.content().cacheable() {
-      println!("DWH: In complete for {:?} with run_token: {:?}, result: {:?}", self.node, result_run_token, result);
-    }
-
     let mut state = self.state.lock();
 
     // We care about exactly one case: a Running state with the same run_token. All other states
@@ -445,9 +432,6 @@ impl<N: Node> Entry<N> {
               // Node was re-executed, but had the same result value.
               (generation, result)
             } else {
-              if !self.node.content().cacheable() {
-                println!("DWH: Incrementing generation for result {:?}", result);
-              }
               (generation.next(), result)
             }
           } else {
