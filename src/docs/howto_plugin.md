@@ -18,83 +18,117 @@ Pants' `jvm` code registers in
 Pants' backend-loader code assumes your plugin has a `register.py` file
 there.
 
-Hello world plugin with its own goal
---------------------
+A "Hello World" plugin
+----------------------
 
-The hello world plugin shows how to register your plugin to Pants and define its own `hello-world` goal which contains 2 tasks and 
-which can be executed by Pants. To achieve that, take a look at the following steps:
-- Create a new Pants project so you have pants.ini file in root of your repository
+This "Hello World" plugin example shows how to register a plugin with Pants. It defines a new 
+`hello-world` goal with two tasks. Here's how to create it:
 
-- Create a home directory for your plugins. In this example we will use `plugins/` directory in root of repository,
-but the word "plugins" is not special for Pants.
+- If you don't have an existing Pants project to work with, create one. Locate its config file,
+ typically `pants.ini` in the repo root.
+
+- Create a directory for your plugins. In this example we will use the `plugins/` directory in 
+the repo root, but there is no convention, and you can put them wherever you like.
 
 - In the `plugins/` directory, create following filesystem structure:
 
-      hello/
-        __init__.py
-        register.py
-        tasks/
-           __init__.py
-           your_tasks.py
-        
+        :::
+        hello/
+          __init__.py
+          register.py
+          tasks/
+             __init__.py
+             your_tasks.py
+      
         
 - `__init__.py` files can be empty - you're just saying to Python that you created modules.
 
 - In `your_tasks.py` place the following content:
 
-      from pants.task.task import Task
+        :::python
+        from pants.task.task import Task
           
-      class HelloTask(Task):
-          def execute(self):
-              print("Hello")
-     
-      class WorldTask(Task):
-          def execute(self):
-              print("world!")
+        class HelloTask(Task):
+            def execute(self):
+                print("Hello")
+         
+        class WorldTask(Task):
+            def execute(self):
+                print("world!")
+
    [Task](https://github.com/pantsbuild/pants/blob/master/src/python/pants/task/task.py) is a simple base
-   class for your tasks - you need to implement an `execute` method which will be executed by Pants.
+   class for your tasks - you must implement the `execute` method.
    
 - In `register.py` place the following content:
 
-      from pants.goal.goal import Goal
-      from pants.goal.task_registrar import TaskRegistrar as task
-      from hello.tasks.your_tasks import HelloTask, WorldTask
-      
-      def register_goals():
-          Goal.register(name="hello-world", description="Say hello to your world")
-          task(name='hello', action=HelloTask).install('hello-world')
-          task(name='world', action=WorldTask).install('hello-world')
-          
-     Here you register new Pants goal named `hello-world` and documented with a description,
-     and then attach 2 tasks to the goal created in previous step.
+        :::python
+        from pants.goal.goal import Goal
+        from pants.goal.task_registrar import TaskRegistrar as task
+        from hello.tasks.your_tasks import HelloTask, WorldTask
+        
+        def register_goals():
+            Goal.register(name="hello-world", description="Say hello to your world")
+            task(name='hello', action=HelloTask).install('hello-world')
+            task(name='world', action=WorldTask).install('hello-world')
+ 
+ This creates a new goal named `hello-world`, and registers the two tasks to it.
+
 
 - In `pants.ini` place the following content:
-      
-      [GLOBAL]
-      pants_version: 1.9.0
-      pythonpath: ["%(buildroot)s/plugins"]
-      backend_packages: ["hello"]
-      
-     You need to put your plugins on the `pythonpath` so Pants will know where to find them.
-     `backend_packages` defines which plugins you want to use in your project.
+  
+        :::ini
+        [GLOBAL]
+        pants_version: 1.9.0
+        pythonpath: ["%(buildroot)s/plugins"]
+        backend_packages: ["hello"]     
+
+`backend_packages` defines which plugins you want to use in your project.
+
+If you want to use custom plugins directly from source when building in the same repo, you need 
+to put them on the `pythonpath` so Pants can find them. 
+
+
+- You are ready to use your plugin! First try to find your goal by typing `./pants goals`:
+
+        :::
+        ...
+        hello-world: Say hello to your world
+        ...
+
+Now you can use your plugin by typing `./pants hello-world`:
+
+        ::
+        ...
+        Executing tasks in goals: hello-world
+        XX:XX:XX 00:00   [hello-world]
+        XX:XX:XX 00:00     [hello]Hello
+        
+        XX:XX:XX 00:00     [world]world!
+        
+        XX:XX:XX 00:00   [complete]
+                       SUCCESS
+
+Note that to consume the custom plugin as a published artifact (say on PyPI), instead of 
+directly from the repo, then instead of `backend_packages` and `pythonpath` you would set `plugins`:
+
+        :::ini
+        [GLOBAL]
+        pants_version: 1.9.0
+        plugins: ["myorg.hello==1.7.6"]
+
+Similarly, if your custom plugin is consumed directly from the repo, but has dependencies on 
+published artifacts, then you list those in `plugins`:
      
-- You are ready to use your plugin with the `hello-world` goal! First try to find your goal by typing `./pants goals`:
+        :::ini
+        [GLOBAL]
+        pants_version: 1.9.0
+        pythonpath: ["%(buildroot)s/plugins"]
+        backend_packages: ["hello"]
+        plugins: ["some.dependency==4.5.11"]
 
-      ...
-      hello-world: Say hello to your world
-      ...
-- Now you can use your plugin by typing `./pants hello-world`:
-
-      ...
-      Executing tasks in goals: hello-world
-      XX:XX:XX 00:00   [hello-world]
-      XX:XX:XX 00:00     [hello]Hello
-      
-      XX:XX:XX 00:00     [world]world!
-      
-      XX:XX:XX 00:00   [complete]
-                     SUCCESS
-
+See below for more details. 
+  
+     
 Simple Configuration
 --------------------
 
