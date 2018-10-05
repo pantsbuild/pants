@@ -205,6 +205,41 @@ This generates a zipfile with runnable contents; instead of a zipfile, we could 
 contents a directory tree, a giant jar, or something else.
 <a pantsref="jvm_bundles">Learn more about bundles</a>.
 
+Compiler Options
+----------------
+
+Compiler options are set the same way any options are set. Please remember to prefix the flag so
+that it is passed through to the target compiler. For instance, Zinc requires the prefix "-S" to
+pass a flag to scalac.
+
+A common example is enabling statistics in scalac (through Zinc), but Zinc doesn't provide the
+output. In order to enable and view scalac's statistics with Pants, add the statistics flag to
+`compiler_option_sets_enabled_args` in the `pants.ini` file like so:
+
+    :::ini
+    [compile.zinc]
+    compiler_option_sets_enabled_args: {
+        'c_profile': [ '-S-Ystatistics' ],
+      }
+
+Then, refer to the set in the target that needs analyzing like below:
+
+    :::python
+    scala_library(
+      sources = globs("*.scala"),
+      compiler_option_sets = { "c_profile" },
+      dependencies = [
+        ...
+      ],
+    )
+
+Now the target is ready to compile, but the output will be squelched by Zinc. To avoid this, add
+`--compile-zinc-args="+['-log-level', 'info']"` when compiling the target. The Pants invoke will
+look like this:
+
+    :::bash
+    $ ./pants compile --compile-zinc-args="+['-log-level', 'info']" <target>
+
 Toolchain
 ---------
 
