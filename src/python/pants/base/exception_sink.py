@@ -73,7 +73,7 @@ class ExceptionSink(object):
     # NB: mutate process-global state!
     if faulthandler.is_enabled():
       logger.debug('re-enabling faulthandler')
-      # Drops a ref count for the previous error stream:
+      # Call Py_CLEAR() on the previous error stream:
       # https://github.com/vstinner/faulthandler/blob/master/faulthandler.c
       faulthandler.disable()
     # Send a stacktrace to this file if interrupted by a fatal error.
