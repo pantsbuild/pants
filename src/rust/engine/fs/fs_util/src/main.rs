@@ -203,7 +203,7 @@ to this directory.",
         )
         .arg(
           Arg::with_name("oauth-bearer-token-file")
-              .help("Path to file containing oauth bearer token. If not set, not authorization will be provided to remote servers.")
+              .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
               .takes_value(true)
               .long("oauth-bearer-token-file")
               .required(false)

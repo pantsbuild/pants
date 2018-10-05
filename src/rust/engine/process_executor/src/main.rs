@@ -95,7 +95,7 @@ fn main() {
       )
       .arg(
         Arg::with_name("execution-oauth-bearer-token-path")
-            .help("Path to file containing oauth bearer token for communication with the execution server. If not set, not authorization will be provided to remote servers.")
+            .help("Path to file containing oauth bearer token for communication with the execution server. If not set, no authorization will be provided to remote servers.")
             .takes_value(true)
             .long("execution-oauth-bearer-token-path")
             .required(false)
@@ -115,7 +115,7 @@ fn main() {
       )
       .arg(
         Arg::with_name("cas-oauth-bearer-token-path")
-            .help("Path to file containing oauth bearer token for communication with the CAS server. If not set, not authorization will be provided to remote servers.")
+            .help("Path to file containing oauth bearer token for communication with the CAS server. If not set, no authorization will be provided to remote servers.")
             .takes_value(true)
             .long("cas-oauth-bearer-token-path")
             .required(false)
