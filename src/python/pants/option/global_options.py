@@ -202,7 +202,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'project depends on.')
     register('--owner-of', type=list, default=[], daemon=False, fromfile=True, metavar='<path>',
              help='Select the targets that own these files. '
-                  'This is the third target calculation strategy along with the --changed '
+                  'This is the third target calculation strategy along with the --changed-* '
                   'options and specifying the targets directly. These three types of target '
                   'selection are mutually exclusive.')
 
@@ -304,7 +304,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
              advanced=True,
              help='Number of concurrent processes that may be executed either locally and remotely.')
-    register('--process-execution-cleanup-local-dirs', type=bool, default=True,
+    register('--process-execution-cleanup-local-dirs', type=bool, default=True, advanced=True,
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')
 
