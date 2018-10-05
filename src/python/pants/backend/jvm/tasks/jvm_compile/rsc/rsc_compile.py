@@ -748,17 +748,20 @@ class RscCompile(ZincCompile):
 
     # NB The json uses absolute paths pointing into either the buildroot or
     #    the temp directory of the hermetic build. This relativizes the keys.
-    an_abs_result_path = metacp_result["status"].items()[0][0]
-    for rel_input_path in (classpath_rel + jvm_lib_jars):
-      if an_abs_result_path.endswith(rel_input_path):
-        prefix = an_abs_result_path[:-len(rel_input_path)]
+    prefix = None
+    for an_abs_result_path in metacp_result["status"].keys():
+      for rel_input_path in (classpath_rel + jvm_lib_jars):
+        if an_abs_result_path.endswith(rel_input_path):
+          prefix = an_abs_result_path[:-len(rel_input_path)]
+          break
+      if prefix:
         break
-    else:
-      raise Exception("Couldn't find a matching input path for output path {}"
-                      .format(an_abs_result_path))
 
     def desandboxify_pantsd_loc(path):
-      return path[len(prefix):]
+      if path.startswith(prefix):
+        return path[len(prefix):]
+      else:
+        return path
 
     status_elements = {
       desandboxify_pantsd_loc(k): v
@@ -778,6 +781,8 @@ class RscCompile(ZincCompile):
   def _get_jvm_distribution(self):
     # TODO We may want to use different jvm distributions depending on what
     # java version the target expects to be compiled against.
+    # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
+    #      different jdks in remote builds.
     local_distribution = JvmPlatform.preferred_jvm_distribution([], strict=True)
     if self.execution_strategy == self.HERMETIC:
       class HermeticDistribution(object):
