@@ -160,7 +160,7 @@ class NailgunClient(object):
   DEFAULT_NG_PORT = 2113
 
   def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
-               workdir=None, exit_on_broken_pipe=False):
+               workdir=None, exit_on_broken_pipe=False, expects_pid=False):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to '127.0.0.1')
@@ -172,6 +172,7 @@ class NailgunClient(object):
     :param file err: a stream to write command standard error to (defaults to stderr)
     :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
     :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are encountered
+    :param bool expects_pid: Whether or not to expect a PID from the server (only true for pantsd)
     """
     self._host = host
     self._port = port
@@ -182,6 +183,7 @@ class NailgunClient(object):
     self._stderr = err or sys.stderr
     self._workdir = workdir or os.path.abspath(os.path.curdir)
     self._exit_on_broken_pipe = exit_on_broken_pipe
+    self._expects_pid = expects_pid
     # Mutable session state.
     self._session = None
     self._current_remote_pid = None
