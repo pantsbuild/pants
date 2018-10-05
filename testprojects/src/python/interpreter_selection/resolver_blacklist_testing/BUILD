@@ -16,6 +16,7 @@ python_requirement_library(
   name='reqlib',
   requirements=[
     python_requirement('jupyter==1.0.0'),
+    python_requirement('jupyter_console<5.4'),
     python_requirement('ipykernel<5'),
     python_requirement('ipython<6'),
   ]
