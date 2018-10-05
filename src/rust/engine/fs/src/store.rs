@@ -935,6 +935,7 @@ mod local {
               if bytes.len() == digest.1 {
                 Ok(Some(f(Bytes::from(bytes))))
               } else {
+                error!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes);
                 Ok(None)
               }
             }
