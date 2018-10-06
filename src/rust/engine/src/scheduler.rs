@@ -292,7 +292,7 @@ impl Scheduler {
       self.core.fs_pool.clone(),
       &[]
     )));
-    let store = self.core.store.clone();
+    let store = self.core.store();
 
     posix_fs
       .expand(path_globs)

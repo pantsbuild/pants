@@ -643,7 +643,7 @@ pub extern "C" fn set_panic_handler() {
 #[no_mangle]
 pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
-    match scheduler.core.store.garbage_collect() {
+    match scheduler.core.store().garbage_collect() {
       Ok(_) => {}
       Err(err) => error!("{}", err),
     }
@@ -654,7 +654,7 @@ pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
 pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
     let digests = scheduler.core.graph.all_digests();
-    match scheduler.core.store.lease_all(digests.iter()) {
+    match scheduler.core.store().lease_all(digests.iter()) {
       Ok(_) => {}
       Err(err) => error!("{}", &err),
     }
@@ -720,7 +720,7 @@ pub extern "C" fn merge_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    fs::Snapshot::merge_directories(scheduler.core.store.clone(), digests)
+    fs::Snapshot::merge_directories(scheduler.core.store(), digests)
       .wait()
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
@@ -754,7 +754,7 @@ pub extern "C" fn materialize_directories(
     futures::future::join_all(
       dir_and_digests
         .into_iter()
-        .map(|(dir, digest)| scheduler.core.store.materialize_directory(dir, digest))
+        .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
         .collect::<Vec<_>>(),
     )
   }).map(|_| ())
