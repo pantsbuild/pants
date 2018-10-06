@@ -109,27 +109,6 @@ impl Store {
   }
 
   ///
-  /// LMDB Environments aren't safe to be re-used after forking, so we need to drop them before
-  /// forking and re-create them afterwards.
-  ///
-  /// I haven't delved into the exact details as to what's fork-unsafe about LMDB, but if two pants
-  /// processes run using the same daemon, one takes out some kind of lock which the other cannot
-  /// ever acquire, so lmdb returns EAGAIN whenever a transaction is created in the second process.
-  ///
-  pub fn with_reset<F>(&self, f: F)
-  where
-    F: FnOnce() -> (),
-  {
-    self.local.with_reset(|| {
-      if let Some(ref remote) = self.remote {
-        remote.with_reset(f)
-      } else {
-        f()
-      }
-    })
-  }
-
-  ///
   /// Store a file locally.
   ///
   pub fn store_file_bytes(&self, bytes: Bytes, initial_lease: bool) -> BoxFuture<Digest, String> {
@@ -632,7 +611,6 @@ mod local {
     self, Cursor, Database, DatabaseFlags, Environment, RwTransaction, Transaction, WriteFlags,
     NO_OVERWRITE, NO_SYNC, NO_TLS,
   };
-  use resettable::Resettable;
   use sha2::Sha256;
   use std::collections::{BinaryHeap, HashMap};
   use std::fmt;
@@ -654,8 +632,8 @@ mod local {
     // Store directories separately from files because:
     //  1. They may have different lifetimes.
     //  2. It's nice to know whether we should be able to parse something as a proto.
-    file_dbs: Resettable<Result<Arc<ShardedLmdb>, String>>,
-    directory_dbs: Resettable<Result<Arc<ShardedLmdb>, String>>,
+    file_dbs: Result<Arc<ShardedLmdb>, String>,
+    directory_dbs: Result<Arc<ShardedLmdb>, String>,
   }
 
   impl ByteStore {
@@ -666,26 +644,16 @@ mod local {
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
           pool: pool,
-          file_dbs: Resettable::new(move || ShardedLmdb::new(&files_root).map(Arc::new)),
-          directory_dbs: Resettable::new(move || ShardedLmdb::new(&directories_root).map(Arc::new)),
+          file_dbs: ShardedLmdb::new(&files_root).map(Arc::new),
+          directory_dbs: ShardedLmdb::new(&directories_root).map(Arc::new),
         }),
       })
-    }
-
-    pub fn with_reset<F>(&self, f: F)
-    where
-      F: FnOnce() -> (),
-    {
-      self
-        .inner
-        .file_dbs
-        .with_reset(|| self.inner.directory_dbs.with_reset(f))
     }
 
     // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
     pub fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
       {
-        let (env, directory_database, _) = self.inner.directory_dbs.get()?.get(fingerprint);
+        let (env, directory_database, _) = self.inner.directory_dbs.clone()?.get(fingerprint);
         let txn = env
           .begin_ro_txn()
           .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
@@ -700,7 +668,7 @@ mod local {
           }
         };
       }
-      let (env, file_database, _) = self.inner.file_dbs.get()?.get(fingerprint);
+      let (env, file_database, _) = self.inner.file_dbs.clone()?.get(fingerprint);
       let txn = env
         .begin_ro_txn()
         .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
@@ -723,7 +691,7 @@ mod local {
     ) -> Result<(), String> {
       let until = Self::default_lease_until_secs_since_epoch();
       for digest in digests {
-        let (env, _, lease_database) = self.inner.file_dbs.get()?.get(&digest.0);
+        let (env, _, lease_database) = self.inner.file_dbs.clone()?.get(&digest.0);
         env
           .begin_rw_txn()
           .and_then(|mut txn| self.lease(lease_database, &digest.0, until, &mut txn))
@@ -787,7 +755,7 @@ mod local {
           EntryType::File => self.inner.file_dbs.clone(),
           EntryType::Directory => self.inner.directory_dbs.clone(),
         };
-        let (env, database, lease_database) = lmdbs.get()?.get(&aged_fingerprint.fingerprint);
+        let (env, database, lease_database) = lmdbs.clone()?.get(&aged_fingerprint.fingerprint);
         {
           env
             .begin_rw_txn()
@@ -819,7 +787,7 @@ mod local {
         EntryType::Directory => self.inner.directory_dbs.clone(),
       };
 
-      for &(ref env, ref database, ref lease_database) in &database.get()?.all_lmdbs() {
+      for &(ref env, ref database, ref lease_database) in &database?.all_lmdbs() {
         let txn = env
           .begin_ro_txn()
           .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
@@ -884,7 +852,7 @@ mod local {
           };
           let digest = Digest(fingerprint, bytes.len());
 
-          let (env, content_database, lease_database) = dbs.get()?.get(&fingerprint);
+          let (env, content_database, lease_database) = dbs.clone()?.get(&fingerprint);
           let put_res = env.begin_rw_txn().and_then(|mut txn| {
             txn.put(content_database, &fingerprint, &bytes, NO_OVERWRITE)?;
             if initial_lease {
@@ -928,7 +896,7 @@ mod local {
         .inner
         .pool
         .spawn_fn(move || {
-          let (env, db, _) = dbs.get()?.get(&digest.0);
+          let (env, db, _) = dbs.clone()?.get(&digest.0);
           let ro_txn = env
             .begin_ro_txn()
             .map_err(|err| format!("Failed to begin read transaction: {}", err));
@@ -1538,7 +1506,6 @@ mod remote {
   use futures::{self, future, Future, Sink, Stream};
   use grpcio;
   use hashing::{Digest, Fingerprint};
-  use resettable::Resettable;
   use sha2::Sha256;
   use std::cmp::min;
   use std::collections::HashSet;
@@ -1548,14 +1515,13 @@ mod remote {
 
   #[derive(Clone)]
   pub struct ByteStore {
-    byte_stream_client: Resettable<Arc<bazel_protos::bytestream_grpc::ByteStreamClient>>,
-    cas_client:
-      Resettable<Arc<bazel_protos::remote_execution_grpc::ContentAddressableStorageClient>>,
+    byte_stream_client: Arc<bazel_protos::bytestream_grpc::ByteStreamClient>,
+    cas_client: Arc<bazel_protos::remote_execution_grpc::ContentAddressableStorageClient>,
     instance_name: Option<String>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
-    env: Resettable<Arc<grpcio::Environment>>,
-    channel: Resettable<grpcio::Channel>,
+    env: Arc<grpcio::Environment>,
+    channel: grpcio::Channel,
     authorization_header: Option<String>,
   }
 
@@ -1569,10 +1535,9 @@ mod remote {
       chunk_size_bytes: usize,
       upload_timeout: Duration,
     ) -> ByteStore {
-      let env = Resettable::new(move || Arc::new(grpcio::Environment::new(thread_count)));
-      let env2 = env.clone();
-      let channel = Resettable::new(move || {
-        let builder = grpcio::ChannelBuilder::new(env2.get());
+      let env = Arc::new(grpcio::Environment::new(thread_count));
+      let channel = {
+        let builder = grpcio::ChannelBuilder::new(env.clone());
         if let Some(ref root_ca_certs) = root_ca_certs {
           let creds = grpcio::ChannelCredentialsBuilder::new()
             .root_cert(root_ca_certs.clone())
@@ -1581,19 +1546,13 @@ mod remote {
         } else {
           builder.connect(&cas_address)
         }
-      });
-      let channel2 = channel.clone();
-      let channel3 = channel.clone();
-      let byte_stream_client = Resettable::new(move || {
-        Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
-          channel2.get(),
-        ))
-      });
-      let cas_client = Resettable::new(move || {
-        Arc::new(
-          bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(channel3.get()),
-        )
-      });
+      };
+      let byte_stream_client = Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
+        channel.clone(),
+      ));
+      let cas_client = Arc::new(
+        bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(channel.clone()),
+      );
 
       ByteStore {
         byte_stream_client,
@@ -1605,17 +1564,6 @@ mod remote {
         channel,
         authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
       }
-    }
-
-    pub fn with_reset<F>(&self, f: F)
-    where
-      F: FnOnce() -> (),
-    {
-      self.cas_client.with_reset(|| {
-        self
-          .byte_stream_client
-          .with_reset(|| self.channel.with_reset(|| self.env.with_reset(f)))
-      })
     }
 
     fn call_option(&self) -> grpcio::CallOption {
@@ -1644,7 +1592,6 @@ mod remote {
       );
       match self
         .byte_stream_client
-        .get()
         .write_opt(self.call_option().timeout(self.upload_timeout))
       {
         Err(err) => future::err(format!(
@@ -1674,7 +1621,7 @@ mod remote {
               },
             );
 
-          future::ok(self.byte_stream_client.get())
+          future::ok(self.byte_stream_client.clone())
             .join(sender.send_all(stream).map_err(move |e| {
               format!(
                 "Error attempting to upload fingerprint {}: {:?}",
@@ -1709,7 +1656,7 @@ mod remote {
       digest: Digest,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
-      match self.byte_stream_client.get().read_opt(
+      match self.byte_stream_client.read_opt(
         &{
           let mut req = bazel_protos::bytestream::ReadRequest::new();
           req.set_resource_name(format!(
@@ -1728,7 +1675,7 @@ mod remote {
         Ok(stream) => {
           // We shouldn't have to pass around the client here, it's a workaround for
           // https://github.com/pingcap/grpc-rs/issues/123
-          future::ok(self.byte_stream_client.get())
+          future::ok(self.byte_stream_client.clone())
             .join(
               stream.fold(BytesMut::with_capacity(digest.1), move |mut bytes, r| {
                 bytes.extend_from_slice(&r.data);
@@ -1771,7 +1718,6 @@ mod remote {
       }
       self
         .cas_client
-        .get()
         .find_missing_blobs_opt(&request, self.call_option())
         .map_err(|err| {
           format!(
@@ -3164,37 +3110,6 @@ mod tests {
     );
     assert!(is_executable(&materialize_dir.path().join("feed")));
     assert!(!is_executable(&materialize_dir.path().join("food")));
-  }
-
-  #[test]
-  fn works_after_reset() {
-    let dir = TempDir::new().unwrap();
-    let cas = new_cas(1024);
-
-    let testdata = TestData::roland();
-    let testdir = TestDirectory::containing_roland();
-
-    let store = new_store(dir.path(), cas.address());
-
-    // Fetches from remote, so initialises both the local and remote ByteStores:
-    assert_eq!(
-      store.load_file_bytes_with(testdata.digest(), |b| b).wait(),
-      Ok(Some(testdata.bytes()))
-    );
-
-    store.with_reset(|| {});
-
-    // Already exists in local store:
-    assert_eq!(
-      store.load_file_bytes_with(testdata.digest(), |b| b).wait(),
-      Ok(Some(testdata.bytes()))
-    );
-
-    // Requires an RPC:
-    assert_eq!(
-      store.load_directory(testdir.digest()).wait(),
-      Ok(Some(testdir.directory()))
-    );
   }
 
   #[test]

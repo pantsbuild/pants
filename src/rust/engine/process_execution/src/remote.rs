@@ -14,7 +14,6 @@ use futures_timer::Delay;
 use grpcio;
 use hashing::{Digest, Fingerprint};
 use protobuf::{self, Message, ProtobufEnum};
-use resettable::Resettable;
 use sha2::Sha256;
 
 use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
@@ -30,10 +29,10 @@ enum OperationOrStatus {
 pub struct CommandRunner {
   instance_name: Option<String>,
   authorization_header: Option<String>,
-  channel: Resettable<grpcio::Channel>,
-  env: Resettable<Arc<grpcio::Environment>>,
-  execution_client: Resettable<Arc<bazel_protos::remote_execution_grpc::ExecutionClient>>,
-  operations_client: Resettable<Arc<bazel_protos::operations_grpc::OperationsClient>>,
+  channel: grpcio::Channel,
+  env: Arc<grpcio::Environment>,
+  execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
+  operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
 }
 
@@ -62,7 +61,6 @@ impl CommandRunner {
     let stream = try_future!(
       self
         .execution_client
-        .get()
         .execute_opt(&execute_request, self.call_option())
         .map_err(rpcerror_to_string)
     );
@@ -202,7 +200,6 @@ impl super::CommandRunner for CommandRunner {
                           .and_then(move |_| {
                             future::done(
                               operations_client
-                                .get()
                                 .get_operation_opt(&operation_request, command_runner3.call_option())
                                 .or_else(move |err| {
                                   rpcerror_recover_cancelled(operation_request.take_name(), err)
@@ -226,16 +223,6 @@ impl super::CommandRunner for CommandRunner {
       Err(err) => future::err(err).to_boxed(),
     }
   }
-
-  fn with_shutdown(&self, f: &mut FnMut() -> ()) {
-    self.channel.with_reset(|| {
-      self.env.with_reset(|| {
-        self
-          .execution_client
-          .with_reset(|| self.operations_client.with_reset(f))
-      })
-    })
-  }
 }
 
 impl CommandRunner {
@@ -250,10 +237,9 @@ impl CommandRunner {
     thread_count: usize,
     store: Store,
   ) -> CommandRunner {
-    let env = Resettable::new(move || Arc::new(grpcio::Environment::new(thread_count)));
-    let env2 = env.clone();
-    let channel = Resettable::new(move || {
-      let builder = grpcio::ChannelBuilder::new(env2.get());
+    let env = Arc::new(grpcio::Environment::new(thread_count));
+    let channel = {
+      let builder = grpcio::ChannelBuilder::new(env.clone());
       if let Some(ref root_ca_certs) = root_ca_certs {
         let creds = grpcio::ChannelCredentialsBuilder::new()
           .root_cert(root_ca_certs.clone())
@@ -262,19 +248,13 @@ impl CommandRunner {
       } else {
         builder.connect(&address)
       }
-    });
-    let channel2 = channel.clone();
-    let channel3 = channel.clone();
-    let execution_client = Resettable::new(move || {
-      Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
-        channel2.get(),
-      ))
-    });
-    let operations_client = Resettable::new(move || {
-      Arc::new(bazel_protos::operations_grpc::OperationsClient::new(
-        channel3.get(),
-      ))
-    });
+    };
+    let execution_client = Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
+      channel.clone(),
+    ));
+    let operations_client = Arc::new(bazel_protos::operations_grpc::OperationsClient::new(
+      channel.clone(),
+    ));
 
     CommandRunner {
       instance_name,

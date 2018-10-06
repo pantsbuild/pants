@@ -170,7 +170,7 @@ impl Core {
       self.graph.with_exclusive(|| {
         self
           .fs_pool
-          .with_shutdown(|| self.store_and_command_runner.with_reset(|| f()))
+          .with_shutdown(|| self.store_and_command_runner.with_reset(f))
       })
     });
     self

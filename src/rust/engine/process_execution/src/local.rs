@@ -298,14 +298,6 @@ impl super::CommandRunner for CommandRunner {
       })
       .to_boxed()
   }
-
-  fn with_shutdown(&self, f: &mut FnMut() -> ()) {
-    // TODO: Although we have a Resettable<CpuPool>, we do not shut it down, because our caller
-    // will (and attempting to shut things down twice guarantees a deadlock because Resettable is
-    // not reentrant). This is fragile, and it would be nice to have type safety to prevent that
-    // case.
-    self.store.with_reset(f)
-  }
 }
 
 #[cfg(test)]

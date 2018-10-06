@@ -16,7 +16,6 @@ grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355d
 hashing = { path = "../hashing" }
 log = "0.4"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
-resettable = { path = "../resettable" }
 sha2 = "0.7"
 tempfile = "3"
 futures-timer = "0.1"
