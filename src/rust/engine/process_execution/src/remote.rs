@@ -1591,6 +1591,7 @@ mod tests {
       cas.address(),
       None,
       None,
+      None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
@@ -1600,7 +1601,7 @@ mod tests {
       .wait()
       .expect("Saving file bytes to store");
 
-    let result = CommandRunner::new(mock_server.address(), None, None, 1, store)
+    let result = CommandRunner::new(mock_server.address(), None, None, None, 1, store)
       .run(cat_roland_request())
       .wait();
     assert_eq!(
