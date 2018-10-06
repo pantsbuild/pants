@@ -4,6 +4,82 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.11.0.dev2 (10/05/2018)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+* Support uploading stats to multiple endpoints. (#6599)
+  `PR #6599 <https://github.com/pantsbuild/pants/pull/6599>`_
+
+New features
+~~~~~~~~~~~~
+
+Bugfixes
+~~~~~~~~
+* Store verifies digest lengths internally (#6588)
+  `PR #6588 <https://github.com/pantsbuild/pants/pull/6588>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update the "hello world" plugin doc. (#6601)
+  `PR #6601 <https://github.com/pantsbuild/pants/pull/6601>`_
+
+
+
+
+
+
+
+
+
+* Allow authentication to grpc APIs with oauth bearer tokens (#6581)
+  `PR #6581 <https://github.com/pantsbuild/pants/pull/6581>`_
+
+* More pinning to fix jupyter floats. (#6600)
+  `PR #6600 <https://github.com/pantsbuild/pants/pull/6600>`_
+
+* Handle RPC errors as well as message-inline errors (#6589)
+  `PR #6589 <https://github.com/pantsbuild/pants/pull/6589>`_
+
+* Add hello world plugin to documentation (#6587)
+  `PR #6587 <https://github.com/pantsbuild/pants/pull/6587>`_
+
+* Fix extra_jvm_options for `jvm_app` targets (#6572)
+  `PR #6572 <https://github.com/pantsbuild/pants/pull/6572>`_
+
+* Don't immediately fail after a MacOS upgrade. (#6591)
+  `PR #6591 <https://github.com/pantsbuild/pants/pull/6591>`_
+
+* Support secure grpc connections (#6584)
+  `PR #6584 <https://github.com/pantsbuild/pants/pull/6584>`_
+
+* Allow instance name to be set for remote executions (#6580)
+  `PR #6580 <https://github.com/pantsbuild/pants/pull/6580>`_
+
+* Enhance the login task. (#6586)
+  `PR #6586 <https://github.com/pantsbuild/pants/pull/6586>`_
+
+* Improve Noop resolution performance (#6577)
+  `PR #6577 <https://github.com/pantsbuild/pants/pull/6577>`_
+
+* StubCAS is built with a builder (#6582)
+  `PR #6582 <https://github.com/pantsbuild/pants/pull/6582>`_
+
+* Use uuid v4 in field which is specified to be a uuid v4 (#6576)
+  `PR #6576 <https://github.com/pantsbuild/pants/pull/6576>`_
+
+
+
+
+
+
+
+
+
+
 1.11.0.dev1 (09/28/2018)
 ------------------------
 
