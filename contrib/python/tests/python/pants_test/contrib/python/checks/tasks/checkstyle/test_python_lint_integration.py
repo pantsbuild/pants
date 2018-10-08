@@ -1,26 +1,33 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class PythonReplIntegrationTest(PantsRunIntegrationTest):
+class PythonLintIntegrationTest(PantsRunIntegrationTest):
 
-  TESTPROJECT = "./pants lint testprojects/src/python/interpreter_selection/python_3_selection_testing{}"
+  TESTPROJECT = "testprojects/src/python/interpreter_selection/python_3_selection_testing{}"
 
-  @ensure_daemon
-  def test_run_lint_py2_only(self):
-    command = ['lint', TESTPROJECT.format(':main_py2')]
+  def test_lint_runs_for_py2_only(self):
+    command = ['lint', self.TESTPROJECT.format(':main_py2')]
     pants_run = self.run_pants(command=command)
-    output_lines = pants_run.stdout_data.rstrip().split('\n')
-    self.assertIn('Success', output_lines)
+    self.assertIn('Style issues found', pants_run.stdout_data)
 
-  @ensure_daemon
+  def test_lint_skips_for_py3_only(self):
+    command = ['lint', self.TESTPROJECT.format(':main_py3')]
+    pants_run = self.run_pants(command=command)
+    # Verify Python 3 lint is skipped.
+    self.assertIn('Linting is currently disabled', pants_run.stdout_data)
+    # Identify that the Python 2 targets are not linted.
+    self.assertNotIn('Style issues found', pants_run.stdout_data)
+
   def test_lint_fails_on_incompatible_closure(self):
-    command = ['lint', TESTPROJECT.format('::')]
+    command = ['lint', self.TESTPROJECT.format('::')]
     pants_run = self.run_pants(command=command)
-    output_lines = pants_run.stdout_data.rstrip().split('\n')
-    self.assertIn('Failed', output_lines)
+    # Verify Python 3 lint is skipped.
+    self.assertIn('Linting is currently disabled', pants_run.stdout_data)
+    # Identify that the Python 2 targets are linted.
+    self.assertIn('Style issues found', pants_run.stdout_data)

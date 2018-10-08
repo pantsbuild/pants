@@ -16,7 +16,6 @@ from pants.base.exceptions import TaskError
 from pants.option.custom_types import file_option
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.task.task import Task
-from pex.interpreter import PythonInterpreter
 
 from pants.contrib.python.checks.tasks.checkstyle.common import CheckSyntaxError, Nit, PythonFile
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
@@ -57,10 +56,6 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
   @classmethod
   def subsystem_dependencies(cls):
     return super(Task, cls).subsystem_dependencies() + cls._subsystems
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    round_manager.require_data(PythonInterpreter)
 
   @classmethod
   def register_options(cls, register):
@@ -186,17 +181,34 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
     interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
                                                PythonRepos.global_instance(),
                                                logger=self.context.log.debug)
-    interpreter = interpreter_cache.select_interpreter_for_targets(targets)
-    # Check interpreter is not 'None' for test cases that do not
-    # run the python interpreter selection task.
-    if interpreter and interpreter.version >= (3, 0 ,0):
-      self.context.log.info('Linting is currently disabled for Python 3 targets.\n '
+    tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility(python_tgts)
+
+    # Check for Python 3-only constraints.
+    context_has_py3_targets = False
+    for constraint in tgts_by_compatibility.copy():
+      if '>3' in str(constraint) or '>=3' in str(constraint):
+        context_has_py3_targets = True
+        del tgts_by_compatibility[constraint]
+
+    if context_has_py3_targets:
+      self.context.log.info('Linting is currently disabled for Python 3 targets.\n'
+                            'They have been filtered out of the target set for this lint run.\n'
                             'See https://github.com/pantsbuild/pants/issues/5764 for '
-                            'long-term solution tracking.')
+                            'long-term solution tracking.\n\n')
+
+    # The target dict is empty, meaning the current context has only Python 3 targets.
+    if not tgts_by_compatibility:
       return
 
+    # Flatten the targets list into a single list of targets.
+    targets = []
+    for tgts in tgts_by_compatibility.values():
+      targets.extend(tgts)
+
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
-      sources = self.calculate_sources([vt.target for vt in invalidation_check.invalid_vts])
+      sources = self.calculate_sources(
+        [vt.target for vt in invalidation_check.invalid_vts if vt.target in targets]
+      )
       if sources:
         return self.checkstyle(sources)
 
