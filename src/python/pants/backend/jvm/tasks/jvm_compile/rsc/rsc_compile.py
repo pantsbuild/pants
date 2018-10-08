@@ -8,7 +8,6 @@ import functools
 import json
 import logging
 import os
-import re
 
 from six import text_type
 
@@ -260,10 +259,7 @@ class RscCompile(ZincCompile):
       if not hit_cache:
         cp_entries = []
 
-        # Include the current machine's jdk lib jars. This'll blow up remotely.
-        # We need a solution for that.
-        # Probably something to do with https://github.com/pantsbuild/pants/pull/6346
-        distribution = JvmPlatform.preferred_jvm_distribution([ctx.target.platform], strict=True)
+        distribution = self._get_jvm_distribution()
         jvm_lib_jars_abs = distribution.find_libs(['rt.jar', 'dt.jar', 'jce.jar', 'tools.jar'])
         cp_entries.extend(jvm_lib_jars_abs)
 
@@ -325,7 +321,7 @@ class RscCompile(ZincCompile):
             args,
             distribution,
             tgt=tgt,
-            input_files=(scalac_classpath_path_entries + classpath_rel),
+            input_files=tuple(scalac_classpath_path_entries + classpath_rel),
             output_dir=rsc_index_dir)
           metacp_stdout = stdout_contents(metacp_wu)
           metacp_result = json.loads(metacp_stdout)
@@ -410,12 +406,7 @@ class RscCompile(ZincCompile):
 
       cp_entries = []
 
-      # Include the current machine's jdk lib jars. This'll blow up remotely.
-      # We need a solution for that.
-      # Probably something to do with https://github.com/pantsbuild/pants/pull/6346
-      # TODO perhaps determine the platform of the jar and use that here.
-      # https://github.com/pantsbuild/pants/issues/6547
-      distribution = JvmPlatform.preferred_jvm_distribution([], strict=True)
+      distribution = self._get_jvm_distribution()
       jvm_lib_jars_abs = distribution.find_libs(['rt.jar', 'dt.jar', 'jce.jar', 'tools.jar'])
       cp_entries.extend(jvm_lib_jars_abs)
 
@@ -428,6 +419,7 @@ class RscCompile(ZincCompile):
         'compile_classpath',
         ctx.target,
         extra_cp_entries=self._extra_compile_time_classpath)
+      dependency_classpath = fast_relpath_collection(dependency_classpath)
       classpath_rel = fast_relpath_collection(classpath_abs)
       cp_entries.extend(classpath_rel)
 
@@ -470,7 +462,7 @@ class RscCompile(ZincCompile):
           args,
           distribution,
           tgt=tgt,
-          input_files=(scalac_classpath_path_entries + classpath_rel),
+          input_files=tuple(dependency_classpath + scalac_classpath_path_entries + classpath_rel),
           output_dir=rsc_index_dir)
         metacp_stdout = stdout_contents(metacp_wu)
         metacp_result = json.loads(metacp_stdout)
@@ -679,12 +671,14 @@ class RscCompile(ZincCompile):
 
         epr = ExecuteProcessRequest(
           argv=tuple(cmd),
-          env=dict(),
           input_files=input_files_directory_digest,
           output_files=tuple(),
           output_directories=(output_dir,),
           timeout_seconds=15*60,
-          description='run {} for {}'.format(tool_name, tgt)
+          description='run {} for {}'.format(tool_name, tgt),
+          # TODO: These should always be unicodes
+          # Since this is always hermetic, we need to use `underlying_dist`
+          jdk_home=text_type(self._zinc.underlying_dist.home),
         )
         res = self.context.execute_process_synchronously_without_raising(
           epr,
@@ -710,7 +704,9 @@ class RscCompile(ZincCompile):
                               jvm_options=self.get_options().jvm_options,
                               args=args,
                               workunit_name=tool_name,
-                              workunit_labels=[WorkUnitLabel.TOOL])
+                              workunit_labels=[WorkUnitLabel.TOOL],
+                              dist=distribution
+        )
         if result != 0:
           raise TaskError('Running {} failed'.format(tool_name))
         runjava_wu = None
@@ -747,21 +743,26 @@ class RscCompile(ZincCompile):
       output_dir=rsc_index_dir
     )
 
-  def _collect_metai_classpath(self, metacp_result, classpath_rel, jvm_lib_jars_abs):
+  def _collect_metai_classpath(self, metacp_result, classpath_rel, jvm_lib_jars):
     metai_classpath = []
-    def desandboxify_pantsd_loc(path):
-      # TODO come up with a cleaner way to maybe relpath paths.
-      try:
-        path = fast_relpath(path, get_buildroot())
-      except Exception:
-        pass
-      pattern = 'process-execution[^{}]+/'.format(re.escape(os.path.sep))
-      return re.split(pattern, path)[-1]
 
-    # TODO when these are generated once, we won't need to collect them here.
-    metai_classpath.append(desandboxify_pantsd_loc(metacp_result["scalaLibrarySynthetics"]))
-    # NB The json is absolute pathed pointing into either the buildroot or
+    # NB The json uses absolute paths pointing into either the buildroot or
     #    the temp directory of the hermetic build. This relativizes the keys.
+    prefix = None
+    for an_abs_result_path in metacp_result["status"].keys():
+      for rel_input_path in (classpath_rel + jvm_lib_jars):
+        if an_abs_result_path.endswith(rel_input_path):
+          prefix = an_abs_result_path[:-len(rel_input_path)]
+          break
+      if prefix:
+        break
+
+    def desandboxify_pantsd_loc(path):
+      if path.startswith(prefix):
+        return path[len(prefix):]
+      else:
+        return path
+
     status_elements = {
       desandboxify_pantsd_loc(k): v
       for k,v in metacp_result["status"].items()
@@ -769,6 +770,37 @@ class RscCompile(ZincCompile):
 
     for cp_entry in classpath_rel:
       metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
-    for cp_entry in jvm_lib_jars_abs:
+    for cp_entry in jvm_lib_jars:
       metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
+
+    # TODO when these are generated once, we won't need to collect them here.
+    metai_classpath.append(desandboxify_pantsd_loc(metacp_result["scalaLibrarySynthetics"]))
+
     return metai_classpath
+
+  def _get_jvm_distribution(self):
+    # TODO We may want to use different jvm distributions depending on what
+    # java version the target expects to be compiled against.
+    # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
+    #      different jdks in remote builds.
+    local_distribution = JvmPlatform.preferred_jvm_distribution([], strict=True)
+    if self.execution_strategy == self.HERMETIC:
+      class HermeticDistribution(object):
+        def __init__(self, home_path, distribution):
+          self._underlying = distribution
+          self._home = home_path
+
+        def find_libs(self, names):
+          underlying_libs = self._underlying.find_libs(names)
+          return [self._rehome(l) for l in underlying_libs]
+
+        @property
+        def java(self):
+          return os.path.join(self._home, 'bin', 'java')
+
+        def _rehome(self, l):
+          return os.path.join(self._home, l[len(self._underlying.home)+1:])
+
+      return HermeticDistribution('.jdk', local_distribution)
+    else:
+      return local_distribution
