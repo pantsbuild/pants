@@ -11,6 +11,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.util.osutil import safe_kill
 from pants.util.strutil import safe_shlex_split
 
 
@@ -51,8 +52,6 @@ class PythonRun(PythonExecutionTaskBase):
             msg = '{cmdline} ... exited non-zero ({code})'.format(cmdline=cmdline, code=result)
             raise TaskError(msg, exit_code=result)
         except KeyboardInterrupt:
-          # TODO: The process may still have exited, even if we were
-          # interrupted. pants.util.osutil.safe_kill will catch ESRCH, which may be more appropriate
-          # here.
-          po.send_signal(signal.SIGINT)
+          # The process may still have exited, even if we were interrupted.
+          safe_kill(po.pid, signal.SIGINT)
           raise
