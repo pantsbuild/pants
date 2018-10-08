@@ -12,7 +12,6 @@ from pex.fetcher import Fetcher
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
-from pants.backend.python.pex_util import expand_and_maybe_adjust_platform
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -160,7 +159,7 @@ def resolve_multi(interpreter, requirements, platforms, find_links):
       requirements=[req.requirement for req in requirements],
       interpreter=interpreter,
       fetchers=fetchers,
-      platform=expand_and_maybe_adjust_platform(interpreter=interpreter, platform=platform),
+      platform=platform,
       context=python_repos.get_network_context(),
       cache=requirements_cache_dir,
       cache_ttl=python_setup.resolver_cache_ttl,

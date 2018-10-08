@@ -26,9 +26,9 @@ class PythonSetup(Subsystem):
                   "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
                   "be ORed together. These constraints are applied in addition to any "
                   "compatibilities required by the relevant targets.")
-    register('--setuptools-version', advanced=True, default='33.1.1',
+    register('--setuptools-version', advanced=True, default='40.4.3',
              help='The setuptools version for this python environment.')
-    register('--wheel-version', advanced=True, default='0.29.0',
+    register('--wheel-version', advanced=True, default='0.31.1',
              help='The wheel version for this python environment.')
     register('--platforms', advanced=True, type=list, metavar='<platform>', default=['current'],
              help='A list of platforms to be supported by this python environment. Each platform'
