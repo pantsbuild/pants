@@ -315,6 +315,9 @@ class TestBase(unittest.TestCase):
       'read_from': [],
       'write_to': [],
     }
+    self.options['python-setup'] = {
+      'interpreter_constraints': ["CPython>=2.7,<3"]
+    }
 
     self._build_configuration = self.build_config()
     self._build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
