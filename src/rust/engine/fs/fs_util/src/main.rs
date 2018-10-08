@@ -182,6 +182,16 @@ to this directory.",
             true,
           )),
       )
+        .subcommand(
+          SubCommand::with_name("gc")
+              .about("Garbage collect the on-disk store. Note that after running this command, any processes with an open store (e.g. a pantsd) may need to re-initialize their store.")
+              .arg(
+                Arg::with_name("target-size-bytes")
+                    .takes_value(true)
+                    .long("target-size-bytes")
+                    .required(true),
+              )
+        )
       .arg(
         Arg::with_name("local-store-path")
           .takes_value(true)
@@ -481,6 +491,12 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           ExitCode::NotFound,
         )),
       }
+    }
+    ("gc", Some(args)) => {
+      let target_size_bytes = value_t!(args.value_of("target-size-bytes"), usize)
+        .expect("--target-size-bytes must be passed as a non-negative integer");
+      store.garbage_collect(target_size_bytes, fs::ShrinkBehavior::Compact)?;
+      Ok(())
     }
 
     (_, _) => unimplemented!(),
