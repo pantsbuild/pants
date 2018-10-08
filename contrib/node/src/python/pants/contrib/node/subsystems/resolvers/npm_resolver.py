@@ -107,11 +107,13 @@ class NpmResolver(Subsystem, NodeResolverBase):
       # Copy the package.json and then remove the file: dependencies from package.json
       # Run the install and symlink the file: dependencies using their node_paths
       # Afterwards, restore the original package.json to not cause diff changes when resolve_locally=True
+      # The file mutation is occuring in place and the package.json may potentially not be restored here
+      # if the process is closed.
       with safe_temp_edit('package.json') as package_json:
         with open(package_json, 'r') as package_json_file:
           json_data = json.load(package_json_file)
-          source_deps = { k : v for k,v in json_data.get('dependencies', {}).items() if v.startswith('file:')}
-          third_party_deps = { k : v for k,v in json_data.get('dependencies', {}).items() if not v.startswith('file:')}
+          source_deps = { k : v for k,v in json_data.get('dependencies', {}).items() if self.parse_file_path(v)}
+          third_party_deps = { k : v for k,v in json_data.get('dependencies', {}).items() if not self.parse_file_path(v)}
           json_data['dependencies'] = third_party_deps
 
         # TODO(6489): Currently the file: dependencies need to be duplicated in BUILD.

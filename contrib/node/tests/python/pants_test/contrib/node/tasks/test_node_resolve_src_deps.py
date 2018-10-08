@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -39,10 +39,7 @@ class NodeResolveSourceDepsTest(TaskTestBase):
       context.products.require_data(product_type)
 
   def _create_trans_dep(self):
-    """Create a transitive dependency target
-
-    :param with_trans_dep: If true, assumes that trans_dep is already created and links
-    """
+    """Create a transitive dependency target"""
     self.create_file('src/node/trans_dep/yarn.lock')
     self.create_file('src/node/trans_dep/package.json', contents=dedent("""
       {
@@ -293,7 +290,7 @@ class NodeResolveSourceDepsTest(TaskTestBase):
     expected = os.path.relpath(app_bin_dep_path, dep_bin_path)
     self.assertEqual(relative_path, expected)
  
-  def test_resolve_transitive_deps(self):
+  def test_resolve_and_run_transitive_deps(self):
     trans_dep = self._create_trans_dep()
     dep = self._create_dep(trans_dep=trans_dep, provide_bin=True, use_bin_dict=True)
     app = self._create_app(dep)
@@ -314,7 +311,8 @@ class NodeResolveSourceDepsTest(TaskTestBase):
   def test_file_dependency_not_found_in_build_graph(self):
     dep = self._create_dep()
     app = self._create_app(dep, dep_not_found=True)
-    with self.assertRaises(TaskError):
+    error_msg = 'Local dependency in package.json not found in the build graph.'
+    with self.assertRaisesRegexp(TaskError, error_msg):
       self._resolve_target(app)
 
   def test_file_dependency_not_supported_npm(self):
