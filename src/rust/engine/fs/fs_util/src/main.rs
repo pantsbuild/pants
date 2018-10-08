@@ -264,7 +264,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           Store::with_remote(
             &store_dir,
             pool.clone(),
-            cas_address.to_owned(),
+            cas_address,
             top_match
               .value_of("remote-instance_name")
               .map(str::to_owned),

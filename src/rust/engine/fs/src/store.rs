@@ -79,7 +79,7 @@ impl Store {
   pub fn with_remote<P: AsRef<Path>>(
     path: P,
     pool: Arc<ResettablePool>,
-    cas_address: String,
+    cas_address: &str,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
@@ -1527,7 +1527,7 @@ mod remote {
 
   impl ByteStore {
     pub fn new(
-      cas_address: String,
+      cas_address: &str,
       instance_name: Option<String>,
       root_ca_certs: Option<Vec<u8>>,
       oauth_bearer_token: Option<String>,
@@ -1538,13 +1538,13 @@ mod remote {
       let env = Arc::new(grpcio::Environment::new(thread_count));
       let channel = {
         let builder = grpcio::ChannelBuilder::new(env.clone());
-        if let Some(ref root_ca_certs) = root_ca_certs {
+        if let Some(root_ca_certs) = root_ca_certs {
           let creds = grpcio::ChannelCredentialsBuilder::new()
-            .root_cert(root_ca_certs.clone())
+            .root_cert(root_ca_certs)
             .build();
-          builder.secure_connect(&cas_address, creds)
+          builder.secure_connect(cas_address, creds)
         } else {
-          builder.connect(&cas_address)
+          builder.connect(cas_address)
         }
       };
       let byte_stream_client = Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
@@ -1883,7 +1883,7 @@ mod remote {
       let cas = StubCAS::empty();
 
       let store = ByteStore::new(
-        cas.address(),
+        &cas.address(),
         None,
         None,
         None,
@@ -1958,7 +1958,7 @@ mod remote {
     #[test]
     fn write_connection_error() {
       let store = ByteStore::new(
-        "doesnotexist.example".to_owned(),
+        "doesnotexist.example",
         None,
         None,
         None,
@@ -2021,7 +2021,7 @@ mod remote {
 
     fn new_byte_store(cas: &StubCAS) -> ByteStore {
       ByteStore::new(
-        cas.address(),
+        &cas.address(),
         None,
         None,
         None,
@@ -2142,7 +2142,7 @@ mod tests {
     Store::with_remote(
       dir,
       Arc::new(ResettablePool::new("test-pool-".to_string())),
-      cas_address,
+      &cas_address,
       None,
       None,
       None,
@@ -2845,7 +2845,7 @@ mod tests {
     let store_with_remote = Store::with_remote(
       dir.path(),
       Arc::new(ResettablePool::new("test-pool-".to_string())),
-      cas.address(),
+      &cas.address(),
       Some("dark-tower".to_owned()),
       None,
       None,
@@ -2871,7 +2871,7 @@ mod tests {
     let store_with_remote = Store::with_remote(
       dir.path(),
       Arc::new(ResettablePool::new("test-pool-".to_string())),
-      cas.address(),
+      &cas.address(),
       Some("dark-tower".to_owned()),
       None,
       None,
@@ -2914,7 +2914,7 @@ mod tests {
     let store_with_remote = Store::with_remote(
       dir.path(),
       Arc::new(ResettablePool::new("test-pool-".to_string())),
-      cas.address(),
+      &cas.address(),
       None,
       None,
       Some("Armory.Key".to_owned()),
@@ -2940,7 +2940,7 @@ mod tests {
     let store_with_remote = Store::with_remote(
       dir.path(),
       Arc::new(ResettablePool::new("test-pool-".to_string())),
-      cas.address(),
+      &cas.address(),
       None,
       None,
       Some("Armory.Key".to_owned()),

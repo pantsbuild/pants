@@ -96,7 +96,7 @@ impl Core {
           Some(ref address) => Store::with_remote(
             store_path,
             fs_pool2.clone(),
-            address.clone(),
+            address,
             remote_instance_name.clone(),
             root_ca_certs.clone(),
             oauth_bearer_token.clone(),
@@ -109,7 +109,7 @@ impl Core {
 
       let underlying_command_runner: Box<CommandRunner> = match &remote_execution_server {
         Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
-          address.clone(),
+          address,
           remote_instance_name.clone(),
           root_ca_certs.clone(),
           oauth_bearer_token.clone(),
