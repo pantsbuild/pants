@@ -233,12 +233,8 @@ Then, refer to the set in the target that needs analyzing like below:
       ],
     )
 
-Now the target is ready to compile, but the output will be squelched by Zinc. To avoid this, add
-`--compile-zinc-args="+['-log-level', 'info']"` when compiling the target. The Pants invoke will
-look like this:
-
-    :::bash
-    $ ./pants compile --compile-zinc-args="+['-log-level', 'info']" <target>
+Now the target is ready to compile. Please note Zinc's log level. Zinc may squelch the
+output if it is set to `warn`, but `info` will allow output from scalac. 
 
 Toolchain
 ---------
