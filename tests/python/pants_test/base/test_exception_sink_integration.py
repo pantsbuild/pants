@@ -75,7 +75,9 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
   def _assert_graceful_signal_log_matches(self, pid, signum, contents):
     self.assertRegexpMatches(contents, """\
 timestamp: ([^\n]+)
-args: ([^\n]+)
+process title: ([^\n]+)
+sys\\.argv: ([^\n]+)
+bootstrap options: ([^\n]+)
 pid: {pid}
 Signal {signum} was raised\\. Exiting with failure\\.
 \\(backtrace omitted\\)

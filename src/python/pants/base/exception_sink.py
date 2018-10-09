@@ -13,7 +13,7 @@ import sys
 import traceback
 from builtins import object, str
 
-from setproctitle import getproctitle as get_process_title
+import setproctitle
 
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -259,7 +259,7 @@ pid: {pid}
     bootstrap_fmt = cls._bootstrap_options.debug_dump() if cls._bootstrap_options else '<none>'
     return cls._EXCEPTION_LOG_FORMAT.format(
       timestamp=cls._iso_timestamp_for_now(),
-      process_title=get_process_title(),
+      process_title=setproctitle.getproctitle(),
       args=sys.argv,
       bootstrap_options=bootstrap_fmt,
       pid=pid,

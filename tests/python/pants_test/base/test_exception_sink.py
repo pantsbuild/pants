@@ -61,7 +61,8 @@ class TestExceptionSink(TestBase):
 
   @mock.patch('setproctitle.getproctitle', autospec=True, spec_set=True)
   def test_log_exception(self, getproctitle_mock):
-    getproctitle_mock.return_value = 'wow'
+    fake_process_title = 'wow'
+    getproctitle_mock.return_value = fake_process_title
     sink = self._gen_sink_subclass()
     pid = os.getpid()
     bs_options = {
@@ -89,12 +90,14 @@ class TestExceptionSink(TestBase):
       # We only logged a single error, so the files should both contain only that single log entry.
       err_rx = """\
 timestamp: ([^\n]+)
-process title: wow
+process title: {fake_process_title}
 sys.argv: ([^\n]+)
 bootstrap options: <fake options\\(<with value map = {bs_options!r}>\\)>
 pid: {pid}
 XXX
-""".format(pid=pid, bs_options=bs_options[GLOBAL_SCOPE])
+""".format(fake_process_title=fake_process_title,
+           bs_options=bs_options[GLOBAL_SCOPE],
+           pid=pid)
       with open(cur_process_error_log_path, 'r') as cur_pid_file:
         self.assertRegexpMatches(cur_pid_file.read(), err_rx)
       with open(shared_error_log_path, 'r') as shared_log_file:
