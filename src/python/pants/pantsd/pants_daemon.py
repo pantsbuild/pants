@@ -365,14 +365,11 @@ class PantsDaemon(FingerprintedProcessManager):
     with self._pantsd_logging() as log_stream:
       # We don't have any stdio streams to log to anymore, but we can get tracebacks of the pantsd
       # process by tailing the pantsd log and sending it SIGUSR2.
+      ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
       ExceptionSink.reset_interactive_output_stream(log_stream)
       global_bootstrap_options = self._bootstrap_options.for_global_scope()
       ExceptionSink.reset_bootstrap_options(global_bootstrap_options)
       ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
-      pantsd_exiter = Exiter(
-        exiter=os._exit,
-        print_backtraces=global_bootstrap_options.print_exception_stacktrace)
-      ExceptionSink.reset_exiter(pantsd_exiter)
       self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
       self._native.set_panic_handler()

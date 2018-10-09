@@ -61,21 +61,23 @@ class TestExceptionSink(TestBase):
     with self.assertRaisesRegexp(ExceptionSink.ExceptionSinkError, err_rx):
       sink.reset_log_location('/')
 
-  @mock.patch('setproctitle.getproctitle', autospec=True, spec_set=True)
-  def test_log_exception(self, getproctitle_mock):
-    fake_process_title = 'wow'
-    getproctitle_mock.return_value = fake_process_title
+  def _assert_log_exception(self, msg, fake_process_title, bootstrap_options=None):
     sink = self._gen_sink_subclass()
     pid = os.getpid()
-    bs_options = {
-      GLOBAL_SCOPE: { 'some_option_name': 'option_value' }
-    }
+
     with temporary_dir() as tmpdir:
       # Check that tmpdir exists, and log an exception into that directory.
-      bs_option_values = create_options(bs_options).for_global_scope()
-      sink.reset_bootstrap_options(bs_option_values)
+      if bootstrap_options:
+        bs_option_values = create_options(bootstrap_options).for_global_scope()
+        sink.reset_bootstrap_options(bs_option_values)
       sink.reset_log_location(tmpdir)
-      sink.log_exception('XXX')
+
+      with mock.patch('setproctitle.getproctitle', autospec=True, spec_set=True) \
+           as getproctitle_mock:
+        getproctitle_mock.return_value = fake_process_title
+        sink.log_exception(msg)
+        getproctitle_mock.assert_called_once()
+
       # This should have created two log files, one specific to the current pid.
       self.assertEqual(os.listdir(tmpdir), ['logs'])
 
@@ -87,23 +89,33 @@ class TestExceptionSink(TestBase):
       # Ensure we're creating two separate files.
       self.assertNotEqual(cur_process_error_log_path, shared_error_log_path)
 
-      getproctitle_mock.assert_called_once()
-
       # We only logged a single error, so the files should both contain only that single log entry.
+      if bootstrap_options is None:
+        msg_bootstrap_options = '<none>'
+      else:
+        msg_bootstrap_options = ('<fake options(<with value map = {!r}>)>'
+                                 .format(bootstrap_options[GLOBAL_SCOPE]))
       err_rx = """\
 timestamp: ([^\n]+)
 process title: {fake_process_title}
 sys.argv: ([^\n]+)
-bootstrap options: <fake options\\(<with value map = {bs_options!r}>\\)>
+bootstrap options: {bootstrap_options}
 pid: {pid}
-XXX
-""".format(fake_process_title=fake_process_title,
-           bs_options=bs_options[GLOBAL_SCOPE],
-           pid=pid)
+{msg}
+""".format(fake_process_title=re.escape(fake_process_title),
+           bootstrap_options=re.escape(msg_bootstrap_options),
+           pid=pid,
+           msg=msg)
       with open(cur_process_error_log_path, 'r') as cur_pid_file:
         self.assertRegexpMatches(cur_pid_file.read(), err_rx)
       with open(shared_error_log_path, 'r') as shared_log_file:
         self.assertRegexpMatches(shared_log_file.read(), err_rx)
+
+  def test_log_exception(self):
+    self._assert_log_exception(msg='XXX', fake_process_title='fake1', bootstrap_options=None)
+    self._assert_log_exception(msg='YYY', fake_process_title='fake2', bootstrap_options={
+      GLOBAL_SCOPE: { 'some_option_name': 'option_value' }
+    })
 
   def test_backup_logging_on_fatal_error(self):
     sink = self._gen_sink_subclass()

@@ -77,9 +77,16 @@ class ExceptionSink(object):
   class ExceptionSinkError(Exception): pass
 
   @classmethod
-  def reset_bootstrap_options(cls, new_bootstrap_options):
-    """???"""
-    cls._bootstrap_options = new_bootstrap_options
+  def reset_bootstrap_options(cls, new_bootstrap_option_values):
+    """Set the bootstrap option values held by this singleton.
+
+    The option values are used to provide more context in a fatal error log entry, and to determine
+    whether to print the exception stacktrace to the terminal on exit.
+
+    Class state:
+    - Overwrites `cls._bootstrap_options`.
+    """
+    cls._bootstrap_options = new_bootstrap_option_values
 
   # All reset_* methods are ~idempotent!
   @classmethod
@@ -307,6 +314,13 @@ timestamp: {timestamp}
                      msg=formatted_terminal_msg,
                      out=cls._interactive_output_stream)
 
+  @classproperty
+  def _should_print_backtrace(cls):
+    if cls._bootstrap_options:
+      return cls._bootstrap_options.print_exception_stacktrace
+    else:
+      return True
+
   @classmethod
   def _log_unhandled_exception_and_exit(cls, exc_class=None, exc=None, tb=None, add_newline=False):
     """A sys.excepthook implementation which logs the error and exits with failure."""
@@ -328,7 +342,7 @@ timestamp: {timestamp}
     # Exiter's should_print_backtrace field).
     stderr_printed_error = cls._format_unhandled_exception_log(
       exc, tb, add_newline,
-      should_print_backtrace=cls._exiter.should_print_backtrace)
+      should_print_backtrace=cls._should_print_backtrace)
     if extra_err_msg:
       stderr_printed_error = '{}\n{}'.format(stderr_printed_error, extra_err_msg)
     cls._exit_with_failure(stderr_printed_error)
@@ -363,7 +377,7 @@ Signal {signum} was raised. Exiting with failure.
 
     # Format a message to be printed to the terminal or other interactive stream, if applicable.
     formatted_traceback_for_terminal = cls._format_traceback(
-      tb, should_print_backtrace=cls._exiter.should_print_backtrace and bool(tb))
+      tb, should_print_backtrace=cls._should_print_backtrace and bool(tb))
     terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
       formatted_traceback=formatted_traceback_for_terminal)
@@ -372,9 +386,9 @@ Signal {signum} was raised. Exiting with failure.
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
-# Sets fatal signal handlers with reasonable defaults to catch errors early in startup.
+# Sets fatal signal handlers with /reasonable defaults to catch errors early in startup.
 ExceptionSink.reset_log_location(os.path.join(get_buildroot(), '.pants.d'))
 # Sets except hook.
-ExceptionSink.reset_exiter(Exiter(print_backtraces=True))
+ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
 ExceptionSink.reset_interactive_output_stream(sys.stderr)

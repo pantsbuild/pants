@@ -32,13 +32,12 @@ class PantsRunner(object):
     self._start_time = start_time
 
   def run(self):
+    ExceptionSink.reset_exiter(self._exiter)
     options_bootstrapper = OptionsBootstrapper(env=self._env, args=self._args)
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
     global_bootstrap_options = bootstrap_options.for_global_scope()
-    ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
     ExceptionSink.reset_bootstrap_options(global_bootstrap_options)
-    self._exiter.should_print_backtrace = global_bootstrap_options.print_exception_stacktrace
-    ExceptionSink.reset_exiter(self._exiter)
+    ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
 
     if bootstrap_options.for_global_scope().enable_pantsd:
       try:

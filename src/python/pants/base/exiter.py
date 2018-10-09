@@ -26,11 +26,9 @@ class Exiter(object):
    4) Call Exiter.exit(), Exiter.exit_and_fail() or exiter_inst() when you wish to exit the runtime.
   """
 
-  def __init__(self, exiter=sys.exit, print_backtraces=True):
+  def __init__(self, exiter=sys.exit):
     """
     :param func exiter: A function to be called to conduct the final exit of the runtime. (Optional)
-    :param bool print_backtraces: Whether or not to print backtraces by default. Can be
-                                  overridden by Exiter.apply_options(). (Optional)
     """
     # Since we have some exit paths that run via the sys.excepthook,
     # symbols we use can become garbage collected before we use them; ie:
@@ -38,7 +36,6 @@ class Exiter(object):
     # all symbols we need here to ensure we function in excepthook context.
     # See: http://stackoverflow.com/questions/2572172/referencing-other-modules-in-atexit
     self._exit = exiter
-    self.should_print_backtrace = print_backtraces
 
   def __call__(self, *args, **kwargs):
     """Map class calls to self.exit() to support sys.exit() fungibility."""
