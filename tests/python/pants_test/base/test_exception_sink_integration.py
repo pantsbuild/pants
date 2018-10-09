@@ -33,7 +33,7 @@ Exception caught: \\(<class 'pants\\.build_graph\\.address_lookup_error\\.Addres
 
 Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
   ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
-""".format(pid=pid, nonce=nonce))
+""".format(pid=pid, nonce=re.escape(nonce)))
 
   def _get_log_file_paths(self, workdir, pants_run):
     pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pants_run.pid, in_dir=workdir)

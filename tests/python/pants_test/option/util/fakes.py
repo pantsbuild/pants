@@ -49,7 +49,7 @@ class _FakeOptionValues(object):
   def option_values(self):
     return self._option_values
 
-  def debug_dump(self):
+  def _debug_dump(self):
     return '<fake options(<with value map = {!r}>)>'.format(self._option_values)
 
 

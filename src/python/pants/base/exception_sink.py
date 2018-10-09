@@ -266,7 +266,7 @@ pid: {pid}
   @classmethod
   def _format_exception_message(cls, msg, pid):
     if cls._bootstrap_option_values:
-      bootstrap_fmt = cls._bootstrap_option_values.debug_dump()
+      bootstrap_fmt = cls._bootstrap_option_values._debug_dump()
     else:
       bootstrap_fmt = '<none>'
     return cls._EXCEPTION_LOG_FORMAT.format(
