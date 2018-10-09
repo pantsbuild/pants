@@ -11,6 +11,7 @@ from builtins import open, str
 
 import mock
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
 from pants.util.osutil import get_normalized_os_name
@@ -18,6 +19,8 @@ from pants_test.test_base import TestBase
 
 
 class TestExceptionSink(TestBase):
+
+  _default_log_dir = os.path.join(get_buildroot(), '.pants.d')
 
   def _gen_sink_subclass(self):
     # Avoid modifying global state by generating a subclass.
@@ -27,8 +30,7 @@ class TestExceptionSink(TestBase):
   def test_default_log_location(self):
     # NB: get_buildroot() returns the temporary buildroot used for running this test, so we cheat
     # and assume we are being run from the buildroot.
-    self.assertEqual(ExceptionSink._log_dir,
-                     os.path.join(os.getcwd(), '.pants.d'))
+    self.assertEqual(ExceptionSink._log_dir, self._default_log_dir)
 
   def test_reset_log_location(self):
     sink = self._gen_sink_subclass()
