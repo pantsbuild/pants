@@ -15,6 +15,7 @@ from builtins import object, str
 
 import setproctitle
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.meta import classproperty
@@ -361,11 +362,10 @@ Signal {signum} was raised. Exiting with failure.
     cls._exit_with_failure(terminal_log_entry)
 
 
-
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
 # Sets fatal signal handlers with reasonable defaults to catch errors early in startup.
-ExceptionSink.reset_log_location(os.getcwd())
+ExceptionSink.reset_log_location(os.path.join(get_buildroot(), '.pants.d'))
 # Sets except hook.
 ExceptionSink.reset_exiter(Exiter(print_backtraces=True))
 # Sets a SIGUSR2 handler.

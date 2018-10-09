@@ -76,6 +76,7 @@ python_library(
     '3rdparty/python:faulthandler',
     '3rdparty/python:setproctitle',
     'src/python/pants/util:dirutil',
+    ':build_environment',
     ':exiter',
   ],
 )

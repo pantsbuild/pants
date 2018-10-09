@@ -27,8 +27,10 @@ class TestExceptionSink(TestBase):
     return AnonymousSink
 
   def test_default_log_location(self):
-    self.assertEqual(self._gen_sink_subclass()._log_dir,
-                     os.getcwd())
+    # NB: get_buildroot() returns the temporary buildroot used for running this test, so we cheat
+    # and assume we are being run from the buildroot.
+    self.assertEqual(ExceptionSink._log_dir,
+                     os.path.join(os.getcwd(), '.pants.d'))
 
   def test_reset_log_location(self):
     sink = self._gen_sink_subclass()
