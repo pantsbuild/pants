@@ -36,9 +36,10 @@ class ExceptionSink(object):
   _exiter = None
   # Where to log stacktraces to in a SIGUSR2 handler.
   _interactive_output_stream = None
-  # Copy of the applicable bootstrap options for the current process. Used in error logs for
-  # debuggability.
-  _bootstrap_options = None
+  # Copy of the applicable bootstrap option values for the current process. Used in error logs for
+  # debuggability, and to determine whether to print the exception stacktrace to the terminal on
+  # exit.
+  _bootstrap_option_values = None
 
   # These persistent open file descriptors are kept so the signal handler can do almost no work
   # (and lets faulthandler figure out signal safety).
@@ -84,9 +85,9 @@ class ExceptionSink(object):
     whether to print the exception stacktrace to the terminal on exit.
 
     Class state:
-    - Overwrites `cls._bootstrap_options`.
+    - Overwrites `cls._bootstrap_option_values`.
     """
-    cls._bootstrap_options = new_bootstrap_option_values
+    cls._bootstrap_option_values = new_bootstrap_option_values
 
   # All reset_* methods are ~idempotent!
   @classmethod
@@ -264,7 +265,10 @@ pid: {pid}
 
   @classmethod
   def _format_exception_message(cls, msg, pid):
-    bootstrap_fmt = cls._bootstrap_options.debug_dump() if cls._bootstrap_options else '<none>'
+    if cls._bootstrap_option_values:
+      bootstrap_fmt = cls._bootstrap_option_values.debug_dump()
+    else:
+      bootstrap_fmt = '<none>'
     return cls._EXCEPTION_LOG_FORMAT.format(
       timestamp=cls._iso_timestamp_for_now(),
       process_title=setproctitle.getproctitle(),
@@ -316,8 +320,8 @@ timestamp: {timestamp}
 
   @classproperty
   def _should_print_backtrace(cls):
-    if cls._bootstrap_options:
-      return cls._bootstrap_options.print_exception_stacktrace
+    if cls._bootstrap_option_values:
+      return cls._bootstrap_option_values.print_exception_stacktrace
     else:
       return True
 
@@ -386,7 +390,7 @@ Signal {signum} was raised. Exiting with failure.
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
-# Sets fatal signal handlers with /reasonable defaults to catch errors early in startup.
+# Sets fatal signal handlers with reasonable defaults to catch errors early in startup.
 ExceptionSink.reset_log_location(os.path.join(get_buildroot(), '.pants.d'))
 # Sets except hook.
 ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
