@@ -85,11 +85,11 @@ class TestInterpreterCache(TestBase):
         existing_dist = Package.from_href(existing_dist_location)
         requirement = '{}=={}'.format(existing_dist.name, existing_dist.raw_version)
 
-      distributions = resolve([requirement],
+      resolved_dists = resolve([requirement],
                               interpreter=self._interpreter,
                               precedence=(EggPackage, SourcePackage))
-      self.assertEqual(1, len(distributions))
-      dist_location = distributions[0].location
+      self.assertEqual(1, len(resolved_dists))
+      dist_location = resolved_dists[0].distribution.location
 
       self.assertRegexpMatches(dist_location, r'\.egg$')
       os.symlink(dist_location, os.path.join(repo_root, os.path.basename(dist_location)))
