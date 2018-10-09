@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import re
 import signal
 import time
 from contextlib import contextmanager
@@ -19,12 +18,11 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
 
-  def _assert_unhandled_exception_log_matches(self, pid, nonce, file_contents):
+  def _assert_unhandled_exception_log_matches(self, pid, file_contents):
     self.assertRegexpMatches(file_contents, """\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
-bootstrap options: OptionValueContainer\\(<with value map = .*build_ignore.*{nonce}.*>\\)
 pid: {pid}
 Exception caught: \\(<class 'pants\\.build_graph\\.address_lookup_error\\.AddressLookupError'>\\)
   File ".*", line [0-9]+, in <module>
@@ -33,7 +31,7 @@ Exception caught: \\(<class 'pants\\.build_graph\\.address_lookup_error\\.Addres
 
 Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
   ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
-""".format(pid=pid, nonce=re.escape(nonce)))
+""".format(pid=pid))
 
   def _get_log_file_paths(self, workdir, pants_run):
     pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pants_run.pid, in_dir=workdir)
@@ -47,10 +45,9 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
     return (pid_specific_log_file, shared_log_file)
 
   def test_logs_unhandled_exception(self):
-    nonce = 'random_string'
     with temporary_dir() as tmpdir:
       pants_run = self.run_pants_with_workdir(
-        ['--build-ignore=+["{}"]'.format(nonce), 'list', '//:this-target-does-not-exist'],
+        ['list', '//:this-target-does-not-exist'],
         workdir=tmpdir,
         # The backtrace should be omitted when --print-exception-stacktrace=False.
         print_exception_stacktrace=False)
@@ -65,27 +62,22 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
 
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
       self._assert_unhandled_exception_log_matches(
-        pants_run.pid, nonce, read_file(pid_specific_log_file))
+        pants_run.pid, read_file(pid_specific_log_file))
       self._assert_unhandled_exception_log_matches(
-        pants_run.pid, nonce, read_file(shared_log_file))
+        pants_run.pid, read_file(shared_log_file))
 
-  def _assert_graceful_signal_log_matches(self, pid, signum, nonce, contents):
+  def _assert_graceful_signal_log_matches(self, pid, signum, contents):
     self.assertRegexpMatches(contents, """\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
-bootstrap options: OptionValueContainer\\(<with value map = .*build_ignore.*{nonce}.*>\\)
 pid: {pid}
 Signal {signum} was raised\\. Exiting with failure\\.
 \\(backtrace omitted\\)
-""".format(pid=pid, signum=signum, nonce=re.escape(nonce)))
+""".format(pid=pid, signum=signum))
 
   @contextmanager
-  def _make_waiter_handle(self, nonce=None):
-    # NB: The `nonce` is a string we ensure is in the bootstrap options for the specific pants
-    # subprocess invoked here by adding it to --build-ignore. This way we can ensure the bootstrap
-    # options printed in the error message are exactly what we expect.
-    nonce = nonce or '<default nonce>'
+  def _make_waiter_handle(self):
     with temporary_dir() as tmpdir:
       # The path is required to end in '.pants.d'. This is validated in
       # GoalRunner#is_valid_workdir().
@@ -94,16 +86,15 @@ Signal {signum} was raised\\. Exiting with failure\\.
       file_to_make = os.path.join(tmpdir, 'some_file')
       waiter_handle = self.run_pants_with_workdir_without_waiting([
         '--no-enable-pantsd',
-        '--build-ignore=+["{}"]'.format(nonce),
         'run', 'testprojects/src/python/coordinated_runs:waiter',
         '--', file_to_make,
       ], workdir)
       yield (workdir, waiter_handle)
 
   @contextmanager
-  def _send_signal_to_waiter_handle(self, signum, nonce=None):
+  def _send_signal_to_waiter_handle(self, signum):
     # This needs to be a contextmanager as well, because workdir may be temporary.
-    with self._make_waiter_handle(nonce=nonce) as (workdir, waiter_handle):
+    with self._make_waiter_handle() as (workdir, waiter_handle):
       # Wait for the python run to be running.
       time.sleep(5)
       os.kill(waiter_handle.process.pid, signum)
@@ -113,9 +104,8 @@ Signal {signum} was raised\\. Exiting with failure\\.
       yield (workdir, waiter_run)
 
   def test_dumps_logs_on_terminate(self):
-    nonce = 'dumps_logs_random_string'
     # Send a SIGTERM to the local pants process.
-    with self._send_signal_to_waiter_handle(signal.SIGTERM, nonce=nonce) as (workdir, waiter_run):
+    with self._send_signal_to_waiter_handle(signal.SIGTERM) as (workdir, waiter_run):
       self.assertRegexpMatches(waiter_run.stderr_data, """\
 timestamp: ([^\n]+)
 Signal {signum} was raised. Exiting with failure.
@@ -124,9 +114,9 @@ Signal {signum} was raised. Exiting with failure.
       # Check that the logs show a graceful exit by SIGTERM.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
       self._assert_graceful_signal_log_matches(
-        waiter_run.pid, signal.SIGTERM, nonce, read_file(pid_specific_log_file))
+        waiter_run.pid, signal.SIGTERM, read_file(pid_specific_log_file))
       self._assert_graceful_signal_log_matches(
-          waiter_run.pid, signal.SIGTERM, nonce, read_file(shared_log_file))
+          waiter_run.pid, signal.SIGTERM, read_file(shared_log_file))
 
   def test_dumps_traceback_on_sigabrt(self):
     # SIGABRT sends a traceback to the log file for the current process thanks to

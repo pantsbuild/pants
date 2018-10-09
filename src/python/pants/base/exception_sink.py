@@ -36,10 +36,8 @@ class ExceptionSink(object):
   _exiter = None
   # Where to log stacktraces to in a SIGUSR2 handler.
   _interactive_output_stream = None
-  # Copy of the applicable bootstrap option values for the current process. Used in error logs for
-  # debuggability, and to determine whether to print the exception stacktrace to the terminal on
-  # exit.
-  _bootstrap_option_values = None
+  # Whether to print a stacktrace in any fatal error message printed to the terminal.
+  _should_print_backtrace_to_terminal = True
 
   # These persistent open file descriptors are kept so the signal handler can do almost no work
   # (and lets faulthandler figure out signal safety).
@@ -78,16 +76,13 @@ class ExceptionSink(object):
   class ExceptionSinkError(Exception): pass
 
   @classmethod
-  def reset_bootstrap_options(cls, new_bootstrap_option_values):
-    """Set the bootstrap option values held by this singleton.
-
-    The option values are used to provide more context in a fatal error log entry, and to determine
-    whether to print the exception stacktrace to the terminal on exit.
+  def reset_should_print_backtrace_to_terminal(cls, should_print_backtrace):
+    """Set whether a backtrace gets printed to the terminal error stream on a fatal error.
 
     Class state:
-    - Overwrites `cls._bootstrap_option_values`.
+    - Overwrites `cls._should_print_backtrace_to_terminal`.
     """
-    cls._bootstrap_option_values = new_bootstrap_option_values
+    cls._should_print_backtrace_to_terminal = should_print_backtrace
 
   # All reset_* methods are ~idempotent!
   @classmethod
@@ -258,22 +253,16 @@ class ExceptionSink(object):
 timestamp: {timestamp}
 process title: {process_title}
 sys.argv: {args}
-bootstrap options: {bootstrap_options}
 pid: {pid}
 {message}
 """
 
   @classmethod
   def _format_exception_message(cls, msg, pid):
-    if cls._bootstrap_option_values:
-      bootstrap_fmt = cls._bootstrap_option_values._debug_dump()
-    else:
-      bootstrap_fmt = '<none>'
     return cls._EXCEPTION_LOG_FORMAT.format(
       timestamp=cls._iso_timestamp_for_now(),
       process_title=setproctitle.getproctitle(),
       args=sys.argv,
-      bootstrap_options=bootstrap_fmt,
       pid=pid,
       message=msg)
 
@@ -318,13 +307,6 @@ timestamp: {timestamp}
                      msg=formatted_terminal_msg,
                      out=cls._interactive_output_stream)
 
-  @classproperty
-  def _should_print_backtrace(cls):
-    if cls._bootstrap_option_values:
-      return cls._bootstrap_option_values.print_exception_stacktrace
-    else:
-      return True
-
   @classmethod
   def _log_unhandled_exception_and_exit(cls, exc_class=None, exc=None, tb=None, add_newline=False):
     """A sys.excepthook implementation which logs the error and exits with failure."""
@@ -346,7 +328,7 @@ timestamp: {timestamp}
     # Exiter's should_print_backtrace field).
     stderr_printed_error = cls._format_unhandled_exception_log(
       exc, tb, add_newline,
-      should_print_backtrace=cls._should_print_backtrace)
+      should_print_backtrace=cls._should_print_backtrace_to_terminal)
     if extra_err_msg:
       stderr_printed_error = '{}\n{}'.format(stderr_printed_error, extra_err_msg)
     cls._exit_with_failure(stderr_printed_error)
@@ -381,7 +363,7 @@ Signal {signum} was raised. Exiting with failure.
 
     # Format a message to be printed to the terminal or other interactive stream, if applicable.
     formatted_traceback_for_terminal = cls._format_traceback(
-      tb, should_print_backtrace=cls._should_print_backtrace and bool(tb))
+      tb, should_print_backtrace=cls._should_print_backtrace_to_terminal and bool(tb))
     terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
       formatted_traceback=formatted_traceback_for_terminal)
