@@ -112,11 +112,9 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
   """
   deduped_reqs = OrderedSet(reqs)
   find_links = OrderedSet()
-  blacklist = PythonSetup.global_instance().resolver_blacklist
   for req in deduped_reqs:
     log.debug('  Dumping requirement: {}'.format(req))
-    if not (req.key in blacklist and interpreter.identity.matches(blacklist[req.key])):
-      builder.add_requirement(req.requirement)
+    builder.add_requirement(req.requirement)
     if req.repository:
       find_links.add(req.repository)
 
@@ -155,7 +153,7 @@ def resolve_multi(interpreter, requirements, platforms, find_links):
   for platform in platforms:
     requirements_cache_dir = os.path.join(python_setup.resolver_cache_dir,
                                           str(interpreter.identity))
-    distributions[platform] = resolve(
+    resolved_dists = resolve(
       requirements=[req.requirement for req in requirements],
       interpreter=interpreter,
       fetchers=fetchers,
@@ -164,7 +162,7 @@ def resolve_multi(interpreter, requirements, platforms, find_links):
       cache=requirements_cache_dir,
       cache_ttl=python_setup.resolver_cache_ttl,
       allow_prereleases=python_setup.resolver_allow_prereleases,
-      pkg_blacklist=python_setup.resolver_blacklist,
       use_manylinux=python_setup.use_manylinux)
+    distributions[platform] = [resolved_dist.distribution for resolved_dist in resolved_dists]
 
   return distributions

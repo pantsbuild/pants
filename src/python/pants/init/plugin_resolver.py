@@ -108,15 +108,17 @@ class PluginResolver(object):
 
   def _resolve_plugins(self):
     logger.info('Resolving new plugins...:\n  {}'.format('\n  '.join(self._plugin_requirements)))
-    return resolver.resolve(self._plugin_requirements,
-                            fetchers=self._python_repos.get_fetchers(),
-                            context=self._python_repos.get_network_context(),
-                            cache=self.plugin_cache_dir,
-                            cache_ttl=10 * 365 * 24 * 60 * 60,  # Effectively never expire.
-                            allow_prereleases=PANTS_SEMVER.is_prerelease,
-                            # Plugins will all depend on `pantsbuild.pants` which is distributed as
-                            # a manylinux wheel.
-                            use_manylinux=True)
+    resolved_dists = resolver.resolve(self._plugin_requirements,
+                                      fetchers=self._python_repos.get_fetchers(),
+                                      context=self._python_repos.get_network_context(),
+                                      cache=self.plugin_cache_dir,
+                                      # Effectively never expire.
+                                      cache_ttl=10 * 365 * 24 * 60 * 60,
+                                      allow_prereleases=PANTS_SEMVER.is_prerelease,
+                                      # Plugins will all depend on `pantsbuild.pants` which is
+                                      # distributed as a manylinux wheel.
+                                      use_manylinux=True)
+    return [resolved_dist.distribution for resolved_dist in resolved_dists]
 
   @memoized_property
   def plugin_cache_dir(self):
