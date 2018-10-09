@@ -266,7 +266,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             pool.clone(),
             cas_address,
             top_match
-              .value_of("remote-instance_name")
+              .value_of("remote-instance-name")
               .map(str::to_owned),
             root_ca_certs,
             oauth_bearer_token,
