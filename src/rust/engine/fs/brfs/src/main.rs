@@ -679,7 +679,7 @@ fn main() {
     Some(address) => fs::Store::with_remote(
       &store_path,
       pool,
-      address.to_owned(),
+      address,
       args.value_of("remote-instance-name").map(str::to_owned),
       root_ca_certs,
       oauth_bearer_token,

@@ -235,10 +235,10 @@ impl Select {
             .and_then(|directory_digest_val| {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             }).and_then(move |digest| {
-              let store = context.core.store.clone();
+              let store = context.core.store();
               context
                 .core
-                .store
+                .store()
                 .load_directory(digest)
                 .map_err(|str| throw(&str))
                 .and_then(move |maybe_directory| {
@@ -407,7 +407,7 @@ impl WrappedNode for ExecuteProcess {
 
     context
       .core
-      .command_runner
+      .command_runner()
       .run(request)
       .map(ProcessResult)
       .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
@@ -470,7 +470,7 @@ impl WrappedNode for DigestFile {
       .and_then(move |c| {
         context
           .core
-          .store
+          .store()
           .store_file_bytes(c.content, true)
           .map_err(|e| throw(&e))
       }).to_boxed()
@@ -527,7 +527,7 @@ impl Snapshot {
       .expand(path_globs)
       .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
       .and_then(move |path_stats| {
-        fs::Snapshot::from_path_stats(context.core.store.clone(), &context, path_stats)
+        fs::Snapshot::from_path_stats(context.core.store(), &context, path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
       }).map_err(|e| throw(&e))
       .to_boxed()

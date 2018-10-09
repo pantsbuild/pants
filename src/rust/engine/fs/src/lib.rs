@@ -65,7 +65,6 @@ extern crate log;
 extern crate mock;
 extern crate parking_lot;
 extern crate protobuf;
-extern crate resettable;
 extern crate serde;
 extern crate sha2;
 #[cfg(test)]

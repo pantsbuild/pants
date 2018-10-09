@@ -38,9 +38,8 @@ pub struct Core {
   pub types: Types,
   pub fs_pool: Arc<ResettablePool>,
   pub runtime: Resettable<Arc<Runtime>>,
-  pub store: Store,
+  store_and_command_runner: Resettable<(Store, BoundedCommandRunner)>,
   pub vfs: PosixFS,
-  pub command_runner: BoundedCommandRunner,
 }
 
 impl Core {
@@ -67,7 +66,6 @@ impl Core {
     let runtime = Resettable::new(|| {
       Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
     });
-
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
@@ -88,45 +86,50 @@ impl Core {
       None
     };
 
-    let store_path = Store::default_path();
+    let fs_pool2 = fs_pool.clone();
+    let store_and_command_runner = Resettable::new(move || {
+      let store_path = Store::default_path();
 
-    let store = safe_create_dir_all_ioerror(&store_path)
-      .map_err(|e| format!("Error making directory {:?}: {:?}", store_path, e))
-      .and_then(|()| match remote_store_server {
-        Some(address) => Store::with_remote(
-          store_path,
-          fs_pool.clone(),
+      let store = safe_create_dir_all_ioerror(&store_path)
+        .map_err(|e| format!("Error making directory {:?}: {:?}", store_path, e))
+        .and_then(|()| match &remote_store_server {
+          Some(ref address) => Store::with_remote(
+            store_path,
+            fs_pool2.clone(),
+            address,
+            remote_instance_name.clone(),
+            root_ca_certs.clone(),
+            oauth_bearer_token.clone(),
+            remote_store_thread_count,
+            remote_store_chunk_bytes,
+            remote_store_chunk_upload_timeout,
+          ),
+          None => Store::local_only(store_path, fs_pool2.clone()),
+        }).unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
+
+      let underlying_command_runner: Box<CommandRunner> = match &remote_execution_server {
+        Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
           address,
           remote_instance_name.clone(),
           root_ca_certs.clone(),
           oauth_bearer_token.clone(),
-          remote_store_thread_count,
-          remote_store_chunk_bytes,
-          remote_store_chunk_upload_timeout,
-        ),
-        None => Store::local_only(store_path, fs_pool.clone()),
-      }).unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
+          // Allow for some overhead for bookkeeping threads (if any).
+          process_execution_parallelism + 2,
+          store.clone(),
+        )),
+        None => Box::new(process_execution::local::CommandRunner::new(
+          store.clone(),
+          fs_pool2.clone(),
+          work_dir.clone(),
+          process_execution_cleanup_local_dirs,
+        )),
+      };
 
-    let underlying_command_runner: Box<CommandRunner> = match remote_execution_server {
-      Some(address) => Box::new(process_execution::remote::CommandRunner::new(
-        address,
-        remote_instance_name,
-        root_ca_certs,
-        oauth_bearer_token,
-        // Allow for some overhead for bookkeeping threads (if any).
-        process_execution_parallelism + 2,
-        store.clone(),
-      )),
-      None => Box::new(process_execution::local::CommandRunner::new(
-        store.clone(),
-        fs_pool.clone(),
-        work_dir,
-        process_execution_cleanup_local_dirs,
-      )),
-    };
+      let command_runner =
+        BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
 
-    let command_runner =
-      BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
+      (store, command_runner)
+    });
 
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 
@@ -137,13 +140,12 @@ impl Core {
       types: types,
       fs_pool: fs_pool.clone(),
       runtime: runtime,
-      store: store,
+      store_and_command_runner: store_and_command_runner,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs: PosixFS::new(build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
-      command_runner: command_runner,
     }
   }
 
@@ -166,17 +168,9 @@ impl Core {
     }
     let t = self.runtime.with_reset(|| {
       self.graph.with_exclusive(|| {
-        self.fs_pool.with_shutdown(|| {
-          // TODO: In order for `CommandRunner` to be "object safe" (which it must be in order to
-          // be `Box`ed for use in the `Core` struct without generic parameters), it cannot have
-          // a generic return type. Rather than giving it a return type like `void*`, we set a
-          // mutable field here.
-          let mut res: Option<T> = None;
-          self.command_runner.with_shutdown(&mut || {
-            res = Some(f());
-          });
-          res.expect("with_shutdown method did not call its argument function.")
-        })
+        self
+          .fs_pool
+          .with_shutdown(|| self.store_and_command_runner.with_reset(f))
       })
     });
     self
@@ -184,6 +178,14 @@ impl Core {
       .mark_draining(false)
       .expect("Multiple callers should not be in the fork context at once.");
     t
+  }
+
+  pub fn store(&self) -> Store {
+    self.store_and_command_runner.get().0
+  }
+
+  pub fn command_runner(&self) -> BoundedCommandRunner {
+    self.store_and_command_runner.get().1
   }
 }
 

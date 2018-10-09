@@ -202,7 +202,7 @@ fn main() {
       fs::Store::with_remote(
         local_store_path,
         pool.clone(),
-        cas_server.to_owned(),
+        cas_server,
         remote_instance_arg.clone(),
         root_ca_certs,
         oauth_bearer_token,
@@ -253,7 +253,7 @@ fn main() {
         };
 
       Box::new(process_execution::remote::CommandRunner::new(
-        address.to_owned(),
+        address,
         remote_instance_arg,
         root_ca_certs,
         oauth_bearer_token,
