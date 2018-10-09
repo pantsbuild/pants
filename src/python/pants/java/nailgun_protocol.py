@@ -8,6 +8,8 @@ import os
 import struct
 from builtins import bytes, object, str, zip
 
+from pants.util.osutil import IntegerForPid
+
 
 STDIO_DESCRIPTORS = (0, 1, 2)
 
@@ -27,7 +29,15 @@ class ChunkType(object):
   ENVIRONMENT = b'E'
   WORKING_DIR = b'D'
   COMMAND = b'C'
-  PID = b'P'  # This is a custom extension to the Nailgun protocol spec for transmitting pid info.
+  # PGRP and PID are custom extensions to the Nailgun protocol spec for transmitting pid info.
+  # PGRP is used to allow the client process to try killing the nailgun server and everything in its
+  # process group when the thin client receives a signal. PID is used to retrieve logs for fatal
+  # errors from the remote process at that PID.
+  # TODO(#6579): we should probably move our custom extensions to a ChunkType subclass in
+  # nailgun_client.py and differentiate clearly whether the client accepts the pailgun extensions
+  # (e.g. by calling it PailgunClient).
+  PGRP = b'G'
+  PID = b'P'
   STDIN = b'0'
   STDOUT = b'1'
   STDERR = b'2'
@@ -35,7 +45,7 @@ class ChunkType(object):
   STDIN_EOF = b'.'
   EXIT = b'X'
   REQUEST_TYPES = (ARGUMENT, ENVIRONMENT, WORKING_DIR, COMMAND)
-  EXECUTION_TYPES = (PID, STDIN, STDOUT, STDERR, START_READING_INPUT, STDIN_EOF, EXIT)
+  EXECUTION_TYPES = (PGRP, PID, STDIN, STDOUT, STDERR, START_READING_INPUT, STDIN_EOF, EXIT)
   VALID_TYPES = REQUEST_TYPES + EXECUTION_TYPES
 
 
@@ -230,9 +240,47 @@ class NailgunProtocol(object):
     cls.write_chunk(sock, ChunkType.EXIT, payload)
 
   @classmethod
+  def send_exit_with_code(cls, sock, code):
+    """Send an Exit chunk over the specified socket, containing the specified return code."""
+    encoded_exit_status = cls.encode_int(code)
+    cls.send_exit(sock, payload=encoded_exit_status)
+
+  @classmethod
   def send_pid(cls, sock, pid):
     """Send the PID chunk over the specified socket."""
-    cls.write_chunk(sock, ChunkType.PID, pid)
+    assert(isinstance(pid, IntegerForPid) and pid > 0)
+    encoded_int = cls.encode_int(pid)
+    cls.write_chunk(sock, ChunkType.PID, encoded_int)
+
+  @classmethod
+  def send_pgrp(cls, sock, pgrp):
+    """Send the PGRP chunk over the specified socket."""
+    assert(isinstance(pgrp, IntegerForPid) and pgrp < 0)
+    encoded_int = cls.encode_int(pgrp)
+    cls.write_chunk(sock, ChunkType.PGRP, encoded_int)
+
+  @classmethod
+  def encode_int(cls, obj):
+    """Verify the object is an int, and ASCII-encode it.
+
+    :param int obj: An integer to be encoded.
+    :raises: :class:`TypeError` if `obj` is not an integer.
+    :return: A binary representation of the int `obj` suitable to pass as the `payload` to
+             send_exit().
+    """
+    if not isinstance(obj, int):
+      raise TypeError("cannot encode non-integer object in encode_int(): object was {} (type '{}')."
+                      .format(obj, type(obj)))
+    return str(obj).encode('ascii')
+
+  @classmethod
+  def encode_env_var_value(cls, obj):
+    """Convert `obj` into a UTF-8 encoded binary string.
+
+    The result of this method be used as the value of an environment variable in a subsequent
+    NailgunClient execution.
+    """
+    return str(obj).encode('utf-8')
 
   @classmethod
   def isatty_to_env(cls, stdin, stdout, stderr):
@@ -246,7 +294,7 @@ class NailgunProtocol(object):
     def gen_env_vars():
       for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
         is_atty = fd.isatty()
-        yield (cls.TTY_ENV_TMPL.format(fd_id), str(int(is_atty)).encode('utf-8'))
+        yield (cls.TTY_ENV_TMPL.format(fd_id), cls.encode_env_var_value(int(is_atty)))
         if is_atty:
           yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or b'')
     return dict(gen_env_vars())

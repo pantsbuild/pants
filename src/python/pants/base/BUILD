@@ -73,7 +73,9 @@ python_library(
   name = 'exception_sink',
   sources = ['exception_sink.py'],
   dependencies = [
+    '3rdparty/python:faulthandler',
     'src/python/pants/util:dirutil',
+    ':exiter',
   ],
 )
 
@@ -231,7 +233,7 @@ python_library(
   sources=['exiter.py'],
   dependencies=[
     '3rdparty/python:future',
-    '3rdparty/python:faulthandler',
-    ':exception_sink',
+    'src/python/pants/util:fileutil',
+    'src/python/pants/util:strutil',
   ]
 )

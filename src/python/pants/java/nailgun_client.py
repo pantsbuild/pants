@@ -7,13 +7,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import errno
 import logging
 import os
-import signal
 import socket
 import sys
 from builtins import object, str
 
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
 
 
@@ -23,7 +23,15 @@ logger = logging.getLogger(__name__)
 class NailgunClientSession(NailgunProtocol):
   """Handles a single nailgun client session."""
 
-  def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False):
+  def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False,
+               remote_pid_callback=None, remote_pgrp_callback=None):
+    """
+    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
+                encountered
+    :param remote_pid_callback: Callback to run when a pid chunk is received from a remote client.
+    :param remote_pgrp_callback: Callback to run when a pgrp (process group) chunk is received from
+                                 a remote client.
+    """
     self._sock = sock
     self._input_writer = None if not in_file else NailgunStreamWriter(
       (in_file.fileno(),),
@@ -35,6 +43,9 @@ class NailgunClientSession(NailgunProtocol):
     self._stderr = err_file
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self.remote_pid = None
+    self.remote_pgrp = None
+    self._remote_pid_callback = remote_pid_callback
+    self._remote_pgrp_callback = remote_pgrp_callback
 
   def _maybe_start_input_writer(self):
     if self._input_writer and not self._input_writer.is_alive():
@@ -62,6 +73,9 @@ class NailgunClientSession(NailgunProtocol):
     """Process the outputs of the nailgun session."""
     try:
       for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True):
+        # TODO(#6579): assert that we have at this point received all the chunk types in
+        # ChunkType.REQUEST_TYPES, then require PID and PGRP (exactly once?), and then allow any of
+        # ChunkType.EXECUTION_TYPES.
         if chunk_type == ChunkType.STDOUT:
           self._write_flush(self._stdout, payload)
         elif chunk_type == ChunkType.STDERR:
@@ -72,6 +86,12 @@ class NailgunClientSession(NailgunProtocol):
           return int(payload)
         elif chunk_type == ChunkType.PID:
           self.remote_pid = int(payload)
+          if self._remote_pid_callback:
+            self._remote_pid_callback(self.remote_pid)
+        elif chunk_type == ChunkType.PGRP:
+          self.remote_pgrp = int(payload)
+          if self._remote_pgrp_callback:
+            self._remote_pgrp_callback(self.remote_pgrp)
         elif chunk_type == ChunkType.START_READING_INPUT:
           self._maybe_start_input_writer()
         else:
@@ -97,20 +117,34 @@ class NailgunClient(object):
 
     DESCRIPTION = 'Problem talking to nailgun server'
 
-    def __init__(self, address, pid, wrapped_exc, traceback):
+    _MSG_FMT = """\
+{description} (address: {address}, remote_pid={pid}, remote_pgrp={pgrp}): {wrapped_exc!r}\
+"""
+
+    def __init__(self, address, pid, pgrp, wrapped_exc, traceback):
       self.address = address
       self.pid = pid
+      self.pgrp = pgrp
       self.wrapped_exc = wrapped_exc
       self.traceback = traceback
-      super(NailgunClient.NailgunError, self).__init__(
-        '{} (address: {}{}): {!r}'
-        .format(
-          self.DESCRIPTION,
-          address,
-          ', remote_pid: {}'.format(pid) if pid is not None else '',
-          self.wrapped_exc
-        )
-      )
+
+      # TODO: these should be ensured to be non-None in NailgunClientSession!
+      if self.pid is not None:
+        pid_msg = str(self.pid)
+      else:
+        pid_msg = '<remote PID chunk not yet received!>'
+      if self.pgrp is not None:
+        pgrp_msg = str(self.pgrp)
+      else:
+        pgrp_msg = '<remote PGRP chunk not yet received!>'
+
+      msg = self._MSG_FMT.format(
+        description=self.DESCRIPTION,
+        address=self.address,
+        pid=pid_msg,
+        pgrp=pgrp_msg,
+        wrapped_exc=self.wrapped_exc)
+      super(NailgunClient.NailgunError, self).__init__(msg, self.wrapped_exc)
 
   class NailgunConnectionError(NailgunError):
     """Indicates an error upon initial connect to the nailgun server."""
@@ -138,7 +172,7 @@ class NailgunClient(object):
     :param file err: a stream to write command standard error to (defaults to stderr)
     :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
     :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are encountered
-    :param bool expect_pid: Whether or not to expect a PID from the server (only true for pantsd)
+    :param bool expects_pid: Whether or not to expect a PID from the server (only true for pantsd)
     """
     self._host = host
     self._port = port
@@ -150,16 +184,22 @@ class NailgunClient(object):
     self._workdir = workdir or os.path.abspath(os.path.curdir)
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self._expects_pid = expects_pid
+    # Mutable session state.
     self._session = None
+    self._current_remote_pid = None
+    self._current_remote_pgrp = None
 
-  @property
-  def pid(self):
-    if not self._expects_pid:
-      return None
-    try:
-      return self._session.remote_pid
-    except AttributeError:
-      return None
+  def _receive_remote_pid(self, pid):
+    self._current_remote_pid = pid
+
+  def _receive_remote_pgrp(self, pgrp):
+    self._current_remote_pgrp = pgrp
+
+  def _maybe_last_pid(self):
+    return self._current_remote_pid
+
+  def _maybe_last_pgrp(self):
+    return self._current_remote_pgrp
 
   def try_connect(self):
     """Creates a socket, connects it to the nailgun and returns the connected socket.
@@ -175,22 +215,26 @@ class NailgunClient(object):
       sock.close()
       raise self.NailgunConnectionError(
         address=self._address_string,
-        pid=self.pid,
+        pid=self._maybe_last_pid(),
+        pgrp=self._maybe_last_pgrp(),
         wrapped_exc=e,
-        traceback=sys.exc_info()[2]
+        traceback=sys.exc_info()[2],
       )
     else:
       return sock
 
-  def send_control_c(self):
-    """Sends SIGINT to a nailgun server using pid information from the active session."""
-    if self._session and self._session.remote_pid is not None:
-      try:
-        os.kill(self._session.remote_pid, signal.SIGINT)
-      except (OSError, IOError) as e:
-        # Ignore "No such process" errors.
-        if e.errno != errno.ESRCH:
-          raise
+  def maybe_send_signal(self, signum, include_pgrp=True):
+    """Send the signal `signum` send if the PID and/or PGRP chunks have been received.
+
+    No error is raised if the pid or pgrp are None or point to an already-dead process.
+    """
+    remote_pid = self._maybe_last_pid()
+    if remote_pid is not None:
+      safe_kill(remote_pid, signum)
+    if include_pgrp:
+      remote_pgrp = self._maybe_last_pgrp()
+      if remote_pgrp:
+        safe_kill(remote_pgrp, signum)
 
   def execute(self, main_class, cwd=None, *args, **environment):
     """Executes the given main_class with any supplied args in the given environment.
@@ -200,32 +244,42 @@ class NailgunClient(object):
     :param list args: any arguments to pass to the main entrypoint
     :param dict environment: an env mapping made available to native nails via the nail context
     :returns: the exit code of the main_class.
+    :raises: :class:`NailgunClient.NailgunError` if there was an error during execution.
     """
     environment = dict(**environment)
     environment.update(self.ENV_DEFAULTS)
     cwd = cwd or self._workdir
 
-    # N.B. This can throw NailgunConnectionError (catchable via NailgunError).
     sock = self.try_connect()
 
-    self._session = NailgunClientSession(sock,
-                                         self._stdin,
-                                         self._stdout,
-                                         self._stderr,
-                                         self._exit_on_broken_pipe)
+    # TODO(#6579): NailgunClientSession currently requires callbacks because it can't depend on
+    # having received these chunks, so we need to avoid clobbering these fields until we initialize
+    # a new session.
+    self._current_remote_pid = None
+    self._current_remote_pgrp = None
+    self._session = NailgunClientSession(
+      sock=sock,
+      in_file=self._stdin,
+      out_file=self._stdout,
+      err_file=self._stderr,
+      exit_on_broken_pipe=self._exit_on_broken_pipe,
+      remote_pid_callback=self._receive_remote_pid,
+      remote_pgrp_callback=self._receive_remote_pgrp)
     try:
       return self._session.execute(cwd, main_class, *args, **environment)
     except socket.error as e:
       raise self.NailgunError(
         address=self._address_string,
-        pid=self.pid,
+        pid=self._maybe_last_pid(),
+        pgrp=self._maybe_last_pgrp(),
         wrapped_exc=e,
         traceback=sys.exc_info()[2]
       )
     except NailgunProtocol.ProtocolError as e:
       raise self.NailgunError(
         address=self._address_string,
-        pid=self.pid,
+        pid=self._maybe_last_pid(),
+        pgrp=self._maybe_last_pgrp(),
         wrapped_exc=e,
         traceback=sys.exc_info()[2]
       )

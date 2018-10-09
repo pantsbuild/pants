@@ -64,7 +64,7 @@ class RemotePantsRunner(object):
     """A contextmanager that overrides the SIGINT (control-c) and SIGQUIT (control-\) handlers
     and handles them remotely."""
     def handle_control_c(signum, frame):
-      client.send_control_c()
+      client.maybe_send_signal(signum, include_pgrp=True)
 
     existing_sigint_handler = signal.signal(signal.SIGINT, handle_control_c)
     # N.B. SIGQUIT will abruptly kill the pantsd-runner, which will shut down the other end

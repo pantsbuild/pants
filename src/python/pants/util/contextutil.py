@@ -372,16 +372,3 @@ def maybe_profiled(profile_path):
     logging.getLogger().info(
       'Dumped profile data to: {}\nUse e.g. {} to render and view.'.format(profile_path, view_cmd)
     )
-
-
-class HardSystemExit(SystemExit):
-  """A SystemExit subclass that incurs an os._exit() via special handling."""
-
-
-@contextmanager
-def hard_exit_handler():
-  """An exit helper for the daemon/fork'd context that provides for deferred os._exit(0) calls."""
-  try:
-    yield
-  except HardSystemExit:
-    os._exit(0)
