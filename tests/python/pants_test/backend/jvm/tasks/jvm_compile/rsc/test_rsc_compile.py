@@ -98,6 +98,10 @@ class RscCompileTest(TaskTestBase):
       dependee_graph = exec_graph.format_dependee_graph()
 
       self.assertEqual(dedent("""
+                     metacp(jdk) -> {
+                       rsc(java/classpath:scala_lib),
+                       compile_against_rsc(java/classpath:scala_lib)
+                     }
                      compile_against_rsc(java/classpath:java_lib) -> {}
                      rsc(java/classpath:scala_lib) -> {
                        compile_against_rsc(java/classpath:scala_lib)
