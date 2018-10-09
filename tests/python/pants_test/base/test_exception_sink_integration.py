@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import re
 import signal
 import time
 from contextlib import contextmanager
@@ -55,6 +54,7 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
         print_exception_stacktrace=False)
       self.assert_failure(pants_run)
       self.assertRegexpMatches(pants_run.stderr_data, """\\A\
+timestamp: ([^\n]+)
 Exception caught: \\(<class 'pants\\.build_graph\\.address_lookup_error\\.AddressLookupError'>\\)
 \\(backtrace omitted\\)
 Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
@@ -106,10 +106,11 @@ Signal {signum} was raised\\. Exiting with failure\\.
   def test_dumps_logs_on_terminate(self):
     # Send a SIGTERM to the local pants process.
     with self._send_signal_to_waiter_handle(signal.SIGTERM) as (workdir, waiter_run):
-      signal_err_rx = re.escape(
-        "Signal {signum} was raised. Exiting with failure.\n(backtrace omitted)\n"
-        .format(signum=signal.SIGTERM))
-      self.assertRegexpMatches(waiter_run.stderr_data, signal_err_rx)
+      self.assertRegexpMatches(waiter_run.stderr_data, """\
+timestamp: ([^\n]+)
+Signal {signum} was raised. Exiting with failure.
+\\(backtrace omitted\\)
+""".format(signum=signal.SIGTERM))
       # Check that the logs show a graceful exit by SIGTERM.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
       self._assert_graceful_signal_log_matches(
@@ -123,9 +124,11 @@ Signal {signum} was raised\\. Exiting with failure\\.
     with self._send_signal_to_waiter_handle(signal.SIGABRT) as (workdir, waiter_run):
       # Check that the logs show an abort signal and the beginning of a traceback.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
-      self.assertRegexpMatches(
-        read_file(pid_specific_log_file),
-        r"Fatal Python error: Aborted\n\nThread [^\n]+ \(most recent call first\):")
+      self.assertRegexpMatches(read_file(pid_specific_log_file), """\
+Fatal Python error: Aborted
+
+Thread [^\n]+ \\(most recent call first\\):
+""")
       # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
       self.assertEqual('', read_file(shared_log_file))
 
@@ -139,9 +142,9 @@ Signal {signum} was raised\\. Exiting with failure\\.
       os.kill(waiter_handle.process.pid, signal.SIGKILL)
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
-      self.assertRegexpMatches(
-        waiter_run.stderr_data,
-        r"Current thread [^\n]+ \(most recent call first\):")
+      self.assertRegexpMatches(waiter_run.stderr_data, """\
+Current thread [^\n]+ \\(most recent call first\\):
+""")
 
   def test_keyboardinterrupt_signals(self):
     for interrupt_signal in [signal.SIGINT, signal.SIGQUIT]:
