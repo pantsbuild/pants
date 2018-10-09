@@ -63,6 +63,7 @@ python_library(
     '3rdparty/python:future',
     '3rdparty/python:setproctitle',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:exception_sink',
     'src/python/pants/base:exiter',
     'src/python/pants/binaries',
     'src/python/pants/engine:native',

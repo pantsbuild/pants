@@ -44,7 +44,7 @@ class StrutilTest(unittest.TestCase):
     with self.assertRaises(TypeError):
       ensure_text(45)
 
-  def test_ensure_bytes(self):
+  def test_ensure_binary(self):
     unicode_val = u'快'
     self.assertEqual(bytearray([0xe5, 0xbf, 0xab]), ensure_binary(unicode_val))
     with self.assertRaises(TypeError):

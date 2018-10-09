@@ -10,6 +10,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/base:exception_sink',
     'src/python/pants/base:exiter',
     'src/python/pants/base:project_tree',
     'src/python/pants/base:specs',
@@ -45,6 +46,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
     'src/python/pants/util:memo',
+    'src/python/pants/util:osutil',
   ],
 )
 

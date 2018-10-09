@@ -175,8 +175,17 @@ class TestNailgunProtocol(unittest.TestCase):
       (ChunkType.EXIT, self.TEST_OUTPUT)
     )
 
+  def test_send_pgrp(self):
+    test_pgrp = -1
+    NailgunProtocol.send_pgrp(self.server_sock, test_pgrp)
+    chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock, return_bytes=True)
+    self.assertEqual(
+      (chunk_type, payload),
+      (ChunkType.PGRP, NailgunProtocol.encode_int(test_pgrp))
+    )
+
   def test_send_pid(self):
-    test_pid = -1
+    test_pid = 1
     NailgunProtocol.send_pid(self.server_sock, test_pid)
     chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock, return_bytes=True)
     self.assertEqual(

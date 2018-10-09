@@ -152,6 +152,7 @@ class TestNailgunClient(unittest.TestCase):
     mock_try_connect.side_effect = NailgunClient.NailgunConnectionError(
       '127.0.0.1:31337',
       31337,
+      -31336,
       Exception('oops'),
       None
     )
@@ -181,18 +182,29 @@ class TestNailgunClient(unittest.TestCase):
 
   @mock.patch('os.kill', **PATCH_OPTS)
   def test_send_control_c(self, mock_kill):
-    self.nailgun_client._session = mock.Mock(remote_pid=31337)
-    self.nailgun_client.send_control_c()
-    mock_kill.assert_called_once_with(31337, signal.SIGINT)
+    self.nailgun_client._maybe_last_pid = lambda: 31337
+    self.nailgun_client._maybe_last_pgrp = lambda: -31336
+    self.nailgun_client.maybe_send_signal(signal.SIGINT)
+    mock_kill.assert_has_calls([
+      # The pid is killed first, then the pgrp, if include_pgrp=True.
+      mock.call(31337, signal.SIGINT),
+      mock.call(-31336, signal.SIGINT),
+    ])
+
+  @mock.patch('os.kill', **PATCH_OPTS)
+  def test_send_signal_no_pgrp(self, mock_kill):
+    self.nailgun_client._maybe_last_pid = lambda: 111111
+    self.nailgun_client.maybe_send_signal(signal.SIGINT, include_pgrp=False)
+    mock_kill.assert_called_once_with(111111, signal.SIGINT)
 
   @mock.patch('os.kill', **PATCH_OPTS)
   def test_send_control_c_noop_none(self, mock_kill):
     self.nailgun_client._session = None
-    self.nailgun_client.send_control_c()
+    self.nailgun_client.maybe_send_signal(signal.SIGINT)
     mock_kill.assert_not_called()
 
   @mock.patch('os.kill', **PATCH_OPTS)
   def test_send_control_c_noop_nopid(self, mock_kill):
-    self.nailgun_client._session = mock.Mock(remote_pid=None)
-    self.nailgun_client.send_control_c()
+    self.nailgun_client._session = mock.Mock(remote_pid=None, remote_pgrp=None)
+    self.nailgun_client.maybe_send_signal(signal.SIGINT)
     mock_kill.assert_not_called()
