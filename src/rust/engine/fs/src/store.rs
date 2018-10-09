@@ -629,8 +629,8 @@ mod local {
   use hashing::{Digest, Fingerprint};
   use lmdb::Error::{KeyExist, NotFound};
   use lmdb::{
-    self, Cursor, Database, DatabaseFlags, Environment, RwTransaction, Transaction, WriteFlags,
-    NO_OVERWRITE, NO_SYNC, NO_TLS,
+    self, Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, RwTransaction,
+    Transaction, WriteFlags,
   };
   use resettable::Resettable;
   use sha2::Sha256;
@@ -886,7 +886,12 @@ mod local {
 
           let (env, content_database, lease_database) = dbs.get()?.get(&fingerprint);
           let put_res = env.begin_rw_txn().and_then(|mut txn| {
-            txn.put(content_database, &fingerprint, &bytes, NO_OVERWRITE)?;
+            txn.put(
+              content_database,
+              &fingerprint,
+              &bytes,
+              WriteFlags::NO_OVERWRITE,
+            )?;
             if initial_lease {
               bytestore.lease(
                 lease_database,
@@ -1005,7 +1010,7 @@ mod local {
             // The only down-side is that you need to make sure that any individual OS thread must
             // not try to perform multiple write transactions concurrently. Fortunately, this
             // property holds for us.
-            .set_flags(NO_SYNC | NO_TLS)
+            .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
             // 2 DBs; one for file contents, one for leases.
             .set_max_dbs(2)
             .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
