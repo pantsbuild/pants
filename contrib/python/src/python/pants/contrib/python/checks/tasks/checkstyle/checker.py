@@ -21,6 +21,8 @@ from pants.contrib.python.checks.tasks.checkstyle.common import CheckSyntaxError
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
 from pants.contrib.python.checks.tasks.checkstyle.register_plugins import register_plugins
 
+from pkg_resources import Distribution, Requirement
+
 
 _NOQA_LINE_SEARCH = re.compile(r'# noqa\b').search
 _NOQA_FILE_SEARCH = re.compile(r'# (flake8|checkstyle): noqa$').search
@@ -45,7 +47,7 @@ def noqa_file_filter(python_file):
 class PythonCheckStyleTask(LintTaskMixin, Task):
   _PYTHON_SOURCE_EXTENSION = '.py'
   _plugins = []
-  _subsystems = tuple()
+  _subsystems = (PythonSetup, PythonRepos)
 
   def __init__(self, *args, **kwargs):
     super(PythonCheckStyleTask, self).__init__(*args, **kwargs)
@@ -55,7 +57,7 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(Task, cls).subsystem_dependencies() + cls._subsystems
+    return super(PythonCheckStyleTask, cls).subsystem_dependencies() + cls._subsystems
 
   @classmethod
   def register_options(cls, register):
@@ -167,6 +169,37 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
         '{} Python Style issues found. You may try `./pants fmt <targets>`'.format(failure_count))
     return failure_count
 
+  @classmethod
+  def _context_has_python_3_compatible_targets(cls, tgts_by_compatibility):
+    """
+    Detect whether the a dict of targets keyed by compatibility constraints
+    contains Python 3-compatible targets. Remove this method after closing:
+    https://github.com/pantsbuild/pants/issues/5764
+    """
+    DISALLOWED_DISTS = [
+      Distribution(project_name="CPython", version="3.0"),
+      Distribution(project_name="CPython", version="3.1"),
+      Distribution(project_name="CPython", version="3.2"),
+      Distribution(project_name="CPython", version="3.3"),
+      Distribution(project_name="CPython", version="3.4"),
+      Distribution(project_name="CPython", version="3.5"),
+      Distribution(project_name="CPython", version="3.6"),
+      Distribution(project_name="CPython", version="3.7"),
+      Distribution(project_name="CPython", version="3.8"),
+      Distribution(project_name="CPython", version="3.9")
+    ]
+
+    # Check for Python 3-only constraints.
+    contains_py_3 = False
+    for constraint_tuple in tgts_by_compatibility.copy():
+      for constraint in constraint_tuple:
+        req = Requirement.parse(constraint)
+        if any(dd in req for dd in DISALLOWED_DISTS):
+          contains_py_3 = True
+          del tgts_by_compatibility[constraint_tuple]
+          break
+    return contains_py_3
+
   def execute(self):
     """Run Checkstyle on all found non-synthetic source files."""
 
@@ -183,14 +216,7 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
                                                logger=self.context.log.debug)
     tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility(python_tgts)
 
-    # Check for Python 3-only constraints.
-    context_has_py3_targets = False
-    for constraint in tgts_by_compatibility.copy():
-      if '>3' in str(constraint) or '>=3' in str(constraint):
-        context_has_py3_targets = True
-        del tgts_by_compatibility[constraint]
-
-    if context_has_py3_targets:
+    if self. _context_has_python_3_compatible_targets(tgts_by_compatibility):
       self.context.log.info('Linting is currently disabled for Python 3 targets.\n'
                             'They have been filtered out of the target set for this lint run.\n'
                             'See https://github.com/pantsbuild/pants/issues/5764 for '
@@ -201,13 +227,17 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
       return
 
     # Flatten the targets list into a single list of targets.
-    targets = []
+    safe_targets = []
     for tgts in tgts_by_compatibility.values():
-      targets.extend(tgts)
+      safe_targets.extend(tgts)
+
+    ### End of Python 3 Lint skipping workaround. ###
+    ### Delete code from here up after closing https://github.com/pantsbuild/pants/issues/5764. ###
 
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
       sources = self.calculate_sources(
-        [vt.target for vt in invalidation_check.invalid_vts if vt.target in targets]
+        # TODO(clivingston): remove if guard after closing pants/issues/5764.
+        [vt.target for vt in invalidation_check.invalid_vts if vt.target in safe_targets]
       )
       if sources:
         return self.checkstyle(sources)

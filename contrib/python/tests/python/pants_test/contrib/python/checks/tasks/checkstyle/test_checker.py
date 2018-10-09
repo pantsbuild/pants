@@ -36,7 +36,7 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
 
   def test_pass(self):
     self.create_file('a/python/pass.py', contents=dedent("""
-                       class UpperCase: 
+                       class UpperCase:
                          pass
                      """))
     target = self.make_target('a/python:pass', PythonLibrary, sources=['pass.py'])
@@ -125,3 +125,43 @@ class PythonCheckStyleTaskTest(PythonTaskTestBase):
                      """     |invalid python\n"""
                      """     |""",
                      str(nits[0]))
+
+  def test_context_has_python_3_compatible_targets_helper(self):
+    """
+    Test the helper method for detecting whether a target set contains python 3 targets.
+    TODO(clivingston): delete this when the following ticket is resolved:
+    https://github.com/pantsbuild/pants/issues/5764
+    """
+    func = PythonCheckStyleTask._context_has_python_3_compatible_targets
+    case_1 = {
+      ('CPython>3',): [None],
+      ('CPython<3',): [None]
+    }
+    case_2 = {
+      ('CPython>3.3.5',): [None],
+      ('CPython>=2.7,<3',): [None]
+    }
+    case_3 = {
+      ('CPython>3,<4',): [None],
+      ('CPython>=2.7,<3',): [None]
+    }
+    case_4 = {
+      ('CPython>2.7.10',): [None],
+      ('CPython>=2.7,<3',): [None]
+    }
+    case_5 = {
+      ('CPython<3',): [None],
+      ('CPython>=2.7.10,<3',): [None]
+    }
+
+    constraint_cases_with_py3 = [case_1, case_2, case_3]
+    for case in constraint_cases_with_py3:
+      self.assertEqual(func(case), True)
+      self.assertEqual(len(case), 1)
+
+    # Test contexts with constraints for Py2-only.
+    self.assertEqual(func(case_4), True)
+    self.assertEqual(len(case_4), 1)
+
+    self.assertEqual(func(case_5), False)
+    self.assertEqual(len(case_5), 2)
