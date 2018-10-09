@@ -36,6 +36,7 @@ class PantsRunner(object):
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
     global_bootstrap_options = bootstrap_options.for_global_scope()
     ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
+    ExceptionSink.reset_bootstrap_options(global_bootstrap_options)
     self._exiter.should_print_backtrace = global_bootstrap_options.print_exception_stacktrace
     ExceptionSink.reset_exiter(self._exiter)
 

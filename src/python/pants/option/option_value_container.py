@@ -27,6 +27,9 @@ class OptionValueContainer(object):
   def __init__(self):
     self._value_map = {}  # key -> either raw value or RankedValue wrapping the raw value.
 
+  def debug_dump(self):
+    return '{}(<with value map = {!r}>)'.format(type(self).__name__, self._value_map)
+
   def get_explicit_keys(self):
     """Returns the keys for any values that were set explicitly (via flag, config, or env var)."""
     ret = []

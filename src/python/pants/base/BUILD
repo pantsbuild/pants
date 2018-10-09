@@ -74,6 +74,7 @@ python_library(
   sources = ['exception_sink.py'],
   dependencies = [
     '3rdparty/python:faulthandler',
+    '3rdparty/python:setproctitle',
     'src/python/pants/util:dirutil',
     ':exiter',
   ],

@@ -13,6 +13,8 @@ import sys
 import traceback
 from builtins import object, str
 
+from setproctitle import getproctitle as get_process_title
+
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.meta import classproperty
@@ -33,6 +35,9 @@ class ExceptionSink(object):
   _exiter = None
   # Where to log stacktraces to in a SIGUSR2 handler.
   _interactive_output_stream = None
+  # Copy of the applicable bootstrap options for the current process. Used in error logs for
+  # debuggability.
+  _bootstrap_options = None
 
   # These persistent open file descriptors are kept so the signal handler can do almost no work
   # (and lets faulthandler figure out signal safety).
@@ -69,6 +74,11 @@ class ExceptionSink(object):
                     .format(cls.__name__))
 
   class ExceptionSinkError(Exception): pass
+
+  @classmethod
+  def reset_bootstrap_options(cls, new_bootstrap_options):
+    """???"""
+    cls._bootstrap_options = new_bootstrap_options
 
   # All reset_* methods are ~idempotent!
   @classmethod
@@ -237,16 +247,21 @@ class ExceptionSink(object):
   # NB: This includes a trailing newline, but no leading newline.
   _EXCEPTION_LOG_FORMAT = """\
 timestamp: {timestamp}
-args: {args}
+process title: {process_title}
+sys.argv: {args}
+bootstrap options: {bootstrap_options}
 pid: {pid}
 {message}
 """
 
   @classmethod
   def _format_exception_message(cls, msg, pid):
+    bootstrap_fmt = cls._bootstrap_options.debug_dump() if cls._bootstrap_options else '<none>'
     return cls._EXCEPTION_LOG_FORMAT.format(
       timestamp=cls._iso_timestamp_for_now(),
+      process_title=get_process_title(),
       args=sys.argv,
+      bootstrap_options=bootstrap_fmt,
       pid=pid,
       message=msg)
 
@@ -294,7 +309,7 @@ Exception message: {exception_message}{maybe_newline}
     try:
       # Always output the unhandled exception details into a log file, including the traceback.
       exception_log_entry = cls._format_unhandled_exception_log(exc, tb, add_newline,
-                                                              should_print_backtrace=True)
+                                                                should_print_backtrace=True)
       cls.log_exception(exception_log_entry)
     except Exception as e:
       extra_err_msg = 'Additional error logging unhandled exception {}: {}'.format(exc, e)

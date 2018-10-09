@@ -49,6 +49,9 @@ class _FakeOptionValues(object):
   def option_values(self):
     return self._option_values
 
+  def debug_dump(self):
+    return '<fake options(<with value map = {!r}>)>'.format(self._option_values)
+
 
 def _options_registration_function(defaults, fingerprintables):
   def register(*args, **kwargs):
