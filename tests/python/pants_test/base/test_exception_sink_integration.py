@@ -20,29 +20,20 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
 
   def _assert_unhandled_exception_log_matches(self, pid, file_contents):
-    # TODO: ensure there's only one log entry in this file so we can avoid more complicated checks!
-    # Search for the log header entry.
     self.assertRegexpMatches(file_contents, """\
 timestamp: ([^\n]+)
-args: ([^\n]+)
+process title: ([^\n]+)
+sys\\.argv: ([^\n]+)
+bootstrap options: ([^\n]+)
 pid: {pid}
-""".format(pid=pid))
-
-    # Search for the exception message and the beginning of the stack trace with a hacky regexp.
-    expected_error_regexp = re.compile(
-      re.escape(
-        "Exception caught: (<class 'pants.build_graph.address_lookup_error.AddressLookupError'>)") +
-      '\n  File ".*", line [0-9]+, in <module>' +
-      '\n    main()')
-    self.assertIsNotNone(expected_error_regexp.search(file_contents))
-
-    # Search for the formatted exception message at the end of the log.
-    self.assertIn("""\
-    \'Build graph construction failed: {} {}\'.format(type(e).__name__, str(e))
+Exception caught: \\(<class 'pants\\.build_graph\\.address_lookup_error\\.AddressLookupError'>\\)
+  File ".*", line [0-9]+, in <module>
+    main\\(\\)
+(.|\n)*
 
 Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
-  ResolveError: "this-target-does-not-exist" was not found in namespace "". Did you mean one of:
-""", file_contents)
+  ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
+""".format(pid=pid))
 
   def _get_log_file_paths(self, workdir, pants_run):
     pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pants_run.pid, in_dir=workdir)
@@ -57,16 +48,18 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
 
   def test_logs_unhandled_exception(self):
     with temporary_dir() as tmpdir:
-      pants_run = self.run_pants_with_workdir([
-        # The backtrace should be omitted when printed to stderr, but not when logged.
-        '--no-print-exception-stacktrace',
-        'list',
-        '//:this-target-does-not-exist',
-      ], workdir=tmpdir)
+      pants_run = self.run_pants_with_workdir(
+        ['list', '//:this-target-does-not-exist'],
+        workdir=tmpdir,
+        # The backtrace should be omitted when --print-exception-stacktrace=False.
+        print_exception_stacktrace=False)
       self.assert_failure(pants_run)
-      self.assertIn('\n(backtrace omitted)\n', pants_run.stderr_data)
-      self.assertIn(' ResolveError: "this-target-does-not-exist" was not found in namespace "". Did you mean one of:',
-                    pants_run.stderr_data)
+      self.assertRegexpMatches(pants_run.stderr_data, """\\A\
+Exception caught: \\(<class 'pants\\.build_graph\\.address_lookup_error\\.AddressLookupError'>\\)
+\\(backtrace omitted\\)
+Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
+  ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
+""")
 
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
       self._assert_unhandled_exception_log_matches(pants_run.pid, read_file(pid_specific_log_file))
