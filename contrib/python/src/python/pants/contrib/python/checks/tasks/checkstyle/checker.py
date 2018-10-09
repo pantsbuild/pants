@@ -172,7 +172,7 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
   @classmethod
   def _context_has_python_3_compatible_targets(cls, tgts_by_compatibility):
     """
-    Detect whether the a dict of targets keyed by compatibility constraints
+    Detect whether a dict of targets keyed by compatibility constraints
     contains Python 3-compatible targets. Remove this method after closing:
     https://github.com/pantsbuild/pants/issues/5764
     """
@@ -190,15 +190,15 @@ class PythonCheckStyleTask(LintTaskMixin, Task):
     ]
 
     # Check for Python 3-only constraints.
-    contains_py_3 = False
+    contains_py_3_compatible_tgts = False
     for constraint_tuple in tgts_by_compatibility.copy():
       for constraint in constraint_tuple:
         req = Requirement.parse(constraint)
         if any(dd in req for dd in DISALLOWED_DISTS):
-          contains_py_3 = True
+          contains_py_3_compatible_tgts = True
           del tgts_by_compatibility[constraint_tuple]
           break
-    return contains_py_3
+    return contains_py_3_compatible_tgts
 
   def execute(self):
     """Run Checkstyle on all found non-synthetic source files."""
