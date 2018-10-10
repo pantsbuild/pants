@@ -815,8 +815,6 @@ class RscCompile(ZincCompile):
     # ignores existing files. It should write the files to a different
     # location, either by providing inputs from a different location,
     # or invoking a script that does the copying
-    if len(metai_classpath) == 0 or len(''.join(metai_classpath)) == 0:
-      raise Exception('empty metai classpath!!!')
     args = [
       '--verbose',
       os.pathsep.join(metai_classpath)
@@ -846,8 +844,6 @@ class RscCompile(ZincCompile):
         break
 
     def desandboxify_pantsd_loc(path):
-      if not path:
-        raise Exception('empty path!')
       if prefix and path.startswith(prefix):
         return path[len(prefix):]
       elif '.pants.d/' in path:
