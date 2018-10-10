@@ -271,23 +271,24 @@ pid: {pid}
   @classmethod
   def _format_traceback(cls, tb, should_print_backtrace):
     if should_print_backtrace:
-      traceback_string = ''.join(traceback.format_tb(tb))
+      traceback_string = '\n{}'.format(''.join(traceback.format_tb(tb)))
     else:
-      traceback_string = cls._traceback_omitted_default_text
+      traceback_string = ' {}'.format(cls._traceback_omitted_default_text)
     return traceback_string
 
   _UNHANDLED_EXCEPTION_LOG_FORMAT = """\
-Exception caught: ({exception_type})
-{backtrace}
+Exception caught: ({exception_type}){backtrace}
 Exception message: {exception_message}{maybe_newline}
 """
 
   @classmethod
   def _format_unhandled_exception_log(cls, exc, tb, add_newline, should_print_backtrace):
+    exc_type = type(exc)
+    exception_full_name = '{}.{}'.format(exc_type.__module__, exc_type.__name__)
     exception_message = str(exc) if exc else '(no message)'
     maybe_newline = '\n' if add_newline else ''
     return cls._UNHANDLED_EXCEPTION_LOG_FORMAT.format(
-      exception_type=type(exc),
+      exception_type=exception_full_name,
       backtrace=cls._format_traceback(tb, should_print_backtrace=should_print_backtrace),
       exception_message=exception_message,
       maybe_newline=maybe_newline)
@@ -334,8 +335,7 @@ timestamp: {timestamp}
     cls._exit_with_failure(stderr_printed_error)
 
   _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\
-Signal {signum} was raised. Exiting with failure.
-{formatted_traceback}
+Signal {signum} was raised. Exiting with failure.{formatted_traceback}
 """
 
   @classmethod

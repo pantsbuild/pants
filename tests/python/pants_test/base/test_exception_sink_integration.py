@@ -24,7 +24,7 @@ timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
-Exception caught: \\(<class 'pants\\.build_graph\\.address_lookup_error\\.AddressLookupError'>\\)
+Exception caught: \\(pants\\.build_graph\\.address_lookup_error\\.AddressLookupError\\)
   File ".*", line [0-9]+, in <module>
     main\\(\\)
 (.|\n)*
@@ -47,19 +47,17 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
   def test_logs_unhandled_exception(self):
     with temporary_dir() as tmpdir:
       pants_run = self.run_pants_with_workdir(
-        ['list', '//:this-target-does-not-exist'],
+        ['--no-enable-pantsd', 'list', '//:this-target-does-not-exist'],
         workdir=tmpdir,
         # The backtrace should be omitted when --print-exception-stacktrace=False.
         print_exception_stacktrace=False)
       self.assert_failure(pants_run)
       self.assertRegexpMatches(pants_run.stderr_data, """\\A\
 timestamp: ([^\n]+)
-Exception caught: \\(<class 'pants\\.build_graph\\.address_lookup_error\\.AddressLookupError'>\\)
-\\(backtrace omitted\\)
+Exception caught: \\(pants\\.build_graph\\.address_lookup_error\\.AddressLookupError\\) \\(backtrace omitted\\)
 Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
   ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
 """)
-
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
       self._assert_unhandled_exception_log_matches(
         pants_run.pid, read_file(pid_specific_log_file))
@@ -72,8 +70,7 @@ timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
-Signal {signum} was raised\\. Exiting with failure\\.
-\\(backtrace omitted\\)
+Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
 """.format(pid=pid, signum=signum))
 
   @contextmanager
@@ -108,8 +105,7 @@ Signal {signum} was raised\\. Exiting with failure\\.
     with self._send_signal_to_waiter_handle(signal.SIGTERM) as (workdir, waiter_run):
       self.assertRegexpMatches(waiter_run.stderr_data, """\
 timestamp: ([^\n]+)
-Signal {signum} was raised. Exiting with failure.
-\\(backtrace omitted\\)
+Signal {signum} was raised. Exiting with failure. \\(backtrace omitted\\)
 """.format(signum=signal.SIGTERM))
       # Check that the logs show a graceful exit by SIGTERM.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)

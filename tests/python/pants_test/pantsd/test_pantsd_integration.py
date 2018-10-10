@@ -439,8 +439,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Ensure that we saw the pantsd-runner process's failure in the client's stderr.
       self.assert_failure(waiter_run)
       self.assertRegexpMatches(waiter_run.stderr_data, """\
-Signal {signum} was raised\\. Exiting with failure\\.
-\\(backtrace omitted\\)
+Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
 """.format(signum=signal.SIGTERM))
       # NB: testing stderr is an "end-to-end" test, as it requires pants knowing the correct remote
       # pid and reading those files to print their content to stderr, so we don't necessarily need
