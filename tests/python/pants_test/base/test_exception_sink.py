@@ -11,6 +11,7 @@ from builtins import open, str
 
 import mock
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
 from pants.util.osutil import get_normalized_os_name
@@ -19,14 +20,17 @@ from pants_test.test_base import TestBase
 
 class TestExceptionSink(TestBase):
 
+  _default_log_dir = os.path.join(get_buildroot(), '.pants.d')
+
   def _gen_sink_subclass(self):
     # Avoid modifying global state by generating a subclass.
     class AnonymousSink(ExceptionSink): pass
     return AnonymousSink
 
   def test_default_log_location(self):
-    self.assertEqual(self._gen_sink_subclass()._log_dir,
-                     os.getcwd())
+    # NB: get_buildroot() returns the temporary buildroot used for running this test, so we cheat
+    # and assume we are being run from the buildroot.
+    self.assertEqual(ExceptionSink._log_dir, self._default_log_dir)
 
   def test_reset_log_location(self):
     sink = self._gen_sink_subclass()
@@ -58,12 +62,21 @@ class TestExceptionSink(TestBase):
       sink.reset_log_location('/')
 
   def test_log_exception(self):
+    fake_process_title = 'fake_title'
+    msg = 'XXX'
     sink = self._gen_sink_subclass()
     pid = os.getpid()
+
     with temporary_dir() as tmpdir:
       # Check that tmpdir exists, and log an exception into that directory.
       sink.reset_log_location(tmpdir)
-      sink.log_exception('XXX')
+
+      with mock.patch('setproctitle.getproctitle', autospec=True, spec_set=True) \
+           as getproctitle_mock:
+        getproctitle_mock.return_value = fake_process_title
+        sink.log_exception(msg)
+        getproctitle_mock.assert_called_once()
+
       # This should have created two log files, one specific to the current pid.
       self.assertEqual(os.listdir(tmpdir), ['logs'])
 
@@ -78,10 +91,13 @@ class TestExceptionSink(TestBase):
       # We only logged a single error, so the files should both contain only that single log entry.
       err_rx = """\
 timestamp: ([^\n]+)
-args: ([^\n]+)
+process title: {fake_process_title}
+sys.argv: ([^\n]+)
 pid: {pid}
-XXX
-""".format(pid=re.escape(str(pid)))
+{msg}
+""".format(fake_process_title=re.escape(fake_process_title),
+           pid=pid,
+           msg=msg)
       with open(cur_process_error_log_path, 'r') as cur_pid_file:
         self.assertRegexpMatches(cur_pid_file.read(), err_rx)
       with open(shared_error_log_path, 'r') as shared_log_file:
