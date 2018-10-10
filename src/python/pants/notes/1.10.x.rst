@@ -3,6 +3,34 @@
 
 This document describes releases leading up to the ``1.10.x`` ``stable`` series.
 
+1.10.0rc2 (10/10/2018)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Pin jupyter transitive deps in integration tests (#6568)
+  `Pex Issue #561, <https://github.com/pantsbuild/pex/issues/561>`_
+  `Pants PR #6568 <https://github.com/pantsbuild/pants/pull/6568>`_
+  `Pex PR #562 <https://github.com/pantsbuild/pex/pull/562>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fatal error logging followup fixes (#6610)
+  `PR #6610 <https://github.com/pantsbuild/pants/pull/6610>`_
+
+* first attempt at centralizing more global error logging state in ExceptionSink (#6552)
+  `PR #6552 <https://github.com/pantsbuild/pants/pull/6552>`_
+
+* pantsd client logs exceptions from server processes (#6539)
+  `PR #6539 <https://github.com/pantsbuild/pants/pull/6539>`_
+
+* create singleton ExceptionSink object to centralize logging of fatal errors (#6533)
+  `PR #6533 <https://github.com/pantsbuild/pants/pull/6533>`_
+
+* Switch synchronization primitive usage to parking_lot (#6564)
+  `PR #6564 <https://github.com/pantsbuild/pants/pull/6564>`_
 
 1.10.0rc1 (09/17/2018)
 ----------------------
