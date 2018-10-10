@@ -846,10 +846,15 @@ class RscCompile(ZincCompile):
     def desandboxify_pantsd_loc(path):
       if prefix and path.startswith(prefix):
         return path[len(prefix):]
-      elif '.pants.d/' in path:
-        return os.path.join('.pants.d', path.split('.pants.d/')[-1])
-      else:
-        return path
+
+      # NB The workdir may be something other than .pants.d, particularly in tests.
+      relative_workdir = fast_relpath(
+        self.context.options.for_global_scope().pants_workdir,
+        get_buildroot())
+      if relative_workdir in path:
+        return os.path.join(relative_workdir, path.split(relative_workdir)[-1])
+
+      return path
 
     status_elements = {
       desandboxify_pantsd_loc(k): v
