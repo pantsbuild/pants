@@ -289,8 +289,9 @@ class RscCompile(ZincCompile):
           distribution,
           tgt='jdk',
           input_files=tuple(
-            # NB no input files because the jdk is expected to exist on the system in a known
-            #    location.
+            # NB: no input files because the jdk is expected to exist on the system in a known
+            #     location.
+            #     Related: https://github.com/pantsbuild/pants/issues/6416
           ),
           output_dir=rsc_index_dir)
         metacp_stdout = stdout_contents(metacp_wu)
