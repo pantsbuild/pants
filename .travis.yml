@@ -241,12 +241,6 @@ matrix:
       osx_image: xcode8.3
       stage: Test Pants
       language: generic
-      env:
-        # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
-        # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
-        # deal with this. Can be removed when this issue is resolved:
-        # https://github.com/pantsbuild/pex/issues/523
-        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>2.7.10,<3']"
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
@@ -257,8 +251,8 @@ matrix:
         # set -z to run the platform-specific tests.
         - ./build-support/bin/travis-ci.sh -ez
 
-    # Rust Clippy on Linux with nightly Rust
-    - name: &clippy_shard "[ALLOWED TO BE RED] Rust Clippy on Linux with nightly Rust"
+    # Rust Clippy on Linux
+    - name: "Rust Clippy on Linux"
       os: linux
       dist: trusty
       sudo: required
@@ -275,9 +269,6 @@ matrix:
         - ulimit -n 8192
       script:
         - ./build-support/bin/travis-ci.sh -bs
-
-  allow_failures:
-    - name: *clippy_shard
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/

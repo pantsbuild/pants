@@ -43,6 +43,7 @@ function calculate_current_hash() {
     echo "${RUST_TOOLCHAIN}"
     git ls-files -c -o --exclude-standard \
      "${NATIVE_ROOT}" \
+     "${REPO_ROOT}/rust-toolchain" \
      "${REPO_ROOT}/src/python/pants/engine/native.py" \
      "${REPO_ROOT}/build-support/bin/native" \
      "${REPO_ROOT}/3rdparty/python/requirements.txt" \

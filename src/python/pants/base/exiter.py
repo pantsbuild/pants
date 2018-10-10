@@ -4,18 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import datetime
-import faulthandler
 import logging
-import os
-import signal
 import sys
-import traceback
-from builtins import object, str
+from builtins import object
 
-from future.utils import PY2
-
-from pants.util.dirutil import safe_open
+from pants.util.strutil import ensure_binary
 
 
 logger = logging.getLogger(__name__)
@@ -33,12 +26,9 @@ class Exiter(object):
    4) Call Exiter.exit(), Exiter.exit_and_fail() or exiter_inst() when you wish to exit the runtime.
   """
 
-  def __init__(self, exiter=sys.exit, formatter=traceback.format_tb, print_backtraces=True):
+  def __init__(self, exiter=sys.exit):
     """
     :param func exiter: A function to be called to conduct the final exit of the runtime. (Optional)
-    :param func formatter: A function to be called to format any encountered tracebacks. (Optional)
-    :param bool print_backtraces: Whether or not to print backtraces by default. Can be
-                                  overridden by Exiter.apply_options(). (Optional)
     """
     # Since we have some exit paths that run via the sys.excepthook,
     # symbols we use can become garbage collected before we use them; ie:
@@ -46,21 +36,10 @@ class Exiter(object):
     # all symbols we need here to ensure we function in excepthook context.
     # See: http://stackoverflow.com/questions/2572172/referencing-other-modules-in-atexit
     self._exit = exiter
-    self._format_tb = formatter
-    self._should_print_backtrace = print_backtraces
-    self._workdir = None
 
   def __call__(self, *args, **kwargs):
     """Map class calls to self.exit() to support sys.exit() fungibility."""
     return self.exit(*args, **kwargs)
-
-  def apply_options(self, options):
-    """Applies global configuration options to internal behavior.
-
-    :param Options options: An instance of an Options object to fetch global options from.
-    """
-    self._should_print_backtrace = options.for_global_scope().print_exception_stacktrace
-    self._workdir = options.for_global_scope().pants_workdir
 
   def exit(self, result=0, msg=None, out=None):
     """Exits the runtime.
@@ -72,9 +51,19 @@ class Exiter(object):
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
     if msg:
-      if PY2:
-        msg = msg.encode('utf-8')  # sys.stderr expects bytes in Py2, unicode in Py3
-      print(msg, file=out or sys.stderr)
+      out = out or sys.stderr
+      # sys.stderr expects bytes in Py2, unicode in Py3
+      msg = ensure_binary(msg)
+      try:
+        print(msg, file=out)
+        # TODO: Determine whether this call is a no-op because the stream gets flushed on exit, or
+        # if we could lose what we just printed, e.g. if we get interrupted by a signal while
+        # exiting and the stream is buffered like stdout.
+        out.flush()
+      except Exception as e:
+        # If the file is already closed, or any other error occurs, just log it and continue to
+        # exit.
+        logger.exception(e)
     self._exit(result)
 
   def exit_and_fail(self, msg=None):
@@ -83,45 +72,3 @@ class Exiter(object):
     :param str msg: A string message to print to stderr before exiting. (Optional)
     """
     self.exit(result=1, msg=msg)
-
-  def handle_unhandled_exception(self, exc_class=None, exc=None, tb=None, add_newline=False):
-    """Default sys.excepthook implementation for unhandled exceptions."""
-    exc_class = exc_class or sys.exc_info()[0]
-    exc = exc or sys.exc_info()[1]
-    tb = tb or sys.exc_info()[2]
-
-    def format_msg(print_backtrace=True):
-      msg = 'Exception caught: ({})\n'.format(type(exc))
-      msg += '{}\n'.format(''.join(self._format_tb(tb))) if print_backtrace else '\n'
-      msg += 'Exception message: {}\n'.format(str(exc) if exc else 'none')
-      msg += '\n' if add_newline else ''
-      return msg
-
-    # Always output the unhandled exception details into a log file.
-    self._log_exception(format_msg())
-    self.exit_and_fail(format_msg(self._should_print_backtrace))
-
-  def _log_exception(self, msg):
-    if self._workdir:
-      try:
-        output_path = os.path.join(self._workdir, 'logs', 'exceptions.log')
-        with safe_open(output_path, 'a') as exception_log:
-          exception_log.write('timestamp: {}\n'.format(datetime.datetime.now().isoformat()))
-          exception_log.write('args: {}\n'.format(sys.argv))
-          exception_log.write('pid: {}\n'.format(os.getpid()))
-          exception_log.write(msg)
-          exception_log.write('\n')
-      except Exception as e:
-        # This is all error recovery logic so we catch all exceptions from the logic above because
-        # we don't want to hide the original error.
-        logger.error('Problem logging original exception: {}'.format(e))
-
-  def _setup_faulthandler(self, trace_stream):
-    faulthandler.enable(trace_stream)
-    # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
-    faulthandler.register(signal.SIGUSR2, trace_stream, chain=True)
-
-  def set_except_hook(self, trace_stream=None):
-    """Sets the global exception hook."""
-    self._setup_faulthandler(trace_stream or sys.stderr)
-    sys.excepthook = self.handle_unhandled_exception

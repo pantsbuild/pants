@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
@@ -10,6 +10,7 @@ use std::time::Instant;
 use bazel_protos;
 use futures::{Future, Sink};
 use grpcio;
+use parking_lot::Mutex;
 use protobuf;
 
 ///
@@ -21,14 +22,14 @@ use protobuf;
 ///
 #[derive(Clone, Debug)]
 pub struct MockOperation {
-  pub op: Option<bazel_protos::operations::Operation>,
+  pub op: Result<Option<bazel_protos::operations::Operation>, grpcio::RpcStatus>,
   pub duration: Option<Duration>,
 }
 
 impl MockOperation {
   pub fn new(op: bazel_protos::operations::Operation) -> MockOperation {
     MockOperation {
-      op: Some(op),
+      op: Ok(Some(op)),
       duration: None,
     }
   }
@@ -90,11 +91,9 @@ impl TestServer {
     let mut server_transport = grpcio::ServerBuilder::new(env)
       .register_service(bazel_protos::remote_execution_grpc::create_execution(
         mock_responder.clone(),
-      ))
-      .register_service(bazel_protos::operations_grpc::create_operations(
+      )).register_service(bazel_protos::operations_grpc::create_operations(
         mock_responder.clone(),
-      ))
-      .bind("localhost", 0)
+      )).bind("localhost", 0)
       .build()
       .unwrap();
     server_transport.start();
@@ -121,7 +120,6 @@ impl Drop for TestServer {
       .mock_execution
       .operation_responses
       .lock()
-      .unwrap()
       .len();
     assert_eq!(
       remaining_expected_responses,
@@ -134,17 +132,9 @@ impl Drop for TestServer {
           .mock_execution
           .operation_responses
           .lock()
-          .unwrap()
           .clone(),
       )),
-      MockResponder::display_all(
-        &self
-          .mock_responder
-          .received_messages
-          .deref()
-          .lock()
-          .unwrap()
-      )
+      MockResponder::display_all(&self.mock_responder.received_messages.deref().lock())
     )
   }
 }
@@ -164,7 +154,7 @@ impl MockResponder {
   }
 
   fn log<T: protobuf::Message + Sized>(&self, message: T) {
-    self.received_messages.lock().unwrap().push((
+    self.received_messages.lock().push((
       message.descriptor().name().to_string(),
       Box::new(message),
       Instant::now(),
@@ -183,19 +173,17 @@ impl MockResponder {
     &self,
     sink: grpcio::UnarySink<super::bazel_protos::operations::Operation>,
   ) {
-    if let Some(MockOperation { op, duration }) = self
-      .mock_execution
-      .operation_responses
-      .lock()
-      .unwrap()
-      .pop_front()
+    if let Some(MockOperation { op, duration }) =
+      self.mock_execution.operation_responses.lock().pop_front()
     {
       if let Some(d) = duration {
         sleep(d);
       }
-      if let Some(op) = op {
+      if let Ok(Some(op)) = op {
         // Complete the channel with the op.
         sink.success(op.clone());
+      } else if let Err(status) = op {
+        sink.fail(status);
       } else {
         // Cancel the request by dropping the sink.
         drop(sink);
@@ -213,18 +201,12 @@ impl MockResponder {
     ctx: &grpcio::RpcContext,
     sink: grpcio::ServerStreamingSink<super::bazel_protos::operations::Operation>,
   ) {
-    match self
-      .mock_execution
-      .operation_responses
-      .lock()
-      .unwrap()
-      .pop_front()
-    {
+    match self.mock_execution.operation_responses.lock().pop_front() {
       Some(MockOperation { op, duration }) => {
         if let Some(d) = duration {
           sleep(d);
         }
-        if let Some(op) = op {
+        if let Ok(Some(op)) = op {
           ctx.spawn(
             sink
               .send((op.clone(), grpcio::WriteFlags::default()))
@@ -232,6 +214,8 @@ impl MockResponder {
               .map(|_| ())
               .map_err(|_| ()),
           )
+        } else if let Err(status) = op {
+          sink.fail(status);
         } else {
           // Cancel the request by dropping the sink.
           drop(sink)
@@ -242,8 +226,7 @@ impl MockResponder {
           .fail(grpcio::RpcStatus::new(
             grpcio::RpcStatusCode::InvalidArgument,
             Some("Did not expect further requests from client.".to_string()),
-          ))
-          .map(|_| ())
+          )).map(|_| ())
           .map_err(|_| ()),
       ),
     }
@@ -267,8 +250,7 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
           .fail(grpcio::RpcStatus::new(
             grpcio::RpcStatusCode::InvalidArgument,
             Some("Did not expect this request".to_string()),
-          ))
-          .map_err(|_| ()),
+          )).map_err(|_| ()),
       );
       return;
     }

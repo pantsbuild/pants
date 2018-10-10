@@ -71,6 +71,13 @@ class DependencyContext(Subsystem, DependencyContextBase):
       prop = prop or selector(ScalaPlatform.global_instance())
     return prop
 
+  def dependencies_respecting_strict_deps(self, target):
+    if self.defaulted_property(target, lambda x: x.strict_deps):
+      dependencies = target.strict_dependencies(self)
+    else:
+      dependencies = self.all_dependencies(target)
+    return dependencies
+
 
 class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
   """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""

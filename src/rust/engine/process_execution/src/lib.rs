@@ -2,16 +2,28 @@
 #![cfg_attr(
   feature = "cargo-clippy",
   deny(
-    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
-    single_match_else, unseparated_literal_suffix, used_underscore_binding
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
   )
 )]
 // It is often more clear to show that nothing is being moved.
 #![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
 // Subjective style.
-#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
@@ -31,7 +43,6 @@ extern crate log;
 #[cfg(test)]
 extern crate mock;
 extern crate protobuf;
-extern crate resettable;
 extern crate sha2;
 #[cfg(test)]
 extern crate tempfile;
@@ -110,28 +121,20 @@ pub struct FallibleExecuteProcessResult {
 
 pub trait CommandRunner: Send + Sync {
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String>;
-
-  ///
-  /// NB: Unlike other `with_shutdown` methods in the codebase, this method takes a Fn reference,
-  /// because in order to be "object safe", `CommandRunner` must not have functions with generic
-  /// parameters.
-  ///
-  fn with_shutdown(&self, f: &mut FnMut() -> ());
 }
 
 ///
 /// A CommandRunner wrapper that limits the number of concurrent requests.
 ///
+#[derive(Clone)]
 pub struct BoundedCommandRunner {
-  inner: Arc<Box<CommandRunner>>,
-  sema: AsyncSemaphore,
+  inner: Arc<(Box<CommandRunner>, AsyncSemaphore)>,
 }
 
 impl BoundedCommandRunner {
   pub fn new(inner: Box<CommandRunner>, bound: usize) -> BoundedCommandRunner {
     BoundedCommandRunner {
-      inner: Arc::new(inner),
-      sema: AsyncSemaphore::new(bound),
+      inner: Arc::new((inner, AsyncSemaphore::new(bound))),
     }
   }
 }
@@ -139,10 +142,6 @@ impl BoundedCommandRunner {
 impl CommandRunner for BoundedCommandRunner {
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let inner = self.inner.clone();
-    self.sema.with_acquired(move || inner.run(req))
-  }
-
-  fn with_shutdown(&self, f: &mut FnMut() -> ()) {
-    self.inner.with_shutdown(f);
+    self.inner.1.with_acquired(move || inner.0.run(req))
   }
 }

@@ -5,6 +5,7 @@
 python_library(
   dependencies = [
     '3rdparty/python:requests',
+    '3rdparty/python:www-authenticate',
     'src/python/pants/subsystem',
     'src/python/pants/process',
     'src/python/pants/util:dirutil',

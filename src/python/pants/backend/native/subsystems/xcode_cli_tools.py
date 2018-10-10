@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 
 from pants.backend.native.config.environment import Assembler, CCompiler, CppCompiler, Linker
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Select
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_readable_dir
@@ -196,5 +196,4 @@ def create_xcode_cli_tools_rules():
     get_ld,
     get_clang,
     get_clang_plusplus,
-    RootRule(XCodeCLITools),
   ]

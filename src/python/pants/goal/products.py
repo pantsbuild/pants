@@ -72,6 +72,9 @@ class UnionProducts(object):
     """Updates the products for a particular target, removing the given existing entries.
 
     :API: public
+
+    :param target: The target to remove the products for.
+    :param products: A list of tuples (conf, path) to remove.
     """
     for product in products:
       self._products_by_target[target].discard(product)

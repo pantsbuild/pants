@@ -22,12 +22,8 @@ function bootstrap_rust() {
   RUST_COMPONENTS=(
     "rustfmt-preview"
     "rust-src"
+    "clippy-preview"
   )
-
-  if [[ "$#" -eq 1 && "$1" == "+beta" ]]; then
-    RUST_TOOLCHAIN="beta"
-    RUST_COMPONENTS=("${RUST_COMPONENTS[@]}" "clippy-preview")
-  fi
 
   # Control a pants-specific rust toolchain.
   if [[ ! -x "${RUSTUP}" ]]

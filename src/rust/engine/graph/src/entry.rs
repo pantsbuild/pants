@@ -1,11 +1,12 @@
 use std::mem;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use node::{EntryId, Node, NodeContext, NodeError};
 
 use futures::future::{self, Future};
 use futures::sync::oneshot;
+use parking_lot::Mutex;
 
 use boxfuture::{BoxFuture, Boxable};
 
@@ -152,11 +153,12 @@ impl<N: Node> Entry<N> {
   /// If the Future for this Node has already completed, returns a clone of its result.
   ///
   pub fn peek(&self) -> Option<Result<N::Item, N::Error>> {
-    let state = self.state.lock().unwrap();
+    let state = self.state.lock();
     match *state {
       EntryState::Completed {
         ref result, dirty, ..
-      } if !dirty =>
+      }
+        if !dirty =>
       {
         Some(result.clone())
       }
@@ -207,8 +209,7 @@ impl<N: Node> Entry<N> {
                   context2.graph().clear_deps(entry_id, run_token);
                   Ok(false)
                 }
-              })
-              .to_boxed()
+              }).to_boxed()
           } else {
             future::ok(false).to_boxed()
           };
@@ -232,8 +233,7 @@ impl<N: Node> Entry<N> {
                     .graph()
                     .complete(&context2, entry_id, run_token, Some(res));
                   Ok(())
-                })
-                .to_boxed()
+                }).to_boxed()
             }
           })
         }));
@@ -274,7 +274,7 @@ impl<N: Node> Entry<N> {
     C: NodeContext<Node = N>,
   {
     {
-      let mut state = self.state.lock().unwrap();
+      let mut state = self.state.lock();
 
       // First check whether the Node is already complete, or is currently running: in both of these
       // cases we don't swap the state of the Node.
@@ -294,7 +294,8 @@ impl<N: Node> Entry<N> {
           generation,
           dirty,
           ..
-        } if !dirty =>
+        }
+          if !dirty =>
         {
           return future::result(result.clone())
             .map(move |res| (res, generation))
@@ -380,7 +381,7 @@ impl<N: Node> Entry<N> {
   ) where
     C: NodeContext<Node = N>,
   {
-    let mut state = self.state.lock().unwrap();
+    let mut state = self.state.lock();
 
     // We care about exactly one case: a Running state with the same run_token. All other states
     // represent various (legal) race conditions. See `RunToken`'s docs for more information.
@@ -467,7 +468,7 @@ impl<N: Node> Entry<N> {
   /// we want the per-Entry locking strategy to be.
   ///
   pub(crate) fn generation(&self) -> Generation {
-    match *self.state.lock().unwrap() {
+    match *self.state.lock() {
       EntryState::NotStarted { generation, .. }
       | EntryState::Running { generation, .. }
       | EntryState::Completed { generation, .. } => generation,
@@ -481,7 +482,7 @@ impl<N: Node> Entry<N> {
   /// we want the per-Entry locking strategy to be.
   ///
   pub(crate) fn run_token(&self) -> RunToken {
-    match *self.state.lock().unwrap() {
+    match *self.state.lock() {
       EntryState::NotStarted { run_token, .. }
       | EntryState::Running { run_token, .. }
       | EntryState::Completed { run_token, .. } => run_token,
@@ -492,7 +493,7 @@ impl<N: Node> Entry<N> {
   /// If the Node has started and has not yet completed, returns its runtime.
   ///
   pub(crate) fn current_running_duration(&self, now: Instant) -> Option<Duration> {
-    match *self.state.lock().unwrap() {
+    match *self.state.lock() {
       EntryState::Running { start_time, .. } => Some(now.duration_since(start_time)),
       _ => None,
     }
@@ -502,7 +503,7 @@ impl<N: Node> Entry<N> {
   /// Clears the state of this Node, forcing it to be recomputed.
   ///
   pub(crate) fn clear(&mut self) {
-    let mut state = self.state.lock().unwrap();
+    let mut state = self.state.lock();
 
     let (run_token, generation, previous_result) =
       match mem::replace(&mut *state, EntryState::initial()) {
@@ -540,7 +541,7 @@ impl<N: Node> Entry<N> {
   /// See comment on complete for information about _graph argument.
   ///
   pub(crate) fn dirty(&mut self, _graph: &mut super::InnerGraph<N>) {
-    match &mut *self.state.lock().unwrap() {
+    match &mut *self.state.lock() {
       &mut EntryState::Running { ref mut dirty, .. }
       | &mut EntryState::Completed { ref mut dirty, .. } => {
         // Mark dirty.

@@ -41,7 +41,6 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python:pex',
-    ':pex_util',
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:exceptions',
     'src/python/pants/process',
@@ -88,10 +87,3 @@ python_library(
   ]
 )
 
-python_library(
-  name = 'pex_util',
-  sources = ['pex_util.py'],
-  dependencies = [
-    '3rdparty/python:pex',
-  ]
-)

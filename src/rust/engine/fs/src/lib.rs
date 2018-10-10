@@ -5,16 +5,28 @@
 #![cfg_attr(
   feature = "cargo-clippy",
   deny(
-    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
-    single_match_else, unseparated_literal_suffix, used_underscore_binding
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
   )
 )]
 // It is often more clear to show that nothing is being moved.
 #![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
 // Subjective style.
-#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
@@ -51,8 +63,8 @@ extern crate lmdb;
 extern crate log;
 #[cfg(test)]
 extern crate mock;
+extern crate parking_lot;
 extern crate protobuf;
-extern crate resettable;
 extern crate serde;
 extern crate sha2;
 #[cfg(test)]
@@ -61,6 +73,7 @@ extern crate tempfile;
 extern crate testutil;
 #[macro_use]
 extern crate serde_derive;
+extern crate uuid;
 
 use std::cmp::min;
 use std::io::{self, Read};
@@ -237,8 +250,7 @@ impl PathGlobIncludeEntry {
       .map(|path_glob| GlobWithSource {
         path_glob,
         source: GlobSource::ParsedInput(self.input.clone()),
-      })
-      .collect()
+      }).collect()
   }
 }
 
@@ -502,8 +514,7 @@ impl PathGlobs {
       .map(|glob| PathGlobIncludeEntry {
         input: MISSING_GLOB_SOURCE.clone(),
         globs: vec![glob],
-      })
-      .collect();
+      }).collect();
     // An empty exclude becomes EMPTY_IGNORE.
     PathGlobs::create_with_globs_and_match_behavior(
       include,
@@ -555,8 +566,7 @@ impl PosixFS {
             ))
           }
         })
-      })
-      .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
+      }).map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
 
     let ignore = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
       format!(
@@ -584,8 +594,7 @@ impl PosixFS {
           &dir_abs,
           get_metadata,
         )
-      })
-      .collect::<Result<Vec<_>, io::Error>>()?;
+      }).collect::<Result<Vec<_>, io::Error>>()?;
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(stats)
   }
@@ -608,8 +617,7 @@ impl PosixFS {
             content: Bytes::from(content),
           })
         })
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
@@ -635,8 +643,7 @@ impl PosixFS {
               })
           }
         })
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 
   ///
@@ -750,8 +757,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
                 io::ErrorKind::NotFound => Ok(None),
                 _ => Err(err),
               },
-            })
-            .and_then(move |maybe_stat| {
+            }).and_then(move |maybe_stat| {
               match maybe_stat {
                 // Note: This will drop PathStats for symlinks which don't point anywhere.
                 Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), &link),
@@ -764,8 +770,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
                 None => future::ok(None).to_boxed(),
               }
             })
-        })
-        .collect::<Vec<_>>(),
+        }).collect::<Vec<_>>(),
     ).to_boxed()
   }
 }
@@ -868,12 +873,12 @@ mod posixfs_test {
       0o600,
     );
     let fs = new_posixfs(&dir.path());
-    let file_content =
-      fs.read_file(&File {
+    let file_content = fs
+      .read_file(&File {
         path: path.clone(),
         is_executable: false,
       }).wait()
-        .unwrap();
+      .unwrap();
     assert_eq!(file_content.path, path);
     assert_eq!(file_content.content, content);
   }
@@ -885,8 +890,7 @@ mod posixfs_test {
       .read_file(&File {
         path: PathBuf::from("marmosets"),
         is_executable: false,
-      })
-      .wait()
+      }).wait()
       .expect_err("Expected error");
   }
 
@@ -1071,8 +1075,7 @@ mod posixfs_test {
         PathBuf::from("dir_symlink"),
         PathBuf::from("symlink_to_nothing"),
         PathBuf::from("doesnotexist"),
-      ])
-      .wait()
+      ]).wait()
       .unwrap();
     let v: Vec<Option<PathStat>> = vec![
       Some(PathStat::file(

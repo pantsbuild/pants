@@ -70,6 +70,18 @@ python_library(
 )
 
 python_library(
+  name = 'exception_sink',
+  sources = ['exception_sink.py'],
+  dependencies = [
+    '3rdparty/python:faulthandler',
+    '3rdparty/python:setproctitle',
+    'src/python/pants/util:dirutil',
+    ':build_environment',
+    ':exiter',
+  ],
+)
+
+python_library(
   name = 'exceptions',
   sources = ['exceptions.py'],
 )
@@ -225,7 +237,7 @@ python_library(
   sources=['exiter.py'],
   dependencies=[
     '3rdparty/python:future',
-    '3rdparty/python:faulthandler',
-    'src/python/pants/util:dirutil'
+    'src/python/pants/util:fileutil',
+    'src/python/pants/util:strutil',
   ]
 )

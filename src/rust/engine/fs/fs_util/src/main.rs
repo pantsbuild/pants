@@ -2,16 +2,28 @@
 #![cfg_attr(
   feature = "cargo-clippy",
   deny(
-    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
-    single_match_else, unseparated_literal_suffix, used_underscore_binding
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
   )
 )]
 // It is often more clear to show that nothing is being moved.
 #![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
 // Subjective style.
-#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
@@ -24,6 +36,7 @@ extern crate env_logger;
 extern crate fs;
 extern crate futures;
 extern crate hashing;
+extern crate parking_lot;
 extern crate protobuf;
 extern crate serde;
 #[macro_use]
@@ -36,11 +49,12 @@ use clap::{App, Arg, SubCommand};
 use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, UploadSummary};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
+use parking_lot::Mutex;
 use protobuf::Message;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -181,6 +195,24 @@ to this directory.",
               .required(false)
         )
         .arg(
+          Arg::with_name("root-ca-cert-file")
+              .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
+              .takes_value(true)
+              .long("root-ca-cert-file")
+              .required(false)
+        )
+        .arg(
+          Arg::with_name("oauth-bearer-token-file")
+              .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
+              .takes_value(true)
+              .long("oauth-bearer-token-file")
+              .required(false)
+        )
+        .arg(Arg::with_name("remote-instance-name")
+            .takes_value(true)
+                 .long("remote-instance-name")
+                 .required(false))
+        .arg(
           Arg::with_name("chunk-bytes")
               .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
               .takes_value(true)
@@ -209,11 +241,35 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       Some(cas_address) => {
         let chunk_size =
           value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
+
+        let root_ca_certs = if let Some(path) = top_match.value_of("root-ca-cert-file") {
+          Some(
+            std::fs::read(path)
+              .map_err(|err| format!("Error reading root CA certs file {}: {}", path, err))?,
+          )
+        } else {
+          None
+        };
+
+        let oauth_bearer_token =
+          if let Some(path) = top_match.value_of("oauth-bearer-token-file") {
+            Some(std::fs::read_to_string(path).map_err(|err| {
+              format!("Error reading oauth bearer token from {:?}: {}", path, err)
+            })?)
+          } else {
+            None
+          };
+
         (
           Store::with_remote(
             &store_dir,
             pool.clone(),
-            cas_address.to_owned(),
+            cas_address,
+            top_match
+              .value_of("remote-instance-name")
+              .map(str::to_owned),
+            root_ca_certs,
+            oauth_bearer_token,
             1,
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures
@@ -334,16 +390,14 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             // something here, or we don't care. Is that a valid assumption?
             fs::StrictGlobMatching::Ignore,
             fs::GlobExpansionConjunction::AllMatch,
-          )?)
-          .map_err(|e| format!("Error expanding globs: {:?}", e))
+          )?).map_err(|e| format!("Error expanding globs: {:?}", e))
           .and_then(move |paths| {
             Snapshot::from_path_stats(
               store_copy.clone(),
               &fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
               paths,
             )
-          })
-          .map(|snapshot| snapshot.digest)
+          }).map(|snapshot| snapshot.digest)
           .wait()?;
 
         let report = ensure_uploaded_to_remote(&store, store_has_remote, digest);
@@ -375,8 +429,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                   .map(|f| format!("{}\n", f))
                   .collect::<Vec<String>>()
                   .join("")
-              })
-              .map(|s| s.into_bytes())
+              }).map(|s| s.into_bytes())
           }),
           format => Err(format!(
             "Unexpected value of --output-format arg: {}",
@@ -415,8 +468,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                   .expect("Error serializing Directory proto"),
               )
             })
-          })
-          .wait()?,
+          }).wait()?,
         some => some,
       };
       match v {
@@ -441,7 +493,7 @@ fn expand_files(store: Store, digest: Digest) -> Result<Option<Vec<String>>, Str
     .wait()
     .map(|maybe| {
       maybe.map(|()| {
-        let mut v = Arc::try_unwrap(files).unwrap().into_inner().unwrap();
+        let mut v = Arc::try_unwrap(files).unwrap().into_inner();
         v.sort();
         v
       })
@@ -459,7 +511,7 @@ fn expand_files_helper(
     .and_then(|maybe_dir| match maybe_dir {
       Some(dir) => {
         {
-          let mut files_unlocked = files.lock().unwrap();
+          let mut files_unlocked = files.lock();
           for file in dir.get_files() {
             files_unlocked.push(format!("{}{}", prefix, file.name));
           }
@@ -476,14 +528,12 @@ fn expand_files_helper(
                 format!("{}{}/", prefix, dir.name),
                 files.clone(),
               )
-            })
-            .collect::<Vec<_>>(),
+            }).collect::<Vec<_>>(),
         ).map(|_| Some(()))
-          .to_boxed()
+        .to_boxed()
       }
       None => futures::future::ok(None).to_boxed(),
-    })
-    .to_boxed()
+    }).to_boxed()
 }
 
 fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {

@@ -206,14 +206,33 @@ python_tests(
 )
 
 python_tests(
-  name = 'exiter',
-  sources = ['test_exiter.py'],
+  name = 'exception_sink',
+  sources = ['test_exception_sink.py'],
   dependencies = [
     '3rdparty/python:future',
-    'src/python/pants/bin',
+    '3rdparty/python:mock',
+    'src/python/pants/base:exception_sink',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/option:testing',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:osutil',
+    'tests/python/pants_test:test_base',
+    'tests/python/pants_test/option/util',
   ],
+  tags={'platform_specific_behavior'},
+)
+
+python_tests(
+  name = 'exception_sink_integration',
+  sources = ['test_exception_sink_integration.py'],
+  dependencies = [
+    '3rdparty/python:future',
+    '3rdparty/python:mock',
+    'src/python/pants/base:exception_sink',
+    'src/python/pants/util:osutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'platform_specific_behavior', 'integration'},
+  timeout = 360,
 )
 
 python_tests(

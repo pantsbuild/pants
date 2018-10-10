@@ -12,14 +12,10 @@ pub struct Get {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
   pub product: TypeConstraint,
-  pub variant_key: Option<String>,
 }
 
 impl Select {
-  pub fn without_variant(product: TypeConstraint) -> Select {
-    Select {
-      product: product,
-      variant_key: None,
-    }
+  pub fn new(product: TypeConstraint) -> Select {
+    Select { product: product }
   }
 }

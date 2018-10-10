@@ -21,16 +21,16 @@ fn main() -> Result<(), String> {
         .takes_value(true)
         .help("Port that the CAS should listen to.")
         .default_value("0"),
-    )
-    .get_matches();
+    ).get_matches();
 
-  let cas = StubCAS::empty_with_port(
-    matches
-      .value_of("port")
-      .unwrap()
-      .parse::<u16>()
-      .expect("port must be a non-negative number"),
-  );
+  let cas = StubCAS::builder()
+    .port(
+      matches
+        .value_of("port")
+        .unwrap()
+        .parse::<u16>()
+        .expect("port must be a non-negative number"),
+    ).build();
   println!("Started CAS at address: {}", cas.address());
   println!("Press enter to exit.");
   let _ = stdin.read(&mut [0u8]).unwrap();

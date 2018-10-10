@@ -2,27 +2,41 @@
 #![cfg_attr(
   feature = "cargo-clippy",
   deny(
-    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
-    single_match_else, unseparated_literal_suffix, used_underscore_binding
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
   )
 )]
 // It is often more clear to show that nothing is being moved.
 #![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
 // Subjective style.
-#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
 extern crate futures;
+extern crate parking_lot;
 
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use futures::future::Future;
 use futures::task::{self, Task};
 use futures::{Async, Poll};
+use parking_lot::Mutex;
 
 struct Inner {
   waiters: VecDeque<Task>,
@@ -75,7 +89,7 @@ pub struct Permit {
 impl Drop for Permit {
   fn drop(&mut self) {
     let task = {
-      let mut inner = self.inner.lock().unwrap();
+      let mut inner = self.inner.lock();
       inner.available_permits += 1;
       if let Some(task) = inner.waiters.pop_front() {
         task
@@ -98,7 +112,7 @@ impl Future for PermitFuture {
   fn poll(&mut self) -> Poll<Permit, ()> {
     let inner = self.inner.take().expect("cannot poll PermitFuture twice");
     let acquired = {
-      let mut inner = inner.lock().unwrap();
+      let mut inner = inner.lock();
       if inner.available_permits == 0 {
         inner.waiters.push_back(task::current());
         false
@@ -152,8 +166,7 @@ mod tests {
           tx_thread1.send(()).unwrap();
           rx_thread1.recv().unwrap();
           future::ok::<_, ()>(())
-        })
-        .wait()
+        }).wait()
         .unwrap();
     });
 
@@ -167,8 +180,7 @@ mod tests {
         .with_acquired(move || {
           tx_thread2.send(()).unwrap();
           future::ok::<_, ()>(())
-        })
-        .wait()
+        }).wait()
         .unwrap();
     });
 

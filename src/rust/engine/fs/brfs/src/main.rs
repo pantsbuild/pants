@@ -2,16 +2,28 @@
 #![cfg_attr(
   feature = "cargo-clippy",
   deny(
-    clippy, default_trait_access, expl_impl_clone_on_copy, if_not_else, needless_continue,
-    single_match_else, unseparated_literal_suffix, used_underscore_binding
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
   )
 )]
 // It is often more clear to show that nothing is being moved.
 #![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
 // Subjective style.
-#![cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty, redundant_field_names))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(feature = "cargo-clippy", allow(new_without_default, new_without_default_derive))]
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
@@ -27,6 +39,7 @@ extern crate hashing;
 extern crate libc;
 #[macro_use]
 extern crate log;
+extern crate parking_lot;
 extern crate protobuf;
 #[cfg(test)]
 extern crate tempfile;
@@ -36,11 +49,12 @@ extern crate time;
 
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
+use parking_lot::Mutex;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
 use std::ffi::{CString, OsStr, OsString};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 const TTL: time::Timespec = time::Timespec { sec: 0, nsec: 0 };
 
@@ -390,8 +404,7 @@ impl fuse::Filesystem for BuildResultFS {
           .map_err(|err| {
             error!("Error loading file by digest {}: {}", digest_str, err);
             libc::EINVAL
-          })
-          .and_then(|maybe_inode| {
+          }).and_then(|maybe_inode| {
             maybe_inode
               .and_then(|inode| self.file_attr_for(inode))
               .ok_or(libc::ENOENT)
@@ -424,11 +437,9 @@ impl fuse::Filesystem for BuildResultFS {
               .map_err(|err| {
                 error!("Error reading directory {:?}: {}", parent_digest, err);
                 libc::EINVAL
-              })?
-              .and_then(|directory| self.node_for_digest(&directory, filename))
+              })?.and_then(|directory| self.node_for_digest(&directory, filename))
               .ok_or(libc::ENOENT)
-          })
-          .and_then(|node| match node {
+          }).and_then(|node| match node {
             Node::Directory(directory_node) => {
               let digest_result: Result<Digest, String> = directory_node.get_digest().into();
               let digest = digest_result.map_err(|err| {
@@ -448,8 +459,7 @@ impl fuse::Filesystem for BuildResultFS {
                 .map_err(|err| {
                   error!("Error loading file by digest {}: {}", filename, err);
                   libc::EINVAL
-                })
-                .and_then(|maybe_inode| {
+                }).and_then(|maybe_inode| {
                   maybe_inode
                     .and_then(|inode| self.file_attr_for(inode))
                     .ok_or(libc::ENOENT)
@@ -512,26 +522,23 @@ impl fuse::Filesystem for BuildResultFS {
           .load_file_bytes_with(digest, move |bytes| {
             let begin = std::cmp::min(offset as usize, bytes.len());
             let end = std::cmp::min(offset as usize + size as usize, bytes.len());
-            let mut reply = reply.lock().unwrap();
+            let mut reply = reply.lock();
             reply.take().unwrap().data(&bytes.slice(begin, end));
-          })
-          .map(|v| {
+          }).map(|v| {
             if v.is_none() {
-              let maybe_reply = reply2.lock().unwrap().take();
+              let maybe_reply = reply2.lock().take();
               if let Some(reply) = maybe_reply {
                 reply.error(libc::ENOENT);
               }
             }
-          })
-          .or_else(|err| {
+          }).or_else(|err| {
             error!("Error loading bytes for {:?}: {}", digest, err);
-            let maybe_reply = reply2.lock().unwrap().take();
+            let maybe_reply = reply2.lock().take();
             if let Some(reply) = maybe_reply {
               reply.error(libc::EINVAL);
             }
             Ok(())
-          })
-          .wait();
+          }).wait();
         result.expect("Error from read future which should have been handled in the future ");
       }
       _ => reply.error(libc::ENOENT),
@@ -613,19 +620,32 @@ fn main() {
         .long("local-store-path")
         .default_value_os(default_store_path.as_ref())
         .required(false),
-    )
-    .arg(
+    ).arg(
       clap::Arg::with_name("server-address")
         .takes_value(true)
         .long("server-address")
         .required(false),
-    )
-    .arg(
+    ).arg(
+      clap::Arg::with_name("remote-instance-name")
+        .takes_value(true)
+        .long("remote-instance-name")
+        .required(false),
+    ).arg(
+      clap::Arg::with_name("root-ca-cert-file")
+          .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
+          .takes_value(true)
+          .long("root-ca-cert-file")
+          .required(false)
+    ).arg(clap::Arg::with_name("oauth-bearer-token-file")
+        .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
+        .takes_value(true)
+        .long("oauth-bearer-token-file")
+        .required(false)
+  ).arg(
       clap::Arg::with_name("mount-path")
         .required(true)
         .takes_value(true),
-    )
-    .get_matches();
+    ).get_matches();
 
   let mount_path = args.value_of("mount-path").unwrap();
   let store_path = args.value_of("local-store-path").unwrap();
@@ -642,12 +662,27 @@ fn main() {
     }
   }
 
+  let root_ca_certs = if let Some(path) = args.value_of("root-ca-cert-file") {
+    Some(std::fs::read(path).expect("Error reading root CA certs file"))
+  } else {
+    None
+  };
+
+  let oauth_bearer_token = if let Some(path) = args.value_of("oauth-bearer-token-file") {
+    Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
+  } else {
+    None
+  };
+
   let pool = Arc::new(fs::ResettablePool::new("brfs-".to_owned()));
   let store = match args.value_of("server-address") {
     Some(address) => fs::Store::with_remote(
       &store_path,
       pool,
-      address.to_owned(),
+      address,
+      args.value_of("remote-instance-name").map(str::to_owned),
+      root_ca_certs,
+      oauth_bearer_token,
       1,
       4 * 1024 * 1024,
       std::time::Duration::from_secs(5 * 60),

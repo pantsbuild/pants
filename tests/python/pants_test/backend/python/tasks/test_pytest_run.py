@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 import coverage
-from six.moves import configparser
+from backports import configparser
 
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep

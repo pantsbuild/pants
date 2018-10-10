@@ -184,19 +184,27 @@ class ClasspathProducts(object):
       self.add_for_target(target, classpath_elements)
 
   def add_for_target(self, target, classpath_elements):
-    """Adds classpath path elements to the products of the provided target."""
+    """Adds classpath path elements to the products of the provided target.
+
+    :param target: The target for which to add the classpath elements.
+    :param classpath_elements: List of tuples, either (conf, filename) or
+                               (conf, pants.backend.jvm.tasks.ClasspathEntry)
+    """
     self._add_elements_for_target(target, self._wrap_path_elements(classpath_elements))
 
   def add_jars_for_targets(self, targets, conf, resolved_jars):
     """Adds jar classpath elements to the products of the provided targets.
 
     The resolved jars are added in a way that works with excludes.
+    :param targets: The targets to add the jars for.
+    :param conf: The configuration.
+    :param resolved_jars: A list of ResolvedJars.
     """
     classpath_entries = []
     for jar in resolved_jars:
       if not jar.pants_path:
         raise TaskError('Jar: {!s} has no specified path.'.format(jar.coordinate))
-      cp_entry = ArtifactClasspathEntry(jar.pants_path, jar.coordinate, jar.cache_path)
+      cp_entry = ArtifactClasspathEntry(jar.pants_path, jar.coordinate, jar.cache_path, jar.directory_digest)
       classpath_entries.append((conf, cp_entry))
 
     for target in targets:
@@ -329,7 +337,15 @@ class ClasspathProducts(object):
       self._excludes.add_for_target(target, target.excludes)
 
   def _wrap_path_elements(self, classpath_elements):
-    return [(element[0], ClasspathEntry(*element[1:])) for element in classpath_elements]
+    wrapped_path_elements = []
+    for element in classpath_elements:
+      if len(element) != 2:
+        raise ValueError('Input must be a list of tuples containing two elements.')
+      if isinstance(element[1], ClasspathEntry):
+        wrapped_path_elements.append(element)
+      else:
+        wrapped_path_elements.append((element[0], ClasspathEntry(element[1])))
+    return wrapped_path_elements
 
   def _add_elements_for_target(self, target, elements):
     self._validate_classpath_tuples(elements, target)

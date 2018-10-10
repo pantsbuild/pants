@@ -22,7 +22,7 @@ class NodeModule(NodePackage):
 
   def __init__(
     self, package_manager=None, sources=None, build_script=None, output_dir='dist',
-    dev_dependency=False, style_ignore_path='.eslintignore', address=None, payload=None, 
+    dev_dependency=False, style_ignore_path='.eslintignore', address=None, payload=None,
     bin_executables=None, node_scope=None, **kwargs):
     """
     :param sources: Javascript and other source code files that make up this module; paths are

@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import configparser
 import getpass
 import io
 import itertools
@@ -13,6 +12,7 @@ from builtins import open
 from contextlib import contextmanager
 
 import six
+from backports import configparser
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
