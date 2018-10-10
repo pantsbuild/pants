@@ -702,6 +702,8 @@ class JvmCompile(NailgunTaskBase):
     return jobs
 
   def pre_compile_jobs(self, counter):
+    # NB: Override this to provide jobs that are scheduled before any of the target jobs are
+    #     scheduled.
     return []
 
   def create_compile_jobs(self, compile_target, all_compile_contexts, invalid_dependencies, ivts,

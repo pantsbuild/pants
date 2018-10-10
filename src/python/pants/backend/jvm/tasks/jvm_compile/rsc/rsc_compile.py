@@ -212,6 +212,9 @@ class RscCompile(ZincCompile):
   def _only_zinc_compileable(self, target):
     return target.has_sources('.java')
 
+  def _is_scala_core_library(self, target):
+    return target.address.spec in ('//:scala-library', '//:scala-library-synthetic')
+
   def create_empty_extra_products(self):
     super(RscCompile, self).create_empty_extra_products()
 
@@ -534,8 +537,7 @@ class RscCompile(ZincCompile):
         # NB: If we're building a scala library jar,
         #     also request that metacp generate the indices
         #     for the scala synthetics.
-        scala_library_jar = tgt.address.spec in ('//:scala-library', '//:scala-library-synthetic')
-        if scala_library_jar:
+        if self._is_scala_core_library(tgt):
           args = [
             '--include-scala-library-synthetics',
           ] + args
@@ -550,8 +552,7 @@ class RscCompile(ZincCompile):
         metacp_stdout = stdout_contents(metacp_wu)
         metacp_result = json.loads(metacp_stdout)
 
-        metai_classpath = self._collect_metai_classpath(
-          metacp_result, classpath_rel, [], is_scala_lib_jar=scala_library_jar)
+        metai_classpath = self._collect_metai_classpath(metacp_result, classpath_rel, [])
 
         # Step 1.5: metai Index the semanticdbs
         # -------------------------------------
@@ -830,7 +831,7 @@ class RscCompile(ZincCompile):
       output_dir=rsc_index_dir
     )
 
-  def _collect_metai_classpath(self, metacp_result, classpath_rel, jvm_lib_jars, is_scala_lib_jar=False):
+  def _collect_metai_classpath(self, metacp_result, classpath_rel, jvm_lib_jars):
     metai_classpath = []
 
     # NB The json uses absolute paths pointing into either the buildroot or
@@ -864,11 +865,9 @@ class RscCompile(ZincCompile):
     for cp_entry in jvm_lib_jars:
       metai_classpath.append(desandboxify_pantsd_loc(status_elements[cp_entry]))
 
-    # TODO when these are generated once, we won't need to collect them here.
-    if is_scala_lib_jar:
-      loc = desandboxify_pantsd_loc(metacp_result["scalaLibrarySynthetics"])
-      if loc:
-        metai_classpath.append(loc)
+    scala_lib_synthetics = desandboxify_pantsd_loc(metacp_result["scalaLibrarySynthetics"])
+    if scala_lib_synthetics:
+      metai_classpath.append(scala_lib_synthetics)
 
     return metai_classpath
 
