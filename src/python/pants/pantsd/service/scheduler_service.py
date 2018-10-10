@@ -184,7 +184,7 @@ class SchedulerService(PantsService):
     # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
     iterations = options.for_global_scope().loop_max
     target_roots = None
-    while iterations and not self.is_killed:
+    while iterations and not self._state.is_terminating:
       try:
         target_roots = self._prefork_body(session, options)
       except session.scheduler_session.execution_error_type as e:
@@ -192,7 +192,7 @@ class SchedulerService(PantsService):
         print(e, file=sys.stderr)
 
       iterations -= 1
-      while iterations and not self.is_killed and not self._loop_condition.wait(timeout=1):
+      while iterations and not self._state.is_terminating and not self._loop_condition.wait(timeout=1):
         continue
     return target_roots
 
@@ -220,7 +220,7 @@ class SchedulerService(PantsService):
 
   def run(self):
     """Main service entrypoint."""
-    while not self.is_killed:
+    while not self._state.is_terminating:
       self._process_event_queue()
 
 

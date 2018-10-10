@@ -52,7 +52,7 @@ class StoreGCService(PantsService):
     jobs = (self._extend_lease, self._garbage_collect)
     threads = [self._launch_thread(job) for job in jobs]
 
-    while not self.is_killed:
+    while not self._state.is_terminating:
       for thread in threads:
         # If any job threads die, we want to exit the `PantsService` thread to cause
         # a daemon teardown.

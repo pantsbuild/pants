@@ -67,7 +67,7 @@ class PailgunService(PantsService):
 
     try:
       # Manually call handle_request() in a loop vs serve_forever() for interruptability.
-      while not self.is_killed:
+      while not self._state.is_terminating:
         self.pailgun.handle_request()
     except select.error as e:
       # SocketServer can throw `error: (9, 'Bad file descriptor')` on teardown. Ignore it.
