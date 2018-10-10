@@ -216,6 +216,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:osutil',
     'tests/python/pants_test:test_base',
+    'tests/python/pants_test/option/util',
   ],
   tags={'platform_specific_behavior'},
 )
@@ -230,7 +231,7 @@ python_tests(
     'src/python/pants/util:osutil',
     'tests/python/pants_test:int-test',
   ],
-  tags = {'integration'},
+  tags = {'platform_specific_behavior', 'integration'},
   timeout = 360,
 )
 

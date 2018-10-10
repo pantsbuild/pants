@@ -32,14 +32,18 @@ class PantsRunner(object):
     self._start_time = start_time
 
   def run(self):
+    # Register our exiter at the beginning of the run() method so that any code in this process from
+    # this point onwards will use that exiter in the case of a fatal error.
+    ExceptionSink.reset_exiter(self._exiter)
+
     options_bootstrapper = OptionsBootstrapper(env=self._env, args=self._args)
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
     global_bootstrap_options = bootstrap_options.for_global_scope()
-    ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
-    self._exiter.should_print_backtrace = global_bootstrap_options.print_exception_stacktrace
-    ExceptionSink.reset_exiter(self._exiter)
 
-    if bootstrap_options.for_global_scope().enable_pantsd:
+    ExceptionSink.reset_should_print_backtrace_to_terminal(global_bootstrap_options.print_exception_stacktrace)
+    ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
+
+    if global_bootstrap_options.enable_pantsd:
       try:
         return RemotePantsRunner(self._exiter, self._args, self._env, bootstrap_options).run()
       except RemotePantsRunner.Fallback as e:
