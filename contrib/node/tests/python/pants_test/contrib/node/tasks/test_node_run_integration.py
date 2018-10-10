@@ -36,3 +36,10 @@ class NodeRunIntegrationTest(PantsRunIntegrationTest):
                '--run-node-script-name=start']
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
+
+  def test_run_yarnpkg_source_deps_with_workspaces(self):
+    command = ['run',
+               'contrib/node/examples/src/node/yarn-workspaces',
+               '--run-node-script-name=test-adder']
+    pants_run = self.run_pants(command=command)
+    self.assert_success(pants_run)
