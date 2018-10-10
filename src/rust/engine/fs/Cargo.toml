@@ -27,10 +27,10 @@ protobuf = { version = "2.0.4", features = ["with-bytes"] }
 sha2 = "0.7"
 serde = "1.0"
 serde_derive = "1.0"
+tempfile = "3"
 uuid = { version = "0.7.1", features = ["v4"] }
 
 [dev-dependencies]
 mock = { path = "../testutil/mock" }
-tempfile = "3"
 testutil = { path = "../testutil" }
 walkdir = "2"

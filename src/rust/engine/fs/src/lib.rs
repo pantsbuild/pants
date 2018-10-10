@@ -67,7 +67,6 @@ extern crate parking_lot;
 extern crate protobuf;
 extern crate serde;
 extern crate sha2;
-#[cfg(test)]
 extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;

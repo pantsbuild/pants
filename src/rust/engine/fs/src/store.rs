@@ -640,6 +640,7 @@ mod local {
   use std::path::{Path, PathBuf};
   use std::sync::Arc;
   use std::time;
+  use tempfile::TempDir;
 
   use super::super::EMPTY_DIGEST;
   use super::MAX_LOCAL_STORE_SIZE_BYTES;
@@ -968,56 +969,7 @@ mod local {
       debug!("Initializing ShardedLmdb at root {:?}", root_path);
       let mut lmdbs = HashMap::new();
 
-      for b in 0x00..0x10 {
-        let key = b << 4;
-
-        let dirname = {
-          let mut s = String::new();
-          fmt::Write::write_fmt(&mut s, format_args!("{:x}", key)).unwrap();
-          s[0..1].to_owned()
-        };
-        let dir = root_path.join(dirname);
-        super::super::safe_create_dir_all(&dir)
-          .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
-        debug!("Making ShardedLmdb env for {:?}", dir);
-        let env = Environment::new()
-            // NO_SYNC
-            // =======
-            //
-            // Don't force fsync on every lmdb write transaction
-            //
-            // This significantly improves performance on slow or contended disks.
-            //
-            // On filesystems which preserve order of writes, on system crash this may lead to some
-            // transactions being rolled back. This is fine because this is just a write-once
-            // content-addressed cache. There is no risk of corruption, just compromised durability.
-            //
-            // On filesystems which don't preserve the order of writes, this may lead to lmdb
-            // corruption on system crash (but in no other circumstances, such as process crash).
-            //
-            // ------------------------------------------------------------------------------------
-            //
-            // NO_TLS
-            // ======
-            //
-            // Without this flag, each time a read transaction is started, it eats into our
-            // transaction limit (default: 126) until that thread dies.
-            //
-            // This flag makes transactions be removed from that limit when they are dropped, rather
-            // than when their thread dies. This is important, because we perform reads from a
-            // thread pool, so our threads never die. Without this flag, all read requests will fail
-            // after the first 126.
-            //
-            // The only down-side is that you need to make sure that any individual OS thread must
-            // not try to perform multiple write transactions concurrently. Fortunately, this
-            // property holds for us.
-            .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
-            // 2 DBs; one for file contents, one for leases.
-            .set_max_dbs(2)
-            .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
-            .open(&dir)
-            .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))?;
-
+      for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path)? {
         debug!("Making ShardedLmdb content database for {:?}", dir);
         let content_database = env
           .create_db(Some("content"), DatabaseFlags::empty())
@@ -1038,10 +990,68 @@ mod local {
             )
           })?;
 
-        lmdbs.insert(key, (Arc::new(env), content_database, lease_database));
+        lmdbs.insert(
+          fingerprint_prefix,
+          (Arc::new(env), content_database, lease_database),
+        );
       }
 
       Ok(ShardedLmdb { lmdbs, root_path })
+    }
+
+    fn envs(root_path: &Path) -> Result<Vec<(Environment, PathBuf, u8)>, String> {
+      let mut envs = Vec::with_capacity(0x10);
+      for b in 0x00..0x10 {
+        let fingerprint_prefix = b << 4;
+        let mut dirname = String::new();
+        fmt::Write::write_fmt(&mut dirname, format_args!("{:x}", fingerprint_prefix)).unwrap();
+        let dirname = dirname[0..1].to_owned();
+        let dir = root_path.join(dirname);
+        super::super::safe_create_dir_all(&dir)
+          .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
+        envs.push((ShardedLmdb::make_env(&dir)?, dir, fingerprint_prefix));
+      }
+      Ok(envs)
+    }
+
+    fn make_env(dir: &Path) -> Result<Environment, String> {
+      Environment::new()
+          // NO_SYNC
+          // =======
+          //
+          // Don't force fsync on every lmdb write transaction
+          //
+          // This significantly improves performance on slow or contended disks.
+          //
+          // On filesystems which preserve order of writes, on system crash this may lead to some
+          // transactions being rolled back. This is fine because this is just a write-once
+          // content-addressed cache. There is no risk of corruption, just compromised durability.
+          //
+          // On filesystems which don't preserve the order of writes, this may lead to lmdb
+          // corruption on system crash (but in no other circumstances, such as process crash).
+          //
+          // ------------------------------------------------------------------------------------
+          //
+          // NO_TLS
+          // ======
+          //
+          // Without this flag, each time a read transaction is started, it eats into our
+          // transaction limit (default: 126) until that thread dies.
+          //
+          // This flag makes transactions be removed from that limit when they are dropped, rather
+          // than when their thread dies. This is important, because we perform reads from a
+          // thread pool, so our threads never die. Without this flag, all read requests will fail
+          // after the first 126.
+          //
+          // The only down-side is that you need to make sure that any individual OS thread must
+          // not try to perform multiple write transactions concurrently. Fortunately, this
+          // property holds for us.
+          .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
+          // 2 DBs; one for file contents, one for leases.
+          .set_max_dbs(2)
+          .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
+          .open(dir)
+          .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))
     }
 
     // First Database is content, second is leases.
@@ -1054,43 +1064,31 @@ mod local {
     }
 
     pub fn compact(&self) -> Result<(), String> {
-      for b in 0x00..0x10 {
-        let key = b << 4;
-
-        let mut dirname = {
-          let mut s = String::new();
-          fmt::Write::write_fmt(&mut s, format_args!("{:x}", key)).unwrap();
-          s[0..1].to_owned()
-        };
-        let old_dir = self.root_path.join(&dirname);
-        dirname.push_str(".tmp");
-        let new_dir = self.root_path.join(&dirname);
-        super::super::safe_create_dir_all(&new_dir).map_err(|err| {
-          format!(
-            "Error making directory for store at {:?}: {:?}",
-            new_dir, err
-          )
-        })?;
-
-        let env = Environment::new()
-          .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
-          .set_max_dbs(2)
-          .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
-          .open(&old_dir)
-          .map_err(|e| format!("Error making env for store at {:?}: {}", old_dir, e))?;
-
+      for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path)? {
+        let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");
         env
-          .copy(&new_dir, EnvironmentCopyFlags::COMPACT)
+          .copy(new_dir.path(), EnvironmentCopyFlags::COMPACT)
           .map_err(|e| {
             format!(
               "Error copying store from {:?} to {:?}: {}",
-              old_dir, new_dir, e
+              old_dir,
+              new_dir.path(),
+              e
             )
           })?;
         std::fs::remove_dir_all(&old_dir)
           .map_err(|e| format!("Error removing old store at {:?}: {}", old_dir, e))?;
-        std::fs::rename(&new_dir, &old_dir)
-          .map_err(|e| format!("Error replacing {:?} with {:?}: {}", old_dir, new_dir, e))?;
+        std::fs::rename(&new_dir.path(), &old_dir).map_err(|e| {
+          format!(
+            "Error replacing {:?} with {:?}: {}",
+            old_dir,
+            new_dir.path(),
+            e
+          )
+        })?;
+
+        // Prevent the tempdir from being deleted on drop.
+        std::mem::drop(new_dir);
       }
       Ok(())
     }
@@ -1502,7 +1500,7 @@ mod local {
 
       let size = get_directory_size(dir.path());
       assert!(
-        size > 2 * 1024 * 1024,
+        size >= 2 * 1024 * 1024,
         "Expect size to be at least 2MB but was {}",
         size
       );
