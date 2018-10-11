@@ -139,7 +139,7 @@ class Checkstyle(LintTaskMixin, Task):
     if self.get_options().strict:
       args.append('--strict')
 
-    with temporary_file() as argfile:
+    with temporary_file(binary_mode=False) as argfile:
       for plugin_subsystem in _PLUGIN_SUBSYSTEMS:
         options_blob = plugin_subsystem.global_instance().options_blob()
         if options_blob:
