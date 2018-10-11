@@ -37,7 +37,7 @@ pub use snapshot::{
   OneOffStoreFileByDigest, Snapshot, StoreFileByDigest, EMPTY_DIGEST, EMPTY_FINGERPRINT,
 };
 mod store;
-pub use store::{Store, UploadSummary};
+pub use store::{ShrinkBehavior, Store, UploadSummary, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
 mod pool;
 pub use pool::ResettablePool;
 
@@ -67,13 +67,14 @@ extern crate parking_lot;
 extern crate protobuf;
 extern crate serde;
 extern crate sha2;
-#[cfg(test)]
 extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;
 #[macro_use]
 extern crate serde_derive;
 extern crate uuid;
+#[cfg(test)]
+extern crate walkdir;
 
 use std::cmp::min;
 use std::io::{self, Read};

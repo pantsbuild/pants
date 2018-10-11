@@ -643,7 +643,10 @@ pub extern "C" fn set_panic_handler() {
 #[no_mangle]
 pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
-    match scheduler.core.store().garbage_collect() {
+    match scheduler.core.store().garbage_collect(
+      fs::DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+      fs::ShrinkBehavior::Fast,
+    ) {
       Ok(_) => {}
       Err(err) => error!("{}", err),
     }

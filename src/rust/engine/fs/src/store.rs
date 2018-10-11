@@ -25,7 +25,7 @@ const MAX_LOCAL_STORE_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024 / 10;
 
 // This is the target number of bytes which should be present in all combined LMDB store files
 // after garbage collection. We almost certainly want to make this configurable.
-const LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
+pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
 
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
@@ -54,6 +54,24 @@ pub struct UploadSummary {
 pub struct Store {
   local: local::ByteStore,
   remote: Option<remote::ByteStore>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ShrinkBehavior {
+  ///
+  /// Free up space in the store for future writes (marking pages as dirty), but don't proactively
+  /// free up the disk space that was used. This is fast and safe, but won't free up disk space.
+  ///
+  Fast,
+
+  ///
+  /// As with Fast, but also free up disk space from no-longer-used data. This may use extra disk
+  /// space temporarily while compaction is happening.
+  ///
+  /// Note that any processes which have the Store open may need to re-open the Store after this
+  /// operation, as the underlying files may have been re-written.
+  ///
+  Compact,
 }
 
 // Note that Store doesn't implement ByteStore because it operates at a higher level of abstraction,
@@ -374,20 +392,24 @@ impl Store {
     self.local.lease_all(digests)
   }
 
-  pub fn garbage_collect(&self) -> Result<(), String> {
-    let target = LOCAL_STORE_GC_TARGET_BYTES;
-    match self.local.shrink(target) {
+  pub fn garbage_collect(
+    &self,
+    target_size_bytes: usize,
+    shrink_behavior: ShrinkBehavior,
+  ) -> Result<(), String> {
+    match self.local.shrink(target_size_bytes, shrink_behavior) {
       Ok(size) => {
-        if size > target {
-          return Err(format!(
+        if size > target_size_bytes {
+          Err(format!(
             "Garbage collection attempted to target {} bytes but could only shrink to {} bytes",
-            target, size
-          ));
+            target_size_bytes, size
+          ))
+        } else {
+          Ok(())
         }
       }
-      Err(err) => return Err(format!("Garbage collection failed: {:?}", err)),
-    };
-    Ok(())
+      Err(err) => Err(format!("Garbage collection failed: {:?}", err)),
+    }
   }
 
   ///
@@ -598,7 +620,7 @@ pub enum EntryType {
 }
 
 mod local {
-  use super::EntryType;
+  use super::{EntryType, ShrinkBehavior};
 
   use boxfuture::{BoxFuture, Boxable};
   use byteorder::{ByteOrder, LittleEndian};
@@ -608,15 +630,17 @@ mod local {
   use hashing::{Digest, Fingerprint};
   use lmdb::Error::{KeyExist, NotFound};
   use lmdb::{
-    self, Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, RwTransaction,
-    Transaction, WriteFlags,
+    self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
+    RwTransaction, Transaction, WriteFlags,
   };
   use sha2::Sha256;
+  use std;
   use std::collections::{BinaryHeap, HashMap};
   use std::fmt;
-  use std::path::Path;
+  use std::path::{Path, PathBuf};
   use std::sync::Arc;
   use std::time;
+  use tempfile::TempDir;
 
   use super::super::EMPTY_DIGEST;
   use super::MAX_LOCAL_STORE_SIZE_BYTES;
@@ -644,8 +668,8 @@ mod local {
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
           pool: pool,
-          file_dbs: ShardedLmdb::new(&files_root).map(Arc::new),
-          directory_dbs: ShardedLmdb::new(&directories_root).map(Arc::new),
+          file_dbs: ShardedLmdb::new(files_root.clone()).map(Arc::new),
+          directory_dbs: ShardedLmdb::new(directories_root.clone()).map(Arc::new),
         }),
       })
     }
@@ -729,7 +753,11 @@ mod local {
     ///
     /// TODO: Use LMDB database statistics when lmdb-rs exposes them.
     ///
-    pub fn shrink(&self, target_bytes: usize) -> Result<usize, String> {
+    pub fn shrink(
+      &self,
+      target_bytes: usize,
+      shrink_behavior: ShrinkBehavior,
+    ) -> Result<usize, String> {
       let mut used_bytes: usize = 0;
       let mut fingerprints_by_expired_ago = BinaryHeap::new();
 
@@ -773,6 +801,11 @@ mod local {
             }).map_err(|err| format!("Error garbage collecting: {}", err))?;
         }
       }
+
+      if shrink_behavior == ShrinkBehavior::Compact {
+        self.inner.file_dbs.clone()?.compact()?;
+      }
+
       Ok(used_bytes)
     }
 
@@ -928,63 +961,15 @@ mod local {
   struct ShardedLmdb {
     // First Database is content, second is leases.
     lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
+    root_path: PathBuf,
   }
 
   impl ShardedLmdb {
-    pub fn new(root_path: &Path) -> Result<ShardedLmdb, String> {
+    pub fn new(root_path: PathBuf) -> Result<ShardedLmdb, String> {
       debug!("Initializing ShardedLmdb at root {:?}", root_path);
       let mut lmdbs = HashMap::new();
 
-      for b in 0x00..0x10 {
-        let key = b << 4;
-
-        let dirname = {
-          let mut s = String::new();
-          fmt::Write::write_fmt(&mut s, format_args!("{:x}", key)).unwrap();
-          s[0..1].to_owned()
-        };
-        let dir = root_path.join(dirname);
-        super::super::safe_create_dir_all(&dir)
-          .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
-        debug!("Making ShardedLmdb env for {:?}", dir);
-        let env = Environment::new()
-            // NO_SYNC
-            // =======
-            //
-            // Don't force fsync on every lmdb write transaction
-            //
-            // This significantly improves performance on slow or contended disks.
-            //
-            // On filesystems which preserve order of writes, on system crash this may lead to some
-            // transactions being rolled back. This is fine because this is just a write-once
-            // content-addressed cache. There is no risk of corruption, just compromised durability.
-            //
-            // On filesystems which don't preserve the order of writes, this may lead to lmdb
-            // corruption on system crash (but in no other circumstances, such as process crash).
-            //
-            // ------------------------------------------------------------------------------------
-            //
-            // NO_TLS
-            // ======
-            //
-            // Without this flag, each time a read transaction is started, it eats into our
-            // transaction limit (default: 126) until that thread dies.
-            //
-            // This flag makes transactions be removed from that limit when they are dropped, rather
-            // than when their thread dies. This is important, because we perform reads from a
-            // thread pool, so our threads never die. Without this flag, all read requests will fail
-            // after the first 126.
-            //
-            // The only down-side is that you need to make sure that any individual OS thread must
-            // not try to perform multiple write transactions concurrently. Fortunately, this
-            // property holds for us.
-            .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
-            // 2 DBs; one for file contents, one for leases.
-            .set_max_dbs(2)
-            .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
-            .open(&dir)
-            .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))?;
-
+      for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path)? {
         debug!("Making ShardedLmdb content database for {:?}", dir);
         let content_database = env
           .create_db(Some("content"), DatabaseFlags::empty())
@@ -1005,10 +990,68 @@ mod local {
             )
           })?;
 
-        lmdbs.insert(key, (Arc::new(env), content_database, lease_database));
+        lmdbs.insert(
+          fingerprint_prefix,
+          (Arc::new(env), content_database, lease_database),
+        );
       }
 
-      Ok(ShardedLmdb { lmdbs })
+      Ok(ShardedLmdb { lmdbs, root_path })
+    }
+
+    fn envs(root_path: &Path) -> Result<Vec<(Environment, PathBuf, u8)>, String> {
+      let mut envs = Vec::with_capacity(0x10);
+      for b in 0x00..0x10 {
+        let fingerprint_prefix = b << 4;
+        let mut dirname = String::new();
+        fmt::Write::write_fmt(&mut dirname, format_args!("{:x}", fingerprint_prefix)).unwrap();
+        let dirname = dirname[0..1].to_owned();
+        let dir = root_path.join(dirname);
+        super::super::safe_create_dir_all(&dir)
+          .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
+        envs.push((ShardedLmdb::make_env(&dir)?, dir, fingerprint_prefix));
+      }
+      Ok(envs)
+    }
+
+    fn make_env(dir: &Path) -> Result<Environment, String> {
+      Environment::new()
+          // NO_SYNC
+          // =======
+          //
+          // Don't force fsync on every lmdb write transaction
+          //
+          // This significantly improves performance on slow or contended disks.
+          //
+          // On filesystems which preserve order of writes, on system crash this may lead to some
+          // transactions being rolled back. This is fine because this is just a write-once
+          // content-addressed cache. There is no risk of corruption, just compromised durability.
+          //
+          // On filesystems which don't preserve the order of writes, this may lead to lmdb
+          // corruption on system crash (but in no other circumstances, such as process crash).
+          //
+          // ------------------------------------------------------------------------------------
+          //
+          // NO_TLS
+          // ======
+          //
+          // Without this flag, each time a read transaction is started, it eats into our
+          // transaction limit (default: 126) until that thread dies.
+          //
+          // This flag makes transactions be removed from that limit when they are dropped, rather
+          // than when their thread dies. This is important, because we perform reads from a
+          // thread pool, so our threads never die. Without this flag, all read requests will fail
+          // after the first 126.
+          //
+          // The only down-side is that you need to make sure that any individual OS thread must
+          // not try to perform multiple write transactions concurrently. Fortunately, this
+          // property holds for us.
+          .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
+          // 2 DBs; one for file contents, one for leases.
+          .set_max_dbs(2)
+          .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
+          .open(dir)
+          .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))
     }
 
     // First Database is content, second is leases.
@@ -1018,6 +1061,36 @@ mod local {
 
     pub fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
       self.lmdbs.values().cloned().collect()
+    }
+
+    pub fn compact(&self) -> Result<(), String> {
+      for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path)? {
+        let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");
+        env
+          .copy(new_dir.path(), EnvironmentCopyFlags::COMPACT)
+          .map_err(|e| {
+            format!(
+              "Error copying store from {:?} to {:?}: {}",
+              old_dir,
+              new_dir.path(),
+              e
+            )
+          })?;
+        std::fs::remove_dir_all(&old_dir)
+          .map_err(|e| format!("Error removing old store at {:?}: {}", old_dir, e))?;
+        std::fs::rename(&new_dir.path(), &old_dir).map_err(|e| {
+          format!(
+            "Error replacing {:?} with {:?}: {}",
+            old_dir,
+            new_dir.path(),
+            e
+          )
+        })?;
+
+        // Prevent the tempdir from being deleted on drop.
+        std::mem::drop(new_dir);
+      }
+      Ok(())
     }
   }
 
@@ -1032,14 +1105,15 @@ mod local {
 
   #[cfg(test)]
   pub mod tests {
-    use super::{ByteStore, EntryType, ResettablePool};
-    use bytes::Bytes;
+    use super::{ByteStore, EntryType, ResettablePool, ShrinkBehavior};
+    use bytes::{BufMut, Bytes, BytesMut};
     use futures::Future;
     use hashing::{Digest, Fingerprint};
     use std::path::Path;
     use std::sync::Arc;
     use tempfile::TempDir;
     use testutil::data::{TestData, TestDirectory};
+    use walkdir::WalkDir;
 
     #[test]
     fn save_file() {
@@ -1147,7 +1221,9 @@ mod local {
         .store_bytes(EntryType::File, bytes.clone(), false)
         .wait()
         .expect("Error storing");
-      store.shrink(10).expect("Error shrinking");
+      store
+        .shrink(10, ShrinkBehavior::Fast)
+        .expect("Error shrinking");
       assert_eq!(
         load_bytes(
           &store,
@@ -1179,7 +1255,9 @@ mod local {
       store
         .lease_all(vec![file_digest].iter())
         .expect("Error leasing");
-      store.shrink(10).expect("Error shrinking");
+      store
+        .shrink(10, ShrinkBehavior::Fast)
+        .expect("Error shrinking");
       assert_eq!(
         load_bytes(&store, EntryType::File, file_digest),
         Ok(Some(bytes))
@@ -1208,7 +1286,9 @@ mod local {
         .store_bytes(EntryType::File, bytes_2.clone(), false)
         .wait()
         .expect("Error storing");
-      store.shrink(10).expect("Error shrinking");
+      store
+        .shrink(10, ShrinkBehavior::Fast)
+        .expect("Error shrinking");
       let mut entries = Vec::new();
       entries.push(load_bytes(&store, EntryType::File, digest_1).expect("Error loading bytes"));
       entries.push(load_bytes(&store, EntryType::File, digest_2).expect("Error loading bytes"));
@@ -1242,7 +1322,9 @@ mod local {
         .store_bytes(EntryType::File, bytes_2.clone(), false)
         .wait()
         .expect("Error storing");
-      store.shrink(1).expect("Error shrinking");
+      store
+        .shrink(1, ShrinkBehavior::Fast)
+        .expect("Error shrinking");
       assert_eq!(
         load_bytes(&store, EntryType::File, digest_1),
         Ok(None),
@@ -1273,7 +1355,9 @@ mod local {
         .store_bytes(EntryType::Directory, other_testdir.bytes(), false)
         .wait()
         .expect("Error storing");
-      store.shrink(80).expect("Error shrinking");
+      store
+        .shrink(80, ShrinkBehavior::Fast)
+        .expect("Error shrinking");
       let mut entries = Vec::new();
       entries.push(
         load_bytes(&store, EntryType::Directory, testdir.digest()).expect("Error loading bytes"),
@@ -1308,7 +1392,9 @@ mod local {
         .wait()
         .expect("Error storing");
 
-      store.shrink(80).expect("Error shrinking");
+      store
+        .shrink(80, ShrinkBehavior::Fast)
+        .expect("Error shrinking");
 
       assert_eq!(
         load_bytes(&store, EntryType::File, testdata.digest()),
@@ -1339,7 +1425,9 @@ mod local {
         .wait()
         .expect("Error storing");
 
-      store.shrink(80).expect("Error shrinking");
+      store
+        .shrink(80, ShrinkBehavior::Fast)
+        .expect("Error shrinking");
 
       assert_eq!(
         load_bytes(&store, EntryType::File, fourty_chars.digest()),
@@ -1375,7 +1463,7 @@ mod local {
         .wait()
         .expect("Error storing");
 
-      assert_eq!(store.shrink(80), Ok(160));
+      assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(160));
 
       assert_eq!(
         load_bytes(&store, EntryType::File, fourty_chars.digest()),
@@ -1388,6 +1476,45 @@ mod local {
         "Leased directory should still be present"
       );
       // Whether the unleased file is present is undefined.
+    }
+
+    #[test]
+    fn garbage_collect_and_compact() {
+      let dir = TempDir::new().unwrap();
+      let store = new_store(dir.path());
+
+      let write_one_meg = |byte: u8| {
+        let mut bytes = BytesMut::with_capacity(1024 * 1024);
+        for _ in 0..1024 * 1024 {
+          bytes.put(byte);
+        }
+        store
+          .store_bytes(EntryType::File, bytes.freeze(), false)
+          .wait()
+          .expect("Error storing");
+      };
+
+      write_one_meg(b'0');
+
+      write_one_meg(b'1');
+
+      let size = get_directory_size(dir.path());
+      assert!(
+        size >= 2 * 1024 * 1024,
+        "Expect size to be at least 2MB but was {}",
+        size
+      );
+
+      store
+        .shrink(1024 * 1024, ShrinkBehavior::Compact)
+        .expect("Error shrinking");
+
+      let size = get_directory_size(dir.path());
+      assert!(
+        size < 2 * 1024 * 1024,
+        "Expect size to be less than 2MB but was {}",
+        size
+      );
     }
 
     #[test]
@@ -1497,6 +1624,18 @@ mod local {
       digest: Digest,
     ) -> Result<Option<Bytes>, String> {
       store.load_bytes_with(entry_type, digest, |b| b).wait()
+    }
+
+    fn get_directory_size(path: &Path) -> usize {
+      let mut len: usize = 0;
+      for entry in WalkDir::new(path) {
+        len += entry
+          .expect("Error walking directory")
+          .metadata()
+          .expect("Error reading metadata")
+          .len() as usize;
+      }
+      len
     }
   }
 }
