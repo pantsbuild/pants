@@ -85,6 +85,18 @@ function pkg_python_checks_install_test() {
     --explain lint | grep "pythonstyle" &> /dev/null
 }
 
+PKG_PYTHON_CHECKS_CHECKER=(
+  "pantsbuild.pants.contrib.python.checks.checker"
+  "//contrib/python/src/python/pants/contrib/python/checks/checker"
+  "pkg_python_checks_checker_install_test"
+)
+function pkg_python_checks_checker_install_test() {
+  local version=$1
+  execute_pex \
+    "pantsbuild.pants.contrib.python.checks.checker==${version}" \
+    -c checker -- --help
+}
+
 PKG_FINDBUGS=(
   "pantsbuild.pants.contrib.findbugs"
   "//contrib/findbugs/src/python/pants/contrib/findbugs:plugin"
@@ -219,6 +231,7 @@ CONTRIB_PACKAGES=(
   PKG_GO
   PKG_NODE
   PKG_PYTHON_CHECKS
+  PKG_PYTHON_CHECKS_CHECKER
   PKG_SCALAJS
   PKG_FINDBUGS
   PKG_CPP

@@ -80,4 +80,7 @@ if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
   log "*** Running pants with extra sources ${WRAPPER_SRCPATH} ***"
 fi
 
+# We're running against a Pants clone.
+export PANTS_DEV=1
+
 exec_pants_bare "$@"
