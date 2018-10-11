@@ -55,6 +55,7 @@ def stdout_contents(wu):
   with open(wu.output_paths()['stdout']) as f:
     return f.read().rstrip()
 
+
 def _create_desandboxify_fn(possible_beginning_paths):
   # Takes a collection of possible canonical prefixes, and returns a function that
   # if it finds a matching prefix, strips the path prior to the prefix and returns it
@@ -69,6 +70,7 @@ def _create_desandboxify_fn(possible_beginning_paths):
         return new_path
     return path
   return desandboxify
+
 
 class RscCompileContext(CompileContext):
   def __init__(self,
