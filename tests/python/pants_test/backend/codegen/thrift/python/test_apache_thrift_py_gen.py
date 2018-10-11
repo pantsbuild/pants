@@ -156,11 +156,11 @@ class ApacheThriftPyGenTest(TaskTestBase):
     #   https://github.com/pantsbuild/pants/issues/5975
     pythonpath = list(interpreter.extras.values())
     pythonpath.extend(os.path.join(get_buildroot(), t.target_base) for t in targets)
-    for dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen))],
-                        interpreter=interpreter,
-                        context=python_repos.get_network_context(),
-                        fetchers=python_repos.get_fetchers()):
-      pythonpath.append(dist.location)
+    for resolved_dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen))],
+                                 interpreter=interpreter,
+                                 context=python_repos.get_network_context(),
+                                 fetchers=python_repos.get_fetchers()):
+      pythonpath.append(resolved_dist.distribution.location)
 
     process = subprocess.Popen([interpreter.binary,
                                 '-c',
