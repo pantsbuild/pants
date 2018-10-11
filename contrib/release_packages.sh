@@ -89,6 +89,7 @@ PKG_PYTHON_CHECKS_CHECKER=(
   "pantsbuild.pants.contrib.python.checks.checker"
   "//contrib/python/src/python/pants/contrib/python/checks/checker"
   "pkg_python_checks_checker_install_test"
+  "--universal"
 )
 function pkg_python_checks_checker_install_test() {
   local version=$1

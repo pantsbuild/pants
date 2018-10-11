@@ -34,7 +34,7 @@ class CheckstyleTest(PythonTaskTestBase):
     subprocess.check_call([os.path.join(get_buildroot(), 'pants'),
                            '--pants-distdir={}'.format(cls._distdir),
                            'setup-py',
-                           '--run=bdist_wheel',
+                           '--run=bdist_wheel --universal',
                            target])
 
     for root, dirs, files in os.walk(cls._distdir):
