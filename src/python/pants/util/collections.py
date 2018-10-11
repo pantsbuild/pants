@@ -34,7 +34,9 @@ def factory_dict(value_factory, *args, **kwargs):
       super(FactoryDict, self).__init__(self.__never_called, *args, **kwargs)
 
     def __missing__(self, key):
-      return value_factory(key)
+      value = value_factory(key)
+      self[key] = value
+      return value
 
   return FactoryDict()
 

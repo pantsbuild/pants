@@ -23,15 +23,18 @@ class TestCollections(unittest.TestCase):
     )
 
   def test_factory_dict(self):
-    cubes = factory_dict(lambda x: x ** 3, ((x, x ** 2) for x in range(3)), three=42)
+    cubes = factory_dict(lambda x: [x ** 3], ((x, x ** 2) for x in range(3)), three=42)
     self.assertEqual(0, cubes[0])
     self.assertEqual(1, cubes[1])
     self.assertEqual(4, cubes[2])
 
-    self.assertEqual(27, cubes[3])
+    self.assertEqual([27], cubes[3])
 
     self.assertIsNone(cubes.get(4))
-    self.assertEqual(64, cubes[4])
+    self.assertEqual([64], cubes[4])
+
+    cubes.get(4).append(8)
+    self.assertEqual([64, 8], cubes[4])
 
     self.assertEqual(42, cubes['three'])
 
