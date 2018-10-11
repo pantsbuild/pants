@@ -58,8 +58,9 @@ class PythonSetup(Subsystem):
               'this option.')
     register('--resolver-blacklist', advanced=True, type=dict, default={},
              removal_version='1.13.0.dev2',
-             removal_hint='Now unused. PEX handles blacklisting automatically via PEP-508 '
-                          'environment markers: '
+             removal_hint='Now unused. Pants, via PEX, handles blacklisting automatically via '
+                          'PEP-508 environment markers anywhere Python requirements are specified '
+                          '(e.g. `requirements.txt` and `python_requirement(...)` in BUILD files): '
                           'https://www.python.org/dev/peps/pep-0508/#environment-markers',
              metavar='<blacklist>',
              help='A blacklist dict (str->str) that maps package name to an interpreter '
