@@ -13,8 +13,7 @@ from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27,
                                                                    python_interpreter_path,
                                                                    skip_unless_python3,
                                                                    skip_unless_python27,
-                                                                   skip_unless_python27_and_python3,
-                                                                   skip_unless_python36)
+                                                                   skip_unless_python27_and_python3)
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
