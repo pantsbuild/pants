@@ -106,6 +106,9 @@ case "${OSTYPE}" in
            ;;
 esac
 
+# We're running against a Pants clone.
+export PANTS_DEV=1
+
 if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
   FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1

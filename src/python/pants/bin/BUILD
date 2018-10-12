@@ -70,7 +70,7 @@ python_binary(
   entry_point='pants.bin.pants_loader:main',
   dependencies=[
     ':bin',
-    'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle:all',
+    'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
     'pants-plugins/src/python/internal_backend:plugins',
   ],
 )
