@@ -16,7 +16,7 @@ def combined_dict(*dicts):
 def factory_dict(value_factory, *args, **kwargs):
   """A dict whose values are computed by `value_factory` when a `__getitem__` key is missing.
 
-  Not that values retrieved by any other method will not be lazily computed; eg: via `get`.
+  Note that values retrieved by any other method will not be lazily computed; eg: via `get`.
 
   :param value_factory:
   :type value_factory: A function from dict key to value.
