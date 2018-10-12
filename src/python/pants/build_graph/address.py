@@ -8,9 +8,8 @@ import os
 from builtins import object
 from collections import namedtuple
 
-from pants.util.dirutil import longest_dir_prefix
+from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
-
 
 # @ is reserved for configuring variant, see `addressable.parse_variants`
 BANNED_CHARS_IN_TARGET_NAME = frozenset('@')
@@ -79,7 +78,7 @@ def parse_spec(spec, relative_to=None, subproject_roots=None):
   else:
     spec_path, target_name = spec_parts
     if not spec_path and relative_to:
-      spec_path = os.path.relpath(relative_to, subproject) if subproject else relative_to
+      spec_path = fast_relpath(relative_to, subproject) if subproject else relative_to
     spec_path = prefix_subproject(normalize_absolute_refs(spec_path))
 
   return spec_path, target_name
