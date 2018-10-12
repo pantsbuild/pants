@@ -685,6 +685,8 @@ class JvmCompile(NailgunTaskBase):
     counter = Counter(len(invalid_vts))
 
     jobs = []
+
+    jobs.extend(self.pre_compile_jobs(counter))
     invalid_target_set = set(invalid_targets)
     for ivts in invalid_vts:
       # Invalidated targets are a subset of relevant targets: get the context for this one.
@@ -698,6 +700,12 @@ class JvmCompile(NailgunTaskBase):
 
     counter.size = len(jobs)
     return jobs
+
+  def pre_compile_jobs(self, counter):
+    """Override this to provide jobs that are not related to particular targets.
+
+    This is only called when there are invalid targets."""
+    return []
 
   def create_compile_jobs(self, compile_target, all_compile_contexts, invalid_dependencies, ivts,
     counter, classpath_product):
