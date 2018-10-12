@@ -11,6 +11,7 @@ from collections import defaultdict
 import six
 from twitter.common.collections import OrderedSet
 
+from pants.util.collections import factory_dict
 from pants.util.dirutil import fast_relpath
 
 
@@ -198,7 +199,7 @@ class MultipleRootedProducts(object):
     """
     :API: public
     """
-    self._rooted_products_by_root = {}
+    self._rooted_products_by_root = factory_dict(RootedProducts)
 
   def add_rel_paths(self, root, rel_paths):
     """
@@ -227,7 +228,7 @@ class MultipleRootedProducts(object):
       yield root, products.abs_paths()
 
   def _get_products_for_root(self, root):
-    return self._rooted_products_by_root.setdefault(root, RootedProducts(root))
+    return self._rooted_products_by_root[root]
 
   def __bool__(self):
     """Return True if any of the roots contains products"""
@@ -365,7 +366,7 @@ class Products(object):
   def __init__(self):
     # TODO(John Sirois): Kill products and simply have users register ProductMapping subtypes
     # as data products.  Will require a class factory, like `ProductMapping.named(typename)`.
-    self.products = {}  # type -> ProductMapping instance.
+    self.products = factory_dict(Products.ProductMapping)  # type -> ProductMapping instance.
     self.required_products = set()
 
     self.data_products = {}  # type -> arbitrary object.
@@ -392,7 +393,7 @@ class Products(object):
 
     :API: public
     """
-    return self.products.setdefault(typename, Products.ProductMapping(typename))
+    return self.products[typename]
 
   def require_data(self, typename):
     """Registers a requirement that data produced by tasks is required.
