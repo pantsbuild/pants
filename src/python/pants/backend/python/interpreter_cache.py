@@ -14,7 +14,6 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 from pex.variables import Variables
 
-from pants.backend.python.pex_util import expand_and_maybe_adjust_platform
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -234,24 +233,22 @@ class PythonInterpreterCache(object):
     # Explicitly set the precedence to avoid resolution of wheels or distillation of sdists into
     # wheels.
     precedence = (EggPackage, SourcePackage)
-    distributions = resolve(requirements=[requirement],
-                            fetchers=self._python_repos.get_fetchers(),
-                            interpreter=interpreter,
-                            platform=expand_and_maybe_adjust_platform(
-                              interpreter=interpreter,
-                              # The local interpreter cache is, by definition, composed of
-                              # interpreters for the 'current' platform.
-                              platform='current'),
-                            context=self._python_repos.get_network_context(),
-                            precedence=precedence)
-    if not distributions:
+    resolved_dists = resolve(requirements=[requirement],
+                             fetchers=self._python_repos.get_fetchers(),
+                             interpreter=interpreter,
+                             # The local interpreter cache is, by definition, composed of
+                             #  interpreters for the 'current' platform.
+                             platform='current',
+                             context=self._python_repos.get_network_context(),
+                             precedence=precedence)
+    if not resolved_dists:
       return None
 
-    assert len(distributions) == 1, ('Expected exactly 1 distribution to be resolved for {}, '
+    assert len(resolved_dists) == 1, ('Expected exactly 1 distribution to be resolved for {}, '
                                      'found:\n\t{}'.format(requirement,
-                                                           '\n\t'.join(map(str, distributions))))
+                                                           '\n\t'.join(map(str, resolved_dists))))
 
-    dist_location = distributions[0].location
+    dist_location = resolved_dists[0].distribution.location
     target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
     shutil.move(dist_location, target_location)
     _safe_link(target_location, target_link)

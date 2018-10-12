@@ -81,6 +81,7 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -104,6 +105,7 @@ python_library(
     'src/python/pants/stats',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 

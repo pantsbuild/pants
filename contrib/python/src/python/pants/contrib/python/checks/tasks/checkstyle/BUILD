@@ -2,18 +2,23 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='all',
-  sources=rglobs('*.py'),
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:pycodestyle',
-    '3rdparty/python:pyflakes',
     '3rdparty/python:pex',
-    'src/python/pants/backend/python/targets:python',
+    'contrib/python/src/python/pants/contrib/python/checks/checker',
+    'src/python/pants/backend/python/subsystems',
+    'src/python/pants/backend/python/targets',
+    'src/python/pants/backend/python/tasks',
+    'src/python/pants/backend/python:python_requirement',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:hash_utils',
+    'src/python/pants/base:workunit',
+    'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/task',
-    'src/python/pants/util:meta',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ]
 )

@@ -636,7 +636,12 @@ fn main() {
           .takes_value(true)
           .long("root-ca-cert-file")
           .required(false)
-    ).arg(
+    ).arg(clap::Arg::with_name("oauth-bearer-token-file")
+        .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
+        .takes_value(true)
+        .long("oauth-bearer-token-file")
+        .required(false)
+  ).arg(
       clap::Arg::with_name("mount-path")
         .required(true)
         .takes_value(true),
@@ -663,14 +668,21 @@ fn main() {
     None
   };
 
+  let oauth_bearer_token = if let Some(path) = args.value_of("oauth-bearer-token-file") {
+    Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
+  } else {
+    None
+  };
+
   let pool = Arc::new(fs::ResettablePool::new("brfs-".to_owned()));
   let store = match args.value_of("server-address") {
     Some(address) => fs::Store::with_remote(
       &store_path,
       pool,
-      address.to_owned(),
+      address,
       args.value_of("remote-instance-name").map(str::to_owned),
       root_ca_certs,
+      oauth_bearer_token,
       1,
       4 * 1024 * 1024,
       std::time::Duration::from_secs(5 * 60),

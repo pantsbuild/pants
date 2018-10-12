@@ -15,7 +15,8 @@ class RscCompileIntegration(BaseCompileIT):
     with temporary_dir() as cache_dir:
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir]},
-        'jvm-platform': {'compiler': 'rsc'}
+        'jvm-platform': {'compiler': 'rsc'},
+        'compile.rsc': {'execution_strategy': 'subprocess'},
       }
 
       pants_run = self.run_pants(

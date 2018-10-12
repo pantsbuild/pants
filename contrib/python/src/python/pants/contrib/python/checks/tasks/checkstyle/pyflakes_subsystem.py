@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from pants.contrib.python.checks.checker.pyflakes import PyflakesChecker
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import PluginSubsystemBase
 
 
@@ -16,6 +17,6 @@ class FlakeCheckSubsystem(PluginSubsystemBase):
     register('--ignore', fingerprint=True, type=list, default=[],
              help='List of warning codes to ignore.')
 
-  def get_plugin_type(self):
-    from pants.contrib.python.checks.tasks.checkstyle.pyflakes import PyflakesChecker
+  @classmethod
+  def plugin_type(cls):
     return PyflakesChecker

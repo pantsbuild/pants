@@ -14,7 +14,7 @@ mock==2.0.0
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.0
-pex==1.4.5
+pex==1.5.1
 psutil==4.3.0
 pycodestyle==2.4.0
 pyflakes==2.0.0
@@ -27,9 +27,9 @@ pywatchman==1.4.1
 requests[security]>=2.5.0,<2.19
 scandir==1.2
 setproctitle==1.1.10
-setuptools==33.1.1
+setuptools==40.4.3
 six>=1.9.0,<2
 subprocess32==3.2.7 ; python_version<'3'
 thrift>=0.9.1
-wheel==0.29.0
+wheel==0.31.1
 www-authenticate==0.9.2

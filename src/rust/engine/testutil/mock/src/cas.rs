@@ -28,6 +28,7 @@ pub struct StubCASBuilder {
   content: HashMap<Fingerprint, Bytes>,
   port: Option<u16>,
   instance_name: Option<String>,
+  required_auth_token: Option<String>,
 }
 
 impl StubCASBuilder {
@@ -38,6 +39,7 @@ impl StubCASBuilder {
       content: HashMap::new(),
       port: None,
       instance_name: None,
+      required_auth_token: None,
     }
   }
 }
@@ -89,6 +91,14 @@ impl StubCASBuilder {
     self
   }
 
+  pub fn required_auth_token(mut self, required_auth_token: String) -> Self {
+    if self.required_auth_token.is_some() {
+      panic!("Can't set required_auth_token twice");
+    }
+    self.required_auth_token = Some(required_auth_token);
+    self
+  }
+
   pub fn build(self) -> StubCAS {
     StubCAS::new(
       self.chunk_size_bytes.unwrap_or(1024),
@@ -96,6 +106,7 @@ impl StubCASBuilder {
       self.port.unwrap_or(0),
       self.always_errors,
       self.instance_name,
+      self.required_auth_token,
     )
   }
 }
@@ -120,6 +131,7 @@ impl StubCAS {
     port: u16,
     always_errors: bool,
     instance_name: Option<String>,
+    required_auth_token: Option<String>,
   ) -> StubCAS {
     let env = Arc::new(grpcio::Environment::new(1));
     let read_request_count = Arc::new(Mutex::new(0));
@@ -132,6 +144,7 @@ impl StubCAS {
       always_errors: always_errors,
       read_request_count: read_request_count.clone(),
       write_message_sizes: write_message_sizes.clone(),
+      required_auth_header: required_auth_token.map(|t| format!("Bearer {}", t)),
     };
     let mut server_transport = grpcio::ServerBuilder::new(env)
       .register_service(bazel_protos::bytestream_grpc::create_byte_stream(
@@ -178,8 +191,35 @@ pub struct StubCASResponder {
   instance_name: Option<String>,
   blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
   always_errors: bool,
+  required_auth_header: Option<String>,
   pub read_request_count: Arc<Mutex<usize>>,
   pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
+}
+
+macro_rules! check_auth {
+  ($self:ident, $ctx:ident, $sink:ident) => {
+    if let Some(ref required_auth_header) = $self.required_auth_header {
+      let authorization_headers: Vec<_> = $ctx
+        .request_headers()
+        .iter()
+        .filter(|(key, _value)| &key.to_lowercase() == "authorization")
+        .map(|(_key, value)| value)
+        .collect();
+      if authorization_headers.len() != 1
+        || authorization_headers[0] != required_auth_header.as_bytes()
+      {
+        $sink.fail(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::Unauthenticated,
+          Some(format!(
+            "Bad Authorization header; want {:?} got {:?}",
+            required_auth_header.as_bytes(),
+            authorization_headers
+          )),
+        ));
+        return;
+      }
+    }
+  };
 }
 
 impl StubCASResponder {
@@ -264,6 +304,8 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
       let mut request_count = self.read_request_count.lock();
       *request_count += 1;
     }
+    check_auth!(self, ctx, sink);
+
     match self.read_internal(&req) {
       Ok(response) => self.send(
         &ctx,
@@ -286,6 +328,8 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
     stream: grpcio::RequestStream<bazel_protos::bytestream::WriteRequest>,
     sink: grpcio::ClientStreamingSink<bazel_protos::bytestream::WriteResponse>,
   ) {
+    check_auth!(self, ctx, sink);
+
     let always_errors = self.always_errors;
     let write_message_sizes = self.write_message_sizes.clone();
     let blobs = self.blobs.clone();
@@ -422,10 +466,12 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
 impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASResponder {
   fn find_missing_blobs(
     &self,
-    _ctx: grpcio::RpcContext,
+    ctx: grpcio::RpcContext,
     req: bazel_protos::remote_execution::FindMissingBlobsRequest,
     sink: grpcio::UnarySink<bazel_protos::remote_execution::FindMissingBlobsResponse>,
   ) {
+    check_auth!(self, ctx, sink);
+
     if self.always_errors {
       sink.fail(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::Internal,

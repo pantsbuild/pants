@@ -8,6 +8,9 @@ import os
 from builtins import object
 
 import pkg_resources
+from pex.interpreter import PythonInterpreter
+from pex.pex import PEX
+from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.subsystems.pytest import PyTest
@@ -23,8 +26,15 @@ class PytestPrep(PythonExecutionTaskBase):
 
     _COVERAGE_PLUGIN_MODULE_NAME = '__{}__'.format(__name__.replace('.', '_'))
 
-    def __init__(self, pex):
-      self._pex = pex
+    def __init__(self, interpreter, pex):
+      # Here we hack around `coverage.cmdline` nuking the 0th element of `sys.path` (our root pex)
+      # by ensuring, the root pex is on the sys.path twice.
+      # See: https://github.com/nedbat/coveragepy/issues/715
+      pex_path = pex.path()
+      pex_info = PexInfo.from_pex(pex_path)
+      pex_info.merge_pex_path(pex_path)  # We're now on the sys.path twice.
+      PEXBuilder(pex_path, interpreter=interpreter, pex_info=pex_info).freeze()
+      self._pex = PEX(pex=pex_path, interpreter=interpreter)
 
     @property
     def pex(self):
@@ -76,4 +86,6 @@ class PytestPrep(PythonExecutionTaskBase):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
     pytest_binary = self.create_pex(pex_info)
-    self.context.products.register_data(self.PytestBinary, self.PytestBinary(pytest_binary))
+    interpreter = self.context.products.get_data(PythonInterpreter)
+    self.context.products.register_data(self.PytestBinary,
+                                        self.PytestBinary(interpreter, pytest_binary))

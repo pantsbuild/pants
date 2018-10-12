@@ -182,6 +182,16 @@ to this directory.",
             true,
           )),
       )
+        .subcommand(
+          SubCommand::with_name("gc")
+              .about("Garbage collect the on-disk store. Note that after running this command, any processes with an open store (e.g. a pantsd) may need to re-initialize their store.")
+              .arg(
+                Arg::with_name("target-size-bytes")
+                    .takes_value(true)
+                    .long("target-size-bytes")
+                    .required(true),
+              )
+        )
       .arg(
         Arg::with_name("local-store-path")
           .takes_value(true)
@@ -199,6 +209,13 @@ to this directory.",
               .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
               .takes_value(true)
               .long("root-ca-cert-file")
+              .required(false)
+        )
+        .arg(
+          Arg::with_name("oauth-bearer-token-file")
+              .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
+              .takes_value(true)
+              .long("oauth-bearer-token-file")
               .required(false)
         )
         .arg(Arg::with_name("remote-instance-name")
@@ -244,15 +261,25 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           None
         };
 
+        let oauth_bearer_token =
+          if let Some(path) = top_match.value_of("oauth-bearer-token-file") {
+            Some(std::fs::read_to_string(path).map_err(|err| {
+              format!("Error reading oauth bearer token from {:?}: {}", path, err)
+            })?)
+          } else {
+            None
+          };
+
         (
           Store::with_remote(
             &store_dir,
             pool.clone(),
-            cas_address.to_owned(),
+            cas_address,
             top_match
-              .value_of("remote-instance_name")
+              .value_of("remote-instance-name")
               .map(str::to_owned),
             root_ca_certs,
+            oauth_bearer_token,
             1,
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures
@@ -464,6 +491,12 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           ExitCode::NotFound,
         )),
       }
+    }
+    ("gc", Some(args)) => {
+      let target_size_bytes = value_t!(args.value_of("target-size-bytes"), usize)
+        .expect("--target-size-bytes must be passed as a non-negative integer");
+      store.garbage_collect(target_size_bytes, fs::ShrinkBehavior::Compact)?;
+      Ok(())
     }
 
     (_, _) => unimplemented!(),

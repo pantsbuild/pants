@@ -11,5 +11,7 @@
     "babel-eslint": "^8.1.2",
     "eslint": "^4.14.0"
   },
-  "dependencies": {}
+  "dependencies": {
+    "eslint-plugin-mocha": "^4.12.1"
+  }
 }

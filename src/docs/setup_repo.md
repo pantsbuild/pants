@@ -126,9 +126,18 @@ To upload these stats to a server for future analysis set the following option i
 
     :::ini
     [run-tracker]
-    stats_upload_url: "http://myorg.org/pantsstats"
+    stats_upload_urls: {
+      'http://myorg.org/pantsstats': 'authprovider'
+    }
 
-Pants will `POST` JSON data to that URL.  The JSON format should be self-explanatory.
+Pants will `POST` JSON data to each key URL.  The `authprovider` is the name of the provider the
+user must auth against in order to post to the corresponding URL.
+See [[here|pants('src/docs/common_tasks:login')]] for details on how to authenticate Pants against
+an auth provider.
+
+If posting to the URL does not require authentication, use the empty string as the auth provider.
+
+The posted JSON format should be self-explanatory.
 
 Using Pants behind a firewall
 -----------------------------

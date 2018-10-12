@@ -39,6 +39,7 @@ class ExecutionOptions(datatype([
   'process_execution_cleanup_local_dirs',
   'remote_instance_name',
   'remote_ca_certs_path',
+  'remote_oauth_bearer_token_path',
 ])):
   """A collection of all options related to (remote) execution of processes.
 
@@ -58,6 +59,7 @@ class ExecutionOptions(datatype([
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
       remote_instance_name=bootstrap_options.remote_instance_name,
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
+      remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
     )
 
 
@@ -71,6 +73,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_cleanup_local_dirs=True,
     remote_instance_name=None,
     remote_ca_certs_path=None,
+    remote_oauth_bearer_token_path=None,
   )
 
 
@@ -199,7 +202,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'project depends on.')
     register('--owner-of', type=list, default=[], daemon=False, fromfile=True, metavar='<path>',
              help='Select the targets that own these files. '
-                  'This is the third target calculation strategy along with the --changed '
+                  'This is the third target calculation strategy along with the --changed-* '
                   'options and specifying the targets directly. These three types of target '
                   'selection are mutually exclusive.')
 
@@ -291,13 +294,17 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Path to a PEM file containing CA certificates used for verifying secure '
                   'connections to --remote-execution-server and --remote-store-server. '
                   'If not specified, TLS will not be used.')
+    register('--remote-oauth-bearer-token-path', advanced=True,
+             help='Path to a file containing an oauth token to use for grpc connections to '
+                  '--remote-execution-server and --remote-store-server. If not specified, no '
+                  'authorization will be performed.')
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.
     register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
              advanced=True,
              help='Number of concurrent processes that may be executed either locally and remotely.')
-    register('--process-execution-cleanup-local-dirs', type=bool, default=True,
+    register('--process-execution-cleanup-local-dirs', type=bool, default=True, advanced=True,
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')
 

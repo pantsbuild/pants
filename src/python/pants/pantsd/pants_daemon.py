@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
@@ -240,7 +241,6 @@ class PantsDaemon(FingerprintedProcessManager):
     self._lifecycle_lock = threading.RLock()
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._kill_switch = threading.Event()
-    self._exiter = Exiter()
 
   @memoized_property
   def watchman_launcher(self):
@@ -363,7 +363,19 @@ class PantsDaemon(FingerprintedProcessManager):
     # Switch log output to the daemon's log stream from here forward.
     self._close_stdio()
     with self._pantsd_logging() as log_stream:
-      self._exiter.set_except_hook(log_stream)
+      # Register an exiter using os._exit to ensure we only close stdio streams once.
+      ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
+
+      # We don't have any stdio streams to log to anymore, but we can get tracebacks of the pantsd
+      # process by tailing the pantsd log and sending it SIGUSR2.
+      ExceptionSink.reset_interactive_output_stream(log_stream)
+
+      # Reset the log location and the backtrace preference from the global bootstrap options.
+      global_bootstrap_options = self._bootstrap_options.for_global_scope()
+      ExceptionSink.reset_should_print_backtrace_to_terminal(
+        global_bootstrap_options.print_exception_stacktrace)
+      ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
+
       self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
       self._native.set_panic_handler()

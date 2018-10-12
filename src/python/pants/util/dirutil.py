@@ -443,6 +443,7 @@ def relative_symlink(source_path, link_path):
     if os.path.lexists(link_path):
       os.unlink(link_path)
     rel_path = os.path.relpath(source_path, os.path.dirname(link_path))
+    safe_mkdir_for(link_path)
     os.symlink(rel_path, link_path)
   except OSError as e:
     # Another run may beat us to deletion or creation.

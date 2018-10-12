@@ -94,6 +94,13 @@ fn main() {
             .required(false)
       )
       .arg(
+        Arg::with_name("execution-oauth-bearer-token-path")
+            .help("Path to file containing oauth bearer token for communication with the execution server. If not set, no authorization will be provided to remote servers.")
+            .takes_value(true)
+            .long("execution-oauth-bearer-token-path")
+            .required(false)
+      )
+      .arg(
       Arg::with_name("cas-server")
         .long("cas-server")
         .takes_value(true)
@@ -104,6 +111,13 @@ fn main() {
             .help("Path to file containing root certificate authority certificates for the CAS server. If not set, TLS will not be used when connecting to the CAS server.")
             .takes_value(true)
             .long("cas-root-ca-cert-file")
+            .required(false)
+      )
+      .arg(
+        Arg::with_name("cas-oauth-bearer-token-path")
+            .help("Path to file containing oauth bearer token for communication with the CAS server. If not set, no authorization will be provided to remote servers.")
+            .takes_value(true)
+            .long("cas-oauth-bearer-token-path")
             .required(false)
       )
       .arg(Arg::with_name("remote-instance-name")
@@ -179,12 +193,19 @@ fn main() {
         None
       };
 
+      let oauth_bearer_token = if let Some(path) = args.value_of("cas-oauth-bearer-token-path") {
+        Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
+      } else {
+        None
+      };
+
       fs::Store::with_remote(
         local_store_path,
         pool.clone(),
-        cas_server.to_owned(),
+        cas_server,
         remote_instance_arg.clone(),
         root_ca_certs,
+        oauth_bearer_token,
         1,
         chunk_size,
         Duration::from_secs(30),
@@ -224,10 +245,18 @@ fn main() {
         None
       };
 
+      let oauth_bearer_token =
+        if let Some(path) = args.value_of("execution-oauth-bearer-token-path") {
+          Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
+        } else {
+          None
+        };
+
       Box::new(process_execution::remote::CommandRunner::new(
-        address.to_owned(),
+        address,
         remote_instance_arg,
         root_ca_certs,
+        oauth_bearer_token,
         1,
         store,
       ))

@@ -544,6 +544,27 @@ function activate_twine() {
   pip install twine
 }
 
+function execute_pex() {
+  (
+    PEX_VERSION=$(grep "pex==" "${ROOT}/3rdparty/python/requirements.txt" | sed -e "s|pex==||")
+    PEX_PEX=pex27
+
+    cd $(mktemp -d -t build_pex.XXXXX)
+    trap "rm -rf $(pwd -P)" EXIT
+
+    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" -O
+    chmod +x ./${PEX_PEX}
+
+    ./${PEX_PEX} \
+      --no-build \
+      --no-pypi \
+      --disable-cache \
+      -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+      -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+      "$@"
+  )
+}
+
 function build_pex() {
   # Builds a pex from the current UNSTABLE version.
   # If $1 == "build", builds a pex just for this platform, from source.
@@ -602,27 +623,11 @@ function build_pex() {
     platform_flags=("${platform_flags[@]}" "--platform=${platform}")
   done
 
-  (
-    PEX_VERSION=$(grep "pex==" "${ROOT}/3rdparty/python/requirements.txt" | sed -e "s|pex==||")
-    PEX_PEX=pex27
-
-    cd $(mktemp -d -t build_pex.XXXXX)
-    trap "rm -rf $(pwd -P)" EXIT
-
-    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" -O
-    chmod +x ./${PEX_PEX}
-
-    ./${PEX_PEX} \
-      -o "${dest}" \
-      --entry-point="pants.bin.pants_loader:main" \
-      --no-build \
-      --no-pypi \
-      --disable-cache \
-      "${platform_flags[@]}" \
-      -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-      -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-      "${requirements[@]}"
-  )
+  execute_pex \
+    -o "${dest}" \
+    --script=pants \
+    "${platform_flags[@]}" \
+    "${requirements[@]}"
 
   if [[ "${PANTS_PEX_RELEASE}" == "stable" ]]; then
     mkdir -p "$(dirname "${stable_dest}")"

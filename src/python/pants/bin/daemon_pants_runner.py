@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import datetime
 import os
-import signal
 import sys
 import termios
 import time
@@ -17,13 +16,14 @@ from future.utils import raise_with_traceback
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
-from pants.util.contextutil import HardSystemExit, hermetic_environment_as, stdio_as
+from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
 
@@ -31,7 +31,10 @@ class DaemonExiter(Exiter):
   """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
 
   def __init__(self, socket):
-    super(DaemonExiter, self).__init__()
+    # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
+    # sys.exit behavior.
+    # TODO: The behavior we're avoiding with the use of os._exit should be described and tested.
+    super(DaemonExiter, self).__init__(exiter=os._exit)
     self._socket = socket
     self._finalizer = None
 
@@ -39,7 +42,7 @@ class DaemonExiter(Exiter):
     """Sets a finalizer that will be called before exiting."""
     self._finalizer = finalizer
 
-  def exit(self, result=0, msg=None):
+  def exit(self, result=0, msg=None, *args, **kwargs):
     """Exit the runtime."""
     if self._finalizer:
       try:
@@ -64,9 +67,7 @@ class DaemonExiter(Exiter):
       # Shutdown the connected socket.
       teardown_socket(self._socket)
     finally:
-      # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
-      # sys.exit behavior (via `pants.util.contextutil.hard_exit_handler()`).
-      raise HardSystemExit()
+      super(DaemonExiter, self).exit(result=result, *args, **kwargs)
 
 
 class DaemonPantsRunner(ProcessManager):
@@ -226,12 +227,6 @@ class DaemonPantsRunner(ProcessManager):
       ) as finalizer:
         yield finalizer
 
-  def _setup_sigint_handler(self):
-    """Sets up a control-c signal handler for the daemon runner context."""
-    def handle_control_c(signum, frame):
-      raise KeyboardInterrupt('remote client sent control-c!')
-    signal.signal(signal.SIGINT, handle_control_c)
-
   def _raise_deferred_exc(self):
     """Raises deferred exceptions from the daemon's synchronous path in the post-fork client."""
     if self._deferred_exception:
@@ -266,7 +261,9 @@ class DaemonPantsRunner(ProcessManager):
     # the `pantsd.log`. This ensures that in the event of e.g. a hung but detached pantsd-runner
     # process that the stacktrace output lands deterministically in a known place vs to a stray
     # terminal window.
-    self._exiter.set_except_hook(sys.stderr)
+    # TODO: test the above!
+    ExceptionSink.reset_exiter(self._exiter)
+    ExceptionSink.reset_interactive_output_stream(sys.stderr)
 
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
@@ -274,12 +271,10 @@ class DaemonPantsRunner(ProcessManager):
     # Set context in the process title.
     set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
 
-    # Setup a SIGINT signal handler.
-    self._setup_sigint_handler()
-
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
-    NailgunProtocol.send_pid(self._socket, os.getpgrp() * -1)
+    NailgunProtocol.send_pid(self._socket, os.getpid())
+    NailgunProtocol.send_pgrp(self._socket, os.getpgrp() * -1)
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
     with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
@@ -306,8 +301,8 @@ class DaemonPantsRunner(ProcessManager):
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
         runner.run()
       except KeyboardInterrupt:
-        self._exiter.exit(1, msg='Interrupted by user.\n')
+        self._exiter.exit_and_fail('Interrupted by user.\n')
       except Exception:
-        self._exiter.handle_unhandled_exception(add_newline=True)
+        ExceptionSink._log_unhandled_exception_and_exit()
       else:
         self._exiter.exit(0)
