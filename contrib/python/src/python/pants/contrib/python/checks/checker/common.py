@@ -134,7 +134,7 @@ class PythonFile(object):
       blob = fp.read()
 
     tree = cls._parse(blob, filename)
-    return cls(blob, tree, root, filename)
+    return cls(blob=blob, tree=tree, root=root, filename=filename)
 
   @classmethod
   def from_statement(cls, statement, filename='<expr>'):
@@ -148,7 +148,7 @@ class PythonFile(object):
 
     blob = '\n'.join(lines).encode('utf-8')
     tree = cls._parse(blob, filename)
-    return cls(blob, tree, None, filename)
+    return cls(blob=blob, tree=tree, root=None, filename=filename)
 
   @classmethod
   def iter_tokens(cls, blob):
