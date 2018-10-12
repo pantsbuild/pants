@@ -20,40 +20,39 @@ from pants.build_graph.address import Address
 from pants.option.custom_types import file_option
 from pants.task.lint_task_mixin import LintTaskMixin
 from pants.task.task import Task
+from pants.util.collections import factory_dict
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_classproperty, memoized_property
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.contrib.python.checks.checker import checker
-from pants.contrib.python.checks.checker.pycodestyle import PyCodeStyleChecker
-from pants.contrib.python.checks.checker.pyflakes import PyflakesChecker
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import \
   default_subsystem_for_plugin
 from pants.contrib.python.checks.tasks.checkstyle.pycodestyle_subsystem import PyCodeStyleSubsystem
 from pants.contrib.python.checks.tasks.checkstyle.pyflakes_subsystem import FlakeCheckSubsystem
 
 
-_CUSTOM_PLUGIN_SUBSYSTEMS = {
-  PyCodeStyleChecker: PyCodeStyleSubsystem,
-  PyflakesChecker: FlakeCheckSubsystem,
-}
-
-
-_PLUGIN_SUBSYSTEMS = tuple(
-  _CUSTOM_PLUGIN_SUBSYSTEMS.get(plugin_type, default_subsystem_for_plugin(plugin_type))
-  for plugin_type in checker.plugins()
-)
-
-
 class Checkstyle(LintTaskMixin, Task):
   _PYTHON_SOURCE_EXTENSION = '.py'
 
+  _CUSTOM_PLUGIN_SUBSYSTEMS = (
+    PyCodeStyleSubsystem,
+    FlakeCheckSubsystem,
+  )
+
+  @memoized_classproperty
+  def plugin_subsystems(cls):
+    subsystem_type_by_plugin_type = factory_dict(default_subsystem_for_plugin)
+    subsystem_type_by_plugin_type.update((subsystem_type.plugin_type(), subsystem_type)
+                                         for subsystem_type in cls._CUSTOM_PLUGIN_SUBSYSTEMS)
+    return tuple(subsystem_type_by_plugin_type[plugin_type] for plugin_type in checker.plugins())
+
   @classmethod
   def subsystem_dependencies(cls):
-    return super(Task, cls).subsystem_dependencies() + _PLUGIN_SUBSYSTEMS + (
+    return super(Task, cls).subsystem_dependencies() + cls.plugin_subsystems + (
       # Needed implicitly by the pex_build_util functions we use.
       PythonSetup, PythonRepos)
 
@@ -140,7 +139,7 @@ class Checkstyle(LintTaskMixin, Task):
       args.append('--strict')
 
     with temporary_file(binary_mode=False) as argfile:
-      for plugin_subsystem in _PLUGIN_SUBSYSTEMS:
+      for plugin_subsystem in self.plugin_subsystems:
         options_blob = plugin_subsystem.global_instance().options_blob()
         if options_blob:
           argfile.write('--{}-options={}\n'.format(plugin_subsystem.plugin_type().name(),
