@@ -164,22 +164,15 @@ class Checkstyle(LintTaskMixin, Task):
   def execute(self):
     """"Run Checkstyle on all found non-synthetic source files."""
 
-    # If we are linting for Python 3, skip lint altogether.
-    # Long-term Python 3 linting solution tracked by:
-    # https://github.com/pantsbuild/pants/issues/5764
-    interpreter = self.context.products.get_data(PythonInterpreter)
-    # Check interpreter is not 'None' for test cases that do not
-    # run the python interpreter selection task.
-    if interpreter and interpreter.version >= (3, 0, 0):
-      self.context.log.info('Linting is currently disabled for Python 3 targets.\n '
-                            'See https://github.com/pantsbuild/pants/issues/5764 for '
-                            'long-term solution tracking.')
-      return
+    tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility(python_tgts)
 
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
-      sources = self.calculate_sources([vt.target for vt in invalidation_check.invalid_vts])
-      if sources:
-        return self.checkstyle(interpreter, sources)
+      tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility([vt.target for vt in invalidation_check.invalid_vts])
+      for constraint, targets in tgts_by_compatibility.items():
+        sources = self.calculate_sources(targets)
+        if sources:
+          interpreter = interpreter_cache.select_interpreter_for_targets(targets)
+          return self.checkstyle(interpreter, sources)
 
   def calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""

@@ -19,15 +19,9 @@ class PythonLintIntegrationTest(PantsRunIntegrationTest):
   def test_lint_skips_for_py3_only(self):
     command = ['lint', self.TESTPROJECT.format(':main_py3')]
     pants_run = self.run_pants(command=command)
-    # Verify Python 3 lint is skipped.
-    self.assertIn('Linting is currently disabled', pants_run.stdout_data)
-    # Identify that the Python 2 targets are not linted.
     self.assertNotIn('Style issues found', pants_run.stdout_data)
 
   def test_lint_fails_on_incompatible_closure(self):
     command = ['lint', self.TESTPROJECT.format('::')]
     pants_run = self.run_pants(command=command)
-    # Verify Python 3 lint is skipped.
-    self.assertIn('Linting is currently disabled', pants_run.stdout_data)
-    # Identify that the Python 2 targets are linted.
     self.assertIn('Style issues found', pants_run.stdout_data)
