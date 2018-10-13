@@ -703,7 +703,7 @@ class Native(object):
           output_fp.write(input_fp.read())
     except (IOError, OSError) as e:
       raise self.BinaryLocationError(
-        "Error loading the native engine binary from path {}: {}".format(lib_path, e),
+        "Error unpacking the native engine binary to path {}: {}".format(lib_path, e),
         e)
     return lib_path
 
