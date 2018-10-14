@@ -70,7 +70,14 @@ class TestConanRequirement(unittest.TestCase):
     cr = ConanRequirement(pkg_spec=pkg_spec)
     platform = Platform.create()
     conan_os_name = platform.resolve_platform_specific(self.CONAN_OS_NAME)
-    expected = ['install', 'test/1.0.0@conan/stable', '-s', 'os={}'.format(conan_os_name)]
+    expected = [
+      'install',
+      'test/1.0.0@conan/stable',
+      '-s',
+      'os={}'.format(conan_os_name),
+      '--build',
+      'missing',
+    ]
     self.assertEqual(cr.fetch_cmdline_args, expected)
 
 
