@@ -17,12 +17,13 @@ class NativeBuildSettings(Subsystem):
 
     register('--strict-deps', type=bool, default=True, fingerprint=True, advanced=True,
              help='The default for the "strict_deps" argument for targets of this language.')
-    # TODO: implement compiler_option_sets here!
+    # TODO: implement compiler_option_sets as an interface to platform/host-specific optimization
+    # flags!
     register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
              help='The default for the "fatal_warnings" argument for targets of this language.')
 
-  # TODO: use some more formal method of mirroring options between a target and a subsystem -- see
-  # pants.backend.jvm.subsystems.dependency_context.DependencyContext#defaulted_property()!
+  # TODO: consider coalescing existing methods of mirroring options between a target and a subsystem
+  # -- see pants.backend.jvm.subsystems.dependency_context.DependencyContext#defaulted_property()!
   def get_subsystem_target_mirrored_field_value(self, field_name, target):
     """Get the attribute `field_name` from `target` if set, else from this subsystem's options."""
     tgt_setting = getattr(target, field_name)
