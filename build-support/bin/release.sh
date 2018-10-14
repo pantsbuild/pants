@@ -730,7 +730,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPi" && \
   (
-    check_origin && check_clean_branch && check_pgp && check_owners && \
+    check_origin && check_pgp && check_owners && \
       publish_packages && tag_release && publish_docs_if_master && \
       banner "Successfully released packages to PyPi"
   ) || die "Failed to release packages to PyPi."
