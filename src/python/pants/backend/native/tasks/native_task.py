@@ -70,8 +70,7 @@ class NativeTask(Task):
 
     return deps
 
-  @staticmethod
-  def _add_product_at_target_base(product_mapping, target, value):
+  def _add_product_at_target_base(self, product_mapping, target, value):
     product_mapping.add(target, target.target_base).append(value)
 
   def _retrieve_single_product_at_target_base(self, product_mapping, target):

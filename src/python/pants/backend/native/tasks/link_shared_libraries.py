@@ -105,7 +105,7 @@ class LinkSharedLibraries(NativeTask):
         else:
           all_shared_libs_by_name[shared_library.name] = shared_library
 
-        shared_libs_product.add(vt.target, vt.target.target_base).append(shared_library)
+        self._add_product_at_target_base(shared_libs_product, vt.target, shared_library)
 
   def _retrieve_shared_lib_from_cache(self, vt):
     native_artifact = vt.target.ctypes_native_library
