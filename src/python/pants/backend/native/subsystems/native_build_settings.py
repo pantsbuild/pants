@@ -7,15 +7,17 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.subsystem.subsystem import Subsystem
 
 
-class NativeCompileSettings(Subsystem):
-  """Any settings relevant to a compiler invocation."""
+class NativeBuildSettings(Subsystem):
+  """Any settings relevant to a compiler and/or linker invocation."""
+  options_scope = 'native-build-settings'
 
   @classmethod
   def register_options(cls, register):
-    super(NativeCompileSettings, cls).register_options(register)
+    super(NativeBuildSettings, cls).register_options(register)
 
     register('--strict-deps', type=bool, default=True, fingerprint=True, advanced=True,
              help='The default for the "strict_deps" argument for targets of this language.')
+    # TODO: implement compiler_option_sets here!
     register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
              help='The default for the "fatal_warnings" argument for targets of this language.')
 
@@ -27,11 +29,3 @@ class NativeCompileSettings(Subsystem):
     if tgt_setting is None:
       return getattr(self.get_options(), field_name)
     return tgt_setting
-
-
-class CCompileSettings(NativeCompileSettings):
-  options_scope = 'c-compile'
-
-
-class CppCompileSettings(NativeCompileSettings):
-  options_scope = 'cpp-compile'

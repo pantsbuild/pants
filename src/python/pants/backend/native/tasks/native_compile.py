@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from abc import abstractmethod
-from builtins import filter
 from collections import defaultdict
 
 from pants.backend.native.config.environment import Executable
@@ -17,7 +16,6 @@ from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.build_graph.dependency_context import DependencyContext
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, datatype
@@ -41,11 +39,6 @@ class ObjectFiles(datatype(['root_dir', 'filenames'])):
     return [os.path.join(self.root_dir, fname) for fname in self.filenames]
 
 
-# TODO: this is a temporary hack -- we could introduce something like a "NativeRequirement" with
-# dependencies, header, object file, library name (more?) instead of using multiple products.
-class NativeTargetDependencies(datatype(['native_deps'])): pass
-
-
 class NativeCompile(NativeTask, AbstractClass):
   # `NativeCompile` will use the `source_target_constraint` to determine what targets have "sources"
   # to compile, and the `dependent_target_constraint` to determine which dependent targets to
@@ -60,7 +53,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   @classmethod
   def product_types(cls):
-    return [ObjectFiles, NativeTargetDependencies]
+    return [ObjectFiles]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -71,20 +64,9 @@ class NativeCompile(NativeTask, AbstractClass):
   def cache_target_dirs(self):
     return True
 
-  @abstractmethod
-  def get_compile_settings(self):
-    """An instance of `NativeCompileSettings` which is used in `NativeCompile`.
-
-    :return: :class:`pants.backend.native.subsystems.native_compile_settings.NativeCompileSettings`
-    """
-
-  @memoized_property
-  def _compile_settings(self):
-    return self.get_compile_settings()
-
   @classmethod
   def implementation_version(cls):
-    return super(NativeCompile, cls).implementation_version() + [('NativeCompile', 0)]
+    return super(NativeCompile, cls).implementation_version() + [('NativeCompile', 1)]
 
   class NativeCompileError(TaskError):
     """Raised for errors in this class's logic.
@@ -92,39 +74,8 @@ class NativeCompile(NativeTask, AbstractClass):
     Subclasses are advised to create their own exception class.
     """
 
-  def native_deps(self, target):
-    return self.strict_deps_for_target(
-      target, predicate=self.dependent_target_constraint.satisfied_by)
-
-  def strict_deps_for_target(self, target, predicate=None):
-    """Get the dependencies of `target` filtered by `predicate`, accounting for 'strict_deps'.
-
-    If 'strict_deps' is on, instead of using the transitive closure of dependencies, targets will
-    only be able to see their immediate dependencies declared in the BUILD file. The 'strict_deps'
-    setting is obtained from the result of `get_compile_settings()`.
-
-    NB: This includes the current target in the result.
-    """
-    if self._compile_settings.get_subsystem_target_mirrored_field_value('strict_deps', target):
-      strict_deps = target.strict_dependencies(DependencyContext())
-      if predicate:
-        filtered_deps = list(filter(predicate, strict_deps))
-      else:
-        filtered_deps = strict_deps
-      deps = [target] + filtered_deps
-    else:
-      deps = self.context.build_graph.transitive_subgraph_of_addresses(
-        [target.address], predicate=predicate)
-
-    return deps
-
-  @staticmethod
-  def _add_product_at_target_base(product_mapping, target, value):
-    product_mapping.add(target, target.target_base).append(value)
-
   def execute(self):
     object_files_product = self.context.products.get(ObjectFiles)
-    native_deps_product = self.context.products.get(NativeTargetDependencies)
     external_libs_product = self.context.products.get_data(NativeExternalLibraryFiles)
     source_targets = self.context.targets(self.source_target_constraint.satisfied_by)
 
@@ -143,7 +94,7 @@ class NativeCompile(NativeTask, AbstractClass):
   # This may be calculated many times for a target, so we memoize it.
   @memoized_method
   def _include_dirs_for_target(self, target):
-    return os.path.join(get_buildroot(), target.target_base)
+    return os.path.join(get_buildroot(), target.address.spec_path)
 
   class NativeSourcesByType(datatype(['rel_root', 'headers', 'sources'])): pass
 
@@ -213,7 +164,7 @@ class NativeCompile(NativeTask, AbstractClass):
       compiler=self._compiler,
       include_dirs=include_dirs,
       sources=sources_and_headers,
-      fatal_warnings=self._compile_settings.get_subsystem_target_mirrored_field_value(
+      fatal_warnings=self._native_build_settings.get_subsystem_target_mirrored_field_value(
         'fatal_warnings', target),
       output_dir=versioned_target.results_dir)
 

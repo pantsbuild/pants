@@ -5,8 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.native.config.environment import LLVMCppToolchain
-from pants.backend.native.subsystems.native_compile_settings import CppCompileSettings
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import CppLibrary
 from pants.backend.native.tasks.native_compile import NativeCompile
 from pants.util.memo import memoized_property
@@ -25,20 +23,6 @@ class CppCompile(NativeCompile):
   @classmethod
   def implementation_version(cls):
     return super(CppCompile, cls).implementation_version() + [('CppCompile', 0)]
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(CppCompile, cls).subsystem_dependencies() + (
-      CppCompileSettings.scoped(cls),
-      NativeToolchain.scoped(cls),
-    )
-
-  @memoized_property
-  def _native_toolchain(self):
-    return NativeToolchain.scoped_instance(self)
-
-  def get_compile_settings(self):
-    return CppCompileSettings.scoped_instance(self)
 
   @memoized_property
   def _cpp_toolchain(self):
