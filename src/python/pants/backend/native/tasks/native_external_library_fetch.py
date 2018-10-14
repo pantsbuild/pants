@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
+from builtins import str
 from distutils.dir_util import copy_tree
 
 from pex.interpreter import PythonInterpreter
@@ -61,7 +62,7 @@ class ConanRequirement(datatype(['pkg_spec'])):
   def fetch_cmdline_args(self):
     platform = Platform.create()
     conan_os_name = platform.resolve_platform_specific(self.CONAN_OS_NAME)
-    # TODO: document these!
+    # TODO: --build missing should be an option!
     args = [
       'install', self.pkg_spec,
       '-s', 'os={}'.format(conan_os_name),
