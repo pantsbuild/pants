@@ -223,12 +223,12 @@ class NativeCompile(NativeTask, AbstractClass):
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
 
     # We are going to execute in the target output, so get absolute paths for everything.
-    # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
     buildroot = get_buildroot()
     argv = (
       [compiler.exe_filename] +
       compiler.extra_args +
       err_flags +
+      # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
       ['-c', '-fPIC'] +
       [
         '-I{}'.format(os.path.join(buildroot, inc_dir))
