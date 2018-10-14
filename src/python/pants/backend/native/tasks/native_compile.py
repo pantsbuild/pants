@@ -206,7 +206,6 @@ class NativeCompile(NativeTask, AbstractClass):
 
     include_dirs = [self._include_dirs_for_target(dep_tgt) for dep_tgt in dependencies]
     include_dirs.extend(self._get_third_party_include_dirs(external_libs_product, dependencies))
-    print('>>> include_dirs: {}'.format(include_dirs))
 
     sources_and_headers = self.get_sources_headers_for_target(target)
 
