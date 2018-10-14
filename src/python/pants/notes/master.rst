@@ -4,6 +4,75 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.11.0.dev3 (10/13/2018)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to pex 1.4.8 and eliminate workarounds. (#6594)
+  `PR #6594 <https://github.com/pantsbuild/pants/pull/6594>`_
+
+* Upgrade to pex 1.5.1; ~kill --resolver-blacklist. (#6619)
+  `PR #6619 <https://github.com/pantsbuild/pants/pull/6619>`_
+
+New features
+~~~~~~~~~~~~
+
+* Pants should manage local dependencies defined in package.json for node_module targets (#6524)
+  `PR #6524 <https://github.com/pantsbuild/pants/pull/6524>`_
+
+* Introduce factory_dict. (#6622)
+  `PR #6622 <https://github.com/pantsbuild/pants/pull/6622>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fixup relative addresses for subprojects. (#6624)
+  `PR #6624 <https://github.com/pantsbuild/pants/pull/6624>`_
+
+* Run pythonstyle under the appropriate interpreter. (#6618)
+  `PR #6618 <https://github.com/pantsbuild/pants/pull/6618>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Leverage factory_dict. (#6623)
+  `PR #6623 <https://github.com/pantsbuild/pants/pull/6623>`_
+
+* [rsc-compile] only metacp the jdk/scala synthetics one time per run (#6614)
+  `PR #6614 <https://github.com/pantsbuild/pants/pull/6614>`_
+
+* Clarify factory method terminal constructor calls. (#6625)
+  `PR #6625 <https://github.com/pantsbuild/pants/pull/6625>`_
+
+* Simplify pants.pex creation, leverage -c. (#6620)
+  `PR #6620 <https://github.com/pantsbuild/pants/pull/6620>`_
+
+* Add fs_util gc (#6612)
+  `PR #6612 <https://github.com/pantsbuild/pants/pull/6612>`_
+
+* add release notes for 1.10.0rc2 (#6615)
+  `PR #6615 <https://github.com/pantsbuild/pants/pull/6615>`_
+
+* Fatal error logging followup fixes (#6610)
+  `PR #6610 <https://github.com/pantsbuild/pants/pull/6610>`_
+
+* Fix typo (#6611)
+  `PR #6611 <https://github.com/pantsbuild/pants/pull/6611>`_
+
+* Consolidate Resettable instances (#6604)
+  `PR #6604 <https://github.com/pantsbuild/pants/pull/6604>`_
+
+* Update lmdb to 0.8 (#6607)
+  `PR #6607 <https://github.com/pantsbuild/pants/pull/6607>`_
+
+* first attempt at centralizing more global error logging state in ExceptionSink (#6552)
+  `PR #6552 <https://github.com/pantsbuild/pants/pull/6552>`_
+
+* [rsc-compile] update jdk dist lookup and usage to work remotely (#6593)
+  `PR #6593 <https://github.com/pantsbuild/pants/pull/6593>`_
+
 
 1.11.0.dev2 (10/05/2018)
 ------------------------
