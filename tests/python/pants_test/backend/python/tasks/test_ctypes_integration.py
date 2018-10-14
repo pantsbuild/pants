@@ -98,14 +98,14 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
     pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party])
     self.assert_success(pants_run)
-    self.assertEqual('Test worked!\n', pants_run.stdout_data)
+    self.assertIn('Test worked!\n', pants_run.stdout_data)
 
     # Test cached run.
     pants_run = self.run_pants(
       command=['-q', 'run', self._binary_target_with_third_party]
     )
     self.assert_success(pants_run)
-    self.assertEqual('Test worked!\n', pants_run.stdout_data)
+    self.assertIn('Test worked!\n', pants_run.stdout_data)
 
   def test_pants_native_source_detection_for_local_ctypes_dists_for_current_platform_only(self):
     """Test that `./pants run` respects platforms when the closure contains native sources.
