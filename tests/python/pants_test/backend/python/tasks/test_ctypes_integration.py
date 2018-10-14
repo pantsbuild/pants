@@ -26,16 +26,16 @@ def invoke_pex_for_output(pex_file_to_run):
 class CTypesIntegrationTest(PantsRunIntegrationTest):
 
   _binary_target = 'testprojects/src/python/python_distribution/ctypes:bin'
+  _binary_target_with_interop = 'testprojects/src/python/python_distribution/ctypes_interop:bin'
   _binary_target_with_third_party = (
     'testprojects/src/python/python_distribution/ctypes_with_third_party:bin_with_third_party'
   )
 
   def test_ctypes_run(self):
-    pants_run = self.run_pants(command=['run', self._binary_target])
+    pants_run = self.run_pants(command=['-q', 'run', self._binary_target])
     self.assert_success(pants_run)
 
-    # This is the entire output from main.py.
-    self.assertIn('x=3, f(x)=17', pants_run.stdout_data)
+    self.assertEqual('x=3, f(x)=17\n', pants_run.stdout_data)
 
   def test_ctypes_binary(self):
     with temporary_dir() as tmp_dir:
@@ -77,20 +77,35 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       binary_run_output = invoke_pex_for_output(pex)
       self.assertEqual('x=3, f(x)=17\n', binary_run_output)
 
+  def test_ctypes_native_language_interop(self):
+    # This should fail because it does not turn on strict_deps for a target which requires it.
+    pants_binary_strict_deps_failure = self.run_pants(['binary', self._binary_target_with_interop])
+    self.assert_failure(pants_binary_strict_deps_failure)
+    self.assertIn("fatal error: 'some_math.h' file not found",
+                  pants_binary_strict_deps_failure.stdout_data)
+
+    pants_run_interop = self.run_pants(['-q', 'run', self._binary_target_with_interop], config={
+      'native-build-settings': {
+        'strict_deps': False,
+      },
+    })
+    self.assert_success(pants_run_interop)
+    self.assertEqual('x=3, f(x)=299\n', pants_run_interop.stdout_data)
+
   def test_ctypes_third_party_integration(self):
     pants_binary = self.run_pants(['binary', self._binary_target_with_third_party])
     self.assert_success(pants_binary)
 
-    pants_run = self.run_pants(['run', self._binary_target_with_third_party])
+    pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party])
     self.assert_success(pants_run)
-    self.assertIn('Test worked!', pants_run.stdout_data)
+    self.assertEqual('Test worked!\n', pants_run.stdout_data)
 
     # Test cached run.
     pants_run = self.run_pants(
-      command=['run', self._binary_target_with_third_party]
+      command=['-q', 'run', self._binary_target_with_third_party]
     )
     self.assert_success(pants_run)
-    self.assertIn('Test worked!', pants_run.stdout_data)
+    self.assertEqual('Test worked!\n', pants_run.stdout_data)
 
   def test_pants_native_source_detection_for_local_ctypes_dists_for_current_platform_only(self):
     """Test that `./pants run` respects platforms when the closure contains native sources.
