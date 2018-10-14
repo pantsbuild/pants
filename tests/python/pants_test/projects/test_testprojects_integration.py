@@ -49,7 +49,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist:missingdirectdepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
-      'testprojects/src/python/python_distribution/ctypes_interop/wrapped-math',
       'testprojects/src/java/org/pantsbuild/testproject/runtime:compile-fail',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_failure',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:fatal',

@@ -57,7 +57,7 @@ class NativeTask(Task):
 
     NB: This includes the current target in the result.
     """
-    if self._native_build_settings.get_subsystem_target_mirrored_field_value('strict_deps', target):
+    if self._native_build_settings.get_strict_deps_value_for_target(target):
       strict_deps = target.strict_dependencies(DependencyContext())
       if predicate:
         filtered_deps = list(filter(predicate, strict_deps))

@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass
+from pants.util.meta import AbstractClass, classproperty
 from pants.util.objects import SubclassesOf, datatype
 from pants.util.process_handler import subprocess
 
@@ -49,7 +49,9 @@ class NativeCompile(NativeTask, AbstractClass):
 
   # `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
   # compiler process. `workunit_label` must be set to a string.
-  workunit_label = None
+  @classproperty
+  def workunit_label(cls):
+    raise NotImplementedError('subclasses of NativeCompile must override workunit_label!')
 
   @classmethod
   def product_types(cls):
@@ -82,7 +84,6 @@ class NativeCompile(NativeTask, AbstractClass):
     with self.invalidated(source_targets, invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         deps = self.native_deps(vt.target)
-        self._add_product_at_target_base(native_deps_product, vt.target, deps)
         if not vt.valid:
           compile_request = self._make_compile_request(vt, deps, external_libs_product)
           self.context.log.debug("compile_request: {}".format(compile_request))
@@ -130,12 +131,23 @@ class NativeCompile(NativeTask, AbstractClass):
 
     return [os.path.join(get_buildroot(), rel_root, src) for src in target_relative_sources]
 
-  # TODO(#5951): expand `Executable` to cover argv generation (where an `Executable` is subclassed
-  # to modify or extend the argument list, as declaratively as possible) to remove
-  # `extra_compile_args(self)`!
+  @abstractmethod
+  def get_compile_settings(self):
+    """Return a subclass of NativeBuildStepSettingsBase.
+
+    NB: the result of this method is cached in self._compile_settings and therefore it is only
+    called once!
+    """
+
+  @memoized_property
+  def _compile_settings(self):
+    return self.get_compile_settings()
+
   @abstractmethod
   def get_compiler(self):
     """An instance of `Executable` which can be invoked to compile files.
+
+    NB: the result of this method is cached in self._compiler and therefore it is only called once!
 
     :return: :class:`pants.backend.native.config.environment.Executable`
     """
@@ -164,8 +176,7 @@ class NativeCompile(NativeTask, AbstractClass):
       compiler=self._compiler,
       include_dirs=include_dirs,
       sources=sources_and_headers,
-      fatal_warnings=self._native_build_settings.get_subsystem_target_mirrored_field_value(
-        'fatal_warnings', target),
+      fatal_warnings=self._compile_settings.get_fatal_warnings_value_for_target(target),
       output_dir=versioned_target.results_dir)
 
   def _make_compile_argv(self, compile_request):

@@ -3,7 +3,8 @@ ctypes_compatible_c_library(
     'testprojects/src/python/python_distribution/ctypes_interop/some-more-math',
   ],
   ctypes_native_library=native_artifact(lib_name='wrapped-math'),
-  # In testing, we will invoke this target with --c-compile-strict-deps switched both on and off (to
-  # test that it fails if strict_deps is on). So this target also implicitly depends on :c_math_lib.
-  # strict_deps=True,
+  # Turning on strict_deps brings the transitive closure of all the native dependencies into the
+  # compile and link tasks. In this case, this target also implicitly depends on the "some-math" C
+  # library, depended on by the "some-more-math" C++ library which we explicitly depend on above.
+  strict_deps=False,
 )
