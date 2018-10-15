@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
+from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -58,10 +59,6 @@ class Checkstyle(LintTaskMixin, Task):
       PythonSetup, PythonRepos)
 
   @classmethod
-  def prepare(cls, options, round_manager):
-    round_manager.require_data(PythonInterpreter)
-
-  @classmethod
   def register_options(cls, register):
     super(Checkstyle, cls).register_options(register)
     register('--severity', fingerprint=True, default='COMMENT', type=str,
@@ -95,11 +92,16 @@ class Checkstyle(LintTaskMixin, Task):
     else:
       checker_id = hash_all([self._CHECKER_REQ])
 
+    # TODO(CMLivingston): We should be able to build a multi interpreter pex here and avoid
+    # multiple pexes and workunits.
+    # Address in: <ticket>
     pex_path = os.path.join(self.workdir, 'checker', checker_id, str(interpreter.identity))
+
     if not os.path.exists(pex_path):
       with self.context.new_workunit(name='build-checker'):
         with safe_concurrent_creation(pex_path) as chroot:
           builder = PEXBuilder(path=chroot, interpreter=interpreter)
+          builder.add_interpreter_constraint(str(interpreter.identity.requirement))
 
           if pants_dev_mode:
             pex_build_util.dump_sources(builder, tgt=self.checker_target, log=self.context.log)
@@ -156,23 +158,29 @@ class Checkstyle(LintTaskMixin, Task):
         failure_count = checker.run(args=args,
                                     stdout=workunit.output('stdout'),
                                     stderr=workunit.output('stderr'))
-        if failure_count > 0 and self.get_options().fail:
-          raise TaskError('{} Python Style issues found. You may try `./pants fmt <targets>`'
-                          .format(failure_count))
         return failure_count
 
   def execute(self):
     """"Run Checkstyle on all found non-synthetic source files."""
-
+    python_tgts = self.context.targets(
+      lambda tgt: isinstance(tgt, (PythonTarget))
+    )
+    interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
+                                               PythonRepos.global_instance(),
+                                               logger=self.context.log.debug)
     tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility(python_tgts)
 
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
+      failure_count = 0
       tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility([vt.target for vt in invalidation_check.invalid_vts])
-      for constraint, targets in tgts_by_compatibility.items():
+      for _, targets in tgts_by_compatibility.items():
         sources = self.calculate_sources(targets)
         if sources:
           interpreter = interpreter_cache.select_interpreter_for_targets(targets)
-          return self.checkstyle(interpreter, sources)
+          failure_count += self.checkstyle(interpreter, sources)
+      if failure_count > 0 and self.get_options().fail:
+          raise TaskError('{} Python Style issues found. You may try `./pants fmt <targets>`'
+                          .format(failure_count))
 
   def calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""

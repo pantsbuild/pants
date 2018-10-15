@@ -60,9 +60,7 @@ class CheckstyleTest(PythonTaskTestBase):
                                  repos=[os.path.dirname(self._checker_dist)])
       self.set_options_for_scope(PythonSetup.options_scope,
                                  resolver_allow_prereleases=True)
-      si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
-      context = self.context(for_task_types=[si_task_type], target_roots=target_roots)
-      si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
+      context = self.context(target_roots=target_roots)
       return self.create_task(context).execute()
 
   def test_no_sources(self):
@@ -113,3 +111,30 @@ class CheckstyleTest(PythonTaskTestBase):
     target = self.make_target('a/python:error', PythonLibrary, sources=['error.py'])
     self.set_options(fail=False)
     self.assertEqual(1, self.execute_task(target_roots=[target]))
+
+  def test_lint_for_py3_only(self):
+    self.create_file('a/python/fail.py', contents=dedent("""
+                         x=2+3
+                         print(x+7)
+                       """))
+    target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
+    with self.assertRaises(TaskError) as task_error:
+      self.execute_task(target_roots=[target])
+    self.assertIn('3 Python Style issues found', str(task_error.exception))
+
+  def test_lint_runs_for_py2_and_py3(self):
+    self.create_file('a/python/fail_py2.py', contents=dedent("""
+                         x=2+3
+                         print x+7
+                       """))
+    target_py2 = self.make_target('a/python:fail2', PythonLibrary, sources=['fail_py2.py'],
+      compatibility=['>=2.7,<3'])
+    self.create_file('a/python/fail_py3.py', contents=dedent("""
+                         x=2+3
+                         print(x+7)
+                       """))
+    target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
+      compatibility=['>=3.6'])
+    with self.assertRaises(TaskError) as task_error:
+      self.execute_task(target_roots=[target_py2, target_py3])
+    self.assertIn('7 Python Style issues found', str(task_error.exception))

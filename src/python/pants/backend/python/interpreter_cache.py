@@ -75,11 +75,11 @@ class PythonInterpreterCache(object):
   def partition_targets_by_compatibility(self, targets):
     """Partition targets by their compatibility constraints.
 
-    :param targets: a list of PythonTarget objects
-
-    :return: tgts_by_compatibilities: a dict that maps compatibility constraint to a list of
-        matching targets
-    :return filters: a set of compatibility constraints imposed by the target set
+    :param targets: a list of `PythonTarget` objects
+    :returns: (tgts_by_compatibilities, filters): a dict that maps compatibility constraints
+      to a list of matching targets, the aggregate set of compatibility constraints imposed
+      by the target set
+    :rtype: (dict(str, list), set)
     """
     tgts_by_compatibilities = defaultdict(list)
     filters = set()
