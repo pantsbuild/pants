@@ -51,9 +51,7 @@ script fail:
 
   - **Get your pypi account added as an `owner` for all pantsbuild.pants packages.**
 
-    You can ask any one of the [Owners](#owners) listed below to do this.
-    Once this is done and you've performed your 1st release, add yourself to
-    the [Owners](#owners) section below.
+    You can ask any one of the current [Owners](#owners) to do this.
 
   - **Configure your pypi credentials locally in `~/.pypirc`**
 
@@ -194,7 +192,7 @@ if the tag for the prior release (eg: release_0.0.33)
     :::bash
     $ ./build-support/bin/contributors.sh -s <tag>
 
-Listing Packages and Owners
+<a name="owners"></a>Listing Packages and Owners
 ------
 
 The current list of packages can be obtained via :
@@ -202,31 +200,13 @@ The current list of packages can be obtained via :
     :::bash
     $ ./build-support/bin/release.sh -l
 
-Right now that's:
-
-- pantsbuild.pants
-- pantsbuild.pants.contrib.avro
-- pantsbuild.pants.contrib.buildgen
-- pantsbuild.pants.contrib.codeanalysis
-- pantsbuild.pants.contrib.confluence
-- pantsbuild.pants.contrib.cpp
-- pantsbuild.pants.contrib.errorprone
-- pantsbuild.pants.contrib.findbugs
-- pantsbuild.pants.contrib.go
-- pantsbuild.pants.contrib.googlejavaformat
-- pantsbuild.pants.contrib.jax_ws
-- pantsbuild.pants.contrib.mypy
-- pantsbuild.pants.contrib.node
-- pantsbuild.pants.contrib.python.checks
-- pantsbuild.pants.contrib.scalajs
-- pantsbuild.pants.contrib.scrooge
-- pantsbuild.pants.contrib.thrifty
-- pantsbuild.pants.testinfra
-
 You can run the following to get a full ownership roster for each
 package :
 
     :::bash
     $ ./build-support/bin/release.sh -o
+
+We generally expect all packages to have the same set of owners, which you can 
+view [here](https://pypi.org/project/pantsbuild.pants/).
 
 [needs-cherrypick]: https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick

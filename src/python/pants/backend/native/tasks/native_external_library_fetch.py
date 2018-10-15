@@ -15,10 +15,10 @@ from pants.backend.native.subsystems.conan import Conan
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.exceptions import TaskError
+from pants.goal.products import UnionProducts
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.contextutil import environment_as
-from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.objects import Exactly, datatype
 from pants.util.process_handler import subprocess
@@ -95,6 +95,10 @@ class NativeExternalLibraryFetch(Task):
              fingerprint=True, help='The conan remote to download conan packages from.')
 
   @classmethod
+  def implementation_version(cls):
+    return super(NativeExternalLibraryFetch, cls).implementation_version() + [('NativeExternalLibraryFetch', 0)]
+
+  @classmethod
   def subsystem_dependencies(cls):
     return super(NativeExternalLibraryFetch, cls).subsystem_dependencies() + (Conan.scoped(cls),)
 
@@ -103,7 +107,10 @@ class NativeExternalLibraryFetch(Task):
     return [NativeExternalLibraryFiles]
 
   @property
-  def cache_target_dirs(self):
+  def create_target_dirs(self):
+    # We create per-target directories in order to act as isolated collections of fetched files.
+    # But do not attempt to automatically cache then (cache_target_dirs), because the entire resolve
+    # must be have its own merged cachekey/VT.
     return True
 
   @memoized_property
@@ -128,40 +135,35 @@ class NativeExternalLibraryFetch(Task):
       with self.invalidated(native_lib_tgts,
                             invalidate_dependents=True) as invalidation_check:
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
-        vts_results_dir = self._prepare_vts_results_dir(resolve_vts)
         if invalidation_check.invalid_vts or not resolve_vts.valid:
           for vt in invalidation_check.all_vts:
-            self._fetch_packages(vt, vts_results_dir)
+            self._fetch_packages(vt)
 
-        native_external_libs_product = self._collect_external_libs(vts_results_dir)
+        native_external_libs_product = self._collect_external_libs(invalidation_check.all_vts)
         self.context.products.register_data(NativeExternalLibraryFiles,
                                             native_external_libs_product)
 
-  def _prepare_vts_results_dir(self, vts):
-    """
-    Given a `VersionedTargetSet`, prepare its results dir.
-    """
-    vt_set_results_dir = os.path.join(self.workdir, vts.cache_key.hash)
-    safe_mkdir(vt_set_results_dir)
-    return vt_set_results_dir
-
-  def _collect_external_libs(self, results_dir):
+  def _collect_external_libs(self, vts):
     """
     Sets the relevant properties of the task product (`NativeExternalLibraryFiles`) object.
     """
-    lib_dir = os.path.join(results_dir, 'lib')
-    include_dir = os.path.join(results_dir, 'include')
+    product = UnionProducts()
+    for vt in vts:
+      lib_dir = os.path.join(vt.results_dir, 'lib')
+      include_dir = os.path.join(vt.results_dir, 'include')
 
-    lib_names = []
-    if os.path.isdir(lib_dir):
-      for filename in os.listdir(lib_dir):
-        lib_name = self._parse_lib_name_from_library_filename(filename)
-        if lib_name:
-          lib_names.append(lib_name)
+      lib_names = []
+      if os.path.isdir(lib_dir):
+        for filename in os.listdir(lib_dir):
+          lib_name = self._parse_lib_name_from_library_filename(filename)
+          if lib_name:
+            lib_names.append(lib_name)
 
-    return NativeExternalLibraryFiles(include_dir=include_dir,
-                                      lib_dir=lib_dir,
-                                      lib_names=tuple(lib_names))
+      nelf = NativeExternalLibraryFiles(include_dir=include_dir,
+                                        lib_dir=lib_dir,
+                                        lib_names=tuple(lib_names))
+      product.add_for_target(vt.target, [nelf])
+    return product
 
   def _get_conan_data_dir_path_for_package(self, pkg_dir_path, pkg_sha):
     return os.path.join(self.workdir,
@@ -237,14 +239,13 @@ class NativeExternalLibraryFetch(Task):
     if os.path.exists(src_include):
       copy_tree(src_include, dest_include)
 
-  def _fetch_packages(self, vt, vts_results_dir):
+  def _fetch_packages(self, vt):
     """
     Invoke the conan pex to fetch conan packages specified by a
     `ExternalLibLibrary` target.
 
-    :param vt: a versioned target containing conan package specifications.
-    :param vts_results_dir: the results directory of the VersionedTargetSet
-      for the purpose of aggregating package contents.
+    :param vt: a versioned target containing conan package specifications, and with a results_dir
+      that we can clone outputs into.
     """
 
     # NB: CONAN_USER_HOME specifies the directory to use for the .conan data directory.
@@ -274,4 +275,4 @@ class NativeExternalLibraryFetch(Task):
           )
 
         pkg_sha = conan_requirement.parse_conan_stdout_for_pkg_sha(stdout)
-        self._copy_package_contents_from_conan_dir(vts_results_dir, conan_requirement, pkg_sha)
+        self._copy_package_contents_from_conan_dir(vt.results_dir, conan_requirement, pkg_sha)
