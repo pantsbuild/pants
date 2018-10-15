@@ -192,7 +192,6 @@ class LinkSharedLibraries(NativeTask):
            # TODO: static archives should be resolvable with -L/-l too, but that's not working for
            # some reason with the IrrXML package in testprojects/.
            list(link_request.external_static_archive_paths) +
-           ['-Wl,-rpath,{}'.format(d) for d in link_request.external_lib_dirs] +
            ['-L{}'.format(d) for d in link_request.external_lib_dirs] +
            ['-l{}'.format(l) for l in link_request.external_lib_names] +
            self.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS) +
