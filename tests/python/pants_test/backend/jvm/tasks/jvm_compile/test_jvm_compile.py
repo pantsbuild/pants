@@ -34,21 +34,19 @@ class JvmCompileTest(TaskTestBase):
     )
 
     context = self.context(target_roots=[target])
-    compile_classpath = context.products.get_data('compile_classpath',
-                                                  ClasspathProducts.init_func(self.pants_workdir))
+    compile_classpath = context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
 
     compile_entry = os.path.join(self.pants_workdir, 'compile-entry')
     pre_init_runtime_entry = os.path.join(self.pants_workdir, 'pre-inited-runtime-entry')
     compile_classpath.add_for_targets([target], [('default', compile_entry)])
-    runtime_classpath = context.products.get_data('runtime_classpath',
-                                                  ClasspathProducts.init_func(self.pants_workdir))
+    runtime_classpath = context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
 
     runtime_classpath.add_for_targets([target], [('default', pre_init_runtime_entry)])
 
     task = self.create_task(context)
     resulting_classpath = task.create_runtime_classpath()
     self.assertEqual([('default', pre_init_runtime_entry), ('default', compile_entry)],
-                     resulting_classpath.get_for_target(target))
+      resulting_classpath.get_for_target(target))
 
 
 class BaseZincCompileJDKTest(TaskTestBase):
