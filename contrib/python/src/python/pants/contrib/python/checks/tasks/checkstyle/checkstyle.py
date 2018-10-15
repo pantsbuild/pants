@@ -90,15 +90,14 @@ class Checkstyle(LintTaskMixin, Task):
     else:
       checker_id = hash_all([self._CHECKER_REQ])
 
-    # TODO(CMLivingston): We should be able to build a multi interpreter pex here and avoid
-    # multiple pexes and workunits.
-    # Address in: <ticket>
     pex_path = os.path.join(self.workdir, 'checker', checker_id, str(interpreter.identity))
 
     if not os.path.exists(pex_path):
       with self.context.new_workunit(name='build-checker'):
         with safe_concurrent_creation(pex_path) as chroot:
           builder = PEXBuilder(path=chroot, interpreter=interpreter)
+          # Constraining is required to guard against the case where the user
+          # has a pexrc file set.
           builder.add_interpreter_constraint(str(interpreter.identity.requirement))
 
           if pants_dev_mode:
@@ -163,6 +162,8 @@ class Checkstyle(LintTaskMixin, Task):
     python_tgts = self.context.targets(
       lambda tgt: isinstance(tgt, (PythonTarget))
     )
+    if not python_tgts:
+      return
     interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
                                                PythonRepos.global_instance(),
                                                logger=self.context.log.debug)
@@ -171,14 +172,19 @@ class Checkstyle(LintTaskMixin, Task):
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
       failure_count = 0
       tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility([vt.target for vt in invalidation_check.invalid_vts])
-      for _, targets in tgts_by_compatibility.items():
+      for filters, targets in tgts_by_compatibility.items():
         sources = self.calculate_sources(targets)
         if sources:
-          interpreter = interpreter_cache.select_interpreter_for_targets(targets)
+          allowed_interpreters = set(interpreter_cache.setup(filters=filters))
+          if not allowed_interpreters:
+            raise TaskError('No valid interpreters found for targets: {}\n(filters: {})'
+                            .format(targets. filters))
+          interpreter = min(allowed_interpreters)
           failure_count += self.checkstyle(interpreter, sources)
       if failure_count > 0 and self.get_options().fail:
         raise TaskError('{} Python Style issues found. You may try `./pants fmt <targets>`'
                         .format(failure_count))
+      return failure_count
 
   def calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""
