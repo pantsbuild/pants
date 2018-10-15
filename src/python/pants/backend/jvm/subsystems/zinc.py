@@ -205,9 +205,7 @@ class Zinc(object):
     underlying_dist = self.underlying_dist
     if self._execution_strategy != NailgunTaskBase.HERMETIC:
       # symlink .pants.d/.jdk -> /some/java/home/
-      jdk_home_symlink = os.path.relpath(
-        os.path.join(self._zinc_factory.get_options().pants_workdir, '.jdk'),
-        get_buildroot())
+      jdk_home_symlink = os.path.join(self._zinc_factory.get_options().pants_workdir, '.jdk')
 
       # Since this code can be run in multi-threading mode due to multiple
       # zinc workers, we need to make sure the file operations below is atomic.
