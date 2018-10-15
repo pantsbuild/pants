@@ -22,8 +22,8 @@ class NodeModule(NodePackage):
 
   def __init__(
     self, package_manager=None, sources=None, build_script=None, output_dir='dist',
-    dev_dependency=False, style_ignore_path='.eslintignore', address=None, payload=None, 
-    bin_executables=None, **kwargs):
+    dev_dependency=False, style_ignore_path='.eslintignore', address=None, payload=None,
+    bin_executables=None, node_scope=None, **kwargs):
     """
     :param sources: Javascript and other source code files that make up this module; paths are
                     relative to the BUILD file's directory.
@@ -49,6 +49,11 @@ class NodeModule(NodePackage):
                            E.G. { 'app': './cli.js', 'runner': './scripts/run.sh' }
                            `string`, file path and package name as  the default bin name
                            E.G. './cli.js' would be interpreted as { 'app': './cli.js' }
+    :param node_scope: Groups related packages together by adding a scope. The `@`
+      symbol is typically used for specifying scope in the package name in `package.json`.
+      However pants target addresses do not allow for `@` in the target address.
+      A repo-level default scope can be added with the --node-distribution-node-scope option.
+      Any target-level node_scope will override the global node-scope.
 
     """
     # TODO(John Sirois): Support devDependencies, etc.  The devDependencies case is not
@@ -74,6 +79,7 @@ class NodeModule(NodePackage):
       'dev_dependency': PrimitiveField(dev_dependency),
       'style_ignore_path': PrimitiveField(style_ignore_path),
       'bin_executables': PrimitiveField(bin_executables),
+      'node_scope': PrimitiveField(node_scope),
     })
     super(NodeModule, self).__init__(address=address, payload=payload, **kwargs)
 

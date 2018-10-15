@@ -8,6 +8,7 @@ import os
 from textwrap import dedent
 
 from pants.base.exceptions import TaskError
+from pants.util.process_handler import subprocess
 from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
@@ -38,7 +39,7 @@ class NodeResolveSourceDepsTest(TaskTestBase):
     for product_type in product_types:
       context.products.require_data(product_type)
 
-  def _create_trans_dep(self):
+  def _create_trans_dep(self, node_scope=None):
     """Create a transitive dependency target"""
     self.create_file('src/node/trans_dep/yarn.lock')
     self.create_file('src/node/trans_dep/package.json', contents=dedent("""
@@ -57,10 +58,12 @@ class NodeResolveSourceDepsTest(TaskTestBase):
                            target_type=NodeModule,
                            sources=['index.js', 'package.json', 'yarn.lock'],
                            package_name='trans_dep',
-                           package_manager='yarn')
+                           package_manager='yarn',
+                           node_scope=node_scope)
     return trans_dep
 
-  def _create_dep(self, trans_dep=None, provide_bin=None, use_bin_dict=None, src_root=None, make_target=True):
+  def _create_dep(self, trans_dep=None, provide_bin=None, use_bin_dict=None, src_root=None, make_target=True,
+                  node_scope=None):
     """Create a dependency target"""
 
     src_root = src_root or 'src/node'
@@ -79,13 +82,16 @@ class NodeResolveSourceDepsTest(TaskTestBase):
         console.log('Hello world!');
       """))
     if trans_dep:
+      require_dep = 'trans_dep'
+      if node_scope:
+        require_dep = os.path.join('@{}'.format(node_scope), require_dep)
       self.create_file(os.path.join(src_root, 'dep/index.js'), contents=dedent("""
-        const trans_dep = require('trans_dep');
-        const addOne = (num) => {
+        const trans_dep = require('{require_dep}');
+        const addOne = (num) => {{
           return trans_dep.add(num, 1);
-        };
+        }};
         module.exports.addOne = addOne;
-      """))
+      """.format(require_dep=require_dep)))
       self.create_file(os.path.join(src_root, 'dep/package.json'), contents=dedent("""
         {{
           "name": "dep",
@@ -103,7 +109,8 @@ class NodeResolveSourceDepsTest(TaskTestBase):
                                package_name='dep',
                                package_manager='yarn',
                                dependencies=[trans_dep],
-                               bin_executables=bin_executables)
+                               bin_executables=bin_executables,
+                               node_scope=node_scope)
       else:
         dep = None
     else:
@@ -125,12 +132,14 @@ class NodeResolveSourceDepsTest(TaskTestBase):
                                sources=['index.js', 'package.json', 'yarn.lock', 'cli.js'],
                                package_name='dep',
                                package_manager='yarn',
-                               bin_executables=bin_executables)
+                               bin_executables=bin_executables,
+                               node_scope=node_scope)
       else:
         dep = None
     return dep
 
-  def _create_app(self, dep, dep_not_found=None, package_manager=None, src_root=None):
+  def _create_app(self, dep, dep_not_found=None, package_manager=None, src_root=None,
+                  node_scope=None):
     src_root = src_root or 'src/node'
     dependencies = '"dep": "file:../dep"'
     if dep_not_found:
@@ -151,10 +160,14 @@ class NodeResolveSourceDepsTest(TaskTestBase):
         }}
       }}
     """.format(dependencies=dependencies)))
+
+    require_dep = 'dep'
+    if node_scope:
+      require_dep = os.path.join('@{}'.format(node_scope), require_dep)
     self.create_file(os.path.join(src_root, 'app/index.js'), contents=dedent("""
-      const dep = require('dep');
+      const dep = require('{require_dep}');
       console.log(dep.addOne(1));
-    """))
+    """.format(require_dep=require_dep)))
     self.create_file(os.path.join(src_root, 'app/cli.js'), contents=dedent("""#!/usr/bin/env node
       console.log('cli');
     """))
@@ -168,7 +181,8 @@ class NodeResolveSourceDepsTest(TaskTestBase):
                            package_manager=package_manager,
                            dependencies=[dep],
                            bin_executables={"app": "./cli.js",
-                                            "app2": "./cli2.js"})
+                                            "app2": "./cli2.js"},
+                           node_scope=node_scope)
     return app
 
   def _create_basic_app(self, src_root=None):
@@ -227,13 +241,14 @@ class NodeResolveSourceDepsTest(TaskTestBase):
                            dependencies=[app])
     return workspace
 
-  def _resolve_target(self, target):
+  def _resolve_target(self, target, node_scope=None):
     context = self.context(target_roots=[target], options={
       'npm-resolver': {'install_optional': False,
                        'force_option_override': False,
                        'install_production': False,
                        'force': False,
-                       'frozen_lockfile': True}
+                       'frozen_lockfile': True},
+      'node-distribution': {'node_scope': node_scope}
     })
     self.wrap_context(context, [NodePaths])
     task = self.create_task(context)
@@ -357,3 +372,210 @@ class NodeResolveSourceDepsTest(TaskTestBase):
     out = task.node_distribution.node_command(args=[script_path]).check_output()
     lines = {line.strip() for line in out.splitlines()}
     self.assertIn('Hello world!', lines)
+
+  def test_node_scope_installed_successfully(self):
+    dep = self._create_dep(node_scope='pants')
+    app = self._create_app(dep, node_scope='pants')
+    task, node_paths = self._resolve_target(app)
+
+    dep_node_path = node_paths.node_path(dep)
+    app_node_path = node_paths.node_path(app)
+    self.assertIsNotNone(dep_node_path)
+    self.assertIsNotNone(app_node_path)
+
+    # Verify that 'app/node_modules' has a correct symlink to '@pants/dep'
+    app_node_modules_path = os.path.join(app_node_path, 'node_modules')
+    link_dep_path = os.path.join(app_node_modules_path, '@pants', 'dep')
+    self.assertTrue(os.path.exists(app_node_modules_path))
+    self.assertTrue(os.path.islink(link_dep_path))
+
+    expected = os.path.relpath(dep_node_path,  os.path.dirname(link_dep_path))
+    self.assertEqual(os.readlink(link_dep_path), expected)
+
+    # Imports are working correctly
+    script_path = os.path.join(app_node_path, 'index.js')
+    out = task.node_distribution.node_command(args=[script_path]).check_output()
+    lines = {line.strip() for line in out.splitlines()}
+    self.assertIn('2', lines)
+
+  def test_transitive_node_scope(self):
+    trans_dep = self._create_trans_dep(node_scope='pants')
+    dep = self._create_dep(trans_dep=trans_dep, provide_bin=True, use_bin_dict=True,
+                           node_scope='pants')
+    app = self._create_app(dep, node_scope='pants')
+    task, node_paths = self._resolve_target(app)
+
+    trans_dep_node_path = node_paths.node_path(trans_dep)
+    dep_node_path = node_paths.node_path(dep)
+    app_node_path = node_paths.node_path(app)
+    self.assertIsNotNone(trans_dep_node_path)
+    self.assertIsNotNone(dep_node_path)
+    self.assertIsNotNone(app_node_path)
+
+    script_path = os.path.join(app_node_path, 'index.js')
+    out = task.node_distribution.node_command(args=[script_path]).check_output()
+    lines = {line.strip() for line in out.splitlines()}
+    self.assertIn('2', lines)
+
+  def test_node_scope_override_successfully(self):
+    node_scope = 'pants'
+    self.create_file('src/node/dep/yarn.lock')
+    self.create_file('src/node/dep/package.json', contents=dedent("""
+      {
+        "name": "@shorts/dep",
+        "version": "0.0.1"
+      }
+    """))
+    self.create_file('src/node/dep/index.js', contents=dedent("""
+      const addOne = (num) => {
+        return num + 1;
+      };
+      module.exports.addOne = addOne;
+    """))
+    dep = self.make_target(spec='src/node/dep:dep',
+                           target_type=NodeModule,
+                           sources=['index.js', 'package.json', 'yarn.lock', 'cli.js'],
+                           package_name='dep',
+                           package_manager='yarn',
+                           node_scope=node_scope)
+    app = self._create_app(dep, node_scope=node_scope)
+    task, node_paths = self._resolve_target(app)
+
+    dep_node_path = node_paths.node_path(dep)
+    app_node_path = node_paths.node_path(app)
+    self.assertIsNotNone(dep_node_path)
+    self.assertIsNotNone(app_node_path)
+
+    # Verify that 'app/node_modules' has a correct symlink to '@pants/dep' and not '@shorts/dep'
+    app_node_modules_path = os.path.join(app_node_path, 'node_modules')
+    link_dep_path = os.path.join(app_node_modules_path, '@pants', 'dep')
+    self.assertTrue(os.path.exists(app_node_modules_path))
+    self.assertTrue(os.path.islink(link_dep_path))
+
+    expected = os.path.relpath(dep_node_path,  os.path.dirname(link_dep_path))
+    self.assertEqual(os.readlink(link_dep_path), expected)
+
+    # Imports are working correctly
+    script_path = os.path.join(app_node_path, 'index.js')
+    out = task.node_distribution.node_command(args=[script_path]).check_output()
+    lines = {line.strip() for line in out.splitlines()}
+    self.assertIn('2', lines)
+
+  def test_import_fails_with_node_scope(self):
+    dep = self._create_dep(node_scope='pants')
+    # In the require('dep') statement, won't include the node_scope
+    app = self._create_app(dep)
+    task, node_paths = self._resolve_target(app)
+
+    dep_node_path = node_paths.node_path(dep)
+    app_node_path = node_paths.node_path(app)
+    self.assertIsNotNone(dep_node_path)
+    self.assertIsNotNone(app_node_path)
+
+    # Verify that 'app/node_modules' has a correct symlink to '@pants/dep'
+    app_node_modules_path = os.path.join(app_node_path, 'node_modules')
+    link_dep_path = os.path.join(app_node_modules_path, '@pants', 'dep')
+    self.assertTrue(os.path.exists(app_node_modules_path))
+    self.assertTrue(os.path.islink(link_dep_path))
+
+    expected = os.path.relpath(dep_node_path,  os.path.dirname(link_dep_path))
+    self.assertEqual(os.readlink(link_dep_path), expected)
+
+    # Imports should fail
+    script_path = os.path.join(app_node_path, 'index.js')
+    with self.assertRaises(subprocess.CalledProcessError):
+      task.node_distribution.node_command(args=[script_path]).check_output()
+
+  def test_scoped_only_in_package_json(self):
+    self.create_file('src/node/dep/yarn.lock')
+
+    # Scoped to @shorts in package.json, but if not specified in pants, will not be Scoped
+    self.create_file('src/node/dep/package.json', contents=dedent("""
+      {
+        "name": "@shorts/dep",
+        "version": "0.0.1"
+      }
+    """))
+    self.create_file('src/node/dep/index.js', contents=dedent("""
+      const addOne = (num) => {
+        return num + 1;
+      };
+      module.exports.addOne = addOne;
+    """))
+    dep = self.make_target(spec='src/node/dep:dep',
+                           target_type=NodeModule,
+                           sources=['index.js', 'package.json', 'yarn.lock', 'cli.js'],
+                           package_name='dep',
+                           package_manager='yarn')
+    app = self._create_app(dep)
+    task, node_paths = self._resolve_target(app)
+
+    dep_node_path = node_paths.node_path(dep)
+    app_node_path = node_paths.node_path(app)
+    self.assertIsNotNone(dep_node_path)
+    self.assertIsNotNone(app_node_path)
+
+    # Verify that 'app/node_modules' has a correct symlink to 'dep'
+    app_node_modules_path = os.path.join(app_node_path, 'node_modules')
+    link_dep_path = os.path.join(app_node_modules_path, 'dep')
+    self.assertTrue(os.path.exists(app_node_modules_path))
+    self.assertTrue(os.path.islink(link_dep_path))
+
+    expected = os.path.relpath(dep_node_path,  app_node_modules_path)
+    self.assertEqual(os.readlink(link_dep_path), expected)
+
+    # Imports are working correctly
+    script_path = os.path.join(app_node_path, 'index.js')
+    out = task.node_distribution.node_command(args=[script_path]).check_output()
+    lines = {line.strip() for line in out.splitlines()}
+    self.assertIn('2', lines)
+
+  def test_global_node_scope_installed_successfully(self):
+    dep = self._create_dep()
+    app = self._create_app(dep, node_scope='pants')
+    task, node_paths = self._resolve_target(app, node_scope='pants')
+
+    dep_node_path = node_paths.node_path(dep)
+    app_node_path = node_paths.node_path(app)
+    self.assertIsNotNone(dep_node_path)
+    self.assertIsNotNone(app_node_path)
+
+    # Verify that 'app/node_modules' has a correct symlink to '@pants/dep'
+    app_node_modules_path = os.path.join(app_node_path, 'node_modules')
+    link_dep_path = os.path.join(app_node_modules_path, '@pants', 'dep')
+    self.assertTrue(os.path.exists(app_node_modules_path))
+    self.assertTrue(os.path.islink(link_dep_path))
+
+    expected = os.path.relpath(dep_node_path,  os.path.dirname(link_dep_path))
+    self.assertEqual(os.readlink(link_dep_path), expected)
+
+    # Imports are working correctly
+    script_path = os.path.join(app_node_path, 'index.js')
+    out = task.node_distribution.node_command(args=[script_path]).check_output()
+    lines = {line.strip() for line in out.splitlines()}
+    self.assertIn('2', lines)
+
+  def test_target_node_scope_overrides_global_successfully(self):
+    dep = self._create_dep(node_scope = 'shorts')
+    app = self._create_app(dep, node_scope='shorts')
+    task, node_paths = self._resolve_target(app, node_scope='pants')
+
+    dep_node_path = node_paths.node_path(dep)
+    app_node_path = node_paths.node_path(app)
+    self.assertIsNotNone(dep_node_path)
+    self.assertIsNotNone(app_node_path)
+
+    # Verify that 'app/node_modules' has a correct symlink to '@shorts/dep'
+    app_node_modules_path = os.path.join(app_node_path, 'node_modules')
+    link_dep_path = os.path.join(app_node_modules_path, '@shorts', 'dep')
+    self.assertTrue(os.path.exists(app_node_modules_path))
+    self.assertTrue(os.path.islink(link_dep_path))
+
+    expected = os.path.relpath(dep_node_path,  os.path.dirname(link_dep_path))
+    self.assertEqual(os.readlink(link_dep_path), expected)
+
+    # Imports are working correctly
+    script_path = os.path.join(app_node_path, 'index.js')
+    out = task.node_distribution.node_command(args=[script_path]).check_output()
+    lines = {line.strip() for line in out.splitlines()}
+    self.assertIn('2', lines)

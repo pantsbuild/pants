@@ -134,22 +134,48 @@ class NpmResolver(Subsystem, NodeResolverBase):
           raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
                           .format(target.address.reference(), command, result))
         if source_deps:
-          self._link_source_dependencies(target, results_dir, node_paths, source_deps)
+          self._link_source_dependencies(node_task, target, results_dir, node_paths, source_deps)
 
-  def _link_source_dependencies(self, target, results_dir, node_paths, source_deps):
-
+  def _link_source_dependencies(self, node_task, target, results_dir, node_paths, source_deps):
     for package_name, file_path in source_deps.items():
       # Package name should always the same as the target name
       dep = self._get_target_from_package_name(target, package_name, file_path)
+
+      # Apply node-scoping rules if applicable
+      node_scope = dep.payload.node_scope or node_task.node_distribution.node_scope
+      dep_package_name = self._scoped_package_name(node_task, dep.package_name, node_scope)
       # Symlink each target
       dep_path = node_paths.node_path(dep)
       node_module_dir = os.path.join(results_dir, 'node_modules')
-      relative_symlink(dep_path, os.path.join(node_module_dir, dep.package_name))
+      relative_symlink(dep_path, os.path.join(node_module_dir, dep_package_name))
       # If there are any bin, we need to symlink those as well
       bin_dir = os.path.join(node_module_dir, '.bin')
       for bin_name, rel_bin_path in dep.bin_executables.items():
         bin_path = os.path.join(dep_path, rel_bin_path)
         relative_symlink(bin_path, os.path.join(bin_dir, bin_name))
+
+  @staticmethod
+  def _scoped_package_name(node_task, package_name, node_scope):
+    """Apply a node_scope to the package name.
+
+    Overrides any existing package_name if already in a scope
+
+    :return: A package_name with prepended with a node scope via '@'
+    """
+
+    if not node_scope:
+      return package_name
+
+    scoped_package_name = package_name
+    chunk = package_name.split('/', 1)
+    if len(chunk) > 1 and chunk[0].startswith('@'):
+      scoped_package_name = os.path.join('@{}'.format(node_scope), chunk[1:])
+    else:
+      scoped_package_name = os.path.join('@{}'.format(node_scope), package_name)
+
+    node_task.context.log.debug(
+      'Node package "{}" will be resolved with scope "{}".'.format(package_name, scoped_package_name))
+    return scoped_package_name
 
   @staticmethod
   def _emit_package_descriptor(node_task, target, results_dir, node_paths):
