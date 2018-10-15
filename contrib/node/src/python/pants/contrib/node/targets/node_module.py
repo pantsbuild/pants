@@ -52,6 +52,8 @@ class NodeModule(NodePackage):
     :param node_scope: Groups related packages together by adding a scope. The `@`
       symbol is typically used for specifying scope in the package name in `package.json`.
       However pants target addresses do not allow for `@` in the target address.
+      A repo-level default scope can be added with the --node-distribution-node-scope option.
+      Any target-level node_scope will override the global node-scope.
 
     """
     # TODO(John Sirois): Support devDependencies, etc.  The devDependencies case is not

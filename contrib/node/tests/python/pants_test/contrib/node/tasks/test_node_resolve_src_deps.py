@@ -84,7 +84,7 @@ class NodeResolveSourceDepsTest(TaskTestBase):
     if trans_dep:
       require_dep = 'trans_dep'
       if node_scope:
-        require_dep = NpmResolver._scoped_package_name(require_dep, node_scope)
+        require_dep = os.path.join('@{}'.format(node_scope), require_dep)
       self.create_file(os.path.join(src_root, 'dep/index.js'), contents=dedent("""
         const trans_dep = require('{require_dep}');
         const addOne = (num) => {{
@@ -163,7 +163,7 @@ class NodeResolveSourceDepsTest(TaskTestBase):
 
     require_dep = 'dep'
     if node_scope:
-      require_dep = NpmResolver._scoped_package_name(require_dep, node_scope)
+      require_dep = os.path.join('@{}'.format(node_scope), require_dep)
     self.create_file(os.path.join(src_root, 'app/index.js'), contents=dedent("""
       const dep = require('{require_dep}');
       console.log(dep.addOne(1));

@@ -143,7 +143,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
 
       # Apply node-scoping rules if applicable
       node_scope = dep.payload.node_scope or node_task.node_distribution.node_scope
-      dep_package_name = self._scoped_package_name(dep.package_name, node_scope)
+      dep_package_name = self._scoped_package_name(node_task, dep.package_name, node_scope)
       # Symlink each target
       dep_path = node_paths.node_path(dep)
       node_module_dir = os.path.join(results_dir, 'node_modules')
@@ -155,7 +155,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
         relative_symlink(bin_path, os.path.join(bin_dir, bin_name))
 
   @staticmethod
-  def _scoped_package_name(package_name, node_scope):
+  def _scoped_package_name(node_task, package_name, node_scope):
     """Apply a node_scope to the package name.
 
     Overrides any existing package_name if already in a scope
@@ -163,16 +163,18 @@ class NpmResolver(Subsystem, NodeResolverBase):
     :return: A package_name with prepended with a node scope via '@'
     """
 
-    if node_scope is None:
+    if not node_scope:
       return package_name
 
     scoped_package_name = package_name
-    chunk = package_name.split('/')
+    chunk = package_name.split('/', 1)
     if len(chunk) > 1 and chunk[0].startswith('@'):
       scoped_package_name = os.path.join('@{}'.format(node_scope), chunk[1:])
     else:
       scoped_package_name = os.path.join('@{}'.format(node_scope), package_name)
 
+    node_task.context.log.debug(
+      'Node package "{}" will be resolved with scope "{}".'.format(package_name, scoped_package_name))
     return scoped_package_name
 
   @staticmethod

@@ -60,7 +60,7 @@ class NodeDistribution(NativeTool):
              help='The path to the global eslint ignore path')
     register('--eslint-version', default='4.15.0', fingerprint=True,
              help='Use this ESLint version.')
-    register('--node-scope', fingerprint=True,
+    register('--node-scope', advanced=True, fingerprint=True,
              help='Default node scope for repo. Scope groups related packages together.')
 
   @memoized_method
