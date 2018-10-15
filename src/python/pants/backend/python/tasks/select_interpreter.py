@@ -57,7 +57,7 @@ class SelectInterpreter(Task):
 
   def execute(self):
     # TODO(CMLivingston): Grabbing `PythonRequirementLibrary`s here seems like it is a hack.
-    # Remove per: <ticket>
+    # Remove per: https://github.com/pantsbuild/pants/issues/6632
     python_tgts_and_reqs = self.context.targets(
       lambda tgt: isinstance(tgt, (PythonTarget, PythonRequirementLibrary))
     )

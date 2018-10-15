@@ -24,7 +24,6 @@ from pants.task.task import Task
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation
 from pants.util.memo import memoized_property
-from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
@@ -179,8 +178,8 @@ class Checkstyle(LintTaskMixin, Task):
           interpreter = interpreter_cache.select_interpreter_for_targets(targets)
           failure_count += self.checkstyle(interpreter, sources)
       if failure_count > 0 and self.get_options().fail:
-          raise TaskError('{} Python Style issues found. You may try `./pants fmt <targets>`'
-                          .format(failure_count))
+        raise TaskError('{} Python Style issues found. You may try `./pants fmt <targets>`'
+                        .format(failure_count))
 
   def calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""

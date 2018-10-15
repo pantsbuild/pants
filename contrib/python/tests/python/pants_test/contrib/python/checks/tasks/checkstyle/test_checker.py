@@ -11,7 +11,6 @@ from textwrap import dedent
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import environment_as
