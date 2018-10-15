@@ -12,6 +12,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
+from pants.base.build_environment import get_buildroot
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -51,29 +52,26 @@ class JvmCompileTest(TaskTestBase):
 
 class BaseZincCompileJDKTest(TaskTestBase):
   DEFAULT_CONF = 'default'
+  old_cwd = os.getcwd()
 
   @classmethod
   def task_type(cls):
     return BaseZincCompile
 
-  def test_subprocess_compile_jdk_being_symlink(self):
-    dummy_target = self.make_target(
-      'java/classpath:java_lib',
-      target_type=JavaLibrary,
-      sources=['com/foo/Bar.java'],
-    )
+  def setUp(self):
+    os.chdir(get_buildroot())
+    super(BaseZincCompileJDKTest, self).setUp()
 
-    context = self.context(target_roots=[dummy_target])
+  def tearDown(self):
+    os.chdir(self.old_cwd)
+    super(BaseZincCompileJDKTest, self).tearDown()
+
+  def test_subprocess_compile_jdk_being_symlink(self):
+    context = self.context(target_roots=[])
     zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.SUBPROCESS)
     self.assertTrue(os.path.islink(zinc.dist.home))
 
   def test_hermetic_jdk_being_underlying_dist(self):
-    dummy_target = self.make_target(
-      'java/classpath:java_lib',
-      target_type=JavaLibrary,
-      sources=['com/foo/Bar.java'],
-    )
-
-    context = self.context(target_roots=[dummy_target])
+    context = self.context(target_roots=[])
     zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.HERMETIC)
     self.assertFalse(os.path.islink(zinc.dist.home))
