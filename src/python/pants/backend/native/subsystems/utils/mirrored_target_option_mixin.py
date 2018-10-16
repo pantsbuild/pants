@@ -6,17 +6,22 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import object
 
+from pants.util.meta import classproperty
+
 
 # TODO: consider coalescing existing methods of mirroring options between a target and a subsystem
 # -- see pants.backend.jvm.subsystems.dependency_context.DependencyContext#defaulted_property()!
 class MirroredTargetOptionMixin(object):
-  """Get option values which may be set in this subsystem or in a Target's keyword argument.
+  """Get option values which may be set in this subsystem or in a Target's keyword argument."""
 
-  Subclasses should override `mirrored_option_to_kwarg_map` with a class property returning a dict
-  mapping this subsystem's options attribute name (with underscores) to the corresponding target's
-  keyword argument name.
-  """
-  mirrored_option_to_kwarg_map = None
+  @classproperty
+  def mirrored_option_to_kwarg_map(cls):
+    """Subclasses should override and return a dict of (subsystem option name) -> (target kwarg).
+
+    This classproperty should return a dict mapping this subsystem's options attribute name (with
+    underscores) to the corresponding target's keyword argument name.
+    """
+    raise NotImplementedError()
 
   def get_target_mirrored_option(self, option_name, target):
     field_name = self.mirrored_option_to_kwarg_map[option_name]

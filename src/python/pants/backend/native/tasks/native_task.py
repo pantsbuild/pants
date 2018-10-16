@@ -12,18 +12,34 @@ from pants.backend.native.targets.native_library import NativeLibrary
 from pants.build_graph.dependency_context import DependencyContext
 from pants.task.task import Task
 from pants.util.collections import assert_single_element
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.meta import classproperty
 from pants.util.objects import SubclassesOf
 
 
 class NativeTask(Task):
 
-  # `NativeCompile` will use the `source_target_constraint` to determine what targets have "sources"
-  # to compile, and the `dependent_target_constraint` to determine which dependent targets to
-  # operate on for `strict_deps` calculation.
-  # NB: `source_target_constraint` must be overridden.
-  source_target_constraint = None
-  dependent_target_constraint = SubclassesOf(NativeLibrary)
+  @classproperty
+  def source_target_constraint(cls):
+    """Return a type constraint which is evaluated to determine "source" targets for this task.
+
+    This is used to make it clearer which tasks act on which targets, since the compile and link
+    tasks work on different target sets (just C and just C++ in the compile tasks, and both in the
+    link task).
+
+    :return: :class:`pants.util.objects.TypeConstraint`
+    """
+    raise NotImplementedError()
+
+  @memoized_classproperty
+  def dependent_target_constraint(cls):
+    """Return a type contraint which is evaluated to determine dependencies for a target.
+
+    This is used to make strict_deps() calculation automatic and declarative.
+
+    :return: :class:`pants.util.objects.TypeConstraint`
+    """
+    return SubclassesOf(NativeLibrary)
 
   @classmethod
   def subsystem_dependencies(cls):

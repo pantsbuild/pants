@@ -37,6 +37,8 @@ class LinkSharedLibraries(NativeTask):
 
   options_scope = 'link-shared-libraries'
 
+  # TODO(#6486): change this to include ExternalNativeLibrary, then add a test that strict-deps
+  # works on external libs.
   source_target_constraint = SubclassesOf(NativeLibrary)
 
   @classmethod

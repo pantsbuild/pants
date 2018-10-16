@@ -135,8 +135,7 @@ class NativeCompile(NativeTask, AbstractClass):
   def get_compile_settings(self):
     """Return a subclass of NativeBuildStepSettingsBase.
 
-    NB: the result of this method is cached in self._compile_settings and therefore it is only
-    called once!
+    NB: Subclasses will be queried for the compile settings once and the result cached.
     """
 
   @memoized_property
@@ -147,7 +146,7 @@ class NativeCompile(NativeTask, AbstractClass):
   def get_compiler(self):
     """An instance of `Executable` which can be invoked to compile files.
 
-    NB: the result of this method is cached in self._compiler and therefore it is only called once!
+    NB: Subclasses will be queried for the compiler instance once and the result cached.
 
     :return: :class:`pants.backend.native.config.environment.Executable`
     """

@@ -8,7 +8,6 @@ from pants.backend.native.config.environment import LLVMCToolchain
 from pants.backend.native.subsystems.native_build_step_settings_base import CCompileSettings
 from pants.backend.native.targets.native_library import CLibrary
 from pants.backend.native.tasks.native_compile import NativeCompile
-from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf
 
 
@@ -29,16 +28,8 @@ class CCompile(NativeCompile):
   def subsystem_dependencies(cls):
     return super(CCompile, cls).subsystem_dependencies() + (CCompileSettings.scoped(cls),)
 
-  @memoized_property
-  def _c_compile_settings(self):
+  def get_compile_settings(self):
     return CCompileSettings.scoped_instance(self)
 
-  @memoized_property
-  def _c_toolchain(self):
-    return self._request_single(LLVMCToolchain, self._native_toolchain).c_toolchain
-
-  def get_compile_settings(self):
-    return self._c_compile_settings
-
   def get_compiler(self):
-    return self._c_toolchain.c_compiler
+    return self._request_single(LLVMCToolchain, self._native_toolchain).c_toolchain.c_compiler
