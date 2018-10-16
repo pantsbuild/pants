@@ -4,7 +4,7 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.10.0rc0 (09/10/2018)
+1.11.0rc0 (10/16/2018)
 ----------------------
 
 New features
