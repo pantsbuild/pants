@@ -63,7 +63,7 @@ class CheckstyleTest(PythonTaskTestBase):
       return self.create_task(context).execute()
 
   def test_no_sources(self):
-    self.assertEqual(None, self.execute_task())
+    self.assertEqual(0, self.execute_task())
 
   def test_pass(self):
     self.create_file('a/python/pass.py', contents=dedent("""
@@ -111,61 +111,97 @@ class CheckstyleTest(PythonTaskTestBase):
     self.set_options(fail=False)
     self.assertEqual(1, self.execute_task(target_roots=[target]))
 
-  def test_lint_for_py3_only_disabled(self):
-    self.create_file('a/python/fail.py', contents=dedent("""
-                         x=2+3
-                         print(x+7)
-                       """))
-    target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'],
-      compatibility=['>=3.6'])
-    self.set_options(fail=False)
-    self.set_options(enable_py3_lint=False)
-    self.assertEqual(0, self.execute_task(target_roots=[target]))
-
-  def test_lint_for_py3_only_enabled(self):
-    self.create_file('a/python/fail.py', contents=dedent("""
-                         x=2+3
-                         print(x+7)
-                       """))
-    target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'],
-      compatibility=['>=3.6'])
-    self.set_options(enable_py3_lint=True)
-    with self.assertRaises(TaskError) as task_error:
-      self.execute_task(target_roots=[target])
-    self.assertIn('3 Python Style issues found', str(task_error.exception))
-
-  def test_lint_runs_for_py2_and_py3(self):
+  # NB: the whitelist tests below have the following lint errors in their respective test files:
+  # fail_py2.py: 4 lint errrors
+  # fail_py3.py: 3 lint errors
+  def test_lint_runs_for_blanket_whitelist(self):
     self.create_file('a/python/fail_py2.py', contents=dedent("""
                          x=2+3
                          print x+7
                        """))
     target_py2 = self.make_target('a/python:fail2', PythonLibrary, sources=['fail_py2.py'],
-      compatibility=['>=2.7,<3'])
+      compatibility=['CPython>=2.7,<3'])
     self.create_file('a/python/fail_py3.py', contents=dedent("""
                          x=2+3
                          print(x+7)
                        """))
     target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
-      compatibility=['>=3.6'])
-    self.set_options(enable_py3_lint=True)
+      compatibility=['CPython>=3.6'])
+    self.set_options(interpreter_constraints_whitelist=[])
     with self.assertRaises(TaskError) as task_error:
       self.execute_task(target_roots=[target_py2, target_py3])
     self.assertIn('7 Python Style issues found', str(task_error.exception))
 
-  def test_lint_runs_for_py2_and_skips_py3(self):
+  def test_lint_runs_for_default_constraints_only(self):
     self.create_file('a/python/fail_py2.py', contents=dedent("""
                          x=2+3
                          print x+7
                        """))
     target_py2 = self.make_target('a/python:fail2', PythonLibrary, sources=['fail_py2.py'],
-      compatibility=['>=2.7,<3'])
+      compatibility=['CPython>=2.7,<3'])
     self.create_file('a/python/fail_py3.py', contents=dedent("""
                          x=2+3
                          print(x+7)
                        """))
     target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
-      compatibility=['>=3.6'])
-    self.set_options(enable_py3_lint=False)
+      compatibility=['CPython>=3.6'])
     with self.assertRaises(TaskError) as task_error:
       self.execute_task(target_roots=[target_py2, target_py3])
     self.assertIn('4 Python Style issues found', str(task_error.exception))
+
+  def test_lint_ignores_unwhitelisted_constraints(self):
+    self.create_file('a/python/fail_py3.py', contents=dedent("""
+                         x=2+3
+                         print(x+7)
+                       """))
+    target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
+      compatibility=['CPython>=3.6'])
+    self.assertEqual(0, self.execute_task(target_roots=[target_py3]))
+
+  def test_lint_runs_for_single_whitelisted_constraints(self):
+    self.create_file('a/python/fail_py3.py', contents=dedent("""
+                         x=2+3
+                         print(x+7)
+                       """))
+    target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
+      compatibility=['CPython>=3.6'])
+    self.set_options(interpreter_constraints_whitelist=["CPython>=3.6"])
+    with self.assertRaises(TaskError) as task_error:
+      self.execute_task(target_roots=[target_py3])
+    self.assertIn('3 Python Style issues found', str(task_error.exception))
+
+  def test_lint_runs_for_multiple_whitelisted_constraints(self):
+    self.create_file('a/python/fail_py2.py', contents=dedent("""
+                         x=2+3
+                         print x+7
+                       """))
+    target_py2 = self.make_target('a/python:fail2', PythonLibrary, sources=['fail_py2.py'],
+      compatibility=['CPython>=2.6'])
+    self.create_file('a/python/fail_py3.py', contents=dedent("""
+                         x=2+3
+                         print(x+7)
+                       """))
+    target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
+      compatibility=['CPython>=3.6'])
+    self.set_options(interpreter_constraints_whitelist=["CPython>=2.6", "CPython>=3.6"])
+    with self.assertRaises(TaskError) as task_error:
+      self.execute_task(target_roots=[target_py2, target_py3])
+    self.assertIn('7 Python Style issues found', str(task_error.exception))
+
+  def test_lint_runs_for_default_constraints_and_matching_whitelist(self):
+    self.create_file('a/python/fail_py2.py', contents=dedent("""
+                         x=2+3
+                         print x+7
+                       """))
+    target_py2 = self.make_target('a/python:fail2', PythonLibrary, sources=['fail_py2.py'],
+      compatibility=['CPython>=2.7,<3'])
+    self.create_file('a/python/fail_py3.py', contents=dedent("""
+                         x=2+3
+                         print(x+7)
+                       """))
+    target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
+      compatibility=['CPython>=3.6'])
+    self.set_options(interpreter_constraints_whitelist=["CPython>=3.6"])
+    with self.assertRaises(TaskError) as task_error:
+      self.execute_task(target_roots=[target_py2, target_py3])
+    self.assertIn('7 Python Style issues found', str(task_error.exception))

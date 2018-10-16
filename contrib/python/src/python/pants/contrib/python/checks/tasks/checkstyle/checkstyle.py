@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
+from packaging import version
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_repos import PythonRepos
@@ -28,7 +29,6 @@ from pants.util.dirutil import safe_concurrent_creation
 from pants.util.memo import memoized_classproperty, memoized_property
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
-from pkg_resources import Distribution, Requirement, RequirementParseError
 
 from pants.contrib.python.checks.checker import checker
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import \
@@ -44,16 +44,6 @@ class Checkstyle(LintTaskMixin, Task):
     PyCodeStyleSubsystem,
     FlakeCheckSubsystem,
   )
-
-  @memoized_classproperty
-  def _python_3_compatible_dists(cls):
-    _VERSIONS = ["3.0", "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
-    _PROJECTS = ["CPython", "stackless", "activepython"]
-    _PYTHON_3_DISTS = []
-    for proj in _PROJECTS:
-      for ver in _VERSIONS:
-        _PYTHON_3_DISTS.append(Distribution(project_name=proj, version=ver))
-    return _PYTHON_3_DISTS
 
   @memoized_classproperty
   def plugin_subsystems(cls):
@@ -79,8 +69,13 @@ class Checkstyle(LintTaskMixin, Task):
              help='Takes a text file where specific rules on specific files will be skipped.')
     register('--fail', fingerprint=True, default=True, type=bool,
              help='Prevent test failure but still produce output for problems.')
-    register('--enable-py3-lint', fingerprint=True, default=False, type=bool,
-             help='Enable linting on Python 3-compatible targets.')
+    register('--interpreter-constraints-whitelist', fingerprint=True,
+             default=None,
+             help='A list of interpreter constraints for which matching targets will be linted '
+                  'in addition to targets that match the global interpreter constraints '
+                  '(either from defaults or pants.ini). If the user supplies an empty list, '
+                  'Pants will lint all targets in the target set, irrespective of the working '
+                  'set of compatibility constraints.')
 
   def _is_checked(self, target):
     return (not target.is_synthetic and isinstance(target, PythonTarget) and
@@ -94,6 +89,18 @@ class Checkstyle(LintTaskMixin, Task):
   def checker_target(self):
     self.context.resolve(self._CHECKER_ADDRESS_SPEC)
     return self.context.build_graph.get_target(Address.parse(self._CHECKER_ADDRESS_SPEC))
+
+  @memoized_property
+  def _acceptable_interpreter_constraints(self):
+    default_constraints = PythonSetup.global_instance().interpreter_constraints
+    whitelisted_constraints = self.get_options().interpreter_constraints_whitelist
+    # The user wants to lint everything.
+    if whitelisted_constraints == []:
+      return []
+    # The user did not pass a whitelist option.
+    elif whitelisted_constraints is None:
+      whitelisted_constraints = ()
+    return [version.parse(v) for v in default_constraints + whitelisted_constraints]
 
   def checker_pex(self, interpreter):
     # TODO(John Sirois): Formalize in pants.base?
@@ -166,30 +173,25 @@ class Checkstyle(LintTaskMixin, Task):
       with self.context.new_workunit(name='pythonstyle',
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT],
                                      cmd=' '.join(checker.cmdline(args))) as workunit:
-        failure_count = checker.run(args=args,
+        return checker.run(args=args,
                                     stdout=workunit.output('stdout'),
                                     stderr=workunit.output('stderr'))
-        return failure_count
 
-  def _constraints_are_py3_compatible(self, constraint_tuple):
+  def _constraints_are_whitelisted(self, constraint_tuple):
     """
     Detect whether a tuple of compatibility constraints
-    contains Python 3-compatible constraints.
-    Remove this method after closing:
-    https://github.com/pantsbuild/pants/issues/5764
+    matches constraints imposed by the merged list of the global
+    constraints from PythonSetup and a user-supplied whitelist.
     """
+    if self._acceptable_interpreter_constraints == []:
+      # The user wants to lint everything.
+      return True
+    num_matches = 0
     for constraint in constraint_tuple:
-      try:
-        req = Requirement.parse(constraint)
-      except RequirementParseError as e:
-        # Coerce "naked" requirements (e.g. `>=2.7,<3` or `>=3.6`)
-        self.context.log.warn(str(e))
-        self.context.log.warn("Python 3 filtering for lint task encountered an invalid "
-                              "interpreter constraint: {}\n Coercing to `CPython{}`."
-                              .format(constraint, constraint))
-        req = Requirement.parse("CPython" + constraint)
-      if any(dd in req for dd in self._python_3_compatible_dists):
-        return True
+      if version.parse(constraint) in self._acceptable_interpreter_constraints:
+        num_matches += 1
+    if len(constraint_tuple) == num_matches:
+      return True
     return False
 
   def execute(self):
@@ -198,7 +200,7 @@ class Checkstyle(LintTaskMixin, Task):
       lambda tgt: isinstance(tgt, (PythonTarget))
     )
     if not python_tgts:
-      return
+      return 0
     interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
                                                PythonRepos.global_instance(),
                                                logger=self.context.log.debug)
@@ -208,12 +210,15 @@ class Checkstyle(LintTaskMixin, Task):
         [vt.target for vt in invalidation_check.invalid_vts]
       )
       for filters, targets in tgts_by_compatibility.items():
-        if not self.get_options().enable_py3_lint and self._constraints_are_py3_compatible(filters):
+        if self.get_options().interpreter_constraints_whitelist is None and not self._constraints_are_whitelisted(filters):
           deprecated_conditional(
-            lambda: not self.get_options().enable_py3_lint,
+            lambda: self.get_options().interpreter_constraints_whitelist is None,
             '1.14.0.dev2',
-            "Python 3 linting is currently disabled by default and this disabling will be removed in the "
-            "future. Use the `--enable-py3-lint` lint option to enable linting for Python 3."
+            "Python linting is currently restricted to targets that match the global "
+            "interpreter constraints: {}. Pants detected unacceptable filters: {}. "
+            "Use the `--interpreter-constraints-whitelist` lint option to whitelist "
+            "compatibiltiy constraints."
+            .format(PythonSetup.global_instance().interpreter_constraints, filters)
           )
         else:
           sources = self.calculate_sources([tgt for tgt in targets])
