@@ -28,14 +28,13 @@ from pants.util.dirutil import safe_concurrent_creation
 from pants.util.memo import memoized_classproperty, memoized_property
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
+from pkg_resources import Distribution, Requirement, RequirementParseError
 
 from pants.contrib.python.checks.checker import checker
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import \
   default_subsystem_for_plugin
 from pants.contrib.python.checks.tasks.checkstyle.pycodestyle_subsystem import PyCodeStyleSubsystem
 from pants.contrib.python.checks.tasks.checkstyle.pyflakes_subsystem import FlakeCheckSubsystem
-
-from pkg_resources import Distribution, Requirement, RequirementParseError
 
 
 class Checkstyle(LintTaskMixin, Task):
