@@ -33,7 +33,7 @@ class PluginSubsystemBase(Subsystem):
 def default_subsystem_for_plugin(plugin_type):
   """Create a singleton PluginSubsystemBase subclass for the given plugin type.
 
-  The singleton enforrcement is useful in cases where dependent Tasks are installed multiple times,
+  The singleton enforcement is useful in cases where dependent Tasks are installed multiple times,
   to avoid creating duplicate types which would have option scope collisions.
 
   :param plugin_type: A CheckstylePlugin subclass.
