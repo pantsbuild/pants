@@ -1,6 +1,8 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use ui::EngineDisplay;
+
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -267,6 +269,8 @@ impl Scheduler {
         break res;
       }
     };
+
+//    let mut display = EngineDisplay::for_stdout(0);
 
     request
       .roots

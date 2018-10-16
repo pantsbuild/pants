@@ -8,7 +8,7 @@ name = "engine_display"
 path = "src/display.rs"
 
 [[bin]]
-name = "ui"
+name = "demo"
 path = "src/main.rs"
 
 [dependencies]

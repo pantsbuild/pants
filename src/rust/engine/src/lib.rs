@@ -67,6 +67,7 @@ extern crate resettable;
 #[macro_use]
 extern crate smallvec;
 extern crate tokio;
+extern crate ui;
 
 use std::ffi::CStr;
 use std::fs::File;
