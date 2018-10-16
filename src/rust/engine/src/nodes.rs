@@ -145,48 +145,6 @@ impl Select {
     }
   }
 
-  fn snapshot(
-    &self,
-    context: &Context,
-    entry: &rule_graph::Entry,
-  ) -> NodeFuture<Arc<fs::Snapshot>> {
-    let edges = context
-      .core
-      .rule_graph
-      .edges_for_inner(entry)
-      .expect("Expected edges to exist for Snapshot intrinsic.");
-    // Compute PathGlobs for the subject.
-    let context = context.clone();
-    Select::new(context.core.types.path_globs, self.params.clone(), &edges)
-      .run(context.clone())
-      .and_then(move |path_globs_val| context.get(Snapshot(externs::key_for(path_globs_val))))
-      .to_boxed()
-  }
-
-  fn execute_process(
-    &self,
-    context: &Context,
-    entry: &rule_graph::Entry,
-  ) -> NodeFuture<ProcessResult> {
-    let edges = &context
-      .core
-      .rule_graph
-      .edges_for_inner(entry)
-      .expect("Expected edges to exist for ExecuteProcess intrinsic.");
-    // Compute an ExecuteProcessRequest for the subject.
-    let context = context.clone();
-    Select::new(
-      context.core.types.process_request,
-      self.params.clone(),
-      edges,
-    ).run(context.clone())
-    .and_then(|process_request_val| {
-      ExecuteProcess::lift(&process_request_val)
-        .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
-    }).and_then(move |process_request| context.get(process_request))
-    .to_boxed()
-  }
-
   ///
   /// Return the Future for the Task that should compute the given product for the
   /// given Params.
@@ -196,6 +154,21 @@ impl Select {
   fn gen_node(&self, context: &Context) -> NodeFuture<Value> {
     if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
       return future::ok(value.clone()).to_boxed();
+    }
+
+    fn select(select: &Select, context: &Context, product: TypeConstraint) -> NodeFuture<Value> {
+      let edges = context
+        .core
+        .rule_graph
+        .edges_for_inner(&select.entry)
+        .ok_or_else(|| {
+          throw(&format!(
+            "Tried to select product {} for intrinsic but found no edges",
+            externs::key_to_str(&product.0)
+          ))
+        });
+      let context = context.clone();
+      Select::new(product, select.params.clone(), &try_future!(edges)).run(context.clone())
     }
 
     match &self.entry {
@@ -212,31 +185,23 @@ impl Select {
             ..
           }) => {
             let context = context.clone();
-            self
-              .snapshot(&context, &self.entry)
-              .map(move |snapshot| Snapshot::store_snapshot(&context.core, &snapshot))
+            let core = context.core.clone();
+            select(&self, &context, context.core.types.path_globs)
+              .and_then(move |val| context.get(Snapshot(externs::key_for(val))))
+              .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
               .to_boxed()
           }
           &rule_graph::Rule::Intrinsic(Intrinsic {
             kind: IntrinsicKind::FilesContent,
             ..
           }) => {
-            let edges = &context
-              .core
-              .rule_graph
-              .edges_for_inner(&self.entry)
-              .expect("Expected edges to exist for FilesContent intrinsic.");
             let context = context.clone();
-            Select::new(
-              context.core.types.directory_digest,
-              self.params.clone(),
-              edges,
-            ).run(context.clone())
-            .and_then(|directory_digest_val| {
-              lift_digest(&directory_digest_val).map_err(|str| throw(&str))
-            }).and_then(move |digest| {
-              let store = context.core.store();
-              context
+            select(&self, &context, context.core.types.directory_digest)
+              .and_then(|directory_digest_val| {
+                lift_digest(&directory_digest_val).map_err(|str| throw(&str))
+              }).and_then(move |digest| {
+                let store = context.core.store();
+                context
                 .core
                 .store()
                 .load_directory(digest)
@@ -250,23 +215,27 @@ impl Select {
                     .contents_for_directory(&directory)
                     .map_err(|str| throw(&str))
                 }).map(move |files_content| Snapshot::store_files_content(&context, &files_content))
-            }).to_boxed()
+              }).to_boxed()
           }
           &rule_graph::Rule::Intrinsic(Intrinsic {
             kind: IntrinsicKind::ProcessExecution,
             ..
           }) => {
             let context = context.clone();
-            self
-              .execute_process(&context, &self.entry)
+            let core = context.core.clone();
+            select(&self, &context, context.core.types.process_request)
+              .and_then(|request| {
+                ExecuteProcess::lift(&request)
+                  .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
+              }).and_then(move |process_request| context.get(process_request))
               .map(move |result| {
                 externs::unsafe_call(
-                  &context.core.types.construct_process_result,
+                  &core.types.construct_process_result,
                   &[
                     externs::store_bytes(&result.0.stdout),
                     externs::store_bytes(&result.0.stderr),
                     externs::store_i64(result.0.exit_code.into()),
-                    Snapshot::store_directory(&context.core, &result.0.output_directory),
+                    Snapshot::store_directory(&core, &result.0.output_directory),
                   ],
                 )
               }).to_boxed()
