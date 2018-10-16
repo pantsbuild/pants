@@ -4,6 +4,33 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.10.0rc0 (09/10/2018)
+----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add a node_scope option to node_module targets to support package-scopes (#6616)
+  `PR #6616 <https://github.com/pantsbuild/pants/pull/6616>`_
+
+* Split conan resolve by native_external_library targets (takeover). (#6630)
+  `PR #6630 <https://github.com/pantsbuild/pants/pull/6630>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Create exactly one associated subsystem per checkstyle plugin (#6634)
+  `PR #6634 <https://github.com/pantsbuild/pants/pull/6634>`_
+
+* Add some jdk tests for execution modes (#6631)
+  `PR #6631 <https://github.com/pantsbuild/pants/pull/6631>`_
+
+* Fix the release script. (#6629)
+  `PR #6629 <https://github.com/pantsbuild/pants/pull/6629>`_
+
+New features
+~~~~~~~~~~~~
+
 1.11.0.dev3 (10/13/2018)
 ------------------------
 
