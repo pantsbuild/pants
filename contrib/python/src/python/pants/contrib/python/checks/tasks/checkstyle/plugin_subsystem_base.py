@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized
 
 
 class PluginSubsystemBase(Subsystem):
@@ -28,6 +29,7 @@ class PluginSubsystemBase(Subsystem):
     return json.dumps(options_dict) if options_dict else None
 
 
+@memoized
 def default_subsystem_for_plugin(plugin_type):
   return type(str('{}Subsystem'.format(plugin_type.__name__)),
               (PluginSubsystemBase,),
