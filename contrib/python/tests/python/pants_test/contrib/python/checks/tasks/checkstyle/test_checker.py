@@ -111,12 +111,25 @@ class CheckstyleTest(PythonTaskTestBase):
     self.set_options(fail=False)
     self.assertEqual(1, self.execute_task(target_roots=[target]))
 
-  def test_lint_for_py3_only(self):
+  def test_lint_for_py3_only_disabled(self):
     self.create_file('a/python/fail.py', contents=dedent("""
                          x=2+3
                          print(x+7)
                        """))
-    target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
+    target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'],
+      compatibility=['>=3.6'])
+    self.set_options(fail=False)
+    self.set_options(enable_py3_lint=False)
+    self.assertEqual(0, self.execute_task(target_roots=[target]))
+
+  def test_lint_for_py3_only_enabled(self):
+    self.create_file('a/python/fail.py', contents=dedent("""
+                         x=2+3
+                         print(x+7)
+                       """))
+    target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'],
+      compatibility=['>=3.6'])
+    self.set_options(enable_py3_lint=True)
     with self.assertRaises(TaskError) as task_error:
       self.execute_task(target_roots=[target])
     self.assertIn('3 Python Style issues found', str(task_error.exception))
@@ -134,6 +147,25 @@ class CheckstyleTest(PythonTaskTestBase):
                        """))
     target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
       compatibility=['>=3.6'])
+    self.set_options(enable_py3_lint=True)
     with self.assertRaises(TaskError) as task_error:
       self.execute_task(target_roots=[target_py2, target_py3])
     self.assertIn('7 Python Style issues found', str(task_error.exception))
+
+  def test_lint_runs_for_py2_and_skips_py3(self):
+    self.create_file('a/python/fail_py2.py', contents=dedent("""
+                         x=2+3
+                         print x+7
+                       """))
+    target_py2 = self.make_target('a/python:fail2', PythonLibrary, sources=['fail_py2.py'],
+      compatibility=['>=2.7,<3'])
+    self.create_file('a/python/fail_py3.py', contents=dedent("""
+                         x=2+3
+                         print(x+7)
+                       """))
+    target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
+      compatibility=['>=3.6'])
+    self.set_options(enable_py3_lint=False)
+    with self.assertRaises(TaskError) as task_error:
+      self.execute_task(target_roots=[target_py2, target_py3])
+    self.assertIn('4 Python Style issues found', str(task_error.exception))

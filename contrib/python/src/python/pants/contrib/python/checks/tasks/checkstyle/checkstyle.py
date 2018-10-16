@@ -14,6 +14,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks import pex_build_util
 from pants.base.build_environment import get_buildroot, pants_version
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_all
 from pants.base.workunit import WorkUnitLabel
@@ -34,6 +35,8 @@ from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import \
 from pants.contrib.python.checks.tasks.checkstyle.pycodestyle_subsystem import PyCodeStyleSubsystem
 from pants.contrib.python.checks.tasks.checkstyle.pyflakes_subsystem import FlakeCheckSubsystem
 
+from pkg_resources import Distribution, Requirement, RequirementParseError
+
 
 class Checkstyle(LintTaskMixin, Task):
   _PYTHON_SOURCE_EXTENSION = '.py'
@@ -42,6 +45,16 @@ class Checkstyle(LintTaskMixin, Task):
     PyCodeStyleSubsystem,
     FlakeCheckSubsystem,
   )
+
+  @memoized_classproperty
+  def _python_3_compatible_dists(cls):
+    _VERSIONS = ["3.0", "3.1", "3.2", "3.3", "3.4", "3.5", "3.6", "3.7", "3.8", "3.9"]
+    _PROJECTS = ["CPython", "stackless", "activepython"]
+    _PYTHON_3_DISTS = []
+    for proj in _PROJECTS:
+      for ver in _VERSIONS:
+        _PYTHON_3_DISTS.append(Distribution(project_name=proj, version=ver))
+    return _PYTHON_3_DISTS
 
   @memoized_classproperty
   def plugin_subsystems(cls):
@@ -67,6 +80,8 @@ class Checkstyle(LintTaskMixin, Task):
              help='Takes a text file where specific rules on specific files will be skipped.')
     register('--fail', fingerprint=True, default=True, type=bool,
              help='Prevent test failure but still produce output for problems.')
+    register('--enable-py3-lint', fingerprint=True, default=False, type=bool,
+             help='Enable linting on Python 3-compatible targets.')
 
   def _is_checked(self, target):
     return (not target.is_synthetic and isinstance(target, PythonTarget) and
@@ -157,6 +172,27 @@ class Checkstyle(LintTaskMixin, Task):
                                     stderr=workunit.output('stderr'))
         return failure_count
 
+  def _constraints_are_py3_compatible(self, constraint_tuple):
+    """
+    Detect whether a tuple of compatibility constraints
+    contains Python 3-compatible constraints.
+    Remove this method after closing:
+    https://github.com/pantsbuild/pants/issues/5764
+    """
+    for constraint in constraint_tuple:
+      try:
+        req = Requirement.parse(constraint)
+      except RequirementParseError as e:
+        # Coerce "naked" requirements (e.g. `>=2.7,<3` or `>=3.6`)
+        self.context.log.warn(str(e))
+        self.context.log.warn("Python 3 filtering for lint task encountered an invalid "
+                              "interpreter constraint: {}\n Coercing to `CPython{}`."
+                              .format(constraint, constraint))
+        req = Requirement.parse("CPython" + constraint)
+      if any(dd in req for dd in self._python_3_compatible_dists):
+        return True
+    return False
+
   def execute(self):
     """"Run Checkstyle on all found non-synthetic source files."""
     python_tgts = self.context.targets(
@@ -167,20 +203,28 @@ class Checkstyle(LintTaskMixin, Task):
     interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
                                                PythonRepos.global_instance(),
                                                logger=self.context.log.debug)
-    tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility(python_tgts)
-
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
       failure_count = 0
-      tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility([vt.target for vt in invalidation_check.invalid_vts])
+      tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility(
+        [vt.target for vt in invalidation_check.invalid_vts]
+      )
       for filters, targets in tgts_by_compatibility.items():
-        sources = self.calculate_sources(targets)
-        if sources:
-          allowed_interpreters = set(interpreter_cache.setup(filters=filters))
-          if not allowed_interpreters:
-            raise TaskError('No valid interpreters found for targets: {}\n(filters: {})'
-                            .format(targets. filters))
-          interpreter = min(allowed_interpreters)
-          failure_count += self.checkstyle(interpreter, sources)
+        if not self.get_options().enable_py3_lint and self._constraints_are_py3_compatible(filters):
+          deprecated_conditional(
+            lambda: not self.get_options().enable_py3_lint,
+            '1.14.0.dev2',
+            "Python 3 linting is currently disabled by default and this disabling will be removed in the "
+            "future. Use the `--enable-py3-lint` lint option to enable linting for Python 3."
+          )
+        else:
+          sources = self.calculate_sources([tgt for tgt in targets])
+          if sources:
+            allowed_interpreters = set(interpreter_cache.setup(filters=filters))
+            if not allowed_interpreters:
+              raise TaskError('No valid interpreters found for targets: {}\n(filters: {})'
+                              .format(targets, filters))
+            interpreter = min(allowed_interpreters)
+            failure_count += self.checkstyle(interpreter, sources)
       if failure_count > 0 and self.get_options().fail:
         raise TaskError('{} Python Style issues found. You may try `./pants fmt <targets>`'
                         .format(failure_count))
