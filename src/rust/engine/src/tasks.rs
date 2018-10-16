@@ -100,6 +100,11 @@ impl Tasks {
         input: types.directory_digest,
       },
       Intrinsic {
+        kind: IntrinsicKind::DirectoryDigest,
+        product: types.directory_digest,
+        input: types.merge_directories_request,
+      },
+      Intrinsic {
         kind: IntrinsicKind::ProcessExecution,
         product: types.process_result,
         input: types.process_request,
@@ -189,6 +194,7 @@ pub struct Intrinsic {
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub enum IntrinsicKind {
+  DirectoryDigest,
   Snapshot,
   FilesContent,
   ProcessExecution,

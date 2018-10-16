@@ -192,6 +192,29 @@ impl Select {
               .to_boxed()
           }
           &rule_graph::Rule::Intrinsic(Intrinsic {
+            kind: IntrinsicKind::DirectoryDigest,
+            ..
+          }) => {
+            let request = select(
+              &self,
+              &context,
+              context.core.types.merge_directories_request,
+            );
+            let core = context.core.clone();
+            request
+              .and_then(move |request| {
+                let digests: Result<Vec<hashing::Digest>, Failure> =
+                  externs::project_multi(&request, "directories")
+                    .into_iter()
+                    .map(|val| lift_digest(&val).map_err(|str| throw(&str)))
+                    .collect();
+                fs::Snapshot::merge_directories(core.store(), try_future!(digests))
+                  .map_err(|err| throw(&err))
+                  .map(move |digest| Snapshot::store_directory(&core, &digest))
+                  .to_boxed()
+              }).to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic {
             kind: IntrinsicKind::FilesContent,
             ..
           }) => {

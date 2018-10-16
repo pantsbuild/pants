@@ -15,7 +15,8 @@ from future.utils import text_type
 
 from pants.base.project_tree import Dir, Link
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize,
-                             FilesContent, PathGlobs, PathGlobsAndRoot, Snapshot, create_fs_rules)
+                             FilesContent, MergeDirectoriesRequest, PathGlobs, PathGlobsAndRoot,
+                             Snapshot, create_fs_rules)
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -321,7 +322,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     dir = scheduler.merge_directories(())
     self.assertEqual(EMPTY_DIRECTORY_DIGEST, dir)
 
-  def test_merge_directories(self):
+  def test_synchronously_merge_directories(self):
     with temporary_dir() as temp_dir:
       with open(os.path.join(temp_dir, "roland"), "w") as f:
         f.write("European Burmese")
@@ -356,6 +357,44 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         roland_snapshot.directory_digest,
         susannah_snapshot.directory_digest,
       ))
+
+      self.assertEqual(both_snapshot.directory_digest, both_merged)
+
+  def test_asynchronously_merge_directories(self):
+    with temporary_dir() as temp_dir:
+      with open(os.path.join(temp_dir, "roland"), "w") as f:
+        f.write("European Burmese")
+      with open(os.path.join(temp_dir, "susannah"), "w") as f:
+        f.write("Not sure actually")
+      scheduler = self.mk_scheduler(rules=create_fs_rules())
+      (empty_snapshot, roland_snapshot, susannah_snapshot, both_snapshot) = (
+        scheduler.capture_snapshots((
+          PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), text_type(temp_dir)),
+          PathGlobsAndRoot(PathGlobs(("roland",), ()), text_type(temp_dir)),
+          PathGlobsAndRoot(PathGlobs(("susannah",), ()), text_type(temp_dir)),
+          PathGlobsAndRoot(PathGlobs(("*",), ()), text_type(temp_dir)),
+        ))
+      )
+
+      empty_merged = scheduler.product_request(
+        DirectoryDigest,
+        [MergeDirectoriesRequest((empty_snapshot.directory_digest,))],
+      )[0]
+      self.assertEqual(empty_snapshot.directory_digest, empty_merged)
+
+      roland_merged = scheduler.product_request(
+        DirectoryDigest,
+        [MergeDirectoriesRequest((roland_snapshot.directory_digest, empty_snapshot.directory_digest))],
+      )[0]
+      self.assertEqual(
+        roland_snapshot.directory_digest,
+        roland_merged,
+      )
+
+      both_merged = scheduler.product_request(
+        DirectoryDigest,
+        [MergeDirectoriesRequest((roland_snapshot.directory_digest, susannah_snapshot.directory_digest))],
+      )[0]
 
       self.assertEqual(both_snapshot.directory_digest, both_merged)
 

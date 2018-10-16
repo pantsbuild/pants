@@ -14,6 +14,7 @@ pub struct Types {
   pub path_globs: TypeConstraint,
   pub directory_digest: TypeConstraint,
   pub snapshot: TypeConstraint,
+  pub merge_directories_request: TypeConstraint,
   pub files_content: TypeConstraint,
   pub dir: TypeConstraint,
   pub file: TypeConstraint,
