@@ -9,13 +9,16 @@ from builtins import object, str
 from textwrap import dedent
 
 from pants.engine.build_files import create_graph_rules
+from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import RootRule, RuleIndex, SingletonRule, TaskRule
+from pants.engine.rules import (RootRule, RuleIndex, SingletonRule, TaskRule, _GoalProduct,
+                                console_rule)
 from pants.engine.selectors import Get, Select
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import JsonParser
-from pants_test.engine.util import TargetTable, assert_equal_with_printing, create_scheduler
+from pants_test.engine.util import (TargetTable, assert_equal_with_printing, create_scheduler,
+                                    run_rule)
 
 
 class A(object):
@@ -53,6 +56,20 @@ class SubA(A):
 
 
 _suba_root_rules = [RootRule(SubA)]
+
+
+@console_rule('example', [Select(Console)])
+def a_console_rule_generator(console):
+  a = yield Get(A, str('a str!'))
+  console.print_stdout(str(a))
+
+
+class RuleTest(unittest.TestCase):
+  def test_run_rule_console_rule_generator(self):
+    res = run_rule(a_console_rule_generator, Console(), {
+        (A, str): lambda _: A(),
+      })
+    self.assertEquals(res, _GoalProduct.for_name('example')())
 
 
 class RuleIndexTest(unittest.TestCase):
