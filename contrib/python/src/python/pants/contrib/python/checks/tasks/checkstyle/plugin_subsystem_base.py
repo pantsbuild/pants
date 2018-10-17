@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized
 
 
 class PluginSubsystemBase(Subsystem):
@@ -28,7 +29,17 @@ class PluginSubsystemBase(Subsystem):
     return json.dumps(options_dict) if options_dict else None
 
 
+@memoized
 def default_subsystem_for_plugin(plugin_type):
+  """Create a singleton PluginSubsystemBase subclass for the given plugin type.
+
+  The singleton enforcement is useful in cases where dependent Tasks are installed multiple times,
+  to avoid creating duplicate types which would have option scope collisions.
+
+  :param plugin_type: A CheckstylePlugin subclass.
+  :type: :class:`pants.contrib.python.checks.checker.common.CheckstylePlugin`
+  :rtype: :class:`pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base.PluginSubsystemBase`
+  """
   return type(str('{}Subsystem'.format(plugin_type.__name__)),
               (PluginSubsystemBase,),
               {
