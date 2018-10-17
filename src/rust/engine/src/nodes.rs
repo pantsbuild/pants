@@ -20,7 +20,7 @@ use hashing;
 use process_execution::{self, CommandRunner};
 use rule_graph;
 use selectors;
-use tasks::{self, Intrinsic, IntrinsicKind};
+use tasks::{self, Intrinsic};
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 
@@ -186,10 +186,9 @@ impl Select {
             task: task.clone(),
             entry: Arc::new(self.entry.clone()),
           }),
-          &rule_graph::Rule::Intrinsic(Intrinsic {
-            kind: IntrinsicKind::Snapshot,
-            ..
-          }) => {
+          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+            if product == context.core.types.snapshot && input == context.core.types.path_globs =>
+          {
             let context = context.clone();
             let core = context.core.clone();
             self
@@ -198,10 +197,10 @@ impl Select {
               .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
               .to_boxed()
           }
-          &rule_graph::Rule::Intrinsic(Intrinsic {
-            kind: IntrinsicKind::DirectoryDigest,
-            ..
-          }) => {
+          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+            if product == context.core.types.directory_digest
+              && input == context.core.types.merged_directories =>
+          {
             let request =
               self.select_product(&context, context.core.types.merged_directories, "intrinsic");
             let core = context.core.clone();
@@ -218,10 +217,10 @@ impl Select {
                   .to_boxed()
               }).to_boxed()
           }
-          &rule_graph::Rule::Intrinsic(Intrinsic {
-            kind: IntrinsicKind::FilesContent,
-            ..
-          }) => {
+          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+            if product == context.core.types.files_content
+              && input == context.core.types.directory_digest =>
+          {
             let context = context.clone();
             self
               .select_product(&context, context.core.types.directory_digest, "intrinsic")
@@ -245,10 +244,10 @@ impl Select {
                 }).map(move |files_content| Snapshot::store_files_content(&context, &files_content))
               }).to_boxed()
           }
-          &rule_graph::Rule::Intrinsic(Intrinsic {
-            kind: IntrinsicKind::ProcessExecution,
-            ..
-          }) => {
+          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+            if product == context.core.types.process_result
+              && input == context.core.types.process_request =>
+          {
             let context = context.clone();
             let core = context.core.clone();
             self
@@ -269,6 +268,7 @@ impl Select {
                 )
               }).to_boxed()
           }
+          &rule_graph::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
         }
       }
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Root(_))
