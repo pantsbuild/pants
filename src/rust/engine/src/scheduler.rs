@@ -267,36 +267,38 @@ impl Scheduler {
 //    println!("{}", request.roots);
     let mut display = EngineDisplay::for_stdout(0);
     display.start();
-    display.log("execute".to_string());
     display.render();
 
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
-    display.log("execute2".to_string());
-    display.render();
-    let worker_ids = vec![
-      "pool worker 1".to_string(),
-      "pool worker 2".to_string(),
-    ];
 
-    for worker_id in worker_ids.clone() {
-    display.add_worker(worker_id);
-    display.render();
-  }
+    let display_worker_count = 8;
 
+    let worker_ids: Vec<String> = (0..display_worker_count).map(|s| format!("{}", s)).collect();
+
+    for worker_id in worker_ids {
+      display.add_worker(worker_id);
+      display.render();
+    }
 
     let roots: Vec<_> = request.roots.clone().into_iter().map(|s| s.into()).collect();
+
     let results = loop {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
-      }
-      else {
-        display.update("pool worker 1".to_string(), format!("{:?}", self.core.graph.heavy_hitters(&roots, 1)));
+      } else {
+        let ongoing_tasks = self.core.graph.heavy_hitters(&roots, display_worker_count);
+        for (i, task) in ongoing_tasks.iter().enumerate() {
+          display.update(i.to_string(), format!("{:?}", task));
+        }
+        for i in ongoing_tasks.len()..display_worker_count {
+          display.update(i.to_string(), "".to_string());
+        }
+//        if (ongoing_tasks.length < 8)
         display.render();
       }
     };
-
-
     display.render();
+    display.finish();
 
 
     request
