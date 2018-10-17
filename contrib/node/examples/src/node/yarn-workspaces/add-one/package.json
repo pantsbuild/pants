@@ -1,0 +1,18 @@
+{
+  "name": "add-one",
+  "version": "1.0.0",
+  "description": "Pantsbuild framework library for Node.js apps",
+  "main": "index.js",
+  "author": "pantsbuild",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "node index.js",
+    "test": "mocha ./test/add-one-test.js"
+  },
+  "dependencies": {
+    "mocha": "^5.2.0",
+    "numeral": "^2.0.6"
+  },
+  "bin": "cli.js"
+}

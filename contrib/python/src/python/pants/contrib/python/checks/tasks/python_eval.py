@@ -34,8 +34,8 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     """A richer failure exception type useful for tests."""
 
     def __init__(self, *args, **kwargs):
-      compiled = kwargs.pop(b'compiled')
-      failed = kwargs.pop(b'failed')
+      compiled = kwargs.pop('compiled')
+      failed = kwargs.pop('failed')
       super(PythonEval.Error, self).__init__(*args, **kwargs)
       self.compiled = compiled
       self.failed = failed
@@ -139,9 +139,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
       executable_file_content = self._get_executable_file_content(exec_pex_parent, modules)
 
       hasher = hashlib.sha1()
-      hasher.update(reqs_pex.path())
-      hasher.update(srcs_pex.path())
-      hasher.update(executable_file_content)
+      hasher.update(reqs_pex.path().encode('utf-8'))
+      hasher.update(srcs_pex.path().encode('utf-8'))
+      hasher.update(executable_file_content.encode('utf-8'))
       exec_file_hash = hasher.hexdigest()
       exec_pex_path = os.path.realpath(os.path.join(exec_pex_parent, exec_file_hash))
       if not os.path.isdir(exec_pex_path):
@@ -203,7 +203,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     return modules
 
   def _get_executable_file_content(self, exec_pex_parent, modules):
-    generator = Generator(pkgutil.get_data(__name__, self._EVAL_TEMPLATE_PATH),
+    generator = Generator(pkgutil.get_data(__name__, self._EVAL_TEMPLATE_PATH).decode('utf-8'),
                           chroot_parent=exec_pex_parent, modules=modules)
     return generator.render()
 
@@ -215,7 +215,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     reqs_pex_path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity),
                                                   vt.cache_key.hash))
     if not os.path.isdir(reqs_pex_path):
-      req_libs =  [t for t in vt.target.closure() if has_python_requirements(t)]
+      req_libs = [t for t in vt.target.closure() if has_python_requirements(t)]
       with safe_concurrent_creation(reqs_pex_path) as safe_path:
         builder = PEXBuilder(safe_path, interpreter=interpreter, copy=True)
         pex_build_util = PexBuildUtil(PythonRepos.global_instance(), PythonSetup.global_instance())

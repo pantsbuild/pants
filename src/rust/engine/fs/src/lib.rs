@@ -1,6 +1,35 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  deny(
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
+  )
+)]
+// It is often more clear to show that nothing is being moved.
+#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+// Subjective style.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
+// Default isn't as big a deal as people seem to think it is.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+
 mod glob_matching;
 pub use glob_matching::GlobMatching;
 mod snapshot;
@@ -8,7 +37,7 @@ pub use snapshot::{
   OneOffStoreFileByDigest, Snapshot, StoreFileByDigest, EMPTY_DIGEST, EMPTY_FINGERPRINT,
 };
 mod store;
-pub use store::Store;
+pub use store::{ShrinkBehavior, Store, UploadSummary, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
 mod pool;
 pub use pool::ResettablePool;
 
@@ -18,6 +47,7 @@ extern crate boxfuture;
 extern crate byteorder;
 extern crate bytes;
 extern crate digest;
+extern crate dirs;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate glob;
@@ -33,13 +63,18 @@ extern crate lmdb;
 extern crate log;
 #[cfg(test)]
 extern crate mock;
+extern crate parking_lot;
 extern crate protobuf;
-extern crate resettable;
+extern crate serde;
 extern crate sha2;
-#[cfg(test)]
 extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;
+#[macro_use]
+extern crate serde_derive;
+extern crate uuid;
+#[cfg(test)]
+extern crate walkdir;
 
 use std::cmp::min;
 use std::io::{self, Read};
@@ -216,8 +251,7 @@ impl PathGlobIncludeEntry {
       .map(|path_glob| GlobWithSource {
         path_glob,
         source: GlobSource::ParsedInput(self.input.clone()),
-      })
-      .collect()
+      }).collect()
   }
 }
 
@@ -396,8 +430,8 @@ pub enum StrictGlobMatching {
 }
 
 impl StrictGlobMatching {
-  // TODO(cosmicexplorer): match this up with the allowed values for the GlobMatchErrorBehavior type
-  // in python somehow?
+  // TODO: match this up with the allowed values for the GlobMatchErrorBehavior type in python
+  // somehow!
   pub fn create(behavior: &str) -> Result<Self, String> {
     match behavior {
       "ignore" => Ok(StrictGlobMatching::Ignore),
@@ -426,10 +460,27 @@ impl StrictGlobMatching {
 }
 
 #[derive(Debug)]
+pub enum GlobExpansionConjunction {
+  AllMatch,
+  AnyMatch,
+}
+
+impl GlobExpansionConjunction {
+  pub fn create(spec: &str) -> Result<Self, String> {
+    match spec {
+      "all_match" => Ok(GlobExpansionConjunction::AllMatch),
+      "any_match" => Ok(GlobExpansionConjunction::AnyMatch),
+      _ => Err(format!("Unrecognized conjunction: {}.", spec)),
+    }
+  }
+}
+
+#[derive(Debug)]
 pub struct PathGlobs {
   include: Vec<PathGlobIncludeEntry>,
   exclude: Arc<GitignoreStyleExcludes>,
   strict_match_behavior: StrictGlobMatching,
+  conjunction: GlobExpansionConjunction,
 }
 
 impl PathGlobs {
@@ -437,21 +488,24 @@ impl PathGlobs {
     include: &[String],
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
+    conjunction: GlobExpansionConjunction,
   ) -> Result<PathGlobs, String> {
     let include = PathGlob::spread_filespecs(include)?;
-    Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior)
+    Self::create_with_globs_and_match_behavior(include, exclude, strict_match_behavior, conjunction)
   }
 
   fn create_with_globs_and_match_behavior(
     include: Vec<PathGlobIncludeEntry>,
     exclude: &[String],
     strict_match_behavior: StrictGlobMatching,
+    conjunction: GlobExpansionConjunction,
   ) -> Result<PathGlobs, String> {
     let gitignore_excludes = GitignoreStyleExcludes::create(exclude)?;
     Ok(PathGlobs {
       include,
       exclude: gitignore_excludes,
       strict_match_behavior,
+      conjunction,
     })
   }
 
@@ -461,10 +515,14 @@ impl PathGlobs {
       .map(|glob| PathGlobIncludeEntry {
         input: MISSING_GLOB_SOURCE.clone(),
         globs: vec![glob],
-      })
-      .collect();
+      }).collect();
     // An empty exclude becomes EMPTY_IGNORE.
-    PathGlobs::create_with_globs_and_match_behavior(include, &[], StrictGlobMatching::Ignore)
+    PathGlobs::create_with_globs_and_match_behavior(
+      include,
+      &[],
+      StrictGlobMatching::Ignore,
+      GlobExpansionConjunction::AllMatch,
+    )
   }
 }
 
@@ -509,8 +567,7 @@ impl PosixFS {
             ))
           }
         })
-      })
-      .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
+      }).map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
 
     let ignore = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
       format!(
@@ -525,7 +582,7 @@ impl PosixFS {
     })
   }
 
-  fn scandir_sync(root: PathBuf, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
+  fn scandir_sync(root: &Path, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
     let dir_abs = root.join(&dir_relative_to_root.0);
     let mut stats: Vec<Stat> = dir_abs
       .read_dir()?
@@ -538,8 +595,7 @@ impl PosixFS {
           &dir_abs,
           get_metadata,
         )
-      })
-      .collect::<Result<Vec<_>, io::Error>>()?;
+      }).collect::<Result<Vec<_>, io::Error>>()?;
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(stats)
   }
@@ -562,8 +618,7 @@ impl PosixFS {
             content: Bytes::from(content),
           })
         })
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
@@ -589,8 +644,7 @@ impl PosixFS {
               })
           }
         })
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 
   ///
@@ -659,7 +713,7 @@ impl PosixFS {
     let root = self.root.0.clone();
     self
       .pool
-      .spawn_fn(move || PosixFS::scandir_sync(root, &dir))
+      .spawn_fn(move || PosixFS::scandir_sync(&root, &dir))
       .map(DirectoryListing)
       .to_boxed()
   }
@@ -704,8 +758,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
                 io::ErrorKind::NotFound => Ok(None),
                 _ => Err(err),
               },
-            })
-            .and_then(move |maybe_stat| {
+            }).and_then(move |maybe_stat| {
               match maybe_stat {
                 // Note: This will drop PathStats for symlinks which don't point anywhere.
                 Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), &link),
@@ -718,8 +771,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
                 None => future::ok(None).to_boxed(),
               }
             })
-        })
-        .collect::<Vec<_>>(),
+        }).collect::<Vec<_>>(),
     ).to_boxed()
   }
 }
@@ -822,12 +874,12 @@ mod posixfs_test {
       0o600,
     );
     let fs = new_posixfs(&dir.path());
-    let file_content =
-      fs.read_file(&File {
+    let file_content = fs
+      .read_file(&File {
         path: path.clone(),
         is_executable: false,
       }).wait()
-        .unwrap();
+      .unwrap();
     assert_eq!(file_content.path, path);
     assert_eq!(file_content.content, content);
   }
@@ -839,8 +891,7 @@ mod posixfs_test {
       .read_file(&File {
         path: PathBuf::from("marmosets"),
         is_executable: false,
-      })
-      .wait()
+      }).wait()
       .expect_err("Expected error");
   }
 
@@ -1025,8 +1076,7 @@ mod posixfs_test {
         PathBuf::from("dir_symlink"),
         PathBuf::from("symlink_to_nothing"),
         PathBuf::from("doesnotexist"),
-      ])
-      .wait()
+      ]).wait()
       .unwrap();
     let v: Vec<Option<PathStat>> = vec![
       Some(PathStat::file(

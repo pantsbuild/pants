@@ -173,7 +173,7 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
     self.assertFalse(self._project_tree.exists('fruit/fruit'))
     self.assertEqual({'apple', 'banana', 'orange'}, set(self._project_tree.glob1('fruit', '*')))
     self.assertEqual({'fruit/apple', 'fruit/banana', 'fruit/orange'},
-                      set(s.path for s in self._project_tree.scandir('fruit')))
+                      {s.path for s in self._project_tree.scandir('fruit')})
 
   def test_ignore_dir_path_ignore_2(self):
     self._project_tree = self.mk_project_tree(self.root_dir, ['fruit/'])
@@ -182,4 +182,4 @@ class PantsIgnoreTestBase(ProjectTreeTestBase):
     self.assertFalse(self._project_tree.exists('fruit'))
     self.assertEqual({'apple', 'banana', 'orange', 'grocery'}, set(self._project_tree.glob1('', '*')))
     self.assertEqual({'apple', 'banana', 'orange', 'grocery'},
-                      set(s.path for s in self._project_tree.scandir('')))
+                      {s.path for s in self._project_tree.scandir('')})

@@ -198,7 +198,7 @@ class ConsoleTaskTestBase(TaskTestBase):
       context = self.context(target_roots=targets, console_outstream=output)
       task = self.create_task(context)
       task.execute()
-      return output.getvalue()
+      return output.getvalue().decode('utf-8')
 
   def execute_console_task(self, targets=None, extra_targets=None, options=None,
                            passthru_args=None, workspace=None, scheduler=None):

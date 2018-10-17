@@ -1,10 +1,40 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  deny(
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
+  )
+)]
+// It is often more clear to show that nothing is being moved.
+#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+// Subjective style.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
+// Default isn't as big a deal as people seem to think it is.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+
 extern crate boxfuture;
 extern crate fnv;
 extern crate futures;
 extern crate hashing;
+extern crate parking_lot;
 extern crate petgraph;
 
 mod entry;
@@ -19,12 +49,12 @@ use std::fs::{File, OpenOptions};
 use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use fnv::FnvHasher;
 
 use futures::future::{self, Future};
+use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
@@ -47,6 +77,10 @@ type Nodes<N> = HashMap<EntryKey<N>, EntryId>;
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
   pg: PGraph<N>,
+  /// A Graph that is marked `draining:True` will not allow the creation of new `Nodes`. But
+  /// while draining, any Nodes that exist in the Graph will continue to run until/unless they
+  /// attempt to get/create new Nodes.
+  draining: bool,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -148,8 +182,7 @@ impl<N: Node> InnerGraph<N> {
         } else {
           None
         }
-      })
-      .collect();
+      }).collect();
     // And their transitive dependencies, which will be dirtied.
     let transitive_ids: Vec<_> = self
       .walk(root_ids.iter().cloned().collect(), Direction::Incoming)
@@ -163,7 +196,9 @@ impl<N: Node> InnerGraph<N> {
 
     // Clear roots and remove their outbound edges.
     for id in &root_ids {
-      self.pg.node_weight_mut(*id).map(|entry| entry.clear());
+      if let Some(entry) = self.pg.node_weight_mut(*id) {
+        entry.clear();
+      }
     }
     self.pg.retain_edges(|pg, edge| {
       if let Some((src, _)) = pg.edge_endpoints(edge) {
@@ -295,7 +330,7 @@ impl<N: Node> InnerGraph<N> {
       let minimum_path_id = root_ids
         .iter()
         .min_by_key(|root_id| path_weights[root_id.index()] as usize)
-        .ok_or_else(|| format!("Encountered a Node that was not reachable from any roots."))?;
+        .ok_or_else(|| "Encountered a Node that was not reachable from any roots.".to_owned())?;
 
       // Collect the path by walking through the `paths` Vec, which contains the indexes of
       // predecessor Nodes along a path to the bottom Node.
@@ -333,7 +368,7 @@ impl<N: Node> InnerGraph<N> {
     let file = try!(OpenOptions::new().append(true).open(file_path));
     let mut f = BufWriter::new(file);
 
-    let _format = |eid: EntryId, depth: usize, is_last: bool| -> String {
+    let format = |eid: EntryId, depth: usize, is_last: bool| -> String {
       let entry = self.unsafe_entry_for_id(eid);
       let indent = "  ".repeat(depth);
       let output = format!("{}Computing {}", indent, entry.node().format());
@@ -354,7 +389,7 @@ impl<N: Node> InnerGraph<N> {
       try!(writeln!(
         &mut f,
         "{}",
-        _format(*id, depth, path_iter.peek().is_none())
+        format(*id, depth, path_iter.peek().is_none())
       ));
     }
 
@@ -370,7 +405,7 @@ impl<N: Node> InnerGraph<N> {
     let queue_entry = |id| {
       self
         .entry_for_id(id)
-        .and_then(|entry| entry.current_running_duration(&now))
+        .and_then(|entry| entry.current_running_duration(now))
         .map(|d| (d, id))
     };
 
@@ -455,6 +490,7 @@ pub struct Graph<N: Node> {
 impl<N: Node> Graph<N> {
   pub fn new() -> Graph<N> {
     let inner = InnerGraph {
+      draining: false,
       nodes: HashMap::default(),
       pg: DiGraph::new(),
     };
@@ -464,7 +500,7 @@ impl<N: Node> Graph<N> {
   }
 
   pub fn len(&self) -> usize {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.nodes.len()
   }
 
@@ -476,27 +512,34 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    let (maybe_entry, entry_id) = {
+    let maybe_entry_and_id = {
       // Get or create the destination, and then insert the dep and return its state.
-      let mut inner = self.inner.lock().unwrap();
-      let dst_id = {
-        // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
-        // without a much more complicated algorithm.
-        let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-        if inner.detect_cycle(src_id, potential_dst_id) {
-          // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-          inner.ensure_entry(EntryKey::Cyclic(dst_node))
-        } else {
-          // Valid dependency.
-          potential_dst_id
-        }
-      };
-      inner.pg.add_edge(src_id, dst_id, ());
-      (inner.entry_for_id(dst_id).cloned(), dst_id)
+      let mut inner = self.inner.lock();
+      if inner.draining {
+        None
+      } else {
+        let dst_id = {
+          // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
+          // without a much more complicated algorithm.
+          let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
+          if inner.detect_cycle(src_id, potential_dst_id) {
+            // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
+            inner.ensure_entry(EntryKey::Cyclic(dst_node))
+          } else {
+            // Valid dependency.
+            potential_dst_id
+          }
+        };
+        inner.pg.add_edge(src_id, dst_id, ());
+        inner
+          .entry_for_id(dst_id)
+          .cloned()
+          .map(|entry| (entry, dst_id))
+      }
     };
 
     // Declare the dep, and return the state of the destination.
-    if let Some(mut entry) = maybe_entry {
+    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
       entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
@@ -510,12 +553,16 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    let (maybe_entry, entry_id) = {
-      let mut inner = self.inner.lock().unwrap();
-      let id = inner.ensure_entry(EntryKey::Valid(node));
-      (inner.entry_for_id(id).cloned(), id)
+    let maybe_entry_and_id = {
+      let mut inner = self.inner.lock();
+      if inner.draining {
+        None
+      } else {
+        let id = inner.ensure_entry(EntryKey::Valid(node));
+        inner.entry_for_id(id).cloned().map(|entry| (entry, id))
+      }
     };
-    if let Some(mut entry) = maybe_entry {
+    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
       entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
@@ -534,7 +581,7 @@ impl<N: Node> Graph<N> {
   where
     C: NodeContext<Node = N>,
   {
-    let mut inner = self.inner.lock().unwrap();
+    let mut inner = self.inner.lock();
     let dep_ids = inner
       .pg
       .neighbors_directed(entry_id, Direction::Outgoing)
@@ -551,8 +598,7 @@ impl<N: Node> Graph<N> {
             .get(context, dep_id)
             .map(|(_, generation)| generation)
             .to_boxed()
-        })
-        .collect::<Vec<_>>(),
+        }).collect::<Vec<_>>(),
     ).to_boxed()
   }
 
@@ -560,7 +606,7 @@ impl<N: Node> Graph<N> {
   /// Clears the dependency edges of the given EntryId if the RunToken matches.
   ///
   fn clear_deps(&self, entry_id: EntryId, run_token: RunToken) {
-    let mut inner = self.inner.lock().unwrap();
+    let mut inner = self.inner.lock();
     // If the RunToken mismatches, return.
     if let Some(entry) = inner.entry_for_id(entry_id) {
       if entry.run_token() != run_token {
@@ -604,7 +650,7 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     let (entry, entry_id, dep_generations) = {
-      let mut inner = self.inner.lock().unwrap();
+      let mut inner = self.inner.lock();
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
@@ -620,7 +666,7 @@ impl<N: Node> Graph<N> {
       )
     };
     if let Some(mut entry) = entry {
-      let mut inner = self.inner.lock().unwrap();
+      let mut inner = self.inner.lock();
       entry.complete(
         context,
         entry_id,
@@ -636,17 +682,17 @@ impl<N: Node> Graph<N> {
   /// Clears the state of all Nodes in the Graph by dropping their state fields.
   ///
   pub fn clear(&self) {
-    let mut inner = self.inner.lock().unwrap();
+    let mut inner = self.inner.lock();
     inner.clear()
   }
 
   pub fn invalidate_from_roots<P: Fn(&N) -> bool>(&self, predicate: P) -> InvalidationResult {
-    let mut inner = self.inner.lock().unwrap();
+    let mut inner = self.inner.lock();
     inner.invalidate_from_roots(predicate)
   }
 
   pub fn trace<T: NodeTracer<N>>(&self, roots: &[N], path: &Path) -> Result<(), String> {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.trace::<T>(roots, path)
   }
 
@@ -656,23 +702,54 @@ impl<N: Node> Graph<N> {
     roots: &[N],
     path: &Path,
   ) -> io::Result<()> {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.visualize(visualizer, roots, path)
   }
 
   pub fn heavy_hitters(&self, roots: &[N], k: usize) -> Vec<(String, Duration)> {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.heavy_hitters(roots, k)
   }
 
   pub fn reachable_digest_count(&self, roots: &[N]) -> usize {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.reachable_digest_count(roots)
   }
 
   pub fn all_digests(&self) -> Vec<hashing::Digest> {
-    let inner = self.inner.lock().unwrap();
+    let inner = self.inner.lock();
     inner.all_digests()
+  }
+
+  ///
+  /// Executes an operation while all access to the Graph is prevented (by acquiring the Graph's
+  /// lock).
+  ///
+  pub fn with_exclusive<F, T>(&self, f: F) -> T
+  where
+    F: FnOnce() -> T,
+  {
+    let _inner = self.inner.lock();
+    f()
+  }
+
+  ///
+  /// Marks this Graph with the given draining status. If the Graph already has a matching
+  /// draining status, then the operation will return an Err.
+  ///
+  /// This is an independent operation from acquiring exclusive access to the Graph
+  /// (`with_exclusive`), because once exclusive access has been acquired, threads attempting to
+  /// access the Graph would wait to acquire the lock, rather than acquiring and then failing fast
+  /// as we'd like them to while `draining:True`.
+  ///
+  pub fn mark_draining(&self, draining: bool) -> Result<(), ()> {
+    let mut inner = self.inner.lock();
+    if inner.draining == draining {
+      Err(())
+    } else {
+      inner.draining = draining;
+      Ok(())
+    }
   }
 }
 
@@ -709,17 +786,19 @@ impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
 
 #[cfg(test)]
 mod tests {
+  extern crate parking_lot;
   extern crate rand;
 
   use std::cmp;
-  use std::collections::HashSet;
-  use std::sync::{mpsc, Arc, Mutex};
+  use std::collections::{HashMap, HashSet};
+  use std::sync::{mpsc, Arc};
   use std::thread;
   use std::time::Duration;
 
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::{self, Future};
   use hashing::Digest;
+  use parking_lot::Mutex;
 
   use self::rand::Rng;
 
@@ -899,6 +978,50 @@ mod tests {
     );
   }
 
+  #[test]
+  fn drain_and_resume() {
+    // Confirms that after draining a Graph that has running work, we are able to resume the work
+    // and have it complete successfully.
+    let graph = Arc::new(Graph::new());
+
+    let delay_before_drain = Duration::from_millis(100);
+    let delay_in_task = delay_before_drain * 10;
+
+    // Create a context that will sleep long enough at TNode(1) to be interrupted before
+    // requesting TNode(0).
+    let context = {
+      let mut delays = HashMap::new();
+      delays.insert(TNode(1), delay_in_task);
+      TContext::new_with_delays(0, delays, graph.clone())
+    };
+
+    // Spawn a background thread that will mark the Graph draining after a short delay.
+    let graph2 = graph.clone();
+    let _join = thread::spawn(move || {
+      thread::sleep(delay_before_drain);
+      graph2
+        .mark_draining(true)
+        .expect("Should not already be draining.");
+    });
+
+    // Request a TNode(1) in the "delayed" context, and expect it to be interrupted by the
+    // drain.
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Err(TError::Invalidated),
+    );
+
+    // Unmark the Graph draining, and try again: we expect the `Invalidated` result we saw before
+    // due to the draining to not have been persisted.
+    graph
+      .mark_draining(false)
+      .expect("Should already be draining.");
+    assert_eq!(
+      graph.create(TNode(2), &context).wait(),
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+    );
+  }
+
   ///
   /// A token containing the id of a Node and the id of a Context, respectively. Has a short name
   /// to minimize the verbosity of tests.
@@ -922,13 +1045,13 @@ mod tests {
       let depth = self.0;
       let token = T(depth, context.id());
       if depth > 0 && !context.stop_at(&self) {
+        context.maybe_delay(&self);
         context
           .get(TNode(depth - 1))
           .map(move |mut v| {
             v.push(token);
             v
-          })
-          .to_boxed()
+          }).to_boxed()
       } else {
         future::ok(vec![token]).to_boxed()
       }
@@ -964,8 +1087,7 @@ mod tests {
         .map(|&T(node_id, context_id)| {
           // We cast to isize to allow comparison to -1.
           (node_id as isize, context_id)
-        })
-        .unzip();
+        }).unzip();
       // Confirm monotonically ordered.
       let mut previous: isize = -1;
       for node_id in node_ids {
@@ -997,6 +1119,7 @@ mod tests {
   struct TContext {
     id: usize,
     stop_at: Option<TNode>,
+    delays: HashMap<TNode, Duration>,
     graph: Arc<Graph<TNode>>,
     runs: Arc<Mutex<Vec<TNode>>>,
     entry_id: Option<EntryId>,
@@ -1007,6 +1130,7 @@ mod tests {
       TContext {
         id: self.id,
         stop_at: self.stop_at.clone(),
+        delays: self.delays.clone(),
         graph: self.graph.clone(),
         runs: self.runs.clone(),
         entry_id: Some(entry_id),
@@ -1033,6 +1157,7 @@ mod tests {
       TContext {
         id,
         stop_at: None,
+        delays: HashMap::default(),
         graph,
         runs: Arc::new(Mutex::new(Vec::new())),
         entry_id: None,
@@ -1043,6 +1168,22 @@ mod tests {
       TContext {
         id,
         stop_at: Some(stop_at),
+        delays: HashMap::default(),
+        graph,
+        runs: Arc::new(Mutex::new(Vec::new())),
+        entry_id: None,
+      }
+    }
+
+    fn new_with_delays(
+      id: usize,
+      delays: HashMap<TNode, Duration>,
+      graph: Arc<Graph<TNode>>,
+    ) -> TContext {
+      TContext {
+        id,
+        stop_at: None,
+        delays,
         graph,
         runs: Arc::new(Mutex::new(Vec::new())),
         entry_id: None,
@@ -1058,8 +1199,14 @@ mod tests {
     }
 
     fn ran(&self, node: TNode) {
-      let mut runs = self.runs.lock().unwrap();
+      let mut runs = self.runs.lock();
       runs.push(node);
+    }
+
+    fn maybe_delay(&self, node: &TNode) {
+      if let Some(delay) = self.delays.get(node) {
+        thread::sleep(*delay);
+      }
     }
 
     fn stop_at(&self, node: &TNode) -> bool {
@@ -1067,7 +1214,7 @@ mod tests {
     }
 
     fn runs(&self) -> Vec<TNode> {
-      self.runs.lock().unwrap().clone()
+      self.runs.lock().clone()
     }
   }
 

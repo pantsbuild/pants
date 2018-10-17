@@ -2,18 +2,18 @@
 
 jar_library(name = 'scalac',
             jars = [
-              jar(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.12.2'),
+              jar(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.12.4'),
             ])
 
 jar_library(name = 'scala-library',
             jars = [
-              jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.12.2'),
+              jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.12.4'),
             ])
 
 jar_library(name = 'scala-repl',
             jars = [
-              jar(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.12.2'),
-              jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.12.2'),
+              jar(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.12.4'),
+              jar(org = 'org.scala-lang', name = 'scala-library', rev = '2.12.4'),
             ])
 
 jar_library(name = 'scalastyle',

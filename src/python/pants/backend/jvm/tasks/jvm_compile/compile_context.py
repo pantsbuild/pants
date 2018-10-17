@@ -30,12 +30,12 @@ class CompileContext(object):
 
   @contextmanager
   def open_jar(self, mode):
-    with open_zip(self.jar_file, mode=mode, compression=zipfile.ZIP_STORED) as jar:
+    with open_zip(self.jar_file.path, mode=mode, compression=zipfile.ZIP_STORED) as jar:
       yield jar
 
   @property
   def _id(self):
-    return (self.target, self.analysis_file, self.classes_dir)
+    return (self.target, self.analysis_file, self.classes_dir.path)
 
   def __eq__(self, other):
     return self._id == other._id

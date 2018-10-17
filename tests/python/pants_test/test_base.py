@@ -340,9 +340,6 @@ class TestBase(unittest.TestCase):
     if self._scheduler is not None:
       self._build_graph.reset()
       self._scheduler.invalidate_all_files()
-      # Eagerly free file handles, threads, connections, etc, held by the scheduler. In theory,
-      # dropping the scheduler is equivalent, but it's easy for references to the scheduler to leak.
-      self._scheduler.pre_fork()
 
   @property
   def build_root(self):
@@ -618,6 +615,9 @@ class TestBase(unittest.TestCase):
 
     def warnings(self):
       return self._messages_for_level('WARNING')
+
+    def errors(self):
+      return self._messages_for_level('ERROR')
 
   @contextmanager
   def captured_logging(self, level=None):

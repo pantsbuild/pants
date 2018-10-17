@@ -126,10 +126,10 @@ class BuildFileManipulatorTest(BaseTest):
     ]
     # Make sure this exception isn't just being thrown no matter what.
     # TODO(pl): These exception types should be more granular.
-    BuildFileManipulator.load(build_file, 'sentinel', set(['target_type']))
+    BuildFileManipulator.load(build_file, 'sentinel', {'target_type'})
     for bad_target in bad_target_names:
       with self.assertRaises(BuildTargetParseError):
-        BuildFileManipulator.load(build_file, bad_target, set(['target_type']))
+        BuildFileManipulator.load(build_file, bad_target, {'target_type'})
 
   def test_simple_targets(self):
     simple_targets = dedent(
@@ -204,7 +204,7 @@ class BuildFileManipulatorTest(BaseTest):
 
     build_file = self.add_to_build_file('BUILD', self.complicated_dep_comments)
 
-    complicated_bfm = BuildFileManipulator.load(build_file, 'no_bg_no_cry', set(['target_type']))
+    complicated_bfm = BuildFileManipulator.load(build_file, 'no_bg_no_cry', {'target_type'})
     target_str = '\n'.join(complicated_bfm.target_lines())
     self.assertEqual(target_str, expected_target_str)
 

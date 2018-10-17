@@ -6,30 +6,31 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import re
 import shlex
+from builtins import bytes, str
 
-from future.utils import binary_type, text_type
+from future.utils import PY3
 
 
 def ensure_binary(text_or_binary):
-  if isinstance(text_or_binary, binary_type):
+  if isinstance(text_or_binary, bytes):
     return text_or_binary
-  elif isinstance(text_or_binary, text_type):
+  elif isinstance(text_or_binary, str):
     return text_or_binary.encode('utf8')
   else:
     raise TypeError('Argument is neither text nor binary type.({})'.format(type(text_or_binary)))
 
 
 def ensure_text(text_or_binary):
-  if isinstance(text_or_binary, binary_type):
+  if isinstance(text_or_binary, bytes):
     return text_or_binary.decode('utf-8')
-  elif isinstance(text_or_binary, text_type):
+  elif isinstance(text_or_binary, str):
     return text_or_binary
   else:
     raise TypeError('Argument is neither text nor binary type ({})'.format(type(text_or_binary)))
 
 
 def is_text_or_binary(obj):
-  return isinstance(obj, (text_type, binary_type))
+  return isinstance(obj, (str, bytes))
 
 
 def safe_shlex_split(text_or_binary):
@@ -37,7 +38,8 @@ def safe_shlex_split(text_or_binary):
 
   Safe even on python versions whose shlex.split() method doesn't accept unicode.
   """
-  return shlex.split(ensure_binary(text_or_binary))
+  value = ensure_text(text_or_binary) if PY3 else ensure_binary(text_or_binary)
+  return shlex.split(value)
 
 
 # `_shell_unsafe_chars_pattern` and `shell_quote` are modified from the CPython 3.6 source:

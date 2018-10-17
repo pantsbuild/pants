@@ -175,18 +175,18 @@ class Git(Scm):
                                              raise_type=Scm.LocalException)
       files.update(committed_changes.split())
     if include_untracked:
-      untracked_cmd = ['ls-files', '--other', '--exclude-standard'] + rel_suffix
+      untracked_cmd = ['ls-files', '--other', '--exclude-standard', '--full-name'] + rel_suffix
       untracked = self._check_output(untracked_cmd,
                                      raise_type=Scm.LocalException)
       files.update(untracked.split())
     # git will report changed files relative to the worktree: re-relativize to relative_to
-    return set(self.fix_git_relative_path(f, relative_to) for f in files)
+    return {self.fix_git_relative_path(f, relative_to) for f in files}
 
   def changes_in(self, diffspec, relative_to=None):
     relative_to = relative_to or self._worktree
     cmd = ['diff-tree', '--no-commit-id', '--name-only', '-r', diffspec]
     files = self._check_output(cmd, raise_type=Scm.LocalException).split()
-    return set(self.fix_git_relative_path(f.strip(), relative_to) for f in files)
+    return {self.fix_git_relative_path(f.strip(), relative_to) for f in files}
 
   def changelog(self, from_commit=None, files=None):
     # We force the log output encoding to be UTF-8 here since the user may have a git config that

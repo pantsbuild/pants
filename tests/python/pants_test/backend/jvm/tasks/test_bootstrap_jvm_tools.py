@@ -30,8 +30,8 @@ class BootstrapJvmToolsTestBase(JvmToolTaskTestBase):
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = process.communicate()
     self.assertEqual(0, process.returncode)
-    self.assertEqual('', err.strip())
-    yield out
+    self.assertEqual('', err.strip().decode('utf-8'))
+    yield out.decode('utf-8')
 
 
 class BootstrapJvmToolsShadingTest(BootstrapJvmToolsTestBase):
@@ -97,7 +97,7 @@ class BootstrapJvmToolsShadingTest(BootstrapJvmToolsTestBase):
     prefix_len = len(Shading.SHADE_PREFIX)
 
     def strip_prefix(shaded):
-      return set(classfile[prefix_len:] for classfile in shaded)
+      return {classfile[prefix_len:] for classfile in shaded}
 
     self.assertEqual(classfiles - excluded_classes,
                      strip_prefix(shaded_classfiles - excluded_classes))

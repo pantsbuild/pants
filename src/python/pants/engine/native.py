@@ -171,7 +171,6 @@ Tasks* tasks_create(void);
 void tasks_task_begin(Tasks*, Function, TypeConstraint);
 void tasks_add_get(Tasks*, TypeConstraint, TypeId);
 void tasks_add_select(Tasks*, TypeConstraint);
-void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
 void tasks_task_end(Tasks*);
 void tasks_singleton_add(Tasks*, Handle, TypeConstraint);
 void tasks_destroy(Tasks*);
@@ -197,8 +196,6 @@ Scheduler* scheduler_create(Tasks*,
                             TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
                             TypeId,
                             TypeId,
                             Buffer,
@@ -207,12 +204,15 @@ Scheduler* scheduler_create(Tasks*,
                             TypeIdBuffer,
                             Buffer,
                             Buffer,
+                            Buffer,
+                            Buffer,
+                            Buffer,
                             uint64_t,
                             uint64_t,
                             uint64_t,
                             uint64_t,
                             _Bool);
-void scheduler_pre_fork(Scheduler*);
+PyResult scheduler_fork_context(Scheduler*, Function);
 Handle scheduler_metrics(Scheduler*, Session*);
 RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
 void scheduler_destroy(Scheduler*);
@@ -448,7 +448,10 @@ def _initialize_externs(ffi):
   def extern_val_to_str(context_handle, val):
     """Given a Handle for `obj`, write str(obj) and return it."""
     c = ffi.from_handle(context_handle)
-    return c.utf8_buf(text_type(c.from_value(val[0])))
+    v = c.from_value(val[0])
+    # Consistently use the empty string to indicate None.
+    v_str = '' if v is None else text_type(v)
+    return c.utf8_buf(v_str)
 
   @ffi.def_extern()
   def extern_satisfied_by(context_handle, constraint_val, val):
@@ -799,9 +802,7 @@ class Native(object):
                     construct_file,
                     construct_link,
                     construct_process_result,
-                    constraint_has_products,
                     constraint_address,
-                    constraint_variants,
                     constraint_path_globs,
                     constraint_directory_digest,
                     constraint_snapshot,
@@ -833,8 +834,6 @@ class Native(object):
         func(construct_process_result),
         # TypeConstraints.
         tc(constraint_address),
-        tc(constraint_has_products),
-        tc(constraint_variants),
         tc(constraint_path_globs),
         tc(constraint_directory_digest),
         tc(constraint_snapshot),
@@ -857,6 +856,9 @@ class Native(object):
         # We can't currently pass Options to the rust side, so we pass empty strings for None.
         self.context.utf8_buf(execution_options.remote_store_server or ""),
         self.context.utf8_buf(execution_options.remote_execution_server or ""),
+        self.context.utf8_buf(execution_options.remote_instance_name or ""),
+        self.context.utf8_buf(execution_options.remote_ca_certs_path or ""),
+        self.context.utf8_buf(execution_options.remote_oauth_bearer_token_path or ""),
         execution_options.remote_store_thread_count,
         execution_options.remote_store_chunk_bytes,
         execution_options.remote_store_chunk_upload_timeout_seconds,

@@ -4,51 +4,16 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 import unittest
 from builtins import object, str
 from textwrap import dedent
 
-from pants.build_graph.address import Address
-from pants.engine.nodes import Return
 from pants.engine.rules import RootRule, TaskRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Select
-from pants.util.contextutil import temporary_dir
 from pants.util.objects import datatype
-from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.engine.util import (assert_equal_with_printing, init_native,
-                                    remove_locations_from_traceback)
-
-
-class EngineExamplesTest(unittest.TestCase):
-
-  _native = init_native()
-
-  def setUp(self):
-    build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
-    self.scheduler = setup_json_scheduler(build_root, self._native)
-
-    self.java = Address.parse('src/java/simple')
-
-  def request(self, products, *addresses):
-    return self.scheduler.execution_request(products, addresses)
-
-  def test_serial_execution_simple(self):
-    request = self.request([Classpath], self.java)
-    result = self.scheduler.execute(request)
-    with temporary_dir() as tempdir:
-      self.scheduler.visualize_graph_to_file(os.path.join(tempdir, 'run.0.dot'))
-    self.assertEqual(Return(Classpath(creator='javac')), result.root_products[0][1])
-    self.assertIsNone(result.error)
-
-  def test_product_request_return(self):
-    count = 0
-    for computed_product in self.scheduler.product_request(Classpath, [self.java]):
-      self.assertIsInstance(computed_product, Classpath)
-      count += 1
-    self.assertGreater(count, 0)
+from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 
 
 class A(object):
@@ -159,6 +124,15 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             Exception: An exception for B
       ''').lstrip()+'\n',
       remove_locations_from_traceback(str(cm.exception)))
+
+  def test_fork_context(self):
+    # A smoketest that confirms that we can successfully enter and exit the fork context, which
+    # implies acquiring and releasing all relevant Engine resources.
+    expected = "42"
+    def fork_context_body():
+      return expected
+    res = self.mk_scheduler().with_fork_context(fork_context_body)
+    self.assertEquals(res, expected)
 
   def test_trace_multi(self):
     # Tests that when multiple distinct failures occur, they are each rendered.

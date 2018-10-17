@@ -101,7 +101,7 @@ class ReportTestSuite(object):
     self.failures = int(failures)
     self.skipped = int(skipped)
     self.time = float(time)
-    self.testcases = testcases
+    self.testcases = sorted(testcases)  # Ensures a consistent reporting order.
     self.file = file
 
   def __lt__(self, other):

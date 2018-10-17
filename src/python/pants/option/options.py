@@ -5,16 +5,30 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
+import re
 import sys
 from builtins import object, open, str
+from textwrap import dedent
 
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import get_frame_info, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import ScopeInfo
+from pants.util.memo import memoized_property
+
+
+def make_flag_regex(long_name, short_name=None):
+  long_esc = re.escape(long_name)
+  if short_name:
+    short_esc = re.escape(short_name)
+    rx_str = r"\A(?:\-({short_esc})|\-\-(?:(no)\-)?({long_esc})(?:=(.*))?)\Z".format(
+      short_esc=short_esc, long_esc=long_esc)
+  else:
+    rx_str = r"\A\-\-(?:(no)\-)?({long_esc})(?:=(.*))?\Z".format(long_esc=long_esc)
+  return re.compile(rx_str)
 
 
 class Options(object):
@@ -285,6 +299,84 @@ class Options(object):
     self._assert_not_frozen()
     self._parser_hierarchy.walk(callback)
 
+  def _check_deprecated_scope(self, scope, values):
+    # If we're the new name of a deprecated scope, also get values from that scope.
+    deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
+    # Note that deprecated_scope and scope share the same Optionable class, so deprecated_scope's
+    # Optionable has a deprecated_options_scope equal to deprecated_scope. Therefore we must
+    # check that scope != deprecated_scope to prevent infinite recursion.
+    if deprecated_scope is not None and scope != deprecated_scope:
+      # Do the deprecation check only on keys that were explicitly set on the deprecated scope
+      # (and not on its enclosing scopes).
+      explicit_keys = self.for_scope(deprecated_scope,
+                                     inherit_from_enclosing_scope=False).get_explicit_keys()
+      if explicit_keys:
+        # Update our values with those of the deprecated scope (now including values inherited
+        # from its enclosing scope).
+        # Note that a deprecated val will take precedence over a val of equal rank.
+        # This makes the code a bit neater.
+        values.update(self.for_scope(deprecated_scope))
+
+        return dict(
+          removal_version=self.known_scope_to_info[scope].deprecated_scope_removal_version,
+          deprecated_entity_description='scope {}'.format(deprecated_scope),
+          hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys)))
+
+  _quiet_flag_regex = make_flag_regex(long_name='quiet', short_name='q')
+
+  # NB: This method can be removed entirely after the deprecation period is complete.
+  def _match_recursive_quiet_flag(self, scope, flags):
+    if scope == GLOBAL_SCOPE:
+      # NB: We do not match a global '-q' or '--quiet' flag -- those are still allowed! Returning
+      # None is explicitly checked for in the _check_deprecations() method.
+      return None
+
+    try:
+      found_flag = next(iter(filter(self._quiet_flag_regex.match, flags)))
+    except StopIteration:
+      # No
+      return None
+
+    if found_flag:
+      return dict(
+        removal_version='1.13.0.dev0',
+        deprecated_entity_description=(
+          "Using the -q or --quiet option recursively "
+          "(i.e. after a goal name on the command line)"),
+        hint=dedent("""
+The -q or --quiet flag should be specified globally by providing it on the
+command line before any other goals (e.g. `./pants -q run
+<binary_target>`). Using -q or --quiet globally will silence all pants logging
+for all tasks and only print output from a console task, which makes binaries
+run from the pants command line usable for consumption by other scripts.
+
+The flag provided was {flag!r}, in scope {scope!r}.
+        """
+        .format(flag=found_flag, scope=scope)),
+        # This shows the call to `self._match_recursive_quiet_flag(...)` in the lambda in
+        # `self.flag_matchers` in the error message so users can know to look at this method for
+        # more context.
+        frame_info=get_frame_info(stacklevel=2),
+        # This warning should always go to stderr, even if a global quiet flag is passed in.
+        ensure_stderr=True)
+
+  @memoized_property
+  def flag_matchers(self):
+    return [
+      lambda scope, _, values: self._check_deprecated_scope(scope, values),
+      lambda scope, flags, _: self._match_recursive_quiet_flag(scope, flags),
+    ]
+
+  def _check_deprecations(self, scope, flags, values):
+    for flag_matcher in self.flag_matchers:
+      maybe_deprecation_warning_kwargs = flag_matcher(scope, flags, values)
+
+      if maybe_deprecation_warning_kwargs is not None:
+        if not isinstance(maybe_deprecation_warning_kwargs, dict):
+          raise TypeError("scope_flags_fun must return a dict, or None (was: {!r})"
+                          .format(maybe_deprecation_warning_kwargs))
+        warn_or_error(**maybe_deprecation_warning_kwargs)
+
   # TODO: Eagerly precompute backing data for this?
   def for_scope(self, scope, inherit_from_enclosing_scope=True):
     """Return the option values for the given scope.
@@ -308,25 +400,8 @@ class Options(object):
     flags_in_scope = self._scope_to_flags.get(scope, [])
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
 
-    # If we're the new name of a deprecated scope, also get values from that scope.
-    deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
-    # Note that deprecated_scope and scope share the same Optionable class, so deprecated_scope's
-    # Optionable has a deprecated_options_scope equal to deprecated_scope. Therefore we must
-    # check that scope != deprecated_scope to prevent infinite recursion.
-    if deprecated_scope is not None and scope != deprecated_scope:
-      # Do the deprecation check only on keys that were explicitly set on the deprecated scope
-      # (and not on its enclosing scopes).
-      explicit_keys = self.for_scope(deprecated_scope,
-                                     inherit_from_enclosing_scope=False).get_explicit_keys()
-      if explicit_keys:
-        warn_or_error(self.known_scope_to_info[scope].deprecated_scope_removal_version,
-                      'scope {}'.format(deprecated_scope),
-                      'Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys)))
-        # Update our values with those of the deprecated scope (now including values inherited
-        # from its enclosing scope).
-        # Note that a deprecated val will take precedence over a val of equal rank.
-        # This makes the code a bit neater.
-        values.update(self.for_scope(deprecated_scope))
+    # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
+    self._check_deprecations(scope, flags_in_scope, values)
 
     # Cache the values.
     self._values_by_scope[scope] = values

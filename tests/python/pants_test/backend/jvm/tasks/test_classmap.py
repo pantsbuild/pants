@@ -6,11 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from contextlib import contextmanager
 
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classmap import ClassmapTask
 from pants.build_graph.target import Target
-from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import open_zip
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
@@ -26,16 +23,28 @@ class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
     super(ClassmapTaskTest, self).setUp()
     init_subsystem(Target.Arguments)
 
-    self.target_a = self.make_target('a', target_type=JavaLibrary, sources=['a1.java', 'a2.java'])
+    self.add_to_build_file(
+      'a',
+      'java_library(sources=["a1.java", "a2.java"])',
+    )
 
     self.jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
     with open_zip(self.jar_artifact.pants_path, 'w') as jar:
       jar.writestr('foo/Foo.class', '')
-    self.target_b = self.make_target('b', target_type=JarLibrary,
-                                     jars=[JarDependency(org='org.example', name='foo', rev='1.0.0')])
 
-    self.target_c = self.make_target('c', dependencies=[self.target_a, self.target_b],
-                                     target_type=JavaLibrary)
+    self.add_to_build_file(
+      'b',
+      'jar_library(jars=[jar(org="org.example", name="foo", rev="1.0.0")])',
+    )
+
+    self.add_to_build_file(
+      'c',
+      'java_library(dependencies=["a", "b"])',
+    )
+
+    self.target_a = self.target('a')
+    self.target_b = self.target('b')
+    self.target_c = self.target('c')
 
   @contextmanager
   def prepare_context(self, options=None):

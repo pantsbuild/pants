@@ -1,4 +1,37 @@
-use std::sync::{Arc, RwLock};
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  deny(
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
+  )
+)]
+// It is often more clear to show that nothing is being moved.
+#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+// Subjective style.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
+// Default isn't as big a deal as people seem to think it is.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+
+extern crate parking_lot;
+
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 
 ///
 /// Resettable is a lazily computed value which can be reset, so that it can be lazily computed
@@ -22,32 +55,38 @@ where
   T: Clone + Send + Sync,
 {
   pub fn new<F: Fn() -> T + 'static>(make: F) -> Resettable<T> {
+    let val = (make)();
     Resettable {
-      val: Arc::new(RwLock::new(None)),
+      val: Arc::new(RwLock::new(Some(val))),
       make: Arc::new(make),
     }
   }
 
+  ///
+  /// TODO: This probably needs to switch to a "with"/context-manager style pattern.
+  /// Having an externalized `get` and using Clone like this is problematic: if there
+  /// might be references/Clones of the field outside of the lock on the resource, then we can't
+  /// be sure that dropping it will actually deallocate the resource.  
+  ///
   pub fn get(&self) -> T {
-    {
-      if let Some(ref val) = *self.val.read().unwrap() {
-        return val.clone();
-      }
-    }
-    {
-      let mut maybe_val = self.val.write().unwrap();
-      {
-        if let Some(ref val) = *maybe_val {
-          return val.clone();
-        }
-      }
-      let val = (self.make)();
-      *maybe_val = Some(val.clone());
-      val
-    }
+    let val_opt = self.val.read();
+    let val = val_opt
+      .as_ref()
+      .unwrap_or_else(|| panic!("A Resettable value cannot be used while it is shutdown."));
+    val.clone()
   }
 
-  pub fn reset(&self) {
-    *self.val.write().unwrap() = None
+  ///
+  /// Run a function while the Resettable resource is cleared, and then recreate it afterward.
+  ///
+  pub fn with_reset<F, O>(&self, f: F) -> O
+  where
+    F: FnOnce() -> O,
+  {
+    let mut val = self.val.write();
+    *val = None;
+    let t = f();
+    *val = Some((self.make)());
+    t
   }
 }

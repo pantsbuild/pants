@@ -122,7 +122,7 @@ class XZCompressedTarArchiver(TarArchiver):
     This allows streaming the decompressed tar archive directly into a tar decompression stream,
     which is significantly faster in practice than making a temporary file.
     """
-    # FIXME: --threads=0 is supposed to use "the number of processor cores on the machine", but I
+    # TODO: --threads=0 is supposed to use "the number of processor cores on the machine", but I
     # see no more than 100% cpu used at any point. This seems like it could be a bug? If performance
     # is an issue, investigate further.
     cmd = [self._xz_binary_path, '--decompress', '--stdout', '--keep', '--threads=0', xz_input_file]
@@ -224,7 +224,7 @@ archive_extensions = {
 }
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
-TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset(['zip'])
+TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset({'zip'})
 TYPE_NAMES_PRESERVE_SYMLINKS = TYPE_NAMES - TYPE_NAMES_NO_PRESERVE_SYMLINKS
 
 

@@ -26,7 +26,7 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import EagerFilesetWithSpec, Files, FilesetWithSpec, Globs
+from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -450,7 +450,7 @@ class Target(AbstractTarget):
 
       dep_hashes = sorted(list(dep_hash_iter()))
       for dep_hash in dep_hashes:
-        hasher.update(dep_hash)
+        hasher.update(dep_hash.encode('utf-8'))
       target_hash = self.invalidation_hash(fingerprint_strategy)
       if target_hash is None and not dep_hashes:
         return None
@@ -680,7 +680,7 @@ class Target(AbstractTarget):
     strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
     if strict_deps is None:
       default_predicate = self._closure_dep_predicate({self}, **dep_context.target_closure_kwargs)
-      # FIXME(#5977): this branch needs testing!
+      # TODO(#5977): this branch needs testing!
       if not default_predicate:
         def default_predicate(*args, **kwargs):
           return True
@@ -864,38 +864,8 @@ class Target(AbstractTarget):
     :return: a payload field object representing the sources parameter
     :rtype: SourcesField
     """
-    if sources is None:
-      # Make sure we don't apply the defaulting to uses of this method other than for
-      # creating a sources= field (e.g., we also use this for creating resources= fields).
-      # Note that the check for supports_default_sources() precedes the subsystem check.
-      # This is so that tests don't need to set up the subsystem when creating targets that
-      # legitimately do not require sources.
-      if (key_arg is None or key_arg == 'sources') and self.supports_default_sources():
-        deprecated_conditional(
-          lambda: True,
-          '1.11.0.dev0',
-          'Default sources should always be parsed through the engine not by create_sources_field. '
-          'This code should be unreachable, and this message should never be displayed. '
-          'If you see this message, please contact pants-dev. '
-          'Class which caused this message: {}'.format(self.__class__.__name__)
-        )
-        sources = self.default_sources(sources_rel_path)
-      else:
-        sources = FilesetWithSpec.empty(sources_rel_path)
-    elif isinstance(sources, (set, list, tuple)):
-      if sources:
-        # Received a literal sources list: convert to a FilesetWithSpec via Files.
-        deprecated_conditional(
-          lambda: True,
-          '1.11.0.dev0',
-          ('Passing collections as the value of the sources argument to create_sources_field is '
-           'deprecated, and now takes a slow path. Instead, class {} should have its sources '
-           'argument populated by the engine, either by using the standard parsing pipeline, or by '
-           'requesting a SourcesField product from the v2 engine.').format(self.__class__.__name__)
-        )
-        sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
-      else:
-        sources = FilesetWithSpec.empty(sources_rel_path)
+    if not sources:
+      sources = FilesetWithSpec.empty(sources_rel_path)
     elif not isinstance(sources, FilesetWithSpec):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
@@ -903,7 +873,7 @@ class Target(AbstractTarget):
     elif not isinstance(sources, EagerFilesetWithSpec):
       deprecated_conditional(
         lambda: True,
-        '1.11.0.dev0',
+        '1.12.0.dev0',
         ('FilesetWithSpec sources values are deprecated except for EagerFilesetWithSpec values. '
          'Saw value of type {}').format(type(sources))
       )

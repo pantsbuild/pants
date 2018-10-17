@@ -38,7 +38,7 @@ class SourceMapperTest(object):
     raise NotImplementedError
 
   def owner(self, owner, f):
-    self.assertEqual(set(owner), set(i.spec for i in self.get_mapper().target_addresses_for_source(f)))
+    self.assertEqual(set(owner), {i.spec for i in self.get_mapper().target_addresses_for_source(f)})
 
   def test_target_address_for_source_yields_unique_addresses(self):
     # NB If the mapper returns more than one copy of an address, it may cause other code to do
@@ -53,8 +53,8 @@ class SourceMapperTest(object):
     )
     '''))
 
-    self.assertEqual(['path:target', 'path:buildholder'],
-                      list(a.spec for a in self.get_mapper().target_addresses_for_source('path/BUILD')))
+    self.assertEqual({'path:target', 'path:buildholder'},
+                     {a.spec for a in self.get_mapper().target_addresses_for_source('path/BUILD')})
 
   def test_joint_ownership(self):
     # A simple target with two sources.

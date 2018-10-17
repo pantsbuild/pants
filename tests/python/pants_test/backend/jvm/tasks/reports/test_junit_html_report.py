@@ -85,9 +85,9 @@ class TestJUnitHtmlReport(TestBase):
     self.assertEqual(1, len(testsuites))
     self.assertEqual(2, testsuites[0].tests)
     self.assertEqual(2, len(testsuites[0].testcases))
-    self.assertEqual(u'org.pantsbuild.PåssingTest', testsuites[0].name)
-    self.assertEqual(u'testTwö', testsuites[0].testcases[1].name)
-    self.assertIn(u'org.pantsbuild.PåssingTest.testTwö', testsuites[0].testcases[1].error)
+    self.assertEqual('org.pantsbuild.PåssingTest', testsuites[0].name)
+    self.assertEqual('testTwö', testsuites[0].testcases[1].name)
+    self.assertIn('org.pantsbuild.PåssingTest.testTwö', testsuites[0].testcases[1].error)
 
   def test_open_report(self):
     with temporary_dir() as output_dir:

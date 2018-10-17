@@ -69,10 +69,10 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
   _NG_PORT_REGEX = re.compile(r'.*\s+port\s+(\d+)\.$')
 
   # Used to identify if we own a given nailgun server.
-  FINGERPRINT_CMD_KEY = b'-Dpants.nailgun.fingerprint'
-  _PANTS_NG_ARG_PREFIX = b'-Dpants.buildroot'
-  _PANTS_OWNER_ARG_PREFIX = b'-Dpants.nailgun.owner'
-  _PANTS_NG_BUILDROOT_ARG = b'='.join((_PANTS_NG_ARG_PREFIX, get_buildroot().encode('utf-8')))
+  FINGERPRINT_CMD_KEY = '-Dpants.nailgun.fingerprint'
+  _PANTS_NG_ARG_PREFIX = '-Dpants.buildroot'
+  _PANTS_OWNER_ARG_PREFIX = '-Dpants.nailgun.owner'
+  _PANTS_NG_BUILDROOT_ARG = '='.join((_PANTS_NG_ARG_PREFIX, get_buildroot()))
 
   _NAILGUN_SPAWN_LOCK = threading.Lock()
   _SELECT_WAIT = 1
@@ -103,10 +103,10 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
 
   def _create_owner_arg(self, workdir):
     # Currently the owner is identified via the full path to the workdir.
-    return b'='.join((self._PANTS_OWNER_ARG_PREFIX, workdir))
+    return '='.join((self._PANTS_OWNER_ARG_PREFIX, workdir))
 
   def _create_fingerprint_arg(self, fingerprint):
-    return b'='.join((self.FINGERPRINT_CMD_KEY, fingerprint))
+    return '='.join((self.FINGERPRINT_CMD_KEY, fingerprint))
 
   @staticmethod
   def _fingerprint(jvm_options, classpath, java_version):
@@ -119,9 +119,11 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     """
     digest = hashlib.sha1()
     # TODO(John Sirois): hash classpath contents?
-    [digest.update(item) for item in (b''.join(sorted(jvm_options)),
-                                      b''.join(sorted(classpath)),
-                                      repr(java_version).encode('utf-8'))]
+    encoded_jvm_options = [option.encode('utf-8') for option in sorted(jvm_options)]
+    encoded_classpath = [cp.encode('utf-8') for cp in sorted(classpath)]
+    encoded_java_version = repr(java_version).encode('utf-8')
+    for item in (encoded_jvm_options, encoded_classpath, encoded_java_version):
+      digest.update(str(item).encode('utf-8'))
     return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
 
   def _runner(self, classpath, main, jvm_options, args, cwd=None):

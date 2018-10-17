@@ -12,18 +12,20 @@ from pants.util.memo import memoized_property
 class ResolvedJar(object):
   """Represents an artifact resolved from the dependency resolution process."""
 
-  def __init__(self, coordinate, cache_path, pants_path=None):
+  def __init__(self, coordinate, cache_path, pants_path=None, directory_digest=None):
     """
     :param coordinate: Coordinate representing this resolved jar.
     :type coordinate: :class:`M2Coordinate`
     :param string cache_path: Path to the artifact in the ivy cache
     :param string pants_path: Path to the symlink for the artifact in the pants work directory.
+    :param DirectoryDigest directory_digest: DirectoryDigest of the artifact.
     """
     self.coordinate = coordinate
     self.cache_path = cache_path
     self.pants_path = pants_path
+    self.directory_digest = directory_digest
 
-    self._id = (coordinate, cache_path, pants_path)
+    self._id = (coordinate, cache_path, pants_path, directory_digest)
 
   def __eq__(self, other):
     return isinstance(other, ResolvedJar) and self._id == other._id
@@ -35,7 +37,8 @@ class ResolvedJar(object):
     return hash(self._id)
 
   def __repr__(self):
-    return 'ResolvedJar(coordinate={!r}, cache_path={!r}, pants_path={!r})'.format(*self._id)
+    return 'ResolvedJar(coordinate={!r}, cache_path={!r}, pants_path={!r}, ' \
+           'directory_digest={!r})'.format(*self._id)
 
 
 class M2Coordinate(object):

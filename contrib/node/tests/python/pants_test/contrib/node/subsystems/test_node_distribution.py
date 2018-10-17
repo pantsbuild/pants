@@ -21,7 +21,7 @@ class NodeDistributionTest(unittest.TestCase):
 
   def test_bootstrap(self):
     node_cmd = self.distribution.node_command(args=['--version'])
-    output = node_cmd.check_output().decode('utf-8').strip()
+    output = node_cmd.check_output().strip()
     self.assertEqual(self.distribution.version(), output)
 
   def test_node(self):
@@ -42,7 +42,7 @@ class NodeDistributionTest(unittest.TestCase):
   def test_npm(self):
     npm_version_flag = self.distribution.get_package_manager('npm').run_command(
       args=['--version'])
-    raw_version = npm_version_flag.check_output().decode('utf-8').strip()
+    raw_version = npm_version_flag.check_output().strip()
 
     npm_version_cmd = self.distribution.get_package_manager('npm').run_command(
       args=['version', '--json'])
@@ -54,7 +54,7 @@ class NodeDistributionTest(unittest.TestCase):
   def test_yarnpkg(self):
     yarnpkg_version_command = self.distribution.get_package_manager('yarn').run_command(
       args=['--version'])
-    yarnpkg_version = yarnpkg_version_command.check_output().decode('utf-8').strip()
+    yarnpkg_version = yarnpkg_version_command.check_output().strip()
     yarnpkg_versions_command = self.distribution.get_package_manager('yarn').run_command(
       args=['versions', '--json'])
     yarnpkg_versions = json.loads(yarnpkg_versions_command.check_output())
@@ -67,7 +67,7 @@ class NodeDistributionTest(unittest.TestCase):
 
     # Test the case in which we do not pass in env,
     # which should fall back to env=os.environ.copy()
-    injected_paths = node_path_cmd.check_output().decode('utf-8').strip().split(os.pathsep)
+    injected_paths = node_path_cmd.check_output().strip().split(os.pathsep)
     self.assertEqual(node_bin_path, injected_paths[0])
 
   def test_node_command_path_injection_with_overrided_path(self):
@@ -76,7 +76,7 @@ class NodeDistributionTest(unittest.TestCase):
     node_bin_path = self.distribution._install_node()
     injected_paths = node_path_cmd.check_output(
       env={'PATH': '/test/path'}
-    ).decode('utf-8').strip().split(os.pathsep)
+    ).strip().split(os.pathsep)
     self.assertEqual(node_bin_path, injected_paths[0])
     self.assertListEqual([node_bin_path, '/test/path'], injected_paths)
 
@@ -86,5 +86,5 @@ class NodeDistributionTest(unittest.TestCase):
     node_bin_path = self.distribution._install_node()
     injected_paths = node_path_cmd.check_output(
       env={'PATH': ''}
-    ).decode('utf-8').strip().split(os.pathsep)
+    ).strip().split(os.pathsep)
     self.assertListEqual([node_bin_path, ''], injected_paths)

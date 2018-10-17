@@ -20,7 +20,7 @@ class JavaThriftLibrary(JvmTarget):
   # In general a plugin will contribute a target and a task, but in this case we have a shared
   # target that can be used by at least 2 tasks - ThriftGen and ScroogeGen.  This is likely not
   # uncommon (gcc & clang) so the arrangement needs to be cleaned up and supported well.
-  _COMPILERS = frozenset(['thrift', 'scrooge'])
+  _COMPILERS = frozenset({'thrift', 'scrooge'})
 
   def __init__(self,
                compiler=None,

@@ -249,14 +249,14 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def _options_fingerprint(self, scope):
     options_hasher = sha1()
-    options_hasher.update(scope)
+    options_hasher.update(scope.encode('utf-8'))
     options_fp = OptionsFingerprinter.combined_options_fingerprint_for_scope(
       scope,
       self.context.options,
       build_graph=self.context.build_graph,
       include_passthru=self.supports_passthru_args(),
     )
-    options_hasher.update(options_fp)
+    options_hasher.update(options_fp.encode('utf-8'))
     return options_hasher.hexdigest() if PY3 else options_hasher.hexdigest().decode('utf-8')
 
   @memoized_property
@@ -270,12 +270,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
     hasher = sha1()
-    hasher.update(self.stable_name())
-    hasher.update(self._options_fingerprint(self.options_scope))
-    hasher.update(self.implementation_version_str())
+    hasher.update(self.stable_name().encode('utf-8'))
+    hasher.update(self._options_fingerprint(self.options_scope).encode('utf-8'))
+    hasher.update(self.implementation_version_str().encode('utf-8'))
     # TODO: this is not recursive, but should be: see #2739
     for dep in self.subsystem_dependencies_iter():
-      hasher.update(self._options_fingerprint(dep.options_scope()))
+      hasher.update(self._options_fingerprint(dep.options_scope()).encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def artifact_cache_reads_enabled(self):
@@ -535,7 +535,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   def do_check_artifact_cache(self, vts, post_process_cached_vts=None):
     """Checks the artifact cache for the specified list of VersionedTargetSets.
 
-    Returns a pair (cached, uncached) of VersionedTargets that were
+    Returns a tuple (cached, uncached, uncached_causes) of VersionedTargets that were
     satisfied/unsatisfied from the cache.
     """
     if not vts:

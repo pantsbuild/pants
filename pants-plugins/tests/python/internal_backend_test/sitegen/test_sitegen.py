@@ -95,10 +95,10 @@ class AllTheThingsTestCase(unittest.TestCase):
   def setUp(self):
     self.config = json.loads(CONFIG_JSON)
     self.soups = {
-      'index': bs4.BeautifulSoup(INDEX_HTML),
-      'subdir/page1': bs4.BeautifulSoup(P1_HTML),
-      'subdir/page2': bs4.BeautifulSoup(P2_HTML),
-      'subdir/page2_no_toc': bs4.BeautifulSoup(P2_HTML),
+      'index': bs4.BeautifulSoup(INDEX_HTML, 'html.parser'),
+      'subdir/page1': bs4.BeautifulSoup(P1_HTML, 'html.parser'),
+      'subdir/page2': bs4.BeautifulSoup(P2_HTML, 'html.parser'),
+      'subdir/page2_no_toc': bs4.BeautifulSoup(P2_HTML, 'html.parser'),
     }
     self.precomputed = sitegen.precompute(self.config, self.soups)
 

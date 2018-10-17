@@ -47,8 +47,12 @@ class ResolveRequirementsTaskBase(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(ResolveRequirementsTaskBase, cls).prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
     round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
+    # Codegen may inject extra resolvable deps, so make sure we have a product dependency
+    # on relevant codegen tasks, if any.
+    round_manager.optional_data('python')
 
   def resolve_requirements(self, interpreter, req_libs):
     """Requirements resolution for PEX files.

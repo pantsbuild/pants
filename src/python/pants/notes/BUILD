@@ -52,3 +52,8 @@ page(
   name='notes-1.9.x',
   source='1.9.x.rst'
 )
+
+page(
+  name='notes-1.10.x',
+  source='1.10.x.rst'
+)

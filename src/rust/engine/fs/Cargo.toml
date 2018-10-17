@@ -9,23 +9,28 @@ bazel_protos = { path = "../process_execution/bazel_protos" }
 boxfuture = { path = "../boxfuture" }
 byteorder = "1"
 bytes = "0.4.5"
-digest = "0.6.2"
+digest = "0.7"
+dirs = "1"
 futures = "^0.1.16"
 futures-cpupool = "0.1"
 glob = "0.2.11"
-grpcio = { version = "0.3", features = ["secure"] }
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", features = ["secure"] }
 hashing = { path = "../hashing" }
 ignore = "0.3.1"
 indexmap = "1"
 itertools = "0.7.2"
-lazy_static = "0.2.2"
-lmdb = "0.7.2"
+lazy_static = "1"
+lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
 log = "0.4"
+parking_lot = "0.6"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
-resettable = { path = "../resettable" }
-sha2 = "0.6.0"
+sha2 = "0.7"
+serde = "1.0"
+serde_derive = "1.0"
+tempfile = "3"
+uuid = { version = "0.7.1", features = ["v4"] }
 
 [dev-dependencies]
 mock = { path = "../testutil/mock" }
-tempfile = "3"
 testutil = { path = "../testutil" }
+walkdir = "2"

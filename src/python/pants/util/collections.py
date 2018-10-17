@@ -4,12 +4,41 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import collections
 from builtins import next
 
 
 def combined_dict(*dicts):
   """Combine one or more dicts into a new, unified dict (dicts to the right take precedence)."""
   return {k: v for d in dicts for k, v in d.items()}
+
+
+def factory_dict(value_factory, *args, **kwargs):
+  """A dict whose values are computed by `value_factory` when a `__getitem__` key is missing.
+
+  Note that values retrieved by any other method will not be lazily computed; eg: via `get`.
+
+  :param value_factory:
+  :type value_factory: A function from dict key to value.
+  :param *args: Any positional args to pass through to `dict`.
+  :param **kwrags: Any kwargs to pass through to `dict`.
+  :rtype: dict
+  """
+  class FactoryDict(collections.defaultdict):
+    @staticmethod
+    def __never_called():
+      raise AssertionError('The default factory should never be called since we override '
+                           '__missing__.')
+
+    def __init__(self):
+      super(FactoryDict, self).__init__(self.__never_called, *args, **kwargs)
+
+    def __missing__(self, key):
+      value = value_factory(key)
+      self[key] = value
+      return value
+
+  return FactoryDict()
 
 
 def recursively_update(d, d2):

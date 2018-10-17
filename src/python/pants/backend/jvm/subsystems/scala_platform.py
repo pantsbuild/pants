@@ -9,10 +9,15 @@ from collections import namedtuple
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
+from pants.base.build_environment import get_buildroot
 from pants.build_graph.address import Address
 from pants.build_graph.injectables_mixin import InjectablesMixin
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import fast_relpath
+from pants.util.memo import memoized_method
 
 
 # full_version - the full scala version to use.
@@ -41,21 +46,21 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
   options_scope = 'scala'
 
   @classmethod
-  def _create_jardep(cls, name, version):
+  def create_jardep(cls, name, version):
     return JarDependency(org='org.scala-lang',
                          name=name,
                          rev=scala_build_info[version].full_version)
 
   @classmethod
   def _create_runtime_jardep(cls, version):
-    return cls._create_jardep('scala-library', version)
+    return cls.create_jardep('scala-library', version)
 
   @classmethod
   def _create_compiler_jardep(cls, version):
-    return cls._create_jardep('scala-compiler', version)
+    return cls.create_jardep('scala-compiler', version)
 
   @classmethod
-  def _key_for_tool_version(cls, tool, version):
+  def versioned_tool_name(cls, tool, version):
     if version == 'custom':
       return tool
     else:
@@ -65,7 +70,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
   def register_options(cls, register):
     def register_scala_compiler_tool(version):
       cls.register_jvm_tool(register,
-                            cls._key_for_tool_version('scalac', version),
+                            cls.versioned_tool_name('scalac', version),
                             classpath=[cls._create_compiler_jardep(version)])
 
     def register_scala_repl_tool(version, with_jline=False):
@@ -78,12 +83,12 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
         )
         classpath.append(jline_dep)
       cls.register_jvm_tool(register,
-                            cls._key_for_tool_version('scala-repl', version),
+                            cls.versioned_tool_name('scala-repl', version),
                             classpath=classpath)
 
     def register_style_tool(version):
       cls.register_jvm_tool(register,
-                            cls._key_for_tool_version('scalastyle', version),
+                            cls.versioned_tool_name('scalastyle', version),
                             classpath=[scala_style_jar])
 
     super(ScalaPlatform, cls).register_options(register)
@@ -126,23 +131,34 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     # fail with a useful error, hence the dummy jardep with rev=None.
     def register_custom_tool(key):
       dummy_jardep = JarDependency('missing spec', ' //:{}'.format(key))
-      cls.register_jvm_tool(register, cls._key_for_tool_version(key, 'custom'),
+      cls.register_jvm_tool(register, cls.versioned_tool_name(key, 'custom'),
                             classpath=[dummy_jardep])
     register_custom_tool('scalac')
     register_custom_tool('scala-repl')
     register_custom_tool('scalastyle')
 
-  def _tool_classpath(self, tool, products):
+  def _tool_classpath(self, tool, products, scheduler):
     """Return the proper classpath based on products and scala version."""
-    return self.tool_classpath_from_products(products,
-                                             self._key_for_tool_version(tool, self.version),
-                                             scope=self.options_scope)
+    classpath = self.tool_classpath_from_products(products,
+                                                  self.versioned_tool_name(tool, self.version),
+                                                  scope=self.options_scope)
+    classpath = tuple(fast_relpath(c, get_buildroot()) for c in classpath)
 
-  def compiler_classpath(self, products):
-    return self._tool_classpath('scalac', products)
+    return self._memoized_scalac_classpath(classpath, scheduler)
 
-  def style_classpath(self, products):
-    return self._tool_classpath('scalastyle', products)
+  @memoized_method
+  def _memoized_scalac_classpath(self, scala_path, scheduler):
+    snapshots = scheduler.capture_snapshots(tuple(PathGlobsAndRoot(PathGlobs([path]), get_buildroot()) for path in scala_path))
+    return [ClasspathEntry(path, snapshot) for path, snapshot in list(zip(scala_path, snapshots))]
+
+  def compiler_classpath_entries(self, products, scheduler):
+    """Returns classpath entries for the scalac tool."""
+    return self._tool_classpath('scalac', products, scheduler)
+
+  def style_classpath(self, products, scheduler):
+    """Returns classpath as paths for scalastyle."""
+    classpath_entries = self._tool_classpath('scalastyle', products, scheduler)
+    return [classpath_entry.path for classpath_entry in classpath_entries]
 
   @property
   def version(self):
@@ -172,7 +188,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
   @property
   def repl(self):
     """Return the repl tool key."""
-    return self._key_for_tool_version('scala-repl', self.version)
+    return self.versioned_tool_name('scala-repl', self.version)
 
   def injectables(self, build_graph):
     if self.version == 'custom':

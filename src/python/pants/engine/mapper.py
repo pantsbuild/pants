@@ -98,7 +98,7 @@ class AddressFamily(datatype(['namespace', 'objects_by_name'])):
     :rtype: :class:`AddressFamily`
     :raises: :class:`MappingError` if the given address maps do not form a family.
     """
-    if spec_path == b'.':
+    if spec_path == '.':
       spec_path = ''
     for address_map in address_maps:
       if not address_map.path.startswith(spec_path):

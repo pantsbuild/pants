@@ -7,14 +7,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import collections
 import functools
 import logging
-from builtins import next, str
+from builtins import next
 from os.path import dirname, join
 
 import six
+from future.utils import raise_from
+from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir
-from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
-                              SingleAddress, Specs)
+from pants.base.specs import SingleAddress, Spec, Specs
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
@@ -24,8 +25,6 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
-from pants.util.dirutil import fast_relpath_optional, recursive_dirname
-from pants.util.filtering import create_filters, wrap_filters
 from pants.util.objects import TypeConstraintError, datatype
 
 
@@ -76,12 +75,18 @@ class UnhydratedStruct(datatype(['address', 'struct', 'dependencies'])):
     return hash(self.struct)
 
 
-def _raise_did_you_mean(address_family, name):
+def _raise_did_you_mean(address_family, name, source=None):
   names = [a.target_name for a in address_family.addressables]
   possibilities = '\n  '.join(':{}'.format(target_name) for target_name in sorted(names))
-  raise ResolveError('"{}" was not found in namespace "{}". '
-                     'Did you mean one of:\n  {}'
-                     .format(name, address_family.namespace, possibilities))
+
+  resolve_error = ResolveError('"{}" was not found in namespace "{}". '
+                               'Did you mean one of:\n  {}'
+                               .format(name, address_family.namespace, possibilities))
+
+  if source:
+    raise_from(resolve_error, source)
+  else:
+    raise resolve_error
 
 
 @rule(UnhydratedStruct, [Select(AddressMapper), Select(Address)])
@@ -205,100 +210,48 @@ def _hydrate(item_type, spec_path, **kwargs):
 def addresses_from_address_families(address_mapper, specs):
   """Given an AddressMapper and list of Specs, return matching BuildFileAddresses.
 
-  Raises a AddressLookupError if:
+  :raises: :class:`ResolveError` if:
      - there were no matching AddressFamilies, or
      - the Spec matches no addresses for SingleAddresses.
+  :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
   """
   # Capture a Snapshot covering all paths for these Specs, then group by directory.
   snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
-  dirnames = set(dirname(f.stat.path) for f in snapshot.files)
+  dirnames = {dirname(f.stat.path) for f in snapshot.files}
   address_families = yield [Get(AddressFamily, Dir(d)) for d in dirnames]
+  address_family_by_directory = {af.namespace: af for af in address_families}
 
-  # NB: `@memoized` does not work on local functions.
-  def by_directory():
-    if by_directory.cached is None:
-      by_directory.cached = {af.namespace: af for af in address_families}
-    return by_directory.cached
-  by_directory.cached = None
-
-  def raise_empty_address_family(spec):
-    raise ResolveError('Path "{}" does not contain any BUILD files.'.format(spec.directory))
-
-  def exclude_address(spec):
-    if specs.exclude_patterns:
-      return any(p.search(spec) is not None for p in specs.exclude_patterns_memo())
-    return False
-
-  def filter_for_tag(tag):
-    return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
-
-  include_target = wrap_filters(create_filters(specs.tags if specs.tags else '', filter_for_tag))
-
-  addresses = []
-  included = set()
-  def include(address_families, predicate=None):
-    matched = False
-    for af in address_families:
-      for (a, t) in af.addressables.items():
-        if (predicate is None or predicate(a)):
-          if include_target(t) and (not exclude_address(a.spec)):
-            matched = True
-            if a not in included:
-              addresses.append(a)
-              included.add(a)
-    return matched
-
+  matched_addresses = OrderedSet()
   for spec in specs.dependencies:
-    if type(spec) is DescendantAddresses:
-      matched = include(
-        af
-        for af in address_families
-        if fast_relpath_optional(af.namespace, spec.directory) is not None
-      )
-      if not matched:
-        raise AddressLookupError(
-          'Spec {} does not match any targets.'.format(spec))
-    elif type(spec) is SiblingAddresses:
-      address_family = by_directory().get(spec.directory)
-      if not address_family:
-        raise_empty_address_family(spec)
-      include([address_family])
-    elif type(spec) is SingleAddress:
-      address_family = by_directory().get(spec.directory)
-      if not address_family:
-        raise_empty_address_family(spec)
-      # spec.name here is generally the root node specified on commandline. equality here implies
-      # a root node i.e. node specified on commandline.
-      if not include([address_family], predicate=lambda a: a.target_name == spec.name):
-        if len(addresses) == 0:
-          _raise_did_you_mean(address_family, spec.name)
-    elif type(spec) is AscendantAddresses:
-      include(
-        af
-        for af in address_families
-        if fast_relpath_optional(spec.directory, af.namespace) is not None
-      )
-    else:
-      raise ValueError('Unrecognized Spec type: {}'.format(spec))
-  yield BuildFileAddresses(addresses)
+    # NB: if a spec is provided which expands to some number of targets, but those targets match
+    # --exclude-target-regexp, we do NOT fail! This is why we wait to apply the tag and exclude
+    # patterns until we gather all the targets the spec would have matched without them.
+    try:
+      addr_families_for_spec = spec.matching_address_families(address_family_by_directory)
+    except Spec.AddressFamilyResolutionError as e:
+      raise raise_from(ResolveError(e), e)
+
+    try:
+      all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(addr_families_for_spec)
+    except Spec.AddressResolutionError as e:
+      raise raise_from(AddressLookupError(e), e)
+    except SingleAddress._SingleAddressResolutionError as e:
+      _raise_did_you_mean(e.single_address_family, e.name, source=e)
+
+    matched_addresses.update(
+      addr for (addr, tgt) in all_addr_tgt_pairs
+      if specs.matcher.matches_target_address_pair(addr, tgt)
+    )
+
+  # NB: This may be empty, as the result of filtering by tag and exclude patterns!
+  yield BuildFileAddresses(tuple(matched_addresses))
 
 
 def _spec_to_globs(address_mapper, specs):
   """Given a Specs object, return a PathGlobs object for the build files that it matches."""
   patterns = set()
   for spec in specs.dependencies:
-    if type(spec) is DescendantAddresses:
-      patterns.update(join(spec.directory, '**', pattern)
-                      for pattern in address_mapper.build_patterns)
-    elif type(spec) in (SiblingAddresses, SingleAddress):
-      patterns.update(join(spec.directory, pattern)
-                      for pattern in address_mapper.build_patterns)
-    elif type(spec) is AscendantAddresses:
-      patterns.update(join(f, pattern)
-                      for pattern in address_mapper.build_patterns
-                      for f in recursive_dirname(spec.directory))
-    else:
-      raise ValueError('Unrecognized Spec type: {}'.format(spec))
+    patterns.update(spec.make_glob_patterns(address_mapper))
   return PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
 
 

@@ -33,7 +33,7 @@ class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintS
     if isinstance(target, UnpackedJars):
       hasher = sha1()
       for cache_key in sorted(jar.cache_key() for jar in target.imported_jars):
-        hasher.update(cache_key)
+        hasher.update(cache_key.encode('utf-8'))
       hasher.update(target.payload.fingerprint().encode('utf-8'))
       return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
     return None

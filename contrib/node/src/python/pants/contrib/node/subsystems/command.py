@@ -63,7 +63,7 @@ class Command(namedtuple('Command', ['executable', 'args', 'extra_paths'])):
     :raises: :class:`subprocess.CalledProcessError` if the command fails.
     """
     env, kwargs = self._prepare_env(kwargs)
-    return subprocess.check_output(self.cmd, env=env, **kwargs)
+    return subprocess.check_output(self.cmd, env=env, **kwargs).decode('utf-8')
 
   def __str__(self):
     return ' '.join(self.cmd)

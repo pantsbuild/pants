@@ -10,7 +10,6 @@ from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
-from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField, PrimitivesSetField
 from pants.build_graph.resources import Resources
@@ -39,7 +38,6 @@ class JvmTarget(Target, Jarable):
                platform=None,
                strict_deps=None,
                exports=None,
-               fatal_warnings=None,
                compiler_option_sets=None,
                zinc_file_manager=None,
                # Some subclasses can have both .java and .scala sources
@@ -83,8 +81,6 @@ class JvmTarget(Target, Jarable):
                          dependents have access to the closure of exports. An example will be that
                          if A exports B, and B exports C, then any targets that depends on A will
                          have access to both B and C.
-    :param bool fatal_warnings: Whether to turn warnings into errors for this target.  If present,
-                                takes priority over the language's fatal-warnings option. Deprecated.
     :param bool zinc_file_manager: Whether to use zinc provided file manager that allows
                                    transactional rollbacks, but in certain cases may conflict with
                                    user libraries.
@@ -97,21 +93,6 @@ class JvmTarget(Target, Jarable):
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
-    deprecated_conditional(
-      lambda: fatal_warnings is not None,
-      removal_version='1.11.0dev0',
-      entity_description='fatal_warnings',
-      hint_message="fatal_warnings should be defined as part of the target compiler_option_sets"
-    )
-    if fatal_warnings is not None:
-      compiler_option_sets = [] if compiler_option_sets is None else compiler_option_sets
-      if fatal_warnings:
-        compiler_option_sets.append('fatal_warnings')
-      else:
-        try:
-          compiler_option_sets.remove('fatal_warnings')
-        except ValueError:
-          pass
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
@@ -145,18 +126,6 @@ class JvmTarget(Target, Jarable):
   @property
   def export_specs(self):
     return self.payload.exports
-
-  @property
-  def fatal_warnings(self):
-    """If set, overrides the platform's default fatal_warnings setting.
-
-    :return: See constructor.
-    :rtype: bool or None
-    """
-    if self.payload.compiler_option_sets is not None:
-      return 'fatal_warnings' in self.payload.compiler_option_sets
-    else:
-      return False
 
   @memoized_property
   def compiler_option_sets(self):

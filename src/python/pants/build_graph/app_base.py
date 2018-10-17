@@ -174,7 +174,7 @@ class BundleField(tuple, PayloadField):
   @staticmethod
   def _hash_bundle(bundle):
     hasher = sha1()
-    hasher.update(bundle.rel_path)
+    hasher.update(bundle.rel_path.encode('utf-8'))
     for abs_path in sorted(bundle.filemap.keys()):
       buildroot_relative_path = os.path.relpath(abs_path, get_buildroot()).encode('utf-8')
       hasher.update(buildroot_relative_path)

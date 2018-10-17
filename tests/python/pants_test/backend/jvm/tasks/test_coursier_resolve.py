@@ -8,6 +8,7 @@ import os
 from builtins import str
 from contextlib import contextmanager
 
+from future.utils import PY3
 from mock import MagicMock
 from psutil.tests import safe_remove
 
@@ -130,7 +131,9 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 
       self.resolve([lib])
     self.assertEqual(
-      'Undefined revs for jars unsupported by Coursier. "jar(org=u\'com.google.guava\', name=u\'guava\', rev=None, classifier=None, ext=u\'jar\')"',
+      "Undefined revs for jars unsupported by Coursier. "
+      "\"jar(org={unicode_literal}'com.google.guava', name={unicode_literal}'guava', "
+      "rev=None, classifier=None, ext={unicode_literal}'jar')\"".format(unicode_literal='' if PY3 else 'u'),
       str(cm.exception))
 
   def test_resolve_multiple_artifacts(self):
@@ -185,7 +188,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       Get the simple coords that are going to be on the classpath
       """
       conf_art_tuples_ex = cp.get_classpath_entries_for_targets(targets)
-      simple_coords = set(x[1].coordinate.simple_coord for x in conf_art_tuples_ex)
+      simple_coords = {x[1].coordinate.simple_coord for x in conf_art_tuples_ex}
       return simple_coords
 
     # If we grab the transitive closure of the coordinates just for junit, then
@@ -271,7 +274,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
   @contextmanager
   def _temp_workdir(self):
     old_workdir = self.options['']['pants_workdir']
-    with temporary_dir() as workdir:
+    with temporary_dir(root_dir=self.build_root) as workdir:
       self.set_options_for_scope('', pants_workdir=workdir)
       self._test_workdir = workdir
       yield workdir

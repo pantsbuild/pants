@@ -6,17 +6,20 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import range
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
 class NodeTestIntegrationTest(PantsRunIntegrationTest):
 
+  @ensure_daemon
   def test_test_simple(self):
     command = ['test',
                'contrib/node/examples/src/node/server-project:unit']
     pants_run = self.run_pants(command=command)
 
     self.assert_success(pants_run)
+    # NB: This test is marked `@ensure_daemon` to provide coverage for unicode-emitting workunits.
+    self.assertIn('✓', pants_run.stdout_data)
 
   def test_test_target_with_non_default_script_name(self):
     command = ['test',

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import math
+from builtins import range
 
 from pants.util.memo import memoized_property
 from pants_test.pants_run_integration_test import ensure_resolver
@@ -98,12 +99,13 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/3rdparty/org/pantsbuild/testprojects:testprojects',
       # Already tested in 'PantsRequirementIntegrationTest' and 'SetupPyIntegrationTest'.
       'testprojects/pants-plugins/*',
+      'testprojects/src/python/python_distribution/ctypes:ctypes_test',
+      'testprojects/src/python/python_distribution/ctypes_with_third_party:ctypes_test',
     ]
 
     targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 +
                           timeout_targets + deliberately_conflicting_targets + simply_skip)
-    exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
-                       targets_to_exclude)
+    exclude_opts = ['--exclude-target-regexp={}'.format(target) for target in targets_to_exclude]
 
     # Run list with exclude options, then parse and sort output.
     pants_run = self.run_pants(['list', 'testprojects::', 'examples::'] + exclude_opts)

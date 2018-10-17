@@ -62,7 +62,7 @@ class TestWatchman(TestBase):
       self.watchman._maybe_init_metadata()
 
       mock_mkdir.assert_called_once_with(self._watchman_dir)
-      mock_file_dump.assert_called_once_with(self._state_file, '{}')
+      mock_file_dump.assert_called_once_with(self._state_file, b'{}')
 
   def test_construct_cmd(self):
     output = self.watchman._construct_cmd(['cmd', 'parts', 'etc'],

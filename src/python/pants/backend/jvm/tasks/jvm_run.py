@@ -80,6 +80,12 @@ class JvmRun(JvmTask):
     else:
       binary = target
 
+    # This task is installed in the "run" goal.
+    # This means that, when invoked with ./pants run, it will run regardless of whether
+    # the target is a jvm target.
+    # As a result, not all targets passed here will have good defaults for extra_jvm_options
+    extra_jvm_options = binary.payload.get_field_value("extra_jvm_options", [])
+
     # We can't throw if binary isn't a JvmBinary, because perhaps we were called on a
     # python_binary, in which case we have to no-op and let python_run do its thing.
     # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
@@ -92,7 +98,7 @@ class JvmRun(JvmTask):
           classpath=self.classpath([target]),
           main=self.get_options().main or binary.main,
           executor=executor,
-          jvm_options=self.jvm_options,
+          jvm_options=self.jvm_options + extra_jvm_options,
           args=self.args,
           cwd=working_dir,
           synthetic_jar_dir=self.workdir,

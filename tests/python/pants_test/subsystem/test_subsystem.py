@@ -222,5 +222,5 @@ class SubsystemTest(unittest.TestCase):
       def subsystem_dependencies(cls):
         return (DummySubsystem.scoped(cls), SubsystemB)
 
-    dep_scopes = set(dep.options_scope() for dep in SubsystemA.subsystem_dependencies_iter())
+    dep_scopes = {dep.options_scope() for dep in SubsystemA.subsystem_dependencies_iter()}
     self.assertEqual({'b', 'dummy.a'}, dep_scopes)

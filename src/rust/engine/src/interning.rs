@@ -48,14 +48,13 @@ impl Interns {
     let type_id = ident.type_id;
     let mut inserted = false;
     let id_generator = self.id_generator;
-    let key = self
+    let key = *self
       .forward
       .entry(InternKey(ident.hash, v.clone()))
       .or_insert_with(|| {
         inserted = true;
         Key::new(id_generator, type_id)
-      })
-      .clone();
+      });
     if inserted {
       self.reverse.insert(key, v);
       self.id_generator += 1;

@@ -22,7 +22,7 @@ def lines_to_set(str_or_list):
   if isinstance(str_or_list, list):
     return set(str_or_list)
   else:
-    return set(x for x in str(str_or_list).split('\n') if x)
+    return {x for x in str(str_or_list).split('\n') if x}
 
 
 def create_file_in(worktree, path, content):

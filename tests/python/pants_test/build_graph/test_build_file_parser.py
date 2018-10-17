@@ -71,10 +71,12 @@ class BuildFileParserBasicsTest(BaseTestWithParser):
   def test_addressable_exceptions(self):
     self.add_to_build_file('b/BUILD', 'java_library(name="foo", "bad_arg")')
     build_file_b = self.create_buildfile('b/BUILD')
-    expected_msg = ('positional argument follows keyword argument'
-                    if PY3 else
-                    'non-keyword arg after keyword arg')
-    self.assert_parser_error(build_file_b, expected_msg)
+    try:
+      # Python 3.5+ message
+      self.assert_parser_error(build_file_b, 'positional argument follows keyword argument')
+    except AssertionError:
+      # Python 2.7-3.4 message
+      self.assert_parser_error(build_file_b, 'non-keyword arg after keyword arg')
 
     self.add_to_build_file('d/BUILD', dedent(
       """
@@ -172,9 +174,9 @@ class BuildFileParserTargetTest(BaseTestWithParser):
       BuildFile.get_build_files_family(FileSystemProjectTree(self.build_root), "."))
     addresses = address_map.keys()
     self.assertEqual({bar_build_file.relpath, base_build_file.relpath, foo_build_file.relpath},
-                     set([address.rel_path for address in addresses]))
+                     {address.rel_path for address in addresses})
     self.assertEqual({'//:base', '//:foo', '//:bat'},
-                     set([address.spec for address in addresses]))
+                     {address.spec for address in addresses})
 
   def test_build_file_duplicates(self):
     # This workspace has two targets in the same file with the same name.

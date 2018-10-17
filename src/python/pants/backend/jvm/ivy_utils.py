@@ -539,8 +539,8 @@ class IvyModuleRef(object):
   # TODO(python3port): Return NotImplemented if other does not have attributes
   def __lt__(self, other):
     # We can't just re-use __repr__ or __str_ because we want to order rev last
-    return ((self.org, self.name, self.classifier, self.ext, self.rev) <
-            (other.org, other.name, other.classifier, other.ext, other.rev))
+    return ((self.org, self.name, self.classifier or '', self.ext, self.rev) <
+            (other.org, other.name, other.classifier or '', other.ext, other.rev))
 
   def __hash__(self):
     return hash(self._id)
@@ -1017,7 +1017,7 @@ class IvyUtils(object):
 
   @classmethod
   def _write_ivy_xml_file(cls, ivyxml, template_data, template_relpath):
-    template_text = pkgutil.get_data(__name__, template_relpath)
+    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
     generator = Generator(template_text, lib=template_data)
     with safe_open(ivyxml, 'w') as output:
       generator.write(output)

@@ -3,6 +3,69 @@
 
 This document describes releases leading up to the ``1.9.x`` ``stable`` series.
 
+1.9.0 (09/17/2018)
+------------------
+
+The first stable release of the 1.9.x series, with no changes since `rc3`.
+
+1.9.0rc3 (09/10/2018)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Cherry-pick setup_py fixes (#6472)
+  `Issue #8315 <https://github.com/travis-ci/travis-ci/issues/8315>`_
+  `PR #6472 <https://github.com/pantsbuild/pants/pull/6472>`_
+
+* Work around production `coverage` float. (#6452)
+  `PR #6452 <https://github.com/pantsbuild/pants/pull/6452>`_
+
+* Cancel running work when entering the fork context (#6464)
+  `PR #6464 <https://github.com/pantsbuild/pants/pull/6464>`_
+
+1.9.0rc2 (08/30/2018)
+---------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add --output-dir flag to ScalaFmt task (#6134)
+  `PR #6134 <https://github.com/pantsbuild/pants/pull/6134>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix --binaries-path-by-id fingerprinting error (#6413)
+  `PR #6413 <https://github.com/pantsbuild/pants/pull/6413>`_
+
+* added fullpath to fix path concat issue with files when not in git root (#6331)
+  `PR #6331 <https://github.com/pantsbuild/pants/pull/6331>`_
+
+* Link requirements targets to their source. (#6405)
+  `PR #6405 <https://github.com/pantsbuild/pants/pull/6405>`_
+
+* Move fork context management to rust (#5521)
+  `PR #5521 <https://github.com/pantsbuild/pants/pull/5521>`_
+
+* Bound pytest below 3.7 to avoid a ZipImportError (#6285)
+  `PR #6285 <https://github.com/pantsbuild/pants/pull/6285>`_
+
+* Fix pydist native sources selection (#6205)
+  `PR #6205 <https://github.com/pantsbuild/pants/pull/6205>`_
+
+* Fix spurious deprecation warning for fatal_warnings (#6237)
+  `PR #6237 <https://github.com/pantsbuild/pants/pull/6237>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add basic native task unit tests. (#6179)
+  `PR #6179 <https://github.com/pantsbuild/pants/pull/6179>`_
+
+* Associate cli arguments with executables and refactor llvm/gcc c/c++ toolchain selection (#6217)
+  `PR #6217 <https://github.com/pantsbuild/pants/pull/6217>`_
+
 1.9.0rc1 (07/20/2018)
 ---------------------
 

@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 bazel_protos = { path = "../../process_execution/bazel_protos" }
 clap = "2"
+dirs = "1"
 env_logger = "0.5.4"
 errno = "0.2.3"
 fs = { path = ".." }
@@ -15,6 +16,7 @@ futures = "^0.1.16"
 hashing = { path = "../../hashing" }
 libc = "0.2.39"
 log = "0.4.1"
+parking_lot = "0.6"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
 time = "0.1.39"
 

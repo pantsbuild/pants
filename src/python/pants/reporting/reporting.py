@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 from builtins import open
-from io import StringIO
+from io import BytesIO
 
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.html_reporter import HtmlReporter
@@ -62,8 +62,8 @@ class Reporting(Subsystem):
 
     # Capture initial console reporting into a buffer. We'll do something with it once
     # we know what the cmd-line flag settings are.
-    outfile = StringIO()
-    errfile = StringIO()
+    outfile = BytesIO()
+    errfile = BytesIO()
     capturing_reporter_settings = PlainTextReporter.Settings(
       outfile=outfile, errfile=errfile, log_level=Report.INFO,
       color=False, indent=True, timing=False,

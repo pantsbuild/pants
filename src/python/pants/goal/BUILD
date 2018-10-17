@@ -81,6 +81,7 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -95,6 +96,7 @@ python_library(
     ':pantsd_stats',
     '3rdparty/python:requests',
     '3rdparty/python:pyopenssl',
+    'src/python/pants/auth',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:run_info',
     'src/python/pants/base:worker_pool',
@@ -103,6 +105,7 @@ python_library(
     'src/python/pants/stats',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 

@@ -120,8 +120,8 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   def prepare(cls, options, round_manager):
     super(ExportTask, cls).prepare(options, round_manager)
     if options.libraries or options.libraries_sources or options.libraries_javadocs:
-      round_manager.require_data('java')
-      round_manager.require_data('scala')
+      round_manager.optional_data('java')
+      round_manager.optional_data('scala')
 
   @memoized_property
   def _interpreter_cache(self):
@@ -399,7 +399,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     def root_package_prefix(source_file):
       source = os.path.dirname(source_file)
       return os.path.join(get_buildroot(), target.target_base, source), source.replace(os.sep, '.')
-    return set(root_package_prefix(source) for source in target.sources_relative_to_source_root())
+    return {root_package_prefix(source) for source in target.sources_relative_to_source_root()}
 
 
 class Export(ExportTask, ConsoleTask):

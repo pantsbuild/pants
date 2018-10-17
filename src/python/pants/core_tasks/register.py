@@ -9,6 +9,7 @@ from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.core_tasks.explain_options_task import ExplainOptionsTask
 from pants.core_tasks.list_goals import ListGoals
+from pants.core_tasks.login import Login
 from pants.core_tasks.noop import NoopCompile, NoopTest
 from pants.core_tasks.pantsd_kill import PantsDaemonKill
 from pants.core_tasks.reporting_server_kill import ReportingServerKill
@@ -66,6 +67,9 @@ def register_goals():
   # TODO: The reporting server should be subsumed into pantsd, and not run via a task.
   task(name='server', action=ReportingServerRun, serialize=False).install()
   task(name='killserver', action=ReportingServerKill, serialize=False).install()
+
+  # Auth.
+  task(name='login', action=Login).install()
 
   # Getting help.
   task(name='goals', action=ListGoals).install()

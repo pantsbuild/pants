@@ -11,6 +11,7 @@ from builtins import open
 
 from future.moves.urllib.parse import parse_qs
 
+from pants.auth.cookies import Cookies
 from pants.goal.run_tracker import RunTracker
 from pants.util.contextutil import temporary_file_path
 from pants_test.test_base import TestBase
@@ -23,27 +24,38 @@ class RunTrackerTest(TestBase):
     class Handler(http.server.BaseHTTPRequestHandler):
       def do_POST(handler):
         try:
-          self.assertEqual('/upload', handler.path)
-          self.assertEqual('application/x-www-form-urlencoded', handler.headers['Content-type'])
-          length = int(handler.headers['Content-Length'])
-          post_data = parse_qs(handler.rfile.read(length).decode('utf-8'))
-          decoded_post_data = {k: json.loads(v[0]) for k, v in post_data.items()}
-          self.assertEqual(stats, decoded_post_data)
-          handler.send_response(200)
+          if handler.path.startswith('/redirect'):
+            code = int(handler.path[-3:])
+            handler.send_response(code)
+            handler.send_header('location', mk_url('/upload'))
+            handler.end_headers()
+          else:
+            self.assertEqual('/upload', handler.path)
+            self.assertEqual('application/x-www-form-urlencoded', handler.headers['Content-type'])
+            length = int(handler.headers['Content-Length'])
+            post_data = parse_qs(handler.rfile.read(length).decode('utf-8'))
+            decoded_post_data = {k: json.loads(v[0]) for k, v in post_data.items()}
+            self.assertEqual(stats, decoded_post_data)
+            handler.send_response(200)
         except Exception:
           handler.send_response(400)  # Ensure the main thread knows the test failed.
           raise
-
 
     server_address = ('', 0)
     server = http.server.HTTPServer(server_address, Handler)
     host, port = server.server_address
 
+    def mk_url(path):
+      return 'http://{}:{}{}'.format(host, port, path)
+
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
     server_thread.start()
 
-    self.assertTrue(RunTracker.post_stats('http://{}:{}/upload'.format(host, port), stats))
+    self.context(for_subsystems=[Cookies])
+    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats))
+    self.assertTrue(RunTracker.post_stats(mk_url('/redirect307'), stats))
+    self.assertFalse(RunTracker.post_stats(mk_url('/redirect302'), stats))
 
     server.shutdown()
     server.server_close()

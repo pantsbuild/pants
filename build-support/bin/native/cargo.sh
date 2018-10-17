@@ -9,6 +9,7 @@ REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 # Exposes:
 # + bootstrap_rust: Bootstraps a Pants-controlled rust toolchain and associated extras.
 source "${REPO_ROOT}/build-support/bin/native/bootstrap_rust.sh"
+
 bootstrap_rust >&2
 
 download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"

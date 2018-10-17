@@ -38,8 +38,8 @@ pub struct Tasks {
 ///   2. add_*() - zero or more times per task to add input clauses
 ///   3. task_end() - once per task
 ///
-/// Also has a one-shot method for adding a singleton (which has no Selects):
-///   1. singleton_add()
+/// Also has a one-shot method for adding Singletons (which have no Selects):
+///   * singleton_add()
 ///
 /// (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
 ///
@@ -65,6 +65,14 @@ impl Tasks {
 
   pub fn all_tasks(&self) -> Vec<&Task> {
     self.tasks.values().flat_map(|tasks| tasks).collect()
+  }
+
+  pub fn singleton_types(&self) -> Vec<TypeId> {
+    self
+      .singletons
+      .values()
+      .map(|&(k, _)| *k.type_id())
+      .collect()
   }
 
   pub fn gen_singleton(&self, product: &TypeConstraint) -> Option<&(Key, Value)> {
@@ -97,14 +105,14 @@ impl Tasks {
         input: types.process_request,
       },
     ].into_iter()
-      .map(|i| (i.product, i))
-      .collect();
+    .map(|i| (i.product, i))
+    .collect();
   }
 
   pub fn singleton_add(&mut self, value: Value, product: TypeConstraint) {
     if let Some(&(_, ref existing_value)) = self.singletons.get(&product) {
       panic!(
-        "More than one singleton rule was installed for the product {:?}: {:?} vs {:?}",
+        "More than one Singleton rule was installed for the product {:?}: {:?} vs {:?}",
         product, existing_value, value,
       );
     }
@@ -143,16 +151,13 @@ impl Tasks {
       });
   }
 
-  pub fn add_select(&mut self, product: TypeConstraint, variant_key: Option<String>) {
+  pub fn add_select(&mut self, product: TypeConstraint) {
     self
       .preparing
       .as_mut()
       .expect("Must `begin()` a task creation before adding clauses!")
       .clause
-      .push(Select {
-        product: product,
-        variant_key: variant_key,
-      });
+      .push(Select::new(product));
   }
 
   pub fn task_end(&mut self) {

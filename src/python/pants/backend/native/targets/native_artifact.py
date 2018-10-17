@@ -28,5 +28,7 @@ class NativeArtifact(datatype(['lib_name']), PayloadField):
     })
 
   def _compute_fingerprint(self):
-    # FIXME: can we just use the __hash__ method here somehow?
-    return sha1(self.lib_name).hexdigest() if PY3 else sha1(self.lib_name).hexdigest().decode('utf-8')
+    # TODO: This fingerprint computation boilerplate is error-prone and could probably be
+    # streamlined, for simple payload fields.
+    hasher = sha1(self.lib_name.encode('utf-8'))
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')

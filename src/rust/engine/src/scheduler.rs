@@ -4,17 +4,18 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc};
+use std::time::Duration;
 
 use futures::future::{self, Future};
-use futures::sync::oneshot;
 
 use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
-use core::{Failure, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
 use fs::{self, GlobMatching, PosixFS};
 use graph::{EntryId, Graph, Node, NodeContext};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
+use parking_lot::Mutex;
 use rule_graph;
 use selectors;
 
@@ -41,12 +42,12 @@ impl Session {
   }
 
   fn extend(&self, new_roots: &[Root]) {
-    let mut roots = self.roots.lock().unwrap();
+    let mut roots = self.roots.lock();
     roots.extend(new_roots.iter().cloned());
   }
 
   fn root_nodes(&self) -> Vec<NodeKey> {
-    let roots = self.roots.lock().unwrap();
+    let roots = self.roots.lock();
     roots.iter().map(|r| r.clone().into()).collect()
   }
 }
@@ -107,11 +108,11 @@ impl Scheduler {
   ) -> Result<(), String> {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      &selectors::Select::without_variant(product),
+      &selectors::Select::new(product),
     )?;
     request
       .roots
-      .push(Select::new(product, subject, Variants::default(), &edges));
+      .push(Select::new(product, Params::new_single(subject), &edges));
     Ok(())
   }
 
@@ -179,7 +180,9 @@ impl Scheduler {
 
   ///
   /// Attempts to complete all of the given roots, retrying the entire set (up to `count`
-  /// times) if any of them fail with `Failure::Invalidated`.
+  /// times) if any of them fail with `Failure::Invalidated`. Sends the result on the given
+  /// mpsc Sender, which allows the caller to poll a channel for the result without blocking
+  /// uninterruptibly on a Future.
   ///
   /// In common usage, graph entries won't be repeatedly invalidated, but in a case where they
   /// were (say by an automated process changing files under pants), we'd want to eventually
@@ -187,9 +190,10 @@ impl Scheduler {
   ///
   fn execute_helper(
     context: RootContext,
+    sender: mpsc::Sender<Vec<Result<Value, Failure>>>,
     roots: Vec<Root>,
     count: usize,
-  ) -> BoxFuture<Vec<Result<Value, Failure>>, ()> {
+  ) {
     let executor = context.core.runtime.get().executor();
     // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
     let roots_res = future::join_all(
@@ -211,7 +215,10 @@ impl Scheduler {
                   // Otherwise (if it is a success, some other type of Failure, or if we've run
                   // out of retries) recover to complete the join, which will cause the results to
                   // propagate to the user.
-                  debug!("Root {} completed.", NodeKey::Select(root).format());
+                  debug!(
+                    "Root {} completed.",
+                    NodeKey::Select(Box::new(root)).format()
+                  );
                   Ok(other.map(|res| {
                     res
                       .try_into()
@@ -220,16 +227,19 @@ impl Scheduler {
                 }
               }
             })
-        })
-        .collect::<Vec<_>>(),
+        }).collect::<Vec<_>>(),
     );
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    oneshot::spawn(
-      roots_res.or_else(move |_| Scheduler::execute_helper(context, roots, count - 1)),
-      &executor,
-    ).to_boxed()
+    executor.spawn(roots_res.then(move |res| {
+      if let Ok(res) = res {
+        sender.send(res).map_err(|_| ())
+      } else {
+        Scheduler::execute_helper(context, sender, roots, count - 1);
+        Ok(())
+      }
+    }));
   }
 
   ///
@@ -250,15 +260,19 @@ impl Scheduler {
     let context = RootContext {
       core: self.core.clone(),
     };
-    let results = Scheduler::execute_helper(context, request.roots.clone(), 8)
-      .wait()
-      .expect("Execution failed.");
+    let (sender, receiver) = mpsc::channel();
+    Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
+    let results = loop {
+      if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
+        break res;
+      }
+    };
 
     request
       .roots
       .iter()
       .zip(results.into_iter())
-      .map(|(s, r)| (&s.subject, &s.selector.product, r))
+      .map(|(s, r)| (s.params.expect_single(), &s.selector.product, r))
       .collect()
   }
 
@@ -278,7 +292,7 @@ impl Scheduler {
       self.core.fs_pool.clone(),
       &[]
     )));
-    let store = self.core.store.clone();
+    let store = self.core.store();
 
     posix_fs
       .expand(path_globs)
@@ -286,11 +300,10 @@ impl Scheduler {
       .and_then(|path_stats| {
         fs::Snapshot::from_path_stats(
           store.clone(),
-          fs::OneOffStoreFileByDigest::new(store, posix_fs),
+          &fs::OneOffStoreFileByDigest::new(store, posix_fs),
           path_stats,
         )
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 }
 

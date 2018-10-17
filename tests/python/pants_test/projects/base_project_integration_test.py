@@ -12,8 +12,9 @@ class ProjectIntegrationTest(PantsRunIntegrationTest):
   :API: public
   """
 
-  def pants_test(self, command):
+  def pants_test(self, command, extra_env=None):
     """
     :API: public
     """
-    return self.run_pants(['test'] + command)
+    return self.run_pants(['test'] + command,
+                          extra_env=extra_env)

@@ -11,6 +11,7 @@ use itertools::Itertools;
 use protobuf;
 use std::ffi::OsString;
 use std::fmt;
+use std::iter::Iterator;
 use std::path::PathBuf;
 use std::sync::Arc;
 use {File, PathStat, PosixFS, Store};
@@ -40,12 +41,23 @@ impl Snapshot {
     Error: fmt::Debug + 'static + Send,
   >(
     store: Store,
-    file_digester: S,
+    file_digester: &S,
     path_stats: Vec<PathStat>,
   ) -> BoxFuture<Snapshot, String> {
     let mut sorted_path_stats = path_stats.clone();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, &file_digester, &sorted_path_stats)
+
+    // The helper assumes that if a Path has multiple children, it must be a directory.
+    // Proactively error if we run into identically named files, because otherwise we will treat
+    // them like empty directories.
+    sorted_path_stats.dedup_by(|a, b| a.path() == b.path());
+    if sorted_path_stats.len() != path_stats.len() {
+      return future::err(format!(
+        "Snapshots must be constructed from unique path stats; got duplicates in {:?}",
+        path_stats
+      )).to_boxed();
+    }
+    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
       .map(|digest| Snapshot { digest, path_stats })
       .to_boxed()
   }
@@ -55,12 +67,12 @@ impl Snapshot {
     Error: fmt::Debug + 'static + Send,
   >(
     store: Store,
-    file_digester: S,
+    file_digester: &S,
     path_stats: &[PathStat],
   ) -> BoxFuture<Digest, String> {
     let mut sorted_path_stats = path_stats.to_owned();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-    Snapshot::ingest_directory_from_sorted_path_stats(store, &file_digester, &sorted_path_stats)
+    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
   }
 
   fn ingest_directory_from_sorted_path_stats<
@@ -103,8 +115,7 @@ impl Snapshot {
                   file_node.set_digest((&digest).into());
                   file_node.set_is_executable(is_executable);
                   Ok(file_node)
-                })
-                .to_boxed(),
+                }).to_boxed(),
             );
           }
           PathStat::Dir { .. } => {
@@ -117,8 +128,7 @@ impl Snapshot {
                   directory_node.set_name(osstring_as_utf8(first_component).unwrap());
                   directory_node.set_digest((&digest).into());
                   directory_node
-                })
-                .to_boxed(),
+                }).to_boxed(),
             );
           }
         }
@@ -134,8 +144,7 @@ impl Snapshot {
             dir_node.set_name(osstring_as_utf8(first_component)?);
             dir_node.set_digest((&digest).into());
             Ok(dir_node)
-          })
-            .to_boxed(),
+          }).to_boxed(),
         );
       }
     }
@@ -146,8 +155,7 @@ impl Snapshot {
         directory.set_directories(protobuf::RepeatedField::from_vec(dirs));
         directory.set_files(protobuf::RepeatedField::from_vec(files));
         store.record_directory(&directory, true)
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 
   ///
@@ -163,7 +171,7 @@ impl Snapshot {
     // `Directory` structure. Only `Dir+Dir` collisions are legal.
     let path_stats = {
       let mut uniq_paths: IndexMap<PathBuf, PathStat> = IndexMap::new();
-      for path_stat in Itertools::flatten(snapshots.iter().map(|s| s.path_stats.iter().cloned())) {
+      for path_stat in Iterator::flatten(snapshots.iter().map(|s| s.path_stats.iter().cloned())) {
         match uniq_paths.entry(path_stat.path().to_owned()) {
           indexmap::map::Entry::Occupied(e) => match (&path_stat, e.get()) {
             (&PathStat::Dir { .. }, &PathStat::Dir { .. }) => (),
@@ -186,13 +194,15 @@ impl Snapshot {
       .map(move |root_digest| Snapshot {
         digest: root_digest,
         path_stats: path_stats,
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 
   ///
   /// Given Digest(s) representing Directory instances, merge them recursively into a single
-  /// output Directory Digest. Fails for collisions.
+  /// output Directory Digest.
+  ///
+  /// If a file is present with the same name and contents multiple times, it will appear once.
+  /// If a file is present with the same name, but different contents, an error will be returned.
   ///
   pub fn merge_directories(store: Store, dir_digests: Vec<Digest>) -> BoxFuture<Digest, String> {
     if dir_digests.is_empty() {
@@ -211,23 +221,23 @@ impl Snapshot {
             maybe_directory
               .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest))
           })
-      })
-      .collect::<Vec<_>>();
+      }).collect::<Vec<_>>();
     join_all(directories)
       .and_then(move |mut directories| {
         let mut out_dir = bazel_protos::remote_execution::Directory::new();
 
         // Merge FileNodes.
+        let file_nodes = Iterator::flatten(
+          directories
+            .iter_mut()
+            .map(|directory| directory.take_files().into_iter()),
+        ).sorted_by(|a, b| a.name.cmp(&b.name));
+
         out_dir.set_files(protobuf::RepeatedField::from_vec(
-          Itertools::flatten(
-            directories
-              .iter_mut()
-              .map(|directory| directory.take_files().into_iter()),
-          ).collect(),
+          file_nodes.into_iter().dedup().collect(),
         ));
-        out_dir.mut_files().sort_by(|a, b| a.name.cmp(&b.name));
         let unique_count = out_dir
-          .mut_files()
+          .get_files()
           .iter()
           .map(|v| v.get_name())
           .dedup()
@@ -237,7 +247,7 @@ impl Snapshot {
             .get_files()
             .iter()
             .group_by(|f| f.get_name().to_owned());
-          for (file_name, group) in groups.into_iter() {
+          for (file_name, group) in &groups {
             if group.count() > 1 {
               return future::err(format!(
                 "Can only merge Directories with no duplicates, but found duplicate files: {}",
@@ -249,7 +259,7 @@ impl Snapshot {
 
         // Group and recurse for DirectoryNodes.
         let sorted_child_directories = {
-          let mut merged_directories = Itertools::flatten(
+          let mut merged_directories = Iterator::flatten(
             directories
               .iter_mut()
               .map(|directory| directory.take_directories().into_iter()),
@@ -276,15 +286,12 @@ impl Snapshot {
                   child_dir.set_digest((&merged_digest).into());
                   child_dir
                 })
-            })
-            .collect::<Vec<_>>(),
+            }).collect::<Vec<_>>(),
         ).and_then(move |child_directories| {
           out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
           store.record_directory(&out_dir, true)
-        })
-          .to_boxed()
-      })
-      .to_boxed()
+        }).to_boxed()
+      }).to_boxed()
   }
 }
 
@@ -316,8 +323,7 @@ fn paths_of_child_dir(paths: Vec<PathStat>) -> Vec<PathStat> {
           stat: stat,
         },
       })
-    })
-    .collect()
+    }).collect()
 }
 
 fn osstring_as_utf8(path: OsString) -> Result<String, String> {
@@ -370,8 +376,8 @@ mod tests {
   use testutil::make_file;
 
   use super::super::{
-    Dir, File, GlobMatching, Path, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot, Store,
-    StrictGlobMatching,
+    Dir, File, GlobExpansionConjunction, GlobMatching, Path, PathGlobs, PathStat, PosixFS,
+    ResettablePool, Snapshot, Store, StrictGlobMatching,
   };
   use super::OneOffStoreFileByDigest;
 
@@ -411,7 +417,7 @@ mod tests {
 
     let path_stats = expand_all_sorted(posix_fs);
     assert_eq!(
-      Snapshot::from_path_stats(store, digester, path_stats.clone())
+      Snapshot::from_path_stats(store, &digester, path_stats.clone())
         .wait()
         .unwrap(),
       Snapshot {
@@ -437,7 +443,7 @@ mod tests {
 
     let path_stats = expand_all_sorted(posix_fs);
     assert_eq!(
-      Snapshot::from_path_stats(store, digester, path_stats.clone())
+      Snapshot::from_path_stats(store, &digester, path_stats.clone())
         .wait()
         .unwrap(),
       Snapshot {
@@ -469,7 +475,7 @@ mod tests {
     let mut unsorted_path_stats = sorted_path_stats.clone();
     unsorted_path_stats.reverse();
     assert_eq!(
-      Snapshot::from_path_stats(store, digester, unsorted_path_stats.clone())
+      Snapshot::from_path_stats(store, &digester, unsorted_path_stats.clone())
         .wait()
         .unwrap(),
       Snapshot {
@@ -531,12 +537,42 @@ mod tests {
       store,
       vec![containing_roland.digest(), containing_wrong_roland.digest()],
     ).wait()
-      .expect_err("Want error merging");
+    .expect_err("Want error merging");
 
     assert!(
       err.contains("roland"),
       "Want error message to contain roland but was: {}",
       err
+    );
+  }
+
+  #[test]
+  fn merge_directories_same_files() {
+    let (store, _, _, _) = setup();
+
+    let containing_roland = TestDirectory::containing_roland();
+    let containing_roland_and_treats = TestDirectory::containing_roland_and_treats();
+
+    store
+      .record_directory(&containing_roland.directory(), false)
+      .wait()
+      .expect("Storing roland directory");
+    store
+      .record_directory(&containing_roland_and_treats.directory(), false)
+      .wait()
+      .expect("Storing treats directory");
+
+    let result = Snapshot::merge_directories(
+      store,
+      vec![
+        containing_roland.digest(),
+        containing_roland_and_treats.digest(),
+      ],
+    ).wait();
+
+    assert_eq!(
+      result,
+      Ok(TestDirectory::containing_roland_and_treats().digest())
     );
   }
 
@@ -562,14 +598,12 @@ mod tests {
     );
 
     let merged = {
-      let snapshot1 = Snapshot::from_path_stats(
-        store.clone(),
-        digester.clone(),
-        vec![dir.clone(), file1.clone()],
-      ).wait()
-        .unwrap();
+      let snapshot1 =
+        Snapshot::from_path_stats(store.clone(), &digester, vec![dir.clone(), file1.clone()])
+          .wait()
+          .unwrap();
       let snapshot2 =
-        Snapshot::from_path_stats(store.clone(), digester, vec![dir.clone(), file2.clone()])
+        Snapshot::from_path_stats(store.clone(), &digester, vec![dir.clone(), file2.clone()])
           .wait()
           .unwrap();
       Snapshot::merge(store.clone(), &[snapshot1, snapshot2])
@@ -614,11 +648,10 @@ mod tests {
     );
 
     let merged_res = {
-      let snapshot1 =
-        Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file.clone()])
-          .wait()
-          .unwrap();
-      let snapshot2 = Snapshot::from_path_stats(store.clone(), digester.clone(), vec![file])
+      let snapshot1 = Snapshot::from_path_stats(store.clone(), &digester, vec![file.clone()])
+        .wait()
+        .unwrap();
+      let snapshot2 = Snapshot::from_path_stats(store.clone(), &digester, vec![file])
         .wait()
         .unwrap();
       Snapshot::merge(store.clone(), &[snapshot1, snapshot2]).wait()
@@ -657,9 +690,13 @@ mod tests {
     let mut v = posix_fs
       .expand(
         // Don't error or warn if there are no paths matched -- that is a valid state.
-        PathGlobs::create(&["**".to_owned()], &[], StrictGlobMatching::Ignore).unwrap(),
-      )
-      .wait()
+        PathGlobs::create(
+          &["**".to_owned()],
+          &[],
+          StrictGlobMatching::Ignore,
+          GlobExpansionConjunction::AllMatch,
+        ).unwrap(),
+      ).wait()
       .unwrap();
     v.sort_by(|a, b| a.path().cmp(b.path()));
     v

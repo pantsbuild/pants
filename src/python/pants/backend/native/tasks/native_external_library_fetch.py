@@ -8,14 +8,17 @@ import os
 import re
 from distutils.dir_util import copy_tree
 
+from pex.interpreter import PythonInterpreter
+
 from pants.backend.native.config.environment import Platform
 from pants.backend.native.subsystems.conan import Conan
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
+from pants.base.build_environment import get_pants_cachedir
 from pants.base.exceptions import TaskError
+from pants.goal.products import UnionProducts
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.contextutil import environment_as
-from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.objects import Exactly, datatype
 from pants.util.process_handler import subprocess
@@ -30,8 +33,7 @@ class ConanRequirement(datatype(['pkg_spec'])):
   }
 
   def parse_conan_stdout_for_pkg_sha(self, stdout):
-    # FIXME: properly regex this method.
-    # https://github.com/pantsbuild/pants/issues/6168
+    # TODO(#6168): properly regex this method.
     pkg_line = stdout.split('Packages')[1]
     collected_matches = [line for line in pkg_line.split() if self.pkg_spec in line]
     pkg_sha = collected_matches[0].split(':')[1]
@@ -73,6 +75,9 @@ class NativeExternalLibraryFetch(Task):
   options_scope = 'native-external-library-fetch'
   native_library_constraint = Exactly(ExternalNativeLibrary)
 
+  conan_pex_subdir = 'conan-support'
+  conan_pex_filename = 'conan.pex'
+
   class NativeExternalLibraryFetchError(TaskError):
     pass
 
@@ -90,6 +95,10 @@ class NativeExternalLibraryFetch(Task):
              fingerprint=True, help='The conan remote to download conan packages from.')
 
   @classmethod
+  def implementation_version(cls):
+    return super(NativeExternalLibraryFetch, cls).implementation_version() + [('NativeExternalLibraryFetch', 0)]
+
+  @classmethod
   def subsystem_dependencies(cls):
     return super(NativeExternalLibraryFetch, cls).subsystem_dependencies() + (Conan.scoped(cls),)
 
@@ -98,12 +107,27 @@ class NativeExternalLibraryFetch(Task):
     return [NativeExternalLibraryFiles]
 
   @property
-  def cache_target_dirs(self):
+  def create_target_dirs(self):
+    # We create per-target directories in order to act as isolated collections of fetched files.
+    # But do not attempt to automatically cache then (cache_target_dirs), because the entire resolve
+    # must be have its own merged cachekey/VT.
     return True
 
   @memoized_property
+  def _conan_python_interpreter(self):
+    return PythonInterpreter.get()
+
+  @memoized_property
+  def _conan_pex_path(self):
+    return os.path.join(get_pants_cachedir(),
+                        self.conan_pex_subdir,
+                        self.conan_pex_filename)
+
+  @memoized_property
   def _conan_binary(self):
-    return Conan.scoped_instance(self).bootstrap_conan()
+    return Conan.scoped_instance(self).bootstrap(
+      self._conan_python_interpreter,
+      self._conan_pex_path)
 
   def execute(self):
     native_lib_tgts = self.context.targets(self.native_library_constraint.satisfied_by)
@@ -111,40 +135,35 @@ class NativeExternalLibraryFetch(Task):
       with self.invalidated(native_lib_tgts,
                             invalidate_dependents=True) as invalidation_check:
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
-        vts_results_dir = self._prepare_vts_results_dir(resolve_vts)
         if invalidation_check.invalid_vts or not resolve_vts.valid:
           for vt in invalidation_check.all_vts:
-            self._fetch_packages(vt, vts_results_dir)
+            self._fetch_packages(vt)
 
-        native_external_libs_product = self._collect_external_libs(vts_results_dir)
+        native_external_libs_product = self._collect_external_libs(invalidation_check.all_vts)
         self.context.products.register_data(NativeExternalLibraryFiles,
                                             native_external_libs_product)
 
-  def _prepare_vts_results_dir(self, vts):
-    """
-    Given a `VersionedTargetSet`, prepare its results dir.
-    """
-    vt_set_results_dir = os.path.join(self.workdir, vts.cache_key.hash)
-    safe_mkdir(vt_set_results_dir)
-    return vt_set_results_dir
-
-  def _collect_external_libs(self, results_dir):
+  def _collect_external_libs(self, vts):
     """
     Sets the relevant properties of the task product (`NativeExternalLibraryFiles`) object.
     """
-    lib_dir = os.path.join(results_dir, 'lib')
-    include_dir = os.path.join(results_dir, 'include')
+    product = UnionProducts()
+    for vt in vts:
+      lib_dir = os.path.join(vt.results_dir, 'lib')
+      include_dir = os.path.join(vt.results_dir, 'include')
 
-    lib_names = []
-    if os.path.isdir(lib_dir):
-      for filename in os.listdir(lib_dir):
-        lib_name = self._parse_lib_name_from_library_filename(filename)
-        if lib_name:
-          lib_names.append(lib_name)
+      lib_names = []
+      if os.path.isdir(lib_dir):
+        for filename in os.listdir(lib_dir):
+          lib_name = self._parse_lib_name_from_library_filename(filename)
+          if lib_name:
+            lib_names.append(lib_name)
 
-    return NativeExternalLibraryFiles(include_dir=include_dir,
-                                      lib_dir=lib_dir,
-                                      lib_names=tuple(lib_names))
+      nelf = NativeExternalLibraryFiles(include_dir=include_dir,
+                                        lib_dir=lib_dir,
+                                        lib_names=tuple(lib_names))
+      product.add_for_target(vt.target, [nelf])
+    return product
 
   def _get_conan_data_dir_path_for_package(self, pkg_dir_path, pkg_sha):
     return os.path.join(self.workdir,
@@ -155,16 +174,16 @@ class NativeExternalLibraryFetch(Task):
                         pkg_sha)
 
   def _remove_conan_center_remote_cmdline(self, conan_binary):
-    return conan_binary.pex.cmdline(['remote',
-                                     'remove',
-                                     'conan-center'])
+    return conan_binary.cmdline(['remote',
+                                 'remove',
+                                 'conan-center'])
 
   def _add_pants_conan_remote_cmdline(self, conan_binary, remote_index_num, remote_url):
-    return conan_binary.pex.cmdline(['remote',
-                                      'add',
-                                      'pants-conan-remote-' + str(remote_index_num),
-                                      remote_url,
-                                      '--insert'])
+    return conan_binary.cmdline(['remote',
+                                 'add',
+                                 'pants-conan-remote-' + str(remote_index_num),
+                                 remote_url,
+                                 '--insert'])
 
   def ensure_conan_remote_configuration(self, conan_binary):
     """
@@ -220,14 +239,13 @@ class NativeExternalLibraryFetch(Task):
     if os.path.exists(src_include):
       copy_tree(src_include, dest_include)
 
-  def _fetch_packages(self, vt, vts_results_dir):
+  def _fetch_packages(self, vt):
     """
     Invoke the conan pex to fetch conan packages specified by a
     `ExternalLibLibrary` target.
 
-    :param vt: a versioned target containing conan package specifications.
-    :param vts_results_dir: the results directory of the VersionedTargetSet
-      for the purpose of aggregating package contents.
+    :param vt: a versioned target containing conan package specifications, and with a results_dir
+      that we can clone outputs into.
     """
 
     # NB: CONAN_USER_HOME specifies the directory to use for the .conan data directory.
@@ -243,7 +261,7 @@ class NativeExternalLibraryFetch(Task):
         # Prepare conan command line and ensure remote is configured properly.
         self.ensure_conan_remote_configuration(self._conan_binary)
         args = conan_requirement.fetch_cmdline_args
-        cmdline = self._conan_binary.pex.cmdline(args)
+        cmdline = self._conan_binary.cmdline(args)
 
         self.context.log.debug('Running conan.pex cmdline: {}'.format(cmdline))
         self.context.log.debug('Conan remotes: {}'.format(self.get_options().conan_remotes))
@@ -257,4 +275,4 @@ class NativeExternalLibraryFetch(Task):
           )
 
         pkg_sha = conan_requirement.parse_conan_stdout_for_pkg_sha(stdout)
-        self._copy_package_contents_from_conan_dir(vts_results_dir, conan_requirement, pkg_sha)
+        self._copy_package_contents_from_conan_dir(vt.results_dir, conan_requirement, pkg_sha)

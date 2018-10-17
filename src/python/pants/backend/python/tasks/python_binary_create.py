@@ -57,8 +57,9 @@ class PythonBinaryCreate(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    # See comment below for why we don't use the GatherSources.PYTHON_SOURCES product.
     round_manager.require_data(PythonInterpreter)
-    round_manager.require_data('python')  # For codegen.
+    round_manager.optional_data('python')  # For codegen.
     round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
 
   @staticmethod

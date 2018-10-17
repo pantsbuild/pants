@@ -48,6 +48,15 @@ class BuildDictionaryInfoExtracter(object):
   ]
 
   @classmethod
+  def _is_custom_init(cls, init_func):
+    """Check if init derives from object or from a custom implementation.
+
+    In Py2, we could check if __init__ was overridden with inspect.ismethod(obj_type). This no longer works in Py3, so
+    we have to use an alternative check.
+    """
+    return 'slot wrapper' not in str(init_func)
+
+  @classmethod
   def get_description_from_docstring(cls, obj):
     """Returns a pair (description, details) from the obj's docstring.
 
@@ -126,13 +135,13 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   def _get_args_for_target_type(cls, target_type):
-    args = {} # name: info.
+    args = {}  # name: info.
 
     # Target.__init__ has several args that are passed to it by TargetAddressable and not by
     # the BUILD file author, so we can't naively inspect it.  Instead we special-case its
     # true BUILD-file-facing arguments here.
     for arg in cls.basic_target_args:
-      args[arg.name] = arg # Don't yield yet; subclass might supply a better description.
+      args[arg.name] = arg  # Don't yield yet; subclass might supply a better description.
 
     # Non-BUILD-file-facing Target.__init__ args that some Target subclasses capture in their
     # own __init__ for various reasons.
@@ -143,7 +152,7 @@ class BuildDictionaryInfoExtracter(object):
     # so clobber its entry in the args dict.
     methods_seen = set()  # Ensure we only look at each __init__ method once.
     for _type in reversed([t for t in target_type.mro() if issubclass(t, Target)]):
-      if (inspect.ismethod(_type.__init__) and
+      if (cls._is_custom_init(_type.__init__) and
           _type.__init__ not in methods_seen and
           _type.__init__ != Target.__init__):
         for arg in cls._get_function_args(_type.__init__):
@@ -151,7 +160,7 @@ class BuildDictionaryInfoExtracter(object):
         methods_seen.add(_type.__init__)
 
     for arg_name in sorted(args.keys()):
-      if not arg_name in ignore_args:
+      if arg_name not in ignore_args:
         yield args[arg_name]
 
   @classmethod
@@ -167,10 +176,7 @@ class BuildDictionaryInfoExtracter(object):
     arg_descriptions = cls.get_arg_descriptions_from_docstring(func)
     argspec = inspect.getargspec(func)
     arg_names = argspec.args
-    # Python2 treats __init__ as a method. Python3 doesn't.
-    # Neither treat __new__ as a method.
-    # Always treat __init__ and __new__ as methods, to drop self from their args.
-    if inspect.ismethod(func) or func.__name__ == '__new__' or func.__name__ == '__init__':
+    if arg_names and arg_names[0] in {'self', 'cls'}:
       arg_names = arg_names[1:]
     num_defaulted_args = len(argspec.defaults) if argspec.defaults is not None else 0
     first_defaulted_arg = len(arg_names) - num_defaulted_args
@@ -208,7 +214,7 @@ class BuildDictionaryInfoExtracter(object):
       raise TaskError('No such object type: {}'.format(alias))
     if inspect.isfunction(obj_type) or inspect.ismethod(obj_type):
       return self.get_function_args(obj_type)
-    elif inspect.isclass(obj_type) and inspect.ismethod(obj_type.__init__):
+    elif inspect.isclass(obj_type) and self._is_custom_init(obj_type.__init__):
       return self.get_function_args(obj_type.__init__)
     elif inspect.isclass(obj_type):
       return self.get_function_args(obj_type.__new__)

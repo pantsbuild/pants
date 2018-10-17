@@ -10,6 +10,7 @@ import re
 import socket
 import time
 from builtins import object, open, str
+from collections import OrderedDict
 
 from pants import version
 from pants.base.build_environment import get_buildroot, get_scm
@@ -25,7 +26,7 @@ class RunInfo(object):
   def __init__(self, info_file):
     self._info_file = info_file
     safe_mkdir_for(self._info_file)
-    self._info = {}
+    self._info = OrderedDict()
     if os.path.exists(self._info_file):
       with open(self._info_file, 'r') as infile:
         info = infile.read()
@@ -53,9 +54,8 @@ class RunInfo(object):
 
   def add_infos(self, *keyvals, **kwargs):
     """Adds the given info and returns a dict composed of just this added info."""
-    infos = dict(keyvals)
     kv_pairs = []
-    for key, val in infos.items():
+    for key, val in keyvals:
       key = key.strip()
       val = str(val).strip()
       if ':' in key:

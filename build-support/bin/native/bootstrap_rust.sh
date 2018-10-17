@@ -7,12 +7,6 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # + fingerprint_data: Fingerprints the data on stdin.
 source "${REPO_ROOT}/build-support/common.sh"
 
-RUST_TOOLCHAIN="$(cat ${REPO_ROOT}/rust-toolchain)"
-readonly RUST_COMPONENTS=(
-  "rustfmt-preview"
-  "rust-src"
-)
-
 readonly rust_toolchain_root="${CACHE_ROOT}/rust"
 export CARGO_HOME="${rust_toolchain_root}/cargo"
 export RUSTUP_HOME="${rust_toolchain_root}/rustup"
@@ -24,6 +18,13 @@ function cargo_bin() {
 }
 
 function bootstrap_rust() {
+  RUST_TOOLCHAIN="$(cat ${REPO_ROOT}/rust-toolchain)"
+  RUST_COMPONENTS=(
+    "rustfmt-preview"
+    "rust-src"
+    "clippy-preview"
+  )
+
   # Control a pants-specific rust toolchain.
   if [[ ! -x "${RUSTUP}" ]]
   then
@@ -39,7 +40,7 @@ function bootstrap_rust() {
   local -r cargo="${CARGO_HOME}/bin/cargo"
   local -r cargo_components_fp=$(echo "${RUST_COMPONENTS[@]}" | fingerprint_data)
   local -r cargo_versioned="cargo-${RUST_TOOLCHAIN}-${cargo_components_fp}"
-  if [[ ! -x "${rust_toolchain_root}/${cargo_versioned}" ]]
+  if [[ ! -x "${rust_toolchain_root}/${cargo_versioned}" || "${RUST_TOOLCHAIN}" == "nightly" ]]
   then
     # If rustup was already bootstrapped against a different toolchain in the past, freshen it and
     # ensure the toolchain and components we need are installed.
@@ -47,7 +48,7 @@ function bootstrap_rust() {
     "${RUSTUP}" toolchain install ${RUST_TOOLCHAIN}
     "${RUSTUP}" component add --toolchain ${RUST_TOOLCHAIN} ${RUST_COMPONENTS[@]} >&2
 
-    ln -fs "$(cargo_bin)" "${rust_toolchain_root}/${cargo_versioned}"
+    ln -fs "$(RUSTUP_TOOLCHAIN="${RUST_TOOLCHAIN}" cargo_bin)" "${rust_toolchain_root}/${cargo_versioned}"
   fi
 
   local -r symlink_farm_root="${REPO_ROOT}/build-support/bin/native"

@@ -115,3 +115,7 @@ class JarLibrary(Target):
       jar_deps.update(target.jar_dependencies)
 
     return list(jar_deps)
+
+  @property
+  def strict_deps(self):
+    return False

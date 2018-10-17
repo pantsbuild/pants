@@ -46,7 +46,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
               'org.pantsbuild.example.wire.temperatureservice.WireTemperatureExample']
       java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
       java_retcode = java_run.wait()
-      java_out = java_run.stdout.read()
+      java_out = java_run.stdout.read().decode('utf-8')
       self.assertEqual(java_retcode, 0)
       self.assertIn('19 degrees celsius', java_out)
 
@@ -63,7 +63,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                                   stdout=subprocess.PIPE,
                                   cwd=out_path)
       java_retcode = java_run.wait()
-      java_out = java_run.stdout.read()
+      java_out = java_run.stdout.read().decode('utf-8')
       self.assertEqual(java_retcode, 0)
       self.assertIn('Element{symbol=Hg, name=Mercury, atomic_number=80, '
                     'melting_point=Temperature{unit=celsius, number=-39}, '

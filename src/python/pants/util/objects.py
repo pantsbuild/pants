@@ -10,8 +10,9 @@ from builtins import object, zip
 from collections import OrderedDict, namedtuple
 
 from future.utils import PY2
+from twitter.common.collections import OrderedSet
 
-from pants.util.memo import memoized
+from pants.util.memo import memoized, memoized_classproperty
 from pants.util.meta import AbstractClass
 
 
@@ -71,8 +72,8 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       except TypeError as e:
         raise cls.make_type_error(e)
 
-      # TODO(cosmicexplorer): Make this kind of exception pattern (filter for
-      # errors then display them all at once) more ergonomic.
+      # TODO: Make this kind of exception pattern (filter for errors then display them all at once)
+      # more ergonomic.
       type_failure_msgs = []
       for field_name, field_constraint in fields_with_constraints.items():
         field_value = getattr(this_object, field_name)
@@ -166,6 +167,75 @@ def datatype(field_decls, superclass_name=None, **kwargs):
     return type(superclass_name, (DataType,), {})
   except TypeError:  # Python2
     return type(superclass_name.encode('utf-8'), (DataType,), {})
+
+
+def enum(field_name, all_values):
+  """A datatype which can take on a finite set of values. This method is experimental and unstable.
+
+  Any enum subclass can be constructed with its create() classmethod. This method will use the first
+  element of `all_values` as the enum value if none is specified.
+
+  :param field_name: A string used as the field for the datatype. Note that enum does not yet
+                     support type checking as with datatype.
+  :param all_values: An iterable of objects representing all possible values for the enum.
+                     NB: `all_values` must be a finite, non-empty iterable with unique values!
+  """
+
+  # This call to list() will eagerly evaluate any `all_values` which would otherwise be lazy, such
+  # as a generator.
+  all_values_realized = list(all_values)
+  # `OrderedSet` maintains the order of the input iterable, but is faster to check membership.
+  allowed_values_set = OrderedSet(all_values_realized)
+
+  if len(allowed_values_set) < len(all_values_realized):
+    raise ValueError("When converting all_values ({}) to a set, at least one duplicate "
+                     "was detected. The unique elements of all_values were: {}."
+                     .format(all_values_realized, allowed_values_set))
+
+  class ChoiceDatatype(datatype([field_name])):
+    allowed_values = allowed_values_set
+    default_value = next(iter(allowed_values))
+
+    @memoized_classproperty
+    def _singletons(cls):
+      """Generate memoized instances of this enum wrapping each of this enum's allowed values."""
+      return { value: cls(value) for value in cls.allowed_values }
+
+    @classmethod
+    def _check_value(cls, value):
+      if value not in cls.allowed_values:
+        raise cls.make_type_error(
+          "Value {!r} for '{}' must be one of: {!r}."
+          .format(value, field_name, cls.allowed_values))
+
+    @classmethod
+    def create(cls, value=None):
+      # If we get an instance of this enum class, just return it. This means you can call .create()
+      # on None, an allowed value for the enum, or an existing instance of the enum.
+      if isinstance(value, cls):
+        return value
+
+      # Providing an explicit value that is not None will *not* use the default value!
+      if value is None:
+        value = cls.default_value
+
+      # We actually circumvent the constructor in this method due to the cls._singletons
+      # memoized_classproperty, but we want to raise the same error, so we move checking into a
+      # common method.
+      cls._check_value(value)
+
+      return cls._singletons[value]
+
+    def __new__(cls, *args, **kwargs):
+      this_object = super(ChoiceDatatype, cls).__new__(cls, *args, **kwargs)
+
+      field_value = getattr(this_object, field_name)
+
+      cls._check_value(field_value)
+
+      return this_object
+
+  return ChoiceDatatype
 
 
 class TypedDatatypeClassConstructionError(Exception):

@@ -406,6 +406,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/jvm:jar_task_test_base',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )

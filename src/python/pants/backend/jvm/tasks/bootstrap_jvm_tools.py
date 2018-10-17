@@ -46,15 +46,15 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
     if base_fingerprint is None:
       return None
 
-    hasher.update('version=2')
+    hasher.update(b'version=2')
     hasher.update(base_fingerprint.encode('utf-8'))
 
     # NB: this series of updates must always cover the same fields that populate `_tuple`'s slots
     # to ensure proper invalidation.
-    hasher.update(self._main)
+    hasher.update(self._main.encode('utf-8'))
     if self._custom_rules:
       for rule in self._custom_rules:
-        hasher.update(rule.render())
+        hasher.update(rule.render().encode('utf-8'))
 
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 

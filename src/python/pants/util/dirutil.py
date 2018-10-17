@@ -100,16 +100,47 @@ def safe_mkdir_for_all(paths):
       created_dirs.add(dir_to_make)
 
 
-def safe_file_dump(filename, payload, binary_mode=True):
+def safe_file_dump(filename, payload, binary_mode=None, mode=None):
   """Write a string to a file.
+
+  This method is "safe" to the extent that `safe_open` is "safe". See the explanation on the method
+  doc there.
+
+  TODO: The `binary_mode` flag should be deprecated and removed from existing callsites. Once
+  `binary_mode` is removed, mode can directly default to `wb`.
+    see https://github.com/pantsbuild/pants/issues/6543
 
   :param string filename: The filename of the file to write to.
   :param string payload: The string to write to the file.
-  :param bool binary_mode: Write to file as bytes or unicode.
+  :param bool binary_mode: Write to file as bytes or unicode. Mutually exclusive with mode.
+  :param string mode: A mode argument for the python `open` builtin. Mutually exclusive with
+    binary_mode.
   """
-  mode = 'wb' if binary_mode else 'w'
-  with safe_open(filename, mode) as f:
+  if binary_mode is not None and mode is not None:
+    raise AssertionError('Only one of `binary_mode` and `mode` may be specified.')
+
+  if mode is None:
+    if binary_mode is False:
+      mode = 'w'
+    else:
+      mode = 'wb'
+
+  with safe_open(filename, mode=mode) as f:
     f.write(payload)
+
+
+def maybe_read_file(filename, binary_mode=True):
+  """Read and return the contents of a file in a single file.read().
+
+  :param string filename: The filename of the file to read.
+  :param bool binary_mode: Read from file as bytes or unicode.
+  :returns: The contents of the file, or opening the file fails for any reason
+  :rtype: string
+  """
+  try:
+    return read_file(filename, binary_mode=binary_mode)
+  except IOError:
+    return None
 
 
 def read_file(filename, binary_mode=True):
@@ -412,6 +443,7 @@ def relative_symlink(source_path, link_path):
     if os.path.lexists(link_path):
       os.unlink(link_path)
     rel_path = os.path.relpath(source_path, os.path.dirname(link_path))
+    safe_mkdir_for(link_path)
     os.symlink(rel_path, link_path)
   except OSError as e:
     # Another run may beat us to deletion or creation.
@@ -535,5 +567,13 @@ def check_no_overlapping_paths(paths):
 
 
 def is_readable_dir(path):
-  """Returns whether a path names an existing directory that we can read."""
-  return os.path.isdir(path) and os.access(path, os.R_OK)
+  """Returns whether a path names an existing directory we can list and read files from."""
+  return os.path.isdir(path) and os.access(path, os.R_OK) and os.access(path, os.X_OK)
+
+
+def is_writable_dir(path):
+  """Returns whether a path names an existing directory that we can create and modify files in.
+
+  We call is_readable_dir(), so this definition of "writable" is a superset of that.
+  """
+  return is_readable_dir(path) and os.access(path, os.W_OK)

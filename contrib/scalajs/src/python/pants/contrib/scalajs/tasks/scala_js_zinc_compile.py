@@ -15,6 +15,7 @@ class ScalaJSZincCompile(BaseZincCompile):
 
   _name = 'scala-js'
   _file_suffix = '.scala'
+  compiler_name = 'zinc'
 
   scalac_plugins = ['scalajs']
 

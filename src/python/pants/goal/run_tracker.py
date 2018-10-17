@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
+import copy
 import json
 import multiprocessing
 import os
@@ -18,6 +19,7 @@ from contextlib import contextmanager
 import requests
 from future.utils import PY2, PY3
 
+from pants.auth.cookies import Cookies
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
@@ -61,12 +63,18 @@ class RunTracker(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (StatsDBFactory,)
+    return super(RunTracker, cls).subsystem_dependencies() + (StatsDBFactory, Cookies)
 
   @classmethod
   def register_options(cls, register):
     register('--stats-upload-url', advanced=True, default=None,
+             removal_version='1.13.0.dev2', removal_hint='Use --stats-upload-urls instead.',
              help='Upload stats to this URL on run completion.')
+    register('--stats-upload-urls', advanced=True, type=dict, default={},
+             help='Upload stats to these URLs on run completion.  Value is a map from URL to the '
+                  'name of the auth provider the user must auth against in order to upload stats '
+                  'to that URL, or None/empty string if no auth is required.  Currently the '
+                  'auth provider name is only used to provide a more helpful error message.')
     register('--stats-upload-timeout', advanced=True, type=int, default=2,
              help='Wait at most this many seconds for the stats upload to complete.')
     register('--num-foreground-workers', advanced=True, type=int,
@@ -163,6 +171,8 @@ class RunTracker(Subsystem):
       raise AssertionError('RunTracker.initialize must not be called multiple times.')
 
     # Initialize the run.
+
+    # Select a globally unique ID for the run, that sorts by time.
     millis = int((self._run_timestamp * 1000) % 1000)
     run_id = 'pants_run_{}_{}_{}'.format(
       time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp)),
@@ -301,29 +311,49 @@ class RunTracker(Subsystem):
     self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
   @classmethod
-  def post_stats(cls, url, stats, timeout=2):
+  def post_stats(cls, stats_url, stats, timeout=2, auth_provider=None):
     """POST stats to the given url.
 
     :return: True if upload was successful, False otherwise.
     """
     def error(msg):
       # Report aleady closed, so just print error.
-      print('WARNING: Failed to upload stats to {} due to {}'.format(url, msg),
+      print('WARNING: Failed to upload stats to {}. due to {}'.format(stats_url, msg),
             file=sys.stderr)
       return False
 
     # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
     # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
-    # But this will first require changing the upload receiver at every shop that uses this
-    # (probably only Foursquare at present).
+    # But this will first require changing the upload receiver at every shop that uses this.
     params = {k: json.dumps(v) for (k, v) in stats.items()}
+    cookies = Cookies.global_instance()
+    auth_provider = auth_provider or '<provider>'
+
+    # We can't simply let requests handle redirects, as we only allow them for specific codes:
+    # 307 and 308 indicate that the redirected request must use the same method, POST in this case.
+    # So they indicate a true redirect of the POST itself, and we allow them.
+    # The other redirect codes either must, or in practice do, cause the user agent to switch the
+    # method to GET. So when they are encountered on a POST, it indicates an auth problem (a
+    # redirection to a login page).
+    def do_post(url, num_redirects_allowed):
+      if num_redirects_allowed < 0:
+        return error('too many redirects.')
+      r = requests.post(url, data=params, timeout=timeout,
+                        cookies=cookies.get_cookie_jar(), allow_redirects=False)
+      if r.status_code in {307, 308}:
+        return do_post(r.headers['location'], num_redirects_allowed - 1)
+      elif r.status_code != 200:
+        error('HTTP error code: {}. Reason: {}.'.format(r.status_code, r.reason))
+        if 300 <= r.status_code < 400 or r.status_code == 401:
+          print('Use `path/to/pants login --to={}` to authenticate against the stats '
+                'upload service.'.format(auth_provider), file=sys.stderr)
+        return False
+      return True
+
     try:
-      r = requests.post(url, data=params, timeout=timeout)
-      if r.status_code != requests.codes.ok:
-        return error("HTTP error code: {}".format(r.status_code))
+      return do_post(stats_url, num_redirects_allowed=6)
     except Exception as e:  # Broad catch - we don't want to fail the build over upload errors.
-      return error("Error: {}".format(e))
-    return True
+      return error('Error: {}'.format(e))
 
   @classmethod
   def write_stats_to_json(cls, file_name, stats):
@@ -370,9 +400,13 @@ class RunTracker(Subsystem):
     StatsDBFactory.global_instance().get_db().insert_stats(stats)
 
     # Upload to remote stats db.
-    stats_url = self.get_options().stats_upload_url
-    if stats_url:
-      self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
+    stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)
+    deprecated_stats_url = self.get_options().stats_upload_url
+    if deprecated_stats_url:
+      stats_upload_urls[deprecated_stats_url] = None
+    timeout = self.get_options().stats_upload_timeout
+    for stats_url, auth_provider in stats_upload_urls.items():
+      self.post_stats(stats_url, stats, timeout=timeout, auth_provider=auth_provider)
 
     # Write stats to local json file.
     stats_json_file_name = self.get_options().stats_local_json_file

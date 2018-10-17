@@ -1,10 +1,9 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::sync::RwLock;
-
 use futures::future::IntoFuture;
 use futures_cpupool::{self, CpuFuture, CpuPool};
+use parking_lot::RwLock;
 
 ///
 /// A wrapper around a CpuPool, to add the ability to drop the pool before forking,
@@ -23,9 +22,15 @@ pub struct ResettablePool {
 impl ResettablePool {
   pub fn new(name_prefix: String) -> ResettablePool {
     ResettablePool {
-      name_prefix: name_prefix,
-      pool: RwLock::new(None),
+      name_prefix: name_prefix.clone(),
+      pool: RwLock::new(Some(Self::new_pool(name_prefix))),
     }
+  }
+
+  fn new_pool(name_prefix: String) -> CpuPool {
+    futures_cpupool::Builder::new()
+      .name_prefix(name_prefix)
+      .create()
   }
 
   ///
@@ -40,31 +45,24 @@ impl ResettablePool {
     R::Item: Send + 'static,
     R::Error: Send + 'static,
   {
-    {
-      // The happy path: pool is already initialized.
-      let pool_opt = self.pool.read().unwrap();
-      if let Some(ref pool) = *pool_opt {
-        return pool.spawn_fn(f);
-      }
-    }
-    {
-      // Initialize the pool, but then release the write lock.
-      let mut pool_opt = self.pool.write().unwrap();
-      pool_opt.get_or_insert_with(|| self.new_pool());
-    }
-
-    // Recurse to run the function under the read lock.
-    self.spawn_fn(f)
+    let pool_opt = self.pool.read();
+    let pool = pool_opt
+      .as_ref()
+      .unwrap_or_else(|| panic!("A CpuPool cannot be used inside the fork context."));
+    pool.spawn_fn(f)
   }
 
-  pub fn reset(&self) {
-    let mut pool = self.pool.write().unwrap();
+  ///
+  /// Run a function while the pool is shut down, and restore the pool after it completes.
+  ///
+  pub fn with_shutdown<F, T>(&self, f: F) -> T
+  where
+    F: FnOnce() -> T,
+  {
+    let mut pool = self.pool.write();
     *pool = None;
-  }
-
-  fn new_pool(&self) -> CpuPool {
-    futures_cpupool::Builder::new()
-      .name_prefix(self.name_prefix.clone())
-      .create()
+    let t = f();
+    *pool = Some(Self::new_pool(self.name_prefix.clone()));
+    t
   }
 }

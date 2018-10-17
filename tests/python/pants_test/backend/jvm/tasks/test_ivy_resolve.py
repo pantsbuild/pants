@@ -428,7 +428,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
   @contextmanager
   def _temp_workdir(self):
     old_workdir = self.options['']['pants_workdir']
-    with temporary_dir() as workdir:
+    with temporary_dir(root_dir=self.build_root) as workdir:
       self.set_options_for_scope('', pants_workdir=workdir)
       self._test_workdir = workdir
       yield workdir

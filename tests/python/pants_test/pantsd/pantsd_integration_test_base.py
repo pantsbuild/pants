@@ -36,8 +36,13 @@ def full_pantsd_log(workdir):
 
 
 class PantsDaemonMonitor(ProcessManager):
-  def __init__(self, metadata_base_dir=None):
+  def __init__(self, runner_process_context, metadata_base_dir=None):
+    """
+    :param runner_process_context: A TrackedProcessContext that can be used to inspect live
+      pantsd-runner instances created in this context.
+    """
     super(PantsDaemonMonitor, self).__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
+    self.runner_process_context = runner_process_context
 
   def _log(self):
     print(magenta(
@@ -47,17 +52,23 @@ class PantsDaemonMonitor(ProcessManager):
   def assert_started(self, timeout=.1):
     self._process = None
     self._pid = self.await_pid(timeout)
-    self.assert_running()
+    self._check_pantsd_is_alive()
+    return self._pid
+
+  def _check_pantsd_is_alive(self):
+    self._log()
+    assert self._pid is not None and self.is_alive(), 'cannot assert that pantsd is running. Try calling assert_started before calling this method.'
     return self._pid
 
   def assert_running(self):
-    self._log()
-    assert self._pid is not None and self.is_alive(), 'pantsd should be running!'
-    return self._pid
+    if not self._pid:
+      return self.assert_started()
+    else:
+      return self._check_pantsd_is_alive()
 
   def assert_stopped(self):
     self._log()
-    assert self._pid is not None, 'cant assert stoppage on an unknown pid!'
+    assert self._pid is not None, 'cannot assert pantsd stoppage. Try calling assert_started before calling this method.'
     assert self.is_dead(), 'pantsd should be stopped!'
     return self._pid
 
@@ -65,7 +76,7 @@ class PantsDaemonMonitor(ProcessManager):
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
   @contextmanager
   def pantsd_test_context(self, log_level='info', extra_config=None, expected_runs=1):
-    with no_lingering_process_by_command('pantsd-runner'):
+    with no_lingering_process_by_command('pantsd-runner') as runner_process_context:
       with self.temporary_workdir() as workdir_base:
         pid_dir = os.path.join(workdir_base, '.pids')
         workdir = os.path.join(workdir_base, '.workdir.pants.d')
@@ -83,8 +94,11 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         if extra_config:
           recursively_update(pantsd_config, extra_config)
         print('>>> config: \n{}\n'.format(pantsd_config))
-        checker = PantsDaemonMonitor(pid_dir)
-        self.assert_success_runner(workdir, pantsd_config, ['kill-pantsd'])
+        checker = PantsDaemonMonitor(runner_process_context, pid_dir)
+        # TODO(#6574): this should be 1, but when we kill pantsd with a signal it doesn't make sure
+        # to close the run tracker -- we can easily address this by moving that cleanup into the
+        # Exiter.
+        self.assert_runner(workdir, pantsd_config, ['kill-pantsd'], expected_runs=1)
         try:
           yield workdir, pantsd_config, checker
         finally:
@@ -92,23 +106,31 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
           for line in read_pantsd_log(workdir):
             print(line)
           banner('END pantsd.log')
-          self.assert_success_runner(
+          self.assert_runner(
             workdir,
             pantsd_config,
             ['kill-pantsd'],
-            expected_runs=expected_runs,
+            # TODO(#6574): this should be 1, see above.
+            expected_runs=1,
           )
           checker.assert_stopped()
 
   @contextmanager
-  def pantsd_successful_run_context(self, log_level='info', extra_config=None, extra_env=None):
+  def pantsd_successful_run_context(self, *args, **kwargs):
+    with self.pantsd_run_context(*args, success=True, **kwargs) as context:
+      yield context
+
+  @contextmanager
+  def pantsd_run_context(self, log_level='info', extra_config=None, extra_env=None, success=True,
+                         no_track_run_counts=False):
     with self.pantsd_test_context(log_level, extra_config) as (workdir, pantsd_config, checker):
       yield (
         functools.partial(
-          self.assert_success_runner,
+          self.assert_runner,
           workdir,
           pantsd_config,
           extra_env=extra_env,
+          success=success,
         ),
         checker,
         workdir,
@@ -122,7 +144,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     else:
       return 0
 
-  def assert_success_runner(self, workdir, config, cmd, extra_config={}, extra_env={}, expected_runs=1):
+  def assert_runner(self, workdir, config, cmd, extra_config={}, extra_env={}, expected_runs=1, success=True):
     combined_config = config.copy()
     recursively_update(combined_config, extra_config)
     print(bold(cyan('\nrunning: ./pants {} (config={}) (extra_env={})'
@@ -140,6 +162,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     elapsed = time.time() - start_time
     print(bold(cyan('\ncompleted in {} seconds'.format(elapsed))))
 
+    # TODO: uncomment this and add an issue link!
     runs_created = self._run_count(workdir) - run_count
     self.assertEqual(
         runs_created,
@@ -149,5 +172,8 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
           runs_created,
         )
     )
-    self.assert_success(run)
+    if success:
+      self.assert_success(run)
+    else:
+      self.assert_failure(run)
     return run

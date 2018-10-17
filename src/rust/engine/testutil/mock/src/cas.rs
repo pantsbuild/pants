@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use bazel_protos;
 use futures;
@@ -8,6 +8,7 @@ use grpcio;
 use bytes::Bytes;
 use futures::{Future, IntoFuture, Stream};
 use hashing::{Digest, Fingerprint};
+use parking_lot::Mutex;
 use testutil::data::{TestData, TestDirectory};
 
 ///
@@ -21,20 +22,98 @@ pub struct StubCAS {
   pub blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
 }
 
+pub struct StubCASBuilder {
+  always_errors: bool,
+  chunk_size_bytes: Option<usize>,
+  content: HashMap<Fingerprint, Bytes>,
+  port: Option<u16>,
+  instance_name: Option<String>,
+  required_auth_token: Option<String>,
+}
+
+impl StubCASBuilder {
+  pub fn new() -> Self {
+    StubCASBuilder {
+      always_errors: false,
+      chunk_size_bytes: None,
+      content: HashMap::new(),
+      port: None,
+      instance_name: None,
+      required_auth_token: None,
+    }
+  }
+}
+
+impl StubCASBuilder {
+  pub fn chunk_size_bytes(mut self, chunk_size_bytes: usize) -> Self {
+    if self.chunk_size_bytes.is_some() {
+      panic!("Can't set chunk_size_bytes twice");
+    }
+    self.chunk_size_bytes = Some(chunk_size_bytes);
+    self
+  }
+
+  pub fn port(mut self, port: u16) -> Self {
+    if self.port.is_some() {
+      panic!("Can't set port twice");
+    }
+    self.port = Some(port);
+    self
+  }
+
+  pub fn file(mut self, file: &TestData) -> Self {
+    self.content.insert(file.fingerprint(), file.bytes());
+    self
+  }
+
+  pub fn directory(mut self, directory: &TestDirectory) -> Self {
+    self
+      .content
+      .insert(directory.fingerprint(), directory.bytes());
+    self
+  }
+
+  pub fn unverified_content(mut self, fingerprint: Fingerprint, content: Bytes) -> Self {
+    self.content.insert(fingerprint, content);
+    self
+  }
+
+  pub fn always_errors(mut self) -> Self {
+    self.always_errors = true;
+    self
+  }
+
+  pub fn instance_name(mut self, instance_name: String) -> Self {
+    if self.instance_name.is_some() {
+      panic!("Can't set instance_name twice");
+    }
+    self.instance_name = Some(instance_name);
+    self
+  }
+
+  pub fn required_auth_token(mut self, required_auth_token: String) -> Self {
+    if self.required_auth_token.is_some() {
+      panic!("Can't set required_auth_token twice");
+    }
+    self.required_auth_token = Some(required_auth_token);
+    self
+  }
+
+  pub fn build(self) -> StubCAS {
+    StubCAS::new(
+      self.chunk_size_bytes.unwrap_or(1024),
+      self.content,
+      self.port.unwrap_or(0),
+      self.always_errors,
+      self.instance_name,
+      self.required_auth_token,
+    )
+  }
+}
+
 impl StubCAS {
-  pub fn with_content(
-    chunk_size_bytes: i64,
-    files: Vec<TestData>,
-    directories: Vec<TestDirectory>,
-  ) -> StubCAS {
-    let mut blobs = HashMap::new();
-    for file in files {
-      blobs.insert(file.fingerprint(), file.bytes());
-    }
-    for directory in directories {
-      blobs.insert(directory.fingerprint(), directory.bytes());
-    }
-    StubCAS::with_unverified_content(chunk_size_bytes, blobs)
+  pub fn builder() -> StubCASBuilder {
+    StubCASBuilder::new()
   }
 
   ///
@@ -45,9 +124,14 @@ impl StubCAS {
   ///                        If a negative value is given, all requests will receive an error.
   /// * `blobs`            - Known Fingerprints and their content responses. These are not checked
   ///                        for correctness.
-  pub fn with_unverified_content(
-    chunk_size_bytes: i64,
+  /// * `port`             - The port for the CAS to listen to.
+  fn new(
+    chunk_size_bytes: usize,
     blobs: HashMap<Fingerprint, Bytes>,
+    port: u16,
+    always_errors: bool,
+    instance_name: Option<String>,
+    required_auth_token: Option<String>,
   ) -> StubCAS {
     let env = Arc::new(grpcio::Environment::new(1));
     let read_request_count = Arc::new(Mutex::new(0));
@@ -55,18 +139,19 @@ impl StubCAS {
     let blobs = Arc::new(Mutex::new(blobs));
     let responder = StubCASResponder {
       chunk_size_bytes: chunk_size_bytes,
+      instance_name: instance_name,
       blobs: blobs.clone(),
+      always_errors: always_errors,
       read_request_count: read_request_count.clone(),
       write_message_sizes: write_message_sizes.clone(),
+      required_auth_header: required_auth_token.map(|t| format!("Bearer {}", t)),
     };
     let mut server_transport = grpcio::ServerBuilder::new(env)
       .register_service(bazel_protos::bytestream_grpc::create_byte_stream(
         responder.clone(),
-      ))
-      .register_service(
+      )).register_service(
         bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder.clone()),
-      )
-      .bind("localhost", 0)
+      ).bind("localhost", port)
       .build()
       .unwrap();
     server_transport.start();
@@ -79,20 +164,12 @@ impl StubCAS {
     }
   }
 
-  pub fn with_roland_and_directory(chunk_size_bytes: i64) -> StubCAS {
-    StubCAS::with_content(
-      chunk_size_bytes,
-      vec![TestData::roland()],
-      vec![TestDirectory::containing_roland()],
-    )
-  }
-
   pub fn empty() -> StubCAS {
-    StubCAS::with_unverified_content(1024, HashMap::new())
+    StubCAS::builder().build()
   }
 
   pub fn always_errors() -> StubCAS {
-    StubCAS::with_unverified_content(-1, HashMap::new())
+    StubCAS::builder().always_errors().build()
   }
 
   ///
@@ -104,21 +181,50 @@ impl StubCAS {
   }
 
   pub fn read_request_count(&self) -> usize {
-    self.read_request_count.lock().unwrap().clone()
+    *self.read_request_count.lock()
   }
 }
 
 #[derive(Clone, Debug)]
 pub struct StubCASResponder {
-  chunk_size_bytes: i64,
+  chunk_size_bytes: usize,
+  instance_name: Option<String>,
   blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
+  always_errors: bool,
+  required_auth_header: Option<String>,
   pub read_request_count: Arc<Mutex<usize>>,
   pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
 }
 
+macro_rules! check_auth {
+  ($self:ident, $ctx:ident, $sink:ident) => {
+    if let Some(ref required_auth_header) = $self.required_auth_header {
+      let authorization_headers: Vec<_> = $ctx
+        .request_headers()
+        .iter()
+        .filter(|(key, _value)| &key.to_lowercase() == "authorization")
+        .map(|(_key, value)| value)
+        .collect();
+      if authorization_headers.len() != 1
+        || authorization_headers[0] != required_auth_header.as_bytes()
+      {
+        $sink.fail(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::Unauthenticated,
+          Some(format!(
+            "Bad Authorization header; want {:?} got {:?}",
+            required_auth_header.as_bytes(),
+            authorization_headers
+          )),
+        ));
+        return;
+      }
+    }
+  };
+}
+
 impl StubCASResponder {
-  fn should_always_fail(&self) -> bool {
-    self.chunk_size_bytes < 0
+  fn instance_name(&self) -> String {
+    self.instance_name.clone().unwrap_or_default()
   }
 
   fn read_internal(
@@ -126,12 +232,16 @@ impl StubCASResponder {
     req: &bazel_protos::bytestream::ReadRequest,
   ) -> Result<Vec<bazel_protos::bytestream::ReadResponse>, grpcio::RpcStatus> {
     let parts: Vec<_> = req.get_resource_name().splitn(4, '/').collect();
-    if parts.len() != 4 || parts.get(0) != Some(&"") || parts.get(1) != Some(&"blobs") {
+    if parts.len() != 4
+      || parts.get(0) != Some(&self.instance_name().as_ref())
+      || parts.get(1) != Some(&"blobs")
+    {
       return Err(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::InvalidArgument,
         Some(format!(
-          "Bad resource name format {} - want /blobs/some-sha256/size",
-          req.get_resource_name()
+          "Bad resource name format {} - want {}/blobs/some-sha256/size",
+          req.get_resource_name(),
+          self.instance_name(),
         )),
       ));
     }
@@ -142,13 +252,13 @@ impl StubCASResponder {
         Some(format!("Bad digest {}: {}", digest, e)),
       )
     })?;
-    if self.should_always_fail() {
+    if self.always_errors {
       return Err(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::Internal,
         Some("StubCAS is configured to always fail".to_owned()),
       ));
     }
-    let blobs = self.blobs.lock().unwrap();
+    let blobs = self.blobs.lock();
     let maybe_bytes = blobs.get(&fingerprint);
     match maybe_bytes {
       Some(bytes) => Ok(
@@ -158,8 +268,7 @@ impl StubCASResponder {
             let mut resp = bazel_protos::bytestream::ReadResponse::new();
             resp.set_data(Bytes::from(b));
             resp
-          })
-          .collect(),
+          }).collect(),
       ),
       None => Err(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::NotFound,
@@ -192,9 +301,11 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
     sink: grpcio::ServerStreamingSink<bazel_protos::bytestream::ReadResponse>,
   ) {
     {
-      let mut request_count = self.read_request_count.lock().unwrap();
-      *request_count = *request_count + 1;
+      let mut request_count = self.read_request_count.lock();
+      *request_count += 1;
     }
+    check_auth!(self, ctx, sink);
+
     match self.read_internal(&req) {
       Ok(response) => self.send(
         &ctx,
@@ -217,9 +328,12 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
     stream: grpcio::RequestStream<bazel_protos::bytestream::WriteRequest>,
     sink: grpcio::ClientStreamingSink<bazel_protos::bytestream::WriteResponse>,
   ) {
-    let should_always_fail = self.should_always_fail();
+    check_auth!(self, ctx, sink);
+
+    let always_errors = self.always_errors;
     let write_message_sizes = self.write_message_sizes.clone();
     let blobs = self.blobs.clone();
+    let instance_name = self.instance_name();
     ctx.spawn(
       stream
         .collect()
@@ -255,19 +369,14 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               )));
             }
             want_next_offset += req.get_data().len() as i64;
-            write_message_sizes
-              .lock()
-              .unwrap()
-              .push(req.get_data().len());
+            write_message_sizes.lock().push(req.get_data().len());
             bytes.extend(req.get_data());
           }
           Ok((maybe_resource_name, bytes))
-        })
-        .map_err(move |err: grpcio::Error| match err {
+        }).map_err(move |err: grpcio::Error| match err {
           grpcio::Error::RpcFailure(status) => status,
           e => grpcio::RpcStatus::new(grpcio::RpcStatusCode::Unknown, Some(format!("{:?}", e))),
-        })
-        .and_then(
+        }).and_then(
           move |(maybe_resource_name, bytes)| match maybe_resource_name {
             None => Err(grpcio::RpcStatus::new(
               grpcio::RpcStatusCode::InvalidArgument,
@@ -276,6 +385,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
             Some(resource_name) => {
               let parts: Vec<_> = resource_name.splitn(6, '/').collect();
               if parts.len() != 6
+                || parts.get(0) != Some(&instance_name.as_ref())
                 || parts.get(1) != Some(&"uploads")
                 || parts.get(3) != Some(&"blobs")
               {
@@ -316,7 +426,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
                 ));
               }
 
-              if should_always_fail {
+              if always_errors {
                 return Err(grpcio::RpcStatus::new(
                   grpcio::RpcStatusCode::Internal,
                   Some("StubCAS is configured to always fail".to_owned()),
@@ -324,7 +434,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               }
 
               {
-                let mut blobs = blobs.lock().unwrap();
+                let mut blobs = blobs.lock();
                 blobs.insert(fingerprint, bytes);
               }
 
@@ -333,12 +443,10 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               Ok(response)
             }
           },
-        )
-        .then(move |result| match result {
+        ).then(move |result| match result {
           Ok(resp) => sink.success(resp),
           Err(err) => sink.fail(err),
-        })
-        .then(move |_| Ok(())),
+        }).then(move |_| Ok(())),
     );
   }
 
@@ -358,18 +466,31 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
 impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASResponder {
   fn find_missing_blobs(
     &self,
-    _ctx: grpcio::RpcContext,
+    ctx: grpcio::RpcContext,
     req: bazel_protos::remote_execution::FindMissingBlobsRequest,
     sink: grpcio::UnarySink<bazel_protos::remote_execution::FindMissingBlobsResponse>,
   ) {
-    if self.should_always_fail() {
+    check_auth!(self, ctx, sink);
+
+    if self.always_errors {
       sink.fail(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::Internal,
         Some("StubCAS is configured to always fail".to_owned()),
       ));
       return;
     }
-    let blobs = self.blobs.lock().unwrap();
+    if req.instance_name != self.instance_name() {
+      sink.fail(grpcio::RpcStatus::new(
+        grpcio::RpcStatusCode::NotFound,
+        Some(format!(
+          "Wrong instance_name; want {:?} got {:?}",
+          self.instance_name(),
+          req.instance_name
+        )),
+      ));
+      return;
+    }
+    let blobs = self.blobs.lock();
     let mut response = bazel_protos::remote_execution::FindMissingBlobsResponse::new();
     for digest in req.get_blob_digests() {
       let hashing_digest_result: Result<Digest, String> = digest.into();

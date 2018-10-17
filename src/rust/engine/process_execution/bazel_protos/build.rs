@@ -49,8 +49,7 @@ fn main() {
         "mod" | ".gitignore" => None,
         module_name => Some(format!("pub mod {};", module_name)),
       }
-    })
-    .collect::<Vec<_>>();
+    }).collect::<Vec<_>>();
   pub_mod_stmts.sort();
   let contents = format!(
     "\

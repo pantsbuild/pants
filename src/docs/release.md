@@ -51,9 +51,7 @@ script fail:
 
   - **Get your pypi account added as an `owner` for all pantsbuild.pants packages.**
 
-    You can ask any one of the [Owners](#owners) listed below to do this.
-    Once this is done and you've performed your 1st release, add yourself to
-    the [Owners](#owners) section below.
+    You can ask any one of the current [Owners](#owners) to do this.
 
   - **Configure your pypi credentials locally in `~/.pypirc`**
 
@@ -140,9 +138,9 @@ whether a release is needed from a stable branch.
 ---------------------
 
 A dry run is not strictly required since CI includes one, but you might
-like to try one anyway; if so, releases should only be published from
-master, so get on master and ensure your version number commit is present.
-After confirming this, run.
+like to try one anyway. To do so, switch to your release branch (which will either be `master` for
+an unstable weekly release, or a release branch like `1.9.x` for a stable release), and ensure that
+your version number commit is present. After confirming this, run:
 
     :::bash
     $ ./build-support/bin/release.sh -n
@@ -159,15 +157,17 @@ is not required.
 ------------------
 
 Once the first two travis shards (the "binary builder" shards) have completed for your release
-commit, you can publish to PyPi. First, ensure you are on the master branch at the release commit.
-If new commits have landed after your release commit, you can reset to your commit
-(`git reset --hard <sha>`). Then, publish the release:
+commit, you can publish to PyPi. First, ensure that you are on your release branch at your version
+bump commit. Then, publish the release:
 
     :::bash
     $ ./build-support/bin/release.sh
 
 This also performs a dry run and then proceeds to upload the smoke
 tested wheels to PyPi. It may take a few minutes for the packages to be downloadable.
+
+Note: If you are releasing from `master` and new commits have landed after your release commit, you
+can reset to your commit (`git reset --hard <sha>`) before publishing.
 
 4. Announce
 -----------
@@ -192,7 +192,7 @@ if the tag for the prior release (eg: release_0.0.33)
     :::bash
     $ ./build-support/bin/contributors.sh -s <tag>
 
-Listing Packages and Owners
+<a name="owners"></a>Listing Packages and Owners
 ------
 
 The current list of packages can be obtained via :
@@ -200,31 +200,13 @@ The current list of packages can be obtained via :
     :::bash
     $ ./build-support/bin/release.sh -l
 
-Right now that's:
-
-- pantsbuild.pants
-- pantsbuild.pants.contrib.avro
-- pantsbuild.pants.contrib.buildgen
-- pantsbuild.pants.contrib.codeanalysis
-- pantsbuild.pants.contrib.confluence
-- pantsbuild.pants.contrib.cpp
-- pantsbuild.pants.contrib.errorprone
-- pantsbuild.pants.contrib.findbugs
-- pantsbuild.pants.contrib.go
-- pantsbuild.pants.contrib.googlejavaformat
-- pantsbuild.pants.contrib.jax_ws
-- pantsbuild.pants.contrib.mypy
-- pantsbuild.pants.contrib.node
-- pantsbuild.pants.contrib.python.checks
-- pantsbuild.pants.contrib.scalajs
-- pantsbuild.pants.contrib.scrooge
-- pantsbuild.pants.contrib.thrifty
-- pantsbuild.pants.testinfra
-
 You can run the following to get a full ownership roster for each
 package :
 
     :::bash
     $ ./build-support/bin/release.sh -o
+
+We generally expect all packages to have the same set of owners, which you can 
+view [here](https://pypi.org/project/pantsbuild.pants/).
 
 [needs-cherrypick]: https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick

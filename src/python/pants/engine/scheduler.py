@@ -20,11 +20,10 @@ from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecute
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import Select, SelectVariant, constraint_for
-from pants.engine.struct import HasProducts, Variants
+from pants.engine.selectors import Select, constraint_for
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
-from pants.util.objects import Collection, SubclassesOf, datatype
+from pants.util.objects import Collection, datatype
 from pants.util.strutil import pluralize
 
 
@@ -103,9 +102,6 @@ class Scheduler(object):
     self._native = native
     self.include_trace_on_error = include_trace_on_error
 
-    # TODO: The only (?) case where we use inheritance rather than exact type unions.
-    has_products_constraint = SubclassesOf(HasProducts)
-
     # Validate and register all provided and intrinsic tasks.
     rule_index = RuleIndex.create(list(rules))
     self._root_subject_types = sorted(rule_index.roots, key=repr)
@@ -132,9 +128,7 @@ class Scheduler(object):
       construct_file=File,
       construct_link=Link,
       construct_process_result=FallibleExecuteProcessResult,
-      constraint_has_products=has_products_constraint,
       constraint_address=constraint_for(Address),
-      constraint_variants=constraint_for(Variants),
       constraint_path_globs=constraint_for(PathGlobs),
       constraint_directory_digest=constraint_for(DirectoryDigest),
       constraint_snapshot=constraint_for(Snapshot),
@@ -230,18 +224,13 @@ class Scheduler(object):
 
   def _register_task(self, output_constraint, rule):
     """Register the given TaskRule with the native scheduler."""
-    func = rule.func
-    self._native.lib.tasks_task_begin(self._tasks, Function(self._to_key(func)), output_constraint)
+    func = Function(self._to_key(rule.func))
+    self._native.lib.tasks_task_begin(self._tasks, func, output_constraint)
     for selector in rule.input_selectors:
       selector_type = type(selector)
       product_constraint = self._to_constraint(selector.product)
       if selector_type is Select:
         self._native.lib.tasks_add_select(self._tasks, product_constraint)
-      elif selector_type is SelectVariant:
-        key_buf = self._to_utf8_buf(selector.variant_key)
-        self._native.lib.tasks_add_select_variant(self._tasks,
-                                                  product_constraint,
-                                                  key_buf)
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
     for get in rule.input_gets:
@@ -313,8 +302,10 @@ class Scheduler(object):
     metrics_val = self._native.lib.scheduler_metrics(self._scheduler, session)
     return {k: v for k, v in self._from_value(metrics_val)}
 
-  def pre_fork(self):
-    self._native.lib.scheduler_pre_fork(self._scheduler)
+  def with_fork_context(self, func):
+    """See the rustdocs for `scheduler_fork_context` for more information."""
+    res = self._native.lib.scheduler_fork_context(self._scheduler, Function(self._to_key(func)))
+    return self._raise_or_return(res)
 
   def _run_and_return_roots(self, session, execution_request):
     raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
@@ -323,7 +314,7 @@ class Scheduler(object):
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
         if raw_root.state_tag is 1:
           state = Return(self._from_value(raw_root.state_value))
-        elif raw_root.state_tag in (2, 3, 4):
+        elif raw_root.state_tag in (2, 3):
           state = Throw(self._from_value(raw_root.state_value))
         else:
           raise ValueError(
@@ -473,8 +464,8 @@ class SchedulerSession(object):
     """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
     return self._scheduler._metrics(self._session)
 
-  def pre_fork(self):
-    self._scheduler.pre_fork()
+  def with_fork_context(self, func):
+    return self._scheduler.with_fork_context(func)
 
   def _maybe_visualize(self):
     if self._scheduler.visualize_to_dir() is not None:
@@ -543,7 +534,7 @@ class SchedulerSession(object):
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
-      unique_exceptions = tuple(set(t.exc for t in throw_root_states))
+      unique_exceptions = tuple({t.exc for t in throw_root_states})
       exception_noun = pluralize(len(unique_exceptions), 'Exception')
 
       if self._scheduler.include_trace_on_error:

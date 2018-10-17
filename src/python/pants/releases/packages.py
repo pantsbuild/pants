@@ -72,7 +72,7 @@ class Package(object):
       for item
       in parser.find_all(html_node_type, class_=html_node_class)
     ]
-    return set(owner.lower() for owner in owners)
+    return {owner.lower() for owner in owners}
 
 
 core_packages = {
@@ -85,7 +85,7 @@ def contrib_packages():
   output = subprocess.check_output(
     ('bash', '-c', 'source contrib/release_packages.sh ; for pkg in "${CONTRIB_PACKAGES[@]}"; do echo "${!pkg}"; done')
   ).decode('utf-8')
-  return set(Package(name) for name in output.strip().split('\n'))
+  return {Package(name) for name in output.strip().split('\n')}
 
 
 def all_packages():
@@ -105,7 +105,7 @@ def check_ownership(users, minimum_owner_count=3):
   minimum_owner_count = max(len(users), minimum_owner_count)
   packages = sorted(all_packages())
   banner("Checking package ownership for {} packages".format(len(packages)))
-  users = set(user.lower() for user in users)
+  users = {user.lower() for user in users}
   insufficient = set()
   unowned = dict()
 

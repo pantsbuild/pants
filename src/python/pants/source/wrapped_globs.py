@@ -100,7 +100,7 @@ class EagerFilesetWithSpec(FilesetWithSpec):
 
   @property
   def files_hash(self):
-    return self._snapshot.directory_digest.fingerprint
+    return self._snapshot.directory_digest.fingerprint.encode('utf-8')
 
   @property
   def snapshot(self):
@@ -147,7 +147,7 @@ class LazyFilesetWithSpec(FilesetWithSpec):
 
 
 class FilesetRelPathWrapper(AbstractClass):
-  KNOWN_PARAMETERS = frozenset(['exclude', 'follow_links'])
+  KNOWN_PARAMETERS = frozenset({'exclude', 'follow_links'})
 
   @abstractproperty
   def wrapped_fn(cls):

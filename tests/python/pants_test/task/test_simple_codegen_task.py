@@ -139,7 +139,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
             sources=[],
           )
         """.format(name=spec_name)))
-    return set([self.target(spec) for spec in target_specs])
+    return {self.target(spec) for spec in target_specs}
 
   @ensure_cached(DummyGen)
   def test_expected_codegen_targets_and_right_execution_count(self):

@@ -304,6 +304,38 @@ In Go, we can import and use the protobuf generated code as it were regular Go c
 
 !inc[start-at=main](examples/src/go/distance/main.go)
 
+To select the version of the go protobuf runtime your generated code depends on, set option `import_target`
+in scope `gen.go-protobuf` to point to an appropriate target address. E.g.,
+
+```ini
+[gen.go-protobuf]
+import_target: 3rdparty/go/github.com/golang/protobuf/proto
+```
+
+(Where 3rdparty/go/github.com/golang/protobuf/proto was presumably created by the buildgen process
+described above.)
+
+## gRPC
+
+Pants supports the proto compiler's gRPC plugin. You can activate it for a single `go_protobuf_library`
+by adding  the `protoc_plugins=['grpc']` argument. See, e.g.,
+[`contrib/go/examples/src/protobuf/org/pantsbuild/example/grpc/BUILD`](https://github.com/pantsbuild/pants/blob/master/contrib/go/examples/src/protobuf/org/pantsbuild/example/grpc/BUILD)
+
+You can also activate it for all `go_protobuf_library` targets in your repo, using the `protoc_plugins`
+option in scope `gen.go-protobuf`. E.g., add this to your `pants.ini`:
+
+```ini
+[gen.go-protobuf]
+protoc_plugins=["grpc"]
+import_target: src/protobuf:grpc-deps
+```
+
+Note that we also modify `import_target`, as your code must now depend on the gRPC runtime.
+See, e.g.,
+[`contrib/go/examples/src/protobuf/org/pantsbuild/example/BUILD`](https://github.com/pantsbuild/pants/blob/master/contrib/go/examples/src/protobuf/org/pantsbuild/example/BUILD)
+
+Note that you can activate other plugins, should any become available, in a similar fashion.
+
 ## Working with other Go ecosystem tools
 
 Go and the Go ecosystem provide rich tool support. From native Go tools like `go list` and `go vet`

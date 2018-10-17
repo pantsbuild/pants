@@ -38,7 +38,7 @@ python_library(
   sources = ['desktop.py'],
   dependencies = [
     ':osutil',
-    'src/python/pants/util:process_handler',
+    ':process_handler',
   ],
 )
 
@@ -79,6 +79,9 @@ python_library(
 python_library(
   name = 'memo',
   sources = ['memo.py'],
+  dependencies = [
+      ':meta'
+  ],
 )
 
 python_library(
@@ -101,6 +104,7 @@ python_library(
   name = 'objects',
   sources = ['objects.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
     ':memo',
     ':meta',

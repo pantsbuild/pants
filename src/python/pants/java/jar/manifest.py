@@ -25,7 +25,7 @@ class Manifest(object):
         chunk = fp.read(69)
         if not chunk:
           return
-        yield ' {}'.format(chunk)
+        yield b' ' + chunk
 
   PATH = 'META-INF/MANIFEST.MF'
 

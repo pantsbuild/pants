@@ -41,7 +41,6 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python:pex',
-    ':pex_util',
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:exceptions',
     'src/python/pants/process',
@@ -58,6 +57,9 @@ python_library(
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -85,10 +87,3 @@ python_library(
   ]
 )
 
-python_library(
-  name = 'pex_util',
-  sources = ['pex_util.py'],
-  dependencies = [
-    '3rdparty/python:pex',
-  ]
-)

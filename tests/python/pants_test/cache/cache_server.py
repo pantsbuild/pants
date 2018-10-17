@@ -17,6 +17,20 @@ from pants.util.dirutil import safe_mkdir
 from pants_test.testutils.file_test_util import exact_files
 
 
+# NB: All API methods should follow redirects, so we always inject one redirect for all handler
+# methods before serving.
+def redirect_once(func):
+  def wrapper(self):
+    if self.path.endswith('/__redir__'):
+      self.path = os.path.dirname(self.path)
+      return func(self)
+    else:
+      self.send_response(307, 'Found')
+      self.send_header('Location', os.path.join(self.path, '__redir__'))
+      self.end_headers()
+  return wrapper
+
+
 # A very trivial server that serves files under the cwd.
 class SimpleRESTHandler(http.server.SimpleHTTPRequestHandler):
   def __init__(self, request, client_address, server):
@@ -24,12 +38,18 @@ class SimpleRESTHandler(http.server.SimpleHTTPRequestHandler):
     # Old-style class, so we must invoke __init__ this way.
     http.server.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
 
+  @redirect_once
   def do_HEAD(self):
     return http.server.SimpleHTTPRequestHandler.do_HEAD(self)
 
+  @redirect_once
+  def do_GET(self):
+    return http.server.SimpleHTTPRequestHandler.do_GET(self)
+
+  @redirect_once
   def do_PUT(self):
     path = self.translate_path(self.path)
-    content_length = int(self.headers.getheader('content-length'))
+    content_length = int(self.headers.get('content-length'))
     content = self.rfile.read(content_length)
     safe_mkdir(os.path.dirname(path))
     with open(path, 'wb') as outfile:
@@ -37,6 +57,7 @@ class SimpleRESTHandler(http.server.SimpleHTTPRequestHandler):
     self.send_response(200)
     self.end_headers()
 
+  @redirect_once
   def do_DELETE(self):
     path = self.translate_path(self.path)
     if os.path.exists(path):
@@ -58,15 +79,19 @@ class FailRESTHandler(http.server.SimpleHTTPRequestHandler):
     self.send_response(401, 'Forced test failure')
     self.end_headers()
 
+  @redirect_once
   def do_HEAD(self):
     return self._return_failed()
 
+  @redirect_once
   def do_GET(self):
     return self._return_failed()
 
+  @redirect_once
   def do_PUT(self):
     return self._return_failed()
 
+  @redirect_once
   def do_DELETE(self):
     return self._return_failed()
 

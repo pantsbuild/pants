@@ -141,7 +141,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
   @classmethod
   def _assert_aligned(self, *iterables):
-    assert len(set(len(i) for i in iterables)) == 1, 'inputs are not aligned'
+    assert len({len(i) for i in iterables}) == 1, 'inputs are not aligned'
 
   @classmethod
   @contextmanager

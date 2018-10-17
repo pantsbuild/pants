@@ -94,7 +94,7 @@ class Duplicate(JarRule):
   encountered.
   """
 
-  _VALID_ACTIONS = frozenset((SKIP, REPLACE, CONCAT, CONCAT_TEXT, FAIL))
+  _VALID_ACTIONS = frozenset({SKIP, REPLACE, CONCAT, CONCAT_TEXT, FAIL})
 
   @classmethod
   def validate_action(cls, action):
@@ -238,9 +238,9 @@ class JarRules(FingerprintedMixin):
 
   def fingerprint(self):
     hasher = sha1()
-    hasher.update(self.payload.fingerprint())
+    hasher.update(self.payload.fingerprint().encode('utf-8'))
     for rule in self.rules:
-      hasher.update(rule.fingerprint())
+      hasher.update(rule.fingerprint().encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   @property
@@ -306,6 +306,7 @@ class JvmBinary(JvmTarget):
                deploy_jar_rules=None,
                manifest_entries=None,
                shading_rules=None,
+               extra_jvm_options=None,
                **kwargs):
     """
     :API: public
@@ -335,6 +336,8 @@ class JvmBinary(JvmTarget):
       (aka monolithic aka fat) binary jar. The order of the rules matters: the first rule which
       matches a fully-qualified class name is used to shade it. See shading_relocate(),
       shading_exclude(), shading_relocate_package(), and shading_exclude_package().
+    :param list extra_jvm_options: A list of options to be passed to the jvm when running the
+      binary. Example: ['-Dexample.property=1', '-DMyFlag', '-Xmx4G'] If unspecified, no extra jvm options will be added.
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     if main and not isinstance(main, string_types):
@@ -357,6 +360,7 @@ class JvmBinary(JvmTarget):
       'manifest_entries': FingerprintedField(ManifestEntries(manifest_entries)),
       'main': PrimitiveField(main),
       'shading_rules': PrimitiveField(shading_rules or ()),
+      'extra_jvm_options': PrimitiveField(list(extra_jvm_options or ())),
     })
 
     super(JvmBinary, self).__init__(name=name,

@@ -5,6 +5,8 @@ env:
   global:
     - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
+    - LC_ALL="en_US.UTF-8"
+
 
 before_cache:
   # Ensure permissions to do the below removals, which happen with or without caching enabled.
@@ -74,7 +76,7 @@ default_test_config: &default_test_config
         - libssl-dev
   stage: Test Pants
   language: python
-  python: "2.7.13"
+  python: &python_version "2.7"
   before_install:
     # Remove bad openjdk6 from trusty image, so
     # Pants will pick up oraclejdk6 from `packages` above.
@@ -86,7 +88,8 @@ matrix:
   include:
 
     # Build macOS engine
-    - os: osx
+    - name: "OSX Native Engine Binary Builder"
+      os: osx
       # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
       # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
@@ -94,19 +97,18 @@ matrix:
       stage: Test Pants
       language: generic
       env:
-        - SHARD="OSX Native Engine Binary Builder"
         - PREPARE_DEPLOY=1
       script:
         - ./pants --version && ./build-support/bin/release.sh -n
 
     # Build Linux engine
-    - os: linux
+    - name: "Linux Native Engine Binary Builder"
+      os: linux
       stage: Test Pants
       language: generic
       services:
         - docker
       env:
-        - SHARD="Linux Native Engine Binary Builder"
         - PREPARE_DEPLOY=1
       before_script:
         - ulimit -c unlimited
@@ -127,7 +129,8 @@ matrix:
         - build-support/bin/ci-failure.sh
 
     # Deploy Pex
-    - os: linux
+    - name: "Deploy Pants PEX"
+      os: linux
       language: python
       stage: Deploy Pants Pex
       env:
@@ -149,132 +152,130 @@ matrix:
           repo: pantsbuild/pants
 
     - <<: *default_test_config
-      env:
-        - SHARD="Self checks, lint, and JVM tests"
-      script:
-        - ./build-support/bin/ci.sh -x -celpn "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Py2 - Unit tests for pants and pants-plugins"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjcnt "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Py3 - Unit tests for pants and pants-plugins"
-        # Use less verbose logs, in order to not hit the log-length limit.
-        - PYTEST_PASSTHRU_ARGS="--tb=line"
-      script:
-        # Allowed to fail.
-        - ./build-support/bin/ci.sh -x -3efkmrjcnt "${SHARD}" || exit 0
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python contrib tests - shard 1"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python contrib tests - shard 2"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 1"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 2"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 3"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 4"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 5"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 6"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7 "${SHARD}"
-
-    - <<: *default_test_config
-      env:
-        - SHARD="Python integration tests for pants - shard 7"
-      script:
-        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7 "${SHARD}"
-
-    # Rust on linux
-    - os: linux
-      dist: trusty
-      sudo: required
-      stage: Test Pants
-      language: python
-      python: "2.7.13"
-      addons:
-        apt:
-          packages:
-            - cmake
+      name: "Self checks, lint, and JVM tests"
       before_install:
         - sudo apt-get install -y pkg-config fuse libfuse-dev
         - sudo modprobe fuse
         - sudo chmod 666 /dev/fuse
         - sudo chown root:$USER /etc/fuse.conf
-      env:
-        - SHARD="Rust Tests Linux"
+      script:
+        - ./build-support/bin/travis-ci.sh -fkmrjt
+
+    - <<: *default_test_config
+      name: "Py2 - Unit tests for pants and pants-plugins"
+      script:
+        - ./build-support/bin/travis-ci.sh -lp
+
+    - <<: *default_test_config
+      name: "Py3 - Unit tests for pants and pants-plugins"
+      script:
+        - ./build-support/bin/travis-ci.sh -3lp
+
+    - <<: *default_test_config
+      name: "Py2 - Python contrib tests"
+      script:
+        - ./build-support/bin/travis-ci.sh -n
+
+    - <<: *default_test_config
+      name: "Py3 - Python contrib tests"
+      script:
+        - ./build-support/bin/travis-ci.sh -3n
+
+    - <<: *default_test_config
+      name: "Python integration tests for pants - shard 1"
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 0/7
+
+    - <<: *default_test_config
+      name: "Python integration tests for pants - shard 2"
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 1/7
+
+    - <<: *default_test_config
+      name: "Python integration tests for pants - shard 3"
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 2/7
+
+    - <<: *default_test_config
+      name: "Python integration tests for pants - shard 4"
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 3/7
+
+    - <<: *default_test_config
+      name: "Python integration tests for pants - shard 5"
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 4/7
+
+    - <<: *default_test_config
+      name: "Python integration tests for pants - shard 6"
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 5/7
+
+    - <<: *default_test_config
+      name: "Python integration tests for pants - shard 7"
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 6/7
+
+    # Rust on linux
+    - name: "Rust Tests Linux"
+      os: linux
+      dist: trusty
+      sudo: required
+      stage: Test Pants
+      language: python
+      python: *python_version
+      before_install:
+        - sudo apt-get install -y pkg-config fuse libfuse-dev
+        - sudo modprobe fuse
+        - sudo chmod 666 /dev/fuse
+        - sudo chown root:$USER /etc/fuse.conf
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        - ./build-support/bin/ci.sh -bcfjklmnprtx
-
+        - ./build-support/bin/travis-ci.sh -be
     # Rust on macOS
-    - os: osx
+    - name: "Rust + Platform-specific Tests OSX"
+      os: osx
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
       stage: Test Pants
       language: generic
-      env:
-        - SHARD="Rust + Platform-specific Tests OSX"
-        # Specifically avoid the OSX provided 2.7.10 under xcode8.3 since it returns a platform
-        # of `macosx-*-intel` where the `intel` suffix is bogus but pex has not yet been taught to
-        # deal with this. Can be removed when this issue is resolved:
-        # https://github.com/pantsbuild/pex/issues/523
-        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>2.7.10,<3']"
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
-        # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and set -z to run the platform-specific tests.
-        - ./build-support/bin/ci.sh -cfjklmnprtxz
+        # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and
+        # set -z to run the platform-specific tests.
+        - ./build-support/bin/travis-ci.sh -ez
+
+    # Rust Clippy on Linux
+    - name: "Rust Clippy on Linux"
+      os: linux
+      dist: trusty
+      sudo: required
+      stage: Test Pants
+      language: python
+      python: *python_version
+      before_install:
+        - sudo apt-get install -y pkg-config fuse libfuse-dev
+        - sudo modprobe fuse
+        - sudo chmod 666 /dev/fuse
+        - sudo chown root:$USER /etc/fuse.conf
+      before_script:
+        - ulimit -c unlimited
+        - ulimit -n 8192
+      script:
+        - ./build-support/bin/travis-ci.sh -bs
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
   provider: s3
   access_key_id: AKIAIWOKBXVU3JLY6EGQ
   secret_access_key:
-    secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
+    secure: "UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM="
   bucket: binaries.pantsbuild.org
   local_dir: dist/deploy
   # Otherwise travis will stash dist/deploy and the deploy will fail.
@@ -286,8 +287,3 @@ deploy:
     # release branches; eg `1.3.x`
     all_branches: true
     repo: pantsbuild/pants
-
-# We accept the default travis-ci email author+committer notification
-# for now which is enabled even with no `notifications` config.
-# notifications:
-#   email: ...

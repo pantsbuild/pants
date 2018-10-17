@@ -56,6 +56,11 @@ object Main {
     if (!Util.isSetProperty("log4j2.disable.jmx")) {
       Util.setProperty("log4j2.disable.jmx", "true")
     }
+
+    // As per https://github.com/pantsbuild/pants/issues/6160, this is a workaround
+    // so we can run zinc without $PATH (as needed in remoting).
+    System.setProperty("sbt.log.format", "true")
+
     val cl =
       ConsoleLogger(
         out = ConsoleOut.systemOut,

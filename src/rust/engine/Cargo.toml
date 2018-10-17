@@ -1,4 +1,4 @@
-[project]
+[package]
 version = "0.0.1"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
@@ -39,6 +39,7 @@ members = [
   "resettable",
   "testutil",
   "testutil/mock",
+  "testutil/local_cas",
   "ui"
 ]
 
@@ -64,6 +65,7 @@ default-members = [
   "resettable",
   "testutil",
   "testutil/mock",
+  "testutil/local_cas",
   "ui"
 ]
 
@@ -75,9 +77,12 @@ fs = { path = "fs" }
 futures = "^0.1.16"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
+itertools = "0.7.2"
 lazy_static = "0.2.2"
 log = "0.4"
+parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 resettable = { path = "resettable" }
+smallvec = "0.6"
 tokio = "0.1"
 tempfile = "3"

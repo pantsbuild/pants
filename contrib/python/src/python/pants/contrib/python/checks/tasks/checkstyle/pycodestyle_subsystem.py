@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from pants.contrib.python.checks.checker.pycodestyle import PyCodeStyleChecker
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import PluginSubsystemBase
 
 
@@ -51,6 +52,6 @@ class PyCodeStyleSubsystem(PluginSubsystemBase):
     register('--max-length', fingerprint=True, type=int, default=100,
              help='Max line length to use for pycodestyle checks.')
 
-  def get_plugin_type(self):
-    from pants.contrib.python.checks.tasks.checkstyle.pycodestyle import PyCodeStyleChecker
+  @classmethod
+  def plugin_type(cls):
     return PyCodeStyleChecker

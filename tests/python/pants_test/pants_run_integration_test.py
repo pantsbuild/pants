@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import configparser
 import glob
 import os
 import shutil
@@ -14,6 +13,7 @@ from contextlib import contextmanager
 from operator import eq, ne
 from threading import Lock
 
+from backports import configparser
 from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
@@ -22,12 +22,21 @@ from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, datatype
+from pants.util.osutil import IntegerForPid
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
+from pants.util.strutil import ensure_binary
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
-class PantsResult(datatype(['command', 'returncode', 'stdout_data', 'stderr_data', 'workdir'])):
+class PantsResult(datatype([
+    'command',
+    ('returncode', int),
+    'stdout_data',
+    'stderr_data',
+    'workdir',
+    ('pid', Exactly(*IntegerForPid)),
+])):
   pass
 
 
@@ -38,10 +47,17 @@ class PantsJoinHandle(datatype(['command', 'process', 'workdir'])):
     communicate_fn = self.process.communicate
     if tee_output:
       communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr
+    if stdin_data is not None:
+      stdin_data = ensure_binary(stdin_data)
     (stdout_data, stderr_data) = communicate_fn(stdin_data)
 
-    return PantsResult(self.command, self.process.returncode, stdout_data.decode("utf-8"),
-                       stderr_data.decode("utf-8"), self.workdir)
+    return PantsResult(
+      self.command,
+      self.process.returncode,
+      stdout_data.decode("utf-8"),
+      stderr_data.decode("utf-8"),
+      self.workdir,
+      self.process.pid)
 
 
 def ensure_cached(expected_num_artifacts=None):
@@ -124,28 +140,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
         'HOME',
         'PANTS_PROFILE',
       ]
-
-  @classmethod
-  def has_python_version(cls, version):
-    """Returns true if the current system has the specified version of python.
-
-    :param version: A python version string, such as 2.7, 3.
-    """
-    return cls.python_interpreter_path(version) is not None
-
-  @classmethod
-  def python_interpreter_path(cls, version):
-    """Returns the interpreter path if the current system has the specified version of python.
-
-    :param version: A python version string, such as 2.7, 3.
-    """
-    try:
-      py_path = subprocess.check_output(['python%s' % version,
-                                         '-c',
-                                         'import sys; print(sys.executable)']).decode('utf-8').strip()
-      return os.path.realpath(py_path)
-    except OSError:
-      return None
 
   def setUp(self):
     super(PantsRunIntegrationTest, self).setUp()
@@ -408,7 +402,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
         stdout, _ = java_run.communicate()
       java_returncode = java_run.returncode
       self.assertEqual(java_returncode, 0)
-      return stdout
+      return stdout.decode('utf-8')
 
   def assert_success(self, pants_run, msg=None):
     self.assert_result(pants_run, self.PANTS_SUCCESS_CODE, expected=True, msg=msg)

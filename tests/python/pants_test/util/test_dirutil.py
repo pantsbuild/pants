@@ -112,7 +112,7 @@ class DirutilTest(unittest.TestCase):
     atexit_register.assert_called_once_with(faux_cleaner)
     self.assertTrue(os_getpid.called)
     self.assertEqual([mock.call(dir='1'), mock.call(dir='2')], tempfile_mkdtemp.mock_calls)
-    self.assertEqual([mock.call(DIR1), mock.call(DIR2)], dirutil_safe_rmtree.mock_calls)
+    self.assertEqual(sorted([mock.call(DIR1), mock.call(DIR2)]), sorted(dirutil_safe_rmtree.mock_calls))
 
   def test_safe_walk(self):
     """Test that directory names are correctly represented as unicode strings"""
@@ -393,12 +393,29 @@ class DirutilTest(unittest.TestCase):
       touch(file_name)
       rm_rf(file_name)
 
-  def test_readwrite_file(self):
+  def assert_dump_and_read(self, test_content, dump_kwargs, read_kwargs):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
-      test_content = b'3333'
-      safe_file_dump(test_filename, test_content)
-      self.assertEqual(read_file(test_filename), test_content)
+      safe_file_dump(test_filename, test_content, **dump_kwargs)
+      self.assertEqual(read_file(test_filename, **read_kwargs), test_content)
+
+  def test_readwrite_file_binary(self):
+    self.assert_dump_and_read(b'333', {'binary_mode': True}, {'binary_mode': True})
+    self.assert_dump_and_read(b'333', {'mode': 'wb'}, {'binary_mode': True})
+    with self.assertRaises(Exception):
+      # File is not opened as binary.
+      self.assert_dump_and_read(b'333', {'mode': 'w'}, {'binary_mode': True})
+    with self.assertRaises(AssertionError):
+      # Both `binary_mode` and `mode` specified.
+      # TODO: Should be removed along with https://github.com/pantsbuild/pants/issues/6543
+      self.assert_dump_and_read(b'333', {'binary_mode': True, 'mode': 'wb'}, {'binary_mode': True})
+
+  def test_readwrite_file_unicode(self):
+    self.assert_dump_and_read('✓', {'binary_mode': False}, {'binary_mode': False})
+    self.assert_dump_and_read('✓', {'mode': 'w'}, {'binary_mode': False})
+    with self.assertRaises(Exception):
+      # File is opened as binary.
+      self.assert_dump_and_read('✓', {'mode': 'wb'}, {'binary_mode': True})
 
   def test_safe_concurrent_creation(self):
     with temporary_dir() as td:
@@ -485,7 +502,7 @@ class DirutilTest(unittest.TestCase):
       os.symlink(real, link)
       self.assertTrue(os.path.exists(real))
       self.assertTrue(os.path.exists(link))
-      safe_rmtree(link);
+      safe_rmtree(link)
       self.assertTrue(os.path.exists(real))
       self.assertFalse(os.path.exists(link))
 

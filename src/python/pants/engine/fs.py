@@ -8,6 +8,7 @@ from future.utils import binary_type, text_type
 
 from pants.base.project_tree import Dir, File
 from pants.engine.rules import RootRule
+from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.objects import Collection, datatype
 
@@ -33,6 +34,7 @@ class PathGlobs(datatype([
     'include',
     'exclude',
     ('glob_match_error_behavior', GlobMatchErrorBehavior),
+    ('conjunction', GlobExpansionConjunction),
 ])):
   """A wrapper around sets of filespecs to include and exclude.
 
@@ -42,7 +44,7 @@ class PathGlobs(datatype([
   be aware of any changes to this object's definition.
   """
 
-  def __new__(cls, include, exclude=(), glob_match_error_behavior=None):
+  def __new__(cls, include, exclude=(), glob_match_error_behavior=None, conjunction=None):
     """Given various file patterns create a PathGlobs object (without using filesystem operations).
 
     :param include: A list of filespecs to include.
@@ -52,15 +54,10 @@ class PathGlobs(datatype([
     """
     return super(PathGlobs, cls).__new__(
       cls,
-      tuple(include),
-      tuple(exclude),
-      GlobMatchErrorBehavior.create(glob_match_error_behavior))
-
-  def with_match_error_behavior(self, glob_match_error_behavior):
-    return PathGlobs(
-      include=self.include,
-      exclude=self.exclude,
-      glob_match_error_behavior=glob_match_error_behavior)
+      include=tuple(include),
+      exclude=tuple(exclude),
+      glob_match_error_behavior=GlobMatchErrorBehavior.create(glob_match_error_behavior),
+      conjunction=GlobExpansionConjunction.create(conjunction))
 
 
 class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', text_type)])):
@@ -100,6 +97,10 @@ class Snapshot(datatype([('directory_digest', DirectoryDigest), ('path_stats', t
   """
 
   @property
+  def is_empty(self):
+    return self == EMPTY_SNAPSHOT
+
+  @property
   def dirs(self):
     return [p for p in self.path_stats if type(p.stat) == Dir]
 
@@ -123,8 +124,7 @@ class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest',
 FilesContent = Collection.of(FileContent)
 
 
-# TODO(cosmicexplorer): don't recreate this in python, get this from
-# fs::EMPTY_DIGEST somehow.
+# TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.
 _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 
 
@@ -144,5 +144,4 @@ def create_fs_rules():
   return [
     RootRule(DirectoryDigest),
     RootRule(PathGlobs),
-    RootRule(Snapshot),
   ]

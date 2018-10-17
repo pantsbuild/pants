@@ -55,7 +55,7 @@ class DuplicateDetector(JvmBinaryTask):
 
   @memoized_property
   def exclude_files(self):
-    return set([x.lower() for x in self.get_options().exclude_files] or [])
+    return {x.lower() for x in self.get_options().exclude_files or []}
 
   @memoized_property
   def exclude_dirs(self):

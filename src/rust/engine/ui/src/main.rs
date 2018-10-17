@@ -1,3 +1,32 @@
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  deny(
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
+  )
+)]
+// It is often more clear to show that nothing is being moved.
+#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+// Subjective style.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
+// Default isn't as big a deal as people seem to think it is.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+
 extern crate engine_display;
 extern crate rand;
 
@@ -45,46 +74,11 @@ fn main() {
     "Link".to_string()
   );
 
-  fn gen_display_work(
-    display: &mut EngineDisplay,
-    counter: &u64,
-    type_selection: &Vec<String>,
-    worker_ids: &Vec<String>,
-    verb_selection: &Vec<String>,
-    log_level_selection: &Vec<String>,
-  ) {
-    let mut rng = rand::thread_rng();
-
-    for worker_id in worker_ids.clone().into_iter() {
-      let random_product = rng.choose(&type_selection).unwrap();
-      let random_subject = rng.choose(&type_selection).unwrap();
-
-      display.update(
-        worker_id,
-        String::from(format!(
-          "computing {} for {}(...)",
-          random_product, random_subject
-        )),
-      );
-    }
-
-    if counter > &50 && counter % 2 == 0 {
-      let random_log_level = rng.choose(&log_level_selection).unwrap();
-      let random_verb = rng.choose(&verb_selection).unwrap();
-      let random_product_2 = rng.choose(&type_selection).unwrap();
-
-      display.log(format!(
-        "{}] {} {}",
-        random_log_level, random_verb, random_product_2
-      ));
-    }
-  }
-
   let mut done = false;
   let mut counter: u64 = 0;
 
-  for worker_id in worker_ids.clone().into_iter() {
-    display.add_worker(String::from(worker_id));
+  for worker_id in worker_ids.clone() {
+    display.add_worker(worker_id);
     display.render();
     thread::sleep(Duration::from_millis(63));
   }
@@ -97,7 +91,7 @@ fn main() {
 
     gen_display_work(
       &mut display,
-      &counter,
+      counter,
       &random_products,
       &worker_ids,
       &random_verbs,
@@ -112,4 +106,36 @@ fn main() {
   }
 
   display.finish();
+}
+
+fn gen_display_work(
+  display: &mut EngineDisplay,
+  counter: u64,
+  type_selection: &[String],
+  worker_ids: &[String],
+  verb_selection: &[String],
+  log_level_selection: &[String],
+) {
+  let mut rng = rand::thread_rng();
+
+  for worker_id in worker_ids {
+    let random_product = rng.choose(&type_selection).unwrap();
+    let random_subject = rng.choose(&type_selection).unwrap();
+
+    display.update(
+      worker_id.to_string(),
+      format!("computing {} for {}(...)", random_product, random_subject),
+    );
+  }
+
+  if counter > 50 && counter % 2 == 0 {
+    let random_log_level = rng.choose(&log_level_selection).unwrap();
+    let random_verb = rng.choose(&verb_selection).unwrap();
+    let random_product_2 = rng.choose(&type_selection).unwrap();
+
+    display.log(format!(
+      "{}] {} {}",
+      random_log_level, random_verb, random_product_2
+    ));
+  }
 }

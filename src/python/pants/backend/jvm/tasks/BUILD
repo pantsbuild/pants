@@ -38,6 +38,7 @@ target(
     ':properties',
     ':provide_tools_jar',
     ':resources_task',
+    ':resolve_shared',
     ':run_jvm_prep_command',
     ':scala_repl',
     ':scaladoc_gen',
@@ -622,6 +623,11 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/task',
   ],
+)
+
+python_library(
+  name = 'resolve_shared',
+  sources = ['resolve_shared.py'],
 )
 
 python_library(

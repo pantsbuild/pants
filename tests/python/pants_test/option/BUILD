@@ -17,9 +17,7 @@ python_tests(
 
 python_tests(
   name='options_integration',
-  sources=[
-    'test_options_integration.py',
-  ],
+  sources=globs('*_integration.py'),
   dependencies=[
     '3rdparty/python:future',
     'src/python/pants/util:contextutil',

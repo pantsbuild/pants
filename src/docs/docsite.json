@@ -5,6 +5,7 @@
     "3rdparty_jvm": "dist/markdown/html/examples/src/java/org/pantsbuild/example/3rdparty_jvm.html",
     "3rdparty_py": "dist/markdown/html/examples/src/python/example/3rdparty_py.html",
     "announce_201409": "dist/markdown/html/src/docs/announce_201409.html",
+    "coursier_migration": "dist/markdown/html/src/docs/blog/coursier_migration.html",
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
     "alias": "dist/markdown/html/src/docs/common_tasks/alias.html",
@@ -47,6 +48,7 @@
     "jvm_tests": "dist/markdown/html/src/docs/common_tasks/jvm_tests.html",
     "list_goals": "dist/markdown/html/src/docs/common_tasks/list_goals.html",
     "list_targets": "dist/markdown/html/src/docs/common_tasks/list_targets.html",
+    "login": "dist/markdown/html/src/docs/common_tasks/login.html",
     "notes-1.0.x": "dist/markdown/html/src/python/pants/notes/1.0.x.html",
     "notes-1.0.x": "dist/markdown/html/src/python/pants/notes/1.0.x.html",
     "notes-1.1.x": "dist/markdown/html/src/python/pants/notes/1.1.x.html",
@@ -59,8 +61,10 @@
     "notes-1.7.x": "dist/markdown/html/src/python/pants/notes/1.7.x.html",
     "notes-1.8.x": "dist/markdown/html/src/python/pants/notes/1.8.x.html",
     "notes-1.9.x": "dist/markdown/html/src/python/pants/notes/1.9.x.html",
+    "notes-1.10.x": "dist/markdown/html/src/python/pants/notes/1.10.x.html",
     "notes-master": "dist/markdown/html/src/python/pants/notes/master.html",
     "notes-master": "dist/markdown/html/src/python/pants/notes/master.html",
+    "orgs": "dist/markdown/html/src/docs/orgs.html",
     "options": "dist/markdown/html/src/docs/options.html",
     "options_reference": "dist/reference/pants_reference_body.html",
     "page": "dist/markdown/html/examples/src/java/org/pantsbuild/example/page.html",
@@ -102,6 +106,9 @@
     "images/intellij-project-structure-project.png": "src/docs/images/intellij-project-structure-project.png",
     "images/intellij-run.png": "src/docs/images/intellij-run.png",
     "images/intellij-select-venv.png": "src/docs/images/intellij-select-venv.png",
+    "images/orgs.png": "src/docs/images/orgs.png",
+    "images/orgs_be.png": "src/docs/images/orgs_be.png",
+    "images/orgs_fe.png": "src/docs/images/orgs_fe.png",
     "images/ossrh-publish-close-staging-repo.png": "src/docs/images/ossrh-publish-close-staging-repo.png",
     "images/ossrh-publish-find-staging-repo.png": "src/docs/images/ossrh-publish-find-staging-repo.png",
     "images/ossrh-publish-release-staging-repo.png": "src/docs/images/ossrh-publish-release-staging-repo.png",
@@ -118,13 +125,13 @@
   "tree": [
     { "page": "index",
       "children": [
-
        {"heading": "Getting Started"},
        {"pages": [
                      "install",
                      "setup_repo",
                      "first_tutorial",
-                     "common_tasks"
+                     "common_tasks",
+                     "orgs"
                 ]
 
        },
@@ -177,6 +184,7 @@
        },
        {"collapsible_heading": "Release Notes",
         "pages" : [
+                    "notes-1.10.x",
                     "notes-1.9.x",
                     "notes-1.8.x",
                     "notes-1.7.x",
@@ -194,6 +202,11 @@
        {"pages" : [
                     "dev",
                     "export"
+                ]
+       },
+       {"heading": "Blogs"},
+       {"pages" : [
+                    "coursier_migration"
                 ]
        }
 

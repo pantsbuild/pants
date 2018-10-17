@@ -77,18 +77,6 @@ python_tests(
 )
 
 python_tests(
-  name='graph',
-  sources=['test_graph.py'],
-  coverage=['pants.engine.graph'],
-  dependencies=[
-    '3rdparty/python:future',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine:scheduler',
-    'tests/python/pants_test/engine/examples:planners',
-  ]
-)
-
-python_tests(
   name='isolated_process',
   sources=['test_isolated_process.py'],
   dependencies=[
@@ -135,7 +123,6 @@ python_tests(
     'src/python/pants/engine:nodes',
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/engine/examples:planners',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
     'tests/python/pants_test/engine:util',
   ]
@@ -201,7 +188,6 @@ python_tests(
     'src/python/pants/engine:selectors',
     'src/python/pants/util:objects',
     'tests/python/pants_test/engine/examples:parsers',
-    'tests/python/pants_test/engine/examples:planners',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
@@ -216,7 +202,6 @@ python_tests(
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
-    'tests/python/pants_test/engine/examples:planners',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
   ]
 )
@@ -231,7 +216,7 @@ python_tests(
   tags={'integration'},
 )
 
-python_tests(
+python_library(
   name='scheduler_test_base',
   sources=['scheduler_test_base.py'],
   dependencies=[

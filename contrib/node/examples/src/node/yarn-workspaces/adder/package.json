@@ -1,0 +1,15 @@
+{
+  "name": "adder",
+  "version": "1.0.0",
+  "description": "Pantsbuild app for Node.js with source-level deps",
+  "main": "index.js",
+  "author": "pantsbuild",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "add-two": "^1.0.0"
+  }
+}

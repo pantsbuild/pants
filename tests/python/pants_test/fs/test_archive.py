@@ -42,7 +42,7 @@ class ArchiveTest(unittest.TestCase):
             archiver.extract(archive, todir, concurrency_safe=concurrency_safe)
             fromlisting = self._listtree(fromdir, empty_dirs)
             if prefix:
-              fromlisting = set(os.path.join(prefix, x) for x in fromlisting)
+              fromlisting = {os.path.join(prefix, x) for x in fromlisting}
               if empty_dirs:
                 fromlisting.add(prefix)
             self.assertEqual(fromlisting, self._listtree(todir, empty_dirs))
@@ -73,7 +73,7 @@ class ArchiveTest(unittest.TestCase):
         archive = create_archiver('zip').create(fromdir, archivedir, 'archive')
         with temporary_dir() as todir:
           create_archiver('zip').extract(archive, todir, filter_func=do_filter)
-          self.assertEqual(set(['allowed.txt']), self._listtree(todir, empty_dirs=False))
+          self.assertEqual({'allowed.txt'}, self._listtree(todir, empty_dirs=False))
 
   def test_tar_dereference(self):
 

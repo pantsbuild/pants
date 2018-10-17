@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import logging
 import os
 import signal
@@ -442,7 +443,7 @@ class ProcessManager(ProcessMetadataManager):
       self.purge_metadata(force=True)
 
   def daemonize(self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None,
-                write_pid=True):
+                fork_context=None, write_pid=True):
     """Perform a double-fork, execute callbacks and write the child pid file.
 
     The double-fork here is necessary to truly daemonize the subprocess such that it can never
@@ -456,33 +457,52 @@ class ProcessManager(ProcessMetadataManager):
     below) due to the fact that the daemons that pants would run are typically personal user
     daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
     differ in their permissions without good reason - in this case, we want to inherit the umask.
+
+    :param fork_context: A function which accepts and calls a function that will call fork. This
+      is not a contextmanager/generator because that would make interacting with native code more
+      challenging. If no fork_context is passed, the fork function is called directly.
     """
+
+
+    def double_fork():
+      logger.debug('forking %s', self)
+      pid = os.fork()
+      if pid == 0:
+        os.setsid()
+        second_pid = os.fork()
+        if second_pid == 0:
+          return False, True
+        else:
+          if write_pid: self.write_pid(second_pid)
+          return True, False
+      else:
+        # This prevents un-reaped, throw-away parent processes from lingering in the process table.
+        os.waitpid(pid, 0)
+      return False, False
+
+    fork_func = functools.partial(fork_context, double_fork) if fork_context else double_fork
+
+    # Perform the double fork (optionally under the fork_context). Three outcomes are possible after
+    # the double fork: we're either the original process, the double-fork parent, or the double-fork
+    # child. We assert below that a process is not somehow both the parent and the child.
     self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
-    logger.debug('forking %s', self)
-    pid = os.fork()
-    if pid == 0:
-      os.setsid()
-      second_pid = os.fork()
-      if second_pid == 0:
-        try:
-          os.chdir(self._buildroot)
-          self.post_fork_child(**post_fork_child_opts or {})
-        except Exception:
-          logger.critical(traceback.format_exc())
-        finally:
-          os._exit(0)
+    is_parent, is_child = fork_func()
+    if not is_parent and not is_child:
+      return
+
+    try:
+      if is_parent:
+        assert not is_child
+        self.post_fork_parent(**post_fork_parent_opts or {})
       else:
-        try:
-          if write_pid: self.write_pid(second_pid)
-          self.post_fork_parent(**post_fork_parent_opts or {})
-        except Exception:
-          logger.critical(traceback.format_exc())
-        finally:
-          os._exit(0)
-    else:
-      # This prevents un-reaped, throw-away parent processes from lingering in the process table.
-      os.waitpid(pid, 0)
+        assert not is_parent
+        os.chdir(self._buildroot)
+        self.post_fork_child(**post_fork_child_opts or {})
+    except Exception:
+      logger.critical(traceback.format_exc())
+    finally:
+      os._exit(0)
 
   def daemon_spawn(self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None):
     """Perform a single-fork to run a subprocess and write the child pid file.

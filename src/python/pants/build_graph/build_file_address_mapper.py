@@ -256,7 +256,7 @@ class BuildFileAddressMapper(AddressMapper):
           .format(was_not_found_message=was_not_found_message))
     # Print BUILD file extensions if there's more than one BUILD file with targets only.
     if (any(not hasattr(address, 'rel_path') for address in addresses) or
-        len(set(address.rel_path for address in addresses)) == 1):
+      len({address.rel_path for address in addresses}) == 1):
       specs = [':{}'.format(address.target_name) for address in addresses]
     else:
       specs = [':{} (from {})'.format(address.target_name, os.path.basename(address.rel_path))

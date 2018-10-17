@@ -9,3 +9,13 @@ python_tests(
     'src/python/pants/java/jar',
   ]
 )
+
+python_tests(
+  name='integration',
+  sources=globs('*_integration.py'),
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+  timeout=300
+)

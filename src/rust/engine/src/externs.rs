@@ -7,13 +7,13 @@ use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::string::FromUtf8Error;
-use std::sync::RwLock;
 
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use enum_primitive::FromPrimitive;
 use handles::{DroppingHandle, Handle};
 use interning::Interns;
 use log;
+use parking_lot::RwLock;
 
 pub fn eval(python: &str) -> Result<Value, Failure> {
   with_externs(|e| (e.eval)(e.context, python.as_ptr(), python.len() as u64)).into()
@@ -28,12 +28,12 @@ pub fn equals(h1: &Handle, h2: &Handle) -> bool {
 }
 
 pub fn key_for(val: Value) -> Key {
-  let mut interns = INTERNS.write().unwrap();
+  let mut interns = INTERNS.write();
   interns.insert(val)
 }
 
 pub fn val_for(key: &Key) -> Value {
-  let interns = INTERNS.read().unwrap();
+  let interns = INTERNS.read();
   interns.get(key).clone()
 }
 
@@ -46,7 +46,7 @@ pub fn drop_handles(handles: &[DroppingHandle]) {
 }
 
 pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
-  let interns = INTERNS.read().unwrap();
+  let interns = INTERNS.read();
   with_externs(|e| {
     (e.satisfied_by)(
       e.context,
@@ -57,7 +57,7 @@ pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
 }
 
 pub fn satisfied_by_type(constraint: &TypeConstraint, cls: TypeId) -> bool {
-  let interns = INTERNS.read().unwrap();
+  let interns = INTERNS.read();
   with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0) as &Handle, &cls))
 }
 
@@ -187,7 +187,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
     PyGeneratorResponseType::Break => Ok(GeneratorResponse::Break(response.values.unwrap_one())),
     PyGeneratorResponseType::Throw => Err(PyResult::failure_from(response.values.unwrap_one())),
     PyGeneratorResponseType::Get => {
-      let mut interns = INTERNS.write().unwrap();
+      let mut interns = INTERNS.write();
       let constraint = TypeConstraint(interns.insert(response.constraints.unwrap_one()));
       Ok(GeneratorResponse::Get(Get(
         constraint,
@@ -195,7 +195,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
       )))
     }
     PyGeneratorResponseType::GetMulti => {
-      let mut interns = INTERNS.write().unwrap();
+      let mut interns = INTERNS.write();
       let continues = response
         .constraints
         .to_vec()
@@ -209,11 +209,22 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
 }
 
 ///
+/// Calls the given function with exclusive access to all locks managed by this module.
+/// Used to ensure that the main thread forks with all locks acquired.
+///
+pub fn exclusive_call(func: &Key) -> Result<Value, Failure> {
+  // NB: Acquiring the interns exclusively as well.
+  let interns = INTERNS.write();
+  let func_val = interns.get(func);
+  with_externs_exclusive(|e| (e.call)(e.context, func_val as &Handle, &[].as_ptr(), 0)).into()
+}
+
+///
 /// NB: Panics on failure. Only recommended for use with built-in functions, such as
 /// those configured in types::Types.
 ///
 pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
-  let interns = INTERNS.read().unwrap();
+  let interns = INTERNS.read();
   let func_val = interns.get(&func.0);
   call(func_val, args).unwrap_or_else(|e| {
     panic!("Core function `{}` failed: {:?}", val_to_str(func_val), e);
@@ -225,6 +236,8 @@ pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
+  // NB: Unfortunately, it's not currently possible to merge these locks, because mutating
+  // the `Interns` requires calls to extern functions, which would be re-entrant.
   static ref EXTERNS: RwLock<Option<Externs>> = RwLock::new(None);
   static ref INTERNS: RwLock<Interns> = RwLock::new(Interns::new());
 }
@@ -246,7 +259,7 @@ static mut LOGGER: FfiLogger = FfiLogger {
 ///
 pub fn set_externs(externs: Externs) {
   let log_level = externs.log_level;
-  let mut externs_ref = EXTERNS.write().unwrap();
+  let mut externs_ref = EXTERNS.write();
   *externs_ref = Some(externs);
   unsafe {
     LOGGER.init(log_level);
@@ -257,7 +270,18 @@ fn with_externs<F, T>(f: F) -> T
 where
   F: FnOnce(&Externs) -> T,
 {
-  let externs_opt = EXTERNS.read().unwrap();
+  let externs_opt = EXTERNS.read();
+  let externs = externs_opt
+    .as_ref()
+    .unwrap_or_else(|| panic!("externs used before static initialization."));
+  f(externs)
+}
+
+fn with_externs_exclusive<F, T>(f: F) -> T
+where
+  F: FnOnce(&Externs) -> T,
+{
+  let externs_opt = EXTERNS.write();
   let externs = externs_opt
     .as_ref()
     .unwrap_or_else(|| panic!("externs used before static initialization."));

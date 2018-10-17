@@ -1,11 +1,42 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  deny(
+    clippy,
+    default_trait_access,
+    expl_impl_clone_on_copy,
+    if_not_else,
+    needless_continue,
+    single_match_else,
+    unseparated_literal_suffix,
+    used_underscore_binding
+  )
+)]
+// It is often more clear to show that nothing is being moved.
+#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+// Subjective style.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(len_without_is_empty, redundant_field_names)
+)]
+// Default isn't as big a deal as people seem to think it is.
+#![cfg_attr(
+  feature = "cargo-clippy",
+  allow(new_without_default, new_without_default_derive)
+)]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+
 extern crate digest;
 extern crate hex;
+extern crate serde;
 extern crate sha2;
 
 use digest::{Digest as DigestTrait, FixedOutput};
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 use sha2::Sha256;
 
 use std::fmt;
@@ -67,6 +98,15 @@ impl AsRef<[u8]> for Fingerprint {
   }
 }
 
+impl Serialize for Fingerprint {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    serializer.serialize_str(self.to_hex().as_str())
+  }
+}
+
 ///
 /// A Digest is a fingerprint, as well as the size in bytes of the plaintext for which that is the
 /// fingerprint.
@@ -76,6 +116,18 @@ impl AsRef<[u8]> for Fingerprint {
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Digest(pub Fingerprint, pub usize);
+
+impl Serialize for Digest {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    let mut obj = serializer.serialize_struct("digest", 2)?;
+    obj.serialize_field("fingerprint", &self.0)?;
+    obj.serialize_field("size_bytes", &self.1)?;
+    obj.end()
+  }
+}
 
 ///
 /// A Write instance that fingerprints all data that passes through it.
@@ -117,6 +169,8 @@ impl<W: Write> Write for WriterHasher<W> {
 #[cfg(test)]
 mod fingerprint_tests {
   use super::Fingerprint;
+  extern crate serde_test;
+  use self::serde_test::{assert_ser_tokens, Token};
 
   #[test]
   fn from_bytes_unsafe() {
@@ -170,8 +224,7 @@ mod fingerprint_tests {
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
         0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0xff,
-      ],)
-        .to_hex(),
+      ],).to_hex(),
       "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_lowercase()
     )
   }
@@ -184,4 +237,53 @@ mod fingerprint_tests {
       hex.to_lowercase()
     )
   }
+
+  #[test]
+  fn serialize_to_str() {
+    let fingerprint = Fingerprint([
+      0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
+      0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+      0xff, 0xff,
+    ]);
+    assert_ser_tokens(
+      &fingerprint,
+      &[Token::Str(
+        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
+      )],
+    );
+  }
+
+}
+
+#[cfg(test)]
+mod digest_tests {
+  use super::Digest;
+  use super::Fingerprint;
+  extern crate serde_test;
+  use self::serde_test::{assert_ser_tokens, Token};
+
+  #[test]
+  fn serialize_to_str() {
+    let digest = Digest(
+      Fingerprint::from_hex_string(
+        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
+      ).unwrap(),
+      1,
+    );
+    assert_ser_tokens(
+      &digest,
+      &[
+        Token::Struct {
+          name: "digest",
+          len: 2,
+        },
+        Token::Str("fingerprint"),
+        Token::Str("0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff"),
+        Token::Str("size_bytes"),
+        Token::U64(1),
+        Token::StructEnd,
+      ],
+    );
+  }
+
 }

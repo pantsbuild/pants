@@ -40,7 +40,7 @@ class ParseSearchDirs(Subsystem):
   def _invoke_compiler_exe(self, cmd, env):
     try:
       # Get stderr interspersed in the error message too -- this should not affect output parsing.
-      compiler_output = subprocess.check_output(cmd, env=env, stderr=subprocess.STDOUT)
+      compiler_output = subprocess.check_output(cmd, env=env, stderr=subprocess.STDOUT).decode('utf-8')
     except OSError as e:
       # We use `safe_shlex_join` here to pretty-print the command.
       raise self.ParseSearchDirsError(

@@ -83,7 +83,8 @@ class PailgunHandler(PailgunHandlerBase):
     """Error handler for failed calls to handle()."""
     if exc:
       NailgunProtocol.send_stderr(self.request, traceback.format_exc())
-    NailgunProtocol.send_exit(self.request, '1')
+    failure_code = 1
+    NailgunProtocol.send_exit_with_code(self.request, failure_code)
 
 
 class PailgunServer(TCPServer):

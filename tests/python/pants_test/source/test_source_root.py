@@ -129,29 +129,29 @@ class SourceRootTest(TestBase):
     trie.add_fixed('fixed2/bar2', ['lang2'], TEST)
 
     # Test raw traversal.
-    self.assertEqual([('baz1', (), UNKNOWN),
-                       ('baz2/qux', (), UNKNOWN)],
-                      list(trie._root.children['foo1'].children['bar1'].subpatterns()))
+    self.assertEqual({('baz1', (), UNKNOWN),
+                      ('baz2/qux', (), UNKNOWN)},
+                     set(trie._root.children['foo1'].children['bar1'].subpatterns()))
 
-    self.assertEqual([('bar1/baz1', (), UNKNOWN),
-                       ('bar1/baz2/qux', (), UNKNOWN),
-                       ('bar2/baz1', (), UNKNOWN),
-                       ('bar2/baz2', (), UNKNOWN)],
-                      list(trie._root.children['foo1'].subpatterns()))
+    self.assertEqual({('bar1/baz1', (), UNKNOWN),
+                      ('bar1/baz2/qux', (), UNKNOWN),
+                      ('bar2/baz1', (), UNKNOWN),
+                      ('bar2/baz2', (), UNKNOWN)},
+                     set(trie._root.children['foo1'].subpatterns()))
 
-    self.assertEqual([('foo1/bar1/baz1', (), UNKNOWN),
-                       ('foo1/bar1/baz2/qux', (), UNKNOWN),
-                       ('foo1/bar2/baz1', (), UNKNOWN),
-                       ('foo1/bar2/baz2', (), UNKNOWN),
-                       ('foo2/bar1', (), UNKNOWN),
-                       ('^/fixed1/bar1', ('lang1',), SOURCE),
-                       ('^/fixed2/bar2', ('lang2',), TEST)],
-                      list(trie._root.subpatterns()))
+    self.assertEqual({('foo1/bar1/baz1', (), UNKNOWN),
+                      ('foo1/bar1/baz2/qux', (), UNKNOWN),
+                      ('foo1/bar2/baz1', (), UNKNOWN),
+                      ('foo1/bar2/baz2', (), UNKNOWN),
+                      ('foo2/bar1', (), UNKNOWN),
+                      ('^/fixed1/bar1', ('lang1',), SOURCE),
+                      ('^/fixed2/bar2', ('lang2',), TEST)},
+                     set(trie._root.subpatterns()))
 
     # Test the fixed() method.
-    self.assertEqual([('fixed1/bar1', ('lang1',), SOURCE),
-                       ('fixed2/bar2', ('lang2',), TEST)],
-                      trie.fixed())
+    self.assertEqual({('fixed1/bar1', ('lang1',), SOURCE),
+                      ('fixed2/bar2', ('lang2',), TEST)},
+                     set(trie.fixed()))
 
   def test_all_roots(self):
     self.create_dir('contrib/go/examples/3rdparty/go')

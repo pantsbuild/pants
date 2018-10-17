@@ -22,8 +22,8 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants_with_workdir(args, workdir)
       self.assert_success(pants_run)
       go_dist = global_subsystem_instance(GoDistribution)
-      goos = go_dist.create_go_cmd('env', args=['GOOS']).check_output().strip()
-      goarch = go_dist.create_go_cmd('env', args=['GOARCH']).check_output().strip()
+      goos = go_dist.create_go_cmd('env', args=['GOOS']).check_output().decode('utf-8').strip()
+      goarch = go_dist.create_go_cmd('env', args=['GOARCH']).check_output().decode('utf-8').strip()
       expected_files = set('contrib.go.examples.src.go.{libname}.{libname}/'
                            'pkg/{goos}_{goarch}/{libname}.a'
                            .format(libname=libname, goos=goos, goarch=goarch)

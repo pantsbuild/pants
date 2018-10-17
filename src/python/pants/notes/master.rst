@@ -4,8 +4,674 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.10.0dev1 (08/03/2018)
------------------------
+1.11.0.dev3 (10/13/2018)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to pex 1.4.8 and eliminate workarounds. (#6594)
+  `PR #6594 <https://github.com/pantsbuild/pants/pull/6594>`_
+
+* Upgrade to pex 1.5.1; ~kill --resolver-blacklist. (#6619)
+  `PR #6619 <https://github.com/pantsbuild/pants/pull/6619>`_
+
+New features
+~~~~~~~~~~~~
+
+* Pants should manage local dependencies defined in package.json for node_module targets (#6524)
+  `PR #6524 <https://github.com/pantsbuild/pants/pull/6524>`_
+
+* Introduce factory_dict. (#6622)
+  `PR #6622 <https://github.com/pantsbuild/pants/pull/6622>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fixup relative addresses for subprojects. (#6624)
+  `PR #6624 <https://github.com/pantsbuild/pants/pull/6624>`_
+
+* Run pythonstyle under the appropriate interpreter. (#6618)
+  `PR #6618 <https://github.com/pantsbuild/pants/pull/6618>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Leverage factory_dict. (#6623)
+  `PR #6623 <https://github.com/pantsbuild/pants/pull/6623>`_
+
+* [rsc-compile] only metacp the jdk/scala synthetics one time per run (#6614)
+  `PR #6614 <https://github.com/pantsbuild/pants/pull/6614>`_
+
+* Clarify factory method terminal constructor calls. (#6625)
+  `PR #6625 <https://github.com/pantsbuild/pants/pull/6625>`_
+
+* Simplify pants.pex creation, leverage -c. (#6620)
+  `PR #6620 <https://github.com/pantsbuild/pants/pull/6620>`_
+
+* Add fs_util gc (#6612)
+  `PR #6612 <https://github.com/pantsbuild/pants/pull/6612>`_
+
+* add release notes for 1.10.0rc2 (#6615)
+  `PR #6615 <https://github.com/pantsbuild/pants/pull/6615>`_
+
+* Fatal error logging followup fixes (#6610)
+  `PR #6610 <https://github.com/pantsbuild/pants/pull/6610>`_
+
+* Fix typo (#6611)
+  `PR #6611 <https://github.com/pantsbuild/pants/pull/6611>`_
+
+* Consolidate Resettable instances (#6604)
+  `PR #6604 <https://github.com/pantsbuild/pants/pull/6604>`_
+
+* Update lmdb to 0.8 (#6607)
+  `PR #6607 <https://github.com/pantsbuild/pants/pull/6607>`_
+
+* first attempt at centralizing more global error logging state in ExceptionSink (#6552)
+  `PR #6552 <https://github.com/pantsbuild/pants/pull/6552>`_
+
+* [rsc-compile] update jdk dist lookup and usage to work remotely (#6593)
+  `PR #6593 <https://github.com/pantsbuild/pants/pull/6593>`_
+
+
+1.11.0.dev2 (10/05/2018)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+* Support uploading stats to multiple endpoints. (#6599)
+  `PR #6599 <https://github.com/pantsbuild/pants/pull/6599>`_
+
+* Improve Noop resolution performance (#6577)
+  `PR #6577 <https://github.com/pantsbuild/pants/pull/6577>`_
+
+New features
+~~~~~~~~~~~~
+* Allow authentication to grpc APIs with oauth bearer tokens (#6581)
+  `PR #6581 <https://github.com/pantsbuild/pants/pull/6581>`_
+
+* Support secure grpc connections (#6584)
+  `PR #6584 <https://github.com/pantsbuild/pants/pull/6584>`_
+
+* Allow instance name to be set for remote executions (#6580)
+  `PR #6580 <https://github.com/pantsbuild/pants/pull/6580>`_
+
+Bugfixes
+~~~~~~~~
+* Store verifies digest lengths internally (#6588)
+  `PR #6588 <https://github.com/pantsbuild/pants/pull/6588>`_
+
+* Fix extra_jvm_options for `jvm_app` targets (#6572)
+  `PR #6572 <https://github.com/pantsbuild/pants/pull/6572>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Update the "hello world" plugin doc. (#6601)
+  `PR #6601 <https://github.com/pantsbuild/pants/pull/6601>`_
+
+* More pinning to fix jupyter floats. (#6600)
+  `PR #6600 <https://github.com/pantsbuild/pants/pull/6600>`_
+
+* Handle RPC errors as well as message-inline errors (#6589)
+  `PR #6589 <https://github.com/pantsbuild/pants/pull/6589>`_
+
+* Add hello world plugin to documentation (#6587)
+  `PR #6587 <https://github.com/pantsbuild/pants/pull/6587>`_
+
+* Don't immediately fail after a MacOS upgrade. (#6591)
+  `PR #6591 <https://github.com/pantsbuild/pants/pull/6591>`_
+
+* Enhance the login task. (#6586)
+  `PR #6586 <https://github.com/pantsbuild/pants/pull/6586>`_
+
+* StubCAS is built with a builder (#6582)
+  `PR #6582 <https://github.com/pantsbuild/pants/pull/6582>`_
+
+* Use uuid v4 in field which is specified to be a uuid v4 (#6576)
+  `PR #6576 <https://github.com/pantsbuild/pants/pull/6576>`_
+
+
+1.11.0.dev1 (09/28/2018)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Store and populate DirectoryDigests for cached targets (#6504)
+  `PR #6504 <https://github.com/pantsbuild/pants/pull/6504>`_
+
+New features
+~~~~~~~~~~~~
+
+* pantsd client logs exceptions from server processes (#6539)
+  `PR #6539 <https://github.com/pantsbuild/pants/pull/6539>`_
+
+* create singleton ExceptionSink object to centralize logging of fatal errors (#6533)
+  `PR #6533 <https://github.com/pantsbuild/pants/pull/6533>`_
+
+Bugfixes
+~~~~~~~~
+
+* refactor encoding for multiple nailgun messages, refactor logging on exit (#6388)
+  `PR #6388 <https://github.com/pantsbuild/pants/pull/6388>`_
+
+* [zinc-compile][hermetic] raise failure on compile failures (#6563)
+  `PR #6563 <https://github.com/pantsbuild/pants/pull/6563>`_
+
+* ExecuteProcessRequest works with overlapping output files and dirs (#6559)
+  `Issue #6558 <https://github.com/pantsbuild/pants/issues/6558>`_
+  `PR #6559 <https://github.com/pantsbuild/pants/pull/6559>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add forbidden imports check to ban std::sync primitives. (#6566)
+  `PR #6566 <https://github.com/pantsbuild/pants/pull/6566>`_
+
+* Pin jupyter transitive deps in integration tests (#6568)
+  `PR #6568 <https://github.com/pantsbuild/pants/pull/6568>`_
+  `Pex Issue #561 <https://github.com/pantsbuild/pex/issues/561>`_
+  `Pex PR #562 <https://github.com/pantsbuild/pex/pull/562>`_
+
+* Switch synchronization primitive usage to parking_lot (#6564)
+  `PR #6564 <https://github.com/pantsbuild/pants/pull/6564>`_
+
+* [rules-graph] ensure params in messages are sorted alphabetically (#6562)
+  `PR #6562 <https://github.com/pantsbuild/pants/pull/6562>`_
+
+* [rsc] break out metacp-ing jars into a separate job in RscCompile (#6538)
+  `PR #6538 <https://github.com/pantsbuild/pants/pull/6538>`_
+
+* Relativise paths (#6553)
+  `PR #6558 <https://github.com/pantsbuild/pants/issues/6558>`_
+  `PR #6553 <https://github.com/pantsbuild/pants/pull/6553>`_
+
+* Ensure consistent performance for instance memos. (#6554)
+  `PR #6554 <https://github.com/pantsbuild/pants/pull/6554>`_
+
+* Refactor pantsd integration test framework (#6508)
+  `PR #6508 <https://github.com/pantsbuild/pants/pull/6508>`_
+
+* Ensure JarLibrary classpath entries have directory digests (#6544)
+  `PR #6544 <https://github.com/pantsbuild/pants/pull/6544>`_
+
+* Remove usage of @memoized_property on MappedSpecs. (#6551)
+  `PR #6551 <https://github.com/pantsbuild/pants/pull/6551>`_
+
+* Update rust to 1.29 (#6527)
+  `PR #6527 <https://github.com/pantsbuild/pants/pull/6527>`_
+
+* Use .jdk dir for hermetic execution (#6502)
+  `PR #6502 <https://github.com/pantsbuild/pants/pull/6502>`_
+
+* Relativise path to compiler bridge (#6546)
+  `PR #6546 <https://github.com/pantsbuild/pants/pull/6546>`_
+
+* Make the sizes of the members of `enum Node` more uniform (#6545)
+  `PR #6545 <https://github.com/pantsbuild/pants/pull/6545>`_
+
+* Explicitly use backports.configparser (#6542)
+  `PR #6542 <https://github.com/pantsbuild/pants/pull/6542>`_
+
+* Merge subjects and variants into Params, and remove Noop (#6170)
+  `PR #6170 <https://github.com/pantsbuild/pants/pull/6170>`_
+
+* custom scalac version test - bump fixture to 2.12.4 (#6532)
+  `PR #6532 <https://github.com/pantsbuild/pants/pull/6532>`_
+
+
+1.11.0.dev0 (09/14/2018)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade Node.js to 8.11.3 and Yarn to 1.6.0 (#6512)
+  `PR #6512 <https://github.com/pantsbuild/pants/pull/6512>`_
+
+New features
+~~~~~~~~~~~~
+
+* Add extra_jvm_options to jvm_binary targets (#6310)
+  `PR #6310 <https://github.com/pantsbuild/pants/pull/6310>`_
+
+* [compile.rsc] Add strategy for compiling with Rsc and Zinc (#6408)
+  `PR #6408 <https://github.com/pantsbuild/pants/pull/6408>`_
+
+* Add support for HTTP basic auth. (#6495)
+  `PR #6495 <https://github.com/pantsbuild/pants/pull/6495>`_
+
+* gRPC support for golang protobufs. (#6507)
+  `PR #6507 <https://github.com/pantsbuild/pants/pull/6507>`_
+
+Bugfixes
+~~~~~~~~
+
+* make fatal_warnings_enabled_args a tuple instead of just parens (#6497)
+  `PR #6497 <https://github.com/pantsbuild/pants/pull/6497>`_
+
+* pass through `compatibility` to synthetic python thrift targets (#6499)
+  `PR #6499 <https://github.com/pantsbuild/pants/pull/6499>`_
+
+* Apply  workaround similer to #6409 to bootstrapper (#6498)
+  `PR #6498 <https://github.com/pantsbuild/pants/pull/6498>`_
+
+* Fix encoding of workunits under pantsd (#6505)
+  `PR #6505 <https://github.com/pantsbuild/pants/pull/6505>`_
+
+* refactor command line target spec resolution and check that all target roots exist (#6480)
+  `PR #6480 <https://github.com/pantsbuild/pants/pull/6480>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* delete unnecessary testproject and broken test (#6494)
+  `PR #6494 <https://github.com/pantsbuild/pants/pull/6494>`_
+
+* skip integration test with pants_requirement() (#6493)
+  `PR #6493 <https://github.com/pantsbuild/pants/pull/6493>`_
+
+* Add bootstrapper jar to compile the compile-bridge. (#6462)
+  `PR #6462 <https://github.com/pantsbuild/pants/pull/6462>`_
+
+* [Hermetic zinc compile] Memoize scalac classpath snapshots (#6491)
+  `PR #6491 <https://github.com/pantsbuild/pants/pull/6491>`_
+
+* remove FIXME and (cosmicexplorer) comments (#6479)
+  `PR #6479 <https://github.com/pantsbuild/pants/pull/6479>`_
+
+* Consume the bootstrapper and modify zinc to allow remote exec (#6463)
+  `PR #6463 <https://github.com/pantsbuild/pants/pull/6463>`_
+
+1.10.0rc0 (09/10/2018)
+----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Allow process_executor to make a JDK present (#6443)
+  `PR #6443 <https://github.com/pantsbuild/pants/pull/6443>`_
+
+* Zinc compiles can execute hermetically (#6351)
+  `PR #6351 <https://github.com/pantsbuild/pants/pull/6351>`_
+
+* Add a node-install goal to Pants for installing node_modules (#6367)
+  `PR #6367 <https://github.com/pantsbuild/pants/pull/6367>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fixup `JsonEncoderTest` encoding tests. (#6457)
+  `PR #6457 <https://github.com/pantsbuild/pants/pull/6457>`_
+
+* Switch back to forked grpc-rs (#6418)
+  `PR #6418 <https://github.com/pantsbuild/pants/pull/6418>`_
+
+* Fix pants_requirement environment markers. (#6451)
+  `PR #6451 <https://github.com/pantsbuild/pants/pull/6451>`_
+
+* Fix CI failures introduced by #6275 (#6454)
+  `PR #6454 <https://github.com/pantsbuild/pants/pull/6454>`_
+
+* Make sure directory digest is defined for cache hits (#6442)
+  `PR #6442 <https://github.com/pantsbuild/pants/pull/6442>`_
+
+* Cancel running work when entering the fork context (#6464)
+  `PR #6464 <https://github.com/pantsbuild/pants/pull/6464>`_
+
+* Fix setup.py rendering. (#6439)
+  `PR #6439 <https://github.com/pantsbuild/pants/pull/6439>`_
+
+* Detect ns packages using correct interpreter. (#6428)
+  `PR #6428 <https://github.com/pantsbuild/pants/pull/6428>`_
+
+* Fixup tests involving pexrc. (#6446)
+  `PR #6446 <https://github.com/pantsbuild/pants/pull/6446>`_
+
+* [fix] Pass full path to isdir rather than just basename. (#6453)
+  `PR #6453 <https://github.com/pantsbuild/pants/pull/6453>`_
+
+* Add missing call to super. (#6477)
+  `PR #6477 <https://github.com/pantsbuild/pants/pull/6477>`_
+
+* Remove broken pyenv shims from the PATH. (#6469)
+  `PR #6469 <https://github.com/pantsbuild/pants/pull/6469>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* fs_util and process_executor: Use default --local-store-path (#6444)
+  `PR #6444 <https://github.com/pantsbuild/pants/pull/6444>`_
+
+* satisfy python_dist setup_requires with a pex to resolve transitive deps, and some other unrelated native toolchain changes (#6275)
+  `PR #6275 <https://github.com/pantsbuild/pants/pull/6275>`_
+
+* Work around production `coverage` float. (#6452)
+  `PR #6452 <https://github.com/pantsbuild/pants/pull/6452>`_
+
+* Get clippy from the beta channel. (#6441)
+  `PR #6441 <https://github.com/pantsbuild/pants/pull/6441>`_
+
+* Tighten travis matrix and python activation. (#6440)
+  `Issue #8315 <https://github.com/travis-ci/travis-ci/issues/8315>`_
+  `PR #6440 <https://github.com/pantsbuild/pants/pull/6440>`_
+
+* Ensure unstable pants dists can never conflict. (#6460)
+  `PR #6460 <https://github.com/pantsbuild/pants/pull/6460>`_
+
+* Extend fs_util deadline to 30 minutes (#6471)
+  `PR #6471 <https://github.com/pantsbuild/pants/pull/6471>`_
+  `PR #6433 <https://github.com/pantsbuild/pants/pull/6433>`_
+
+* remove clean-all from pants invocations in python_dist() integration testing + some other refactoring (#6474)
+  `PR #6474 <https://github.com/pantsbuild/pants/pull/6474>`_
+
+* Re-enable pants_setup_requires:bin IT. (#6466)
+  `PR #6466 <https://github.com/pantsbuild/pants/pull/6466>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Minor tweak on blogpost (#6438)
+  `PR #6438 <https://github.com/pantsbuild/pants/pull/6438>`_
+
+
+1.10.0.dev5 (08/31/2018)
+------------------------
+
+New features
+~~~~~~~~~~~~
+
+* Support HEAD redirects in RESTfulArtifactCache. (#6412)
+  `PR #6412 <https://github.com/pantsbuild/pants/pull/6412>`_
+
+* Add json upload summary to `fs_util` (#6318) (#6389)
+  `PR #6318 <https://github.com/pantsbuild/pants/pull/6318>`_
+
+* Override interpreter constraints if global option is passed down (#6387)
+  `PR #6387 <https://github.com/pantsbuild/pants/pull/6387>`_
+  `PR #6250 <https://github.com/pantsbuild/pants/pull/6250>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix --binaries-path-by-id fingerprinting error (#6413)
+  `PR #6413 <https://github.com/pantsbuild/pants/pull/6413>`_
+
+* Remove false positive glob expansion failure warnings (#6278)
+  `PR #6278 <https://github.com/pantsbuild/pants/pull/6278>`_
+
+* Change zinc logging so it doesn't error out (#6409)
+  `PR #6409 <https://github.com/pantsbuild/pants/pull/6409>`_
+
+* Move fork context management to rust (#5521)
+  `PR #5521 <https://github.com/pantsbuild/pants/pull/5521>`_
+
+* Link requirements targets to their source. (#6405)
+  `PR #6405 <https://github.com/pantsbuild/pants/pull/6405>`_
+
+* Fix pants_requirement by allowing Python 3 (#6391)
+  `PR #6391 <https://github.com/pantsbuild/pants/pull/6391>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix clippy errors (#6420)
+  `PR #6420 <https://github.com/pantsbuild/pants/pull/6420>`_
+
+* Re-enable rust clippy on its own shard (#6419)
+  `PR #6419 <https://github.com/pantsbuild/pants/pull/6419>`_
+
+* Set JDK properties for remote execution (#6417)
+  `PR #6417 <https://github.com/pantsbuild/pants/pull/6417>`_
+  `PR #391 <https://github.com/twitter/scoot/pull/391>`_
+
+* s/size/size_bytes/ for consistency (#6410)
+  `PR #6410 <https://github.com/pantsbuild/pants/pull/6410>`_
+
+* Update rust deps (#6399)
+  `PR #6399 <https://github.com/pantsbuild/pants/pull/6399>`_
+
+* Update scalafmt to 1.5.1 (#6403)
+  `PR #6403 <https://github.com/pantsbuild/pants/pull/6403>`_
+
+Migration to Python3 compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Python 3 - fixes to get most of src unit tests green (#6372)
+  `PR #6372 <https://github.com/pantsbuild/pants/pull/6372>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Clarify release docs for stable branches. (#6427)
+  `PR #6427 <https://github.com/pantsbuild/pants/pull/6427>`_
+
+* Coursier Migration Blogpost (#6400)
+  `PR #6400 <https://github.com/pantsbuild/pants/pull/6400>`_
+
+* add 1.9.0rc2 notes (#6425)
+  `PR #6425 <https://github.com/pantsbuild/pants/pull/6425>`_
+
+
+1.10.0.dev4 (08/24/2018)
+------------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix CI (#6402)
+  `PR #6402 <https://github.com/pantsbuild/pants/pull/6402>`_
+
+* Requirements on language-specific sources should be optional. (#6375)
+  `PR #6375 <https://github.com/pantsbuild/pants/pull/6375>`_
+
+* Deprecate --quiet recursive option (#6156)
+  `PR #6156 <https://github.com/pantsbuild/pants/pull/6156>`_
+
+* Decode python_eval template resource as utf-8. (#6379)
+  `PR #6379 <https://github.com/pantsbuild/pants/pull/6379>`_
+
+* Use set literals & set comprehensions where possible (#6376)
+  `PR #6376 <https://github.com/pantsbuild/pants/pull/6376>`_
+
+* Stabilize test case sorting in suites. (#6371)
+  `PR #6371 <https://github.com/pantsbuild/pants/pull/6371>`_
+
+Migration to Python3 compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* No longer expect failure from test_pinger (#6373)
+  `PR #6373 <https://github.com/pantsbuild/pants/pull/6373>`_
+
+* Pin interpreter <3.7 in ci. (#6364)
+  `PR #6364 <https://github.com/pantsbuild/pants/pull/6364>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* [engine] Add note to readme about fs_util (#6377)
+  `PR #6377 <https://github.com/pantsbuild/pants/pull/6377>`_
+
+
+1.10.0.dev3 (08/20/2018)
+------------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add contrib dist support to pants_requirement. (#6365)
+  `PR #6365 <https://github.com/pantsbuild/pants/pull/6365>`_
+
+* Allow pex download path to be overridden (#6348)
+  `PR #6348 <https://github.com/pantsbuild/pants/pull/6348>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix Single Address Exclude (#6366)
+  `PR #6366 <https://github.com/pantsbuild/pants/pull/6366>`_
+
+* Add an environment marker to `pants_requirement`. (#6361)
+  `PR #6361 <https://github.com/pantsbuild/pants/pull/6361>`_
+
+* Make requirements on codegen products optional. (#6357)
+  `PR #6357 <https://github.com/pantsbuild/pants/pull/6357>`_
+
+* Use --entry-point not -c when building pex (#6349)
+  `PR #6349 <https://github.com/pantsbuild/pants/pull/6349>`_
+  `PR #6267 <https://github.com/pantsbuild/pants/pull/6267>`_
+
+* Recover from cancelled remote execution RPCs (#6188)
+  `PR #6188 <https://github.com/pantsbuild/pants/pull/6188>`_
+
+* Use forked version of grpcio (#6344)
+  `PR #6344 <https://github.com/pantsbuild/pants/pull/6344>`_
+  `PR #211 <https://github.com/pingcap/grpc-rs/pull/211>`_
+
+* added fullpath to fix path concat issue with files when not in git root (#6331)
+  `PR #6331 <https://github.com/pantsbuild/pants/pull/6331>`_
+
+* Log test targets that failed to run. (#6335)
+  `PR #6335 <https://github.com/pantsbuild/pants/pull/6335>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Run clippy with nightly rust on CI (#6347)
+  `PR #6347 <https://github.com/pantsbuild/pants/pull/6347>`_
+
+* Fix formatting of store.rs (#6350)
+  `PR #6350 <https://github.com/pantsbuild/pants/pull/6350>`_
+  `PR #6336 <https://github.com/pantsbuild/pants/pull/6336>`_
+
+* Download Directory recursively from remote CAS  (#6336)
+  `PR #6336 <https://github.com/pantsbuild/pants/pull/6336>`_
+
+* Process execution: Create symlink to JDK on demand (#6346)
+  `PR #6346 <https://github.com/pantsbuild/pants/pull/6346>`_
+
+* Simplify ExecuteProcessRequest construction (#6345)
+  `PR #6345 <https://github.com/pantsbuild/pants/pull/6345>`_
+
+* ci.sh uses positive rather than negative flags (#6342)
+  `PR #6342 <https://github.com/pantsbuild/pants/pull/6342>`_
+
+* Merge directories with identical files (#6343)
+  `PR #6343 <https://github.com/pantsbuild/pants/pull/6343>`_
+
+* Set chunk size in process_executor (#6337)
+  `PR #6337 <https://github.com/pantsbuild/pants/pull/6337>`_
+
+Migration to Python3 compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Python 3 - fixes to get backend mostly green (#6360)
+  `PR #6360 <https://github.com/pantsbuild/pants/pull/6360>`_
+
+* Python 3 - fixes to get green contrib (#6340)
+  `PR #6340 <https://github.com/pantsbuild/pants/pull/6340>`_
+
+1.10.0.dev2 (08/10/2018)
+------------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add a `--loop` flag, to allow for running continuously (#6270)
+  `PR #6270 <https://github.com/pantsbuild/pants/pull/6270>`_
+
+Bugfixes
+~~~~~~~~
+
+* pantsrc file paths are always unicode (#6316)
+  `PR #6316 <https://github.com/pantsbuild/pants/pull/6316>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Relativize most paths in the zinc compile command line (#6322)
+  `PR #6322 <https://github.com/pantsbuild/pants/pull/6322>`_
+
+* A few misc cleanups (#6324)
+  `PR #6324 <https://github.com/pantsbuild/pants/pull/6324>`_
+
+* Use dependency ClasspathEntries, not merged strings (#6317)
+  `PR #6317 <https://github.com/pantsbuild/pants/pull/6317>`_
+
+* Register products when compilation finishes (#6315)
+  `PR #6315 <https://github.com/pantsbuild/pants/pull/6315>`_
+
+* ClasspathEntry optionally takes a DirectoryDigest (#6297)
+  `PR #6297 <https://github.com/pantsbuild/pants/pull/6297>`_
+
+* Cache more of rust. (#6309)
+  `PR #6309 <https://github.com/pantsbuild/pants/pull/6309>`_
+
+* Tighten up local process streaming. (#6307)
+  `PR #6307 <https://github.com/pantsbuild/pants/pull/6307>`_
+
+* Bump rust to 1.28 (#6306)
+  `PR #6306 <https://github.com/pantsbuild/pants/pull/6306>`_
+
+* Remove unused Task._build_invalidator root param. (#6308)
+  `PR #6308 <https://github.com/pantsbuild/pants/pull/6308>`_
+
+* Reinstate possibility of local process streaming. (#6300)
+  `PR #6300 <https://github.com/pantsbuild/pants/pull/6300>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Document Pants features for Organizations (#5673)
+  `PR #5673 <https://github.com/pantsbuild/pants/pull/5673>`_
+
+* Add Sigma to "Powered by Pants" page (#6314)
+  `PR #6314 <https://github.com/pantsbuild/pants/pull/6314>`_
+
+* Add contributor (#6312)
+  `PR #6312 <https://github.com/pantsbuild/pants/pull/6312>`_
+
+Migration to Python3 compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Skip known to fail tests in py3 (#6323)
+  `PR #6323 <https://github.com/pantsbuild/pants/pull/6323>`_
+
+* Strings are correctly returned from rust code (#6325)
+  `PR #6325 <https://github.com/pantsbuild/pants/pull/6325>`_
+
+* Switch to Py2 and Py3 shards. (#6289)
+  `PR #6289 <https://github.com/pantsbuild/pants/pull/6289>`_
+
+* Python 3 fixes - various bytes vs unicode issues (#6311)
+  `PR #6311 <https://github.com/pantsbuild/pants/pull/6311>`_
+
+* Always return unicode with hexdigest() (#6313)
+  `PR #6313 <https://github.com/pantsbuild/pants/pull/6313>`_
+
+* Specify unicode vs bytes for Path and FileContent types (#6303)
+  `PR #6303 <https://github.com/pantsbuild/pants/pull/6303>`_
+
+* Python 3 fixes - add open backport to contrib (#6295)
+  `PR #6295 <https://github.com/pantsbuild/pants/pull/6295>`_
+
+* Python 3 fixes - add open() backport to safe_open() (#6304)
+  `PR #6304 <https://github.com/pantsbuild/pants/pull/6304>`_
+  `PR #6290 <https://github.com/pantsbuild/pants/pull/6290>`_
+
+* Require the system encoding to be UTF-8 (#6305)
+  `PR #6305 <https://github.com/pantsbuild/pants/pull/6305>`_
+
+* Python 3 fixes - add open() backport stage 2 (#6291)
+  `PR #6291 <https://github.com/pantsbuild/pants/pull/6291>`_
+  `PR #6290 <https://github.com/pantsbuild/pants/pull/6290>`_
+
+* drop self from __init__ and __new__ (#6299)
+  `PR #6299 <https://github.com/pantsbuild/pants/pull/6299>`_
+
+1.10.0.dev1 (08/03/2018)
+------------------------
 
 New features
 ~~~~~~~~~~~~
@@ -67,8 +733,8 @@ Migration to Python3 compatibility
 * Python 3 fixes - fix contrib/python checkstyle (#6274)
   `PR #6274 <https://github.com/pantsbuild/pants/pull/6274>`_
 
-1.10.0dev0 (07/27/2018)
------------------------
+1.10.0.dev0 (07/27/2018)
+------------------------
 
 * Remove 1.10.x deprecations (#6268)
   `PR #6268 <https://github.com/pantsbuild/pants/pull/6268>`_

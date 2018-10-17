@@ -12,10 +12,9 @@ import textwrap
 from builtins import open
 from collections import defaultdict
 from contextlib import closing
-from hashlib import sha1
 from xml.etree import ElementTree
 
-from future.utils import PY3
+from future.utils import PY3, text_type
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -31,6 +30,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
+from pants.engine.fs import DirectoryToMaterialize
+from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_open
@@ -197,7 +198,7 @@ class BaseZincCompile(JvmCompile):
 
   @memoized_property
   def _zinc(self):
-    return Zinc.Factory.global_instance().create(self.context.products)
+    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
 
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
@@ -207,6 +208,28 @@ class BaseZincCompile(JvmCompile):
     # Validate zinc options.
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args,
                                    self._args)
+    if self.execution_strategy == self.HERMETIC:
+      # TODO: Make incremental compiles work. See:
+      # hermetically https://github.com/pantsbuild/pants/issues/6517
+      if self.get_options().incremental:
+        raise TaskError("Hermetic zinc execution does not currently support incremental compiles. "
+                        "Please use --no-compile-zinc-incremental.")
+      try:
+        fast_relpath(self.get_options().pants_workdir, get_buildroot())
+      except ValueError:
+        raise TaskError(
+          "Hermetic zinc execution currently requires the workdir to be a child of the buildroot "
+          "but workdir was {} and buildroot was {}".format(
+            self.get_options().pants_workdir,
+            get_buildroot(),
+          )
+        )
+
+      if self.get_options().use_classpath_jars:
+        # TODO: Make this work by capturing the correct DirectoryDigest and passing them around the
+        # right places.
+        # See https://github.com/pantsbuild/pants/issues/6432
+        raise TaskError("Hermetic zinc execution currently doesn't work with classpath jars")
 
   def select(self, target):
     raise NotImplementedError()
@@ -221,8 +244,8 @@ class BaseZincCompile(JvmCompile):
 
     if zinc_analysis is not None:
       for compile_context in compile_contexts:
-        zinc_analysis[compile_context.target] = (compile_context.classes_dir,
-        compile_context.jar_file,
+        zinc_analysis[compile_context.target] = (compile_context.classes_dir.path,
+        compile_context.jar_file.path,
         compile_context.analysis_file)
 
     if zinc_args is not None:
@@ -243,18 +266,20 @@ class BaseZincCompile(JvmCompile):
     # the JDK it was invoked with.
     return Java.global_javac_classpath(self.context.products)
 
-  def scalac_classpath(self):
-    return ScalaPlatform.global_instance().compiler_classpath(self.context.products)
+  def scalac_classpath_entries(self):
+    """Returns classpath entries for the scalac classpath."""
+    return ScalaPlatform.global_instance().compiler_classpath_entries(
+      self.context.products, self.context._scheduler)
 
   def write_extra_resources(self, compile_context):
     """Override write_extra_resources to produce plugin and annotation processor files."""
     target = compile_context.target
     if isinstance(target, ScalacPlugin):
-      self._write_scalac_plugin_info(compile_context.classes_dir, target)
+      self._write_scalac_plugin_info(compile_context.classes_dir.path, target)
     elif isinstance(target, JavacPlugin):
-      self._write_javac_plugin_info(compile_context.classes_dir, target)
+      self._write_javac_plugin_info(compile_context.classes_dir.path, target)
     elif isinstance(target, AnnotationProcessor) and target.processors:
-      processor_info_file = os.path.join(compile_context.classes_dir, _PROCESSOR_INFO_FILE)
+      processor_info_file = os.path.join(compile_context.classes_dir.path, _PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
 
   def _write_processor_info(self, processor_info_file, processors):
@@ -262,47 +287,33 @@ class BaseZincCompile(JvmCompile):
       for processor in processors:
         f.write('{}\n'.format(processor.strip()))
 
-  @memoized_property
-  def _zinc_cache_dir(self):
-    """A directory where zinc can store compiled copies of the `compiler-bridge`.
-
-    The compiler-bridge is specific to each scala version, and is lazily computed by zinc if the
-    appropriate version does not exist. Eventually it would be great to just fetch this rather
-    than compiling it.
-    """
-    hasher = sha1()
-    for cp_entry in [self._zinc.zinc, self._zinc.compiler_interface, self._zinc.compiler_bridge]:
-      hasher.update(os.path.relpath(cp_entry, self.get_options().pants_workdir))
-    key = hasher.hexdigest()[:12]
-    return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
-
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
-    absolute_classpath = (ctx.classes_dir,) + tuple(ce.path for ce in dependency_classpath)
+    absolute_classpath = (ctx.classes_dir.path,) + tuple(ce.path for ce in dependency_classpath)
 
     if self.get_options().capture_classpath:
-      self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir)
+      self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir.path)
 
-    self._verify_zinc_classpath(absolute_classpath)
-    self._verify_zinc_classpath(list(upstream_analysis.keys()))
+    self._verify_zinc_classpath(absolute_classpath, allow_dist=(self.execution_strategy != self.HERMETIC))
+    # TODO: Investigate upstream_analysis for hermetic compiles
+    self._verify_zinc_classpath(upstream_analysis.keys())
 
     def relative_to_exec_root(path):
+      # TODO: Support workdirs not nested under buildroot by path-rewriting.
       return fast_relpath(path, get_buildroot())
 
-    scala_path = self.scalac_classpath()
-    compiler_interface = self._zinc.compiler_interface
-    compiler_bridge = self._zinc.compiler_bridge
-    classes_dir = ctx.classes_dir
+    classes_dir = ctx.classes_dir.path
     analysis_cache = ctx.analysis_file
 
-    scala_path = tuple(relative_to_exec_root(c) for c in scala_path)
-    compiler_interface = relative_to_exec_root(compiler_interface)
-    compiler_bridge = relative_to_exec_root(compiler_bridge)
     analysis_cache = relative_to_exec_root(analysis_cache)
     classes_dir = relative_to_exec_root(classes_dir)
     # TODO: Have these produced correctly, rather than having to relativize them here
     relative_classpath = tuple(relative_to_exec_root(c) for c in absolute_classpath)
+
+    # list of classpath entries
+    scalac_classpath_entries = self.scalac_classpath_entries()
+    scala_path = [classpath_entry.path for classpath_entry in scalac_classpath_entries]
 
     zinc_args = []
     zinc_args.extend([
@@ -314,10 +325,8 @@ class BaseZincCompile(JvmCompile):
     if not self.get_options().colors:
       zinc_args.append('-no-color')
 
-    zinc_args.extend(['-compiler-interface', compiler_interface])
-    zinc_args.extend(['-compiler-bridge', compiler_bridge])
-    # TODO: Move this to live inside the workdir: https://github.com/pantsbuild/pants/issues/6155
-    zinc_args.extend(['-zinc-cache-dir', self._zinc_cache_dir])
+    compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
+    zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
@@ -332,7 +341,7 @@ class BaseZincCompile(JvmCompile):
     #   triggering the plugin search mechanism, which does the memoizing).
     scalac_plugin_search_classpath = (
       (set(absolute_classpath) | set(self.scalac_plugin_classpath_elements())) -
-      {ctx.classes_dir, ctx.jar_file}
+      {ctx.classes_dir.path, ctx.jar_file.path}
     )
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
@@ -388,16 +397,66 @@ class BaseZincCompile(JvmCompile):
         fp.write(arg)
         fp.write(b'\n')
 
-    if self.runjava(classpath=[self._zinc.zinc],
-                    main=Zinc.ZINC_COMPILE_MAIN,
-                    jvm_options=jvm_options,
-                    args=zinc_args,
-                    workunit_name=self.name(),
-                    workunit_labels=[WorkUnitLabel.COMPILER],
-                    dist=self._zinc.dist):
-      raise TaskError('Zinc compile failed.')
+    if self.execution_strategy == self.HERMETIC:
+      zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
 
-  def _verify_zinc_classpath(self, classpath):
+      snapshots = [
+        self._zinc.snapshot(self.context._scheduler),
+        ctx.target.sources_snapshot(self.context._scheduler),
+      ]
+
+      relevant_classpath_entries = dependency_classpath + [compiler_bridge_classpath_entry]
+      directory_digests = tuple(
+        entry.directory_digest for entry in relevant_classpath_entries if entry.directory_digest
+      )
+      if len(directory_digests) != len(relevant_classpath_entries):
+        for dep in relevant_classpath_entries:
+          if dep.directory_digest is None:
+            logger.warning(
+              "ClasspathEntry {} didn't have a DirectoryDigest, so won't be present for hermetic "
+              "execution".format(dep)
+            )
+
+      snapshots.extend(
+        classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
+      )
+
+      merged_input_digest = self.context._scheduler.merge_directories(
+        tuple(s.directory_digest for s in (snapshots)) + directory_digests
+      )
+
+      # TODO: Extract something common from Executor._create_command to make the command line
+      # TODO: Lean on distribution for the bin/java appending here
+      argv = tuple(['.jdk/bin/java'] + jvm_options + ['-cp', zinc_relpath, Zinc.ZINC_COMPILE_MAIN] + zinc_args)
+      req = ExecuteProcessRequest(
+        argv=argv,
+        input_files=merged_input_digest,
+        output_directories=(classes_dir,),
+        description="zinc compile for {}".format(ctx.target.address.spec),
+        # TODO: These should always be unicodes
+        # Since this is always hermetic, we need to use `underlying_dist`
+        jdk_home=text_type(self._zinc.underlying_dist.home),
+      )
+      res = self.context.execute_process_synchronously_or_raise(req, self.name(), [WorkUnitLabel.COMPILER])
+
+      # TODO: Materialize as a batch in do_compile or somewhere
+      self.context._scheduler.materialize_directories((
+        DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
+      ))
+
+      # TODO: This should probably return a ClasspathEntry rather than a DirectoryDigest
+      return res.output_directory_digest
+    else:
+      if self.runjava(classpath=[self._zinc.zinc],
+                      main=Zinc.ZINC_COMPILE_MAIN,
+                      jvm_options=jvm_options,
+                      args=zinc_args,
+                      workunit_name=self.name(),
+                      workunit_labels=[WorkUnitLabel.COMPILER],
+                      dist=self._zinc.dist):
+        raise TaskError('Zinc compile failed.')
+
+  def _verify_zinc_classpath(self, classpath, allow_dist=True):
     def is_outside(path, putative_parent):
       return os.path.relpath(path, putative_parent).startswith(os.pardir)
 
@@ -407,7 +466,7 @@ class BaseZincCompile(JvmCompile):
         raise TaskError('Classpath entries provided to zinc should be absolute. '
                         '{} is not.'.format(path))
 
-      if is_outside(path, self.get_options().pants_workdir) and is_outside(path, dist.home):
+      if is_outside(path, self.get_options().pants_workdir) and (not allow_dist or is_outside(path, dist.home)):
         raise TaskError('Classpath entries provided to zinc should be in working directory or '
                         'part of the JDK. {} is not.'.format(path))
       if path != os.path.normpath(path):
@@ -466,7 +525,7 @@ class BaseZincCompile(JvmCompile):
     since SBT doesn't support plugins with dependencies anyway).
     """
     # Allow multiple flags and also comma-separated values in a single flag.
-    plugin_names = set([p for val in scalac_plugins for p in val.split(',')])
+    plugin_names = {p for val in scalac_plugins for p in val.split(',')}
     if not plugin_names:
       return {}
 
@@ -534,6 +593,8 @@ class BaseZincCompile(JvmCompile):
 class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code to classfiles using Zinc."""
 
+  compiler_name = 'zinc'
+
   @classmethod
   def product_types(cls):
     return ['runtime_classpath', 'zinc_analysis', 'zinc_args']
@@ -547,7 +608,3 @@ class ZincCompile(BaseZincCompile):
 
   def select_source(self, source_file_path):
     return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
-
-  def execute(self):
-    if JvmPlatform.global_instance().get_options().compiler == 'zinc':
-      return super(ZincCompile, self).execute()

@@ -13,7 +13,7 @@ import java.io.File
 case class AnalysisOptions(
   _cache: Option[File]         = None,
   cacheMap: Map[File, File]    = Map.empty,
-  rebaseMap: Map[File, File]   = Map.empty,
+  rebaseMap: Map[File, File]   = Map(new File(System.getProperty("user.dir")) -> new File("/proc/self/cwd")),
   clearInvalid: Boolean        = true
 ) {
   lazy val cache: File =

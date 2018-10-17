@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 bazel_protos = { path = "../process_execution/bazel_protos" }
 bytes = "0.4.5"
-digest = "0.6.2"
+digest = "0.7"
 hashing = { path = "../hashing" }
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
-sha2 = "0.6.0"
+sha2 = "0.7"

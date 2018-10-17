@@ -8,11 +8,10 @@ import os
 import shutil
 import tempfile
 from abc import abstractmethod
-from builtins import object, open
+from builtins import bytes, object, open
 from contextlib import contextmanager
 
-import six
-from six import binary_type, string_types
+from future.utils import iteritems, string_types
 from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.argfile import safe_args
@@ -190,7 +189,7 @@ class Jar(object):
     if not path or not isinstance(path, string_types):
       raise ValueError('The path must be a non-empty string')
 
-    if contents is None or not isinstance(contents, binary_type):
+    if contents is None or not isinstance(contents, bytes):
       raise ValueError('The contents must be a sequence of bytes')
 
     self._add_entry(self.MemoryEntry(path, contents))
@@ -392,7 +391,7 @@ class JarBuilderTask(JarTask):
       :param JvmBinary jvm_binary_target:
       :param Manifest manifest:
       """
-      for header, value in six.iteritems(jvm_binary_target.manifest_entries.entries):
+      for header, value in iteritems(jvm_binary_target.manifest_entries.entries):
         manifest.addentry(header, value)
 
     @staticmethod

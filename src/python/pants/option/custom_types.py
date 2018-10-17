@@ -12,6 +12,7 @@ import six
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
+from pants.util.objects import enum
 from pants.util.strutil import ensure_text
 
 
@@ -306,3 +307,11 @@ class DictValueComponent(object):
 
   def __repr__(self):
     return '{} {}'.format(self.action, self.val)
+
+
+class GlobExpansionConjunction(enum('conjunction', ['any_match', 'all_match'])):
+
+  # NB: The `default_value` is automatically the first element of the value list, but can be
+  # overridden or made more explicit in the body of the class. We want to be explicit here about
+  # which behavior we have when merging globs, as that can affect performance.
+  default_value = 'any_match'

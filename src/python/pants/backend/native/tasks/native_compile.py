@@ -10,6 +10,7 @@ from builtins import filter
 from collections import defaultdict
 
 from pants.backend.native.config.environment import Executable
+from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFiles
 from pants.backend.native.tasks.native_task import NativeTask
@@ -33,14 +34,14 @@ class NativeCompileRequest(datatype([
 ])): pass
 
 
-# FIXME(#5950): perform all process execution in the v2 engine!
+# TODO(#5950): perform all process execution in the v2 engine!
 class ObjectFiles(datatype(['root_dir', 'filenames'])):
 
   def file_paths(self):
     return [os.path.join(self.root_dir, fname) for fname in self.filenames]
 
 
-# FIXME: this is a temporary hack -- we could introduce something like a "NativeRequirement" with
+# TODO: this is a temporary hack -- we could introduce something like a "NativeRequirement" with
 # dependencies, header, object file, library name (more?) instead of using multiple products.
 class NativeTargetDependencies(datatype(['native_deps'])): pass
 
@@ -51,7 +52,7 @@ class NativeCompile(NativeTask, AbstractClass):
   # operate on for `strict_deps` calculation.
   # NB: `source_target_constraint` must be overridden.
   source_target_constraint = None
-  dependent_target_constraint = SubclassesOf(NativeLibrary)
+  dependent_target_constraint = SubclassesOf(ExternalNativeLibrary, NativeLibrary)
 
   # `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
   # compiler process. `workunit_label` must be set to a string.
@@ -128,14 +129,14 @@ class NativeCompile(NativeTask, AbstractClass):
     source_targets = self.context.targets(self.source_target_constraint.satisfied_by)
 
     with self.invalidated(source_targets, invalidate_dependents=True) as invalidation_check:
-      for vt in invalidation_check.invalid_vts:
+      for vt in invalidation_check.all_vts:
         deps = self.native_deps(vt.target)
         self._add_product_at_target_base(native_deps_product, vt.target, deps)
-        compile_request = self._make_compile_request(vt, deps, external_libs_product)
-        self.context.log.debug("compile_request: {}".format(compile_request))
-        self._compile(compile_request)
+        if not vt.valid:
+          compile_request = self._make_compile_request(vt, deps, external_libs_product)
+          self.context.log.debug("compile_request: {}".format(compile_request))
+          self._compile(compile_request)
 
-      for vt in invalidation_check.all_vts:
         object_files = self.collect_cached_objects(vt)
         self._add_product_at_target_base(object_files_product, vt.target, object_files)
 
@@ -160,7 +161,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
     # Unique file names are required because we just dump object files into a single directory, and
     # the compiler will silently just produce a single object file if provided non-unique filenames.
-    # FIXME: add some shading to file names so we can remove this check.
+    # TODO: add some shading to file names so we can remove this check.
     # NB: It shouldn't matter if header files have the same name, but this will raise an error in
     # that case as well. We won't need to do any shading of header file names.
     seen_filenames = defaultdict(list)
@@ -178,7 +179,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
     return [os.path.join(get_buildroot(), rel_root, src) for src in target_relative_sources]
 
-  # FIXME(#5951): expand `Executable` to cover argv generation (where an `Executable` is subclassed
+  # TODO(#5951): expand `Executable` to cover argv generation (where an `Executable` is subclassed
   # to modify or extend the argument list, as declaratively as possible) to remove
   # `extra_compile_args(self)`!
   @abstractmethod
@@ -192,18 +193,19 @@ class NativeCompile(NativeTask, AbstractClass):
   def _compiler(self):
     return self.get_compiler()
 
-  def _get_third_party_include_dirs(self, external_libs_product):
+  def _get_third_party_include_dirs(self, external_libs_product, dependencies):
     if not external_libs_product:
       return []
 
-    directory = external_libs_product.include_dir
-    return [directory] if directory else []
+    return [nelf.include_dir
+            for nelf in external_libs_product.get_for_targets(dependencies)
+            if nelf.include_dir]
 
   def _make_compile_request(self, versioned_target, dependencies, external_libs_product):
     target = versioned_target.target
 
     include_dirs = [self._include_dirs_for_target(dep_tgt) for dep_tgt in dependencies]
-    include_dirs.extend(self._get_third_party_include_dirs(external_libs_product))
+    include_dirs.extend(self._get_third_party_include_dirs(external_libs_product, dependencies))
 
     sources_and_headers = self.get_sources_headers_for_target(target)
 
@@ -221,12 +223,12 @@ class NativeCompile(NativeTask, AbstractClass):
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
 
     # We are going to execute in the target output, so get absolute paths for everything.
-    # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
     buildroot = get_buildroot()
     argv = (
       [compiler.exe_filename] +
       compiler.extra_args +
       err_flags +
+      # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
       ['-c', '-fPIC'] +
       [
         '-I{}'.format(os.path.join(buildroot, inc_dir))

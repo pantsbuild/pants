@@ -48,12 +48,12 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
                                           JarDependency(org='org.gnu', name='gary', rev='4.0.0',
                                                         ext='tar.gz')])
 
-    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content')
+    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content', binary_mode=False)
     self.resources_target = self.make_target('//resources:foo-resources', Resources,
                                              sources=['foo/file'])
 
     # This is so that payload fingerprint can be computed.
-    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content')
+    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content', binary_mode=False)
     self.java_lib_target = self.make_target('//foo:foo-library', JavaLibrary, sources=['Foo.java'])
 
     self.binary_target = self.make_target(spec='//foo:foo-binary',
@@ -94,7 +94,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
     )
 
     # Confirm that we haven't destroyed deps.
-    expected_non_deps = set(['output-0.jar', 'Foo.class', 'foo.txt', 'file'])
+    expected_non_deps = {'output-0.jar', 'Foo.class', 'foo.txt', 'file'}
     found = set(os.listdir(self.pants_workdir))
     print(expected_non_deps - found)
     self.assertTrue(expected_non_deps - found == expected_non_deps)
@@ -119,9 +119,9 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
     )
 
     # Confirm that we haven't destroyed deps.
-    expected_deps = set(['org.apache-baz-3.0.0-tests.jar',
-                         'org.example-foo-1.0.0.jar',
-                         'org.gnu-gary-4.0.0.tar.gz',
-                         'org.pantsbuild-bar-2.0.0.zip'])
+    expected_deps = {'org.apache-baz-3.0.0-tests.jar',
+                     'org.example-foo-1.0.0.jar',
+                     'org.gnu-gary-4.0.0.tar.gz',
+                     'org.pantsbuild-bar-2.0.0.zip'}
     found = set(os.listdir(self.pants_workdir))
     self.assertTrue(expected_deps - found == set())

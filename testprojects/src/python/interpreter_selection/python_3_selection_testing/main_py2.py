@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import sys
 
 from interpreter_selection.python_3_selection_testing.lib_py2 import say_something
@@ -15,7 +16,7 @@ from interpreter_selection.python_3_selection_testing.lib_py2 import say_somethi
 
 def main():
   v = sys.version_info
-  print(sys.executable)
+  print(os.path.realpath(sys.executable))
   print('%d.%d.%d' % v[0:3])
   return say_something()
 

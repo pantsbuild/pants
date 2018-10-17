@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 import coverage
-from six.moves import configparser
+from backports import configparser
 
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
@@ -26,6 +26,21 @@ from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import ensure_cached
+
+
+# NB: Our production code depends on `pytest-cov` which indirectly depends on `coverage`, but in
+# this test we have a direct dependency on `coverage` in order to load data files and test that
+# coverage is collected by `pytest-cov` and has expected values. Unfortunately, `pytest-cov` has a
+# floating dependency on `coverage` and `coverage` has changed its data file format in the past (eg:
+# https://pypi.org/project/coverage/5.0a2/). If the default data format differs between `coverage`
+# float and `coverage` pinned, we'll fail to read coverage data here in this test. We work around
+# this by adding a pinned `coverage` requirement that matches our test dependency to the
+# `PytestPrep` production requirements here.
+class PytestPrepCoverageVersionPinned(PytestPrep):
+  def extra_requirements(self):
+    extra_reqs = list(super(PytestPrepCoverageVersionPinned, self).extra_requirements())
+    extra_reqs.append('coverage=={}'.format(coverage.__version__))
+    return extra_reqs
 
 
 class PytestTestBase(PythonTaskTestBase):
@@ -68,7 +83,7 @@ class PytestTestBase(PythonTaskTestBase):
     si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
     rr_task_type = self.synthesize_task_subtype(ResolveRequirements, 'rr_scope')
     gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
-    pp_task_type = self.synthesize_task_subtype(PytestPrep, 'pp_scope')
+    pp_task_type = self.synthesize_task_subtype(PytestPrepCoverageVersionPinned, 'pp_scope')
     context = self.context(for_task_types=[si_task_type, rr_task_type, gs_task_type, pp_task_type],
                            target_roots=targets,
                            passthru_args=list(passthru_args))
@@ -479,7 +494,7 @@ python_tests(
       PytestRun._add_plugin_config(cp,
                                    src_chroot_path=src_chroot_path,
                                    src_to_target_base=src_to_target_base)
-      with temporary_file() as fp:
+      with temporary_file(binary_mode=False) as fp:
         cp.write(fp)
         fp.close()
 

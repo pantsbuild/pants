@@ -4,8 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import str
-
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -17,11 +15,11 @@ class ClocIntegrationTest(PantsRunIntegrationTest):
     ])
     self.assert_success(pants_run)
     # Strip out the header which is non-deterministic because it has speed information in it.
-    stdout = str('\n'.join(pants_run.stdout_data.split('\n')[1:]))
-    self.assertEqual(stdout, str("""-------------------------------------------------------------------------------
+    stdout = '\n'.join(pants_run.stdout_data.split('\n')[1:])
+    self.assertEqual(stdout, """-------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
 Python                           1              3              3              4
 -------------------------------------------------------------------------------
 
-"""))
+""")

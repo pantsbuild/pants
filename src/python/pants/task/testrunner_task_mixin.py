@@ -461,14 +461,18 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
       for partition in sorted(results):
         rv = results[partition]
         failed_targets = set(rv.failed_targets)
+        pre_execution_error = not failed_targets and not rv.success
         for target in partition:
-          if target in failed_targets:
+          if pre_execution_error:
+            log = self.context.log.warn
+            result = 'NOT RUN'
+          elif target in failed_targets:
             log = self.context.log.error
             result = rv
           else:
             log = self.context.log.info
             result = self.result_class.successful()
-          log('{0:80}.....{1:>10}'.format(target.address.reference(), result))
+          log('{0:80}.....{1:>10}'.format(target.address.reference(), str(result)))
 
       msgs = [str(_rv) for _rv in results.values() if not _rv.success]
       failed_targets = [target

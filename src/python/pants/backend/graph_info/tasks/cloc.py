@@ -40,7 +40,7 @@ class CountLinesOfCode(ConsoleTask):
     input_snapshots = tuple(
       target.sources_snapshot(scheduler=self.context._scheduler) for target in targets
     )
-    input_files = set(f.path for snapshot in input_snapshots for f in snapshot.files)
+    input_files = {f.path for snapshot in input_snapshots for f in snapshot.files}
 
     # TODO: Work out a nice library-like utility for writing an argfile, as this will be common.
     with temporary_dir() as tmpdir:
@@ -75,22 +75,19 @@ class CountLinesOfCode(ConsoleTask):
 
     # The cloc script reaches into $PATH to look up perl. Let's assume it's in /usr/bin.
     req = ExecuteProcessRequest(
-      cmd,
-      (),
-      directory_digest,
-      ('ignored', 'report'),
-      (),
-      15 * 60,
-      'cloc'
+      argv=cmd,
+      input_files=directory_digest,
+      output_files=('ignored', 'report'),
+      description='cloc',
     )
-    exec_result = self.context.execute_process_synchronously(req, 'cloc', (WorkUnitLabel.TOOL,))
+    exec_result = self.context.execute_process_synchronously_without_raising(req, 'cloc', (WorkUnitLabel.TOOL,))
 
     files_content_tuple = self.context._scheduler.product_request(
       FilesContent,
       [exec_result.output_directory_digest]
     )[0].dependencies
 
-    files_content = {fc.path: fc.content for fc in files_content_tuple}
+    files_content = {fc.path: fc.content.decode('utf-8') for fc in files_content_tuple}
     for line in files_content['report'].split('\n'):
       yield line
 

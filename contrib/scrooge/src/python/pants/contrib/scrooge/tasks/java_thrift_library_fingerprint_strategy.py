@@ -29,8 +29,8 @@ class JavaThriftLibraryFingerprintStrategy(FingerprintStrategy):
       return fp
 
     hasher = hashlib.sha1()
-    hasher.update(fp)
-    hasher.update(self._thrift_defaults.language(target))
+    hasher.update(fp.encode('utf-8'))
+    hasher.update(self._thrift_defaults.language(target).encode('utf-8'))
     hasher.update(str(self._thrift_defaults.compiler_args(target)).encode('utf-8'))
 
     namespace_map = self._thrift_defaults.namespace_map(target)

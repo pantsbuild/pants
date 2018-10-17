@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 
 from pants.backend.native.config.environment import Assembler, CCompiler, CppCompiler, Linker
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Select
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_readable_dir
@@ -128,7 +128,7 @@ class XCodeCLITools(Subsystem):
 
     all_inc_dirs = base_inc_dirs
     for d in base_inc_dirs:
-      # FIXME: what does this directory do?
+      # TODO: figure out what this directory does and why it's not already found by this compiler.
       secure_inc_dir = os.path.join(d, 'secure')
       if is_readable_dir(secure_inc_dir):
         all_inc_dirs.append(secure_inc_dir)
@@ -196,5 +196,4 @@ def create_xcode_cli_tools_rules():
     get_ld,
     get_clang,
     get_clang_plusplus,
-    RootRule(XCodeCLITools),
   ]

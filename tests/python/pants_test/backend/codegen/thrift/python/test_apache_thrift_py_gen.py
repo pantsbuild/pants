@@ -154,13 +154,13 @@ class ApacheThriftPyGenTest(TaskTestBase):
     # TODO(John Sirois): We really should be emitting setuptools in a
     # `synthetic_target_extra_dependencies` override in `ApacheThriftPyGen`:
     #   https://github.com/pantsbuild/pants/issues/5975
-    pythonpath = interpreter.extras.values()
+    pythonpath = list(interpreter.extras.values())
     pythonpath.extend(os.path.join(get_buildroot(), t.target_base) for t in targets)
-    for dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen))],
-                        interpreter=interpreter,
-                        context=python_repos.get_network_context(),
-                        fetchers=python_repos.get_fetchers()):
-      pythonpath.append(dist.location)
+    for resolved_dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen))],
+                                 interpreter=interpreter,
+                                 context=python_repos.get_network_context(),
+                                 fetchers=python_repos.get_fetchers()):
+      pythonpath.append(resolved_dist.distribution.location)
 
     process = subprocess.Popen([interpreter.binary,
                                 '-c',
@@ -169,3 +169,21 @@ class ApacheThriftPyGenTest(TaskTestBase):
                                stderr=subprocess.PIPE)
     _, stderr = process.communicate()
     self.assertEqual(0, process.returncode, stderr)
+
+  def test_compatibility_passthrough(self):
+    py2_thrift_library = self.make_target(spec='src/thrift/com/foo:py2',
+                                          target_type=PythonThriftLibrary,
+                                          sources=[],
+                                          compatibility=['CPython>=2.7,<3'])
+    _, py2_synthetic_target = self.generate_single_thrift_target(py2_thrift_library)
+
+    self.assertEqual(py2_thrift_library.compatibility, py2_synthetic_target.compatibility)
+
+    py3_thrift_library = self.make_target(spec='src/thrift/com/foo:py3',
+                                          target_type=PythonThriftLibrary,
+                                          sources=[],
+                                          compatibility=['CPython>=3,<3.7'])
+    _, py3_synthetic_target = self.generate_single_thrift_target(py3_thrift_library)
+
+    self.assertEqual(py3_thrift_library.compatibility, py3_synthetic_target.compatibility)
+    self.assertNotEqual(py3_synthetic_target.compatibility, py2_synthetic_target.compatibility)

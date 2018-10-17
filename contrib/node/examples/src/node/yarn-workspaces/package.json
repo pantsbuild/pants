@@ -1,0 +1,19 @@
+{
+  "name": "yarn-workspaces",
+  "version": "1.0.0-yarn-workspaces",
+  "description": "A yarn workspace project for testing source-deps integration",
+  "author": "pantsbuild",
+  "license": "MIT",
+  "private": true,
+  "workspaces": [
+    "./adder",
+    "./add-two"
+  ],
+  "dependencies": {
+    "add-one": "file:add-one"
+  },
+  "scripts": {
+    "test-adder": "cd ./adder && yarnpkg start",
+    "test-add-two": "cd ./add-two && yarnpkg test"
+  }
+}

@@ -13,6 +13,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Benjy Weinberger
 + Bill Farner
 + Billy "Hyun Joon" Seol
++ Borja Lorente
 + Brandon Milton
 + Brian Larson
 + Brian Wickman
@@ -70,6 +71,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Ity Kaul
 + Jackson Davis
 + Jake Donham
++ Jakub Bujny
 + James Bench
 + James Koch
 + James Mouradian
@@ -120,6 +122,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Mark McBride
 + Mateo Rodriguez
 + Mathew Jennings
++ Mathieu Sabourin
 + Matt Dee
 + Matt Landis
 + Matt Olsen
@@ -139,9 +142,11 @@ Created by running `./build-support/bin/contributors.sh`.
 + Ny Saechao
 + Oliver Gould
 + Oliver Seemann
++ Omer Zach
 + Pankaj Gupta
 + Patrick Lawson
 + Paul Groudas
++ Paul Yau
 + Peiyu Wang
 + Peter Seibel
 + Qicheng Ma
@@ -152,6 +157,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Sara Solano
 + Senthil Kumaran
 + Sergey Serebryakov
++ Shane Delmore
 + Shuo Li
 + Simeon Franklin
 + Stefan Sauer

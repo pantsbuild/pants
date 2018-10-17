@@ -32,17 +32,7 @@ class LinkSharedLibraryRequest(datatype([
     ('external_lib_dirs', tuple),
     ('external_lib_names', tuple),
 ])):
-
-  @classmethod
-  def with_external_libs_product(cls, external_libs_product=None, *args, **kwargs):
-    if external_libs_product is None:
-      lib_dirs = ()
-      lib_names = ()
-    else:
-      lib_dirs = (external_libs_product.lib_dir,)
-      lib_names = external_libs_product.lib_names
-
-    return cls(*args, external_lib_dirs=lib_dirs, external_lib_names=lib_names, **kwargs)
+  pass
 
 
 class LinkSharedLibraries(NativeTask):
@@ -88,7 +78,7 @@ class LinkSharedLibraries(NativeTask):
 
   @memoized_property
   def platform(self):
-    # FIXME: convert this to a v2 engine dependency injection.
+    # TODO: convert this to a v2 engine dependency injection.
     return Platform.create()
 
   def _retrieve_single_product_at_target_base(self, product_mapping, target):
@@ -114,7 +104,7 @@ class LinkSharedLibraries(NativeTask):
         if vt.valid:
           shared_library = self._retrieve_shared_lib_from_cache(vt)
         else:
-          # FIXME: We need to partition links based on proper dependency edges and not
+          # TODO: We need to partition links based on proper dependency edges and not
           # perform a link to every native_external_library for all targets in the closure.
           # https://github.com/pantsbuild/pants/issues/6178
           link_request = self._make_link_request(
@@ -154,21 +144,30 @@ class LinkSharedLibraries(NativeTask):
     deps = self._retrieve_single_product_at_target_base(native_target_deps_product, vt.target)
 
     all_compiled_object_files = []
-
     for dep_tgt in deps:
-      self.context.log.debug("dep_tgt: {}".format(dep_tgt))
-      object_files = self._retrieve_single_product_at_target_base(compiled_objects_product, dep_tgt)
-      self.context.log.debug("object_files: {}".format(object_files))
-      object_file_paths = object_files.file_paths()
-      self.context.log.debug("object_file_paths: {}".format(object_file_paths))
-      all_compiled_object_files.extend(object_file_paths)
+      if compiled_objects_product.get(dep_tgt):
+        self.context.log.debug("dep_tgt: {}".format(dep_tgt))
+        object_files = self._retrieve_single_product_at_target_base(compiled_objects_product, dep_tgt)
+        self.context.log.debug("object_files: {}".format(object_files))
+        object_file_paths = object_files.file_paths()
+        self.context.log.debug("object_file_paths: {}".format(object_file_paths))
+        all_compiled_object_files.extend(object_file_paths)
 
-    return LinkSharedLibraryRequest.with_external_libs_product(
+    external_lib_dirs = []
+    external_lib_names = []
+    if external_libs_product is not None:
+      for nelf in external_libs_product.get_for_targets(deps):
+        if nelf.lib_dir:
+          external_lib_dirs.append(nelf.lib_dir)
+        external_lib_names.extend(nelf.lib_names)
+
+    return LinkSharedLibraryRequest(
       linker=self.linker,
       object_files=tuple(all_compiled_object_files),
       native_artifact=vt.target.ctypes_native_library,
       output_dir=vt.results_dir,
-      external_libs_product=external_libs_product)
+      external_lib_dirs=tuple(external_lib_dirs),
+      external_lib_names=tuple(external_lib_names))
 
   _SHARED_CMDLINE_ARGS = {
     'darwin': lambda: ['-Wl,-dylib'],

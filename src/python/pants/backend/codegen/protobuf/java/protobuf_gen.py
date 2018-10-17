@@ -62,7 +62,7 @@ class ProtobufGen(SimpleCodegenTask):
   def prepare(cls, options, round_manager):
     super(ProtobufGen, cls).prepare(options, round_manager)
     round_manager.require_data(JarImportProducts)
-    round_manager.require_data('deferred_sources')
+    round_manager.optional_data('deferred_sources')
   # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def __init__(self, *args, **kwargs):

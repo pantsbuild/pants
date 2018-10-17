@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import configparser
 import itertools
 import json
 import os
@@ -17,6 +16,8 @@ from collections import OrderedDict
 from contextlib import contextmanager
 from io import StringIO
 from textwrap import dedent
+
+from backports import configparser
 
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -240,7 +241,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     # Note that it's important to put the tmpfile under the workdir, because pytest
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
-    with temporary_file(root_dir=workdirs.root_dir) as fp:
+    with temporary_file(root_dir=workdirs.root_dir, binary_mode=False) as fp:
       cp.write(fp)
       fp.close()
       coverage_rc = fp.name

@@ -16,21 +16,22 @@ from pants.backend.native.config.environment import LLVMCppToolchain, LLVMCToolc
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_native_code import (PythonNativeCode,
+from pants.backend.python.subsystems.python_native_code import (BuildSetupRequiresPex,
+                                                                PythonNativeCode,
                                                                 SetupPyExecutionEnvironment,
-                                                                SetupPyNativeTools,
-                                                                ensure_setup_requires_site_dir)
+                                                                SetupPyNativeTools)
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import is_local_python_dist
-from pants.backend.python.tasks.setup_py import SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
+from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.task.task import Task
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import environment_as
+from pants.util.contextutil import pushd
 from pants.util.dirutil import safe_mkdir_for, split_basename_and_dirname
 from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.strutil import safe_shlex_join
 
 
 class BuildLocalPythonDistributions(Task):
@@ -43,6 +44,8 @@ class BuildLocalPythonDistributions(Task):
   _SETUP_REQUIRES_SITE_SUBDIR = 'setup_requires_site'
   # This will contain the sources used to build the python_dist().
   _DIST_SOURCE_SUBDIR = 'python_dist_subdir'
+
+  setup_requires_pex_filename = 'setup-requires.pex'
 
   # This defines the output directory when building the dist, so we know where the output wheel is
   # located. It is a subdirectory of `_DIST_SOURCE_SUBDIR`.
@@ -58,7 +61,7 @@ class BuildLocalPythonDistributions(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
-    round_manager.require(SharedLibrary)
+    round_manager.optional_product(SharedLibrary)
 
   @classmethod
   def implementation_version(cls):
@@ -67,6 +70,7 @@ class BuildLocalPythonDistributions(Task):
   @classmethod
   def subsystem_dependencies(cls):
     return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (
+      BuildSetupRequiresPex.scoped(cls),
       PythonNativeCode.scoped(cls),
     )
 
@@ -80,7 +84,11 @@ class BuildLocalPythonDistributions(Task):
   def _python_native_code_settings(self):
     return PythonNativeCode.scoped_instance(self)
 
-  # FIXME(#5869): delete this and get Subsystems from options, when that is possible.
+  @memoized_property
+  def _build_setup_requires_pex_settings(self):
+    return BuildSetupRequiresPex.scoped_instance(self)
+
+  # TODO(#5869): delete this and get Subsystems from options, when that is possible.
   def _request_single(self, product, subject):
     # NB: This is not supposed to be exposed to Tasks yet -- see #4769 to track the status of
     # exposing v2 products in v1 tasks.
@@ -222,6 +230,8 @@ class BuildLocalPythonDistributions(Task):
       # We are including a platform-specific shared lib in this dist, so mark it as such.
       is_platform_specific = True
 
+    versioned_target_fingerprint = versioned_target.cache_key.hash
+
     setup_requires_dir = os.path.join(results_dir, self._SETUP_REQUIRES_SITE_SUBDIR)
     setup_reqs_to_resolve = self._get_setup_requires_to_resolve(dist_target)
     if setup_reqs_to_resolve:
@@ -229,22 +239,22 @@ class BuildLocalPythonDistributions(Task):
                              'Installing setup requirements: {}\n\n'
                              .format([req.key for req in setup_reqs_to_resolve]))
 
-    setup_requires_site_dir = ensure_setup_requires_site_dir(
-      setup_reqs_to_resolve, interpreter, setup_requires_dir, platforms=['current'])
-    if setup_requires_site_dir:
-      self.context.log.debug('Setting PYTHONPATH with setup_requires site directory: {}'
-                             .format(setup_requires_site_dir))
+    setup_reqs_pex_path = os.path.join(
+      setup_requires_dir,
+      'setup-requires-{}.pex'.format(versioned_target_fingerprint))
+    extra_reqs = list(setup_reqs_to_resolve or [])
+    setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
+      interpreter, setup_reqs_pex_path, extra_reqs=extra_reqs)
+    self.context.log.debug('Using pex file as setup.py interpreter: {}'
+                           .format(setup_requires_pex))
 
     setup_py_execution_environment = SetupPyExecutionEnvironment(
-      setup_requires_site_dir=setup_requires_site_dir,
+      setup_requires_pex=setup_requires_pex,
       setup_py_native_tools=native_tools)
-
-    versioned_target_fingerprint = versioned_target.cache_key.hash
 
     self._create_dist(
       dist_target,
       dist_output_dir,
-      interpreter,
       setup_py_execution_environment,
       versioned_target_fingerprint,
       is_platform_specific)
@@ -269,40 +279,47 @@ class BuildLocalPythonDistributions(Task):
 
     dist_dir_args = ['--dist-dir', self._DIST_OUTPUT_DIR]
 
-    setup_py_command = egg_info_snapshot_tag_args + bdist_whl_args + platform_args + dist_dir_args
-    return setup_py_command
+    return (['setup.py'] +
+            egg_info_snapshot_tag_args +
+            bdist_whl_args +
+            platform_args +
+            dist_dir_args)
 
-  def _create_dist(self, dist_tgt, dist_target_dir, interpreter,
-                   setup_py_execution_environment, snapshot_fingerprint, is_platform_specific):
+  def _create_dist(self,
+                   dist_tgt,
+                   dist_target_dir,
+                   setup_py_execution_environment,
+                   snapshot_fingerprint,
+                   is_platform_specific):
     """Create a .whl file for the specified python_distribution target."""
     self._copy_sources(dist_tgt, dist_target_dir)
 
     setup_py_snapshot_version_argv = self._generate_snapshot_bdist_wheel_argv(
       snapshot_fingerprint, is_platform_specific)
 
-    setup_runner = SetupPyRunner(
-      source_dir=dist_target_dir,
-      setup_command=setup_py_snapshot_version_argv,
-      interpreter=interpreter)
-
+    setup_requires_pex = setup_py_execution_environment.setup_requires_pex
     setup_py_env = setup_py_execution_environment.as_environment()
-    with environment_as(**setup_py_env):
-      # Build a whl using SetupPyRunner and return its absolute path.
-      was_installed_successfully = setup_runner.run()
-      # FIXME: Make a run_raising_error() method in SetupPyRunner that doesn't print directly to
-      # stderr like pex does (better: put this in pex itself).
-      if not was_installed_successfully:
-        raise self.BuildLocalPythonDistributionsError(
-          "Installation of python distribution from target {target} into directory {into_dir} "
-          "failed.\n"
-          "The chosen interpreter was: {interpreter}.\n"
-          "The execution environment was: {env}.\n"
-          "The setup command was: {command}."
-          .format(target=dist_tgt,
-                  into_dir=dist_target_dir,
-                  interpreter=interpreter,
-                  env=setup_py_env,
-                  command=setup_py_snapshot_version_argv))
+
+    cmd = safe_shlex_join(setup_requires_pex.cmdline(setup_py_snapshot_version_argv))
+    with self.context.new_workunit('setup.py', cmd=cmd, labels=[WorkUnitLabel.TOOL]) as workunit:
+      with pushd(dist_target_dir):
+        result = setup_requires_pex.run(args=setup_py_snapshot_version_argv,
+                                        env=setup_py_env,
+                                        stdout=workunit.output('stdout'),
+                                        stderr=workunit.output('stderr'))
+        if result != 0:
+          raise self.BuildLocalPythonDistributionsError(
+            "Installation of python distribution from target {target} into directory {into_dir} "
+            "failed (return value of run() was: {rc!r}).\n"
+            "The chosen interpreter was: {interpreter}.\n"
+            "The execution environment was: {env}.\n"
+            "The setup command was: {command}."
+            .format(target=dist_tgt,
+                    into_dir=dist_target_dir,
+                    rc=result,
+                    interpreter=setup_requires_pex.path(),
+                    env=setup_py_env,
+                    command=setup_py_snapshot_version_argv))
 
   def _inject_synthetic_dist_requirements(self, dist, req_lib_addr):
     """Inject a synthetic requirements library that references a local wheel.

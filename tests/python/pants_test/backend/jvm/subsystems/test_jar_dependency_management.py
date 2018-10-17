@@ -154,7 +154,7 @@ class PinnedJarArtifactSetTest(unittest.TestCase):
     self.assertEqual('1.2', set1[M2Coordinate('org', 'foo')].rev)
     self.assertEqual('7.8', set1[M2Coordinate('org', 'bar')].rev)
     self.assertEqual('1.8', set1[M2Coordinate('org', 'foo', ext='tar')].rev)
-    self.assertEqual(set(coord.rev for coord in set1), {'1.2', '7.8', '1.8'})
+    self.assertEqual({coord.rev for coord in set1}, {'1.2', '7.8', '1.8'})
     self.assertIn(M2Coordinate('org', 'foo'), set1)
     self.assertIn(M2Coordinate('org', 'foo', '27'), set1)
     self.assertNotIn(M2Coordinate('hello', 'there'), set1)

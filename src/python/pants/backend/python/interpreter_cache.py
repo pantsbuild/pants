@@ -14,7 +14,6 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 from pex.variables import Variables
 
-from pants.backend.python.pex_util import expand_and_maybe_adjust_platform
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -37,13 +36,13 @@ class PythonInterpreterCache(object):
     """Indicates a python interpreter matching given constraints could not be located."""
 
   @staticmethod
-  def _matches(interpreter, filters):
-    return any(interpreter.identity.matches(filt) for filt in filters)
+  def _matches(interpreter, filters=()):
+    return not filters or any(interpreter.identity.matches(filt) for filt in filters)
 
   @classmethod
-  def _matching(cls, interpreters, filters):
+  def _matching(cls, interpreters, filters=()):
     for interpreter in interpreters:
-      if cls._matches(interpreter, filters):
+      if cls._matches(interpreter, filters=filters):
         yield interpreter
 
   @classmethod
@@ -77,6 +76,7 @@ class PythonInterpreterCache(object):
     """Pick an interpreter compatible with all the specified targets."""
     tgts_by_compatibilities = defaultdict(list)
     filters = set()
+
     for target in targets:
       if isinstance(target, PythonTarget):
         c = self._python_setup.compatibility_or_constraints(target)
@@ -86,13 +86,13 @@ class PythonInterpreterCache(object):
     allowed_interpreters = set(self.setup(filters=filters))
 
     # Constrain allowed_interpreters based on each target's compatibility requirements.
-    for compatibility in tgts_by_compatibilities.keys():
+    for compatibility in tgts_by_compatibilities:
       compatible_with_target = set(self._matching(allowed_interpreters, compatibility))
       allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
       # Create a helpful error message.
-      unique_compatibilities = set(tuple(c) for c in tgts_by_compatibilities.keys())
+      unique_compatibilities = {tuple(c) for c in tgts_by_compatibilities.keys()}
       unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
       tgts_by_compatibilities_strs = [t[0].address.spec for t in tgts_by_compatibilities.values()]
       raise self.UnsatisfiableInterpreterConstraintsError(
@@ -102,13 +102,13 @@ class PythonInterpreterCache(object):
     # Return the lowest compatible interpreter.
     return min(allowed_interpreters)
 
-  def _interpreter_from_path(self, path, filters):
+  def _interpreter_from_path(self, path, filters=()):
     try:
       executable = os.readlink(os.path.join(path, 'python'))
     except OSError:
       return None
     interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
-    if self._matches(interpreter, filters):
+    if self._matches(interpreter, filters=filters):
       return self._resolve(interpreter)
     return None
 
@@ -118,29 +118,29 @@ class PythonInterpreterCache(object):
       os.symlink(interpreter.binary, os.path.join(safe_path, 'python'))
       return self._resolve(interpreter, safe_path)
 
-  def _setup_cached(self, filters):
+  def _setup_cached(self, filters=()):
     """Find all currently-cached interpreters."""
     for interpreter_dir in os.listdir(self._cache_dir):
-      if os.path.isdir(interpreter_dir):
-        path = os.path.join(self._cache_dir, interpreter_dir)
-        pi = self._interpreter_from_path(path, filters)
+      path = os.path.join(self._cache_dir, interpreter_dir)
+      if os.path.isdir(path):
+        pi = self._interpreter_from_path(path, filters=filters)
         if pi:
           self._logger('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
           yield pi
 
-  def _setup_paths(self, paths, filters):
+  def _setup_paths(self, paths, filters=()):
     """Find interpreters under paths, and cache them."""
-    for interpreter in self._matching(PythonInterpreter.all(paths), filters):
+    for interpreter in self._matching(PythonInterpreter.all(paths), filters=filters):
       identity_str = str(interpreter.identity)
       cache_path = os.path.join(self._cache_dir, identity_str)
-      pi = self._interpreter_from_path(cache_path, filters)
+      pi = self._interpreter_from_path(cache_path, filters=filters)
       if pi is None:
         self._setup_interpreter(interpreter, cache_path)
-        pi = self._interpreter_from_path(cache_path, filters)
+        pi = self._interpreter_from_path(cache_path, filters=filters)
       if pi:
         yield pi
 
-  def setup(self, paths=(), filters=(b'',)):
+  def setup(self, paths=(), filters=()):
     """Sets up a cache of python interpreters.
 
     :param paths: The paths to search for a python interpreter; the system ``PATH`` by default.
@@ -167,14 +167,14 @@ class PythonInterpreterCache(object):
 
     interpreters = []
     with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, '.file_lock')):
-      interpreters.extend(self._setup_cached(filters))
+      interpreters.extend(self._setup_cached(filters=filters))
       if unsatisfied_filters(interpreters):
-        interpreters.extend(self._setup_paths(setup_paths, filters))
+        interpreters.extend(self._setup_paths(setup_paths, filters=filters))
 
     for filt in unsatisfied_filters(interpreters):
       self._logger('No valid interpreters found for {}!'.format(filt))
 
-    matches = list(self._matching(interpreters, filters))
+    matches = list(self._matching(interpreters, filters=filters))
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
 
@@ -221,24 +221,22 @@ class PythonInterpreterCache(object):
     # Explicitly set the precedence to avoid resolution of wheels or distillation of sdists into
     # wheels.
     precedence = (EggPackage, SourcePackage)
-    distributions = resolve(requirements=[requirement],
-                            fetchers=self._python_repos.get_fetchers(),
-                            interpreter=interpreter,
-                            platform=expand_and_maybe_adjust_platform(
-                              interpreter=interpreter,
-                              # The local interpreter cache is, by definition, composed of
-                              # interpreters for the 'current' platform.
-                              platform='current'),
-                            context=self._python_repos.get_network_context(),
-                            precedence=precedence)
-    if not distributions:
+    resolved_dists = resolve(requirements=[requirement],
+                             fetchers=self._python_repos.get_fetchers(),
+                             interpreter=interpreter,
+                             # The local interpreter cache is, by definition, composed of
+                             #  interpreters for the 'current' platform.
+                             platform='current',
+                             context=self._python_repos.get_network_context(),
+                             precedence=precedence)
+    if not resolved_dists:
       return None
 
-    assert len(distributions) == 1, ('Expected exactly 1 distribution to be resolved for {}, '
+    assert len(resolved_dists) == 1, ('Expected exactly 1 distribution to be resolved for {}, '
                                      'found:\n\t{}'.format(requirement,
-                                                           '\n\t'.join(map(str, distributions))))
+                                                           '\n\t'.join(map(str, resolved_dists))))
 
-    dist_location = distributions[0].location
+    dist_location = resolved_dists[0].distribution.location
     target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
     shutil.move(dist_location, target_location)
     _safe_link(target_location, target_link)

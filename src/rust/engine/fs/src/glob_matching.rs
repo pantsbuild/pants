@@ -12,8 +12,8 @@ use glob::Pattern;
 use indexmap::{map::Entry::Occupied, IndexMap, IndexSet};
 
 use {
-  Dir, GitignoreStyleExcludes, GlobParsedSource, GlobSource, GlobWithSource, Link, PathGlob,
-  PathGlobs, PathStat, Stat, VFS,
+  Dir, GitignoreStyleExcludes, GlobExpansionConjunction, GlobParsedSource, GlobSource,
+  GlobWithSource, Link, PathGlob, PathGlobs, PathStat, Stat, VFS,
 };
 
 pub trait GlobMatching<E: Send + Sync + 'static>: VFS<E> {
@@ -103,16 +103,14 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
                 .file_name()
                 .map(|file_name| wildcard.matches_path(Path::new(file_name)))
                 .unwrap_or(false)
-            })
-            .filter_map(|stat| {
+            }).filter_map(|stat| {
               // Append matched filenames.
               stat
                 .path()
                 .file_name()
                 .map(|file_name| symbolic_path.join(file_name))
                 .map(|symbolic_stat_path| (symbolic_stat_path, stat))
-            })
-            .map(|(stat_symbolic_path, stat)| {
+            }).map(|(stat_symbolic_path, stat)| {
               // Canonicalize matched PathStats, and filter paths that are ignored by either the
               // context, or by local excludes. Note that we apply context ignore patterns to both
               // the symbolic and canonical names of Links, but only apply local excludes to their
@@ -132,15 +130,12 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
                   ))).to_boxed(),
                 }
               }
-            })
-            .collect::<Vec<_>>(),
+            }).collect::<Vec<_>>(),
         )
-      })
-      .map(|path_stats| {
+      }).map(|path_stats| {
         // See the note above.
         path_stats.into_iter().filter_map(|pso| pso).collect()
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 
   fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
@@ -148,6 +143,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
       include,
       exclude,
       strict_match_behavior,
+      conjunction,
     } = path_globs;
 
     if include.is_empty() {
@@ -197,8 +193,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
                 GlobMatch::SuccessfullyMatchedSomeFiles
               },
               sources: vec![],
-            })
-            .sources
+            }).sources
             .push(source);
 
           // Do we need to worry about cloning for all these `GlobSource`s (each containing a
@@ -278,8 +273,7 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
                     inputs_with_matches.insert(parsed_source.clone());
                     None
                   }
-                })
-                .collect(),
+                }).collect(),
             },
           };
           new_matched_source_globs.into_iter().for_each(|path_glob| {
@@ -292,12 +286,20 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
 
         // Get all the inputs which didn't transitively expand to any files.
         let non_matching_inputs: Vec<GlobParsedSource> = include
+          .clone()
           .into_iter()
           .map(|entry| entry.input)
           .filter(|parsed_source| !inputs_with_matches.contains(parsed_source))
           .collect();
 
-        if !non_matching_inputs.is_empty() {
+        let match_failed = match conjunction {
+          // All must match.
+          GlobExpansionConjunction::AllMatch => !non_matching_inputs.is_empty(),
+          // Only one needs to match.
+          GlobExpansionConjunction::AnyMatch => include.len() <= non_matching_inputs.len(),
+        };
+
+        if match_failed {
           // TODO(#5684): explain what global and/or target-specific option to set to
           // modify this behavior!
           let msg = format!(
@@ -312,15 +314,14 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
             return future::err(Self::mk_error(&msg));
           } else {
             // TODO(#5683): this doesn't have any useful context (the stack trace) without
-            // being thrown -- this needs to be provided, otherwise this is unusable.
+            // being thrown -- this needs to be provided, otherwise this is far less useful.
             warn!("{}", msg);
           }
         }
       }
 
       future::ok(match_results)
-    })
-      .to_boxed()
+    }).to_boxed()
   }
 
   ///
@@ -333,42 +334,53 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
     exclude: &Arc<GitignoreStyleExcludes>,
   ) -> BoxFuture<SingleExpansionResult, E> {
     match sourced_glob.path_glob.clone() {
-      PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
+      PathGlob::Wildcard {
+        canonical_dir,
+        symbolic_path,
+        wildcard,
+      } =>
       // Filter directory listing to return PathStats, with no continuation.
-        self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
-        .map(move |path_stats| SingleExpansionResult {
-          sourced_glob,
-          path_stats,
-          globs: vec![],
-        })
-        .to_boxed(),
-      PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
-      // Filter directory listing and request additional PathGlobs for matched Dirs.
-        self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
-        .and_then(move |path_stats| {
-          path_stats.into_iter()
-            .filter_map(|ps| match ps {
-              PathStat::Dir { path, stat } =>
-                Some(
-                  PathGlob::parse_globs(stat, path, &remainder)
-                    .map_err(|e| Self::mk_error(e.as_str()))
-                ),
-              PathStat::File { .. } => None,
-            })
-            .collect::<Result<Vec<_>, E>>()
-        })
-        .map(move |path_globs| {
-          let flattened = path_globs
-            .into_iter()
-            .flat_map(|path_globs| path_globs.into_iter())
-            .collect();
-          SingleExpansionResult {
+      {
+        self
+          .directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
+          .map(move |path_stats| SingleExpansionResult {
             sourced_glob,
-            path_stats: vec![],
-            globs: flattened,
-          }
-        })
-        .to_boxed(),
+            path_stats,
+            globs: vec![],
+          }).to_boxed()
+      }
+      PathGlob::DirWildcard {
+        canonical_dir,
+        symbolic_path,
+        wildcard,
+        remainder,
+      } =>
+      // Filter directory listing and request additional PathGlobs for matched Dirs.
+      {
+        self
+          .directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
+          .and_then(move |path_stats| {
+            path_stats
+              .into_iter()
+              .filter_map(|ps| match ps {
+                PathStat::Dir { path, stat } => Some(
+                  PathGlob::parse_globs(stat, path, &remainder)
+                    .map_err(|e| Self::mk_error(e.as_str())),
+                ),
+                PathStat::File { .. } => None,
+              }).collect::<Result<Vec<_>, E>>()
+          }).map(move |path_globs| {
+            let flattened = path_globs
+              .into_iter()
+              .flat_map(|path_globs| path_globs.into_iter())
+              .collect();
+            SingleExpansionResult {
+              sourced_glob,
+              path_stats: vec![],
+              globs: flattened,
+            }
+          }).to_boxed()
+      }
     }
   }
 
@@ -384,22 +396,18 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
           .and_then(|dest_str| {
             // Escape any globs in the parsed dest, which should guarantee one output PathGlob.
             PathGlob::create(&[Pattern::escape(dest_str)]).ok()
-          })
-          .unwrap_or_else(|| vec![])
-      })
-      .and_then(|link_globs| {
+          }).unwrap_or_else(|| vec![])
+      }).and_then(|link_globs| {
         let new_path_globs =
           future::result(PathGlobs::from_globs(link_globs)).map_err(|e| Self::mk_error(e.as_str()));
         new_path_globs.and_then(move |path_globs| context.expand(path_globs))
-      })
-      .map(|mut path_stats| {
+      }).map(|mut path_stats| {
         // Since we've escaped any globs in the parsed path, expect either 0 or 1 destination.
         path_stats.pop().map(|ps| match ps {
           PathStat::Dir { stat, .. } => PathStat::dir(symbolic_path, stat),
           PathStat::File { stat, .. } => PathStat::file(symbolic_path, stat),
         })
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 }
 

@@ -16,47 +16,17 @@ from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.memo import memoized_classproperty
-from pants.util.objects import datatype
+from pants.util.objects import datatype, enum
 
 
-class GlobMatchErrorBehavior(datatype(['failure_behavior'])):
+class GlobMatchErrorBehavior(enum('failure_behavior', ['ignore', 'warn', 'error'])):
   """Describe the action to perform when matching globs in BUILD files to source files.
 
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
 
-  IGNORE = 'ignore'
-  WARN = 'warn'
-  ERROR = 'error'
-
-  allowed_values = [IGNORE, WARN, ERROR]
-
-  default_value = IGNORE
-
-  default_option_value = WARN
-
-  @memoized_classproperty
-  def _singletons(cls):
-    return { behavior: cls(behavior) for behavior in cls.allowed_values }
-
-  @classmethod
-  def create(cls, value=None):
-    if isinstance(value, cls):
-      return value
-    if not value:
-      value = cls.default_value
-    return cls._singletons[value]
-
-  def __new__(cls, *args, **kwargs):
-    this_object = super(GlobMatchErrorBehavior, cls).__new__(cls, *args, **kwargs)
-
-    if this_object.failure_behavior not in cls.allowed_values:
-      raise cls.make_type_error("Value {!r} for failure_behavior must be one of: {!r}."
-                                .format(this_object.failure_behavior, cls.allowed_values))
-
-    return this_object
+  default_option_value = 'warn'
 
 
 class ExecutionOptions(datatype([
@@ -67,6 +37,9 @@ class ExecutionOptions(datatype([
   'remote_store_chunk_upload_timeout_seconds',
   'process_execution_parallelism',
   'process_execution_cleanup_local_dirs',
+  'remote_instance_name',
+  'remote_ca_certs_path',
+  'remote_oauth_bearer_token_path',
 ])):
   """A collection of all options related to (remote) execution of processes.
 
@@ -84,6 +57,9 @@ class ExecutionOptions(datatype([
       remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
       process_execution_parallelism=bootstrap_options.process_execution_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
+      remote_instance_name=bootstrap_options.remote_instance_name,
+      remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
+      remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
     )
 
 
@@ -95,6 +71,9 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_upload_timeout_seconds=60,
     process_execution_parallelism=multiprocessing.cpu_count()*2,
     process_execution_cleanup_local_dirs=True,
+    remote_instance_name=None,
+    remote_ca_certs_path=None,
+    remote_oauth_bearer_token_path=None,
   )
 
 
@@ -223,7 +202,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'project depends on.')
     register('--owner-of', type=list, default=[], daemon=False, fromfile=True, metavar='<path>',
              help='Select the targets that own these files. '
-                  'This is the third target calculation strategy along with the --changed '
+                  'This is the third target calculation strategy along with the --changed-* '
                   'options and specifying the targets directly. These three types of target '
                   'selection are mutually exclusive.')
 
@@ -308,13 +287,24 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--remote-store-chunk-upload-timeout-seconds', type=int, advanced=True,
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
              help='Timeout (in seconds) for uploads of individual chunks to the remote file store.')
+    register('--remote-instance-name', advanced=True,
+             help='Name of the remote execution instance to use. Used for routing within '
+                  '--remote-execution-server and --remote-store-server.')
+    register('--remote-ca-certs-path', advanced=True,
+             help='Path to a PEM file containing CA certificates used for verifying secure '
+                  'connections to --remote-execution-server and --remote-store-server. '
+                  'If not specified, TLS will not be used.')
+    register('--remote-oauth-bearer-token-path', advanced=True,
+             help='Path to a file containing an oauth token to use for grpc connections to '
+                  '--remote-execution-server and --remote-store-server. If not specified, no '
+                  'authorization will be performed.')
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.
     register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
              advanced=True,
              help='Number of concurrent processes that may be executed either locally and remotely.')
-    register('--process-execution-cleanup-local-dirs', type=bool, default=True,
+    register('--process-execution-cleanup-local-dirs', type=bool, default=True, advanced=True,
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')
 

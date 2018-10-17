@@ -9,8 +9,8 @@ import base64
 import fnmatch
 import glob
 import hashlib
-import json
 import os
+import re
 import zipfile
 from builtins import open, str
 
@@ -89,6 +89,11 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
   safe_file_dump(os.path.join(workspace, dst_record_file), '\r\n'.join(output_records) + '\r\n', binary_mode=False)
 
 
+# The wheel METADATA file will contain a line like: `Version: 1.11.0.dev3+7951ec01`.
+# We don't parse the entire file because it's large (it contains the entire release notes history).
+_version_re = re.compile('Version: (?P<version>\S+)')
+
+
 def reversion(args):
   with temporary_dir() as workspace:
     # Extract the input.
@@ -100,10 +105,17 @@ def reversion(args):
     dist_info_dir = locate_dist_info_dir(workspace)
     record_file = os.path.join(dist_info_dir, 'RECORD')
 
-    # Load metadata for the input whl.
-    with open(os.path.join(workspace, dist_info_dir, 'metadata.json'), 'r') as info:
-      metadata = json.load(info)
-    input_version = metadata['version']
+    # Get version from the input whl's metadata.
+    input_version = None
+    metadata_file = os.path.join(workspace, dist_info_dir, 'METADATA')
+    with open(metadata_file, 'r') as info:
+      for line in info:
+        mo = _version_re.match(line)
+        if mo:
+          input_version = mo.group('version')
+          break
+    if not input_version:
+      raise Exception('Could not find `Version:` line in {}'.format(metadata_file))
 
     # Rewrite and move all files (including the RECORD file), recording which files need to be
     # re-fingerprinted due to content changes.

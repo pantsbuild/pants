@@ -1,0 +1,7 @@
+tests/python/pants_test/backend/codegen/thrift/python:python
+tests/python/pants_test/backend/jvm/tasks:jar_publish
+tests/python/pants_test/backend/jvm/tasks:junit_run
+tests/python/pants_test/backend/python/tasks:tasks
+tests/python/pants_test/build_graph:build_graph
+tests/python/pants_test/goal:other
+tests/python/pants_test/pantsd:process_manager

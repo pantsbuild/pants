@@ -138,7 +138,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     def compute_fingerprint(self, target):
       hasher = sha1()
       if hasattr(target, 'platform'):
-        hasher.update(str(tuple(target.platform)))
+        hasher.update(str(tuple(target.platform)).encode('utf-8'))
       return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
     def __eq__(self, other):

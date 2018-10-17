@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from builtins import str
 
+from future.utils import PY3
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -34,7 +35,12 @@ class ResolveRequirementsTest(TaskTestBase):
     # the requirement isn't sneaking in some other way, which would render the remainder
     # of this test moot.)
     _, stderr_data = self._exercise_module(self._resolve_requirements([noreqs_tgt]), 'colors')
-    self.assertIn('ImportError: No module named colors', stderr_data)
+
+    try:
+      self.assertIn("ModuleNotFoundError: No module named 'colors'", stderr_data)
+    except AssertionError:
+      # < Python 3.6 uses ImportError instead of ModuleNotFoundError.
+      self.assertIn('ImportError: No module named colors', stderr_data)
 
     # Check that the module is available if specified as a requirement.
     stdout_data, stderr_data = self._exercise_module(self._resolve_requirements([ansicolors_tgt]),
@@ -43,7 +49,7 @@ class ResolveRequirementsTest(TaskTestBase):
 
     path = stdout_data.strip()
     # Check that the requirement resolved to what we expect.
-    self.assertTrue(path.endswith('/.deps/ansicolors-1.0.2-py2-none-any.whl/colors.py'))
+    self.assertTrue(path.endswith('/.deps/ansicolors-1.0.2-{}-none-any.whl/colors.py'.format('py3' if PY3 else 'py2')))
     # Check that the path is under the test's build root, so we know the pex was created there.
     self.assertTrue(path.startswith(os.path.realpath(get_buildroot())))
 
@@ -74,7 +80,7 @@ class ResolveRequirementsTest(TaskTestBase):
       parts = os.path.splitext(whl)[0].split('-')
       return '{}-{}'.format(parts[0], parts[1]), parts[-1]
 
-    names_and_platforms = set(name_and_platform(w) for w in wheels)
+    names_and_platforms = {name_and_platform(w) for w in wheels}
     expected_name_and_platforms = {
       # Note that we don't check for 'current' because if there's no published wheel for the
       # current platform we may end up with a wheel for a compatible platform (e.g., if there's no
@@ -136,9 +142,10 @@ class ResolveRequirementsTest(TaskTestBase):
       return context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
 
   def _exercise_module(self, pex, expected_module):
-    with temporary_file() as f:
+    with temporary_file(binary_mode=False) as f:
       f.write('import {m}; print({m}.__file__)'.format(m=expected_module))
       f.close()
       proc = pex.run(args=[f.name], blocking=False,
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      return proc.communicate()
+      stdout, stderr = proc.communicate()
+      return (stdout.decode('utf-8'), stderr.decode('utf-8'))

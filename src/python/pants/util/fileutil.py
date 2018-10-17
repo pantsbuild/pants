@@ -9,6 +9,7 @@ import os
 import random
 import shutil
 from builtins import open
+from contextlib import contextmanager
 from uuid import uuid4
 
 from pants.util.contextutil import temporary_file
@@ -20,6 +21,24 @@ def atomic_copy(src, dst):
     shutil.copyfile(src, tmp_dst.name)
     os.chmod(tmp_dst.name, os.stat(src).st_mode)
     os.rename(tmp_dst.name, dst)
+
+
+@contextmanager
+def safe_temp_edit(filename):
+  """Safely modify a file within context that automatically reverts any changes afterwards
+
+  The file mutatation occurs in place. The file is backed up in a temporary file before edits
+  occur and when the context is closed, the mutated file is discarded and replaced with the backup.
+
+  WARNING: There may be a chance that the file may not be restored and this method should be used
+  carefully with the known risk.
+  """
+  with temporary_file() as tmp_file:
+    try:
+      shutil.copyfile(filename, tmp_file.name)
+      yield filename
+    finally:
+      shutil.copyfile(tmp_file.name, filename)
 
 
 def create_size_estimators():

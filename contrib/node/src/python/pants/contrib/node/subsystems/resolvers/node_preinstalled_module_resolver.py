@@ -14,6 +14,7 @@ from pants.fs.archive import archiver_for_path
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_rmtree
 
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
@@ -30,8 +31,9 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
     super(NodePreinstalledModuleResolver, cls).register_options(register)
     NodeResolve.register_resolver_for_type(NodePreinstalledModule, cls)
 
-  def resolve_target(self, node_task, target, results_dir, node_paths):
-    self._copy_sources(target, results_dir)
+  def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False, **kwargs):
+    if not resolve_locally:
+      self._copy_sources(target, results_dir)
 
     with temporary_dir() as temp_dir:
       archive_file_name = urllib_parse.urlsplit(target.dependencies_archive_url).path.split('/')[-1]
@@ -75,4 +77,8 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
                         .format(target=target.address.reference(),
                                 dependencies_archive_url=target.dependencies_archive_url))
 
-      shutil.move(extracted_node_modules, os.path.join(results_dir, 'node_modules'))
+      # shutil.move doesn't handle directory collision nicely. This is mainly to address
+      # installing within the source directory for local resolves.
+      node_modules_path = os.path.join(results_dir, 'node_modules')
+      safe_rmtree(node_modules_path)
+      shutil.move(extracted_node_modules, node_modules_path)
