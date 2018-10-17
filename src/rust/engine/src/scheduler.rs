@@ -264,22 +264,18 @@ impl Scheduler {
     };
     let (sender, receiver) = mpsc::channel();
 
-//    println!("{}", request.roots);
+    // Setting up display
+    let display_worker_count = 8;
     let mut display = EngineDisplay::for_stdout(0);
     display.start();
     display.render();
-
-    Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
-
-    let display_worker_count = 8;
-
     let worker_ids: Vec<String> = (0..display_worker_count).map(|s| format!("{}", s)).collect();
-
     for worker_id in worker_ids {
       display.add_worker(worker_id);
       display.render();
     }
 
+    Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
     let roots: Vec<_> = request.roots.clone().into_iter().map(|s| s.into()).collect();
 
     let results = loop {
@@ -297,9 +293,9 @@ impl Scheduler {
         display.render();
       }
     };
+
     display.render();
     display.finish();
-
 
     request
       .roots
