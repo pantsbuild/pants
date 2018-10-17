@@ -186,13 +186,8 @@ class Checkstyle(LintTaskMixin, Task):
     if self._acceptable_interpreter_constraints == []:
       # The user wants to lint everything.
       return True
-    num_matches = 0
-    for constraint in constraint_tuple:
-      if version.parse(constraint) in self._acceptable_interpreter_constraints:
-        num_matches += 1
-    if len(constraint_tuple) == num_matches:
-      return True
-    return False
+    return all(version.parse(constraint) in self._acceptable_interpreter_constraints
+           for constraint in constraint_tuple)
 
   def execute(self):
     """"Run Checkstyle on all found non-synthetic source files."""
