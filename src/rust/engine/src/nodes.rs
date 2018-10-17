@@ -145,6 +145,27 @@ impl Select {
     }
   }
 
+  fn select_product(
+    &self,
+    context: &Context,
+    product: TypeConstraint,
+    caller_description: &str,
+  ) -> NodeFuture<Value> {
+    let edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(&self.entry)
+      .ok_or_else(|| {
+        throw(&format!(
+          "Tried to select product {} for {} but found no edges",
+          externs::key_to_str(&product.0),
+          caller_description
+        ))
+      });
+    let context = context.clone();
+    Select::new(product, self.params.clone(), &try_future!(edges)).run(context.clone())
+  }
+
   ///
   /// Return the Future for the Task that should compute the given product for the
   /// given Params.
@@ -154,21 +175,6 @@ impl Select {
   fn gen_node(&self, context: &Context) -> NodeFuture<Value> {
     if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
       return future::ok(value.clone()).to_boxed();
-    }
-
-    fn select(select: &Select, context: &Context, product: TypeConstraint) -> NodeFuture<Value> {
-      let edges = context
-        .core
-        .rule_graph
-        .edges_for_inner(&select.entry)
-        .ok_or_else(|| {
-          throw(&format!(
-            "Tried to select product {} for intrinsic but found no edges",
-            externs::key_to_str(&product.0)
-          ))
-        });
-      let context = context.clone();
-      Select::new(product, select.params.clone(), &try_future!(edges)).run(context.clone())
     }
 
     match &self.entry {
@@ -186,7 +192,8 @@ impl Select {
           }) => {
             let context = context.clone();
             let core = context.core.clone();
-            select(&self, &context, context.core.types.path_globs)
+            self
+              .select_product(&context, context.core.types.path_globs, "intrinsic")
               .and_then(move |val| context.get(Snapshot(externs::key_for(val))))
               .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
               .to_boxed()
@@ -195,11 +202,8 @@ impl Select {
             kind: IntrinsicKind::DirectoryDigest,
             ..
           }) => {
-            let request = select(
-              &self,
-              &context,
-              context.core.types.merge_directories_request,
-            );
+            let request =
+              self.select_product(&context, context.core.types.merged_directories, "intrinsic");
             let core = context.core.clone();
             request
               .and_then(move |request| {
@@ -219,7 +223,8 @@ impl Select {
             ..
           }) => {
             let context = context.clone();
-            select(&self, &context, context.core.types.directory_digest)
+            self
+              .select_product(&context, context.core.types.directory_digest, "intrinsic")
               .and_then(|directory_digest_val| {
                 lift_digest(&directory_digest_val).map_err(|str| throw(&str))
               }).and_then(move |digest| {
@@ -246,7 +251,8 @@ impl Select {
           }) => {
             let context = context.clone();
             let core = context.core.clone();
-            select(&self, &context, context.core.types.process_request)
+            self
+              .select_product(&context, context.core.types.process_request, "intrinsic")
               .and_then(|request| {
                 ExecuteProcess::lift(&request)
                   .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))

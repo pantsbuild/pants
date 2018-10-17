@@ -281,7 +281,7 @@ pub extern "C" fn scheduler_create(
     path_globs: type_path_globs,
     directory_digest: type_directory_digest,
     snapshot: type_snapshot,
-    merge_directories_request: type_merge_directories_request,
+    merged_directories: type_merge_directories_request,
     files_content: type_files_content,
     dir: type_dir,
     file: type_file,

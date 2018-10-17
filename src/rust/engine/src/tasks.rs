@@ -102,7 +102,7 @@ impl Tasks {
       Intrinsic {
         kind: IntrinsicKind::DirectoryDigest,
         product: types.directory_digest,
-        input: types.merge_directories_request,
+        input: types.merged_directories,
       },
       Intrinsic {
         kind: IntrinsicKind::ProcessExecution,
