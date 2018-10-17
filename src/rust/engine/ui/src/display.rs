@@ -244,7 +244,7 @@ impl EngineDisplay {
 
   fn render_for_pipe(&self) {
     // TODO: Handle non-tty output w polling interval adjustment + summary rendering.
-    panic!("TODO");
+    // Currently no action is performed for pipe.
   }
 
   // Paints one screen of rendering.
@@ -309,6 +309,10 @@ impl EngineDisplay {
 
   // Terminates the EngineDisplay and returns the cursor to a static position.
   pub fn finish(&mut self) {
+    // Don't do anything if it's not tty.
+    if !self.is_tty {
+      return;
+    }
     self.running = false;
     let current_pos = self.get_cursor_pos();
     let action_count = self.action_map.len() as u16;
