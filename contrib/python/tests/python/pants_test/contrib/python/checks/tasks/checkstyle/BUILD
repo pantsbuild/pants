@@ -4,6 +4,7 @@
 python_tests(
   dependencies=[
     '3rdparty/python:future',
+    '3rdparty/python:parameterized',
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',

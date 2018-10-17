@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import sys
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_repos import PythonRepos
@@ -27,6 +28,7 @@ from pants.util.memo import memoized_classproperty, memoized_property
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
+from pkg_resources import DistributionNotFound, Requirement, WorkingSet
 
 from pants.contrib.python.checks.checker import checker
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import \
@@ -55,6 +57,10 @@ class Checkstyle(LintTaskMixin, Task):
     return super(Task, cls).subsystem_dependencies() + cls.plugin_subsystems + (
       # Needed implicitly by the pex_build_util functions we use.
       PythonSetup, PythonRepos)
+
+  @classmethod
+  def implementation_version(cls):
+    return super(Checkstyle, cls).implementation_version() + [('Checkstyle', 0)]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -109,10 +115,21 @@ class Checkstyle(LintTaskMixin, Task):
                                                  req_libs=req_libs,
                                                  log=self.context.log)
           else:
-            pex_build_util.dump_requirements(builder,
-                                             interpreter=interpreter,
-                                             reqs=[PythonRequirement(self._CHECKER_REQ)],
-                                             log=self.context.log)
+            try:
+              # The checker is already on sys.path, eg: embedded in pants.pex.
+              working_set = WorkingSet(entries=sys.path)
+              for dist in working_set.resolve([Requirement.parse(self._CHECKER_REQ)]):
+                for req in dist.requires():
+                  builder.add_requirement(req)
+                builder.add_distribution(dist)
+              builder.add_requirement(self._CHECKER_REQ)
+            except DistributionNotFound:
+              # We need to resolve the checker from a local or remote distribution repo.
+              pex_build_util.dump_requirements(builder,
+                                               interpreter=interpreter,
+                                               reqs=[PythonRequirement(self._CHECKER_REQ)],
+                                               log=self.context.log)
+
           builder.set_entry_point(self._CHECKER_ENTRYPOINT)
           builder.freeze()
 
