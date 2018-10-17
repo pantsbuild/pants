@@ -15,7 +15,7 @@ from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (DirectoryDigest, DirectoryToMaterialize, FileContent, FilesContent,
-                             Path, PathGlobs, PathGlobsAndRoot, Snapshot)
+                             MergedDirectories, Path, PathGlobs, PathGlobsAndRoot, Snapshot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
@@ -132,6 +132,7 @@ class Scheduler(object):
       constraint_path_globs=constraint_for(PathGlobs),
       constraint_directory_digest=constraint_for(DirectoryDigest),
       constraint_snapshot=constraint_for(Snapshot),
+      constraint_merge_snapshots_request=constraint_for(MergedDirectories),
       constraint_files_content=constraint_for(FilesContent),
       constraint_dir=constraint_for(Dir),
       constraint_file=constraint_for(File),
