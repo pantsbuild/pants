@@ -57,11 +57,16 @@ impl Session {
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,
+  // Flag used to determine whether to show engine execution progress.
+  pub should_render_ui: bool
 }
 
 impl ExecutionRequest {
-  pub fn new() -> ExecutionRequest {
-    ExecutionRequest { roots: Vec::new() }
+  pub fn new(should_render_ui: bool) -> ExecutionRequest {
+    ExecutionRequest {
+      roots: Vec::new(),
+      should_render_ui
+    }
   }
 
   ///

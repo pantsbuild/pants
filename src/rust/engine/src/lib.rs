@@ -572,8 +572,8 @@ pub extern "C" fn session_destroy(ptr: *mut Session) {
 }
 
 #[no_mangle]
-pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
-  Box::into_raw(Box::new(ExecutionRequest::new()))
+pub extern "C" fn execution_request_create(should_render_ui: bool) -> *const ExecutionRequest {
+  Box::into_raw(Box::new(ExecutionRequest::new(should_render_ui)))
 }
 
 #[no_mangle]

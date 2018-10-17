@@ -40,6 +40,7 @@ class ExecutionOptions(datatype([
   'remote_instance_name',
   'remote_ca_certs_path',
   'remote_oauth_bearer_token_path',
+  'render_v2_engine_ui'
 ])):
   """A collection of all options related to (remote) execution of processes.
 
@@ -60,6 +61,7 @@ class ExecutionOptions(datatype([
       remote_instance_name=bootstrap_options.remote_instance_name,
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
       remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
+      render_v2_engine_ui=bootstrap_options.render_v2_engine_ui,
     )
 
 
@@ -74,6 +76,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_instance_name=None,
     remote_ca_certs_path=None,
     remote_oauth_bearer_token_path=None,
+    render_v2_engine_ui=False,
   )
 
 
@@ -223,6 +226,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'of the directory will be overwritten if any filenames collide.')
     register('--print-exception-stacktrace', advanced=True, type=bool,
              help='Print to console the full exception stack trace if encountered.')
+    register('--render-v2-engine-ui', default=False, type=bool, daemon=False,
+             help='whether to show v2 engine execution progress.')
 
     # BinaryUtil options.
     register('--binaries-baseurls', type=list, advanced=True,

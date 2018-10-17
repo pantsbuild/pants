@@ -221,7 +221,7 @@ void scheduler_destroy(Scheduler*);
 Session* session_create(Scheduler*);
 void session_destroy(Session*);
 
-ExecutionRequest* execution_request_create(void);
+ExecutionRequest* execution_request_create(_Bool);
 void execution_request_destroy(ExecutionRequest*);
 
 uint64_t graph_len(Scheduler*);
@@ -782,7 +782,7 @@ class Native(object):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 
   def new_execution_request(self):
-    return self.gc(self.lib.execution_request_create(), self.lib.execution_request_destroy)
+    return self.gc(self.lib.execution_request_create(False), self.lib.execution_request_destroy)
 
   def new_session(self, scheduler):
     return self.gc(self.lib.session_create(scheduler), self.lib.session_destroy)
