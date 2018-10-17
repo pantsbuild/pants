@@ -494,7 +494,16 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn current_running_duration(&self, now: Instant) -> Option<Duration> {
     match *self.state.lock() {
-      EntryState::Running { start_time, .. } => Some(now.duration_since(start_time)),
+      EntryState::Running { start_time, .. } =>
+      // NB: `Instant::duration_since` panics if the start time is before the end time, which can
+      // happen when starting a Node races against a caller creating their Instant.
+      {
+        Some(if start_time < now {
+          now.duration_since(start_time)
+        } else {
+          Duration::from_secs(0)
+        })
+      }
       _ => None,
     }
   }
