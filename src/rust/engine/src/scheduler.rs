@@ -286,10 +286,11 @@ impl Scheduler {
         for (i, task) in ongoing_tasks.iter().enumerate() {
           display.update(i.to_string(), format!("{:?}", task));
         }
+        // If number of ongoing tasks is less than the workers,
+        // fill the rest of the workers with empty string.
         for i in ongoing_tasks.len()..display_worker_count {
           display.update(i.to_string(), "".to_string());
         }
-//        if (ongoing_tasks.length < 8)
         display.render();
       }
     };
