@@ -17,10 +17,11 @@ from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import environment_as
-from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
+from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from parameterized import parameterized
+from wheel.install import WheelFile
 
 from pants.contrib.python.checks.tasks.checkstyle.checkstyle import Checkstyle
 
@@ -30,35 +31,38 @@ CHECKER_RESOLVE_METHOD = [('sys.path', True), ('resolve', False)]
 
 class CheckstyleTest(PythonTaskTestBase):
 
+  @staticmethod
+  def build_checker_wheel(root_dir):
+    target = Checkstyle._CHECKER_ADDRESS_SPEC
+    subprocess.check_call([os.path.join(get_buildroot(), 'pants'),
+                           '--pants-distdir={}'.format(root_dir),
+                           'setup-py',
+                           '--run=bdist_wheel --universal',
+                           target])
+
+    for root, _, files in os.walk(root_dir):
+      for f in files:
+        if f.endswith('.whl'):
+          return os.path.join(root, f)
+
+    raise AssertionError('Failed to generate a wheel for {}'.format(target))
+
+  @staticmethod
+  def install_wheel(wheel, root_dir):
+    importable_path = os.path.join(root_dir, 'install', os.path.basename(wheel))
+    overrides = {path: root_dir for path in ('purelib', 'platlib', 'headers', 'scripts', 'data')}
+    WheelFile(wheel).install(force=True, overrides=overrides)
+    return importable_path
+
   _distdir = None
   _checker_dist = None
-  _dist_pythonpath = None
+  _checker_dist_importable_path = None
 
   @classmethod
   def setUpClass(cls):
     cls._distdir = safe_mkdtemp()
-    target = Checkstyle._CHECKER_ADDRESS_SPEC
-
-    # NB: The setup command `install --home X` installs the distribution to X/lib/python, but in
-    # order to do so X/lib/python:
-    # 1. Must exist.
-    # 2. Must be on the PYTHONPATH.
-    cls._dist_pythonpath = os.path.join(cls._distdir, 'lib', 'python')
-    safe_mkdir(cls._dist_pythonpath, clean=True)
-    with environment_as(PYTHONPATH=cls._dist_pythonpath):
-      subprocess.check_call([os.path.join(get_buildroot(), 'pants'),
-                             '--pants-distdir={}'.format(cls._distdir),
-                             'setup-py',
-                             '--run=install --home {} bdist_wheel --universal'.format(cls._distdir),
-                             target])
-
-    for root, dirs, files in os.walk(cls._distdir):
-      for f in files:
-        if f.endswith('.whl'):
-          cls._checker_dist = os.path.join(root, f)
-          break
-    if cls._checker_dist is None:
-      raise AssertionError('Failed to generate a wheel for {}'.format(target))
+    cls._checker_dist = cls.build_checker_wheel(cls._distdir)
+    cls._checker_dist_importable_path = cls.install_wheel(cls._checker_dist, cls._distdir)
 
   @classmethod
   def tearDownClass(cls):
@@ -73,7 +77,7 @@ class CheckstyleTest(PythonTaskTestBase):
   def resolve_configuration(self, resolve_local=False):
     if resolve_local:
       prior = sys.path[:]
-      sys.path.append(self._dist_pythonpath)
+      sys.path.append(self._checker_dist_importable_path)
       try:
         yield
       finally:
