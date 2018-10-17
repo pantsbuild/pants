@@ -184,6 +184,7 @@ python_tests(
     ':util',
     ':scheduler_test_base',
     'src/python/pants/engine:build_files',
+    'src/python/pants/engine:console',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/util:objects',
