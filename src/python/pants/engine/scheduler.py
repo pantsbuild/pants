@@ -421,7 +421,6 @@ class SchedulerSession(object):
     self._scheduler.visualize_rule_graph_to_file(filename)
 
   def execution_request_literal(self, request_specs, render_v2_engine_ui):
-    print(render_v2_engine_ui)
     native_execution_request = self._scheduler._native.new_execution_request(render_v2_engine_ui)
     for subject, product in request_specs:
       self._scheduler.add_root_selection(native_execution_request, subject, product)
@@ -441,6 +440,7 @@ class SchedulerSession(object):
     :param subjects: A list of Spec and/or PathGlobs objects.
     :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
       :class:`pants.engine.fs.PathGlobs` objects.
+    :param list render_v2_engine_ui: whether to render the v2 engine UI
     :returns: An ExecutionRequest for the given products and subjects.
     """
     roots = (tuple((s, p) for s in subjects for p in products))
@@ -517,6 +517,7 @@ class SchedulerSession(object):
 
     :param list products: A list of product type for the request.
     :param list subjects: A list of subjects for the request.
+    :param list render_v2_engine_ui: whether to render the v2 engine UI
     :returns: A dict from product type to lists of products each with length matching len(subjects).
     """
     request = self.execution_request(products, subjects, render_v2_engine_ui)
@@ -559,11 +560,12 @@ class SchedulerSession(object):
       product_results[product].append(state.value)
     return product_results
 
-  def product_request(self, product, subjects, render_v2_engine_ui):
+  def product_request(self, product, subjects, render_v2_engine_ui=False):
     """Executes a request for a single product for some subjects, and returns the products.
 
     :param class product: A product type for the request.
     :param list subjects: A list of subjects for the request.
+    :param list render_v2_engine_ui: whether to render the v2 engine UI
     :returns: A list of the requested products, with length match len(subjects).
     """
     return self.products_request([product], subjects, render_v2_engine_ui)[product]
