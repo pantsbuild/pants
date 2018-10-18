@@ -188,7 +188,8 @@ class LocalPantsRunner(object):
     try:
       self._graph_session.run_console_rules(
         self._options.goals,
-        self._target_roots
+        self._target_roots,
+        self._global_options.render_v2_engine_ui
       )
     except Exception as e:
       logger.warn('Encountered unhandled exception {!r} during rule execution!'
