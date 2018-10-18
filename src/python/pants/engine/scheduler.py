@@ -101,7 +101,7 @@ class Scheduler(object):
 
     self._native = native
     self.include_trace_on_error = include_trace_on_error
-
+    self.render_v2_engine_ui = execution_options.render_v2_engine_ui
     # Validate and register all provided and intrinsic tasks.
     rule_index = RuleIndex.create(list(rules))
     self._root_subject_types = sorted(rule_index.roots, key=repr)
@@ -422,7 +422,9 @@ class SchedulerSession(object):
     self._scheduler.visualize_rule_graph_to_file(filename)
 
   def execution_request_literal(self, request_specs):
-    native_execution_request = self._scheduler._native.new_execution_request()
+    native_execution_request = self._scheduler._native.new_execution_request(
+      self._scheduler.render_v2_engine_ui
+    )
     for subject, product in request_specs:
       self._scheduler.add_root_selection(native_execution_request, subject, product)
     return ExecutionRequest(request_specs, native_execution_request)

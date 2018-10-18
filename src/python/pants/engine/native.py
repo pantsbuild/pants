@@ -781,8 +781,10 @@ class Native(object):
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 
-  def new_execution_request(self):
-    return self.gc(self.lib.execution_request_create(False), self.lib.execution_request_destroy)
+  def new_execution_request(self, render_v2_engine_ui):
+    return self.gc(
+      self.lib.execution_request_create(render_v2_engine_ui),
+      self.lib.execution_request_destroy)
 
   def new_session(self, scheduler):
     return self.gc(self.lib.session_create(scheduler), self.lib.session_destroy)
@@ -866,7 +868,7 @@ class Native(object):
         execution_options.remote_store_chunk_bytes,
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.process_execution_parallelism,
-        execution_options.process_execution_cleanup_local_dirs
+        execution_options.process_execution_cleanup_local_dirs,
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
 

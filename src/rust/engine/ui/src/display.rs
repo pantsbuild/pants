@@ -244,7 +244,7 @@ impl EngineDisplay {
 
   fn render_for_pipe(&self) {
     // TODO: Handle non-tty output w polling interval adjustment + summary rendering.
-    // Currently no action is performed for pipe.
+    // Nothing needs to be printed to pipe by default.
   }
 
   // Paints one screen of rendering.
