@@ -57,14 +57,14 @@ pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,
   // Flag used to determine whether to show engine execution progress.
-  pub should_render_ui: bool
+  pub should_render_ui: bool,
 }
 
 impl ExecutionRequest {
   pub fn new(should_render_ui: bool) -> ExecutionRequest {
     ExecutionRequest {
       roots: Vec::new(),
-      should_render_ui
+      should_render_ui,
     }
   }
 
@@ -278,16 +278,22 @@ impl Scheduler {
     optional_display.as_mut().map(|display| {
       display.start();
       display.render();
-      let worker_ids: Vec<String> = (0..display_worker_count).map(|s| format!("{}", s)).collect();
+      let worker_ids: Vec<String> = (0..display_worker_count)
+        .map(|s| format!("{}", s))
+        .collect();
       for worker_id in worker_ids {
         display.add_worker(worker_id);
         display.render();
       }
     });
 
-
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
-    let roots: Vec<_> = request.roots.clone().into_iter().map(|s| s.into()).collect();
+    let roots: Vec<_> = request
+      .roots
+      .clone()
+      .into_iter()
+      .map(|s| s.into())
+      .collect();
 
     let results = loop {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {

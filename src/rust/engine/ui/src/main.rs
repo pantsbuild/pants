@@ -27,8 +27,8 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-extern crate ui;
 extern crate rand;
+extern crate ui;
 
 use std::thread;
 use std::time::Duration;
