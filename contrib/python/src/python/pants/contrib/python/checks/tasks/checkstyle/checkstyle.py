@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 
+from packaging import version
+from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -14,6 +16,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks import pex_build_util
 from pants.base.build_environment import get_buildroot, pants_version
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_all
 from pants.base.workunit import WorkUnitLabel
@@ -25,7 +28,6 @@ from pants.util.collections import factory_dict
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation
 from pants.util.memo import memoized_classproperty, memoized_property
-from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pkg_resources import DistributionNotFound, Requirement, WorkingSet
@@ -60,11 +62,7 @@ class Checkstyle(LintTaskMixin, Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(Checkstyle, cls).implementation_version() + [('Checkstyle', 0)]
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    round_manager.require_data(PythonInterpreter)
+    return super(Checkstyle, cls).implementation_version() + [('Checkstyle', 1)]
 
   @classmethod
   def register_options(cls, register):
@@ -77,6 +75,13 @@ class Checkstyle(LintTaskMixin, Task):
              help='Takes a text file where specific rules on specific files will be skipped.')
     register('--fail', fingerprint=True, default=True, type=bool,
              help='Prevent test failure but still produce output for problems.')
+    register('--interpreter-constraints-whitelist', fingerprint=True,
+             default=None,
+             help='A list of interpreter constraints for which matching targets will be linted '
+                  'in addition to targets that match the global interpreter constraints '
+                  '(either from defaults or pants.ini). If the user supplies an empty list, '
+                  'Pants will lint all targets in the target set, irrespective of the working '
+                  'set of compatibility constraints.')
 
   def _is_checked(self, target):
     return (not target.is_synthetic and isinstance(target, PythonTarget) and
@@ -91,6 +96,18 @@ class Checkstyle(LintTaskMixin, Task):
     self.context.resolve(self._CHECKER_ADDRESS_SPEC)
     return self.context.build_graph.get_target(Address.parse(self._CHECKER_ADDRESS_SPEC))
 
+  @memoized_property
+  def _acceptable_interpreter_constraints(self):
+    default_constraints = PythonSetup.global_instance().interpreter_constraints
+    whitelisted_constraints = self.get_options().interpreter_constraints_whitelist
+    # The user wants to lint everything.
+    if whitelisted_constraints == []:
+      return []
+    # The user did not pass a whitelist option.
+    elif whitelisted_constraints is None:
+      whitelisted_constraints = ()
+    return [version.parse(v) for v in default_constraints + whitelisted_constraints]
+
   def checker_pex(self, interpreter):
     # TODO(John Sirois): Formalize in pants.base?
     pants_dev_mode = os.environ.get('PANTS_DEV')
@@ -101,10 +118,14 @@ class Checkstyle(LintTaskMixin, Task):
       checker_id = hash_all([self._CHECKER_REQ])
 
     pex_path = os.path.join(self.workdir, 'checker', checker_id, str(interpreter.identity))
+
     if not os.path.exists(pex_path):
       with self.context.new_workunit(name='build-checker'):
         with safe_concurrent_creation(pex_path) as chroot:
           builder = PEXBuilder(path=chroot, interpreter=interpreter)
+          # Constraining is required to guard against the case where the user
+          # has a pexrc file set.
+          builder.add_interpreter_constraint(str(interpreter.identity.requirement))
 
           if pants_dev_mode:
             pex_build_util.dump_sources(builder, tgt=self.checker_target, log=self.context.log)
@@ -169,33 +190,61 @@ class Checkstyle(LintTaskMixin, Task):
       with self.context.new_workunit(name='pythonstyle',
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT],
                                      cmd=' '.join(checker.cmdline(args))) as workunit:
-        failure_count = checker.run(args=args,
+        return checker.run(args=args,
                                     stdout=workunit.output('stdout'),
                                     stderr=workunit.output('stderr'))
-        if failure_count > 0 and self.get_options().fail:
-          raise TaskError('{} Python Style issues found. You may try `./pants fmt <targets>`'
-                          .format(failure_count))
-        return failure_count
+
+  def _constraints_are_whitelisted(self, constraint_tuple):
+    """
+    Detect whether a tuple of compatibility constraints
+    matches constraints imposed by the merged list of the global
+    constraints from PythonSetup and a user-supplied whitelist.
+    """
+    if self._acceptable_interpreter_constraints == []:
+      # The user wants to lint everything.
+      return True
+    return all(version.parse(constraint) in self._acceptable_interpreter_constraints
+           for constraint in constraint_tuple)
 
   def execute(self):
     """"Run Checkstyle on all found non-synthetic source files."""
-
-    # If we are linting for Python 3, skip lint altogether.
-    # Long-term Python 3 linting solution tracked by:
-    # https://github.com/pantsbuild/pants/issues/5764
-    interpreter = self.context.products.get_data(PythonInterpreter)
-    # Check interpreter is not 'None' for test cases that do not
-    # run the python interpreter selection task.
-    if interpreter and interpreter.version >= (3, 0, 0):
-      self.context.log.info('Linting is currently disabled for Python 3 targets.\n '
-                            'See https://github.com/pantsbuild/pants/issues/5764 for '
-                            'long-term solution tracking.')
-      return
-
+    python_tgts = self.context.targets(
+      lambda tgt: isinstance(tgt, (PythonTarget))
+    )
+    if not python_tgts:
+      return 0
+    interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
+                                               PythonRepos.global_instance(),
+                                               logger=self.context.log.debug)
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
-      sources = self.calculate_sources([vt.target for vt in invalidation_check.invalid_vts])
-      if sources:
-        return self.checkstyle(interpreter, sources)
+      failure_count = 0
+      tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility(
+        [vt.target for vt in invalidation_check.invalid_vts]
+      )
+      for filters, targets in tgts_by_compatibility.items():
+        if self.get_options().interpreter_constraints_whitelist is None and not self._constraints_are_whitelisted(filters):
+          deprecated_conditional(
+            lambda: self.get_options().interpreter_constraints_whitelist is None,
+            '1.14.0.dev2',
+            "Python linting is currently restricted to targets that match the global "
+            "interpreter constraints: {}. Pants detected unacceptable filters: {}. "
+            "Use the `--interpreter-constraints-whitelist` lint option to whitelist "
+            "compatibiltiy constraints."
+            .format(PythonSetup.global_instance().interpreter_constraints, filters)
+          )
+        else:
+          sources = self.calculate_sources([tgt for tgt in targets])
+          if sources:
+            allowed_interpreters = set(interpreter_cache.setup(filters=filters))
+            if not allowed_interpreters:
+              raise TaskError('No valid interpreters found for targets: {}\n(filters: {})'
+                              .format(targets, filters))
+            interpreter = min(allowed_interpreters)
+            failure_count += self.checkstyle(interpreter, sources)
+      if failure_count > 0 and self.get_options().fail:
+        raise TaskError('{} Python Style issues found. You may try `./pants fmt <targets>`'
+                        .format(failure_count))
+      return failure_count
 
   def calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""
