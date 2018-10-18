@@ -180,6 +180,7 @@ class NativeExternalLibraryFetch(NativeTask):
       include_dir = os.path.join(vt.results_dir, 'include')
 
       lib_names = []
+      static_archive_paths = []
       if os.path.isdir(lib_dir):
         for filename in os.listdir(lib_dir):
           if filename.endswith('.a'):

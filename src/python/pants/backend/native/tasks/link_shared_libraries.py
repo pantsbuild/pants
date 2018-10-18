@@ -153,11 +153,13 @@ class LinkSharedLibraries(NativeTask):
 
     external_lib_dirs = []
     external_lib_names = []
+    external_static_archive_paths = []
     if external_libs_product is not None:
       for nelf in external_libs_product.get_for_targets(deps):
         if nelf.lib_dir:
           external_lib_dirs.append(nelf.lib_dir)
         external_lib_names.extend(nelf.lib_names)
+        external_static_archive_paths.extend(nelf.static_archive_paths)
 
     return LinkSharedLibraryRequest(
       linker=self.linker,
@@ -165,7 +167,8 @@ class LinkSharedLibraries(NativeTask):
       native_artifact=vt.target.ctypes_native_library,
       output_dir=vt.results_dir,
       external_lib_dirs=tuple(external_lib_dirs),
-      external_lib_names=tuple(external_lib_names))
+      external_lib_names=tuple(external_lib_names),
+      external_static_archive_paths=tuple(external_static_archive_paths))
 
   _SHARED_CMDLINE_ARGS = {
     'darwin': lambda: ['-Wl,-dylib'],
