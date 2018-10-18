@@ -17,6 +17,7 @@ from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
+from pants.base.exceptions import GracefulTerminationException
 from pants.base.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
@@ -230,10 +231,12 @@ class DaemonPantsRunner(ProcessManager):
   def _raise_deferred_exc(self):
     """Raises deferred exceptions from the daemon's synchronous path in the post-fork client."""
     if self._deferred_exception:
+      exc_type, exc_value, exc_traceback = self._deferred_exception
+      if exc_type == GracefulTerminationException:
+        self._exiter.exit(exc_value.exit_code)
       try:
         # Expect `_deferred_exception` to be a 3-item tuple of the values returned by sys.exc_info().
         # This permits use the 3-arg form of the `raise` statement to preserve the original traceback.
-        exc_type, exc_value, exc_traceback = self._deferred_exception
         raise_with_traceback(exc_type(exc_value), exc_traceback)
       except ValueError:
         # If `_deferred_exception` isn't a 3-item tuple, treat it like a bare exception.

@@ -11,7 +11,7 @@ from builtins import object, open, str, zip
 from collections import defaultdict
 from types import GeneratorType
 
-from pants.base.exceptions import TaskError
+from pants.base.exceptions import GracefulTerminationException, TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (DirectoryDigest, DirectoryToMaterialize, FileContent, FilesContent,
@@ -536,6 +536,10 @@ class SchedulerSession(object):
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
       unique_exceptions = tuple({t.exc for t in throw_root_states})
+
+      if len(unique_exceptions) == 1 and isinstance(unique_exceptions[0], GracefulTerminationException):
+        raise unique_exceptions[0]
+
       exception_noun = pluralize(len(unique_exceptions), 'Exception')
 
       if self._scheduler.include_trace_on_error:

@@ -8,6 +8,7 @@ import logging
 from builtins import object
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import GracefulTerminationException
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
@@ -190,8 +191,11 @@ class LocalPantsRunner(object):
         self._options.goals_and_possible_v2_goals,
         self._target_roots
       )
+    except GracefulTerminationException as e:
+      logger.debug('Encountered graceful termination exception {}; exiting'.format(e))
+      return e.exit_code
     except Exception as e:
-      logger.warn('Encountered unhandled exception {!r} during rule execution!'
+      logger.warn('Encountered unhandled exception {} during rule execution!'
                   .format(e))
       return 1
     else:
