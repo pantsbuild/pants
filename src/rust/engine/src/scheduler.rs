@@ -275,7 +275,7 @@ impl Scheduler {
       false => None,
     };
 
-    optional_display.as_mut().map(|display| {
+    if let Some(display) = optional_display.as_mut() {
       display.start();
       display.render();
       let worker_ids: Vec<String> = (0..display_worker_count)
@@ -285,7 +285,7 @@ impl Scheduler {
         display.add_worker(worker_id);
         display.render();
       }
-    });
+    }
 
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
     let roots: Vec<_> = request
@@ -299,7 +299,7 @@ impl Scheduler {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
       } else {
-        optional_display.as_mut().map(|display| {
+        if let Some(display) = optional_display.as_mut() {
           let ongoing_tasks = self.core.graph.heavy_hitters(&roots, display_worker_count);
           for (i, task) in ongoing_tasks.iter().enumerate() {
             display.update(i.to_string(), format!("{:?}", task));
@@ -310,14 +310,13 @@ impl Scheduler {
             display.update(i.to_string(), "".to_string());
           }
           display.render();
-        });
+        }
       }
     };
-
-    optional_display.as_mut().map(|display| {
+    if let Some(display) = optional_display.as_mut() {
       display.render();
       display.finish();
-    });
+    };
 
     request
       .roots
