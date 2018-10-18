@@ -25,7 +25,7 @@ class ArgSplitterError(Exception):
 
 
 class SplitArgs(namedtuple('SplitArgs',
-                           ['goals', 'scope_to_flags', 'targets', 'passthru', 'passthru_owner'])):
+                           ['goals', 'scope_to_flags', 'targets', 'passthru', 'passthru_owner', 'unknown_scopes'])):
   """The result of splitting args.
 
   goals: A list of explicitly specified goals.
@@ -202,7 +202,7 @@ class ArgSplitter(object):
     if not goals and not self._help_request:
       self._help_request = NoGoalHelp()
 
-    return SplitArgs(goals, scope_to_flags, targets, passthru, passthru_owner if passthru else None)
+    return SplitArgs(goals, scope_to_flags, targets, passthru, passthru_owner if passthru else None, self._unknown_scopes)
 
   def _consume_scope(self):
     """Returns a pair (scope, list of flags encountered in that scope).

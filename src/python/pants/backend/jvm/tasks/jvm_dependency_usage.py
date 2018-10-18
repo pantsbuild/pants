@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 import sys
-from builtins import next, object, open
+from builtins import next, object, open, str
 from collections import defaultdict, namedtuple
 
 from future.utils import PY3
@@ -440,4 +440,4 @@ class DependencyUsageGraph(object):
         'dependencies': [gen_dep_edge(node, edge, dep_tgt, node.dep_aliases.get(dep_tgt, {}))
                          for dep_tgt, edge in node.dep_edges.items()],
       }
-    yield json.dumps(res_dict, indent=2, sort_keys=True)
+    yield str(json.dumps(res_dict, indent=2, sort_keys=True))

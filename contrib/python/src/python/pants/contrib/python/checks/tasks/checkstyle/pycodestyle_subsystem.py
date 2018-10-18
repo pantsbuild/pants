@@ -45,8 +45,7 @@ class PyCodeStyleSubsystem(PluginSubsystemBase):
   )
 
   @classmethod
-  def register_options(cls, register):
-    super(PyCodeStyleSubsystem, cls).register_options(register)
+  def register_plugin_options(cls, register):
     register('--ignore', fingerprint=True, type=list, default=cls.DEFAULT_IGNORE_CODES,
              help='Prevent test failure but still produce output for problems.')
     register('--max-length', fingerprint=True, type=int, default=100,

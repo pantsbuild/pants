@@ -183,11 +183,11 @@ class LocalPantsRunner(object):
     # If we're a pure --v2 run, validate goals - otherwise some goals specified
     # may be provided by the --v1 task paths.
     if not self._global_options.v1:
-      self._graph_session.validate_goals(self._options.goals)
+      self._graph_session.validate_goals(self._options.goals_and_possible_v2_goals)
 
     try:
       self._graph_session.run_console_rules(
-        self._options.goals,
+        self._options.goals_and_possible_v2_goals,
         self._target_roots,
         self._global_options.render_v2_engine_ui
       )
