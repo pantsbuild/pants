@@ -271,14 +271,21 @@ impl Scheduler {
 
     // Setting up display
     let display_worker_count = 8;
-    let mut display = EngineDisplay::for_stdout(0);
-    display.start();
-    display.render();
-    let worker_ids: Vec<String> = (0..display_worker_count).map(|s| format!("{}", s)).collect();
-    for worker_id in worker_ids {
-      display.add_worker(worker_id);
+    let mut optional_display = match request.should_render_ui {
+      true => Some(EngineDisplay::for_stdout(0)),
+      false => None,
+    };
+
+    optional_display.as_mut().map(|display| {
+      display.start();
       display.render();
-    }
+      let worker_ids: Vec<String> = (0..display_worker_count).map(|s| format!("{}", s)).collect();
+      for worker_id in worker_ids {
+        display.add_worker(worker_id);
+        display.render();
+      }
+    });
+
 
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
     let roots: Vec<_> = request.roots.clone().into_iter().map(|s| s.into()).collect();
@@ -287,21 +294,25 @@ impl Scheduler {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
       } else {
-        let ongoing_tasks = self.core.graph.heavy_hitters(&roots, display_worker_count);
-        for (i, task) in ongoing_tasks.iter().enumerate() {
-          display.update(i.to_string(), format!("{:?}", task));
-        }
-        // If the number of ongoing tasks is less than the number of workers,
-        // fill the rest of the workers with empty string.
-        for i in ongoing_tasks.len()..display_worker_count {
-          display.update(i.to_string(), "".to_string());
-        }
-        display.render();
+        optional_display.as_mut().map(|display| {
+          let ongoing_tasks = self.core.graph.heavy_hitters(&roots, display_worker_count);
+          for (i, task) in ongoing_tasks.iter().enumerate() {
+            display.update(i.to_string(), format!("{:?}", task));
+          }
+          // If the number of ongoing tasks is less than the number of workers,
+          // fill the rest of the workers with empty string.
+          for i in ongoing_tasks.len()..display_worker_count {
+            display.update(i.to_string(), "".to_string());
+          }
+          display.render();
+        });
       }
     };
 
-    display.render();
-    display.finish();
+    optional_display.as_mut().map(|display| {
+      display.render();
+      display.finish();
+    });
 
     request
       .roots
