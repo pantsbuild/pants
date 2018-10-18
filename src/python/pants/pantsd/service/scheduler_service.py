@@ -211,10 +211,10 @@ class SchedulerService(PantsService):
 
     if global_options.v2:
       if not global_options.v1:
-        session.validate_goals(options.goals)
+        session.validate_goals(options.goals_and_possible_v2_goals)
 
       # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
-      session.run_console_rules(options.goals, target_roots)
+      session.run_console_rules(options.goals_and_possible_v2_goals, target_roots)
 
     return target_roots
 
