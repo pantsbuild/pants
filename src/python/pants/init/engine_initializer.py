@@ -199,7 +199,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
 
     :param list goals: The list of requested goal names as passed on the commandline.
     :param TargetRoots target_roots: The targets root of the request.
-    :param list render_v2_engine_ui: whether to render the v2 engine UI
+    :param bool render_v2_engine_ui: whether to render the v2 engine UI
     """
     # Reduce to only applicable goals - with validation happening by way of `validate_goals()`.
     goals = [goal for goal in goals if goal in self.goal_map]
