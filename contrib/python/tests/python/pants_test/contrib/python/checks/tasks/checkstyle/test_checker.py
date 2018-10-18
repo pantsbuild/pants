@@ -86,12 +86,17 @@ class CheckstyleTest(PythonTaskTestBase):
                                  repos=[os.path.dirname(self._checker_dist)])
       self.set_options_for_scope(PythonSetup.options_scope,
                                  resolver_allow_prereleases=True)
-      context = self.context(target_roots=target_roots)
-      return self.create_task(context).execute()
+      yield
+
+  def execute_task(self, target_roots=None, resolve_local=False):
+    with self.resolve_configuration(resolve_local=resolve_local):
+      with environment_as(PANTS_DEV=None, PEX_VERBOSE='9'):
+        context = self.context(target_roots=target_roots)
+        return self.create_task(context).execute()
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_no_sources(self, unused_test_name, resolve_local):
-    self.assertEqual(None, self.execute_task(resolve_local=resolve_local))
+    self.assertEqual(0, self.execute_task(resolve_local=resolve_local))
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_pass(self, unused_test_name, resolve_local):

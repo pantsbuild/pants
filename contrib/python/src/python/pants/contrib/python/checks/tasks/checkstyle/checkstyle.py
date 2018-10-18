@@ -64,6 +64,7 @@ class Checkstyle(LintTaskMixin, Task):
   def implementation_version(cls):
     return super(Checkstyle, cls).implementation_version() + [('Checkstyle', 1)]
 
+  @classmethod
   def register_options(cls, register):
     super(Checkstyle, cls).register_options(register)
     register('--severity', fingerprint=True, default='COMMENT', type=str,
