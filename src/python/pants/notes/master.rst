@@ -4,6 +4,52 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.11.0rc0 (10/16/2018)
+----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add a node_scope option to node_module targets to support package-scopes (#6616)
+  `PR #6616 <https://github.com/pantsbuild/pants/pull/6616>`_
+
+* Split conan resolve by native_external_library targets (takeover). (#6630)
+  `PR #6630 <https://github.com/pantsbuild/pants/pull/6630>`_
+
+* Add intrinsic task to merge DirectoryDigests (#6635)
+  `Issue #5502 <https://github.com/pantsbuild/pants/issues/5502>`_
+  `PR #6635 <https://github.com/pantsbuild/pants/pull/6635>`_
+
+Bugfixes
+~~~~~~~~
+
+* Tighten up checkstyle plugin subsystem option passing. (#6648)
+  `PR #6648 <https://github.com/pantsbuild/pants/pull/6648>`_
+
+* [dep-usage] when no summary, ensure json output is unicode (#6641)
+  `PR #6641 <https://github.com/pantsbuild/pants/pull/6641>`_
+
+* Fix console_rule generators, and add a test to coverage running them under run_rule. (#6644)
+  `PR #6644 <https://github.com/pantsbuild/pants/pull/6644>`_
+
+* Add bounds checking to Entry::current_running_duration (#6643)
+  `PR #6643 <https://github.com/pantsbuild/pants/pull/6643>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Create exactly one associated subsystem per checkstyle plugin (#6634)
+  `PR #6634 <https://github.com/pantsbuild/pants/pull/6634>`_
+
+* Add some jdk tests for execution modes (#6631)
+  `PR #6631 <https://github.com/pantsbuild/pants/pull/6631>`_
+
+* Fix the release script. (#6629)
+  `PR #6629 <https://github.com/pantsbuild/pants/pull/6629>`_
+
+* Support resolving `Checker` from `sys.path`. (#6642)
+  `PR #6642 <https://github.com/pantsbuild/pants/pull/6642>`_
+
 1.11.0.dev3 (10/13/2018)
 ------------------------
 
