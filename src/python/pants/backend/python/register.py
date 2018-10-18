@@ -8,6 +8,7 @@ from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
+from pants.backend.python.rules.python_test_runner import run_python_test
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -73,3 +74,7 @@ def register_goals():
   task(name='isort-prep', action=IsortPrep).install('fmt')
   task(name='isort', action=IsortRun).install('fmt')
   task(name='py', action=PythonBundle).install('bundle')
+
+
+def rules():
+  return (run_python_test,)

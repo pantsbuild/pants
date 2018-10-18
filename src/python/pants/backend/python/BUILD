@@ -9,6 +9,7 @@ python_library(
     ':python_artifact',
     ':python_requirement',
     ':python_requirements',
+    'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/build_graph',
