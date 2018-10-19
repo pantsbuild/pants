@@ -10,9 +10,8 @@ from collections import defaultdict
 
 from pex.pex import PEX
 
-from pants.backend.native.config.environment import CppToolchain, CToolchain, Platform
+from pants.backend.native.config.environment import CppToolchain, CToolchain
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
-from pants.backend.native.subsystems.xcode_cli_tools import MIN_OSX_VERSION_ARG
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -159,7 +158,6 @@ class BuildSetupRequiresPex(ExecutablePexTool):
 class SetupPyNativeTools(datatype([
     ('c_toolchain', CToolchain),
     ('cpp_toolchain', CppToolchain),
-    ('platform', Platform),
 ])):
   """The native tools needed for a setup.py invocation.
 
@@ -174,16 +172,6 @@ class SetupPyExecutionEnvironment(datatype([
     # If None, don't execute in the toolchain environment.
     'setup_py_native_tools',
 ])):
-
-  _SHARED_CMDLINE_ARGS = {
-    'darwin': lambda: [
-      MIN_OSX_VERSION_ARG,
-      '-Wl,-dylib',
-      '-undefined',
-      'dynamic_lookup',
-    ],
-    'linux': lambda: ['-shared'],
-  }
 
   def as_environment(self):
     ret = {}

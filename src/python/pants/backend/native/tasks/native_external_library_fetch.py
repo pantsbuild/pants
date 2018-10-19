@@ -12,6 +12,7 @@ from distutils.dir_util import copy_tree
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.native.config.environment import LLVMCppToolchain, Platform
+from pants.backend.native.subsystems.binaries.cmake import CMake
 from pants.backend.native.subsystems.conan import Conan
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
@@ -88,6 +89,7 @@ class NativeExternalLibraryFetch(NativeTask):
   @classmethod
   def subsystem_dependencies(cls):
     return super(NativeExternalLibraryFetch, cls).subsystem_dependencies() + (
+      CMake.scoped(cls),
       Conan.scoped(cls),
       NativeToolchain.scoped(cls),
     )
@@ -122,17 +124,20 @@ class NativeExternalLibraryFetch(NativeTask):
     return self._request_single(LLVMCppToolchain, self._native_toolchain).cpp_toolchain
 
   @memoized_property
+  def _cmake(self):
+    return CMake.scoped_instance(self)
+
+  @memoized_property
   def _build_environment(self):
     cpp_compiler = self._cpp_toolchain.cpp_compiler
     cpp_linker = self._cpp_toolchain.cpp_linker
     # Compose the invocation environments.
     invocation_env_dict = cpp_compiler.as_invocation_environment_dict.copy()
     invocation_env_dict.update(cpp_linker.as_invocation_environment_dict)
-    invocation_env_dict.update({
-      'PATH': create_path_env_var((cpp_compiler.path_entries + cpp_linker.path_entries),
-                                  os.environ.copy(),
-                                  prepend=True),
-    })
+    invocation_env_dict['PATH'] = create_path_env_var((
+      cpp_compiler.path_entries +
+      cpp_linker.path_entries +
+      [self._cmake.bin_dir]))
     return invocation_env_dict
 
   class NativeExternalLibraryFetchError(TaskError):

@@ -222,8 +222,7 @@ class BuildLocalPythonDistributions(Task):
       # TODO: test this branch somehow!
       native_tools = SetupPyNativeTools(
         c_toolchain=self._c_toolchain,
-        cpp_toolchain=self._cpp_toolchain,
-        platform=self._platform)
+        cpp_toolchain=self._cpp_toolchain)
       # Native code in this python_dist() target requires marking the dist as platform-specific.
       is_platform_specific = True
     elif len(all_native_artifacts) > 0:
