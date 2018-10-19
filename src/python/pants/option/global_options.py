@@ -223,8 +223,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'of the directory will be overwritten if any filenames collide.')
     register('--print-exception-stacktrace', advanced=True, type=bool,
              help='Print to console the full exception stack trace if encountered.')
-    register('--render-v2-engine-ui', default=False, type=bool, daemon=False,
-             help='whether to show v2 engine execution progress.')
+    register('--v2-ui', default=False, type=bool, daemon=False,
+             help='Whether to show v2 engine execution progress. '
+                  'This requires the --v2 flag to take effect.')
 
     # BinaryUtil options.
     register('--binaries-baseurls', type=list, advanced=True,
