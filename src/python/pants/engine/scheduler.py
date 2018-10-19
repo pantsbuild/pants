@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import multiprocessing
 import os
 import time
 from builtins import object, open, str, zip
@@ -421,7 +422,7 @@ class SchedulerSession(object):
     self._scheduler.visualize_rule_graph_to_file(filename)
 
   def execution_request_literal(self, request_specs, v2_ui):
-    native_execution_request = self._scheduler._native.new_execution_request(v2_ui)
+    native_execution_request = self._scheduler._native.new_execution_request(v2_ui, multiprocessing.cpu_count())
     for subject, product in request_specs:
       self._scheduler.add_root_selection(native_execution_request, subject, product)
     return ExecutionRequest(request_specs, native_execution_request)

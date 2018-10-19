@@ -58,13 +58,15 @@ pub struct ExecutionRequest {
   pub roots: Vec<Root>,
   // Flag used to determine whether to show engine execution progress.
   pub should_render_ui: bool,
+  pub ui_worker_count: u64,
 }
 
 impl ExecutionRequest {
-  pub fn new(should_render_ui: bool) -> ExecutionRequest {
+  pub fn new(should_render_ui: bool, ui_worker_count: u64) -> ExecutionRequest {
     ExecutionRequest {
       roots: Vec::new(),
       should_render_ui,
+      ui_worker_count,
     }
   }
 
@@ -269,7 +271,7 @@ impl Scheduler {
     let (sender, receiver) = mpsc::channel();
 
     // Setting up display
-    let display_worker_count = 8;
+    let display_worker_count = request.ui_worker_count as usize;
     let mut optional_display = if request.should_render_ui {
       Some(EngineDisplay::for_stdout(0))
     } else {
