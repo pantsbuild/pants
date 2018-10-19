@@ -29,6 +29,7 @@ class NativeCompileRequest(datatype([
     'sources',
     ('fatal_warnings', bool),
     'output_dir',
+    'extra_compiler_options',
 ])): pass
 
 
@@ -165,6 +166,13 @@ class NativeCompile(NativeTask, AbstractClass):
             for nelf in external_libs_product.get_for_targets(dependencies)
             if nelf.include_dir]
 
+  def _merge_extra_compiler_options_for_targets(self, targets):
+    options = set()
+    for tgt in targets:
+      if getattr(tgt, 'extra_compiler_options', None):
+        options.update(tgt.extra_compiler_options)
+    return list(options)
+
   def _make_compile_request(self, versioned_target, dependencies, external_libs_product):
     target = versioned_target.target
 
@@ -172,18 +180,21 @@ class NativeCompile(NativeTask, AbstractClass):
     include_dirs.extend(self._get_third_party_include_dirs(external_libs_product, dependencies))
 
     sources_and_headers = self.get_sources_headers_for_target(target)
+    extra_compiler_options = self._merge_extra_compiler_options_for_targets([target] + dependencies)
 
     return NativeCompileRequest(
       compiler=self._compiler,
       include_dirs=include_dirs,
       sources=sources_and_headers,
       fatal_warnings=self._compile_settings.get_fatal_warnings_value_for_target(target),
-      output_dir=versioned_target.results_dir)
+      output_dir=versioned_target.results_dir,
+      extra_compiler_options=extra_compiler_options)
 
   def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
     compiler = compile_request.compiler
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
+    extra_compiler_options = compile_request.extra_compiler_options
 
     # We are going to execute in the target output, so get absolute paths for everything.
     buildroot = get_buildroot()
@@ -193,6 +204,7 @@ class NativeCompile(NativeTask, AbstractClass):
       err_flags +
       # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
       ['-c', '-fPIC'] +
+      extra_compiler_options +
       [
         '-I{}'.format(os.path.join(buildroot, inc_dir))
         for inc_dir in compile_request.include_dirs
