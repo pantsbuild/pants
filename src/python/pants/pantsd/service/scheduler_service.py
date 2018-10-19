@@ -214,7 +214,7 @@ class SchedulerService(PantsService):
         session.validate_goals(options.goals_and_possible_v2_goals)
 
       # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
-      session.run_console_rules(options.goals_and_possible_v2_goals, target_roots, render_v2_engine_ui=global_options.v2_ui)
+      session.run_console_rules(options.goals_and_possible_v2_goals, target_roots, v2_ui=global_options.v2_ui)
 
     return target_roots
 

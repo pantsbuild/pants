@@ -420,13 +420,13 @@ class SchedulerSession(object):
   def visualize_rule_graph_to_file(self, filename):
     self._scheduler.visualize_rule_graph_to_file(filename)
 
-  def execution_request_literal(self, request_specs, render_v2_engine_ui):
-    native_execution_request = self._scheduler._native.new_execution_request(render_v2_engine_ui)
+  def execution_request_literal(self, request_specs, v2_ui):
+    native_execution_request = self._scheduler._native.new_execution_request(v2_ui)
     for subject, product in request_specs:
       self._scheduler.add_root_selection(native_execution_request, subject, product)
     return ExecutionRequest(request_specs, native_execution_request)
 
-  def execution_request(self, products, subjects, render_v2_engine_ui=False):
+  def execution_request(self, products, subjects, v2_ui=False):
     """Create and return an ExecutionRequest for the given products and subjects.
 
     The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
@@ -440,11 +440,11 @@ class SchedulerSession(object):
     :param subjects: A list of Spec and/or PathGlobs objects.
     :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
       :class:`pants.engine.fs.PathGlobs` objects.
-    :param bool render_v2_engine_ui: whether to render the v2 engine UI
+    :param bool v2_ui: whether to render the v2 engine UI
     :returns: An ExecutionRequest for the given products and subjects.
     """
     roots = (tuple((s, p) for s in subjects for p in products))
-    return self.execution_request_literal(roots, render_v2_engine_ui)
+    return self.execution_request_literal(roots, v2_ui)
 
   def invalidate_files(self, direct_filenames):
     """Invalidates the given filenames in an internal product Graph instance."""
@@ -512,15 +512,15 @@ class SchedulerSession(object):
     except TaskError as e:
       return ExecutionResult.failure(e)
 
-  def products_request(self, products, subjects, render_v2_engine_ui):
+  def products_request(self, products, subjects, v2_ui):
     """Executes a request for multiple products for some subjects, and returns the products.
 
     :param list products: A list of product type for the request.
     :param list subjects: A list of subjects for the request.
-    :param bool render_v2_engine_ui: whether to render the v2 engine UI
+    :param bool v2_ui: whether to render the v2 engine UI
     :returns: A dict from product type to lists of products each with length matching len(subjects).
     """
-    request = self.execution_request(products, subjects, render_v2_engine_ui)
+    request = self.execution_request(products, subjects, v2_ui)
     result = self.execute(request)
     if result.error:
       raise result.error
@@ -560,15 +560,15 @@ class SchedulerSession(object):
       product_results[product].append(state.value)
     return product_results
 
-  def product_request(self, product, subjects, render_v2_engine_ui=False):
+  def product_request(self, product, subjects, v2_ui=False):
     """Executes a request for a single product for some subjects, and returns the products.
 
     :param class product: A product type for the request.
     :param list subjects: A list of subjects for the request.
-    :param bool render_v2_engine_ui: whether to render the v2 engine UI
+    :param bool v2_ui: whether to render the v2 engine UI
     :returns: A list of the requested products, with length match len(subjects).
     """
-    return self.products_request([product], subjects, render_v2_engine_ui)[product]
+    return self.products_request([product], subjects, v2_ui)[product]
 
   def capture_snapshots(self, path_globs_and_roots):
     """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.
