@@ -270,7 +270,11 @@ impl Scheduler {
 
     // Setting up display
     let display_worker_count = 8;
-    let mut optional_display = if request.should_render_ui { Some(EngineDisplay::for_stdout(0)) } else { None };
+    let mut optional_display = if request.should_render_ui {
+      Some(EngineDisplay::for_stdout(0))
+    } else {
+      None
+    };
     if let Some(display) = optional_display.as_mut() {
       display.start();
       display.render();
@@ -306,7 +310,6 @@ impl Scheduler {
         }
         display.render();
       }
-
     };
     if let Some(display) = optional_display.as_mut() {
       display.render();
