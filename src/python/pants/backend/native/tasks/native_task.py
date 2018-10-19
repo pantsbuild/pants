@@ -8,6 +8,7 @@ from builtins import filter
 
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.build_graph.dependency_context import DependencyContext
 from pants.task.task import Task
@@ -39,7 +40,7 @@ class NativeTask(Task):
 
     :return: :class:`pants.util.objects.TypeConstraint`
     """
-    return SubclassesOf(NativeLibrary)
+    return SubclassesOf(ExternalNativeLibrary, NativeLibrary)
 
   @classmethod
   def subsystem_dependencies(cls):

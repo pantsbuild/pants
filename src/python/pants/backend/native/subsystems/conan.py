@@ -22,23 +22,7 @@ class Conan(ExecutablePexTool):
 
   # TODO: It would be great if these requirements could be drawn from a BUILD file (potentially with
   # a special target specified in BUILD.tools)?
-  default_conan_requirements = (
-    'conan==1.4.4',
-    'PyJWT>=1.4.0, <2.0.0',
-    'requests>=2.7.0, <3.0.0',
-    'colorama>=0.3.3, <0.4.0',
-    'PyYAML>=3.11, <3.13.0',
-    'patch==1.16',
-    'fasteners>=0.14.1',
-    'six>=1.10.0',
-    'node-semver==0.2.0',
-    'distro>=1.0.2, <1.2.0',
-    'pylint>=1.8.1, <1.9.0',
-    'future==0.16.0',
-    'pygments>=2.0, <3.0',
-    'astroid>=1.6, <1.7',
-    'deprecation>=2.0, <2.1'
-  )
+  default_conan_requirements = ('conan==1.8.2',)
 
   @classmethod
   def register_options(cls, register):
