@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from twitter.common.collections import maybe_list
+
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
@@ -20,7 +22,7 @@ class NativeLibrary(Target, AbstractClass):
     return isinstance(target, cls) and bool(target.ctypes_native_library)
 
   def __init__(self, address, payload=None, sources=None, ctypes_native_library=None,
-               strict_deps=None, fatal_warnings=None, **kwargs):
+               strict_deps=None, fatal_warnings=None, extra_compiler_options=None, **kwargs):
 
     if not payload:
       payload = Payload()
@@ -30,6 +32,7 @@ class NativeLibrary(Target, AbstractClass):
       'ctypes_native_library': ctypes_native_library,
       'strict_deps': PrimitiveField(strict_deps),
       'fatal_warnings': PrimitiveField(fatal_warnings),
+      'extra_compiler_options': PrimitiveField(maybe_list(extra_compiler_options or ())),
     })
 
     if ctypes_native_library and not isinstance(ctypes_native_library, NativeArtifact):
@@ -47,6 +50,10 @@ class NativeLibrary(Target, AbstractClass):
   @property
   def fatal_warnings(self):
     return self.payload.fatal_warnings
+
+  @property
+  def extra_compiler_options(self):
+    return self.payload.extra_compiler_options
 
   @property
   def ctypes_native_library(self):
