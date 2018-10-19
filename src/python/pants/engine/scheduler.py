@@ -538,6 +538,8 @@ class SchedulerSession(object):
     if throw_root_states:
       unique_exceptions = tuple({t.exc for t in throw_root_states})
 
+      # TODO: consider adding a new top-level function adjacent to products_request used for running console tasks,
+      # so that this code doesn't need to exist in this form.
       if len(unique_exceptions) == 1 and isinstance(unique_exceptions[0], GracefulTerminationException):
         raise unique_exceptions[0]
 
