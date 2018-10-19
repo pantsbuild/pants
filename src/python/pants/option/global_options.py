@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import multiprocessing
 import os
 import sys
+from builtins import str
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)

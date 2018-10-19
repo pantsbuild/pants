@@ -10,6 +10,12 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class NativeBuildStepSettingsBase(Subsystem, MirroredTargetOptionMixin):
+  """Holds options which are understood by all parts of the compile and link pipeline.
+
+  NB: This is separate from NativeBuildSettings, which is used to store options controlling pants
+  behavior. Rather, this subsystem stores options which are typically interpreted into command-line
+  arguments or environment variables for a compiler or linker invocation.
+  """
 
   mirrored_option_to_kwarg_map = {
     'fatal_warnings': 'fatal_warnings',
