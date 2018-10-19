@@ -270,11 +270,7 @@ impl Scheduler {
 
     // Setting up display
     let display_worker_count = 8;
-    let mut optional_display = match request.should_render_ui {
-      true => Some(EngineDisplay::for_stdout(0)),
-      false => None,
-    };
-
+    let mut optional_display = if request.should_render_ui { Some(EngineDisplay::for_stdout(0)) } else { None };
     if let Some(display) = optional_display.as_mut() {
       display.start();
       display.render();
@@ -298,20 +294,19 @@ impl Scheduler {
     let results = loop {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
-      } else {
-        if let Some(display) = optional_display.as_mut() {
-          let ongoing_tasks = self.core.graph.heavy_hitters(&roots, display_worker_count);
-          for (i, task) in ongoing_tasks.iter().enumerate() {
-            display.update(i.to_string(), format!("{:?}", task));
-          }
-          // If the number of ongoing tasks is less than the number of workers,
-          // fill the rest of the workers with empty string.
-          for i in ongoing_tasks.len()..display_worker_count {
-            display.update(i.to_string(), "".to_string());
-          }
-          display.render();
+      } else if let Some(display) = optional_display.as_mut() {
+        let ongoing_tasks = self.core.graph.heavy_hitters(&roots, display_worker_count);
+        for (i, task) in ongoing_tasks.iter().enumerate() {
+          display.update(i.to_string(), format!("{:?}", task));
         }
+        // If the number of ongoing tasks is less than the number of workers,
+        // fill the rest of the workers with empty string.
+        for i in ongoing_tasks.len()..display_worker_count {
+          display.update(i.to_string(), "".to_string());
+        }
+        display.render();
       }
+
     };
     if let Some(display) = optional_display.as_mut() {
       display.render();
