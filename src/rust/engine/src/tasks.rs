@@ -94,6 +94,10 @@ impl Tasks {
         input: types.path_globs,
       },
       Intrinsic {
+        product: types.snapshot,
+        input: types.url_to_fetch,
+      },
+      Intrinsic {
         product: types.files_content,
         input: types.directory_digest,
       },

@@ -197,6 +197,7 @@ Scheduler* scheduler_create(Tasks*,
                             TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
+                            TypeConstraint,
                             TypeId,
                             TypeId,
                             Buffer,
@@ -823,7 +824,8 @@ class Native(object):
                     constraint_link,
                     constraint_process_request,
                     constraint_process_result,
-                    constraint_generator):
+                    constraint_generator,
+                    constraint_url_to_fetch):
     """Create and return an ExternContext and native Scheduler."""
 
     def func(constraint):
@@ -856,6 +858,7 @@ class Native(object):
         tc(constraint_process_request),
         tc(constraint_process_result),
         tc(constraint_generator),
+        tc(constraint_url_to_fetch),
         # Types.
         TypeId(self.context.to_id(text_type)),
         TypeId(self.context.to_id(binary_type)),

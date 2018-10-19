@@ -125,6 +125,11 @@ class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest',
   """A request to materialize the contents of a directory digest at the provided path."""
   pass
 
+
+class UrlToFetch(datatype([('url', text_type)])):
+  pass
+
+
 FilesContent = Collection.of(FileContent)
 
 
