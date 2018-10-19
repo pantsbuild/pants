@@ -11,7 +11,7 @@ from builtins import object, open, str, zip
 from collections import defaultdict
 from types import GeneratorType
 
-from pants.base.exceptions import GracefulTerminationException, TaskError
+from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (DirectoryDigest, DirectoryToMaterialize, FileContent, FilesContent,
@@ -21,6 +21,7 @@ from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Select, constraint_for
+from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.objects import Collection, datatype

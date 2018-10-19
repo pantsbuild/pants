@@ -8,7 +8,6 @@ import logging
 from builtins import object
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import GracefulTerminationException
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
@@ -19,6 +18,7 @@ from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
+from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import maybe_profiled
 
 

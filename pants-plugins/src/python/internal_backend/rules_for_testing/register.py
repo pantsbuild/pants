@@ -4,11 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.base.exceptions import GracefulTerminationException
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.rules import console_rule
 from pants.engine.selectors import Select
+from pants.rules.core.exceptions import GracefulTerminationException
 
 
 @console_rule('list-and-die-for-testing', [Select(Console), Select(BuildFileAddresses)])

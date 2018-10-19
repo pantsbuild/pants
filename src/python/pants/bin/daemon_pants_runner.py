@@ -17,13 +17,13 @@ from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
-from pants.base.exceptions import GracefulTerminationException
 from pants.base.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
+from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
