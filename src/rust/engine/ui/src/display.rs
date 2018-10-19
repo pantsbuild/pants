@@ -214,9 +214,8 @@ impl EngineDisplay {
 
   // Renders one frame of the action portion of the screen.
   fn render_actions(&mut self, start_row: usize) {
-    let cursor_start = self.cursor_start;
     let worker_states = self.action_map.clone();
-
+    let cursor_start = self.cursor_start;
     // For every active worker in the action map, jump to the exact cursor
     // representing the swimlane for this worker and lay down a text label.
     for (n, (_worker_id, action)) in worker_states.iter().enumerate() {
@@ -276,14 +275,6 @@ impl EngineDisplay {
   // Starts the EngineDisplay at the current cursor position.
   pub fn start(&mut self) {
     self.running = true;
-    let cursor_start = self.cursor_start;
-    self
-      .write(&format!(
-        "{hide_cursor}{cursor_init}{clear_after_cursor}",
-        hide_cursor = termion::cursor::Hide,
-        cursor_init = cursor::Goto(cursor_start.0, cursor_start.1),
-        clear_after_cursor = clear::AfterCursor
-      )).expect("could not write to terminal");
   }
 
   // Adds a worker/thread to the visual representation.
@@ -309,19 +300,6 @@ impl EngineDisplay {
 
   // Terminates the EngineDisplay and returns the cursor to a static position.
   pub fn finish(&mut self) {
-    // Don't do anything if it's not tty.
-    if !self.is_tty {
-      return;
-    }
-    self.running = false;
-    let current_pos = self.get_cursor_pos();
-    let action_count = self.action_map.len() as u16;
-    self
-      .write(&format!(
-        "{park_cursor}{clear_after_cursor}{reveal_cursor}",
-        park_cursor = cursor::Goto(1, current_pos.1 - action_count),
-        clear_after_cursor = clear::AfterCursor,
-        reveal_cursor = termion::cursor::Show
-      )).expect("could not write to terminal");
+    self.write(&"\n".to_string()).expect("could not write to terminal");
   }
 }
