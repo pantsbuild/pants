@@ -16,7 +16,6 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
 
-  # TODO: This test is known to fail until we implement the last part of #6146.
   def test_v2_list(self):
     with self.pantsd_successful_run_context() as (runner, checker, workdir, pantsd_config):
       def run_list():

@@ -337,14 +337,25 @@ impl<N: Node> Entry<N> {
           // The Node has already completed but is now marked dirty. This indicates that we are the
           // first caller to request it since it was marked dirty. We attempt to clean it (which will
           // cause it to re-run if the dep_generations mismatch).
+          // Note that if the node is uncacheable, we avoid storing a previous result, which will
+          // transitively invalidate every node that depends on us. This works because, in practice,
+          // the only uncacheable nodes are Select nodes and @console_rule Task nodes. See #6146 and #6598
           Self::run(
             context,
             &self.node,
             entry_id,
             run_token,
             generation,
-            if self.node.content().cacheable() { Some(dep_generations) } else { None },
-            if self.node.content().cacheable() { Some(result) } else { None },
+            if self.node.content().cacheable() {
+              Some(dep_generations)
+            } else {
+              None
+            },
+            if self.node.content().cacheable() {
+              Some(result)
+            } else {
+              None
+            },
           )
         }
         EntryState::Running { .. } => {
