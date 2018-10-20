@@ -21,6 +21,9 @@ from pants_test.testutils.process_test_util import no_lingering_process_by_comma
 
 def launch_file_toucher(f):
   """Launch a loop to touch the given file, and return a function to call to stop and join it."""
+  if not os.path.isfile(f):
+    raise AssertionError('Refusing to touch a non-file.')
+
   halt = threading.Event()
   def file_toucher():
     while not halt.isSet():
@@ -227,10 +230,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_started()
 
       # Launch a separate thread to poke files in 3rdparty.
-      join = launch_file_toucher('3rdparty/BUILD')
+      join = launch_file_toucher('3rdparty/jvm/com/google/auto/value/BUILD')
 
       # Repeatedly re-list 3rdparty while the file is being invalidated.
-      for _ in range(0, 8):
+      for _ in range(0, 16):
         pantsd_run(cmd)
         checker.assert_running()
 

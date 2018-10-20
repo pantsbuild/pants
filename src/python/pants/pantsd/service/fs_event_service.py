@@ -115,6 +115,7 @@ class FSEventService(PantsService):
 
     # Setup subscriptions and begin the main event firing loop.
     for handler_name, event_data in self._watchman.subscribed(self._build_root, subscriptions):
+      self._state.maybe_pause()
       if self._state.is_terminating:
         break
 

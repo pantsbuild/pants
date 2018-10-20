@@ -128,7 +128,7 @@ class SchedulerService(PantsService):
   def _process_event_queue(self):
     """File event notification queue processor."""
     try:
-      event = self._event_queue.get(timeout=1)
+      event = self._event_queue.get(timeout=0.05)
     except queue.Empty:
       return
 
@@ -222,6 +222,7 @@ class SchedulerService(PantsService):
     """Main service entrypoint."""
     while not self._state.is_terminating:
       self._process_event_queue()
+      self._state.maybe_pause()
 
 
 class LoopCondition(object):
