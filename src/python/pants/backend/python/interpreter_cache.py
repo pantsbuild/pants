@@ -72,8 +72,15 @@ class PythonInterpreterCache(object):
     safe_mkdir(cache_dir)
     return cache_dir
 
-  def select_interpreter_for_targets(self, targets):
-    """Pick an interpreter compatible with all the specified targets."""
+  def partition_targets_by_compatibility(self, targets):
+    """Partition targets by their compatibility constraints.
+
+    :param targets: a list of `PythonTarget` objects
+    :returns: (tgts_by_compatibilities, filters): a dict that maps compatibility constraints
+      to a list of matching targets, the aggregate set of compatibility constraints imposed
+      by the target set
+    :rtype: (dict(str, list), set)
+    """
     tgts_by_compatibilities = defaultdict(list)
     filters = set()
 
@@ -82,8 +89,13 @@ class PythonInterpreterCache(object):
         c = self._python_setup.compatibility_or_constraints(target)
         tgts_by_compatibilities[c].append(target)
         filters.update(c)
+    return tgts_by_compatibilities, filters
 
-    allowed_interpreters = set(self.setup(filters=filters))
+  def select_interpreter_for_targets(self, targets):
+    """Pick an interpreter compatible with all the specified targets."""
+
+    tgts_by_compatibilities, total_filter_set = self.partition_targets_by_compatibility(targets)
+    allowed_interpreters = set(self.setup(filters=total_filter_set))
 
     # Constrain allowed_interpreters based on each target's compatibility requirements.
     for compatibility in tgts_by_compatibilities:

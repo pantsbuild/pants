@@ -22,6 +22,7 @@ from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Select, constraint_for
+from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.objects import Collection, datatype
@@ -538,6 +539,12 @@ class SchedulerSession(object):
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
       unique_exceptions = tuple({t.exc for t in throw_root_states})
+
+      # TODO: consider adding a new top-level function adjacent to products_request used for running console tasks,
+      # so that this code doesn't need to exist in this form.
+      if len(unique_exceptions) == 1 and isinstance(unique_exceptions[0], GracefulTerminationException):
+        raise unique_exceptions[0]
+
       exception_noun = pluralize(len(unique_exceptions), 'Exception')
 
       if self._scheduler.include_trace_on_error:

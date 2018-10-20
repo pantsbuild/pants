@@ -18,6 +18,7 @@ from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
+from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import maybe_profiled
 
 
@@ -191,8 +192,11 @@ class LocalPantsRunner(object):
         self._target_roots,
         self._global_options.v2_ui
       )
+    except GracefulTerminationException as e:
+      logger.debug('Encountered graceful termination exception {}; exiting'.format(e))
+      return e.exit_code
     except Exception as e:
-      logger.warn('Encountered unhandled exception {!r} during rule execution!'
+      logger.warn('Encountered unhandled exception {} during rule execution!'
                   .format(e))
       return 1
     else:
