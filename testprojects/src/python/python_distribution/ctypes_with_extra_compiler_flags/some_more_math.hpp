@@ -4,7 +4,7 @@
 #ifdef NDEBUG
 #define assert(condition) ((void)0)
 #else
-#define assert(condition) /*implementation defined*/
+#define assert(condition)
 #endif
 
 int mangled_function(int);
