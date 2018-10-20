@@ -8,6 +8,22 @@ import threading
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
+
+
+class PantsServices(datatype([
+  # A tuple of instantiated PantsService instances.
+  ('services', tuple),
+  # A dict of (port_name -> port_info) for named ports hosted by the services.
+  ('port_map', dict),
+  # A lock to guard lifecycle changes for the services. This can be used by individual services
+  # to safeguard daemon-synchronous sections that should be protected from abrupt teardown.
+  # Notably, this lock is currently acquired for an entire pailgun request (by PailgunServer).
+  # NB: This is a `threading.RLock` instance, but the constructor for RLock is an alias for a
+  # native function, rather than an actual type.
+  'lifecycle_lock',
+])):
+  """A registry of PantsServices instances"""
 
 
 class PantsService(AbstractClass):
@@ -30,15 +46,12 @@ class PantsService(AbstractClass):
     """
     return self._kill_switch.is_set()
 
-  def setup(self, lifecycle_lock):
+  def setup(self, services):
     """Called before `run` to allow for service->service or other side-effecting setup.
 
-    :param threading.RLock lifecycle_lock: A lock to guard the service thread lifecycles. This
-                                           can be used by individual services to safeguard
-                                           daemon-synchronous sections that should be protected
-                                           from abrupt teardown.
+    :param PantsServices services: A registry of all services within this run.
     """
-    self.lifecycle_lock = lifecycle_lock
+    self.services = services
 
   @abstractmethod
   def run(self):

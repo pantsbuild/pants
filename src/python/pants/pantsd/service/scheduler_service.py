@@ -64,9 +64,9 @@ class SchedulerService(PantsService):
   def _combined_invalidating_fileset_from_globs(glob_strs, root):
     return set.union(*(Fileset.globs(glob_str, root=root)() for glob_str in glob_strs))
 
-  def setup(self, lifecycle_lock):
+  def setup(self, services):
     """Service setup."""
-    super(SchedulerService, self).setup(lifecycle_lock)
+    super(SchedulerService, self).setup(services)
     # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
 

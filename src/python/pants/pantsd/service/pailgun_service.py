@@ -52,9 +52,11 @@ class PailgunService(PantsService):
       )
 
     # Plumb the daemon's lifecycle lock to the `PailgunServer` to safeguard teardown.
+    # This indirection exists to allow the server to be created before PantsService.setup
+    # has been called to actually initialize the `services` field.
     @contextmanager
     def lifecycle_lock():
-      with self.lifecycle_lock:
+      with self.services.lifecycle_lock:
         yield
 
     return PailgunServer(self._bind_addr, runner_factory, lifecycle_lock)
