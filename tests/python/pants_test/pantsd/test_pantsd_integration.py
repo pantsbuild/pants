@@ -225,7 +225,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
   def test_pantsd_filesystem_invalidation(self):
     """Runs with pantsd enabled, in a loop, while another thread invalidates files."""
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
-      cmd = ['list', '::']
+      cmd = ['-ldebug', 'list', '::']
       pantsd_run(cmd)
       checker.assert_started()
 

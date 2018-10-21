@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import datetime
+import logging
 import os
 import sys
 import termios
@@ -26,6 +27,9 @@ from pants.pantsd.process_manager import ProcessManager
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
+
+
+logger = logging.getLogger(__name__)
 
 
 class DaemonExiter(Exiter):

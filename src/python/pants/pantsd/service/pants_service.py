@@ -4,12 +4,17 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
+import os
 import threading
 import time
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 class PantsServices(datatype([
@@ -53,7 +58,7 @@ class PantsService(AbstractClass):
   def __init__(self):
     super(PantsService, self).__init__()
     self.name = self.__class__.__name__
-    self._state = _ServiceState()
+    self._state = _ServiceState(self)
 
   def setup(self, services):
     """Called before `run` to allow for service->service or other side-effecting setup.
@@ -122,8 +127,9 @@ class _ServiceState(object):
   _PAUSING = 'Pausing'
   _TERMINATING = 'Terminating'
 
-  def __init__(self):
+  def __init__(self, service):
     """Creates a ServiceState in the Running state."""
+    self._service = service
     self._state = self._RUNNING
     self._lock = threading.Lock()
     self._condition = threading.Condition(self._lock)
@@ -131,6 +137,7 @@ class _ServiceState(object):
   def _set_state(self, state, *valid_states):
     if valid_states and self._state not in valid_states:
       raise AssertionError('Cannot move {} to `{}` while it is `{}`.'.format(self, state, self._state))
+    logger.warn('>>> {}: {} changing state from {} to {}'.format(os.getpid(), self._service, self._state, state))
     self._state = state
     self._condition.notify_all()
 
@@ -177,7 +184,9 @@ class _ServiceState(object):
       # Set Paused, and then wait until we are no longer Paused.
       self._set_state(self._PAUSED, self._PAUSING)
       while self._state == self._PAUSED:
-        self._condition.wait()
+        logger.warn('>>> {}: {} still paused with {}'.format(os.getpid(), self._service, self._state))
+        self._condition.wait(1)
+      logger.warn('>>> {} unpaused!'.format(self._service))
 
   def mark_pausing(self):
     """Requests that the service move to the Paused state, without waiting for it to do so.

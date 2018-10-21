@@ -13,7 +13,7 @@ class NodeTestIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_daemon
   def test_test_simple(self):
-    command = ['test',
+    command = ['-ldebug', 'test',
                'contrib/node/examples/src/node/server-project:unit']
     pants_run = self.run_pants(command=command)
 
