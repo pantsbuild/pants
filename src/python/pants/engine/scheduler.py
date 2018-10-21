@@ -514,7 +514,7 @@ class SchedulerSession(object):
     except TaskError as e:
       return ExecutionResult.failure(e)
 
-  def products_request(self, products, subjects, v2_ui):
+  def products_request_console_rule(self, products, subjects, v2_ui):
     """Executes a request for multiple products for some subjects, and returns the products.
 
     :param list products: A list of product type for the request.
@@ -523,6 +523,57 @@ class SchedulerSession(object):
     :returns: A dict from product type to lists of products each with length matching len(subjects).
     """
     request = self.execution_request(products, subjects, v2_ui)
+    result = self.execute(request)
+    if result.error:
+      raise result.error
+
+    # State validation.
+    unknown_state_types = tuple(
+      type(state) for _, state in result.root_products if type(state) not in (Throw, Return)
+    )
+    if unknown_state_types:
+      State.raise_unrecognized(unknown_state_types)
+
+    # Throw handling.
+    # TODO: See https://github.com/pantsbuild/pants/issues/3912
+    throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
+    if throw_root_states:
+      unique_exceptions = tuple({t.exc for t in throw_root_states})
+
+      if len(unique_exceptions) == 1 and isinstance(unique_exceptions[0], GracefulTerminationException):
+        raise unique_exceptions[0]
+
+      exception_noun = pluralize(len(unique_exceptions), 'Exception')
+
+      if self._scheduler.include_trace_on_error:
+        cumulative_trace = '\n'.join(self.trace(request))
+        raise ExecutionError(
+          '{} encountered:\n{}'.format(exception_noun, cumulative_trace),
+          unique_exceptions,
+        )
+      else:
+        raise ExecutionError(
+          '{} encountered:\n  {}'.format(
+            exception_noun,
+            '\n  '.join('{}: {}'.format(type(t).__name__, str(t)) for t in unique_exceptions)),
+          unique_exceptions
+        )
+
+    # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
+    # order in output lists.
+    product_results = defaultdict(list)
+    for (_, product), state in result.root_products:
+      product_results[product].append(state.value)
+    return product_results
+
+  def products_request(self, products, subjects):
+    """Executes a request for multiple products for some subjects, and returns the products.
+
+    :param list products: A list of product type for the request.
+    :param list subjects: A list of subjects for the request.
+    :returns: A dict from product type to lists of products each with length matching len(subjects).
+    """
+    request = self.execution_request(products, subjects)
     result = self.execute(request)
     if result.error:
       raise result.error
@@ -568,7 +619,7 @@ class SchedulerSession(object):
       product_results[product].append(state.value)
     return product_results
 
-  def product_request(self, product, subjects, v2_ui=False):
+  def product_request(self, product, subjects):
     """Executes a request for a single product for some subjects, and returns the products.
 
     :param class product: A product type for the request.
@@ -576,7 +627,7 @@ class SchedulerSession(object):
     :param bool v2_ui: whether to render the v2 engine UI
     :returns: A list of the requested products, with length match len(subjects).
     """
-    return self.products_request([product], subjects, v2_ui)[product]
+    return self.products_request([product], subjects)[product]
 
   def capture_snapshots(self, path_globs_and_roots):
     """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.

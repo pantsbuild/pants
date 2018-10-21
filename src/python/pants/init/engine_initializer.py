@@ -207,7 +207,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
     for goal in goals:
       goal_product = self.goal_map[goal]
       logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
-      self.scheduler_session.product_request(goal_product, subjects, v2_ui)
+      self.scheduler_session.products_request_console_rule([goal_product], subjects, v2_ui)
 
   def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.
