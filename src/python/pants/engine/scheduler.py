@@ -624,7 +624,6 @@ class SchedulerSession(object):
 
     :param class product: A product type for the request.
     :param list subjects: A list of subjects for the request.
-    :param bool v2_ui: whether to render the v2 engine UI
     :returns: A list of the requested products, with length match len(subjects).
     """
     return self.products_request([product], subjects)[product]
