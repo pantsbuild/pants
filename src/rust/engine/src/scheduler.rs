@@ -290,7 +290,7 @@ impl Scheduler {
     }
 
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
-    let roots: Vec<_> = request
+    let roots: Vec<NodeKey> = request
       .roots
       .clone()
       .into_iter()
@@ -301,17 +301,7 @@ impl Scheduler {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
       } else if let Some(display) = optional_display.as_mut() {
-        let ongoing_tasks = self.core.graph.heavy_hitters(&roots, display_worker_count);
-        for (i, task) in ongoing_tasks.iter().enumerate() {
-          display.update(i.to_string(), format!("{:?}", task));
-        }
-        // If the number of ongoing tasks is less than the number of workers,
-        // fill the rest of the workers with empty string.
-        // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666)
-        for i in ongoing_tasks.len()..display_worker_count {
-          display.update(i.to_string(), "".to_string());
-        }
-        display.render();
+        self.display_ongoing_tasks(&self.core.graph, &roots, display, display_worker_count);
       }
     };
     if let Some(display) = optional_display.as_mut() {
@@ -325,6 +315,26 @@ impl Scheduler {
       .zip(results.into_iter())
       .map(|(s, r)| (s.params.expect_single(), &s.selector.product, r))
       .collect()
+  }
+
+  fn display_ongoing_tasks(
+    &self,
+    graph: &Graph<NodeKey>,
+    roots: &Vec<NodeKey>,
+    display: &mut EngineDisplay,
+    display_worker_count: usize,
+  ) {
+    let ongoing_tasks = graph.heavy_hitters(&roots, display_worker_count);
+    for (i, task) in ongoing_tasks.iter().enumerate() {
+      display.update(i.to_string(), format!("{:?}", task));
+    }
+    // If the number of ongoing tasks is less than the number of workers,
+    // fill the rest of the workers with empty string.
+    // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666)
+    for i in ongoing_tasks.len()..display_worker_count {
+      display.update(i.to_string(), "".to_string());
+    }
+    display.render();
   }
 
   pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path>>(
