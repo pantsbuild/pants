@@ -11,7 +11,6 @@ import threading
 import time
 import unittest
 from builtins import open, range, zip
-from concurrent.futures import ThreadPoolExecutor
 
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
@@ -22,19 +21,17 @@ from pants_test.testutils.process_test_util import no_lingering_process_by_comma
 
 def launch_file_toucher(f):
   """Launch a loop to touch the given file, and return a function to call to stop and join it."""
-  executor = ThreadPoolExecutor(max_workers=1)
   halt = threading.Event()
-
   def file_toucher():
     while not halt.isSet():
       touch(f)
       time.sleep(1)
-
-  future = executor.submit(file_toucher)
+  thread = threading.Thread(target=file_toucher)
+  thread.start()
 
   def join():
     halt.set()
-    future.result(timeout=10)
+    thread.join(timeout=10)
 
   return join
 

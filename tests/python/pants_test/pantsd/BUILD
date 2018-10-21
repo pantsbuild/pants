@@ -80,7 +80,6 @@ python_tests(
   sources = ['test_pantsd_integration.py'],
   dependencies = [
     ':pantsd_integration_test_base',
-    '3rdparty/python:futures',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/testutils:process_test_util',
   ],
