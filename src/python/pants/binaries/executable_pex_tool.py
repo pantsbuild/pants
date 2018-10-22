@@ -8,7 +8,6 @@ import logging
 
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
-from pex.pex_info import PexInfo
 
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -41,14 +40,12 @@ class ExecutablePexTool(Subsystem):
   def bootstrap(self, interpreter, pex_file_path, extra_reqs=None):
     # Caching is done just by checking if the file at the specified path is already executable.
     if not is_executable(pex_file_path):
-      pex_info = PexInfo.default(interpreter=interpreter)
-      if self.entry_point is not None:
-        pex_info.entry_point = self.entry_point
-
       with safe_concurrent_creation(pex_file_path) as safe_path:
-        builder = PEXBuilder(interpreter=interpreter, pex_info=pex_info)
+        builder = PEXBuilder(interpreter=interpreter)
         all_reqs = list(self.base_requirements) + list(extra_reqs or [])
         dump_requirements(builder, interpreter, all_reqs, logger, platforms=['current'])
+        if self.entry_point:
+          builder.set_entry_point(self.entry_point)
         builder.build(safe_path)
 
     return PEX(pex_file_path, interpreter)
