@@ -22,7 +22,8 @@ class NativeLibrary(Target, AbstractClass):
     return isinstance(target, cls) and bool(target.ctypes_native_library)
 
   def __init__(self, address, payload=None, sources=None, ctypes_native_library=None,
-               strict_deps=None, fatal_warnings=None, extra_compiler_options=None, **kwargs):
+               strict_deps=None, fatal_warnings=None, ndebug=None,
+               glibcxx_use_cxx11_abi=None, **kwargs):
 
     if not payload:
       payload = Payload()
@@ -32,7 +33,8 @@ class NativeLibrary(Target, AbstractClass):
       'ctypes_native_library': ctypes_native_library,
       'strict_deps': PrimitiveField(strict_deps),
       'fatal_warnings': PrimitiveField(fatal_warnings),
-      'extra_compiler_options': PrimitiveField(maybe_list(extra_compiler_options or ())),
+      'ndebug': PrimitiveField(ndebug),
+      'glibcxx_use_cxx11_abi': PrimitiveField(glibcxx_use_cxx11_abi),
     })
 
     if ctypes_native_library and not isinstance(ctypes_native_library, NativeArtifact):
@@ -52,8 +54,12 @@ class NativeLibrary(Target, AbstractClass):
     return self.payload.fatal_warnings
 
   @property
-  def extra_compiler_options(self):
-    return self.payload.extra_compiler_options
+  def ndebug(self):
+    return self.payload.ndebug
+
+  @property
+  def glibcxx_use_cxx11_abi(self):
+    return self.payload.glibcxx_use_cxx11_abi
 
   @property
   def ctypes_native_library(self):

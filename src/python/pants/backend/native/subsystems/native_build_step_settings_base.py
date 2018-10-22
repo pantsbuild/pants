@@ -13,6 +13,8 @@ class NativeBuildStepSettingsBase(Subsystem, MirroredTargetOptionMixin):
 
   mirrored_option_to_kwarg_map = {
     'fatal_warnings': 'fatal_warnings',
+    'ndebug': 'ndebug',
+    'glibcxx_use_cxx11_abi': 'glibcxx_use_cxx11_abi',
   }
 
   @classmethod
@@ -23,9 +25,19 @@ class NativeBuildStepSettingsBase(Subsystem, MirroredTargetOptionMixin):
     # flags!
     register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
              help='The default for the "fatal_warnings" argument for targets of this language.')
+    register('--ndebug', type=bool, default=False, fingerprint=True, advanced=True,
+             help='The default for the "ndebug" argument for targets of this language.')
+    register('--glibcxx-use-cxx11-abi', type=bool, default=False, fingerprint=True, advanced=True,
+             help='The default for the "glibcxx_use_cxx11_abi" argument for targets of this language.')
 
   def get_fatal_warnings_value_for_target(self, target):
     return self.get_target_mirrored_option('fatal_warnings', target)
+
+  def get_ndebug_value_for_target(self, target):
+    return self.get_target_mirrored_option('ndebug', target)
+
+  def get_glibcxx_use_cxx11_abi_value_for_target(self, target):
+    return self.get_target_mirrored_option('glibcxx_use_cxx11_abi', target)
 
 
 class CCompileSettings(NativeBuildStepSettingsBase):

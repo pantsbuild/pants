@@ -5,7 +5,8 @@ ctypes_compatible_cpp_library(
   name='cpp_library',
   sources=['some_more_math.hpp', 'some_more_math.cpp'],
   ctypes_native_library=native_artifact(lib_name='asdf-cpp'),
-  extra_compiler_options=["-DNDEBUG"],
+  ndebug=True,
+  glibcxx_use_cxx11_abi=False,
 )
 
 python_dist(
