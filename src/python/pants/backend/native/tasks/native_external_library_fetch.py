@@ -13,6 +13,7 @@ from pex.interpreter import PythonInterpreter
 
 from pants.backend.native.config.environment import LLVMCppToolchain, Platform
 from pants.backend.native.subsystems.binaries.cmake import CMake
+from pants.backend.native.subsystems.binaries.make import Make
 from pants.backend.native.subsystems.conan import Conan
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
@@ -91,6 +92,7 @@ class NativeExternalLibraryFetch(NativeTask):
     return super(NativeExternalLibraryFetch, cls).subsystem_dependencies() + (
       CMake.scoped(cls),
       Conan.scoped(cls),
+      Make.scoped(cls),
       NativeToolchain.scoped(cls),
     )
 
@@ -128,6 +130,10 @@ class NativeExternalLibraryFetch(NativeTask):
     return CMake.scoped_instance(self)
 
   @memoized_property
+  def _make(self):
+    return Make.scoped_instance(self)
+
+  @memoized_property
   def _build_environment(self):
     cpp_compiler = self._cpp_toolchain.cpp_compiler
     cpp_linker = self._cpp_toolchain.cpp_linker
@@ -137,7 +143,7 @@ class NativeExternalLibraryFetch(NativeTask):
     invocation_env_dict['PATH'] = create_path_env_var((
       cpp_compiler.path_entries +
       cpp_linker.path_entries +
-      [self._cmake.bin_dir]))
+      [self._cmake.bin_dir, self._make.bin_dir]))
     return invocation_env_dict
 
   class NativeExternalLibraryFetchError(TaskError):
