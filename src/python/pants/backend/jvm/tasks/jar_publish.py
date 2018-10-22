@@ -193,6 +193,7 @@ class PomWriter(object):
       template_data = template_data.extend(name=name,
                                            description=pom.description,
                                            url=pom.url,
+                                           packaging=pom.packaging,
                                            licenses=pom.licenses,
                                            scm=pom.scm.tagged(self._tag),
                                            developers=pom.developers)
