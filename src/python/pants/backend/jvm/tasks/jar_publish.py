@@ -193,7 +193,6 @@ class PomWriter(object):
       template_data = template_data.extend(name=name,
                                            description=pom.description,
                                            url=pom.url,
-                                           packaging=pom.packaging,
                                            licenses=pom.licenses,
                                            scm=pom.scm.tagged(self._tag),
                                            developers=pom.developers)
@@ -814,8 +813,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     def collect_invalid(publish_target, walked_target):
       for derived_target in walked_target.derived_from_chain:
         derived_by_target[derived_target].add(walked_target)
-      if not walked_target.has_sources() or not walked_target.sources_relative_to_buildroot():
-        invalid[publish_target][walked_target].add('No sources.')
+      # Targets with no sources are considered valid - so we continue to publish them.
       if not self._is_exported(walked_target):
         invalid[publish_target][walked_target].add('Does not provide a binary artifact.')
 

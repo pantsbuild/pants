@@ -126,13 +126,11 @@ class OSSRHPublicationMetadata(PublicationMetadata):
   See: http://central.sonatype.org/pages/requirements.html#sufficient-metadata
   """
 
-  def __init__(self, description, url, licenses, packaging, developers, scm, name=None):
+  def __init__(self, description, url, licenses, developers, scm, name=None):
     """All parameters are required except for `name` to pass OSSRH requirements.
 
     :param string description: A description of the library.
     :param string url: An url pointing to more information about the library.
-    :param string packaging: A packaging type string such as pom, jar, war etc. If not supplied,
-                             defaults to jar.
     :param list licenses: The licenses that apply to the library.
     :param list developers:  The developers who work on the library.
     :param scm: The primary scm system hosting the library source code.
@@ -147,8 +145,6 @@ class OSSRHPublicationMetadata(PublicationMetadata):
 
     self.description = _validate_string('description', description)
     self.url = _validate_string('url', url)
-    _packaging = _validate_maybe_string('packaging', packaging)
-    self.packaging = _packaging if _packaging else 'jar'
     self.licenses = validate_nonempty_list('licenses', licenses, License)
     self.developers = validate_nonempty_list('developers', developers, Developer)
 
