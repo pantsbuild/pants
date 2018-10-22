@@ -320,7 +320,7 @@ impl Scheduler {
   fn display_ongoing_tasks(
     &self,
     graph: &Graph<NodeKey>,
-    roots: &Vec<NodeKey>,
+    roots: &[NodeKey],
     display: &mut EngineDisplay,
     display_worker_count: usize,
   ) {
