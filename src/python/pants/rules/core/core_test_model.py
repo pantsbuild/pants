@@ -14,8 +14,6 @@ class Status(object):
   FAILURE = str('FAILURE')
 
 
-# This would be called TestResult, but then PyTest outputs a warning that it detected TestResult
-# was a test class, but couldn't treat it like a test class, because it has a constructor.
 class TestResult(datatype([
   # One of the Status pseudo-enum values capturing whether the run was successful.
   ('status', str),
