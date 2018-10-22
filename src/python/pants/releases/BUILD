@@ -21,3 +21,15 @@ python_binary(
   ],
   tags={'platform_specific_behavior'},
 )
+
+python_binary(
+  name = 'release',
+  source = 'release.py',
+  dependencies = [
+    '3rdparty/python:fire',
+    '3rdparty/python:configparser',
+    'src/python/pants/util:process_handler',
+    'src/python/pants/net:net',
+    'src/python/pants/util:contextutil',
+  ],
+)
