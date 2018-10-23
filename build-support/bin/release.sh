@@ -12,7 +12,9 @@ PY=$(which python2.7 || exit 0)
 export PY
 
 function run_local_pants() {
+  pushd ${ROOT}
   ${ROOT}/pants "$@"
+  popd
 }
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
@@ -433,13 +435,11 @@ function reversion_whls() {
 readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
 
 function list_prebuilt_wheels() {
-  pushd ${ROOT}
   run_local_pants -q run src/python/pants/releases:release -- \
     list_prebuilt_wheels \
     --binary-base-url=${BINARY_BASE_URL} \
     --deploy-pants-wheels-path=${DEPLOY_PANTS_WHEELS_PATH} \
     --deploy-3rdparty-wheels-path=${DEPLOY_3RDPARTY_WHEELS_PATH}
-  popd
 }
 
 function fetch_prebuilt_wheels() {
@@ -448,18 +448,12 @@ function fetch_prebuilt_wheels() {
   banner "Fetching prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
   (
     cd "${to_dir}"
-    list_prebuilt_wheels | {
-      while read path_tuple
-      do
-        local file_path=$(echo "$path_tuple" | awk -F'\t' '{print $1}')
-        local url_path=$(echo "$path_tuple" | awk -F'\t' '{print $2}')
-        echo "${BINARY_BASE_URL}/${url_path}:"
-        local dest="${to_dir}/${file_path}"
-        mkdir -p "$(dirname "${dest}")"
-        curl --fail --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
-          || die "Could not fetch ${dest}."
-      done
-    }
+    run_local_pants -q run src/python/pants/releases:release -- \
+      fetch_prebuilt_wheels \
+      --binary-base-url=${BINARY_BASE_URL} \
+      --deploy-pants-wheels-path=${DEPLOY_PANTS_WHEELS_PATH} \
+      --deploy-3rdparty-wheels-path=${DEPLOY_3RDPARTY_WHEELS_PATH} \
+      --to-dir=${to_dir}
   )
 }
 
@@ -473,8 +467,8 @@ function fetch_and_check_prebuilt_wheels() {
   fi
 
   banner "Checking prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
+  echo "${check_dir}"
   fetch_prebuilt_wheels "${check_dir}"
-
   local missing=()
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do

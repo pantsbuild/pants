@@ -4,18 +4,25 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import hashlib
 import logging
+import os
 import urllib
 import xml.etree.ElementTree as ET
 
 import fire
 import requests
 
+from pants.net.http.fetcher import Fetcher
+from pants.util.dirutil import safe_mkdir
 
+logging.basicConfig()
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.DEBUG)
 
 class Releaser(object):
+
+  OUTPUT_DELIMITER = '\t'
 
   def list_prebuilt_wheels(self, binary_base_url, deploy_pants_wheels_path,
                            deploy_3rdparty_wheels_path):
@@ -35,12 +42,35 @@ class Releaser(object):
       for key in root.findall('s3:Contents/s3:Key', ns):
         # Because filenames may contain characters that have different meanings
         # in URLs (namely '+'), # print the key both as url-encoded and as a file path.
-        keys.append('{}\t{}'.format(key.text, urllib.quote_plus(key.text)))
+        keys.append('{}{}{}'.format(key.text, self.OUTPUT_DELIMITER, urllib.quote_plus(key.text)))
 
     return '\n'.join(keys)
 
-  def fetch_prebuilt_wheels(self, binary_base_url, pants_unstable_version):
-    pass
+  def fetch_prebuilt_wheels(self, binary_base_url, deploy_pants_wheels_path,
+                           deploy_3rdparty_wheels_path, to_dir):
+    keys = self.list_prebuilt_wheels(binary_base_url,
+                                                     deploy_pants_wheels_path,
+                                                     deploy_3rdparty_wheels_path)
+
+    fetcher = Fetcher(os.getcwd())
+    checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
+
+    for k in keys.splitlines():
+      file_path, url_path = k.split(self.OUTPUT_DELIMITER)
+      dest = os.path.join(to_dir, file_path)
+      safe_mkdir(os.path.dirname(dest))
+
+      url = '{}/{}'.format(binary_base_url, url_path)
+      with open(dest, 'wb') as file_path:
+        try:
+          logger.info('\nDownloading {}'.format(url))
+          fetcher.download(url,
+                           listener=fetcher.ProgressListener().wrap(checksummer),
+                           path_or_fd=file_path,
+                           timeout_secs=5)
+          logger.info('sha1: {}'.format(checksummer.checksum))
+        except fetcher.Error as e:
+          raise fetcher.Error('Failed to download: {}'.format(e))
 
   def fetch_and_check_prebuilt_wheels(self, deploy_dir):
     pass
