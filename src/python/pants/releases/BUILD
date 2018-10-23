@@ -26,11 +26,12 @@ python_binary(
   name = 'release',
   source = 'release.py',
   dependencies = [
-    '3rdparty/python:fire',
-    '3rdparty/python:futures',
     '3rdparty/python:configparser',
-    'src/python/pants/util:process_handler',
+    '3rdparty/python:fire',
+    '3rdparty/python:future',
+    '3rdparty/python:futures',
     'src/python/pants/net:net',
+    'src/python/pants/util:process_handler',
     'src/python/pants/util:contextutil',
   ],
 )
