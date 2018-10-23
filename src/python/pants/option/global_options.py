@@ -223,9 +223,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'of the directory will be overwritten if any filenames collide.')
     register('--print-exception-stacktrace', advanced=True, type=bool,
              help='Print to console the full exception stack trace if encountered.')
-    register('--v2-ui', default=False, type=bool, daemon=False,
-             help='Whether to show v2 engine execution progress. '
-                  'This requires the --v2 flag to take effect.')
 
     # BinaryUtil options.
     register('--binaries-baseurls', type=list, advanced=True,
@@ -333,6 +330,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Enables execution of v1 Tasks.')
     register('--v2', advanced=True, type=bool, default=False,
              help='Enables execution of v2 @console_rules.')
+    register('--v2-ui', default=False, type=bool, daemon=False,
+             help='Whether to show v2 engine execution progress. '
+                  'This requires the --v2 flag to take effect.')
 
     loop_flag = '--loop'
     register(loop_flag, type=bool,
@@ -376,3 +376,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                          '`--v2 --no-v1` to function as expected.')
     if opts.loop and not opts.enable_pantsd:
       raise OptionsError('The --loop option requires `--enable-pantsd`, in order to watch files.')
+
+    if opts.v2_ui and not opts.v2:
+      raise OptionsError('The --v2-ui option requires --v2 to be enabled together.')
