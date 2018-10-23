@@ -98,9 +98,13 @@ def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None):
                     Defaults to the platforms specified by PythonSetup.
   """
   deprecated('1.11.0.dev0',
-    'This function has been moved onto the PexBuildUtil class.')
-  pex_build_util = PexBuildUtil(PythonRepos.global_instance(), PythonSetup.global_instance())
-  pex_build_util.dump_requirement_libs(builder, interpreter, req_libs, log, platforms)
+    'This function has been moved onto the PexBuilderWrapper class.')
+  PexBuilderWrapper(
+    builder,
+    PythonRepos.global_instance(),
+    PythonSetup.global_instance(),
+    log
+  ).add_requirement_libs_from(req_libs, platforms)
 
 
 def dump_requirements(builder, interpreter, reqs, log, platforms=None):
@@ -114,11 +118,13 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
                     Defaults to the platforms specified by PythonSetup.
   """
   deprecated('1.11.0.dev0',
-    'This function has been moved onto the PexBuildUtil class.')
-  pex_build_util = PexBuildUtil(
+    'This function has been moved onto the PexBuilderWrapper class.')
+  PexBuilderWrapper(
+    builder,
     PythonRepos.global_instance(),
-    PythonSetup.global_instance())
-  pex_build_util.dump_requirements(builder, interpreter, reqs, log, platforms)
+    PythonSetup.global_instance(),
+    log
+  ).add_resolved_requirements(reqs, platforms)
 
 
 def resolve_multi(interpreter, requirements, platforms, find_links):
@@ -135,21 +141,25 @@ def resolve_multi(interpreter, requirements, platforms, find_links):
            to satisfy the requirements on that platform.
   """
   deprecated('1.11.0.dev0',
-    'This function has been moved onto the PexBuildUtil class.')
+    'This function has been moved onto the PexBuilderWrapper class.')
   python_setup = PythonSetup.global_instance()
   python_repos = PythonRepos.global_instance()
-  pex_build_util = PexBuildUtil(python_repos, python_setup)
-  return pex_build_util.resolve_multi(interpreter, requirements, platforms, find_links)
+  return PexBuilderWrapper(builder=None,
+    python_repos_subsystem=python_repos,
+    python_setup_subsystem=python_setup, log=None
+  )._resolve_multi(interpreter, requirements, platforms, find_links)
 
 
-class PexBuildUtil(object):
-  """Encapsulates requirements resolution utilities."""
+class PexBuilderWrapper(object):
+  """Wraps PEXBuilder to provide an API that consumes targets and other BUILD file entities."""
 
-  def __init__(self, python_repos_subsystem, python_setup_subsystem):
+  def __init__(self, builder, python_repos_subsystem, python_setup_subsystem, log=None):
+    self._builder = builder
     self._python_repos_subsystem = python_repos_subsystem
     self._python_setup_subsystem = python_setup_subsystem
+    self._log = log
 
-  def dump_requirement_libs(self, builder, interpreter, req_libs, log, platforms=None):
+  def add_requirement_libs_from(self, req_libs, platforms=None):
     """Multi-platform dependency resolution for PEX files.
 
     :param builder: Dump the requirements into this builder.
@@ -160,9 +170,9 @@ class PexBuildUtil(object):
                       Defaults to the platforms specified by PythonSetup.
     """
     reqs = [req for req_lib in req_libs for req in req_lib.requirements]
-    self.dump_requirements(builder, interpreter, reqs, log, platforms=platforms)
+    self.add_resolved_requirements(reqs, platforms=platforms)
 
-  def dump_requirements(self, builder, interpreter, reqs, log, platforms=None):
+  def add_resolved_requirements(self, reqs, platforms=None):
     """Multi-platform dependency resolution for PEX files.
 
     :param builder: Dump the requirements into this builder.
@@ -175,22 +185,23 @@ class PexBuildUtil(object):
     deduped_reqs = OrderedSet(reqs)
     find_links = OrderedSet()
     for req in deduped_reqs:
-      log.debug('  Dumping requirement: {}'.format(req))
-      builder.add_requirement(req.requirement)
+      self._log.debug('  Dumping requirement: {}'.format(req))
+      self._builder.add_requirement(req.requirement)
       if req.repository:
         find_links.add(req.repository)
 
     # Resolve the requirements into distributions.
-    distributions = self.resolve_multi(interpreter, deduped_reqs, platforms, find_links)
+    distributions = self._resolve_multi(self._builder.interpreter, deduped_reqs, platforms,
+      find_links)
     locations = set()
     for platform, dists in distributions.items():
       for dist in dists:
         if dist.location not in locations:
-          log.debug('  Dumping distribution: .../{}'.format(os.path.basename(dist.location)))
-          builder.add_distribution(dist)
+          self._log.debug('  Dumping distribution: .../{}'.format(os.path.basename(dist.location)))
+          self._builder.add_distribution(dist)
         locations.add(dist.location)
 
-  def resolve_multi(self, interpreter, requirements, platforms, find_links):
+  def _resolve_multi(self, interpreter, requirements, platforms, find_links):
     """Multi-platform dependency resolution for PEX files.
 
     Returns a list of distributions that must be included in order to satisfy a set of requirements.
@@ -227,3 +238,56 @@ class PexBuildUtil(object):
       distributions[platform] = [resolved_dist.distribution for resolved_dist in resolved_dists]
 
     return distributions
+
+  def add_sources_from(self, tgt):
+    dump_source = _create_source_dumper(self._builder, tgt)
+    self._log.debug('  Dumping sources: {}'.format(tgt))
+    for relpath in tgt.sources_relative_to_buildroot():
+      try:
+        # Necessary to avoid py_compile from trying to decode non-ascii source code into unicode.
+        # Python 3's py_compile can safely handle unicode in source files, meanwhile.
+        if PY2:
+          relpath = relpath.encode('utf-8')
+        dump_source(relpath)
+      except OSError:
+        self._log.error('Failed to copy {} for target {}'.format(relpath, tgt.address.spec))
+        raise
+
+    if (getattr(tgt, '_resource_target_specs', None) or
+      getattr(tgt, '_synthetic_resources_target', None)):
+      # No one should be on old-style resources any more.  And if they are,
+      # switching to the new python pipeline will be a great opportunity to fix that.
+      raise TaskError('Old-style resources not supported for target {}.  '
+                      'Depend on resources() targets instead.'.format(tgt.address.spec))
+
+  def freeze(self):
+    self._builder.freeze()
+
+  def set_entry_point(self, entry_point):
+    self._builder.set_entry_point(entry_point)
+
+  def build(self, safe_path):
+    self._builder.build(safe_path)
+
+  def set_shebang(self, shebang):
+    self._builder.set_shebang(shebang)
+
+  def add_interpreter_constraint(self, constraint):
+    self._builder.add_interpreter_constraint(constraint)
+
+  def add_interpreter_constraints_from(self, constraint_tgts):
+    # TODO this would be a great place to validate the constraints and present a good error message
+    # if they are incompatible because all the sources of the constraints are available.
+    # See: https://github.com/pantsbuild/pex/blob/584b6e367939d24bc28aa9fa36eb911c8297dac8/pex/interpreter_constraints.py
+    for tgt in constraint_tgts:
+      self._builder.add_interpreter_constraint(tgt.compatibility)
+
+  def add_direct_requirements(self, reqs):
+    for req in reqs:
+      self._builder.add_requirement(req)
+
+  def add_distribution(self, dist):
+    self._builder.add_distribution(dist)
+
+  def set_script(self, script):
+    self._builder.set_script(script)

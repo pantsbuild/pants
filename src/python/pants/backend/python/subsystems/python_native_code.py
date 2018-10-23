@@ -15,7 +15,6 @@ from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.subsystems.xcode_cli_tools import MIN_OSX_VERSION_ARG
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -48,8 +47,6 @@ class PythonNativeCode(Subsystem):
   def subsystem_dependencies(cls):
     return super(PythonNativeCode, cls).subsystem_dependencies() + (
       NativeToolchain.scoped(cls),
-      # TODO nh add dep on exec pex tool
-      PythonRepos,
       # We generally have to use PythonSetup's global instance, as methods such as
       # `dump_requirements` will use it directly.
       # TODO: when subsystems are more easily requestable from the v2 engine, this restriction could
