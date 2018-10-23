@@ -514,7 +514,14 @@ class SchedulerSession(object):
     except TaskError as e:
       return ExecutionResult.failure(e)
 
-  def products_request_console_rule(self, products, subjects, v2_ui):
+  def run_console_rule(self, product, subject, v2_ui):
+    """
+
+    :param product: product type for the request.
+    :param subject: subject for the request.
+    :param v2_ui: whether to render the v2 engine UI
+    :return: product each with length matching len(subjects).
+    """
     """Executes a request for multiple products for some subjects, and returns the products.
 
     :param list products: A list of product type for the request.
@@ -522,7 +529,8 @@ class SchedulerSession(object):
     :param bool v2_ui: whether to render the v2 engine UI
     :returns: A dict from product type to lists of products each with length matching len(subjects).
     """
-    request = self.execution_request(products, subjects, v2_ui)
+
+    request = self.execution_request([product], [subject], v2_ui)
     result = self.execute(request)
     if result.error:
       raise result.error
