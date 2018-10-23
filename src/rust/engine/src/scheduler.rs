@@ -330,7 +330,7 @@ impl Scheduler {
     }
     // If the number of ongoing tasks is less than the number of workers,
     // fill the rest of the workers with empty string.
-    // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666)
+    // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666
     for i in ongoing_tasks.len()..display_worker_count {
       display.update(i.to_string(), "".to_string());
     }
