@@ -9,10 +9,10 @@ import logging
 import os
 import urllib
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 
 import fire
 import requests
-from concurrent.futures import ThreadPoolExecutor
 
 from pants.net.http.fetcher import Fetcher
 from pants.util.dirutil import safe_mkdir
@@ -96,7 +96,6 @@ class Releaser(object):
         logger.debug('sha1: {}'.format(checksummer.checksum))
       except fetcher.Error as e:
         raise fetcher.Error('Failed to download: {}'.format(e))
-
 
   def fetch_and_check_prebuilt_wheels(self, deploy_dir):
     # TODO
