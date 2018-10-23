@@ -12,13 +12,15 @@ import xml.etree.ElementTree as ET
 
 import fire
 import requests
+from concurrent.futures import ThreadPoolExecutor
 
 from pants.net.http.fetcher import Fetcher
 from pants.util.dirutil import safe_mkdir
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
+
 
 class Releaser(object):
 
@@ -47,30 +49,46 @@ class Releaser(object):
     return '\n'.join(keys)
 
   def fetch_prebuilt_wheels(self, binary_base_url, deploy_pants_wheels_path,
-                           deploy_3rdparty_wheels_path, to_dir):
+                            deploy_3rdparty_wheels_path, to_dir):
     keys = self.list_prebuilt_wheels(binary_base_url,
-                                                     deploy_pants_wheels_path,
-                                                     deploy_3rdparty_wheels_path)
+                                     deploy_pants_wheels_path,
+                                     deploy_3rdparty_wheels_path)
 
     fetcher = Fetcher(os.getcwd())
     checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
+    futures = []
+    with ThreadPoolExecutor(max_workers=8) as executor:
+      for k in keys.splitlines():
+        file_path, url_path = k.split(self.OUTPUT_DELIMITER)
+        dest = os.path.join(to_dir, file_path)
+        safe_mkdir(os.path.dirname(dest))
 
-    for k in keys.splitlines():
-      file_path, url_path = k.split(self.OUTPUT_DELIMITER)
-      dest = os.path.join(to_dir, file_path)
-      safe_mkdir(os.path.dirname(dest))
+        url = '{}/{}'.format(binary_base_url, url_path)
+        future = executor.submit(self._download, fetcher, checksummer, url, dest)
+        futures.append((future, url))
 
-      url = '{}/{}'.format(binary_base_url, url_path)
-      with open(dest, 'wb') as file_path:
-        try:
-          logger.info('\nDownloading {}'.format(url))
-          fetcher.download(url,
-                           listener=fetcher.ProgressListener().wrap(checksummer),
-                           path_or_fd=file_path,
-                           timeout_secs=5)
-          logger.info('sha1: {}'.format(checksummer.checksum))
-        except fetcher.Error as e:
-          raise fetcher.Error('Failed to download: {}'.format(e))
+    fail = False
+    for future, url in futures:
+      if future.exception() is not None:
+        logger.error('Failed to download: {}'.format(url))
+      else:
+        logger.info('Downloaded: {}'.format(url))
+
+    if fail:
+      raise fetcher.Error()
+
+  def _download(self, fetcher, checksummer, url, dest):
+    with open(dest, 'wb') as file_path:
+      try:
+        logger.info('\nDownloading {}'.format(url))
+        fetcher.download(url,
+                         listener=fetcher.ProgressListener().wrap(checksummer),
+                         path_or_fd=file_path,
+                         timeout_secs=30)
+        logger.debug('sha1: {}'.format(checksummer.checksum))
+      except fetcher.Error as e:
+        raise fetcher.Error('Failed to download: {}'.format(e))
+
 
   def fetch_and_check_prebuilt_wheels(self, deploy_dir):
     pass

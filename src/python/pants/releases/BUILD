@@ -27,6 +27,7 @@ python_binary(
   source = 'release.py',
   dependencies = [
     '3rdparty/python:fire',
+    '3rdparty/python:futures',
     '3rdparty/python:configparser',
     'src/python/pants/util:process_handler',
     'src/python/pants/net:net',
