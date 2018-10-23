@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pants.net.http.fetcher import Fetcher
 from pants.util.dirutil import safe_mkdir
 
+
 logging.basicConfig()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
