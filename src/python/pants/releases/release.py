@@ -54,6 +54,9 @@ class Releaser(object):
                                      deploy_pants_wheels_path,
                                      deploy_3rdparty_wheels_path)
 
+    if len(keys.strip()) == 0:
+      raise ValueError("No wheels found.")
+
     fetcher = Fetcher(os.getcwd())
     checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
     futures = []
