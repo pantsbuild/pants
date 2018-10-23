@@ -271,6 +271,8 @@ impl Scheduler {
     let (sender, receiver) = mpsc::channel();
 
     // Setting up display
+    // TODO: It would probably be good to extract more of this into a wrapper struct around
+    // the EngineDisplay and some roots.
     let display_worker_count = request.ui_worker_count as usize;
     let mut optional_display = if request.should_render_ui {
       Some(EngineDisplay::for_stdout(0))
@@ -301,7 +303,7 @@ impl Scheduler {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
       } else if let Some(display) = optional_display.as_mut() {
-        self.display_ongoing_tasks(&self.core.graph, &roots, display, display_worker_count);
+        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, display_worker_count);
       }
     };
     if let Some(display) = optional_display.as_mut() {
@@ -318,7 +320,6 @@ impl Scheduler {
   }
 
   fn display_ongoing_tasks(
-    &self,
     graph: &Graph<NodeKey>,
     roots: &[NodeKey],
     display: &mut EngineDisplay,
