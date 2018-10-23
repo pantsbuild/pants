@@ -4,46 +4,30 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-# import argparse
-# import base64
-# import fnmatch
-# import glob
-# import hashlib
-# import os
-# import re
-# import zipfile
-# from builtins import open, str
-import hashlib
 import logging
-import os
-import requests
-import subprocess
-
-#
-# from pants.util.contextutil import open_zip, temporary_dir
-# from pants.util.dirutil import read_file, safe_file_dump
-
-
-import fire
-
-from pants.net.http.fetcher import Fetcher
-from pants.util.contextutil import temporary_file
-import sys
 import urllib
 import xml.etree.ElementTree as ET
+
+import fire
+import requests
+
+
 logger = logging.getLogger(__name__)
 
 
 class Releaser(object):
 
-  def list_prebuilt_wheels(self, binary_base_url, deploy_pants_wheels_path, deploy_3rdparty_wheels_path):
+  def list_prebuilt_wheels(self, binary_base_url, deploy_pants_wheels_path,
+                           deploy_3rdparty_wheels_path):
     keys = []
     for wheel_path in [deploy_pants_wheels_path, deploy_3rdparty_wheels_path]:
       url = '{}/?prefix={}'.format(binary_base_url, wheel_path)
       # can't figure out how not to get 400 with requests, so shell off to 'curl' instead.
       resp = requests.get(url, allow_redirects=True, auth=None)
       if resp.status_code != 200:
-        raise requests.exceptions.HTTPError("HTTP GET {} failed. You might want to remove invalid entries in ~/.netrc (e.g. `default`)".format(url))
+        raise requests.exceptions.HTTPError(
+          'HTTP GET {} failed. You might want to remove '
+          'invalid entries in ~/.netrc (e.g. `default`)'.format(url))
       wheel_listing = resp.content
 
       root = ET.fromstring(wheel_listing)
@@ -64,4 +48,3 @@ class Releaser(object):
 
 if __name__ == '__main__':
   fire.Fire(Releaser)
-
