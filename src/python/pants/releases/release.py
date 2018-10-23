@@ -46,7 +46,7 @@ class Releaser(object):
         # in URLs (namely '+'), # print the key both as url-encoded and as a file path.
         keys.append('{}{}{}'.format(key.text, self.OUTPUT_DELIMITER, urllib.quote_plus(key.text)))
 
-    return '\n'.join(keys)
+    return keys
 
   def fetch_prebuilt_wheels(self, binary_base_url, deploy_pants_wheels_path,
                             deploy_3rdparty_wheels_path, to_dir):
@@ -54,14 +54,17 @@ class Releaser(object):
                                      deploy_pants_wheels_path,
                                      deploy_3rdparty_wheels_path)
 
-    if len(keys.strip()) == 0:
+    if not keys:
       raise ValueError("No wheels found.")
 
+    # Fetching the wheels in parallel
+    # It is okay to have some interleaving outputs from the fetcher,
+    # because we are summarizing things in the end.
     fetcher = Fetcher(os.getcwd())
     checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
     futures = []
     with ThreadPoolExecutor(max_workers=8) as executor:
-      for k in keys.splitlines():
+      for k in keys:
         file_path, url_path = k.split(self.OUTPUT_DELIMITER)
         dest = os.path.join(to_dir, file_path)
         safe_mkdir(os.path.dirname(dest))
@@ -70,6 +73,7 @@ class Releaser(object):
         future = executor.submit(self._download, fetcher, checksummer, url, dest)
         futures.append((future, url))
 
+    # Summarize the fetch results.
     fail = False
     for future, url in futures:
       if future.exception() is not None:
@@ -94,6 +98,7 @@ class Releaser(object):
 
 
   def fetch_and_check_prebuilt_wheels(self, deploy_dir):
+    # TODO
     pass
 
 

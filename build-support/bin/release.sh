@@ -2,7 +2,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-set -ex
+set -e
 
 ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 source ${ROOT}/build-support/common.sh
@@ -12,9 +12,9 @@ PY=$(which python2.7 || exit 0)
 export PY
 
 function run_local_pants() {
-  pushd ${ROOT}
+  pushd ${ROOT} &> /dev/null
   ${ROOT}/pants "$@"
-  popd
+  popd &> /dev/null
 }
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
