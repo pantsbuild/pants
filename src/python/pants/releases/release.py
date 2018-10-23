@@ -9,6 +9,7 @@ import logging
 import os
 import urllib
 import xml.etree.ElementTree as ET
+from builtins import open
 from concurrent.futures import ThreadPoolExecutor
 
 import fire
@@ -29,7 +30,7 @@ class Releaser(object):
 
   def list_prebuilt_wheels(self, binary_base_url, deploy_pants_wheels_path,
                            deploy_3rdparty_wheels_path):
-    keys = []
+    wheel_paths = []
     for wheel_path in [deploy_pants_wheels_path, deploy_3rdparty_wheels_path]:
       url = '{}/?prefix={}'.format(binary_base_url, wheel_path)
       # can't figure out how not to get 400 with requests, so shell off to 'curl' instead.
@@ -45,17 +46,17 @@ class Releaser(object):
       for key in root.findall('s3:Contents/s3:Key', ns):
         # Because filenames may contain characters that have different meanings
         # in URLs (namely '+'), # print the key both as url-encoded and as a file path.
-        keys.append('{}{}{}'.format(key.text, self.OUTPUT_DELIMITER, urllib.quote_plus(key.text)))
+        wheel_paths.append('{}{}{}'.format(key.text, self.OUTPUT_DELIMITER, urllib.quote_plus(key.text)))
 
-    return keys
+    return wheel_paths
 
   def fetch_prebuilt_wheels(self, binary_base_url, deploy_pants_wheels_path,
                             deploy_3rdparty_wheels_path, to_dir):
-    keys = self.list_prebuilt_wheels(binary_base_url,
+    wheel_paths = self.list_prebuilt_wheels(binary_base_url,
                                      deploy_pants_wheels_path,
                                      deploy_3rdparty_wheels_path)
 
-    if not keys:
+    if not wheel_paths:
       raise ValueError("No wheels found.")
 
     # Fetching the wheels in parallel
@@ -65,7 +66,7 @@ class Releaser(object):
     checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
     futures = []
     with ThreadPoolExecutor(max_workers=8) as executor:
-      for k in keys:
+      for k in wheel_paths:
         file_path, url_path = k.split(self.OUTPUT_DELIMITER)
         dest = os.path.join(to_dir, file_path)
         safe_mkdir(os.path.dirname(dest))
