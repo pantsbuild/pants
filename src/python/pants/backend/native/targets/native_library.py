@@ -4,12 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from twitter.common.collections import maybe_list
-
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
-from pants.base.payload_field import PrimitiveField
+from pants.base.payload_field import PrimitiveField, PrimitivesSetField
 from pants.build_graph.target import Target
 from pants.util.meta import AbstractClass
 
@@ -33,8 +31,7 @@ class NativeLibrary(Target, AbstractClass):
       'ctypes_native_library': ctypes_native_library,
       'strict_deps': PrimitiveField(strict_deps),
       'fatal_warnings': PrimitiveField(fatal_warnings),
-      'ndebug': PrimitiveField(ndebug),
-      'glibcxx_use_cxx11_abi': PrimitiveField(glibcxx_use_cxx11_abi),
+      'compiler_option_sets': PrimitivesSetField(compiler_option_sets),
     })
 
     if ctypes_native_library and not isinstance(ctypes_native_library, NativeArtifact):
@@ -53,13 +50,14 @@ class NativeLibrary(Target, AbstractClass):
   def fatal_warnings(self):
     return self.payload.fatal_warnings
 
-  @property
-  def ndebug(self):
-    return self.payload.ndebug
-
-  @property
-  def glibcxx_use_cxx11_abi(self):
-    return self.payload.glibcxx_use_cxx11_abi
+  @memoized_property
+  def compiler_option_sets(self):
+    """For every element in this list, enable the corresponding flags on compilation
+    of targets.
+    :return: See constructor.
+    :rtype: list
+    """
+    return self.payload.compiler_option_sets
 
   @property
   def ctypes_native_library(self):

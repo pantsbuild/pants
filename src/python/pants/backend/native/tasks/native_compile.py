@@ -180,29 +180,22 @@ class NativeCompile(NativeTask, AbstractClass):
       include_dirs=include_dirs,
       sources=sources_and_headers,
       fatal_warnings=self._compile_settings.get_fatal_warnings_value_for_target(target),
-      ndebug=self._compile_settings.get_ndebug_value_for_target(target),
-      glibcxx_use_cxx11_abi=self._compile_settings.get_glibcxx_use_cxx11_abi_value_for_target(target),
+      compiler_option_sets_options=self._compile_settings.get_merged_compiler_options_for_target(target),
       output_dir=versioned_target.results_dir)
 
   def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
     compiler = compile_request.compiler
-    err_flags = ['-Werror'] if compile_request.fatal_warnings else []
-    ndebug_flag = ['-DNDEBUG'] if compile_request.ndebug else []
-    glibcxx_use_cxx11_abi_flag = []
-    use_cxx_flag_value = '1' if compile_request.glibcxx_use_cxx11_abi else '0'
-    glibcxx_use_cxx11_abi_flag = ['-D_GLIBCXX_USE_CXX11_ABI={}'.format(use_cxx_flag_value)]
+    compiler_option_sets_options = compile_request.compiler_option_sets_options
 
     # We are going to execute in the target output, so get absolute paths for everything.
     buildroot = get_buildroot()
     argv = (
       [compiler.exe_filename] +
       compiler.extra_args +
-      err_flags +
-      ndebug_flag +
-      glibcxx_use_cxx11_abi_flag +
       # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
       ['-c', '-fPIC'] +
+      compiler_option_sets_options +
       [
         '-I{}'.format(os.path.join(buildroot, inc_dir))
         for inc_dir in compile_request.include_dirs

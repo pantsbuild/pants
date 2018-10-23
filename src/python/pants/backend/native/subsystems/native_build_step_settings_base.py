@@ -9,35 +9,55 @@ from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
 from pants.subsystem.subsystem import Subsystem
 
 
-class NativeBuildStepSettingsBase(Subsystem, MirroredTargetOptionMixin):
+class NativeBuildStepSettingsBase(Subsystem, NativeBuildSettings, MirroredTargetOptionMixin):
 
   mirrored_option_to_kwarg_map = {
     'fatal_warnings': 'fatal_warnings',
-    'ndebug': 'ndebug',
-    'glibcxx_use_cxx11_abi': 'glibcxx_use_cxx11_abi',
+    'compiler_option_sets': 'compiler_option_sets',
   }
 
   @classmethod
   def register_options(cls, register):
     super(NativeBuildStepSettingsBase, cls).register_options(register)
 
-    # TODO: implement compiler_option_sets as an interface to platform/host-specific optimization
-    # flags!
-    register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
-             help='The default for the "fatal_warnings" argument for targets of this language.')
-    register('--ndebug', type=bool, default=False, fingerprint=True, advanced=True,
-             help='The default for the "ndebug" argument for targets of this language.')
-    register('--glibcxx-use-cxx11-abi', type=bool, default=False, fingerprint=True, advanced=True,
-             help='The default for the "glibcxx_use_cxx11_abi" argument for targets of this language.')
+    register('--fatal-warnings-enabled-args', advanced=True, type=list, fingerprint=True,
+             default=list(cls.get_fatal_warnings_enabled_args_default()),
+             help='Extra compiler args to use when fatal warnings are enabled.')
+    register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
+             default=list(cls.get_fatal_warnings_disabled_args_default()),
+             help='Extra compiler args to use when fatal warnings are disabled.')
+    register('--compiler-option-sets-enabled-args', advanced=True, type=dict, fingerprint=True,
+             default={
+              'fatal_warnings': list(cls.get_fatal_warnings_enabled_args_default()),
+             },
+             help='Extra compiler args to use for each enabled option set.')
+    register('--compiler-option-sets-disabled-args', advanced=True, type=dict, fingerprint=True,
+             default={
+              'fatal_warnings': list(cls.get_fatal_warnings_disabled_args_default()),
+             },
+             help='Extra compiler args to use for each disabled option set.')
 
-  def get_fatal_warnings_value_for_target(self, target):
-    return self.get_target_mirrored_option('fatal_warnings', target)
+  @classmethod
+  def get_fatal_warnings_enabled_args_default(cls):
+    """Override to set default for this option."""
+    return ('-Werror',)
 
-  def get_ndebug_value_for_target(self, target):
-    return self.get_target_mirrored_option('ndebug', target)
+  @classmethod
+  def get_fatal_warnings_disabled_args_default(cls):
+    """Override to set default for this option."""
+    return ()
 
-  def get_glibcxx_use_cxx11_abi_value_for_target(self, target):
-    return self.get_target_mirrored_option('glibcxx_use_cxx11_abi', target)
+  def get_merged_compiler_options_for_target(self, target):
+    fatal_warnings = self.get_target_mirrored_option('fatal_warnings', target)
+    compiler_option_sets = self.get_compiler_option_sets_for_target(target)
+    compiler_options = []
+    if compiler_option_sets:
+      for option_set_key in compiler_option_sets:
+        compiler_option_sets.update(
+          self.get_options().compiler_option_sets_enabled_args[option_set_key]
+        )
+        compiler_options = list(compiler_option_sets)
+    return compiler_options
 
 
 class CCompileSettings(NativeBuildStepSettingsBase):
