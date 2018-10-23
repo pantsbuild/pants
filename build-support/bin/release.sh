@@ -21,7 +21,7 @@ function run_local_pants() {
 # suffix here and mutate the VERSION_FILE to affect the current version.
 readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
 PANTS_STABLE_VERSION="$(cat "${VERSION_FILE}")"
-HEAD_SHA="3d22e955e6a4a124669941c867f1598d81787f86"
+HEAD_SHA=$(git rev-parse --verify HEAD)
 readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
