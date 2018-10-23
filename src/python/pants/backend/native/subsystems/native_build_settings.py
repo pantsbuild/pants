@@ -15,6 +15,7 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
 
   mirrored_option_to_kwarg_map = {
     'strict_deps': 'strict_deps',
+    'compiler_option_sets': 'compiler_option_sets',
   }
 
   @classmethod
@@ -27,6 +28,13 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
                   "for C and C++ targets by default. If this is False, all transitive dependencies "
                   "are used when compiling and linking native code. C and C++ targets may override "
                   "this behavior with the strict_deps keyword argument as well.")
+    register('--compiler-option-sets', advanced=True, default=[], type=list,
+             fingerprint=True,
+             help='The default for the "compiler_option_sets" argument '
+                  'for targets of this language.')
 
   def get_strict_deps_value_for_target(self, target):
     return self.get_target_mirrored_option('strict_deps', target)
+
+  def get_compiler_option_sets_for_target(self, target):
+    return self.get_target_mirrored_option('compiler_option_sets', target)

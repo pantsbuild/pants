@@ -146,7 +146,8 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertIn('x=3, f(x)=17', pants_run.stdout_data)
 
-  def test_cpp_library_extra_options_integration(self):
+  '''
+  def test_native_compiler_option_sets_integration(self):
     """Test that native compilation includes extra compiler flags from target definitions.
 
     This target has ndebug=True and glibcxx_use_cxx11_abi=False.
@@ -159,3 +160,4 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
     self.assertIn('x=3, f(x)=126', pants_run.stdout_data)
+  '''
