@@ -514,6 +514,22 @@ class SchedulerSession(object):
     except TaskError as e:
       return ExecutionResult.failure(e)
 
+  def _trace_on_error(self, unique_exceptions, request):
+    exception_noun = pluralize(len(unique_exceptions), 'Exception')
+    if self._scheduler.include_trace_on_error:
+      cumulative_trace = '\n'.join(self.trace(request))
+      raise ExecutionError(
+        '{} encountered:\n{}'.format(exception_noun, cumulative_trace),
+        unique_exceptions,
+      )
+    else:
+      raise ExecutionError(
+        '{} encountered:\n  {}'.format(
+          exception_noun,
+          '\n  '.join('{}: {}'.format(type(t).__name__, str(t)) for t in unique_exceptions)),
+        unique_exceptions
+      )
+
   def run_console_rule(self, product, subject, v2_ui):
     """
 
@@ -535,44 +551,23 @@ class SchedulerSession(object):
     if result.error:
       raise result.error
 
+    self._state_validation(result)
+    assert len(result.root_products) == 1
+    root, state = result.root_products[0]
+    if type(state) is Throw:
+      exc = state.exc
+      if isinstance(exc, GracefulTerminationException):
+        raise exc
+      self._trace_on_error([exc], request)
+    return {product: state.value}
+
+  def _state_validation(self, result):
     # State validation.
     unknown_state_types = tuple(
       type(state) for _, state in result.root_products if type(state) not in (Throw, Return)
     )
     if unknown_state_types:
       State.raise_unrecognized(unknown_state_types)
-
-    # Throw handling.
-    # TODO: See https://github.com/pantsbuild/pants/issues/3912
-    throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
-    if throw_root_states:
-      unique_exceptions = tuple({t.exc for t in throw_root_states})
-
-      if len(unique_exceptions) == 1 and isinstance(unique_exceptions[0], GracefulTerminationException):
-        raise unique_exceptions[0]
-
-      exception_noun = pluralize(len(unique_exceptions), 'Exception')
-
-      if self._scheduler.include_trace_on_error:
-        cumulative_trace = '\n'.join(self.trace(request))
-        raise ExecutionError(
-          '{} encountered:\n{}'.format(exception_noun, cumulative_trace),
-          unique_exceptions,
-        )
-      else:
-        raise ExecutionError(
-          '{} encountered:\n  {}'.format(
-            exception_noun,
-            '\n  '.join('{}: {}'.format(type(t).__name__, str(t)) for t in unique_exceptions)),
-          unique_exceptions
-        )
-
-    # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
-    # order in output lists.
-    product_results = defaultdict(list)
-    for (_, product), state in result.root_products:
-      product_results[product].append(state.value)
-    return product_results
 
   def products_request(self, products, subjects):
     """Executes a request for multiple products for some subjects, and returns the products.
@@ -586,39 +581,14 @@ class SchedulerSession(object):
     if result.error:
       raise result.error
 
-    # State validation.
-    unknown_state_types = tuple(
-      type(state) for _, state in result.root_products if type(state) not in (Throw, Return)
-    )
-    if unknown_state_types:
-      State.raise_unrecognized(unknown_state_types)
+    self._state_validation(result)
 
     # Throw handling.
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
       unique_exceptions = tuple({t.exc for t in throw_root_states})
-
-      # TODO: consider adding a new top-level function adjacent to products_request used for running console tasks,
-      # so that this code doesn't need to exist in this form.
-      if len(unique_exceptions) == 1 and isinstance(unique_exceptions[0], GracefulTerminationException):
-        raise unique_exceptions[0]
-
-      exception_noun = pluralize(len(unique_exceptions), 'Exception')
-
-      if self._scheduler.include_trace_on_error:
-        cumulative_trace = '\n'.join(self.trace(request))
-        raise ExecutionError(
-          '{} encountered:\n{}'.format(exception_noun, cumulative_trace),
-          unique_exceptions,
-        )
-      else:
-        raise ExecutionError(
-          '{} encountered:\n  {}'.format(
-            exception_noun,
-            '\n  '.join('{}: {}'.format(type(t).__name__, str(t)) for t in unique_exceptions)),
-          unique_exceptions
-        )
+      self._trace_on_error(unique_exceptions, request)
 
     # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
     # order in output lists.
