@@ -467,6 +467,7 @@ function fetch_and_check_prebuilt_wheels() {
   fi
 
   banner "Checking prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
+
   fetch_prebuilt_wheels "${check_dir}"
   local missing=()
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
