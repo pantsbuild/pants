@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -37,8 +37,7 @@ class Releaser(object):
       resp = requests.get(url, allow_redirects=True, auth=None)
       if resp.status_code != 200:
         raise requests.exceptions.HTTPError(
-          'HTTP GET {} failed. You might want to remove '
-          'invalid entries in ~/.netrc (e.g. `default`)'.format(url))
+          'HTTP GET {} failed. You may have invalid entries in ~/.netrc (e.g. `default`)'.format(url))
       wheel_listing = resp.content
 
       root = ET.fromstring(wheel_listing)
@@ -80,6 +79,7 @@ class Releaser(object):
     for future, url in futures:
       if future.exception() is not None:
         logger.error('Failed to download: {}'.format(url))
+        fail = True
       else:
         logger.info('Downloaded: {}'.format(url))
 
