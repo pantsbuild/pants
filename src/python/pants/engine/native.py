@@ -196,6 +196,7 @@ Scheduler* scheduler_create(Tasks*,
                             TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
+                            TypeConstraint,
                             TypeId,
                             TypeId,
                             Buffer,
@@ -685,19 +686,26 @@ class Native(object):
   def visualize_to_dir(self):
     return self._visualize_to_dir
 
+  class BinaryLocationError(Exception): pass
+
   @memoized_property
   def binary(self):
     """Load and return the path to the native engine binary."""
     lib_name = '{}.so'.format(NATIVE_ENGINE_MODULE)
     lib_path = os.path.join(safe_mkdtemp(), lib_name)
-    with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
-      # NB: The header stripping code here must be coordinated with header insertion code in
-      #     build-support/bin/native/bootstrap_code.sh
-      engine_version = input_fp.readline().decode('utf-8').strip()
-      repo_version = input_fp.readline().decode('utf-8').strip()
-      logger.debug('using {} built at {}'.format(engine_version, repo_version))
-      with open(lib_path, 'wb') as output_fp:
-        output_fp.write(input_fp.read())
+    try:
+      with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
+        # NB: The header stripping code here must be coordinated with header insertion code in
+        #     build-support/bin/native/bootstrap_code.sh
+        engine_version = input_fp.readline().decode('utf-8').strip()
+        repo_version = input_fp.readline().decode('utf-8').strip()
+        logger.debug('using {} built at {}'.format(engine_version, repo_version))
+        with open(lib_path, 'wb') as output_fp:
+          output_fp.write(input_fp.read())
+    except (IOError, OSError) as e:
+      raise self.BinaryLocationError(
+        "Error unpacking the native engine binary to path {}: {}".format(lib_path, e),
+        e)
     return lib_path
 
   @memoized_property
@@ -806,6 +814,7 @@ class Native(object):
                     constraint_path_globs,
                     constraint_directory_digest,
                     constraint_snapshot,
+                    constraint_merge_snapshots_request,
                     constraint_files_content,
                     constraint_dir,
                     constraint_file,
@@ -837,6 +846,7 @@ class Native(object):
         tc(constraint_path_globs),
         tc(constraint_directory_digest),
         tc(constraint_snapshot),
+        tc(constraint_merge_snapshots_request),
         tc(constraint_files_content),
         tc(constraint_dir),
         tc(constraint_file),

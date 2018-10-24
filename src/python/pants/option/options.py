@@ -10,6 +10,8 @@ import sys
 from builtins import object, open, str
 from textwrap import dedent
 
+from twitter.common.collections import OrderedSet
+
 from pants.base.deprecated import get_frame_info, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -127,7 +129,7 @@ class Options(object):
     complete_known_scope_infos = cls.complete_scopes(known_scope_infos)
     splitter = ArgSplitter(complete_known_scope_infos)
     args = sys.argv if args is None else args
-    goals, scope_to_flags, target_specs, passthru, passthru_owner = splitter.split_args(args)
+    goals, scope_to_flags, target_specs, passthru, passthru_owner, unknown_scopes = splitter.split_args(args)
 
     if not option_tracker:
       raise cls.OptionTrackerRequiredError()
@@ -147,11 +149,11 @@ class Options(object):
     known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
     return cls(goals, scope_to_flags, target_specs, passthru, passthru_owner, help_request,
                parser_hierarchy, values_by_scope, bootstrap_option_values, known_scope_to_info,
-               option_tracker)
+               option_tracker, unknown_scopes)
 
   def __init__(self, goals, scope_to_flags, target_specs, passthru, passthru_owner, help_request,
                parser_hierarchy, values_by_scope, bootstrap_option_values, known_scope_to_info,
-               option_tracker):
+               option_tracker, unknown_scopes):
     """The low-level constructor for an Options instance.
 
     Dependees should use `Options.create` instead.
@@ -168,6 +170,7 @@ class Options(object):
     self._known_scope_to_info = known_scope_to_info
     self._option_tracker = option_tracker
     self._frozen = False
+    self._unknown_scopes = unknown_scopes
 
   # TODO: Eliminate this in favor of a builder/factory.
   @property
@@ -202,6 +205,21 @@ class Options(object):
     """
     return self._goals
 
+  # TODO: Replace this with a formal way of registering v2-only goals.
+  # See https://github.com/pantsbuild/pants/issues/6651
+  @property
+  def goals_and_possible_v2_goals(self):
+    """Goals, including any unrecognised scopes which may be v2-only goals.
+
+    Experimental API which shouldn't be relied on outside of Pants itself.
+    """
+    if self._unknown_scopes:
+      r = OrderedSet(self.goals)
+      r.update(self._unknown_scopes)
+      return r
+    else:
+      return self.goals
+
   @property
   def known_scope_to_info(self):
     return self._known_scope_to_info
@@ -234,7 +252,8 @@ class Options(object):
                    no_values,
                    self._bootstrap_option_values,
                    self._known_scope_to_info,
-                   self._option_tracker)
+                   self._option_tracker,
+                   self._unknown_scopes)
 
   def is_known_scope(self, scope):
     """Whether the given scope is known by this instance.

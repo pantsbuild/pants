@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use core::{TypeConstraint, TypeId};
+use externs;
+use std::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Get {
@@ -9,7 +11,7 @@ pub struct Get {
   pub subject: TypeId,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Select {
   pub product: TypeConstraint,
 }
@@ -17,5 +19,15 @@ pub struct Select {
 impl Select {
   pub fn new(product: TypeConstraint) -> Select {
     Select { product: product }
+  }
+}
+
+impl fmt::Debug for Select {
+  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    write!(
+      f,
+      "Select {{ product: {} }}",
+      externs::key_to_str(&self.product.0)
+    )
   }
 }

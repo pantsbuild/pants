@@ -23,6 +23,7 @@ from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
+from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
@@ -230,10 +231,12 @@ class DaemonPantsRunner(ProcessManager):
   def _raise_deferred_exc(self):
     """Raises deferred exceptions from the daemon's synchronous path in the post-fork client."""
     if self._deferred_exception:
+      exc_type, exc_value, exc_traceback = self._deferred_exception
+      if exc_type == GracefulTerminationException:
+        self._exiter.exit(exc_value.exit_code)
       try:
         # Expect `_deferred_exception` to be a 3-item tuple of the values returned by sys.exc_info().
         # This permits use the 3-arg form of the `raise` statement to preserve the original traceback.
-        exc_type, exc_value, exc_traceback = self._deferred_exception
         raise_with_traceback(exc_type(exc_value), exc_traceback)
       except ValueError:
         # If `_deferred_exception` isn't a 3-item tuple, treat it like a bare exception.

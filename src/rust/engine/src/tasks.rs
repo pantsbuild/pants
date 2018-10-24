@@ -90,17 +90,18 @@ impl Tasks {
   pub fn intrinsics_set(&mut self, types: &Types) {
     self.intrinsics = vec![
       Intrinsic {
-        kind: IntrinsicKind::Snapshot,
         product: types.snapshot,
         input: types.path_globs,
       },
       Intrinsic {
-        kind: IntrinsicKind::FilesContent,
         product: types.files_content,
         input: types.directory_digest,
       },
       Intrinsic {
-        kind: IntrinsicKind::ProcessExecution,
+        product: types.directory_digest,
+        input: types.merged_directories,
+      },
+      Intrinsic {
         product: types.process_result,
         input: types.process_request,
       },
@@ -182,14 +183,6 @@ impl Tasks {
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub struct Intrinsic {
-  pub kind: IntrinsicKind,
   pub product: TypeConstraint,
   pub input: TypeConstraint,
-}
-
-#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
-pub enum IntrinsicKind {
-  Snapshot,
-  FilesContent,
-  ProcessExecution,
 }

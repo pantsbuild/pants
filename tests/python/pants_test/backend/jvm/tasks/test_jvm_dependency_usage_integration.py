@@ -74,3 +74,10 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
       # Confirm that usage is non-zero, and that the reports match.
       self._assert_non_zero_usage(run_two)
       self.assertEqual(run_one, run_two)
+
+  def test_no_summary_works(self):
+    target = 'testprojects/src/java/org/pantsbuild/testproject/unicode/main'
+    with self.temporary_cachedir() as cachedir, \
+      self.temporary_workdir() as workdir:
+      self._run_dep_usage(workdir, target, clean_all=True, cachedir=cachedir,
+        extra_args=['--no-dep-usage-jvm-summary'])
