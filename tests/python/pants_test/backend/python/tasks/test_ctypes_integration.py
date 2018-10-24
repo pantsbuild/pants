@@ -32,6 +32,9 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   _binary_target_with_third_party = (
     'testprojects/src/python/python_distribution/ctypes_with_third_party:bin_with_third_party'
   )
+  _binary_target_with_compiler_option_sets = (
+    'testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin'
+  )
 
   def test_ctypes_run(self):
     pants_run = self.run_pants(command=['-q', 'run', self._binary_target])
@@ -146,18 +149,31 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertIn('x=3, f(x)=17', pants_run.stdout_data)
 
-  '''
   def test_native_compiler_option_sets_integration(self):
     """Test that native compilation includes extra compiler flags from target definitions.
 
-    This target has ndebug=True and glibcxx_use_cxx11_abi=False.
-    If either of these are not present or negated, this test will fail.
+    This target uses the ndebug and glibcxx_use_cxx11_abi option sets.
+    If either of these are not present (disabled), this test will fail.
     """
     command = [
       'run',
-      'testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin'
+      self._binary_target_with_compiler_option_sets
     ]
-    pants_run = self.run_pants(command=command)
+    pants_run = self.run_pants(command=command, config={
+      'cpp-compile-settings': {
+        'compiler_option_sets_enabled_args': {
+          'ndebug': ['-DNDEBUG'],
+          'glibcxx_use_cxx11_abi': ['-D_GLIBCXX_USE_CXX11_ABI=1'],
+        },
+        'compiler_option_sets_disabled_args': {
+          'glibcxx_use_cxx11_abi': ['-D_GLIBCXX_USE_CXX11_ABI=0'],
+        }
+      },
+      'native-build-step-settings-base': {
+        'compiler_option_sets_enabled_args': {
+          'ndebug': ['-DNDEBUG'],
+        }
+      },
+    })
     self.assert_success(pants_run)
     self.assertIn('x=3, f(x)=126', pants_run.stdout_data)
-  '''
