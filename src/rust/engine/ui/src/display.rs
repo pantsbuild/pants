@@ -66,6 +66,28 @@ pub struct EngineDisplay {
 // TODO: Better error handling for .flush() and .write() failure modes.
 // TODO: Permit scrollback in the terminal - both at exit and during the live run.
 impl EngineDisplay {
+  pub fn create(display_worker_count: usize, should_render_ui: bool) -> Option<EngineDisplay> {
+    if should_render_ui {
+      let mut display = EngineDisplay::for_stdout(0);
+      display.initialize(display_worker_count);
+      Some(display)
+    } else {
+      None
+    }
+  }
+
+  fn initialize(&mut self, display_worker_count: usize) {
+      self.start();
+      self.render();
+      let worker_ids: Vec<String> = (0..display_worker_count)
+        .map(|s| format!("{}", s))
+        .collect();
+      for worker_id in worker_ids {
+        self.add_worker(worker_id);
+      }
+      self.render();
+  }
+
   pub fn for_stdout(indent_level: u16) -> EngineDisplay {
     let write_handle = stdout();
     let is_tty = termion::is_tty(&write_handle);

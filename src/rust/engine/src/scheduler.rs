@@ -274,22 +274,9 @@ impl Scheduler {
     // TODO: It would probably be good to extract more of this into a wrapper struct around
     // the EngineDisplay and some roots.
     let display_worker_count = request.ui_worker_count as usize;
-    let mut optional_display = if request.should_render_ui {
-      Some(EngineDisplay::for_stdout(0))
-    } else {
-      None
-    };
-    if let Some(display) = optional_display.as_mut() {
-      display.start();
-      display.render();
-      let worker_ids: Vec<String> = (0..display_worker_count)
-        .map(|s| format!("{}", s))
-        .collect();
-      for worker_id in worker_ids {
-        display.add_worker(worker_id);
-        display.render();
-      }
-    }
+    let mut optional_display: Option<EngineDisplay> = EngineDisplay::create(
+      request.ui_worker_count as usize,
+      request.should_render_ui);
 
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
     let roots: Vec<NodeKey> = request
