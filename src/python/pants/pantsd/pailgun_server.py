@@ -95,9 +95,9 @@ class PailgunServer(ThreadingMixIn, TCPServer):
   `process_request_thread`, which we override.
   """
 
+  timeout = 0.05
   # Override the ThreadingMixIn default, to minimize the chances of zombie pailgun processes.
   daemon_threads = True
-  timeout = 0.05
 
   def __init__(self, server_address, runner_factory, lifecycle_lock,
                handler_class=None, bind_and_activate=True):
