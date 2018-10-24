@@ -33,7 +33,6 @@ class Releaser(object):
     wheel_paths = []
     for wheel_path in [deploy_pants_wheels_path, deploy_3rdparty_wheels_path]:
       url = '{}/?prefix={}'.format(binary_base_url, wheel_path)
-      # can't figure out how not to get 400 with requests, so shell off to 'curl' instead.
       resp = requests.get(url, allow_redirects=True, auth=None)
       if resp.status_code != 200:
         raise requests.exceptions.HTTPError(
