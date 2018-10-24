@@ -35,6 +35,3 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
 
   def get_strict_deps_value_for_target(self, target):
     return self.get_target_mirrored_option('strict_deps', target)
-
-  def get_compiler_option_sets_for_target(self, target):
-    return self.get_target_mirrored_option('compiler_option_sets', target)

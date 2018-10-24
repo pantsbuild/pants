@@ -20,8 +20,8 @@ class NativeLibrary(Target, AbstractClass):
     return isinstance(target, cls) and bool(target.ctypes_native_library)
 
   def __init__(self, address, payload=None, sources=None, ctypes_native_library=None,
-               strict_deps=None, fatal_warnings=None, ndebug=None,
-               glibcxx_use_cxx11_abi=None, **kwargs):
+               strict_deps=None, fatal_warnings=None, compiler_option_sets=None,
+               **kwargs):
 
     if not payload:
       payload = Payload()
@@ -50,7 +50,7 @@ class NativeLibrary(Target, AbstractClass):
   def fatal_warnings(self):
     return self.payload.fatal_warnings
 
-  @memoized_property
+  @property
   def compiler_option_sets(self):
     """For every element in this list, enable the corresponding flags on compilation
     of targets.

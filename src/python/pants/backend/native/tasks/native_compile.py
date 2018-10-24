@@ -28,8 +28,7 @@ class NativeCompileRequest(datatype([
     'include_dirs',
     'sources',
     ('fatal_warnings', bool),
-    ('ndebug', bool),
-    ('glibcxx_use_cxx11_abi', bool),
+    'compiler_options',
     'output_dir',
 ])): pass
 
@@ -172,28 +171,35 @@ class NativeCompile(NativeTask, AbstractClass):
     include_dirs.extend(self._get_third_party_include_dirs(external_libs_product, dependencies))
 
     sources_and_headers = self.get_sources_headers_for_target(target)
-
     return NativeCompileRequest(
       compiler=self._compiler,
       include_dirs=include_dirs,
       sources=sources_and_headers,
-      fatal_warnings=self._compile_settings.get_fatal_warnings_value_for_target(target),
-      compiler_option_sets_options=self._compile_settings.get_merged_compiler_options_for_target(target),
+      fatal_warnings=(self._compile_settings
+                         ._native_build_step_settings
+                         .get_fatal_warnings_value_for_target(target)),
+      compiler_options=(self._compile_settings
+                           ._native_build_step_settings
+                           .get_merged_compiler_options_for_target(target,
+          [self._compile_settings.get_options().compiler_option_sets_enabled_args],
+          [self._compile_settings.get_options().compiler_option_sets_disabled_args])),
       output_dir=versioned_target.results_dir)
 
   def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
     compiler = compile_request.compiler
-    compiler_option_sets_options = compile_request.compiler_option_sets_options
+    err_flags = ['-Werror'] if compile_request.fatal_warnings else []
+    compiler_options = compile_request.compiler_options
 
     # We are going to execute in the target output, so get absolute paths for everything.
     buildroot = get_buildroot()
     argv = (
       [compiler.exe_filename] +
       compiler.extra_args +
+      err_flags +
       # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
       ['-c', '-fPIC'] +
-      compiler_option_sets_options +
+      compiler_options +
       [
         '-I{}'.format(os.path.join(buildroot, inc_dir))
         for inc_dir in compile_request.include_dirs
