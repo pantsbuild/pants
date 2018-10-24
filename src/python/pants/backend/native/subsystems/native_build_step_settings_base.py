@@ -52,12 +52,11 @@ class NativeBuildStepSettingsBase(Subsystem, MirroredTargetOptionMixin):
     compiler_options = set()
 
     # Set values for enabled options.
-    if compiler_option_sets:
-      for opt_set_key in compiler_option_sets:
-        for osed in (opt_set_enabled_dicts + [self.get_options().compiler_option_sets_enabled_args]):
-          val = osed.get(opt_set_key)
-          if val:
-            compiler_options.update(val)
+    for opt_set_key in compiler_option_sets:
+      for osed in (opt_set_enabled_dicts + [self.get_options().compiler_option_sets_enabled_args]):
+        val = osed.get(opt_set_key)
+        if val:
+          compiler_options.update(val)
 
     # Set values for disabled options.
     for osdd in (opt_set_disabled_dicts + [self.get_options().compiler_option_sets_disabled_args]):
@@ -87,7 +86,7 @@ class CCompileSettings(Subsystem):
              default={}, help='Extra compiler args to use for each disabled option set.')
 
   @memoized_property
-  def _native_build_step_settings(self):
+  def _native_build_step_settings_base(self):
     return NativeBuildStepSettingsBase.scoped_instance(self)
 
 
@@ -109,7 +108,7 @@ class CppCompileSettings(Subsystem):
              default={}, help='Extra compiler args to use for each disabled option set.')
 
   @memoized_property
-  def _native_build_step_settings(self):
+  def _native_build_step_settings_base(self):
     return NativeBuildStepSettingsBase.scoped_instance(self)
 
 
