@@ -48,6 +48,8 @@ class NativeCompile(NativeTask, AbstractClass):
   source_target_constraint = None
   dependent_target_constraint = SubclassesOf(ExternalNativeLibrary, NativeLibrary)
 
+  HEADER_EXTENSIONS = ('.h', '.hpp')
+
   # `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
   # compiler process. `workunit_label` must be set to a string.
   @classproperty
@@ -176,10 +178,10 @@ class NativeCompile(NativeTask, AbstractClass):
       include_dirs=include_dirs,
       sources=sources_and_headers,
       fatal_warnings=(self._compile_settings
-                         ._native_build_step_settings
+                         ._native_build_step_settings_base
                          .get_fatal_warnings_value_for_target(target)),
       compiler_options=(self._compile_settings
-                           ._native_build_step_settings
+                           ._native_build_step_settings_base
                            .get_merged_compiler_options_for_target(target,
           [self._compile_settings.get_options().compiler_option_sets_enabled_args],
           [self._compile_settings.get_options().compiler_option_sets_disabled_args])),
@@ -218,7 +220,7 @@ class NativeCompile(NativeTask, AbstractClass):
     """
     sources = compile_request.sources
 
-    if len(sources) == 0 or not [s for s in sources if not s.endswith(('.h', '.hpp'))]:
+    if len(sources) == 0 or not any(s for s in sources if not s.endswith(self.HEADER_EXTENSIONS)):
       # TODO: do we need this log message? Should we still have it for intentionally header-only
       # libraries (that might be a confusing message to see)?
       self.context.log.debug("no sources in request {}, skipping".format(compile_request))
