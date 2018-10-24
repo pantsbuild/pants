@@ -178,7 +178,6 @@ class PantsDaemon(FingerprintedProcessManager):
       fs_event_service = FSEventService(
         watchman,
         build_root,
-        bootstrap_options.pantsd_fs_event_workers
       )
 
       pidfile_absolute = PantsDaemon.metadata_file_path('pantsd', 'pid', bootstrap_options.pants_subprocessdir)

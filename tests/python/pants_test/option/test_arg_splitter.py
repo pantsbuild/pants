@@ -31,11 +31,13 @@ class ArgSplitterTest(unittest.TestCase):
 
   def _split(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
              expected_passthru=None, expected_passthru_owner=None,
-             expected_is_help=False, expected_help_advanced=False, expected_help_all=False):
+             expected_is_help=False, expected_help_advanced=False, expected_help_all=False,
+             expected_unknown_scopes=None):
     expected_passthru = expected_passthru or []
+    expected_unknown_scopes = expected_unknown_scopes or []
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
     args = shlex.split(args_str)
-    goals, scope_to_flags, target_specs, passthru, passthru_owner = splitter.split_args(args)
+    goals, scope_to_flags, target_specs, passthru, passthru_owner, unknown_scopes = splitter.split_args(args)
     self.assertEqual(expected_goals, goals)
     self.assertEqual(expected_scope_to_flags, scope_to_flags)
     self.assertEqual(expected_target_specs, target_specs)
@@ -48,6 +50,7 @@ class ArgSplitterTest(unittest.TestCase):
     self.assertEqual(expected_help_all,
                       (isinstance(splitter.help_request, OptionsHelp) and
                        splitter.help_request.all_scopes))
+    self.assertEqual(expected_unknown_scopes, unknown_scopes)
 
   def _split_help(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
                   expected_help_advanced=False, expected_help_all=False):
@@ -64,9 +67,10 @@ class ArgSplitterTest(unittest.TestCase):
 
   def _split_unknown_goal(self, args_str, unknown_goals):
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
-    splitter.split_args(shlex.split(args_str))
+    result = splitter.split_args(shlex.split(args_str))
     self.assertTrue(isinstance(splitter.help_request, UnknownGoalHelp))
     self.assertSetEqual(set(unknown_goals), set(splitter.help_request.unknown_goals))
+    self.assertEqual(result.unknown_scopes, unknown_goals)
 
   def _split_no_goal(self, args_str):
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)

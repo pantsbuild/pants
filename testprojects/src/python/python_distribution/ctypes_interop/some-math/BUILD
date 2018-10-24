@@ -1,0 +1,1 @@
+ctypes_compatible_c_library()

@@ -12,8 +12,7 @@ class FlakeCheckSubsystem(PluginSubsystemBase):
   options_scope = 'pycheck-pyflakes'
 
   @classmethod
-  def register_options(cls, register):
-    super(FlakeCheckSubsystem, cls).register_options(register)
+  def register_plugin_options(cls, register):
     register('--ignore', fingerprint=True, type=list, default=[],
              help='List of warning codes to ignore.')
 

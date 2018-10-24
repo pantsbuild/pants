@@ -112,6 +112,11 @@ def ensure_daemon(f):
         with environment_as(**env):
           try:
             f(self, *args, **kwargs)
+          except Exception:
+            print('Test failed with enable-pantsd={}:'.format(enable_daemon))
+            if enable_daemon == 'false':
+              print('Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false.')
+            raise
           finally:
             if enable_daemon:
               self.assert_success(self.run_pants(['kill-pantsd']))

@@ -280,7 +280,7 @@ class PexBuilderWrapper(object):
     # if they are incompatible because all the sources of the constraints are available.
     # See: https://github.com/pantsbuild/pex/blob/584b6e367939d24bc28aa9fa36eb911c8297dac8/pex/interpreter_constraints.py
     for tgt in constraint_tgts:
-      self._builder.add_interpreter_constraint(tgt.compatibility)
+      self.add_interpreter_constraint(tgt.compatibility)
 
   def add_direct_requirements(self, reqs):
     for req in reqs:

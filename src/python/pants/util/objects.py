@@ -393,7 +393,13 @@ class SubclassesOf(TypeConstraint):
 
 
 class Collection(object):
-  """Constructs classes representing collections of objects of a particular type."""
+  """Constructs classes representing collections of objects of a particular type.
+
+  The produced class will expose its values under a field named dependencies - this is a stable API
+  which may be consumed e.g. over FFI from the engine.
+
+  Python consumers of a Collection should prefer to use its standard iteration API.
+  """
   # TODO: could we check that the input is iterable in the ctor?
 
   @classmethod
@@ -412,3 +418,6 @@ class Collection(object):
     setattr(sys.modules[cls.__module__], type_name, collection_of_type)
 
     return collection_of_type
+
+  def __iter__(self):
+    return iter(self.dependencies)
