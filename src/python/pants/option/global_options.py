@@ -241,6 +241,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
     register('--pantsd-fs-event-workers', advanced=True, type=int, default=4,
+             removal_version='1.14.0.dev2',
+             removal_hint='Filesystem events are now handled by a single dedicated thread.',
              help='The number of workers to use for the filesystem event service executor pool.')
     register('--pantsd-invalidation-globs', advanced=True, type=list, fromfile=True, default=[],
              help='Filesystem events matching any of these globs will trigger a daemon restart.')

@@ -4,8 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import object
-from collections import namedtuple
 from contextlib import contextmanager
 
 import mock
@@ -13,17 +11,6 @@ import mock
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.watchman import Watchman
 from pants_test.test_base import TestBase
-
-
-class TestExecutor(object):
-  FakeFuture = namedtuple('FakeFuture', ['done', 'result'])
-
-  def submit(self, closure, *args, **kwargs):
-    result = closure(*args, **kwargs)
-    return self.FakeFuture(lambda: True, lambda: result)
-
-  def shutdown(self):
-    pass
 
 
 class TestFSEventService(TestBase):
@@ -36,8 +23,8 @@ class TestFSEventService(TestBase):
   def setUp(self):
     super(TestFSEventService, self).setUp()
     self.mock_watchman = mock.create_autospec(Watchman, spec_set=True)
-    self.service = FSEventService(self.mock_watchman, self.BUILD_ROOT, self.WORKER_COUNT)
-    self.service.setup(None, executor=TestExecutor())
+    self.service = FSEventService(self.mock_watchman, self.BUILD_ROOT)
+    self.service.setup(None)
     self.service.register_all_files_handler(lambda x: True, name='test')
     self.service.register_all_files_handler(lambda x: False, name='test2')
 
