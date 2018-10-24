@@ -143,11 +143,10 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
         if not invalidation_check.all_vts:
           continue
 
-        pants_workdir = self.get_options().pants_workdir
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
-        vt_set_results_dir = self._prepare_vts_results_dir(pants_workdir, resolve_vts)
-        pants_jar_base_dir = self._prepare_workdir(pants_workdir)
+        vt_set_results_dir = self._prepare_vts_results_dir(resolve_vts)
+        pants_jar_base_dir = self._prepare_workdir()
         coursier_cache_dir = CoursierSubsystem.global_instance().get_options().cache_dir
 
         # If a report is requested, do not proceed with loading validated result.
@@ -165,7 +164,7 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
                                                                                artifact_set,
                                                                                manager)
 
-        results = self._get_result_from_coursier(jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
+        results = self._get_result_from_coursier(jars_to_resolve, global_excludes, pinned_coords,
                                                  coursier_cache_dir, sources, javadoc)
 
         for conf, result_list in results.items():
@@ -184,24 +183,21 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
     else:
       return None
 
-  def _prepare_vts_results_dir(self, pants_workdir, vts):
+  def _prepare_vts_results_dir(self, vts):
     """
     Given a `VergetTargetSet`, prepare its results dir.
     """
-    vt_set_results_dir = os.path.join(pants_workdir, 'coursier', 'workdir', vts.cache_key.hash)
+    vt_set_results_dir = os.path.join(self.versioned_workdir, 'results', vts.cache_key.hash)
     safe_mkdir(vt_set_results_dir)
     return vt_set_results_dir
 
-  def _prepare_workdir(self, pants_workdir):
-    """
-    Given pants workdir, prepare the location in pants workdir to store all the hardlinks
-    to coursier cache dir.
-    """
-    pants_jar_base_dir = os.path.join(pants_workdir, 'coursier', 'cache')
+  def _prepare_workdir(self):
+    """Prepare the location in our task workdir to store all the hardlinks to coursier cache dir."""
+    pants_jar_base_dir = os.path.join(self.versioned_workdir, 'cache')
     safe_mkdir(pants_jar_base_dir)
     return pants_jar_base_dir
 
-  def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
+  def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords,
                                 coursier_cache_path, sources, javadoc):
     """
     Calling coursier and return the result per invocation.
@@ -212,7 +208,6 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
     :param jars_to_resolve: List of `JarDependency`s to resolve
     :param global_excludes: List of `M2Coordinate`s to exclude globally
     :param pinned_coords: List of `M2Coordinate`s that need to be pinned.
-    :param pants_workdir: Pants' workdir
     :param coursier_cache_path: path to where coursier cache is stored.
 
     :return: The aggregation of results by conf from coursier. Each coursier call could return
@@ -264,7 +259,7 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
                    '--cache', coursier_cache_path
                    ] + repo_args + artifact_types_arg + advanced_options
 
-    coursier_work_temp_dir = os.path.join(pants_workdir, 'tmp')
+    coursier_work_temp_dir = os.path.join(self.versioned_workdir, 'tmp')
     safe_mkdir(coursier_work_temp_dir)
 
     results_by_conf = self._get_default_conf_results(common_args, coursier_jar, global_excludes, jars_to_resolve,
@@ -682,7 +677,7 @@ class CoursierResolve(CoursierMixin):
 
   @classmethod
   def implementation_version(cls):
-    return super(CoursierResolve, cls).implementation_version() + [('CoursierResolve', 1)]
+    return super(CoursierResolve, cls).implementation_version() + [('CoursierResolve', 2)]
   
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
