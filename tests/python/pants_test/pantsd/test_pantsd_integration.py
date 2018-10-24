@@ -27,6 +27,7 @@ def launch_file_toucher(f):
       touch(f)
       time.sleep(1)
   thread = threading.Thread(target=file_toucher)
+  thread.daemon = True
   thread.start()
 
   def join():
