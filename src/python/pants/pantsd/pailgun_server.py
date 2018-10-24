@@ -8,7 +8,7 @@ import logging
 import socket
 import traceback
 
-from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer
+from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
@@ -33,7 +33,8 @@ class PailgunHandlerBase(BaseRequestHandler):
   def handle_request(self):
     """Handle a request (the equivalent of the latter half of BaseRequestHandler.__init__()).
 
-    This is invoked by a TCPServer subclass that overrides process_request().
+    This is invoked by a TCPServer subclass that spawns a thread from process_request() that invokes
+    an overridden process_request_thread().
     """
     self.setup()
     try:
@@ -87,8 +88,16 @@ class PailgunHandler(PailgunHandlerBase):
     NailgunProtocol.send_exit_with_code(self.request, failure_code)
 
 
-class PailgunServer(TCPServer):
-  """A (forking) pants nailgun server."""
+class PailgunServer(ThreadingMixIn, TCPServer):
+  """A pants nailgun server.
+
+  This class spawns a thread per request via `ThreadingMixIn`: the thread body runs
+  `process_request_thread`, which we override.
+  """
+
+  timeout = 0.05
+  # Override the ThreadingMixIn default, to minimize the chances of zombie pailgun processes.
+  daemon_threads = True
 
   def __init__(self, server_address, runner_factory, lifecycle_lock,
                handler_class=None, bind_and_activate=True):
@@ -130,6 +139,10 @@ class PailgunServer(TCPServer):
   def handle_request(self):
     """Override of TCPServer.handle_request() that provides locking.
 
+    Calling this method has the effect of "maybe" (if the socket does not time out first)
+    accepting a request and (because we mixin in ThreadingMixIn) spawning it on a thread. It should
+    always return within `min(self.timeout, socket.gettimeout())`.
+
     N.B. Most of this is copied verbatim from SocketServer.py in the stdlib.
     """
     timeout = self.socket.gettimeout()
@@ -147,9 +160,8 @@ class PailgunServer(TCPServer):
     with self.lifecycle_lock():
       self._handle_request_noblock()
 
-  def process_request(self, request, client_address):
-    """Override of TCPServer.process_request() that provides for forking request handlers and
-    delegates error handling to the request handler."""
+  def process_request_thread(self, request, client_address):
+    """Override of ThreadingMixIn.process_request_thread() that delegates to the request handler."""
     # Instantiate the request handler.
     handler = self.RequestHandlerClass(request, client_address, self)
     try:
