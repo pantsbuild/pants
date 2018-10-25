@@ -181,7 +181,7 @@ impl Select {
       return future::ok(value.clone()).to_boxed();
     }
 
-    println!("BL: Select::gen_node with entry {:?}", &self.entry);
+    //    println!("BL: Select::gen_node with entry {:?}", &self.entry);
 
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
@@ -695,7 +695,27 @@ impl WrappedNode for DownloadedFile {
         .get(url)
         .send()
         .map_err(|err| throw(&format!("Error downloading file: {}", err)))
+        .and_then(|response| if response.status().is_server_error() {
+          Err(throw(&format!(
+            "Server error ({}) downloading file {} from {}",
+            response.status().as_str(),
+            file_name,
+            url_to_fetch,
+          )))
+        } else if response.status().is_client_error() {
+          Err(throw(&format!(
+            "Client error ({}) downloading file {} from {}",
+            response.status().as_str(),
+            file_name,
+            url_to_fetch,
+          )))
+        } else {
+          Ok(response)
+        })
     );
+
+    println!("BL: {:?}", response);
+
     {
       let temp_file_path = tempdir.path().join(&file_name);
       let mut file = std::fs::File::create(&temp_file_path).expect("TODO");

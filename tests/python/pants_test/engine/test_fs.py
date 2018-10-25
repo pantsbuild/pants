@@ -15,8 +15,9 @@ from future.utils import text_type
 
 from pants.base.project_tree import Dir, Link
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize,
-  FilesContent, MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot,
-  create_fs_rules, UrlToFetch)
+                             FilesContent, MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot,
+                             UrlToFetch, create_fs_rules)
+from pants.engine.scheduler import ExecutionError
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -474,5 +475,16 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
 
   def test_download(self):
     scheduler = self.mk_scheduler(rules=create_fs_rules())
-    snapshot = scheduler.product_request(Snapshot, subjects=[UrlToFetch("http://science-binaries.local.twitter.com/home/third_party/source/python/wheels/Babel-2.5.3-py2.py3-none-any.whl")])
-    assert(snapshot)
+    # Downloads a scratch file that should remain unchanged.
+    url = UrlToFetch("https://raw.githubusercontent.com/blorente/pants/dwagnerhall/v2/urlfetch/src/rust/engine/testutil/resources/brandy")
+    snapshot = scheduler.product_request(Snapshot, subjects=[url])
+    print(snapshot)
+    self.assert_snapshot_equals(snapshot, ["test_fs.py"], DirectoryDigest(
+      text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+      120
+    ))
+
+  def test_download_missing_file(self):
+    scheduler = self.mk_scheduler(rules=create_fs_rules())
+    url = UrlToFetch("https://google.com/not-a-real-link")
+    self.assertRaises(ExecutionError, scheduler.product_request, Snapshot, subjects=[url])

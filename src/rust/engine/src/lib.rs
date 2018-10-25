@@ -437,7 +437,7 @@ pub extern "C" fn execution_add_root_select(
 ) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
-      debug!("BL: add_root_select with subject {:?}, product {:?}", subject, product);
+      //      debug!("BL: add_root_select with subject {:?}, product {:?}", subject, product);
       scheduler
         .add_root_select(execution_request, subject, product)
         .into()
@@ -785,7 +785,7 @@ pub extern "C" fn materialize_directories(
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
-  debug!("BL: graph_full with scheduler.core.tasks {:?}", scheduler.core.tasks);
+  //  debug!("BL: graph_full with scheduler.core.tasks {:?}", scheduler.core.tasks);
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
   graph_maker.full_graph()
 }
