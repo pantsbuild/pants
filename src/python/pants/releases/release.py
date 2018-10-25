@@ -10,13 +10,15 @@ import os
 import urllib
 import xml.etree.ElementTree as ET
 from builtins import open
-from concurrent.futures import ThreadPoolExecutor
 
 import fire
 import requests
+from concurrent.futures import ThreadPoolExecutor
 
 from pants.net.http.fetcher import Fetcher
+from pants.releases.package_constants import RELEASE_PACKAGES
 from pants.util.dirutil import safe_mkdir
+from pants.util.process_handler import subprocess
 
 
 logging.basicConfig()
@@ -84,6 +86,21 @@ class Releaser(object):
 
     if fail:
       raise fetcher.Error()
+
+  def build_pants_packages(self, version, deploy_pants_wheel_dir, release_packages):
+    # Sanity check the packages to be built
+    packages = release_packages.split()
+    assert len(packages) == len(RELEASE_PACKAGES)
+    logger.info('Going to build:\n{}'.format('\n'.join(p.name for p in RELEASE_PACKAGES)))
+    for package in RELEASE_PACKAGES:
+      args = [
+        './pants',
+        'setup-py',
+        '--run=bdist_wheel {}'.format(package.bdist_wheel_flags if package.bdist_wheel_flags else '--python-tag py27'),
+        package.build_target]
+      logger.info('Building {}'.format(package.name))
+      logger.info(' '.join("'{}'".format(a) for a in args))
+      subprocess.check_output(args)
 
   def _download(self, fetcher, checksummer, url, dest):
     with open(dest, 'wb') as file_path:
