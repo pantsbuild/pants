@@ -207,25 +207,16 @@ function build_pants_packages() {
   rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
   mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
 
-  pants_version_set "${version}"
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    NAME=$(pkg_name $PACKAGE)
-    BUILD_TARGET=$(pkg_build_target $PACKAGE)
-    BDIST_WHEEL_FLAGS=$(bdist_wheel_flags $PACKAGE)
+  # Pants script is only using `RELEASE_PACKAGES` to sanity check the packages to built,
+  # the actual definition is defined in src/python/pants/releases/package_constants.py
+  local expanded_packages=${RELEASE_PACKAGES[@]}
+  run_local_pants -q run src/python/pants/releases:release -- \
+    build_pants_packages \
+    --version="${version}" \
+    --release-packages="\"$expanded_packages\"" \
+    --deploy-pants-wheel-dir="${DEPLOY_PANTS_WHEEL_DIR}" || die "build_pants_packages failed"
 
-    start_travis_section "${NAME}" "Building package ${NAME}-${version} with target '${BUILD_TARGET}'"
-    (
-      # Update the --python-tag default in lockstep with other changes as described in
-      #   https://github.com/pantsbuild/pants/issues/6450
-      run_local_pants setup-py \
-        --run="bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
-          ${BUILD_TARGET} && \
-      wheel=$(find_pkg ${NAME} ${version} "${ROOT}/dist") && \
-      cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
-    ) || die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
-    end_travis_section
-  done
+  pants_version_set "${version}"
 
   start_travis_section "fs_util" "Building fs_util binary"
   # fs_util is a standalone tool which can be used to inspect and manipulate
@@ -691,7 +682,6 @@ while getopts "hdntcloepqw" opt; do
 done
 
 if [[ "${debug}" == "true" ]]; then
-  set -x
   pause_after_venv_creation="true"
 fi
 
