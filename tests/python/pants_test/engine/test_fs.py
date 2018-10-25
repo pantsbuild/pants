@@ -476,12 +476,13 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
   def test_download(self):
     scheduler = self.mk_scheduler(rules=create_fs_rules())
     # Downloads a scratch file that should remain unchanged.
+    # TODO: Change to a path in master when merged
     url = UrlToFetch("https://raw.githubusercontent.com/blorente/pants/dwagnerhall/v2/urlfetch/src/rust/engine/testutil/resources/brandy")
-    snapshot = scheduler.product_request(Snapshot, subjects=[url])
+    snapshot, = scheduler.product_request(Snapshot, subjects=[url])
     print(snapshot)
-    self.assert_snapshot_equals(snapshot, ["test_fs.py"], DirectoryDigest(
-      text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
-      120
+    self.assert_snapshot_equals(snapshot, ["brandy"], DirectoryDigest(
+      text_type("575ec70215213d97582a3caa3378821c6ee0f40507176e9121dc9dba04de063c"),
+      82
     ))
 
   def test_download_missing_file(self):
