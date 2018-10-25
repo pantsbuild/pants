@@ -102,17 +102,17 @@ class Releaser(object):
       try:
         f.seek(0)
         f.write(new_version + '\n')
+        f.truncate()
         f.flush()
         yield
       finally:
         f.seek(0)
         f.write(previous_version)
+        f.truncate()
 
   def build_pants_packages(self, version, deploy_pants_wheel_dir, release_packages):
 
     with self.temporary_version(version):
-      import pdb
-      pdb.set_trace()
       # Sanity check the packages to be built
       packages = release_packages.split()
       assert len(packages) == len(RELEASE_PACKAGES)
