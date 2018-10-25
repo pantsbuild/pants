@@ -136,7 +136,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   @abstractmethod
   def get_compile_settings(self):
-    """Return a subclass of NativeBuildStepSettingsBase.
+    """Return a subclass of NativeBuildStepSettings.
 
     NB: Subclasses will be queried for the compile settings once and the result cached.
     """
@@ -178,13 +178,11 @@ class NativeCompile(NativeTask, AbstractClass):
       include_dirs=include_dirs,
       sources=sources_and_headers,
       fatal_warnings=(self._compile_settings
-                         ._native_build_step_settings_base
+                         ._native_build_step_settings
                          .get_fatal_warnings_value_for_target(target)),
       compiler_options=(self._compile_settings
-                           ._native_build_step_settings_base
-                           .get_merged_compiler_options_for_target(target,
-          [self._compile_settings.get_options().compiler_option_sets_enabled_args],
-          [self._compile_settings.get_options().compiler_option_sets_disabled_args])),
+                           ._native_build_step_settings
+                           .get_merged_compiler_options_for_target(target)),
       output_dir=versioned_target.results_dir)
 
   def _make_compile_argv(self, compile_request):
@@ -192,7 +190,6 @@ class NativeCompile(NativeTask, AbstractClass):
     compiler = compile_request.compiler
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
     compiler_options = compile_request.compiler_options
-
     # We are going to execute in the target output, so get absolute paths for everything.
     buildroot = get_buildroot()
     argv = (
