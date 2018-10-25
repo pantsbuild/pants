@@ -536,16 +536,8 @@ class SchedulerSession(object):
     :param product: product type for the request.
     :param subject: subject for the request.
     :param v2_ui: whether to render the v2 engine UI
-    :return: product each with length matching len(subjects).
+    :return: A dict from product type to lists of products each with length matching len(subjects).
     """
-    """Executes a request for multiple products for some subjects, and returns the products.
-
-    :param list products: A list of product type for the request.
-    :param list subjects: A list of subjects for the request.
-    :param bool v2_ui: whether to render the v2 engine UI
-    :returns: A dict from product type to lists of products each with length matching len(subjects).
-    """
-
     request = self.execution_request([product], [subject], v2_ui)
     result = self.execute(request)
     if result.error:
@@ -559,7 +551,7 @@ class SchedulerSession(object):
       if isinstance(exc, GracefulTerminationException):
         raise exc
       self._trace_on_error([exc], request)
-    return {product: state.value}
+    return {result.root_products[0]: [state.value]}
 
   def _state_validation(self, result):
     # State validation.
