@@ -67,6 +67,7 @@ extern crate resettable;
 #[macro_use]
 extern crate smallvec;
 extern crate tokio;
+extern crate ui;
 
 use std::ffi::CStr;
 use std::fs::File;
@@ -572,8 +573,14 @@ pub extern "C" fn session_destroy(ptr: *mut Session) {
 }
 
 #[no_mangle]
-pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
-  Box::into_raw(Box::new(ExecutionRequest::new()))
+pub extern "C" fn execution_request_create(
+  should_render_ui: bool,
+  ui_worker_count: u64,
+) -> *const ExecutionRequest {
+  Box::into_raw(Box::new(ExecutionRequest::new(
+    should_render_ui,
+    ui_worker_count,
+  )))
 }
 
 #[no_mangle]

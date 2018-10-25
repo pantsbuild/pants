@@ -40,7 +40,7 @@ class SchedulerTraceTest(unittest.TestCase):
     ]
 
     scheduler = create_scheduler(rules)
-    request = scheduler._native.new_execution_request()
+    request = scheduler._native.new_execution_request(v2_ui=False, ui_worker_count=1)
     subject = B()
     scheduler.add_root_selection(request, subject, A)
     session = scheduler.new_session()
