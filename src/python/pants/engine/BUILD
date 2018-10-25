@@ -174,7 +174,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
-    'src/python/pants/rules/core:core',
+    'src/python/pants/rules/core',
     'src/python/pants/util:objects',
   ]
 )

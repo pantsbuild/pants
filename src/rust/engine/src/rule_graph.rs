@@ -907,11 +907,8 @@ fn task_display(task: &Task) -> String {
 }
 
 impl RuleGraph {
-  pub fn new(tasks: &Tasks, root_param_types: Vec<TypeId>) -> RuleGraph {
-    GraphMaker::new(tasks, root_param_types).full_graph()
-  }
-
   pub fn find_root_edges(&self, param_type: TypeId, select: Select) -> Option<RuleEdges> {
+    debug!("BL: find_root_edges with param_type {:?} and select {:?}", param_type, select);
     // TODO: Support more than one root parameter... needs some API work.
     //   see https://github.com/pantsbuild/pants/issues/6478
     let root = RootEntry {
@@ -920,9 +917,13 @@ impl RuleGraph {
       gets: vec![],
     };
     self
-      .rule_dependency_edges
-      .get(&EntryWithDeps::Root(root))
-      .cloned()
+        .rule_dependency_edges
+        .get(&EntryWithDeps::Root(root))
+        .cloned()
+  }
+
+  pub fn new(tasks: &Tasks, root_param_types: Vec<TypeId>) -> RuleGraph {
+    GraphMaker::new(tasks, root_param_types).full_graph()
   }
 
   ///

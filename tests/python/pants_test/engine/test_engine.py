@@ -8,10 +8,12 @@ import unittest
 from builtins import object, str
 from textwrap import dedent
 
+from pants.base.project_tree import Link
+from pants.engine.fs import Snapshot, UrlToFetch
 from pants.engine.rules import RootRule, TaskRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Select
-from pants.util.objects import datatype
+from pants.util.objects import datatype, Exactly
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 
@@ -50,6 +52,13 @@ def fib(n):
   x, y = yield Get(Fib, int(n-2)), Get(Fib, int(n-1))
   yield Fib(x.val + y.val)
 
+class WorkaroundSnapshot(datatype([('snapshot', Snapshot)])):
+  pass
+
+@rule(WorkaroundSnapshot, [Select(UrlToFetch)])
+def download(url):
+  s = yield Get(Snapshot, UrlToFetch, url)
+  yield
 
 class EngineTest(unittest.TestCase, SchedulerTestBase):
 
@@ -190,3 +199,12 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
       list(scheduler.product_request(A, subjects=[(B())]))
 
     self.assert_equal_with_printing('No installed rules can satisfy Select(A) for a root subject of type B.', str(cm.exception))
+
+  def test_download(self):
+    rules = [download]
+    # rules = []
+    scheduler = self.scheduler(rules, include_trace_on_error=True)
+    # print("BL: scheduler.".format(scheduler._scheduler._))
+    url = UrlToFetch("http://google.com")
+    snapshot, = scheduler.product_request(Snapshot, subjects=[url])
+    self.assert_equal_with_printing('a', str(snapshot))

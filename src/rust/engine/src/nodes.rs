@@ -181,6 +181,8 @@ impl Select {
       return future::ok(value.clone()).to_boxed();
     }
 
+    println!("BL: Select::gen_node with entry {:?}", &self.entry);
+
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
         .rule()

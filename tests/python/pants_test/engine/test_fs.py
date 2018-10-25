@@ -15,8 +15,8 @@ from future.utils import text_type
 
 from pants.base.project_tree import Dir, Link
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize,
-                             FilesContent, MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot,
-                             create_fs_rules)
+  FilesContent, MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot,
+  create_fs_rules, UrlToFetch)
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -471,3 +471,8 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
+
+  def test_download(self):
+    scheduler = self.mk_scheduler(rules=create_fs_rules())
+    snapshot = scheduler.product_request(Snapshot, subjects=[UrlToFetch("http://science-binaries.local.twitter.com/home/third_party/source/python/wheels/Babel-2.5.3-py2.py3-none-any.whl")])
+    assert(snapshot)

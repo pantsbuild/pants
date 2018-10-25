@@ -20,7 +20,7 @@ pub struct Task {
 ///
 /// Registry of native (rust) Intrinsic tasks, user (python) Tasks, and Singletons.
 ///
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Tasks {
   // output product type -> Intrinsic providing it
   intrinsics: HashMap<TypeConstraint, Vec<Intrinsic>, FNV>,
