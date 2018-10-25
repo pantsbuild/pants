@@ -16,23 +16,43 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
 
+  maxDiff = None
+
   def test_v2_list(self):
+    with self.pantsd_successful_run_context() as (runner, checker, workdir, pantsd_config):
+      v1_command = ['list',
+                    '::']
+
+      v1_res = runner(v1_command)
+      checker.assert_started()
+
+      v2_command = ['--no-v1',
+        '--v2',
+        'list',
+        '::']
+
+      v2_res = runner(v2_command)
+      checker.assert_started()
+
+      self.assertEqual(sorted(v1_res.stdout_data.splitlines()), sorted(v2_res.stdout_data.splitlines()))
+
+  def test_v2_list_does_not_cache(self):
     with self.pantsd_successful_run_context() as (runner, checker, workdir, pantsd_config):
       def run_list():
         command = ['--no-v1',
                    '--v2',
                    'list',
-                   '::',]
+                   'src/::',]
 
         result = runner(command)
         checker.assert_started()
         return result
 
-      first_run = run_list()
-      first_run_output_lines = first_run.stdout_data.splitlines()
+      # Warm the daemon
+      run_list()
       second_run = run_list()
       second_run_output_lines = second_run.stdout_data.splitlines()
-      self.assertEqual(first_run_output_lines, second_run_output_lines)
+      self.assertTrue(len(second_run_output_lines) > 1)
 
   @ensure_daemon
   def test_v2_goal_validation(self):
