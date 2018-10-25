@@ -7,14 +7,20 @@
 #
 
 
+from __future__ import print_function
+
 from collections import namedtuple
+from distutils.util import get_platform
 
-
-Package = namedtuple('PACKAGE', ['name', 'build_target', 'test_func', 'bdist_wheel_flags'])
+PackageInfo = namedtuple('PACKAGE', ['name', 'build_target', 'test_func', 'bdist_wheel_flags'])
 
 
 def to_be_implemented():
   raise NotImplemented
+
+
+def find_plat_name():
+  return get_platform().replace('-', '_').replace('.', '_')
 
 
 ### CORE ####
@@ -40,14 +46,14 @@ def to_be_implemented():
 #      == "${version}" ]] || die "Installed version of pants does match requested version!"
 # }
 
-PKG_PANTS = Package(
+PKG_PANTS = PackageInfo(
   "pantsbuild.pants",
   "//src/python/pants:pants-packaged",
   "pkg_pants_install_test",
 
   # Update the --python-tag in lockstep with other changes as described in
   #   https://github.com/pantsbuild/pants/issues/6450
-  "--python-tag cp27 --plat-name $(find_plat_name)",
+  "--python-tag cp27 --plat-name {}".format(find_plat_name()),
 )
 
 # PKG_PANTS_TESTINFRA=(
@@ -63,7 +69,7 @@ PKG_PANTS = Package(
 #   python -c "import pants_test"
 # }
 
-PKG_PANTS_TESTINFRA = Package(
+PKG_PANTS_TESTINFRA = PackageInfo(
   "pantsbuild.pants.testinfra",
   "//tests/python/pants_test:test_infra",
   to_be_implemented,
@@ -87,7 +93,7 @@ PKG_PANTS_TESTINFRA = Package(
 #     --explain lint | grep "thrift" &> /dev/null
 # }
 
-PKG_SCROOGE = Package(
+PKG_SCROOGE = PackageInfo(
   "pantsbuild.pants.contrib.scrooge",
   "//contrib/scrooge/src/python/pants/contrib/scrooge:plugin",
   "pkg_scrooge_install_test",
@@ -107,7 +113,7 @@ PKG_SCROOGE = Package(
 #   python -c "from pants.contrib.buildgen.build_file_manipulator import *"
 # }
 
-PKG_BUILDGEN = Package(
+PKG_BUILDGEN = PackageInfo(
   "pantsbuild.pants.contrib.buildgen",
   "//contrib/buildgen/src/python/pants/contrib/buildgen:plugin",
   "pkg_buildgen_install_test",
@@ -126,7 +132,7 @@ PKG_BUILDGEN = Package(
 #       --explain test | grep "GoTest_test_go" &> /dev/null
 # }
 
-PKG_GO = Package(
+PKG_GO = PackageInfo(
   "pantsbuild.pants.contrib.go",
   "//contrib/go/src/python/pants/contrib/go:plugin",
   "pkg_go_install_test",
@@ -145,7 +151,7 @@ PKG_GO = Package(
 #       --explain test | grep "NodeTest_test_node" &> /dev/null
 # }
 
-PKG_NODE = Package(
+PKG_NODE = PackageInfo(
   "pantsbuild.pants.contrib.node",
   "//contrib/node/src/python/pants/contrib/node:plugin",
   "pkg_node_install_test",
@@ -164,7 +170,7 @@ PKG_NODE = Package(
 #       --explain compile | grep "scala-js-link" &> /dev/null
 # }
 
-PKG_SCALAJS = Package(
+PKG_SCALAJS = PackageInfo(
   "pantsbuild.pants.contrib.scalajs",
   "//contrib/scalajs/src/python/pants/contrib/scalajs:plugin",
   "pkg_scalajs_install_test",
@@ -186,7 +192,7 @@ PKG_SCALAJS = Package(
 #     --explain lint | grep "pythonstyle" &> /dev/null
 # }
 
-PKG_PYTHON_CHECKS = Package(
+PKG_PYTHON_CHECKS = PackageInfo(
   "pantsbuild.pants.contrib.python.checks",
   "//contrib/python/src/python/pants/contrib/python/checks:plugin",
   "pkg_python_checks_install_test",
@@ -206,7 +212,7 @@ PKG_PYTHON_CHECKS = Package(
 #     -c checker -- --help
 # }
 
-PKG_PYTHON_CHECKS_CHECKER = Package(
+PKG_PYTHON_CHECKS_CHECKER = PackageInfo(
   "pantsbuild.pants.contrib.python.checks.checker",
   "//contrib/python/src/python/pants/contrib/python/checks/checker",
   "pkg_python_checks_checker_install_test",
@@ -225,7 +231,7 @@ PKG_PYTHON_CHECKS_CHECKER = Package(
 #       --explain compile | grep "findbugs" &> /dev/null
 # }
 
-PKG_FINDBUGS = Package(
+PKG_FINDBUGS = PackageInfo(
   "pantsbuild.pants.contrib.findbugs",
   "//contrib/findbugs/src/python/pants/contrib/findbugs:plugin",
   "pkg_findbugs_install_test",
@@ -244,7 +250,7 @@ PKG_FINDBUGS = Package(
 #       --explain compile | grep "cpp" &> /dev/null
 # }
 
-PKG_CPP = Package(
+PKG_CPP = PackageInfo(
   "pantsbuild.pants.contrib.cpp",
   "//contrib/cpp/src/python/pants/contrib/cpp:plugin",
   "pkg_cpp_install_test",
@@ -263,7 +269,7 @@ PKG_CPP = Package(
 #       --explain confluence | grep "ConfluencePublish_confluence" &> /dev/null
 # }
 
-PKG_CONFLUENCE = Package(
+PKG_CONFLUENCE = PackageInfo(
   "pantsbuild.pants.contrib.confluence",
   "//contrib/confluence/src/python/pants/contrib/confluence:plugin",
   "pkg_confluence_install_test",
@@ -282,7 +288,7 @@ PKG_CONFLUENCE = Package(
 #       --explain compile | grep "errorprone" &> /dev/null
 # }
 
-PKG_ERRORPRONE = Package(
+PKG_ERRORPRONE = PackageInfo(
   "pantsbuild.pants.contrib.errorprone",
   "//contrib/errorprone/src/python/pants/contrib/errorprone:plugin",
   "pkg_errorprone_install_test",
@@ -300,7 +306,7 @@ PKG_ERRORPRONE = Package(
 #       --plugins="['pantsbuild.pants.contrib.codeanalysis==${version}']" \
 #       --explain index | grep "kythe" &> /dev/null
 # }
-PKG_CODEANALYSIS = Package(
+PKG_CODEANALYSIS = PackageInfo(
   "pantsbuild.pants.contrib.codeanalysis",
   "//contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin",
   "pkg_codeanalysis_install_test",
@@ -323,7 +329,7 @@ PKG_CODEANALYSIS = Package(
 #       targets | grep "jax_ws_library" &> /dev/null
 # }
 
-PKG_JAXWS = Package(
+PKG_JAXWS = PackageInfo(
   "pantsbuild.pants.contrib.jax_ws",
   "//contrib/jax_ws/src/python/pants/contrib/jax_ws:plugin",
   "pkg_jax_ws_install_test",
@@ -342,7 +348,7 @@ PKG_JAXWS = Package(
 #     --explain mypy &> /dev/null
 # }
 
-PKG_MYPY = Package(
+PKG_MYPY = PackageInfo(
   "pantsbuild.pants.contrib.mypy",
   "//contrib/mypy/src/python/pants/contrib/mypy:plugin",
   "pkg_mypy_install_test",
@@ -361,7 +367,7 @@ PKG_MYPY = Package(
 #     --explain gen | grep "avro-java" &> /dev/null
 # }
 
-PKG_AVRO = Package(
+PKG_AVRO = PackageInfo(
   "pantsbuild.pants.contrib.avro",
   "//contrib/avro/src/python/pants/contrib/avro:plugin",
   "pkg_avro_install_test",
@@ -379,7 +385,7 @@ PKG_AVRO = Package(
 #     --plugins="['pantsbuild.pants.contrib.thrifty==${version}']" \
 #     --explain gen | grep "thrifty" &> /dev/null
 # }
-PKG_THRIFTY = Package(
+PKG_THRIFTY = PackageInfo(
   "pantsbuild.pants.contrib.thrifty",
   "//contrib/thrifty/src/python/pants/contrib/thrifty:plugin",
   "pkg_thrifty_install_test",
@@ -401,7 +407,7 @@ PKG_THRIFTY = Package(
 #     --explain lint | grep "google-java-format" &> /dev/null
 # }
 
-PKG_GOOGLEJAVAFORMAT = Package(
+PKG_GOOGLEJAVAFORMAT = PackageInfo(
   "pantsbuild.pants.contrib.googlejavaformat",
   "//contrib/googlejavaformat/src/python/pants/contrib/googlejavaformat:plugin",
   "pkg_googlejavaformat_install_test",
@@ -428,3 +434,6 @@ CONTRIB_PACKAGES = [
   PKG_THRIFTY,
   PKG_GOOGLEJAVAFORMAT,
 ]
+
+CORE_PACKAGES = [PKG_PANTS, PKG_PANTS_TESTINFRA]
+RELEASE_PACKAGES = CORE_PACKAGES + CONTRIB_PACKAGES
