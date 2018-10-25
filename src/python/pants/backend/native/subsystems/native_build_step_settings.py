@@ -11,9 +11,9 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
 
-class NativeBuildStepSettingsBase(Subsystem, MirroredTargetOptionMixin):
+class NativeBuildStepSettings(Subsystem, MirroredTargetOptionMixin):
 
-  options_scope = 'native-build-step-settings-base'
+  options_scope = 'native-build-step-settings'
 
   mirrored_option_to_kwarg_map = {
     'fatal_warnings': 'fatal_warnings',
@@ -22,7 +22,7 @@ class NativeBuildStepSettingsBase(Subsystem, MirroredTargetOptionMixin):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(NativeBuildStepSettingsBase, cls).subsystem_dependencies() + (
+    return super(NativeBuildStepSettings, cls).subsystem_dependencies() + (
       NativeBuildSettings.scoped(cls),
     )
 
@@ -32,7 +32,7 @@ class NativeBuildStepSettingsBase(Subsystem, MirroredTargetOptionMixin):
 
   @classmethod
   def register_options(cls, register):
-    super(NativeBuildStepSettingsBase, cls).register_options(register)
+    super(NativeBuildStepSettings, cls).register_options(register)
 
     # TODO: Deprecate `--fatal-warnings` in a follow-up revision.
     register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
@@ -45,24 +45,26 @@ class NativeBuildStepSettingsBase(Subsystem, MirroredTargetOptionMixin):
   def get_fatal_warnings_value_for_target(self, target):
     return self.get_target_mirrored_option('fatal_warnings', target)
 
-  def get_merged_compiler_options_for_target(self, target, opt_set_enabled_dicts, opt_set_disabled_dicts):
-    """Merge compiler option sets for a native target into a list of compiler flags."""
+  def get_merged_compiler_options_for_target(self, target):
+    """Merge compiler option sets for a native target into a list of compiler flags.
+
+    :param target: a `NativeLibrary` target that may set a compiler_option_sets argument.
+    :returns: compiler_options: a list of compiler flags as individual strings.
+    """
     compiler_option_sets = self._native_build_settings.get_target_mirrored_option(
         'compiler_option_sets', target)
     compiler_options = set()
 
     # Set values for enabled options.
     for opt_set_key in compiler_option_sets:
-      for osed in (opt_set_enabled_dicts + [self.get_options().compiler_option_sets_enabled_args]):
-        val = osed.get(opt_set_key)
-        if val:
-          compiler_options.update(val)
+      val = self.get_options().compiler_option_sets_enabled_args.get(opt_set_key)
+      if val:
+        compiler_options.update(val)
 
     # Set values for disabled options.
-    for osdd in (opt_set_disabled_dicts + [self.get_options().compiler_option_sets_disabled_args]):
-      for opt_set_key, opt_value in osdd.items():
-        if not opt_set_key in compiler_option_sets:
-          compiler_options.update(opt_value)
+    for opt_set_key, opt_value in self.get_options().compiler_option_sets_disabled_args.items():
+      if not opt_set_key in compiler_option_sets:
+        compiler_options.update(opt_value)
 
     compiler_options = list(compiler_options)
     return compiler_options
@@ -74,20 +76,12 @@ class CCompileSettings(Subsystem):
   @classmethod
   def subsystem_dependencies(cls):
     return super(CCompileSettings, cls).subsystem_dependencies() + (
-      NativeBuildStepSettingsBase.scoped(cls),
+      NativeBuildStepSettings.scoped(cls),
     )
 
-  @classmethod
-  def register_options(cls, register):
-    super(CCompileSettings, cls).register_options(register)
-    register('--compiler-option-sets-enabled-args', advanced=True, type=dict, fingerprint=True,
-             default={}, help='Extra compiler args to use for each enabled option set.')
-    register('--compiler-option-sets-disabled-args', advanced=True, type=dict, fingerprint=True,
-             default={}, help='Extra compiler args to use for each disabled option set.')
-
   @memoized_property
-  def _native_build_step_settings_base(self):
-    return NativeBuildStepSettingsBase.scoped_instance(self)
+  def _native_build_step_settings(self):
+    return NativeBuildStepSettings.scoped_instance(self)
 
 
 class CppCompileSettings(Subsystem):
@@ -96,22 +90,14 @@ class CppCompileSettings(Subsystem):
   @classmethod
   def subsystem_dependencies(cls):
     return super(CppCompileSettings, cls).subsystem_dependencies() + (
-      NativeBuildStepSettingsBase.scoped(cls),
+      NativeBuildStepSettings.scoped(cls),
     )
 
-  @classmethod
-  def register_options(cls, register):
-    super(CppCompileSettings, cls).register_options(register)
-    register('--compiler-option-sets-enabled-args', advanced=True, type=dict, fingerprint=True,
-             default={}, help='Extra compiler args to use for each enabled option set.')
-    register('--compiler-option-sets-disabled-args', advanced=True, type=dict, fingerprint=True,
-             default={}, help='Extra compiler args to use for each disabled option set.')
-
   @memoized_property
-  def _native_build_step_settings_base(self):
-    return NativeBuildStepSettingsBase.scoped_instance(self)
+  def _native_build_step_settings(self):
+    return NativeBuildStepSettings.scoped_instance(self)
 
 
 # TODO: add a fatal_warnings kwarg to NativeArtifact and make a LinkSharedLibrariesSettings subclass
-# of NativeBuildStepSettingsBase here! The method should work even though NativeArtifact is not a
+# of NativeBuildStepSettings here! The method should work even though NativeArtifact is not a
 # Target.

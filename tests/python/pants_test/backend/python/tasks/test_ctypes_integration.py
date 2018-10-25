@@ -160,18 +160,13 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       self._binary_target_with_compiler_option_sets
     ]
     pants_run = self.run_pants(command=command, config={
-      'cpp-compile-settings': {
+      'native-build-step-settings.cpp-compile-settings': {
         'compiler_option_sets_enabled_args': {
           'ndebug': ['-DNDEBUG'],
           'glibcxx_use_cxx11_abi': ['-D_GLIBCXX_USE_CXX11_ABI=1'],
         },
         'compiler_option_sets_disabled_args': {
           'glibcxx_use_cxx11_abi': ['-D_GLIBCXX_USE_CXX11_ABI=0'],
-        }
-      },
-      'native-build-step-settings-base': {
-        'compiler_option_sets_enabled_args': {
-          'ndebug': ['-DNDEBUG'],
         }
       },
     })
