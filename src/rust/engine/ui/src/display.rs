@@ -77,14 +77,14 @@ impl EngineDisplay {
   }
 
   fn initialize(&mut self, display_worker_count: usize) {
-      self.start();
-      let worker_ids: Vec<String> = (0..display_worker_count)
-        .map(|s| format!("{}", s))
-        .collect();
-      for worker_id in worker_ids {
-        self.add_worker(worker_id);
-      }
-      self.render();
+    self.start();
+    let worker_ids: Vec<String> = (0..display_worker_count)
+      .map(|s| format!("{}", s))
+      .collect();
+    for worker_id in worker_ids {
+      self.add_worker(worker_id);
+    }
+    self.render();
   }
 
   pub fn for_stdout(indent_level: u16) -> EngineDisplay {
@@ -96,9 +96,9 @@ impl EngineDisplay {
       poll_interval_ms: Duration::from_millis(55),
       padding: " ".repeat(indent_level.into()),
       terminal: match write_handle.into_raw_mode() {
-          Ok(t) => Console::Terminal(t),
-          Err(_) => Console::Pipe(stdout()),
-        },
+        Ok(t) => Console::Terminal(t),
+        Err(_) => Console::Pipe(stdout()),
+      },
       action_map: BTreeMap::new(),
       // This is arbitrary based on a guesstimated peak terminal row size for modern displays.
       // The reason this can't be capped to e.g. the starting size is because of resizing - we
