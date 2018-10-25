@@ -1,5 +1,6 @@
-#!/usr/bin/env bash
-
+# Original definition from contrib/release_packages.sh
+# Copied here for reference
+# TODO(yic): test_func parameter is not working now.
 #
 # List of contrib packages to be released
 # See build-support/README.md for more information on the format of each
@@ -72,7 +73,7 @@ PKG_PANTS = PackageInfo(
 PKG_PANTS_TESTINFRA = PackageInfo(
   "pantsbuild.pants.testinfra",
   "//tests/python/pants_test:test_infra",
-  to_be_implemented,
+  "pkg_pants_testinfra_install_test",
   None
 )
 

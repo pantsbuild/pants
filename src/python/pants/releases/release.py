@@ -66,7 +66,7 @@ class Releaser(object):
     # Fetching the wheels in parallel
     # It is okay to have some interleaving outputs from the fetcher,
     # because we are summarizing things in the end.
-    fetcher = Fetcher(os.getcwd())
+    fetcher = Fetcher(self.ROOT)
     checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
     futures = []
     with ThreadPoolExecutor(max_workers=8) as executor:
@@ -91,8 +91,9 @@ class Releaser(object):
     if fail:
       raise fetcher.Error()
 
+  @classmethod
   @contextmanager
-  def temporary_version(self, new_version):
+  def temporary_pants_version(cls, new_version):
     """
       A with-context that changes Pants version temporarily.
     """
@@ -104,7 +105,7 @@ class Releaser(object):
         f.write(new_version + '\n')
         f.truncate()
         f.flush()
-        yield
+        yield f
       finally:
         f.seek(0)
         f.write(previous_version)
@@ -112,7 +113,7 @@ class Releaser(object):
 
   def build_pants_packages(self, version, deploy_pants_wheel_dir, release_packages):
 
-    with self.temporary_version(version):
+    with self.temporary_pants_version(version):
       # Sanity check the packages to be built
       packages = release_packages.split()
       assert len(packages) == len(RELEASE_PACKAGES)
@@ -121,20 +122,31 @@ class Releaser(object):
         args = [
           './pants',
           'setup-py',
-          '--run=bdist_wheel {}'.format(package.bdist_wheel_flags if package.bdist_wheel_flags else '--python-tag py27'),
+          '--run=bdist_wheel {}'.format(
+            package.bdist_wheel_flags if package.bdist_wheel_flags else '--python-tag py27'),
           package.build_target]
         logger.info('Building {}'.format(package.name))
         logger.info(' '.join("'{}'".format(a) for a in args))
         subprocess.check_output(args)
-        logger.info(self._find_pkg(pkg_name=package.name, version=version, search_dir=os.path.join(os.getcwd(), 'dist')))
-        break
+
+        built_wheel = self._find_pkg(pkg_name=package.name, version=version,
+                                     search_dir=os.path.join(self.ROOT, 'dist'))
+
+        self._cp_built_wheels_to_wheels_dir(built_wheel,
+                                            os.path.join(deploy_pants_wheel_dir, version))
+
+  @classmethod
+  def _cp_built_wheels_to_wheels_dir(cls, built_wheel,final_wheel_location):
+    args = ['cp', '-p', built_wheel, final_wheel_location]
+    subprocess.check_output(args)
 
   def _find_pkg(self, pkg_name, version, search_dir):
     args = ['find', search_dir, '-type', 'f', '-name', '{}-{}-*.whl'.format(pkg_name, version)]
-    print(' '.join(args))
-    output = subprocess.check_output(
-      args)
-    return output.splitlines()
+    output = subprocess.check_output(args)
+    lines = output.splitlines()
+    if len(lines) != 1:
+      raise ValueError("Exactly one wheel is expected to be found, but found: {}".format(lines))
+    return lines[0]
 
   def _download(self, fetcher, checksummer, url, dest):
     with open(dest, 'wb') as file_path:
