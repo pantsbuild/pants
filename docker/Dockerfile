@@ -22,7 +22,7 @@ RUN ./pants clean-all
 
 RUN mkdir /results
 
-COPY entrypoint.sh .
+COPY run_python3_tests.sh entrypoint.sh
 RUN chmod +x entrypoint.sh
 
 ENTRYPOINT ./entrypoint.sh
