@@ -9,6 +9,8 @@ import logging
 import os
 import urllib
 import xml.etree.ElementTree as ET
+from contextlib import contextmanager
+
 from builtins import open
 
 import fire
@@ -29,6 +31,8 @@ logger.setLevel(logging.INFO)
 class Releaser(object):
 
   OUTPUT_DELIMITER = '\t'
+  ROOT = os.getcwd()
+  VERSION_FILE = "{}/src/python/pants/VERSION".format(ROOT)
 
   def list_prebuilt_wheels(self, binary_base_url, deploy_pants_wheels_path,
                            deploy_3rdparty_wheels_path):
@@ -87,20 +91,50 @@ class Releaser(object):
     if fail:
       raise fetcher.Error()
 
+  @contextmanager
+  def temporary_version(self, new_version):
+    """
+      A with-context that changes Pants version temporarily.
+    """
+
+    with open(Releaser.VERSION_FILE, 'r+') as f:
+      previous_version = f.read()
+      try:
+        f.seek(0)
+        f.write(new_version + '\n')
+        f.flush()
+        yield
+      finally:
+        f.seek(0)
+        f.write(previous_version)
+
   def build_pants_packages(self, version, deploy_pants_wheel_dir, release_packages):
-    # Sanity check the packages to be built
-    packages = release_packages.split()
-    assert len(packages) == len(RELEASE_PACKAGES)
-    logger.info('Going to build:\n{}'.format('\n'.join(p.name for p in RELEASE_PACKAGES)))
-    for package in RELEASE_PACKAGES:
-      args = [
-        './pants',
-        'setup-py',
-        '--run=bdist_wheel {}'.format(package.bdist_wheel_flags if package.bdist_wheel_flags else '--python-tag py27'),
-        package.build_target]
-      logger.info('Building {}'.format(package.name))
-      logger.info(' '.join("'{}'".format(a) for a in args))
-      subprocess.check_output(args)
+
+    with self.temporary_version(version):
+      import pdb
+      pdb.set_trace()
+      # Sanity check the packages to be built
+      packages = release_packages.split()
+      assert len(packages) == len(RELEASE_PACKAGES)
+      logger.info('Going to build:\n{}'.format('\n'.join(p.name for p in RELEASE_PACKAGES)))
+      for package in RELEASE_PACKAGES:
+        args = [
+          './pants',
+          'setup-py',
+          '--run=bdist_wheel {}'.format(package.bdist_wheel_flags if package.bdist_wheel_flags else '--python-tag py27'),
+          package.build_target]
+        logger.info('Building {}'.format(package.name))
+        logger.info(' '.join("'{}'".format(a) for a in args))
+        subprocess.check_output(args)
+        logger.info(self._find_pkg(pkg_name=package.name, version=version, search_dir=os.path.join(os.getcwd(), 'dist')))
+        break
+
+  def _find_pkg(self, pkg_name, version, search_dir):
+    args = ['find', search_dir, '-type', 'f', '-name', '{}-{}-*.whl'.format(pkg_name, version)]
+    print(' '.join(args))
+    output = subprocess.check_output(
+      args)
+    return output.splitlines()
 
   def _download(self, fetcher, checksummer, url, dest):
     with open(dest, 'wb') as file_path:

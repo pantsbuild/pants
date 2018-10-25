@@ -26,6 +26,7 @@ python_binary(
   name = 'release',
   source = 'release.py',
   dependencies = [
+    ':pkg_const',
     '3rdparty/python:configparser',
     '3rdparty/python:fire',
     '3rdparty/python:future',
@@ -34,4 +35,9 @@ python_binary(
     'src/python/pants/util:process_handler',
     'src/python/pants/util:contextutil',
   ],
+)
+
+python_library(
+  name = 'pkg_const',
+  sources = ['package_constants.py']
 )
