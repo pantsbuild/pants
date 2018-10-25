@@ -57,7 +57,6 @@ pub struct EngineDisplay {
   action_map: BTreeMap<String, String>,
   logs: VecDeque<String>,
   running: bool,
-  is_tty: bool,
   cursor_start: (u16, u16),
   terminal_size: (u16, u16),
 }
@@ -66,8 +65,9 @@ pub struct EngineDisplay {
 // TODO: Better error handling for .flush() and .write() failure modes.
 // TODO: Permit scrollback in the terminal - both at exit and during the live run.
 impl EngineDisplay {
+  /// Create a EngineDisplay only if stdout is tty and v2 ui is enabled.
   pub fn create(display_worker_count: usize, should_render_ui: bool) -> Option<EngineDisplay> {
-    if should_render_ui {
+    if should_render_ui && termion::is_tty(&stdout()) {
       let mut display = EngineDisplay::for_stdout(0);
       display.initialize(display_worker_count);
       Some(display)
@@ -89,28 +89,22 @@ impl EngineDisplay {
 
   pub fn for_stdout(indent_level: u16) -> EngineDisplay {
     let write_handle = stdout();
-    let is_tty = termion::is_tty(&write_handle);
 
     EngineDisplay {
       sigil: '⚡',
       divider: "▵".to_string(),
       poll_interval_ms: Duration::from_millis(55),
       padding: " ".repeat(indent_level.into()),
-      terminal: if is_tty {
-        match write_handle.into_raw_mode() {
+      terminal: match write_handle.into_raw_mode() {
           Ok(t) => Console::Terminal(t),
           Err(_) => Console::Pipe(stdout()),
-        }
-      } else {
-        Console::Pipe(write_handle)
-      },
+        },
       action_map: BTreeMap::new(),
       // This is arbitrary based on a guesstimated peak terminal row size for modern displays.
       // The reason this can't be capped to e.g. the starting size is because of resizing - we
       // want to be able to fill the entire screen if resized much larger than when we started.
       logs: VecDeque::with_capacity(500),
       running: false,
-      is_tty: is_tty,
       // N.B. This will cause the screen to clear - but with some improved position
       // tracking logic we could avoid screen clearing in favor of using the value
       // of `EngineDisplay::get_cursor_pos()` as initialization here. From there, the
@@ -263,11 +257,6 @@ impl EngineDisplay {
     }
   }
 
-  fn render_for_pipe(&self) {
-    // TODO: Handle non-tty output w polling interval adjustment + summary rendering.
-    // Nothing needs to be printed to pipe by default.
-  }
-
   // Paints one screen of rendering.
   fn render_for_tty(&mut self) {
     self.set_size();
@@ -280,12 +269,7 @@ impl EngineDisplay {
 
   // Paints one screen of rendering.
   pub fn render(&mut self) {
-    // TODO: Split this fork out into sub-types of EngineDisplay.
-    if self.is_tty {
-      self.render_for_tty()
-    } else {
-      self.render_for_pipe()
-    }
+    self.render_for_tty()
   }
 
   // Paints one screen of rendering and sleeps for the poll interval.
@@ -334,10 +318,6 @@ impl EngineDisplay {
 
   // Terminates the EngineDisplay and returns the cursor to a static position.
   pub fn finish(&mut self) {
-    // Don't do anything if it's not tty.
-    if !self.is_tty {
-      return;
-    }
     self.running = false;
     let current_pos = self.get_cursor_pos();
     let action_count = self.action_map.len() as u16;
