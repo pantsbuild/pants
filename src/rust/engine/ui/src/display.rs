@@ -78,7 +78,6 @@ impl EngineDisplay {
 
   fn initialize(&mut self, display_worker_count: usize) {
       self.start();
-      self.render();
       let worker_ids: Vec<String> = (0..display_worker_count)
         .map(|s| format!("{}", s))
         .collect();
@@ -327,6 +326,10 @@ impl EngineDisplay {
   // Adds a log entry for display.
   pub fn log(&mut self, log_entry: String) {
     self.logs.push_front(log_entry)
+  }
+
+  pub fn worker_count(&self) -> usize {
+    self.action_map.len()
   }
 
   // Terminates the EngineDisplay and returns the cursor to a static position.
