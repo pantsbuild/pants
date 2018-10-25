@@ -69,12 +69,20 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       self.assert_pex_attribute(test_pex, 'zip_safe', True)
 
   def test_platforms(self):
+    """Ensure that changing platforms invalidates the generated pex binaries."""
+
+    def numpy_deps(deps):
+      return [d for d in deps if 'numpy' in d]
+    def assertInAny(substring, collection):
+      self.assertTrue(any(substring in d for d in collection),
+        'Expected an entry matching "{}" in {}'.format(substring, collection))
+    def assertNotInAny(substring, collection):
+      self.assertTrue(all(substring not in d for d in collection),
+        'Expected an entry matching "{}" in {}'.format(substring, collection))
     test_project = 'testprojects/src/python/cache_fields'
     test_build = os.path.join(test_project, 'BUILD')
     test_src = os.path.join(test_project, 'main.py')
     test_pex = 'dist/cache_fields.pex'
-    numpy_manylinux_dep = '.deps/numpy-1.14.5-cp27-cp27m-manylinux1_x86_64.whl/numpy/__init__.py'
-    numpy_macos_dep = '.deps/numpy-1.14.5-cp27-cp27m-macosx_10_6_intel.macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64.whl/numpy/__init__.py'
 
     with self.caching_config() as config, self.mock_buildroot() as buildroot, buildroot.pushd():
       config['python-setup'] = {
@@ -108,13 +116,9 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       build()
 
       with open_zip(test_pex) as z:
-        namelist = z.namelist()
-        self.assertIn(
-          numpy_manylinux_dep,
-          namelist)
-        self.assertNotIn(
-          numpy_macos_dep,
-          namelist)
+        deps = numpy_deps(z.namelist())
+        assertInAny('manylinux', deps)
+        assertNotInAny('macosx', deps)
 
       # When both linux and macosx platforms are requested,
       # wheels for both should end up in the pex.
@@ -124,10 +128,6 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       build()
 
       with open_zip(test_pex) as z:
-        namelist = z.namelist()
-        self.assertIn(
-          numpy_manylinux_dep,
-          namelist)
-        self.assertIn(
-          numpy_macos_dep,
-          namelist)
+        deps = numpy_deps(z.namelist())
+        assertInAny('manylinux', deps)
+        assertInAny('macosx', deps)
