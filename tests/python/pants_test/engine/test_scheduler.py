@@ -52,7 +52,7 @@ class SchedulerTraceTest(unittest.TestCase):
 
     assert_equal_with_printing(self, dedent('''
                      Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, =A)
-                       Computing Task(nested_raise, <pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, =A)
+                       Computing Task(nested_raise, <pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, =A, true)
                          Throw(An exception for B)
                            Traceback (most recent call last):
                              File LOCATION-INFO, in call
