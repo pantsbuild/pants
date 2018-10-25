@@ -908,7 +908,6 @@ fn task_display(task: &Task) -> String {
 
 impl RuleGraph {
   pub fn find_root_edges(&self, param_type: TypeId, select: Select) -> Option<RuleEdges> {
-    //    debug!("BL: find_root_edges with param_type {:?} and select {:?}", param_type, select);
     // TODO: Support more than one root parameter... needs some API work.
     //   see https://github.com/pantsbuild/pants/issues/6478
     let root = RootEntry {

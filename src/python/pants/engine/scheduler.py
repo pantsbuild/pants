@@ -294,7 +294,6 @@ class Scheduler(object):
     return self._native.lib.graph_len(self._scheduler)
 
   def add_root_selection(self, execution_request, subject, product):
-    # print("BL: PY add_root_selection with subject {}, product {}".format(subject, product))
     res = self._native.lib.execution_add_root_select(self._scheduler,
                                                      execution_request,
                                                      self._to_key(subject),
