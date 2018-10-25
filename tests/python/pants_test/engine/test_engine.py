@@ -112,7 +112,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
-        Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
+        Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A, true)
           Throw(An exception for B)
             Traceback (most recent call last):
               File LOCATION-INFO, in call
@@ -150,8 +150,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
-        Computing Task(A, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
-          Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D)
+        Computing Task(A, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A, true)
+          Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
@@ -164,8 +164,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
 
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
-        Computing Task(A, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
-          Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C)
+        Computing Task(A, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A, true)
+          Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call

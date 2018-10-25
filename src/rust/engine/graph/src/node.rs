@@ -36,6 +36,11 @@ pub trait Node: Clone + Debug + Eq + Hash + Send + 'static {
   /// If the given Node output represents an FS operation, returns its Digest.
   ///
   fn digest(result: Self::Item) -> Option<Digest>;
+
+  ///
+  /// If the node result is cacheable, return true.
+  ///
+  fn cacheable(&self) -> bool;
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send {

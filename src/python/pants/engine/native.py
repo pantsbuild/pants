@@ -168,7 +168,7 @@ Key key_for(Handle);
 Handle val_for(Key);
 
 Tasks* tasks_create(void);
-void tasks_task_begin(Tasks*, Function, TypeConstraint);
+void tasks_task_begin(Tasks*, Function, TypeConstraint, _Bool);
 void tasks_add_get(Tasks*, TypeConstraint, TypeId);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_task_end(Tasks*);

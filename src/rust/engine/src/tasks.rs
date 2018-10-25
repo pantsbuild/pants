@@ -125,14 +125,14 @@ impl Tasks {
   ///
   /// The following methods define the Task registration lifecycle.
   ///
-  pub fn task_begin(&mut self, func: Function, product: TypeConstraint) {
+  pub fn task_begin(&mut self, func: Function, product: TypeConstraint, cacheable: bool) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
     );
 
     self.preparing = Some(Task {
-      cacheable: true,
+      cacheable: cacheable,
       product: product,
       clause: Vec::new(),
       gets: Vec::new(),

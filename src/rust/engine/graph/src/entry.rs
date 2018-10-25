@@ -52,6 +52,7 @@ impl Generation {
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
+#[derive(Debug)]
 pub(crate) enum EntryState<N: Node> {
   // A node that has either been explicitly cleared, or has not yet started Running. In this state
   // there is no need for a dirty bit because the RunToken is either in its initial state, or has
@@ -122,7 +123,7 @@ impl<N: Node> EntryKey<N> {
 ///
 /// An Entry and its adjacencies.
 ///
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Entry<N: Node> {
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
@@ -243,7 +244,7 @@ impl<N: Node> Entry<N> {
           start_time: Instant::now(),
           run_token,
           generation,
-          previous_result,
+          previous_result: previous_result,
           dirty: false,
         }
       }
@@ -295,7 +296,7 @@ impl<N: Node> Entry<N> {
           dirty,
           ..
         }
-          if !dirty =>
+          if !dirty && self.node.content().cacheable() =>
         {
           return future::result(result.clone())
             .map(move |res| (res, generation))
@@ -329,21 +330,32 @@ impl<N: Node> Entry<N> {
           dirty,
         } => {
           assert!(
-            dirty,
+            dirty || !self.node.content().cacheable(),
             "A clean Node should not reach this point: {:?}",
             result
           );
           // The Node has already completed but is now marked dirty. This indicates that we are the
           // first caller to request it since it was marked dirty. We attempt to clean it (which will
           // cause it to re-run if the dep_generations mismatch).
+          // Note that if the node is uncacheable, we avoid storing a previous result, which will
+          // transitively invalidate every node that depends on us. This works because, in practice,
+          // the only uncacheable nodes are Select nodes and @console_rule Task nodes. See #6146 and #6598
           Self::run(
             context,
             &self.node,
             entry_id,
             run_token,
             generation,
-            Some(dep_generations),
-            Some(result),
+            if self.node.content().cacheable() {
+              Some(dep_generations)
+            } else {
+              None
+            },
+            if self.node.content().cacheable() {
+              Some(result)
+            } else {
+              None
+            },
           )
         }
         EntryState::Running { .. } => {
