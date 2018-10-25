@@ -82,18 +82,15 @@ class RscCompileContext(CompileContext):
                log_dir,
                zinc_args_file,
                sources,
-               rsc_index_dir,
-               rsc_outline_dir):
+               rsc_index_dir):
     super(RscCompileContext, self).__init__(target, analysis_file, classes_dir, jar_file,
                                                log_dir, zinc_args_file, sources)
     self.rsc_mjar_file = rsc_mjar_file
     self.rsc_index_dir = rsc_index_dir
-    self.rsc_outline_dir = rsc_outline_dir
 
   def ensure_output_dirs_exist(self):
     safe_mkdir(os.path.dirname(self.rsc_mjar_file))
     safe_mkdir(self.rsc_index_dir)
-    safe_mkdir(self.rsc_outline_dir)
 
 
 class RscCompile(ZincCompile):
@@ -687,7 +684,6 @@ class RscCompile(ZincCompile):
         log_dir=os.path.join(rsc_dir, 'logs'),
         sources=sources,
         rsc_index_dir=os.path.join(rsc_dir, 'index'),
-        rsc_outline_dir=os.path.join(rsc_dir, 'outline'),
       ),
       CompileContext(
         target=target,
