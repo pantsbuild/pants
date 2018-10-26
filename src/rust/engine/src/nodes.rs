@@ -674,12 +674,15 @@ impl WrappedNode for DownloadedFile {
     let url = try_future!(
       Url::parse(&url_to_fetch).map_err(|err| throw(&format!("Error parsing URL: {}", err)))
     );
+
     let file_name = url
       .path_segments()
-      .expect("TODO")
-      .last()
-      .expect("TODO")
-      .to_owned();
+      .and_then(|ps| ps.last())
+      .map(|f| f.to_owned())
+      .expect(&format!(
+        "Error getting the file name from the parsed URL: {}",
+        url_to_fetch
+      ));
 
     let tempdir = try_future!(
       tempfile::TempDir::new()
@@ -693,40 +696,45 @@ impl WrappedNode for DownloadedFile {
         .get(url)
         .send()
         .map_err(|err| throw(&format!("Error downloading file: {}", err)))
-        .and_then(|response| if response.status().is_server_error() {
-          Err(throw(&format!(
-            "Server error ({}) downloading file {} from {}",
-            response.status().as_str(),
-            file_name,
-            url_to_fetch,
-          )))
-        } else if response.status().is_client_error() {
-          Err(throw(&format!(
-            "Client error ({}) downloading file {} from {}",
-            response.status().as_str(),
-            file_name,
-            url_to_fetch,
-          )))
-        } else {
-          Ok(response)
+        .and_then(|response| {
+          // Handle common HTTP errors.
+          if response.status().is_server_error() {
+            Err(throw(&format!(
+              "Server error ({}) downloading file {} from {}",
+              response.status().as_str(),
+              file_name,
+              url_to_fetch,
+            )))
+          } else if response.status().is_client_error() {
+            Err(throw(&format!(
+              "Client error ({}) downloading file {} from {}",
+              response.status().as_str(),
+              file_name,
+              url_to_fetch,
+            )))
+          } else {
+            Ok(response)
+          }
+        }).and_then(|mut response| {
+          // Copy the contents of response into a file and modify its permissions.
+          let temp_file_path = tempdir.path().join(&file_name);
+          std::fs::File::create(&temp_file_path)
+            .and_then(|mut file| std::io::copy(&mut response, &mut file).map(|_| file))
+            .and_then(|file| {
+              use std::os::unix::fs::PermissionsExt;
+              std::fs::metadata(temp_file_path).and_then(|metadata| {
+                let mut permissions = metadata.permissions();
+                permissions.set_mode(0o755);
+                file.set_permissions(permissions)
+              })
+            }).map_err(|err| {
+              throw(&format!(
+                "Error copying the downloaded file to disk: {}",
+                err
+              ))
+            })
         })
     );
-
-    {
-      let temp_file_path = tempdir.path().join(&file_name);
-      let mut file = std::fs::File::create(&temp_file_path).expect("TODO");
-      try_future!(
-        std::io::copy(&mut response, &mut file)
-          .map_err(|err| throw(&format!("Error writing downloaded file: {}", err)))
-      );
-
-      use std::os::unix::fs::PermissionsExt;
-      let mut permissions = std::fs::metadata(temp_file_path)
-        .expect("TODO")
-        .permissions();
-      permissions.set_mode(0o755);
-      file.set_permissions(permissions).expect("TODO");
-    }
 
     fs::Snapshot::capture_snapshot_from_arbitrary_root(
       context.core.store(),
