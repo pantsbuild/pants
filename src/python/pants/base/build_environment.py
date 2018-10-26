@@ -24,7 +24,7 @@ def pants_version():
 
 def pants_release():
   """Returns a user-friendly release label."""
-  return ('Pants {version} https://pypi.python.org/pypi/pantsbuild.pants/{version}'
+  return ('Pants {version} https://pypi.org/pypi/pantsbuild.pants/{version}'
           .format(version=pants_version()))
 
 
