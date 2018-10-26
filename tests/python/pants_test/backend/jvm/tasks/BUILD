@@ -80,6 +80,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
   ],
+  timeout=180,
   tags = {'integration'},
 )
 
