@@ -29,7 +29,7 @@ def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
   :param str name: The name of the package.
   :param str description: A brief description of what the package provides.
   :param list additional_classifiers: Any additional trove classifiers that apply to the package,
-                                      see: https://pypi.python.org/pypi?%3Aaction=list_classifiers
+                                      see: https://pypi.org/pypi?%3Aaction=list_classifiers
   :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
                  <https://pythonhosted.org/setuptools/setuptools.html>`_.
   :returns: A setup_py suitable for building and publishing pants components.
@@ -70,7 +70,7 @@ def contrib_setup_py(name, description, additional_classifiers=None, **kwargs):
   :param str name: The name of the package; must start with 'pantsbuild.pants.contrib.'.
   :param str description: A brief description of what the plugin provides.
   :param list additional_classifiers: Any additional trove classifiers that apply to the plugin,
-                                      see: https://pypi.python.org/pypi?%3Aaction=list_classifiers
+                                      see: https://pypi.org/pypi?%3Aaction=list_classifiers
   :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
                  <https://pythonhosted.org/setuptools/setuptools.html>`_.
   :returns: A setup_py suitable for building and publishing pants components.
@@ -159,7 +159,7 @@ class PantsPlugin(PythonLibrary):
                                   'pantsbuild.pants.'.
     :param str description: A brief description of what the plugin provides.
     :param list additional_classifiers: Any additional trove classifiers that apply to the plugin,
-                                        see: https://pypi.python.org/pypi?%3Aaction=list_classifiers
+                                        see: https://pypi.org/pypi?%3Aaction=list_classifiers
     :param bool build_file_aliases: If `True`, register.py:build_file_aliases must be defined and
                                     registers the 'build_file_aliases' 'pantsbuild.plugin'
                                     entrypoint.

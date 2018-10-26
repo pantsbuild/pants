@@ -256,7 +256,7 @@ For python repos, you need to override the following settings in pants.ini:
       ]
 
     indexes: [
-        "https://pypi.python.org/simple/"
+        "https://pypi.org/simple/"
       ]
 
 You can also reference a local repo relative to your project's build root with this pattern:

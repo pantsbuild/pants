@@ -6,8 +6,8 @@ tooling easier.
 
 ## Installation
 
-Go support is provided by a plugin distributed to 
-[pypi](https://pypi.python.org/pypi/pantsbuild.pants.contrib.go).
+Go support is provided by a plugin distributed to
+[pypi](https://pypi.org/pypi/pantsbuild.pants.contrib.go).
 Assuming you have already [installed pants](http://www.pantsbuild.org/install.html), you'll need to
 add the Go plugin in your `pants.ini`, like so:
 ```ini
@@ -57,18 +57,18 @@ some configuration and seeding to work.
 ### Source root configuration
 
 Internally, pants uses the concept of a "source root" to determine the portion of a source file's
-path that represents the package for the language in question. 
+path that represents the package for the language in question.
 
 Pants attempts to guess where your source roots are via pattern matching.  For example, it assumes
-by default that `src/*` and `src/main/*`, where `*` is some language name, are possible source 
-roots for that language. 
+by default that `src/*` and `src/main/*`, where `*` is some language name, are possible source
+roots for that language.
 
-However when it comes to Go, `src/go` is probably not the correct source root. For Go code in a 
-standard multi-language repo layout, `src/go` is probably on the $GOPATH, which means that 
-`src/go/src` is the actual source root. 
+However when it comes to Go, `src/go` is probably not the correct source root. For Go code in a
+standard multi-language repo layout, `src/go` is probably on the $GOPATH, which means that
+`src/go/src` is the actual source root.
 
 Pants corrects for this in the case of its default patterns: It will correctly detect
-that `src/go/src` and `src/main/go/src` are the possible source roots for Go. 
+that `src/go/src` and `src/main/go/src` are the possible source roots for Go.
 
 But if your Go code does not live in one of these locations then you'll need to tell Pants where
 to find it, e.g., by adding this to `pants.ini`:
@@ -275,8 +275,8 @@ default.
 
 ## Testing
 
-You can run your Go tests with `./pants test [go targets]`. Any 
-[standard Go tests](https://golang.org/pkg/testing/) found amongst the targets will be compiled and 
+You can run your Go tests with `./pants test [go targets]`. Any
+[standard Go tests](https://golang.org/pkg/testing/) found amongst the targets will be compiled and
 run with output sent to the console.
 
 ## Protocol Buffers
