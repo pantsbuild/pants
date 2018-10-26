@@ -11,11 +11,13 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_repos import PythonRepos
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
-                                                       has_python_requirements, has_python_sources,
-                                                       has_resources, is_python_target)
+from pants.backend.python.tasks.pex_build_util import (PexBuilderWrapper, has_python_requirements,
+                                                       has_python_sources, has_resources,
+                                                       is_python_target)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -31,7 +33,11 @@ class PythonBinaryCreate(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonBinaryCreate, cls).subsystem_dependencies() + (PythonNativeCode.scoped(cls),)
+    return super(PythonBinaryCreate, cls).subsystem_dependencies() + (
+      PythonNativeCode.scoped(cls),
+      PythonRepos,
+      PythonSetup,
+    )
 
   @memoized_property
   def _python_native_code_settings(self):
@@ -113,38 +119,44 @@ class PythonBinaryCreate(Task):
       pex_info = binary_tgt.pexinfo.copy()
       pex_info.build_properties = build_properties
 
-      builder = PEXBuilder(path=tmpdir, interpreter=interpreter, pex_info=pex_info, copy=True)
+      pex_builder = PexBuilderWrapper(
+        PEXBuilder(path=tmpdir, interpreter=interpreter, pex_info=pex_info, copy=True),
+        PythonRepos.global_instance(),
+        PythonSetup.global_instance(),
+        self.context.log)
 
       if binary_tgt.shebang:
         self.context.log.info('Found Python binary target {} with customized shebang, using it: {}'
-                                .format(binary_tgt.name, binary_tgt.shebang))
-        builder.set_shebang(binary_tgt.shebang)
+          .format(binary_tgt.name, binary_tgt.shebang))
+        pex_builder.set_shebang(binary_tgt.shebang)
       else:
         self.context.log.debug('No customized shebang found for {}'.format(binary_tgt.name))
 
       # Find which targets provide sources and which specify requirements.
       source_tgts = []
       req_tgts = []
+      constraint_tgts = []
       for tgt in binary_tgt.closure(exclude_scopes=Scopes.COMPILE):
         if has_python_sources(tgt) or has_resources(tgt):
           source_tgts.append(tgt)
         elif has_python_requirements(tgt):
           req_tgts.append(tgt)
-        # Add target's interpreter compatibility constraints to pex info.
         if is_python_target(tgt):
-          for constraint in tgt.compatibility:
-            builder.add_interpreter_constraint(constraint)
+          constraint_tgts.append(tgt)
+
+      # Add target's interpreter compatibility constraints to pex info.
+      pex_builder.add_interpreter_constraints_from(constraint_tgts)
 
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
-        dump_sources(builder, tgt, self.context.log)
+        pex_builder.add_sources_from(tgt)
+
       # We need to ensure that we are resolving for only the current platform if we are
       # including local python dist targets that have native extensions.
       self._python_native_code_settings.check_build_for_current_platform_only(self.context.targets())
-      dump_requirement_libs(builder, interpreter, req_tgts, self.context.log,
-                            platforms=binary_tgt.platforms)
+      pex_builder.add_requirement_libs_from(req_tgts, platforms=binary_tgt.platforms)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))
-      builder.build(pex_path)
+      pex_builder.build(pex_path)
       return pex_path

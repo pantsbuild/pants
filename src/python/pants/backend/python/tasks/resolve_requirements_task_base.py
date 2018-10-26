@@ -14,8 +14,10 @@ from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_repos import PythonRepos
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import dump_requirement_libs, dump_requirements
+from pants.backend.python.tasks.pex_build_util import PexBuilderWrapper
 from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -35,6 +37,8 @@ class ResolveRequirementsTaskBase(Task):
   def subsystem_dependencies(cls):
     return super(ResolveRequirementsTaskBase, cls).subsystem_dependencies() + (
       PythonNativeCode.scoped(cls),
+      PythonRepos,
+      PythonSetup,
     )
 
   @memoized_property
@@ -80,9 +84,13 @@ class ResolveRequirementsTaskBase(Task):
       # to cover the empty case.
       if not os.path.isdir(path):
         with safe_concurrent_creation(path) as safe_path:
-          builder = PEXBuilder(path=safe_path, interpreter=interpreter, copy=True)
-          dump_requirement_libs(builder, interpreter, req_libs, self.context.log, platforms=maybe_platforms)
-          builder.freeze()
+          pex_builder = PexBuilderWrapper(
+            PEXBuilder(path=safe_path, interpreter=interpreter, copy=True),
+            PythonRepos.global_instance(),
+            PythonSetup.global_instance(),
+            self.context.log)
+          pex_builder.add_requirement_libs_from(req_libs, platforms=maybe_platforms)
+          pex_builder.freeze()
     return PEX(path, interpreter=interpreter)
 
   def resolve_requirement_strings(self, interpreter, requirement_strings):
@@ -99,9 +107,13 @@ class ResolveRequirementsTaskBase(Task):
     if not os.path.isdir(path):
       reqs = [PythonRequirement(req_str) for req_str in requirement_strings]
       with safe_concurrent_creation(path) as safe_path:
-        builder = PEXBuilder(path=safe_path, interpreter=interpreter, copy=True)
-        dump_requirements(builder, interpreter, reqs, self.context.log)
-        builder.freeze()
+        pex_builder = PexBuilderWrapper(
+          PEXBuilder(path=safe_path, interpreter=interpreter, copy=True),
+          PythonRepos.global_instance(),
+          PythonSetup.global_instance(),
+          self.context.log)
+        pex_builder.add_resolved_requirements(reqs)
+        pex_builder.freeze()
     return PEX(path, interpreter=interpreter)
 
   @classmethod
