@@ -24,7 +24,21 @@ class Conan(ExecutablePexTool):
   # a special target specified in BUILD.tools)?
   default_conan_requirements = (
     'conan==1.8.2',
-    'typed_ast<1.1.0',  # Remove typed_ast when Pants runs with Python 3 by default.
+    'PyJWT>=1.4.0, <2.0.0',
+    'requests>=2.7.0, <3.0.0',
+    'colorama>=0.3.3, <0.4.0',
+    'PyYAML>=3.11, <3.14.0',
+    'patch==1.16',
+    'fasteners>=0.14.1',
+    'six>=1.10.0',
+    'node-semver==0.2.0',
+    'distro>=1.0.2, <1.2.0',
+    'pylint>=1.9.3',
+    'future==0.16.0',
+    'pygments>=2.0, <3.0',
+    'astroid>=1.6.5',
+    'deprecation>=2.0, <2.1',
+    'tqdm>=4.28.1, <5',
   )
 
   @classmethod
