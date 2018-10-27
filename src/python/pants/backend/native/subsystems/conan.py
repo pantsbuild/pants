@@ -22,7 +22,10 @@ class Conan(ExecutablePexTool):
 
   # TODO: It would be great if these requirements could be drawn from a BUILD file (potentially with
   # a special target specified in BUILD.tools)?
-  default_conan_requirements = ('conan==1.8.2',)
+  default_conan_requirements = (
+    'conan==1.8.2',
+    'typed_ast<1.1.0',  # Remove typed_ast when Pants runs with Python 3 by default.
+  )
 
   @classmethod
   def register_options(cls, register):
