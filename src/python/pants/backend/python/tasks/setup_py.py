@@ -727,5 +727,7 @@ class SetupPy(Task):
           self.context.log.info('Running {} against {}'.format(self._run, setup_dir))
           split_command = safe_shlex_split(self._run)
           setup_runner = SetupPyRunner(setup_dir, split_command, interpreter=interpreter)
-          setup_runner.run()
+          installed = setup_runner.run()
+          if not installed:
+            raise TaskError('Install failed.')
           python_dists[exported_python_target] = setup_dir
