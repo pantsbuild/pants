@@ -404,7 +404,7 @@ class TestProcessManager(TestBase):
 
   def test_daemonize_child_parent(self):
     with self.mock_daemonize_context(chk_post_parent=True) as mock_fork:
-      mock_fork.side_effect = [0, 1]    # Simulate the childs parent.
+      mock_fork.side_effect = [1, 1]    # Simulate the original parent process.
       self.pm.daemonize(write_pid=False)
 
   def test_daemon_spawn_parent(self):
