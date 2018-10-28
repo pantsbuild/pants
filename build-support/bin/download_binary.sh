@@ -8,4 +8,4 @@ BINARY_HELPER_SCRIPT="${REPO_ROOT}/src/python/pants/binaries/binary_util.py"
 source "${REPO_ROOT}/build-support/pants_venv"
 
 activate_pants_venv 1>&2
-PYTHONPATH="${REPO_ROOT}/src/python" python "$BINARY_HELPER_SCRIPT" $@
+PYTHONPATH="${REPO_ROOT}/src/python:${PYTHONPATH}" python "$BINARY_HELPER_SCRIPT" $@

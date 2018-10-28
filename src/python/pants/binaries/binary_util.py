@@ -482,7 +482,7 @@ See binary_util.py for more information.
   parser.add_argument("util_name",
                       help="Subdirectory for the requested tool in the pants hosted binary schema.")
   parser.add_argument("version", help="Version of the requested binary tool to download.")
-  parser.add_argument("filename", default=None,
+  parser.add_argument("filename", nargs='?', default=None,
                       help="Filename to download. Defaults to the value provided for `util_name`.")
   return parser
 
