@@ -4,19 +4,25 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import argparse
 import logging
 import os
 import posixpath
 import shutil
+import sys
 from abc import abstractmethod
 from builtins import object
 from contextlib import contextmanager
+from functools import reduce
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.fs.archive import archiver_for_path
 from pants.net.http.fetcher import Fetcher
+from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
@@ -455,3 +461,70 @@ class BinaryUtil(object):
   def select_script(self, supportdir, version, name):
     binary_request = self._make_deprecated_script_request(supportdir, version, name)
     return self.select(binary_request)
+
+
+def _create_bootstrap_binary_arg_parser():
+  parser = argparse.ArgumentParser(description="""\
+Helper for download_binary.sh to use BinaryUtil to download the appropriate binaries.
+
+Downloads the specified binary at the specified version if it's not already present.
+
+Outputs an absolute path to the binary, whether fetched or already present, to stdout.
+
+If the file ends in ".tar.gz", untars the file and outputs the directory to which the files were
+untar'd. Otherwise, makes the file executable.
+
+If a binary tool with the requested name, version, and filename does not exist, the
+script will exit with an error and print a message to stderr.
+
+See binary_util.py for more information.
+""")
+  parser.add_argument("util_name",
+                      help="Subdirectory for the requested tool in the pants hosted binary schema.")
+  parser.add_argument("version", help="Version of the requested binary tool to download.")
+  parser.add_argument("filename", nargs='?', default=None,
+                      help="Filename to download. Defaults to the value provided for `util_name`.")
+  return parser
+
+
+def main():
+  # Parse positional arguments to the script.
+  args = _create_bootstrap_binary_arg_parser().parse_args()
+  # Resolve bootstrap options with a fake empty command line.
+  options_bootstrapper = OptionsBootstrapper(args=[sys.argv[0]])
+  subsystems = (GlobalOptionsRegistrar, BinaryUtil.Factory)
+  known_scope_infos = reduce(set.union, (ss.known_scope_infos() for ss in subsystems), set())
+  options = options_bootstrapper.get_full_options(known_scope_infos)
+  # Set the options on all applicable scopes so BinaryUtil.Factory.create() can use the applicable
+  # bootstrap options.
+  for subsystem in subsystems:
+    subsystem.register_options_on_scope(options)
+  Subsystem.set_options(options)
+
+  # If the filename provided ends in a known archive extension (such as ".tar.gz"), then we get the
+  # appropriate Archiver to pass to BinaryUtil.
+  archiver_for_current_binary = None
+  filename = args.filename or args.util_name
+  try:
+    archiver_for_current_binary = archiver_for_path(filename)
+    # BinaryRequest requires the `name` field to be provided without an extension, as it appends the
+    # archiver's extension if one is provided, so we have to remove it here.
+    filename = filename[:-(len(archiver_for_current_binary.extension) + 1)]
+  except ValueError:
+    pass
+
+  binary_util = BinaryUtil.Factory.create()
+  binary_request = BinaryRequest(
+    supportdir='bin/{}'.format(args.util_name),
+    version=args.version,
+    name=filename,
+    platform_dependent=True,
+    external_url_generator=None,
+    archiver=archiver_for_current_binary)
+  path = binary_util.select(binary_request)
+
+  print(path)
+
+
+if __name__ == '__main__':
+  main()
