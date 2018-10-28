@@ -145,8 +145,8 @@ class BaseZincCompile(JvmCompile):
     return ('-S-Xfatal-warnings', '-C-Werror')
 
   @classmethod
-  def get_compiler_option_sets_enabled_default_value(cls):
-    return {'fatal_warnings': cls.get_fatal_warnings_enabled_args_default}
+  def get_fatal_warnings_disabled_args_default(cls):
+    return ()
 
   @classmethod
   def register_options(cls, register):
@@ -357,8 +357,17 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(self._get_zinc_arguments(settings))
     zinc_args.append('-transactional')
 
-    compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(ctx.target)
-    zinc_args.extend(compiler_option_sets_args)
+    for option_set in compiler_option_sets:
+      enabled_args = self.get_options().compiler_option_sets_enabled_args.get(option_set, [])
+      if option_set == 'fatal_warnings':
+        enabled_args = self.get_options().fatal_warnings_enabled_args
+      zinc_args.extend(enabled_args)
+
+    for option_set, disabled_args in self.get_options().compiler_option_sets_disabled_args.items():
+      if option_set not in compiler_option_sets:
+        if option_set == 'fatal_warnings':
+          disabled_args = self.get_options().fatal_warnings_disabled_args
+        zinc_args.extend(disabled_args)
 
     if not self._clear_invalid_analysis:
       zinc_args.append('-no-clear-invalid-analysis')

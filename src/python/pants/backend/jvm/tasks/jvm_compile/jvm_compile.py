@@ -35,7 +35,6 @@ from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
-from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
@@ -44,7 +43,7 @@ from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
 
 
-class JvmCompile(NailgunTaskBase, CompilerOptionSetsMixin):
+class JvmCompile(NailgunTaskBase):
   """A common framework for JVM compilation.
 
   To subclass for a specific JVM language, implement the static values and methods
@@ -52,11 +51,6 @@ class JvmCompile(NailgunTaskBase, CompilerOptionSetsMixin):
   """
 
   size_estimators = create_size_estimators()
-
-  mirrored_option_to_kwarg_map = {
-    'fatal_warnings': 'fatal_warnings',
-    'compiler_option_sets': 'compiler_option_sets',
-  }
 
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
@@ -84,6 +78,22 @@ class JvmCompile(NailgunTaskBase, CompilerOptionSetsMixin):
     register('--no-warning-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
+
+    register('--fatal-warnings-enabled-args', advanced=True, type=list, fingerprint=True,
+             default=list(cls.get_fatal_warnings_enabled_args_default()),
+             help='Extra compiler args to use when fatal warnings are enabled.')
+
+    register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
+             default=list(cls.get_fatal_warnings_disabled_args_default()),
+             help='Extra compiler args to use when fatal warnings are disabled.')
+
+    register('--compiler-option-sets-enabled-args', advanced=True, type=dict, fingerprint=True,
+             default={'fatal_warnings': list(cls.get_fatal_warnings_enabled_args_default())},
+             help='Extra compiler args to use for each enabled option set.')
+
+    register('--compiler-option-sets-disabled-args', advanced=True, type=dict, fingerprint=True,
+             default={'fatal_warnings': list(cls.get_fatal_warnings_disabled_args_default())},
+             help='Extra compiler args to use for each disabled option set.')
 
     register('--debug-symbols', type=bool, fingerprint=True,
              help='Compile with debug symbol enabled.')
@@ -194,6 +204,16 @@ class JvmCompile(NailgunTaskBase, CompilerOptionSetsMixin):
   @classmethod
   def get_no_warning_args_default(cls):
     """Override to set default for --no-warning-args option."""
+    return ()
+
+  @classmethod
+  def get_fatal_warnings_enabled_args_default(cls):
+    """Override to set default for --fatal-warnings-enabled-args option."""
+    return ()
+
+  @classmethod
+  def get_fatal_warnings_disabled_args_default(cls):
+    """Override to set default for --fatal-warnings-disabled-args option."""
     return ()
 
   @property
