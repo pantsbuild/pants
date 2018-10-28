@@ -16,11 +16,11 @@ download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
 
 # The following is needed by grpcio-sys and we have no better way to hook its build.rs than this;
 # ie: wrapping cargo.
-cmakeroot="$("${download_binary}" "binaries.pantsbuild.org" "cmake" "3.9.5" "cmake.tar.gz")"
-goroot="$("${download_binary}" "binaries.pantsbuild.org" "go" "1.7.3" "go.tar.gz")/go"
+cmakeroot="$("${download_binary}" "cmake" "3.9.5" "cmake.tar.gz")"
+goroot="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go"
 
 # Code generation in the bazel_protos crate needs to be able to find protoc on the PATH.
-protoc="$("${download_binary}" "binaries.pantsbuild.org" "protobuf" "3.4.1" "protoc")"
+protoc="$("${download_binary}" "protobuf" "3.4.1" "protoc")"
 
 export GOROOT="${goroot}"
 export PATH="${cmakeroot}/bin:${goroot}/bin:${CARGO_HOME}/bin:$(dirname "${protoc}"):${PATH}"
