@@ -183,7 +183,7 @@ class NativeCompile(NativeTask, AbstractClass):
                             .get_merged_args_for_compiler_option_sets(target)),
       output_dir=versioned_target.results_dir)
 
-  def _make_compile_argv(self, compile_request):
+  def _make_compile_argv(self, compile_request, sources_minus_headers):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
     compiler = compile_request.compiler
     err_flags = ['-Werror'] if compile_request.fatal_warnings else []
@@ -201,7 +201,7 @@ class NativeCompile(NativeTask, AbstractClass):
         '-I{}'.format(os.path.join(buildroot, inc_dir))
         for inc_dir in compile_request.include_dirs
       ] +
-      [os.path.join(buildroot, src) for src in compile_request.sources])
+      [os.path.join(buildroot, src) for src in sources_minus_headers])
 
     self.context.log.debug("compile argv: {}".format(argv))
 
@@ -215,7 +215,8 @@ class NativeCompile(NativeTask, AbstractClass):
     """
     sources = compile_request.sources
 
-    if len(sources) == 0:
+    sources_minus_headers = [s for s in sources if (not s.endswith('.h')) and (not s.endswith('.hpp'))]
+    if len(sources_minus_headers) == 0:
       # TODO: do we need this log message? Should we still have it for intentionally header-only
       # libraries (that might be a confusing message to see)?
       self.context.log.debug("no sources in request {}, skipping".format(compile_request))
@@ -224,7 +225,7 @@ class NativeCompile(NativeTask, AbstractClass):
     compiler = compile_request.compiler
     output_dir = compile_request.output_dir
 
-    argv = self._make_compile_argv(compile_request)
+    argv = self._make_compile_argv(compile_request, sources_minus_headers)
     env = compiler.as_invocation_environment_dict
 
     with self.context.new_workunit(
