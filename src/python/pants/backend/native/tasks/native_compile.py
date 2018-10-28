@@ -30,6 +30,7 @@ class NativeCompileRequest(datatype([
     ('fatal_warnings', bool),
     'compiler_options',
     'output_dir',
+    'header_file_extensions',
 ])): pass
 
 
@@ -134,7 +135,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   @abstractmethod
   def get_compile_settings(self):
-    """Return a subclass of NativeBuildStepSettings.
+    """Return a subclass of CompileSettings.
 
     NB: Subclasses will be queried for the compile settings once and the result cached.
     """
@@ -172,16 +173,20 @@ class NativeCompile(NativeTask, AbstractClass):
 
     sources_and_headers = self.get_sources_headers_for_target(target)
     return NativeCompileRequest(
-      compiler=self._compiler,
+      compiler=self._compiler.copy(include_dirs=(
+        self._compile_settings.compile_settings.get_hacky_preferred_std_include_dirs +
+        self._compiler.include_dirs +
+        self._compile_settings.compile_settings.get_hacky_non_preferred_std_include_dirs)),
       include_dirs=include_dirs,
       sources=sources_and_headers,
       fatal_warnings=(self._compile_settings
-                         .native_build_step_settings
+                         .compile_settings
                          .get_fatal_warnings_value_for_target(target)),
       compiler_options=(self._compile_settings
-                            .native_build_step_settings
+                            .compile_settings
                             .get_merged_args_for_compiler_option_sets(target)),
-      output_dir=versioned_target.results_dir)
+      output_dir=versioned_target.results_dir,
+      header_file_extensions=self._compile_settings.header_file_extensions)
 
   def _make_compile_argv(self, compile_request, sources_minus_headers):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
@@ -215,7 +220,9 @@ class NativeCompile(NativeTask, AbstractClass):
     """
     sources = compile_request.sources
 
-    sources_minus_headers = [s for s in sources if (not s.endswith('.h')) and (not s.endswith('.hpp'))]
+    sources_minus_headers = [
+      s for s in sources if not any(s.endswith(h) for h in compile_request.header_file_extensions)
+    ]
     if len(sources_minus_headers) == 0:
       # TODO: do we need this log message? Should we still have it for intentionally header-only
       # libraries (that might be a confusing message to see)?

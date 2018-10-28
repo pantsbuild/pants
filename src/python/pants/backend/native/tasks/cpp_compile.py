@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.native.config.environment import LLVMCppToolchain
-from pants.backend.native.subsystems.native_build_step_settings import CppCompileSettings
+from pants.backend.native.subsystems.compile_settings import CppCompileSettings
 from pants.backend.native.targets.native_library import CppLibrary
 from pants.backend.native.tasks.native_compile import NativeCompile
 from pants.util.objects import SubclassesOf
