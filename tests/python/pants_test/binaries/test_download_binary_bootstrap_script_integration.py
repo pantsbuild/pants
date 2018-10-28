@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import unittest
+from builtins import str
 
 from pants.base.build_environment import get_buildroot
 from pants.util.process_handler import subprocess
@@ -34,4 +35,4 @@ class BinaryUtilIntegrationTest(unittest.TestCase):
       self.fail('Version 213521351235 of cmake should not exist!')
     except subprocess.CalledProcessError as e:
       self.assertNotEqual(0, e.returncode)
-      self.assertIn('Failed to fetch cmake binary from any source', e.output)
+      self.assertIn('Failed to fetch cmake binary from any source', str(e.output))
