@@ -71,6 +71,13 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
                        'org/pantsbuild/example/distance/constants.py',
                        'org/pantsbuild/example/distance/ttypes.py'])
 
+  def test_setup_py_with_codegen_simpl_invalid_run(self):
+    command = ['setup-py',
+               '--run=invalid_cmd',
+               'examples/src/thrift/org/pantsbuild/example/distance:distance-python']
+    pants_run = self.run_pants(command=command)
+    self.assert_failure(pants_run)
+
   def test_setup_py_with_codegen_exported_deps(self):
     self.maxDiff = None
 
