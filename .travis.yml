@@ -83,6 +83,9 @@ default_test_config: &default_test_config
     - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
     - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
     - jdk_switcher use oraclejdk8
+    # Increase the max number of user watches to ensure that watchman is able to watch all
+    # files in the working copy.
+    - sudo sysctl fs.inotify.max_user_watches=524288
 
 matrix:
   include:
