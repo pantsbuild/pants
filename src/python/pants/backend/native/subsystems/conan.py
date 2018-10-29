@@ -38,7 +38,9 @@ class Conan(ExecutablePexTool):
     'pygments>=2.0, <3.0',
     'astroid>=1.6.5',
     'deprecation>=2.0, <2.1',
-    'tqdm>=4.28.1, <5',
+    'tqdm==4.20.0',
+    'pluginbase<1.0,>=0.5',
+    'bottle<0.13,>=0.12.8',
   )
 
   @classmethod
