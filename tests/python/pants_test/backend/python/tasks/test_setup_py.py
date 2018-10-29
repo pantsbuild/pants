@@ -610,12 +610,13 @@ class TestSetupPy(SetupPyTestBase):
 
   def test_run_invalid_cmd_failure(self):
     self.set_options(run='invalid_command')
-    with self.assertRaises(TaskError) as e:
+    with self.assertRaises(TaskError):
       self.run_execute(self.create_python_library(
         relpath='foo',
         name='foo',
         provides="setup_py(name='foo', version='0.0.0')",
       )).__enter__()
+
 
 def test_detect_namespace_packages():
   def has_ns(stmt):
