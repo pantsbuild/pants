@@ -14,8 +14,8 @@ from builtins import open, range, zip
 
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
-from pants_test.pantsd.pantsd_integration_test_base import (PantsDaemonIntegrationTestBase,
-                                                            full_pantsd_log, read_pantsd_log)
+from pants_test.pants_run_integration_test import read_pantsd_log
+from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
 
 
@@ -291,9 +291,12 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Let any fs events quiesce.
       time.sleep(5)
 
+      def full_pantsd_log():
+        return '\n'.join(read_pantsd_log(workdir))
+
       # Check the logs.
       self.assertRegexpMatches(
-        full_pantsd_log(workdir),
+        full_pantsd_log(),
         r'watching invalidating files:.*{}'.format(test_file)
       )
 
@@ -303,7 +306,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       time.sleep(10)
       checker.assert_stopped()
 
-      self.assertIn('saw file events covered by invalidation globs', full_pantsd_log(workdir))
+      self.assertIn('saw file events covered by invalidation globs', full_pantsd_log())
 
   def test_pantsd_pid_deleted(self):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
