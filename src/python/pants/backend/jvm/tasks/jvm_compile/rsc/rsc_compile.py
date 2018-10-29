@@ -8,6 +8,7 @@ import functools
 import json
 import logging
 import os
+import re
 
 from six import text_type
 
@@ -56,18 +57,20 @@ def stdout_contents(wu):
     return f.read().rstrip()
 
 
-def _create_desandboxify_fn(possible_beginning_paths):
+def _create_desandboxify_fn(possible_path_patterns):
   # Takes a collection of possible canonical prefixes, and returns a function that
   # if it finds a matching prefix, strips the path prior to the prefix and returns it
   # if it doesn't it returns the original path
   # TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
+  regexes = [re.compile(p) for p in possible_path_patterns]
   def desandboxify(path):
     if not path:
       return path
-    for p in possible_beginning_paths:
-      if p in path:
-        new_path = path[path.index(p):]
-        return new_path
+    for r in regexes:
+      match = r.search(path)
+      print('>>> matched {} with {} against {}'.format(match, r.pattern, path))
+      if match:
+        return match.group(0)
     return path
   return desandboxify
 
@@ -857,10 +860,9 @@ class RscCompile(ZincCompile):
     #    TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
     desandboxify = _create_desandboxify_fn(
       [
-        os.path.join(relative_workdir, 'ivy', 'jars'),
-        os.path.join(relative_workdir, 'compile', 'rsc'),
-        os.path.join(relative_workdir, '.jdk'),
-        '.jdk'
+        os.path.join(relative_workdir, 'resolve', 'ivy', '[^/]*', 'ivy', 'jars', '.*'),
+        os.path.join(relative_workdir, 'compile', 'rsc', '.*'),
+        os.path.join(relative_workdir, '\.jdk', '.*'),
       ]
       )
 
