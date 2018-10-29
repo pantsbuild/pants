@@ -16,19 +16,19 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
 
-  def test_v2_list_is_identical_to_v1(self):
-    def run_list(extra_flags=[]):
-      with self.pantsd_successful_run_context() as (runner, checker, workdir, pantsd_config):
-        print(workdir)
-        command = extra_flags + ['list', '3rdparty/::']
-        res = runner(command)
-        checker.assert_running()
-        return res
+  @ensure_daemon
+  def test_v2_list(self):
+    result = self.do_command(
+      '--no-v1',
+      '--v2',
+      'list',
+      '::',
+      success=True
+    )
 
-    v1_res = run_list()
-    v2_res = run_list(['--v2', '--no-v1'])
-
-    self.assertEqual(sorted(v1_res.stdout_data.splitlines()), sorted(v2_res.stdout_data.splitlines()))
+    output_lines = result.stdout_data.splitlines()
+    self.assertGreater(len(output_lines), 1000)
+    self.assertIn('3rdparty/python:psutil', output_lines)
 
   def test_v2_list_does_not_cache(self):
     with self.pantsd_successful_run_context() as (runner, checker, workdir, pantsd_config):
@@ -42,11 +42,9 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
         checker.assert_started()
         return result
 
-      # Warm the daemon
-      run_list()
-      second_run = run_list()
-      second_run_output_lines = second_run.stdout_data.splitlines()
-      self.assertTrue(len(second_run_output_lines) > 1)
+      first_run = run_list().stdout_data.splitlines()
+      second_run = run_list().stdout_data.splitlines()
+      self.assertTrue(sorted(first_run), sorted(second_run))
 
   @ensure_daemon
   def test_v2_goal_validation(self):
