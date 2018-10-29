@@ -57,6 +57,7 @@ python_tests(
   coverage = ['pants.pantsd.pants_daemon'],
   dependencies = [
     ':test_deps',
+    'src/python/pants/bin',
     'src/python/pants/pantsd:pants_daemon',
     'src/python/pants/pantsd/service:pants_service',
     'src/python/pants/util:contextutil',

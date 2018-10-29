@@ -463,7 +463,6 @@ class ProcessManager(ProcessMetadataManager):
       challenging. If no fork_context is passed, the fork function is called directly.
     """
 
-
     def double_fork():
       logger.debug('forking %s', self)
       pid = os.fork()

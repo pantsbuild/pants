@@ -24,7 +24,7 @@ class Watchman(ProcessManager):
     """Raised when Watchman crashes."""
 
   STARTUP_TIMEOUT_SECONDS = 30.0
-  SOCKET_TIMEOUT_SECONDS = 5.0
+  SOCKET_TIMEOUT_SECONDS = 0.1
 
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 

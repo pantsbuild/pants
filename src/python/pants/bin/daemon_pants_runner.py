@@ -78,7 +78,7 @@ class DaemonPantsRunner(ProcessManager):
   """
 
   @classmethod
-  def create(cls, sock, args, env, scheduler_service):
+  def create(cls, sock, args, env, services, scheduler_service):
     try:
       # N.B. This will temporarily redirect stdio in the daemon's pre-fork context
       # to the nailgun session. We'll later do this a second time post-fork, because
@@ -104,12 +104,13 @@ class DaemonPantsRunner(ProcessManager):
       env,
       graph_helper,
       target_roots,
+      services,
       subprocess_dir,
       options_bootstrapper,
       deferred_exc
     )
 
-  def __init__(self, socket, args, env, graph_helper, target_roots,
+  def __init__(self, socket, args, env, graph_helper, target_roots, services,
                metadata_base_dir, options_bootstrapper, deferred_exc):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
@@ -119,6 +120,7 @@ class DaemonPantsRunner(ProcessManager):
                                             construction. In the event of an exception, this will be
                                             None.
     :param TargetRoots target_roots: The `TargetRoots` for this run.
+    :param PantsServices services: The PantsServices that are currently running.
     :param str metadata_base_dir: The ProcessManager metadata_base_dir from options.
     :param OptionsBootstrapper options_bootstrapper: An OptionsBootstrapper to reuse.
     :param Exception deferred_exception: A deferred exception from the daemon's pre-fork context.
@@ -133,6 +135,7 @@ class DaemonPantsRunner(ProcessManager):
     self._env = env
     self._graph_helper = graph_helper
     self._target_roots = target_roots
+    self._services = services
     self._options_bootstrapper = options_bootstrapper
     self._deferred_exception = deferred_exc
 
@@ -256,6 +259,20 @@ class DaemonPantsRunner(ProcessManager):
     fork_context = self._graph_helper.scheduler_session.with_fork_context if self._graph_helper else None
     self.daemonize(write_pid=False, fork_context=fork_context)
 
+  def pre_fork(self):
+    # Mark all services pausing (to allow them to concurrently pause), and then wait for them
+    # to have paused.
+    # NB: PailgunServer ensures that the entire run occurs under the lifecycle_lock.
+    for service in self._services.services:
+      service.mark_pausing()
+    for service in self._services.services:
+      service.await_paused()
+
+  def post_fork_parent(self):
+    # NB: PailgunServer ensures that the entire run occurs under the lifecycle_lock.
+    for service in self._services.services:
+      service.resume()
+
   def post_fork_child(self):
     """Post-fork child process callback executed via ProcessManager.daemonize()."""
     # Set the Exiter exception hook post-fork so as not to affect the pantsd processes exception
@@ -278,6 +295,10 @@ class DaemonPantsRunner(ProcessManager):
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
     NailgunProtocol.send_pid(self._socket, os.getpid())
     NailgunProtocol.send_pgrp(self._socket, os.getpgrp() * -1)
+
+    # Stop the services that were paused pre-fork.
+    for service in self._services.services:
+      service.terminate()
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
     with self.nailgunned_stdio(self._socket, self._env) as finalizer,\

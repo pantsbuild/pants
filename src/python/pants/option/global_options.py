@@ -264,8 +264,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--watchman-startup-timeout', type=float, advanced=True, default=30.0,
              help='The watchman socket timeout (in seconds) for the initial `watch-project` command. '
                   'This may need to be set higher for larger repos due to watchman startup cost.')
-    register('--watchman-socket-timeout', type=float, advanced=True, default=5.0,
-             help='The watchman client socket timeout in seconds.')
+    register('--watchman-socket-timeout', type=float, advanced=True, default=0.1,
+             help='The watchman client socket timeout in seconds. Setting this to too high a '
+                  'value can negatively impact the latency of runs forked by pantsd.')
     register('--watchman-socket-path', type=str, advanced=True, default=None,
              help='The path to the watchman UNIX socket. This can be overridden if the default '
                   'absolute path length exceeds the maximum allowed by the OS.')
