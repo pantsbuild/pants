@@ -679,19 +679,22 @@ impl WrappedNode for DownloadedFile {
       .path_segments()
       .and_then(|ps| ps.last())
       .map(|f| f.to_owned())
-      .expect(&format!(
-        "Error getting the file name from the parsed URL: {}",
-        url_to_fetch
-      ));
+      .unwrap_or_else(|| {
+        panic!(
+          "Error getting the file name from the parsed URL: {}",
+          url_to_fetch
+        )
+      });
 
     let tempdir = try_future!(
       tempfile::TempDir::new()
         .map_err(|err| throw(&format!("Error making tempdir to download file: {}", err)))
     );
 
+    // Download the file
     // TODO: Share a client which is pre-configured.
     // TODO: Async
-    let mut response = try_future!(
+    try_future!(
       reqwest::Client::new()
         .get(url)
         .send()
