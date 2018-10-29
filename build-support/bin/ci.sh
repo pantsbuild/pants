@@ -215,7 +215,7 @@ if [[ "${run_contrib:-false}" == "true" ]]; then
   (
     ./pants.pex --exclude-target-regexp='.*/testprojects/.*' test.pytest \
     --test-pytest-test-shard=${python_contrib_shard} \
-    contrib:: -- ${PYTEST_PASSTHRU_ARGS}
+    contrib/node:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Contrib python test failure"
   end_travis_section
 fi
