@@ -40,7 +40,7 @@ class ResolveRequirementsTest(TaskTestBase):
       self.assertIn("ModuleNotFoundError: No module named 'colors'", stderr_data)
     except AssertionError:
       # < Python 3.6 uses ImportError instead of ModuleNotFoundError.
-      self.assertIn('ImportError: No module named colors', stderr_data)
+      self.assertIn("ImportError: No module named 'colors'", stderr_data)
 
     # Check that the module is available if specified as a requirement.
     stdout_data, stderr_data = self._exercise_module(self._resolve_requirements([ansicolors_tgt]),
