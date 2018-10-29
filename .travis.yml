@@ -73,7 +73,7 @@ default_test_config: &default_test_config
         - python-dev
         - python3
         - openssl
-        - libssl-dev
+        - libssl1.0-dev
   stage: Test Pants
   language: python
   python: &python_version "2.7"
