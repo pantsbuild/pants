@@ -27,6 +27,7 @@ from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.pantsd.process_manager import FingerprintedProcessManager
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pailgun_service import PailgunService
+from pants.pantsd.service.pants_service import PantsServices
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.pantsd.watchman_launcher import WatchmanLauncher
@@ -94,7 +95,7 @@ class PantsDaemon(FingerprintedProcessManager):
       :rtype: PantsDaemon.Handle
       """
       stub_pantsd = cls.create(bootstrap_options, full_init=False)
-      with stub_pantsd.lifecycle_lock:
+      with stub_pantsd._services.lifecycle_lock:
         if stub_pantsd.needs_restart(stub_pantsd.options_fingerprint):
           # Once we determine we actually need to launch, recreate with full initialization.
           pantsd = cls.create(bootstrap_options)
@@ -115,7 +116,7 @@ class PantsDaemon(FingerprintedProcessManager):
       :rtype: PantsDaemon.Handle
       """
       pantsd = cls.create(bootstrap_options)
-      with pantsd.lifecycle_lock:
+      with pantsd._services.lifecycle_lock:
         # N.B. This will call `pantsd.terminate()` before starting.
         return pantsd.launch()
 
@@ -131,13 +132,8 @@ class PantsDaemon(FingerprintedProcessManager):
       """
       bootstrap_options = bootstrap_options or cls._parse_bootstrap_options()
       bootstrap_options_values = bootstrap_options.for_global_scope()
-
       # TODO: https://github.com/pantsbuild/pants/issues/3479
       watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
-      native = None
-      build_root = None
-      services = None
-      port_map = None
 
       if full_init:
         build_root = get_buildroot()
@@ -147,12 +143,16 @@ class PantsDaemon(FingerprintedProcessManager):
         legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(native,
                                                                       bootstrap_options_values,
                                                                       build_config)
-        services, port_map = cls._setup_services(
+        services = cls._setup_services(
           build_root,
           bootstrap_options_values,
           legacy_graph_scheduler,
           watchman
         )
+      else:
+        build_root = None
+        native = None
+        services = PantsServices()
 
       return PantsDaemon(
         native=native,
@@ -160,7 +160,6 @@ class PantsDaemon(FingerprintedProcessManager):
         work_dir=bootstrap_options_values.pants_workdir,
         log_level=bootstrap_options_values.level.upper(),
         services=services,
-        socket_map=port_map,
         metadata_base_dir=bootstrap_options_values.pants_subprocessdir,
         bootstrap_options=bootstrap_options
       )
@@ -173,7 +172,7 @@ class PantsDaemon(FingerprintedProcessManager):
     def _setup_services(build_root, bootstrap_options, legacy_graph_scheduler, watchman):
       """Initialize pantsd services.
 
-      :returns: A tuple of (`tuple` service_instances, `dict` port_map).
+      :returns: A PantsServices instance.
       """
       fs_event_service = FSEventService(
         watchman,
@@ -207,20 +206,19 @@ class PantsDaemon(FingerprintedProcessManager):
 
       store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
 
-      return (
-        # Services.
-        (fs_event_service, scheduler_service, pailgun_service, store_gc_service),
-        # Port map.
-        dict(pailgun=pailgun_service.pailgun_port)
+      return PantsServices(
+        services=(fs_event_service, scheduler_service, pailgun_service, store_gc_service),
+        port_map=dict(pailgun=pailgun_service.pailgun_port),
       )
 
-  def __init__(self, native, build_root, work_dir, log_level, services, socket_map,
+  def __init__(self, native, build_root, work_dir, log_level, services,
                metadata_base_dir, bootstrap_options=None):
     """
     :param Native native: A `Native` instance.
     :param string build_root: The pants build root.
     :param string work_dir: The pants work directory.
     :param string log_level: The log level to use for daemon logging.
+    :param PantsServices services: A registry of services to use in this run.
     :param string metadata_base_dir: The ProcessManager metadata base dir.
     :param Options bootstrap_options: The bootstrap options, if available.
     """
@@ -230,14 +228,10 @@ class PantsDaemon(FingerprintedProcessManager):
     self._work_dir = work_dir
     self._log_level = log_level
     self._services = services
-    self._socket_map = socket_map
     self._bootstrap_options = bootstrap_options
 
     self._log_dir = os.path.join(work_dir, self.name)
     self._logger = logging.getLogger(__name__)
-    # A lock to guard the service thread lifecycles. This can be used by individual services
-    # to safeguard daemon-synchronous sections that should be protected from abrupt teardown.
-    self._lifecycle_lock = threading.RLock()
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._kill_switch = threading.Event()
 
@@ -260,7 +254,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def shutdown(self, service_thread_map):
     """Gracefully terminate all services and kill the main PantsDaemon loop."""
-    with self._lifecycle_lock:
+    with self._services.lifecycle_lock:
       for service, service_thread in service_thread_map.items():
         self._logger.info('terminating pantsd service: {}'.format(service))
         service.terminate()
@@ -309,11 +303,10 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.debug('logging initialized')
       yield result.log_handler.stream
 
-  def _setup_services(self, services):
-    assert self._lifecycle_lock is not None, 'PantsDaemon lock has not been set!'
-    for service in services:
+  def _setup_services(self, pants_services):
+    for service in pants_services.services:
       self._logger.info('setting up service {}'.format(service))
-      service.setup(self._lifecycle_lock)
+      service.setup(self._services)
 
   @staticmethod
   def _make_thread(target):
@@ -321,13 +314,14 @@ class PantsDaemon(FingerprintedProcessManager):
     t.daemon = True
     return t
 
-  def _run_services(self, services):
+  def _run_services(self, pants_services):
     """Service runner main loop."""
-    if not services:
+    if not pants_services.services:
       self._logger.critical('no services to run, bailing!')
       return
 
-    service_thread_map = {service: self._make_thread(service.run) for service in services}
+    service_thread_map = {service: self._make_thread(service.run)
+                          for service in pants_services.services}
 
     # Start services.
     for service, service_thread in service_thread_map.items():
@@ -383,7 +377,7 @@ class PantsDaemon(FingerprintedProcessManager):
       set_process_title('pantsd [{}]'.format(self._build_root))
 
       # Write service socket information to .pids.
-      self._write_named_sockets(self._socket_map)
+      self._write_named_sockets(self._services.port_map)
 
       # Enter the main service runner loop.
       self._setup_services(self._services)
@@ -402,7 +396,7 @@ class PantsDaemon(FingerprintedProcessManager):
   def needs_launch(self):
     """Determines if pantsd needs to be launched.
 
-    N.B. This should always be called under care of `self.lifecycle_lock`.
+    N.B. This should always be called under care of the `lifecycle_lock`.
 
     :returns: True if the daemon needs launching, False otherwise.
     :rtype: bool
@@ -415,7 +409,7 @@ class PantsDaemon(FingerprintedProcessManager):
   def launch(self):
     """Launches pantsd in a subprocess.
 
-    N.B. This should always be called under care of `self.lifecycle_lock`.
+    N.B. This should always be called under care of the `lifecycle_lock`.
 
     :returns: A Handle for the pantsd instance.
     :rtype: PantsDaemon.Handle
@@ -434,7 +428,7 @@ class PantsDaemon(FingerprintedProcessManager):
   def terminate(self, include_watchman=True):
     """Terminates pantsd and watchman.
 
-    N.B. This should always be called under care of `self.lifecycle_lock`.
+    N.B. This should always be called under care of the `lifecycle_lock`.
     """
     super(PantsDaemon, self).terminate()
     if include_watchman:

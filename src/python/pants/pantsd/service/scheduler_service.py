@@ -64,9 +64,9 @@ class SchedulerService(PantsService):
   def _combined_invalidating_fileset_from_globs(glob_strs, root):
     return set.union(*(Fileset.globs(glob_str, root=root)() for glob_str in glob_strs))
 
-  def setup(self, lifecycle_lock):
+  def setup(self, services):
     """Service setup."""
-    super(SchedulerService, self).setup(lifecycle_lock)
+    super(SchedulerService, self).setup(services)
     # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
 
@@ -128,7 +128,7 @@ class SchedulerService(PantsService):
   def _process_event_queue(self):
     """File event notification queue processor."""
     try:
-      event = self._event_queue.get(timeout=1)
+      event = self._event_queue.get(timeout=0.05)
     except queue.Empty:
       return
 
@@ -184,7 +184,7 @@ class SchedulerService(PantsService):
     # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
     iterations = options.for_global_scope().loop_max
     target_roots = None
-    while iterations and not self.is_killed:
+    while iterations and not self._state.is_terminating:
       try:
         target_roots = self._prefork_body(session, options)
       except session.scheduler_session.execution_error_type as e:
@@ -192,7 +192,7 @@ class SchedulerService(PantsService):
         print(e, file=sys.stderr)
 
       iterations -= 1
-      while iterations and not self.is_killed and not self._loop_condition.wait(timeout=1):
+      while iterations and not self._state.is_terminating and not self._loop_condition.wait(timeout=1):
         continue
     return target_roots
 
@@ -220,8 +220,9 @@ class SchedulerService(PantsService):
 
   def run(self):
     """Main service entrypoint."""
-    while not self.is_killed:
+    while not self._state.is_terminating:
       self._process_event_queue()
+      self._state.maybe_pause()
 
 
 class LoopCondition(object):
