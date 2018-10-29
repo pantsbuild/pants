@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import glob
 import os
 from builtins import open
 from contextlib import contextmanager
@@ -302,11 +303,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
       self.resolve([junit_jar_lib])
 
       # Find the resolution work dir.
-      ivy_workdir = os.path.join(workdir, 'ivy')
-      ivy_subdirs = os.listdir(ivy_workdir)
-      ivy_subdirs.remove('jars')
-      self.assertEqual(1, len(ivy_subdirs))
-      resolve_workdir = os.path.join(ivy_workdir, ivy_subdirs[0])
+      resolve_workdir = self._find_resolve_workdir(workdir)
 
       # Remove a required file for a simple load to force a fetch.
       resolve_report = os.path.join(resolve_workdir, 'resolve-report-default.xml')
@@ -417,7 +414,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     return junit_jar_lib
 
   def _find_resolve_workdir(self, workdir):
-    ivy_dir = os.path.join(workdir, 'ivy')
+    # NB: Skip one component for the workdir version suffix.
+    ivy_dir = glob.glob(os.path.join(workdir, '[a-f0-9]*/ivy'))[0]
     ivy_dir_subdirs = os.listdir(ivy_dir)
     ivy_dir_subdirs.remove('jars')  # Ignore the jars directory.
     self.assertEqual(1, len(ivy_dir_subdirs), 'There should only be the resolve directory.')

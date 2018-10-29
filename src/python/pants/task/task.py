@@ -75,6 +75,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return '.'.join(['_'.join(map(str, x)) for x in cls.implementation_version()])
 
   @classmethod
+  @memoized_method
+  def implementation_version_slug(cls):
+    return sha1(cls.implementation_version_str().encode('utf-8')).hexdigest()[:12]
+
+  @classmethod
   def stable_name(cls):
     """The stable name of this task type.
 
@@ -246,6 +251,19 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     safe_mkdir(self._workdir)
     return self._workdir
+
+  @memoized_property
+  def versioned_workdir(self):
+    """The Task.workdir suffixed with a fingerprint of the Task implementation version.
+
+    When choosing whether to store values directly in `self.workdir` or below it in
+    the directory returned by this property, you should generally prefer this value.
+
+    :API: public
+    """
+    versioned_workdir = os.path.join(self.workdir, self.implementation_version_slug())
+    safe_mkdir(versioned_workdir)
+    return versioned_workdir
 
   def _options_fingerprint(self, scope):
     options_hasher = sha1()
@@ -468,7 +486,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                              fingerprint_strategy=fingerprint_strategy,
                                              invalidation_report=self.context.invalidation_report,
                                              task_name=self._task_name,
-                                             task_version=self.implementation_version_str(),
+                                             task_version_slug=self.implementation_version_slug(),
                                              artifact_write_callback=self.maybe_write_artifact)
 
     # If this Task's execution has been forced, invalidate all our target fingerprints.

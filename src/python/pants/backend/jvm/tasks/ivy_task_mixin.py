@@ -101,7 +101,7 @@ class IvyTaskMixin(TaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 4)]
+    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 5)]
 
   @memoized_property
   def ivy_repository_cache_dir(self):
@@ -229,8 +229,9 @@ class IvyTaskMixin(TaskBase):
       resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
       resolve_hash_name = resolve_vts.cache_key.hash
-      global_ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
-                                        'ivy')
+      # NB: This used to be a global directory, but is now specific to each task that includes
+      # this mixin.
+      ivy_workdir = os.path.join(self.versioned_workdir, 'ivy')
       targets = resolve_vts.targets
 
       fetch = IvyFetchStep(confs,
@@ -239,14 +240,14 @@ class IvyTaskMixin(TaskBase):
                            self.get_options().soft_excludes,
                            self.ivy_resolution_cache_dir,
                            self.ivy_repository_cache_dir,
-                           global_ivy_workdir)
+                           ivy_workdir)
       resolve = IvyResolveStep(confs,
                                resolve_hash_name,
                                pinned_artifacts,
                                self.get_options().soft_excludes,
                                self.ivy_resolution_cache_dir,
                                self.ivy_repository_cache_dir,
-                               global_ivy_workdir)
+                               ivy_workdir)
 
       return self._perform_resolution(fetch, resolve, executor, extra_args, invalidation_check,
                                       resolve_vts, targets, workunit_name)

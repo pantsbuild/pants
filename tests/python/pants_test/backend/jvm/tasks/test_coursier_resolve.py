@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import re
 from builtins import str
 from contextlib import contextmanager
 
@@ -47,6 +48,10 @@ class CoursierResolveTest(JvmToolTaskTestBase):
                                write_to=None)
     self.set_options_for_scope('resolver', resolver='coursier')
 
+  def _cache_dir_regex(self, cache_type):
+    # One component for the task name, and one for the version.
+    return re.compile(r'\.pants\.d/[^/]+/[a-f0-9]+/cache/' + cache_type + '/')
+
   def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
     context = self.context(target_roots=targets)
@@ -71,7 +76,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     compile_classpath = self.resolve([dep_with_url_lib])
     # Get paths on compile classpath and assert that it starts with '.../coursier/cache/relative'
     paths = [tup[1] for tup in compile_classpath.get_for_target(dep_with_url_lib)]
-    self.assertTrue(any('.pants.d/coursier/cache/relative/' in path for path in paths))
+    self.assertTrue(any(self._cache_dir_regex('relative').search(path) for path in paths), str(paths))
   
   def test_resolve_with_local_url(self):
     with temporary_file_path(suffix='.jar') as url:
@@ -81,7 +86,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       compile_classpath = self.resolve([dep_with_url_lib])
       # Get paths on compile classpath and assert that it starts with '.../coursier/cache/absolute'
       paths = [tup[1] for tup in compile_classpath.get_for_target(dep_with_url_lib)]
-      self.assertTrue(any('.pants.d/coursier/cache/absolute/' in path for path in paths))
+      self.assertTrue(any(self._cache_dir_regex('absolute').search(path) for path in paths), str(paths))
 
   def test_resolve_specific_with_sources_javadocs(self):
     # Create a jar_library with a single dep, and another library with no deps.
