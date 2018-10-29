@@ -37,6 +37,7 @@ class RunTrackerTest(TestBase):
             decoded_post_data = {k: json.loads(v[0]) for k, v in post_data.items()}
             self.assertEqual(stats, decoded_post_data)
             handler.send_response(200)
+            handler.end_headers()
         except Exception:
           handler.send_response(400)  # Ensure the main thread knows the test failed.
           raise

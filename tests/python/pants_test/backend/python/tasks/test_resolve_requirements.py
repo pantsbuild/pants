@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import re
 from builtins import str
 
 from future.utils import PY3
@@ -40,7 +41,8 @@ class ResolveRequirementsTest(TaskTestBase):
       self.assertIn("ModuleNotFoundError: No module named 'colors'", stderr_data)
     except AssertionError:
       # < Python 3.6 uses ImportError instead of ModuleNotFoundError.
-      self.assertIn('ImportError: No module named colors', stderr_data)
+      # Python < 3 uses not quotes for module, python >= 3 does.
+      self.assertNotEqual(re.search(r"ImportError: No module named '?colors'?", stderr_data), None)
 
     # Check that the module is available if specified as a requirement.
     stdout_data, stderr_data = self._exercise_module(self._resolve_requirements([ansicolors_tgt]),
@@ -88,9 +90,9 @@ class ResolveRequirementsTest(TaskTestBase):
       # This is technically also true for the hard-coded platforms we list below, but we chose
       # those and we happen to know that cffi wheels exist for them.  Whereas we have no such
       # advance knowledge for the current platform, whatever that might be in the future.
-      ('cffi-1.9.1', 'macosx_10_10_x86_64'),
-      ('cffi-1.9.1', 'manylinux1_i686'),
-      ('cffi-1.9.1', 'win_amd64'),
+      'macosx',
+      'manylinux1_i686',
+      'win_amd64',
     }
 
     # pycparser is a dependency of cffi only on CPython.  We might as well check for it,
@@ -107,9 +109,15 @@ class ResolveRequirementsTest(TaskTestBase):
         'could not find pycparser in transitive dependencies!'
       )
 
-    self.assertTrue(expected_name_and_platforms.issubset(names_and_platforms),
-                    '{} is not a subset of {}'.format(expected_name_and_platforms,
-                                                      names_and_platforms))
+    for name, platform in names_and_platforms:
+      if 'macosx' in platform:
+        platform = 'macosx'
+
+      expected_name_and_platforms.discard(platform)
+
+    self.assertEqual(len(expected_name_and_platforms), 0, "Found no wheels for {} in {}".format(
+      expected_name_and_platforms, names_and_platforms
+    ))
 
     # Check that the path is under the test's build root, so we know the pex was created there.
     self.assertTrue(path.startswith(os.path.realpath(get_buildroot())))
