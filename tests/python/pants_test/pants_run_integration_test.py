@@ -101,25 +101,28 @@ def ensure_resolver(f):
 def ensure_daemon(f):
   """A decorator for running an integration test with and without the daemon enabled."""
   def wrapper(self, *args, **kwargs):
-    for enable_daemon in ('false', 'true',):
+    for enable_daemon in [False, True]:
       with temporary_dir() as subprocess_dir:
+        enable_daemon_str = str(enable_daemon)
         env = {
             'HERMETIC_ENV': 'PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR',
-            'PANTS_ENABLE_PANTSD': enable_daemon,
-            'PANTS_ENABLE_V2_ENGINE': enable_daemon,
+            'PANTS_ENABLE_PANTSD': enable_daemon_str,
+            'PANTS_ENABLE_V2_ENGINE': enable_daemon_str,
             'PANTS_SUBPROCESSDIR': subprocess_dir,
           }
         with environment_as(**env):
           try:
             f(self, *args, **kwargs)
-          except Exception:
-            print('Test failed with enable-pantsd={}:'.format(enable_daemon))
-            if enable_daemon == 'false':
-              print('Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false.')
-            raise
-          finally:
             if enable_daemon:
               self.assert_success(self.run_pants(['kill-pantsd']))
+          except Exception:
+            print('Test failed with enable-pantsd={}:'.format(enable_daemon))
+            if enable_daemon:
+              # If we are already raising, do not attempt to confirm that `kill-pantsd` succeeds.
+              self.run_pants(['kill-pantsd'])
+            else:
+              print('Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false.')
+            raise
   return wrapper
 
 
