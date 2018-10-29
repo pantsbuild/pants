@@ -161,7 +161,7 @@ matrix:
       env:
         - PREPARE_DEPLOY=1
       script:
-        - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/*.pex dist/deploy/pex/
+        - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
     - <<: *default_test_config
       name: "Self checks, lint, and JVM tests"
