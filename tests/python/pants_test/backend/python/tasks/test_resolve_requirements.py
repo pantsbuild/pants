@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import re
 from builtins import str
 
 from future.utils import PY3
@@ -40,7 +41,8 @@ class ResolveRequirementsTest(TaskTestBase):
       self.assertIn("ModuleNotFoundError: No module named 'colors'", stderr_data)
     except AssertionError:
       # < Python 3.6 uses ImportError instead of ModuleNotFoundError.
-      self.assertIn("ImportError: No module named 'colors'", stderr_data)
+      # Python < 3 uses not quotes for module, python >= 3 does.
+      self.assertNotEqual(re.search(r"ImportError: No module named '?colors'?", stderr_data), None)
 
     # Check that the module is available if specified as a requirement.
     stdout_data, stderr_data = self._exercise_module(self._resolve_requirements([ansicolors_tgt]),
