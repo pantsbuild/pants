@@ -160,9 +160,8 @@ matrix:
       stage: Deploy Pants Pex
       env:
         - PREPARE_DEPLOY=1
-#        - PANTS_PEX_RELEASE=stable
       script:
-        - ./build-support/bin/release.sh -p && mv dist/*.pex dist/deploy/
+        - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/*.pex dist/deploy/pex/
 
     - <<: *default_test_config
       name: "Self checks, lint, and JVM tests"
