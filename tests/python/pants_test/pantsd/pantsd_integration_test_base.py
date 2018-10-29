@@ -7,14 +7,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import functools
 import os
 import time
-from builtins import open
 from contextlib import contextmanager
 
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.collections import recursively_update
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, read_pantsd_log
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
 
 
@@ -22,17 +21,6 @@ def banner(s):
   print(cyan('=' * 63))
   print(cyan('- {} {}'.format(s, '-' * (60 - len(s)))))
   print(cyan('=' * 63))
-
-
-def read_pantsd_log(workdir):
-  # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
-  with open('{}/pantsd/pantsd.log'.format(workdir), 'r') as f:
-    for line in f:
-      yield line.strip()
-
-
-def full_pantsd_log(workdir):
-  return '\n'.join(read_pantsd_log(workdir))
 
 
 class PantsDaemonMonitor(ProcessManager):
