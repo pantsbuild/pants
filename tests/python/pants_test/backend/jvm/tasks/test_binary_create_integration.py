@@ -7,8 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.util.contextutil import open_zip
-from pants.util.dirutil import safe_delete
+from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -81,16 +80,20 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
           self.assertIn(('Agent-Class', 'org.pantsbuild.testproject.manifest.Agent'), entries)
 
   def test_deploy_excludes(self):
-    jar_filename = os.path.join('dist', 'deployexcludes.jar')
-    safe_delete(jar_filename)
-    command = [
-      '--no-compile-zinc-capture-classpath',
-      'binary',
-      'testprojects/src/java/org/pantsbuild/testproject/deployexcludes',
-    ]
-    with self.pants_results(command) as pants_run:
-      self.assert_success(pants_run)
-      # The resulting binary should not contain any guava classes
+    with temporary_dir() as distdir:
+      def build(name):
+        jar_filename = os.path.join(distdir, '{}.jar'.format(name))
+        command = [
+          '--pants-distdir={}'.format(distdir),
+          '--no-compile-zinc-capture-classpath',
+          'binary',
+          'testprojects/src/java/org/pantsbuild/testproject/deployexcludes:{}'.format(name),
+        ]
+        self.assert_success(self.run_pants(command))
+        return jar_filename
+
+      # The excluded binary should not contain any guava classes, and should fail to run.
+      jar_filename = build('deployexcludes')
       with open_zip(jar_filename) as jar_file:
         self.assertEqual({'META-INF/',
                            'META-INF/MANIFEST.MF',
@@ -100,20 +103,14 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
                            'org/pantsbuild/testproject/deployexcludes/',
                            'org/pantsbuild/testproject/deployexcludes/DeployExcludesMain.class'},
                           set(jar_file.namelist()))
-
-      # This jar should not run by itself, missing symbols
       self.run_java(java_args=['-jar', jar_filename],
                     expected_returncode=1,
                     expected_output='java.lang.NoClassDefFoundError: '
                                     'com/google/common/collect/ImmutableSortedSet')
 
-      # But adding back the deploy_excluded symbols should result in a clean run.
-      classpath = [jar_filename,
-                   os.path.join(pants_run.workdir,
-                                'ivy/jars/com.google.guava/guava/jars/guava-18.0.jar')]
-
-      self.run_java(java_args=['-cp', os.pathsep.join(classpath),
-                               'org.pantsbuild.testproject.deployexcludes.DeployExcludesMain'],
+      # And the non excluded binary should succeed.
+      jar_filename = build('nodeployexcludes')
+      self.run_java(java_args=['-jar', jar_filename],
                     expected_output='DeployExcludes Hello World')
 
   def build_and_run(self, pants_args, rel_out_path, java_args, expected_output):
