@@ -32,4 +32,4 @@ class CppCompile(NativeCompile):
     return CppCompileSettings.scoped_instance(self)
 
   def get_compiler(self):
-    return self._request_single(LLVMCppToolchain, self._native_toolchain).cpp_toolchain.cpp_compiler
+    return self._cpp_toolchain.cpp_toolchain.cpp_compiler

@@ -32,4 +32,4 @@ class CCompile(NativeCompile):
     return CCompileSettings.scoped_instance(self)
 
   def get_compiler(self):
-    return self._request_single(LLVMCToolchain, self._native_toolchain).c_toolchain.c_compiler
+    return self._c_toolchain.c_toolchain.c_compiler

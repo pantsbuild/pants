@@ -4,9 +4,16 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
+
 from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
   MirroredTargetOptionMixin
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_property
+from pants.util.objects import enum
+
+
+class ToolchainVariant(enum('descriptor', ['llvm', 'gnu'])): pass
 
 
 class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
@@ -28,5 +35,15 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
                   "are used when compiling and linking native code. C and C++ targets may override "
                   "this behavior with the strict_deps keyword argument as well.")
 
+    register('--toolchain-variant', type=str,
+             choices=ToolchainVariant.allowed_values,
+             default=ToolchainVariant.default_value,
+             fingerprint=True, advanced=True,
+             help='???')
+
   def get_strict_deps_value_for_target(self, target):
     return self.get_target_mirrored_option('strict_deps', target)
+
+  @memoized_property
+  def toolchain_variant(self):
+    return ToolchainVariant.create(self.get_options().toolchain_variant)

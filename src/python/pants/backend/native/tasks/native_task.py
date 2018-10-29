@@ -6,6 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import filter
 
+from pants.backend.native.config.environment import GCCCToolchain, GCCCppToolchain, LLVMCToolchain, LLVMCppToolchain
+from pants.backend.native.subsystems.compile_settings import CCompileSettings
+from pants.backend.native.targets.native_library import CLibrary
+
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
@@ -60,6 +64,20 @@ class NativeTask(Task):
   @memoized_property
   def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
+
+  @memoized_property
+  def _c_toolchain(self):
+    if self._native_build_settings.toolchain_variant.descriptor == 'gnu':
+      return self._request_single(GCCCToolchain, self._native_toolchain)
+    else:
+      return self._request_single(LLVMCToolchain, self._native_toolchain)
+
+  @memoized_property
+  def _cpp_toolchain(self):
+    if self._native_build_settings.toolchain_variant.descriptor == 'gnu':
+      return self._request_single(GCCCppToolchain, self._native_toolchain)
+    else:
+      return self._request_single(LLVMCppToolchain, self._native_toolchain)
 
   def native_deps(self, target):
     return self.strict_deps_for_target(
