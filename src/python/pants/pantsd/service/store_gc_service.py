@@ -32,7 +32,7 @@ class StoreGCService(PantsService):
     self._next_gc = time.time() + self._GARBAGE_COLLECTION_INTERVAL_SECONDS
 
   def _set_next_lease_extension(self):
-    self._next_lease_extension = time.time() + self._GARBAGE_COLLECTION_INTERVAL_SECONDS
+    self._next_lease_extension = time.time() + self._LEASE_EXTENSION_INTERVAL_SECONDS
 
   def _maybe_extend_lease(self):
     if time.time() < self._next_lease_extension:

@@ -152,7 +152,7 @@ class PantsDaemon(FingerprintedProcessManager):
       else:
         build_root = None
         native = None
-        services = PantsServices(tuple(), dict(), threading.RLock())
+        services = PantsServices()
 
       return PantsDaemon(
         native=native,
@@ -207,12 +207,8 @@ class PantsDaemon(FingerprintedProcessManager):
       store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
 
       return PantsServices(
-        # Services.
-        (fs_event_service, scheduler_service, pailgun_service, store_gc_service),
-        # Port map.
-        dict(pailgun=pailgun_service.pailgun_port),
-        # The lifecyle lock.
-        threading.RLock(),
+        services=(fs_event_service, scheduler_service, pailgun_service, store_gc_service),
+        port_map=dict(pailgun=pailgun_service.pailgun_port),
       )
 
   def __init__(self, native, build_root, work_dir, log_level, services,

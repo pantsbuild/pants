@@ -140,7 +140,7 @@ class _ServiceState(object):
     If a timeout is specified, the method may return False to indicate a timeout: with no timeout
     it will always (eventually) return True.
 
-    Raises if the service is not currently in either the Pausing or Running state.
+    Raises if the service is not currently in the Pausing state.
     """
     deadline = time.time() + timeout if timeout else None
     with self._lock:
@@ -151,17 +151,17 @@ class _ServiceState(object):
         timeout = deadline - time.time() if deadline else None
         if timeout and timeout <= 0:
           return False
-        self._condition.wait(timeout)
+        self._condition.wait(timeout=timeout)
       return True
 
   def maybe_pause(self, timeout=None):
     """Called by the service to indicate that it is pausable.
 
     If the service calls this method while the state is `Pausing`, the state will transition
-    to `Paused`, and the service will block here until it is marked `Running` again.
+    to `Paused`, and the service will block here until it is marked `Running` or `Terminating`.
 
     If the state is not currently `Pausing`, and a timeout is not passed, this method returns
-    immediately. If a timeout is passed, this method block up to that number of seconds to wait
+    immediately. If a timeout is passed, this method blocks up to that number of seconds to wait
     to transition to `Pausing`.
     """
     deadline = time.time() + timeout if timeout else None
