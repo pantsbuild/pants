@@ -18,6 +18,7 @@ use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use parking_lot::Mutex;
 use rule_graph;
 use selectors;
+use ui::EngineDisplay;
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
@@ -55,11 +56,18 @@ impl Session {
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,
+  // Flag used to determine whether to show engine execution progress.
+  pub should_render_ui: bool,
+  pub ui_worker_count: u64,
 }
 
 impl ExecutionRequest {
-  pub fn new() -> ExecutionRequest {
-    ExecutionRequest { roots: Vec::new() }
+  pub fn new(should_render_ui: bool, ui_worker_count: u64) -> ExecutionRequest {
+    ExecutionRequest {
+      roots: Vec::new(),
+      should_render_ui,
+      ui_worker_count,
+    }
   }
 
   ///
@@ -261,11 +269,28 @@ impl Scheduler {
       core: self.core.clone(),
     };
     let (sender, receiver) = mpsc::channel();
+
+    // Setting up display
+    let mut optional_display: Option<EngineDisplay> =
+      EngineDisplay::create(request.ui_worker_count as usize, request.should_render_ui);
+
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
+    let roots: Vec<NodeKey> = request
+      .roots
+      .clone()
+      .into_iter()
+      .map(|s| s.into())
+      .collect();
+
     let results = loop {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
+      } else if let Some(display) = optional_display.as_mut() {
+        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display);
       }
+    };
+    if let Some(display) = optional_display.as_mut() {
+      display.finish();
     };
 
     request
@@ -274,6 +299,21 @@ impl Scheduler {
       .zip(results.into_iter())
       .map(|(s, r)| (s.params.expect_single(), &s.selector.product, r))
       .collect()
+  }
+
+  fn display_ongoing_tasks(graph: &Graph<NodeKey>, roots: &[NodeKey], display: &mut EngineDisplay) {
+    let display_worker_count = display.worker_count();
+    let ongoing_tasks = graph.heavy_hitters(&roots, display_worker_count);
+    for (i, task) in ongoing_tasks.iter().enumerate() {
+      display.update(i.to_string(), format!("{:?}", task));
+    }
+    // If the number of ongoing tasks is less than the number of workers,
+    // fill the rest of the workers with empty string.
+    // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666
+    for i in ongoing_tasks.len()..display_worker_count {
+      display.update(i.to_string(), "".to_string());
+    }
+    display.render();
   }
 
   pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path>>(

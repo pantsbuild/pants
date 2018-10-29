@@ -193,21 +193,24 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
     if invalid_goals:
       raise self.InvalidGoals(invalid_goals)
 
-  def run_console_rules(self, goals, target_roots):
+  def run_console_rules(self, goals, target_roots, v2_ui):
     """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
 
     For retryable failures, raises scheduler.ExecutionError.
 
     :param list goals: The list of requested goal names as passed on the commandline.
     :param TargetRoots target_roots: The targets root of the request.
+    :param bool v2_ui: whether to render the v2 engine UI
     """
     # Reduce to only applicable goals - with validation happening by way of `validate_goals()`.
     goals = [goal for goal in goals if goal in self.goal_map]
     subjects = self._determine_subjects(target_roots)
+    # Console rule can only have one subject.
+    assert len(subjects) == 1
     for goal in goals:
       goal_product = self.goal_map[goal]
       logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
-      self.scheduler_session.product_request(goal_product, subjects)
+      self.scheduler_session.run_console_rule(goal_product, subjects[0], v2_ui)
 
   def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.

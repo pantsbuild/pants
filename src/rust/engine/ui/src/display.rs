@@ -57,7 +57,6 @@ pub struct EngineDisplay {
   action_map: BTreeMap<String, String>,
   logs: VecDeque<String>,
   running: bool,
-  is_tty: bool,
   cursor_start: (u16, u16),
   terminal_size: (u16, u16),
 }
@@ -66,22 +65,39 @@ pub struct EngineDisplay {
 // TODO: Better error handling for .flush() and .write() failure modes.
 // TODO: Permit scrollback in the terminal - both at exit and during the live run.
 impl EngineDisplay {
+  /// Create a EngineDisplay only if stdout is tty and v2 ui is enabled.
+  pub fn create(display_worker_count: usize, should_render_ui: bool) -> Option<EngineDisplay> {
+    if should_render_ui && termion::is_tty(&stdout()) {
+      let mut display = EngineDisplay::for_stdout(0);
+      display.initialize(display_worker_count);
+      Some(display)
+    } else {
+      None
+    }
+  }
+
+  fn initialize(&mut self, display_worker_count: usize) {
+    self.start();
+    let worker_ids: Vec<String> = (0..display_worker_count)
+      .map(|s| format!("{}", s))
+      .collect();
+    for worker_id in worker_ids {
+      self.add_worker(worker_id);
+    }
+    self.render();
+  }
+
   pub fn for_stdout(indent_level: u16) -> EngineDisplay {
     let write_handle = stdout();
-    let is_tty = termion::is_tty(&write_handle);
 
     EngineDisplay {
       sigil: '⚡',
       divider: "▵".to_string(),
       poll_interval_ms: Duration::from_millis(55),
       padding: " ".repeat(indent_level.into()),
-      terminal: if is_tty {
-        match write_handle.into_raw_mode() {
-          Ok(t) => Console::Terminal(t),
-          Err(_) => Console::Pipe(stdout()),
-        }
-      } else {
-        Console::Pipe(write_handle)
+      terminal: match write_handle.into_raw_mode() {
+        Ok(t) => Console::Terminal(t),
+        Err(_) => Console::Pipe(stdout()),
       },
       action_map: BTreeMap::new(),
       // This is arbitrary based on a guesstimated peak terminal row size for modern displays.
@@ -89,7 +105,6 @@ impl EngineDisplay {
       // want to be able to fill the entire screen if resized much larger than when we started.
       logs: VecDeque::with_capacity(500),
       running: false,
-      is_tty: is_tty,
       // N.B. This will cause the screen to clear - but with some improved position
       // tracking logic we could avoid screen clearing in favor of using the value
       // of `EngineDisplay::get_cursor_pos()` as initialization here. From there, the
@@ -242,11 +257,6 @@ impl EngineDisplay {
     }
   }
 
-  fn render_for_pipe(&self) {
-    // TODO: Handle non-tty output w polling interval adjustment + summary rendering.
-    panic!("TODO");
-  }
-
   // Paints one screen of rendering.
   fn render_for_tty(&mut self) {
     self.set_size();
@@ -259,12 +269,7 @@ impl EngineDisplay {
 
   // Paints one screen of rendering.
   pub fn render(&mut self) {
-    // TODO: Split this fork out into sub-types of EngineDisplay.
-    if self.is_tty {
-      self.render_for_tty()
-    } else {
-      self.render_for_pipe()
-    }
+    self.render_for_tty()
   }
 
   // Paints one screen of rendering and sleeps for the poll interval.
@@ -305,6 +310,10 @@ impl EngineDisplay {
   // Adds a log entry for display.
   pub fn log(&mut self, log_entry: String) {
     self.logs.push_front(log_entry)
+  }
+
+  pub fn worker_count(&self) -> usize {
+    self.action_map.len()
   }
 
   // Terminates the EngineDisplay and returns the cursor to a static position.

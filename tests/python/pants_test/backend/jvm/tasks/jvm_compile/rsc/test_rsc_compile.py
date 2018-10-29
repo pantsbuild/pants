@@ -115,7 +115,7 @@ class RscCompileTest(TaskTestBase):
 
   def test_desandbox_fn(self):
     # TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
-    desandbox = _create_desandboxify_fn(['.pants.d/cool/beans', '.pants.d/c/r/c'])
+    desandbox = _create_desandboxify_fn(['.pants.d/cool/beans.*', '.pants.d/c/r/c/.*'])
     self.assertEqual(desandbox('/some/path/.pants.d/cool/beans'), '.pants.d/cool/beans')
     self.assertEqual(desandbox('/some/path/.pants.d/c/r/c/beans'), '.pants.d/c/r/c/beans')
     self.assertEqual(desandbox(
