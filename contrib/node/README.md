@@ -35,6 +35,14 @@ to the target dependency
 3. In the BUILD definition, the node_module target must also specify the fully qualified pants target address for each `file:` dependency.
 (In the future, with dep inference, this step may no longer be necessary).
 
+4. Scopes normally defined in the the `name` field of the `package.json` file needs to be replicated in the BUILD definition in the `node_scope` option.
+
+With some caveats,
+* Peer dependencies cannot be resolved within source dependencies. The source dependencies are symlinked and do not have a direct relationships with the parent
+target. There may be duplicate dependencies since there is no flattening of the dependency graph.
+* Source dependencies can only be specified in the “dependencies” field.
+* Source dependencies need to match 1:1 with package dependencies, but cannot currently express the node_scope within that context. The node_scope is assumed through the `node_scope` field in the BUILD definition.
+
 See the examples directory for real examples.
 
 ## Bootstrapping
