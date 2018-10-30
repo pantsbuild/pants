@@ -44,7 +44,7 @@ from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
 
 
-class JvmCompile(NailgunTaskBase, CompilerOptionSetsMixin):
+class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   """A common framework for JVM compilation.
 
   To subclass for a specific JVM language, implement the static values and methods

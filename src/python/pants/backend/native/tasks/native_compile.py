@@ -169,8 +169,10 @@ class NativeCompile(NativeTask, AbstractClass):
 
     include_dirs = [self._include_dirs_for_target(dep_tgt) for dep_tgt in dependencies]
     include_dirs.extend(self._get_third_party_include_dirs(external_libs_product, dependencies))
-
     sources_and_headers = self.get_sources_headers_for_target(target)
+    compiler_option_sets = (self._compile_settings.native_build_step_settings
+                                .get_compiler_option_sets_for_target(target))
+
     return NativeCompileRequest(
       compiler=self._compiler,
       include_dirs=include_dirs,
@@ -180,7 +182,7 @@ class NativeCompile(NativeTask, AbstractClass):
                          .get_fatal_warnings_value_for_target(target)),
       compiler_options=(self._compile_settings
                             .native_build_step_settings
-                            .get_merged_args_for_compiler_option_sets(target)),
+                            .get_merged_args_for_compiler_option_sets(compiler_option_sets)),
       output_dir=versioned_target.results_dir)
 
   def _make_compile_argv(self, compile_request):

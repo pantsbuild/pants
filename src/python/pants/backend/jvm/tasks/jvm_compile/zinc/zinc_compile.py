@@ -146,7 +146,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def get_compiler_option_sets_enabled_default_value(cls):
-    return {'fatal_warnings': cls.get_fatal_warnings_enabled_args_default}
+    return {'fatal_warnings': cls.get_fatal_warnings_enabled_args_default()}
 
   @classmethod
   def register_options(cls, register):
@@ -357,7 +357,7 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(self._get_zinc_arguments(settings))
     zinc_args.append('-transactional')
 
-    compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(ctx.target)
+    compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(compiler_option_sets)
     zinc_args.extend(compiler_option_sets_args)
 
     if not self._clear_invalid_analysis:

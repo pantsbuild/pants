@@ -17,10 +17,6 @@ class CompilerOptionSetsMixin(MirroredTargetOptionMixin, object):
   def register_options(cls, register):
     super(CompilerOptionSetsMixin, cls).register_options(register)
 
-    register('--compiler-option-sets', advanced=True, default=(), type=list,
-             fingerprint=True,
-             help='The default for the "compiler_option_sets" argument '
-                  'for targets of this language.')
     register('--fatal-warnings-enabled-args', advanced=True, type=list, fingerprint=True,
              default=list(cls.get_fatal_warnings_enabled_args_default()),
              help='Extra compiler args to use when fatal warnings are enabled.')
@@ -78,9 +74,7 @@ class CompilerOptionSetsMixin(MirroredTargetOptionMixin, object):
     """Override to set default for this option."""
     return ()
 
-  def get_merged_args_for_compiler_option_sets(self, target):
-    compiler_option_sets = self.get_target_mirrored_option(
-        'compiler_option_sets', target)
+  def get_merged_args_for_compiler_option_sets(self, compiler_option_sets):
     compiler_options = set()
 
     # Set values for enabled options.

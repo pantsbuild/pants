@@ -26,9 +26,16 @@ class NativeBuildStepSettings(CompilerOptionSetsMixin, Subsystem):
              help='The default for the "fatal_warnings" argument for targets of this language.',
              removal_version='1.14.0.dev2',
              removal_hint='Use compiler options sets instead.')
+    register('--compiler-option-sets', advanced=True, default=(), type=list,
+             fingerprint=True,
+             help='The default for the "compiler_option_sets" argument '
+                  'for targets of this language.')
 
   def get_fatal_warnings_value_for_target(self, target):
     return self.get_target_mirrored_option('fatal_warnings', target)
+
+  def get_compiler_option_sets_for_target(self, target):
+    return self.get_target_mirrored_option('compiler_option_sets', target)
 
 
 class CCompileSettings(Subsystem):
