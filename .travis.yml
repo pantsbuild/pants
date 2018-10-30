@@ -160,7 +160,7 @@ matrix:
     - name: "Deploy Pants PEX Unstable"
       os: linux
       language: python
-      stage: Deploy Pants Pex
+      stage: Deploy Pants Pex Unstable
       env:
         - PREPARE_DEPLOY=1
       script:
