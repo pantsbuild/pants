@@ -10,7 +10,7 @@ import sys
 import mock
 
 from pants.pantsd.pants_daemon import PantsDaemon, _LoggerStream
-from pants.pantsd.service.pants_service import PantsService
+from pants.pantsd.service.pants_service import PantsService, PantsServices
 from pants.util.contextutil import stdio_as
 from pants_test.test_base import TestBase
 
@@ -50,8 +50,7 @@ class PantsDaemonTest(TestBase):
                               'test_buildroot',
                               'test_work_dir',
                               logging.INFO,
-                              [],
-                              {},
+                              PantsServices(),
                               '/tmp/pants_test_metadata_dir',
                               mock_options)
     self.mock_killswitch = mock.Mock()
@@ -79,7 +78,7 @@ class PantsDaemonTest(TestBase):
     mock_thread.join.assert_called_once_with(PantsDaemon.JOIN_TIMEOUT_SECONDS)
 
   def test_run_services_no_services(self):
-    self.pantsd._run_services([])
+    self.pantsd._run_services(PantsServices())
 
   @mock.patch('threading.Thread', **PATCH_OPTS)
   @mock.patch.object(PantsDaemon, 'shutdown', spec_set=True)
@@ -87,7 +86,7 @@ class PantsDaemonTest(TestBase):
     mock_thread.return_value.start.side_effect = RuntimeError('oops!')
 
     with self.assertRaises(PantsDaemon.StartupFailure):
-      self.pantsd._run_services([self.mock_service])
+      self.pantsd._run_services(PantsServices(services=(self.mock_service,)))
 
     self.assertGreater(mock_shutdown.call_count, 0)
 
@@ -101,6 +100,6 @@ class PantsDaemonTest(TestBase):
     mock_fp.return_value = 'some_sha'
 
     with self.assertRaises(PantsDaemon.RuntimeFailure):
-      self.pantsd._run_services([self.mock_service])
+      self.pantsd._run_services(PantsServices(services=(self.mock_service,)))
 
     self.assertGreater(mock_shutdown.call_count, 0)

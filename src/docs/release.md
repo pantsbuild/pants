@@ -14,7 +14,7 @@ lucky release managers, this may result in two or more releases in a particular 
 A release is always prepared for each pantsbuild/pants branch by a green Travis CI run; ie: master,
 1.0.x, 1.1.x, etc. branches on [github.com/pantsbuild/pants](https://github.com/pantsbuild/pants) will have wheels created, tested
 and deployed to [binaries.pantsbuild.org](https://binaries.pantsbuild.org) ready for use in a release.
- 
+
 Once you know what to release, releasing pants involves:
 
 -   Preparing the release.
@@ -68,7 +68,7 @@ script fail:
         username: <fill me in>
         password: <fill me in>
         EOF
-    
+
   - Note that the release script expects your pantsbuild/pants git remote to be named `origin`.
     If you have another name for it, you should `git remote rename othername origin` before running
     the release script, and rename it back afterwards.
@@ -77,7 +77,7 @@ script fail:
 ------------------
 
 Pants and the common libraries are published to the [Python Package
-Index](https://pypi.python.org/pypi) per the Python community
+Index](https://pypi.org/pypi) per the Python community
 convention.
 
 Although the build and publish are automated, the version bumping, changelog edits,
@@ -173,7 +173,7 @@ can reset to your commit (`git reset --hard <sha>`) before publishing.
 -----------
 
 Check PyPi to ensure everything looks good. The [pantsbuild.pants
-package index page](https://pypi.python.org/pypi/pantsbuild.pants)
+package index page](https://pypi.org/pypi/pantsbuild.pants)
 should display the package version you just uploaded. The same check
 applies to other related package PyPi pages.
 
@@ -206,7 +206,7 @@ package :
     :::bash
     $ ./build-support/bin/release.sh -o
 
-We generally expect all packages to have the same set of owners, which you can 
+We generally expect all packages to have the same set of owners, which you can
 view [here](https://pypi.org/project/pantsbuild.pants/).
 
 [needs-cherrypick]: https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick

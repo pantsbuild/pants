@@ -11,7 +11,7 @@ This plugin uses FindBugs 3.0.1 which requires Java 1.7.0 or later to run.
 ## Installation
 
 FindBugs support is provided by a plugin distributed to [pypi]
-(https://pypi.python.org/pypi/pantsbuild.pants.contrib.findbugs).
+(https://pypi.org/pypi/pantsbuild.pants.contrib.findbugs).
 Assuming you have already [installed pants](http://www.pantsbuild.org/install.html), you'll need to
 add the FindBugs plugin in your `pants.ini`, like so:
 ```ini

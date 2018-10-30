@@ -12,9 +12,7 @@ PY=$(which python2.7 || exit 0)
 export PY
 
 function run_local_pants() {
-  pushd ${ROOT} &> /dev/null
   ${ROOT}/pants "$@"
-  popd &> /dev/null
 }
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
@@ -435,11 +433,25 @@ function reversion_whls() {
 readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
 
 function list_prebuilt_wheels() {
-  run_local_pants -q run src/python/pants/releases:release -- \
-    list_prebuilt_wheels \
-    --binary-base-url=${BINARY_BASE_URL} \
-    --deploy-pants-wheels-path=${DEPLOY_PANTS_WHEELS_PATH} \
-    --deploy-3rdparty-wheels-path=${DEPLOY_3RDPARTY_WHEELS_PATH}
+  # List prebuilt wheels as tab-separated tuples of filename and URL-encoded name.
+  wheel_listing="$(mktemp -t pants.wheels.XXXXX)"
+  trap "rm -f ${wheel_listing}" RETURN
+
+  for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
+    curl -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
+    "${PY}" << EOF
+from __future__ import print_function
+import sys
+import urllib
+import xml.etree.ElementTree as ET
+root = ET.parse("${wheel_listing}")
+ns = {'s3': 'http://s3.amazonaws.com/doc/2006-03-01/'}
+for key in root.findall('s3:Contents/s3:Key', ns):
+  # Because filenames may contain characters that have different meanings
+  # in URLs (namely '+'), # print the key both as url-encoded and as a file path.
+  print('{}\t{}'.format(key.text, urllib.quote_plus(key.text)))
+EOF
+ done
 }
 
 function fetch_prebuilt_wheels() {
@@ -448,12 +460,18 @@ function fetch_prebuilt_wheels() {
   banner "Fetching prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
   (
     cd "${to_dir}"
-    run_local_pants -q run src/python/pants/releases:release -- \
-      fetch_prebuilt_wheels \
-      --binary-base-url=${BINARY_BASE_URL} \
-      --deploy-pants-wheels-path=${DEPLOY_PANTS_WHEELS_PATH} \
-      --deploy-3rdparty-wheels-path=${DEPLOY_3RDPARTY_WHEELS_PATH} \
-      --to-dir=${to_dir}
+    list_prebuilt_wheels | {
+      while read path_tuple
+      do
+        local file_path=$(echo "$path_tuple" | awk -F'\t' '{print $1}')
+        local url_path=$(echo "$path_tuple" | awk -F'\t' '{print $2}')
+        echo "${BINARY_BASE_URL}/${url_path}:"
+        local dest="${to_dir}/${file_path}"
+        mkdir -p "$(dirname "${dest}")"
+        curl --fail --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
+          || die "Could not fetch ${dest}."
+      done
+    }
   )
 }
 

@@ -1,12 +1,12 @@
 # Pants plugin for JAX-WS
 
-The JAX-WS plugin for Pants uses the [wsimport tool](https://jax-ws.java.net/jax-ws-ea3/docs/wsimport.html) to generate web service client stubs from a 
+The JAX-WS plugin for Pants uses the [wsimport tool](https://jax-ws.java.net/jax-ws-ea3/docs/wsimport.html) to generate web service client stubs from a
 Web Services Description Language (WSDL) file for calling a JAX-WS web service.
 
 ## Installation
 
 JAX-WS support is provided by a plugin distributed to [pypi]
-(https://pypi.python.org/pypi/pantsbuild.pants.contrib.jax_ws).
+(https://pypi.org/pypi/pantsbuild.pants.contrib.jax_ws).
 Assuming you have already [installed pants](http://www.pantsbuild.org/install.html), you'll need to
 add the JAX-WS plugin in your `pants.ini`, like so:
 ```ini

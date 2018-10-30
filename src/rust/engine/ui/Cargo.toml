@@ -4,11 +4,10 @@ version = "0.0.1"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [lib]
-name = "engine_display"
 path = "src/display.rs"
 
 [[bin]]
-name = "ui"
+name = "demo"
 path = "src/main.rs"
 
 [dependencies]

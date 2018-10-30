@@ -192,9 +192,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     return html_report_file, listdir
 
   def _find_resolve_workdir(self, workdir):
-    # Finds the first resolve workdir that contains a resolution.json.
-    # Otherwise fails
-    ivy_dir = os.path.join(workdir, 'ivy')
+    ivy_dir = os.path.join(workdir, 'export/export/current/ivy')
     listdir = os.listdir(ivy_dir)
     listdir.remove('jars')
     for dir in listdir:

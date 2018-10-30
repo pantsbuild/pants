@@ -20,7 +20,7 @@ class PythonRepos(Subsystem):
     register('--repos', advanced=True, type=list, default=[], fingerprint=True,
              help='URLs of code repositories.')
     register('--indexes', advanced=True, type=list, fingerprint=True,
-             default=['https://pypi.python.org/simple/'], help='URLs of code repository indexes.')
+             default=['https://pypi.org/simple/'], help='URLs of code repository indexes.')
 
   @property
   def repos(self):
