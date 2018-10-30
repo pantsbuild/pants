@@ -1,1 +1,2 @@
 tests/python/pants_test/backend/jvm/tasks:jar_publish
+tests/python/pants_test/pantsd:process_manager
