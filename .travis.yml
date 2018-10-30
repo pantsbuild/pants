@@ -56,9 +56,9 @@ cache:
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
   - Test Pants
-  - name: Deploy Pants Pex
+  - name: &build_stable Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
-  - name: Deploy Pants Pex Unstable
+  - name: &build_unstable Deploy Pants Pex Unstable
     if: tag IS NOT present
 
 default_test_config: &default_test_config
@@ -137,7 +137,7 @@ matrix:
     - name: "Deploy Pants PEX"
       os: linux
       language: python
-      stage: Deploy Pants Pex
+      stage: *build_stable
       env:
         - PANTS_PEX_RELEASE=stable
       script:
@@ -160,7 +160,7 @@ matrix:
     - name: "Deploy Pants PEX Unstable"
       os: linux
       language: python
-      stage: Deploy Pants Pex Unstable
+      stage: *build_unstable
       env:
         - PREPARE_DEPLOY=1
       script:
