@@ -4,25 +4,27 @@ This is a plugin to integrate Node.js with Pants.
 
 # Targets
 
-Node.js targets in pants are designed to work with existing Node.js package management tools. A node_module target will work with a package.json
-source file in the same directory, combining the BUILD dependencies with the additional fields from the source package.json to form the complete
-package.json used for tasks on the target.
+Node.js targets in Pants are designed to work with existing Node.js package management tools and
+their configuration files. The node_module target type uses a package.json file in the same
+directory as its definition. It combines dependencies declared on the target in the BUILD
+file with the original package.json to form a complete package.json that can be used to run tasks
+on the target through Pants.
 
 
-`node_module`: A node module target.
-`node_preinstalled_module`: A prebuilt node_module that will be downloaded during resolve step.
-`node_bundle`: A bundle of node modules.
-`node_remote_module`: Remote third party module. [Not recommended, instead specify dependencies in package.json with lock file]
-`node_test`: Run Javascript tests defined in package.json.
+* `node_module`: A node module target.
+* `node_preinstalled_module`: A prebuilt node_module that will be downloaded during resolve step.
+* `node_bundle`: A bundle of node modules.
+* `node_remote_module`: Remote third party module. [Not recommended, instead specify dependencies in package.json with lock file]
+* `node_test`: Run Javascript tests defined in package.json.
 
 # Functionality
 
-There is limited support for `lint` and `fmt` that leverage the use of `eslint`. `eslint` global rules will need to be configured by the repo owner
-and currently does not support target-level rule overrides.
+There is limited support for linting and formatting using the `lint` and `fmt` goals, which use `eslint`.
+`eslint` global rules will need to be configured by the repo owner
 
 ## Source level dependencies
 
-Source-level dependencies is currently supported within the `yarn` package manager. To specify a target-level dependency on
+Source-level dependencies are currently supported within the `yarn` package manager. To specify a target-level dependency on
 another node_module target, you must:
 
 1. Specify the local dependency using the `file:` specifier following npm rules within the `package.json` with relative path
@@ -48,25 +50,35 @@ There are two supported package management tools: NPM and Yarn. You can specify 
 your dependencies in your BUILD target definition.
 
 NPM 5.0+ and Yarn both support locking dependencies to specific versions through the `package-lock.json` and `yarn.lock` files respectively.
-To ensure determinism and reproducibility within Pants, these files should be checked into your repository and included in the the target definition.
+To ensure determinism and reproducibility within Pants, these files should be checked into your repository and included in the
+target definition's sources argument.
 
-## Resolve
-
-Pants can install Node modules into the .pants.d working directory with
-
-	`./pants resolve [target]`
-
-You can resolve all types of node_module targets. Pants effectively walks forward from
-the edges of the dependency tree topological sort for a target and does an "install"
-for each target it encounters along the way. node_module targets have their sources copied into
-place under the working directory. node_remote_module dependencies are installed from the
-remote source, and node_module dependencies are installed via paths to previously-installed targets
-under the working directory. Targets resolved into the .pants.d directory using the yarn package manager
-will use the `--frozen-lockfile` parameter and will deterministically install your dependencies.
+## Install
 
 Pants can install Node modules into the source definition directory with
 
-	`./pants node-install [target]`
+    `./pants node-install [target]`
+
+You can install all types of node_module targets. Pants effectively walks forward from
+the edges of the dependency tree topological sort for a target and does an "install"
+for each target it encounters along the way. Pants then symlinks each of the source dependencies
+in the correct path under the `node_modules` directory.
+
+## Test
+
+Pants can run tests defined in your `package.json` file similar to your vanilla package manager.
+The main difference is that the tests are executed within Pants' virtual environment.
+
+`node_test` targets are able to run scripts defined in the `package.json` file.
+
+When Pants executes a `node_test` target, the target's sources are copied into place under the working directory. The
+sources are then `resolved` or `installed` into the pants working directory. The targets and paths are cached
+and passed into the Node.js runtime as NODE_PATH parameters to execute your test.
+
+Resolve is a task that helps Pants install and keep track of node_module targets.
+
+`node_remote_module` dependencies are installed from the remote source, and `node_module` dependencies are installed via
+paths to previously-installed targets under the working directory.
 
 
 ## REPL
@@ -74,7 +86,7 @@ Pants can install Node modules into the source definition directory with
 "./pants repl [target]" lets you run Node in REPL mode from the resolved target's path under the
 working directory.
 
-REPL is only working with npm package manager.
+REPL only works with npm package manager.
 
 # Examples
 
@@ -88,12 +100,3 @@ The examples directory contains a few types of interdependent JS projects.
   button component, and containing its own test file
 * A yarn workspace project using source-level dependencies in two ways. (Workspaces and pants).
   Source-level dependencies does not need Yarn Workspaces.
-
-Resolving the server project produces a dist directory with code transpiled by Babel, in addition
-to the project sources, in the target's directory under .pants.d.
-
-The other projects are designed to eventually demonstrate building code with the web build tool
-project via "npm run build" and testing (including a pre-test build step) via "npm test", once
-the ability to run scripts from a target is implemented.
-
-When Yarn package manager support was included, yarn projects have also been added.
