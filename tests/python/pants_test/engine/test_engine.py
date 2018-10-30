@@ -51,6 +51,17 @@ def fib(n):
   yield Fib(x.val + y.val)
 
 
+class MyInt(datatype([('val', int)])): pass
+
+
+class MyFloat(datatype([('val', float)])): pass
+
+
+@rule(MyFloat, [Select(MyInt)])
+def upcast(n):
+  yield MyFloat(float(n.val))
+
+
 class EngineTest(unittest.TestCase, SchedulerTestBase):
 
   assert_equal_with_printing = assert_equal_with_printing
@@ -190,3 +201,19 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
       list(scheduler.product_request(A, subjects=[(B())]))
 
     self.assert_equal_with_printing('No installed rules can satisfy Select(A) for a root subject of type B.', str(cm.exception))
+
+  def test_non_existing_root_fails_differently(self):
+    rules = [
+      upcast,
+    ]
+
+    with self.assertRaises(Exception) as cm:
+      list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
+
+    self.assert_equal_with_printing(dedent('''
+      Rules with errors: 1
+        (MyFloat, [Select(MyInt)], upcast):
+          No root rule found to compute MyInt. Maybe declare it as a RootRule(MyInt).
+        ''').strip(),
+      str(cm.exception)
+    )
