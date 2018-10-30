@@ -62,15 +62,15 @@ def _create_desandboxify_fn(possible_path_patterns):
   # if it finds a matching prefix, strips the path prior to the prefix and returns it
   # if it doesn't it returns the original path
   # TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
-  regexes = [re.compile(p) for p in possible_path_patterns]
+  regexes = [re.compile('/({})'.format(p)) for p in possible_path_patterns]
   def desandboxify(path):
     if not path:
       return path
     for r in regexes:
       match = r.search(path)
-      print('>>> matched {} with {} against {}'.format(match, r.pattern, path))
+      logger.debug('>>> matched {} with {} against {}'.format(match, r.pattern, path))
       if match:
-        return match.group(0)
+        return match.group(1)
     return path
   return desandboxify
 
@@ -85,18 +85,15 @@ class RscCompileContext(CompileContext):
                log_dir,
                zinc_args_file,
                sources,
-               rsc_index_dir,
-               rsc_outline_dir):
+               rsc_index_dir):
     super(RscCompileContext, self).__init__(target, analysis_file, classes_dir, jar_file,
                                                log_dir, zinc_args_file, sources)
     self.rsc_mjar_file = rsc_mjar_file
     self.rsc_index_dir = rsc_index_dir
-    self.rsc_outline_dir = rsc_outline_dir
 
   def ensure_output_dirs_exist(self):
     safe_mkdir(os.path.dirname(self.rsc_mjar_file))
     safe_mkdir(self.rsc_index_dir)
-    safe_mkdir(self.rsc_outline_dir)
 
 
 class RscCompile(ZincCompile):
@@ -117,8 +114,8 @@ class RscCompile(ZincCompile):
   def register_options(cls, register):
     super(RscCompile, cls).register_options(register)
 
-    rsc_toolchain_version = '0.0.0-294-d7114447'
-    scalameta_toolchain_version = '4.0.0-M10'
+    rsc_toolchain_version = '0.0.0-446-c64e6937'
+    scalameta_toolchain_version = '4.0.0'
 
     # TODO: it would be better to have a less adhoc approach to handling
     #       optional dependencies. See: https://github.com/pantsbuild/pants/issues/6390
@@ -155,19 +152,6 @@ class RscCompile(ZincCompile):
       ],
       custom_rules=[
         Shader.exclude_package('rsc', recursive=True),
-      ])
-    cls.register_jvm_tool(
-      register,
-      'mjar',
-      classpath=[
-          JarDependency(
-              org='com.twitter',
-              name='mjar_2.11',
-              rev=rsc_toolchain_version,
-          ),
-      ],
-      custom_rules=[
-        Shader.exclude_package('scala', recursive=True),
       ])
     cls.register_jvm_tool(
       register,
@@ -431,15 +415,14 @@ class RscCompile(ZincCompile):
             # NB: there are no unmetacp'd dependencies
             metai_classpath = []
 
+          rsc_mjar_file = fast_relpath(ctx.rsc_mjar_file, get_buildroot())
+
           # Step 2: Outline Scala sources into SemanticDB
           # ---------------------------------------------
-          rsc_outline_dir = fast_relpath(ctx.rsc_outline_dir, get_buildroot())
-          rsc_out = os.path.join(rsc_outline_dir, 'META-INF/semanticdb/out.semanticdb')
-          safe_mkdir(os.path.join(rsc_outline_dir, 'META-INF/semanticdb'))
           target_sources = ctx.sources
           args = [
             '-cp', os.pathsep.join(metai_classpath + metacp_jar_classpath_rel),
-            '-out', rsc_out,
+            '-d', rsc_mjar_file,
           ] + target_sources
           self._runtool(
             'rsc.cli.Main',
@@ -450,41 +433,7 @@ class RscCompile(ZincCompile):
             # TODO pass the input files from the target snapshot instead of the below
             # input_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
             input_files=target_sources + metai_classpath + metacp_jar_classpath_rel,
-            output_dir=rsc_outline_dir)
-          rsc_classpath = [rsc_outline_dir]
-
-          # Step 2.5: Postprocess the rsc outputs
-          # TODO: This is only necessary as a workaround for https://github.com/twitter/rsc/issues/199.
-          # Ideally, Rsc would do this on its own.
-          self._run_metai_tool(distribution,
-            rsc_classpath,
-            rsc_outline_dir,
-            tgt,
-            extra_input_files=(rsc_out,))
-
-
-          # Step 3: Convert SemanticDB into an mjar
-          # ---------------------------------------
-          rsc_mjar_file = fast_relpath(ctx.rsc_mjar_file, get_buildroot())
-          args = [
-            '-out', rsc_mjar_file,
-            os.pathsep.join(rsc_classpath),
-          ]
-          self._runtool(
-            'scala.meta.cli.Mjar',
-            'mjar',
-            args,
-            distribution,
-            tgt=tgt,
-            input_files=(
-              rsc_out,
-            ),
-            output_dir=os.path.dirname(rsc_mjar_file)
-            )
-          self.context.products.get_data('rsc_classpath').add_for_target(
-            ctx.target,
-            [(conf, ctx.rsc_mjar_file) for conf in self._confs],
-          )
+            output_dir=os.path.dirname(rsc_mjar_file))
 
         self._record_target_stats(tgt,
                                   len(cp_entries),
@@ -738,7 +687,6 @@ class RscCompile(ZincCompile):
         log_dir=os.path.join(rsc_dir, 'logs'),
         sources=sources,
         rsc_index_dir=os.path.join(rsc_dir, 'index'),
-        rsc_outline_dir=os.path.join(rsc_dir, 'outline'),
       ),
       CompileContext(
         target=target,
@@ -860,9 +808,11 @@ class RscCompile(ZincCompile):
     #    TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
     desandboxify = _create_desandboxify_fn(
       [
+        os.path.join(relative_workdir, 'resolve', 'coursier', '[^/]*', 'cache', '.*'),
         os.path.join(relative_workdir, 'resolve', 'ivy', '[^/]*', 'ivy', 'jars', '.*'),
         os.path.join(relative_workdir, 'compile', 'rsc', '.*'),
         os.path.join(relative_workdir, '\.jdk', '.*'),
+        os.path.join('\.jdk', '.*'),
       ]
       )
 
