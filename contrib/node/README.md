@@ -38,9 +38,12 @@ to the target dependency
 4. Scopes normally defined in the the `name` field of the `package.json` file needs to be replicated in the BUILD definition in the `node_scope` option.
 
 With some caveats,
+
 * Peer dependencies cannot be resolved within source dependencies. The source dependencies are symlinked and do not have a direct relationships with the parent
 target. There may be duplicate dependencies since there is no flattening of the dependency graph.
+
 * Source dependencies can only be specified in the “dependencies” field.
+
 * Source dependencies need to match 1:1 with package dependencies, but cannot currently express the node_scope within that context. The node_scope is assumed through the `node_scope` field in the BUILD definition.
 
 See the examples directory for real examples.
@@ -65,7 +68,7 @@ target definition's sources argument.
 
 Pants can install Node modules into the source definition directory with
 
-    `./pants node-install [target]`
+    ./pants node-install [target]
 
 You can install all types of node_module targets. Pants effectively walks forward from
 the edges of the dependency tree topological sort for a target and does an "install"
@@ -91,7 +94,7 @@ paths to previously-installed targets under the working directory.
 
 ## REPL
 
-"./pants repl [target]" lets you run Node in REPL mode from the resolved target's path under the
+`./pants repl [target]` lets you run Node in REPL mode from the resolved target's path under the
 working directory.
 
 REPL only works with npm package manager.
