@@ -154,7 +154,7 @@ matrix:
         on:
           # We only release a pex for Pants releases, which are tagged.
           tags: true
-          repo: wisechengyi/pants
+          repo: pantsbuild/pants
 
     # Deploy Pex Unstable to s3
     - name: "Deploy Pants PEX Unstable"
@@ -301,4 +301,4 @@ deploy:
     # NB: We mainly want deploys for `master` commits; but we also need new binaries for stable
     # release branches; eg `1.3.x`
     all_branches: true
-    repo: wisechengyi/pants
+    repo: pantsbuild/pants
