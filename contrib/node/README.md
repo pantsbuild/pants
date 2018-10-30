@@ -1,4 +1,4 @@
-# Plugin to support JavaScript and Node.js
+# Node.js Support
 
 This is a plugin to integrate Node.js with Pants.
 
