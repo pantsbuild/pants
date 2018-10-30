@@ -80,19 +80,23 @@ class CompilerOptionSetsMixin(MirroredTargetOptionMixin, object):
     # Set values for enabled options.
     for option_set_key in compiler_option_sets:
       # Fatal warnings option has special treatment for backwards compatibility.
-      if option_set_key == 'fatal_warnings':
-        enabled_fatal_warn_args = self.get_options().fatal_warnings_enabled_args
-        compiler_options.update(enabled_fatal_warn_args)
-      val = self.get_options().compiler_option_sets_enabled_args.get(option_set_key, ())
-      compiler_options.update(val)
+      # This is because previously this has had its own {enabled, disabled}_args
+      # options when these were defined in the jvm compile task.
+      fatal_warnings = self.get_options().fatal_warnings_enabled_args
+      if option_set_key == 'fatal_warnings' and fatal_warnings:
+        compiler_options.update(fatal_warnings)
+      else:
+        val = self.get_options().compiler_option_sets_enabled_args.get(option_set_key, ())
+        compiler_options.update(val)
 
     # Set values for disabled options.
     for option_set, disabled_args in self.get_options().compiler_option_sets_disabled_args.items():
       # Fatal warnings option has special treatment for backwards compatibility.
-      if option_set == 'fatal_warnings':
-        disabled_fatal_warn_args = self.get_options().fatal_warnings_disabled_args
+      disabled_fatal_warn_args = self.get_options().fatal_warnings_disabled_args
+      if option_set == 'fatal_warnings' and disabled_fatal_warn_args:
         compiler_options.update(disabled_fatal_warn_args)
-      if not option_set in compiler_option_sets:
-        compiler_options.update(disabled_args)
+      else:
+        if not option_set in compiler_option_sets:
+          compiler_options.update(disabled_args)
 
     return list(compiler_options)

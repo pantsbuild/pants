@@ -25,7 +25,7 @@ class NativeBuildStepSettings(CompilerOptionSetsMixin, Subsystem):
     register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
              help='The default for the "fatal_warnings" argument for targets of this language.',
              removal_version='1.14.0.dev2',
-             removal_hint='Use compiler options sets instead.')
+             removal_hint='Use compiler option sets instead.')
     register('--compiler-option-sets', advanced=True, default=(), type=list,
              fingerprint=True,
              help='The default for the "compiler_option_sets" argument '
