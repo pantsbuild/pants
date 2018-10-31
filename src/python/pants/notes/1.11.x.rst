@@ -15,6 +15,9 @@ Bugfixes
 * Move ivy/coursier link farms under versioned task directories (#6686)
   `PR #6686 <https://github.com/pantsbuild/pants/pull/6686>`_
 
+* Fixup `CheckstyleTest` for local resolves. (#6707)
+  `PR #6707 <https://github.com/pantsbuild/pants/pull/6707>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
