@@ -6,11 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import object
 
-from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
-  MirroredTargetOptionMixin
 
-
-class CompilerOptionSetsMixin(MirroredTargetOptionMixin, object):
+class CompilerOptionSetsMixin(object):
   """A mixin for language-scoped that support compiler option sets."""
 
   @classmethod

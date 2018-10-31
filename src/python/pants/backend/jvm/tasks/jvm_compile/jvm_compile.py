@@ -53,11 +53,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   size_estimators = create_size_estimators()
 
-  mirrored_option_to_kwarg_map = {
-    'fatal_warnings': 'fatal_warnings',
-    'compiler_option_sets': 'compiler_option_sets',
-  }
-
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
     return cls.size_estimators[estimation_strategy_name]
