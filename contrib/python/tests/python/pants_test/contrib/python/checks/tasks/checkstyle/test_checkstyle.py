@@ -20,6 +20,7 @@ from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from parameterized import parameterized
+from pex.interpreter import PythonInterpreter
 from wheel.install import WheelFile
 
 from pants.contrib.python.checks.tasks.checkstyle.checkstyle import Checkstyle
@@ -49,7 +50,8 @@ class CheckstyleTest(PythonTaskTestBase):
   @staticmethod
   def install_wheel(wheel, root_dir):
     importable_path = os.path.join(root_dir, 'install', os.path.basename(wheel))
-    overrides = {path: root_dir for path in ('purelib', 'platlib', 'headers', 'scripts', 'data')}
+    overrides = {path: importable_path
+                 for path in ('purelib', 'platlib', 'headers', 'scripts', 'data')}
     WheelFile(wheel).install(force=True, overrides=overrides)
     return importable_path
 
@@ -75,6 +77,13 @@ class CheckstyleTest(PythonTaskTestBase):
   @contextmanager
   def resolve_configuration(self, resolve_local=False):
     if resolve_local:
+      # Ensure our checkstyle task runs under the same interpreter we are running under so that
+      # local resolves find dists compatible with the current interpreter.
+      current_interpreter = PythonInterpreter.get()
+      constraint = '{}=={}'.format(current_interpreter.identity.interpreter,
+                                   current_interpreter.identity.version_str)
+      self.set_options_for_scope(PythonSetup.options_scope, interpreter_constraints=[constraint])
+
       prior = sys.path[:]
       sys.path.append(self._checker_dist_importable_path)
       try:
