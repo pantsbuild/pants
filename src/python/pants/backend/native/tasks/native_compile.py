@@ -134,7 +134,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   @abstractmethod
   def get_compile_settings(self):
-    """Return a subclass of NativeBuildStepSettings.
+    """Return an instance of NativeBuildStepSettings.
 
     NB: Subclasses will be queried for the compile settings once and the result cached.
     """

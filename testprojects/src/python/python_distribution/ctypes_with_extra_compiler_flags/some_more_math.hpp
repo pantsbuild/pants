@@ -7,8 +7,8 @@
 #define assert(condition)
 #endif
 
-#ifdef _GLIBCXX_USE_CXX11_ABI
-#if _GLIBCXX_USE_CXX11_ABI == 0
+#ifdef ASDF
+#if ASDF == 0
 #define SOMETHING 800000
 #else
 #define SOMETHING 1

@@ -152,7 +152,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   def test_native_compiler_option_sets_integration(self):
     """Test that native compilation includes extra compiler flags from target definitions.
 
-    This target uses the ndebug and glibcxx_use_cxx11_abi option sets.
+    This target uses the ndebug and asdf option sets.
     If either of these are not present (disabled), this test will fail.
     """
     command = [
@@ -163,10 +163,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       'native-build-step-settings.cpp-compile-settings': {
         'compiler_option_sets_enabled_args': {
           'ndebug': ['-DNDEBUG'],
-          'glibcxx_use_cxx11_abi': ['-D_GLIBCXX_USE_CXX11_ABI=1'],
+          'asdf': ['-DASDF=1'],
         },
         'compiler_option_sets_disabled_args': {
-          'glibcxx_use_cxx11_abi': ['-D_GLIBCXX_USE_CXX11_ABI=0'],
+          'asdf': ['-DASDF=0'],
         }
       },
     })

@@ -36,6 +36,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_open
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.meta import classproperty
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -140,13 +141,13 @@ class BaseZincCompile(JvmCompile):
   def get_no_warning_args_default(cls):
     return ('-C-nowarn', '-C-Xlint:none', '-S-nowarn', '-S-Xlint:none', )
 
-  @classmethod
+  @classproperty
   def get_fatal_warnings_enabled_args_default(cls):
     return ('-S-Xfatal-warnings', '-C-Werror')
 
-  @classmethod
+  @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):
-    return {'fatal_warnings': cls.get_fatal_warnings_enabled_args_default()}
+    return {'fatal_warnings': cls.get_fatal_warnings_enabled_args_default}
 
   @classmethod
   def register_options(cls, register):

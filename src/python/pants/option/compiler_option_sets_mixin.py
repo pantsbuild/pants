@@ -6,6 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import object
 
+from pants.util.meta import classproperty
+
 
 class CompilerOptionSetsMixin(object):
   """A mixin for language-scoped that support compiler option sets."""
@@ -15,19 +17,23 @@ class CompilerOptionSetsMixin(object):
     super(CompilerOptionSetsMixin, cls).register_options(register)
 
     register('--fatal-warnings-enabled-args', advanced=True, type=list, fingerprint=True,
-             default=list(cls.get_fatal_warnings_enabled_args_default()),
-             help='Extra compiler args to use when fatal warnings are enabled.')
+             default=cls.get_fatal_warnings_enabled_args_default,
+             help='Extra compiler args to use when fatal warnings are enabled.',
+             removal_version='1.14.0.dev2',
+             removal_hint='Use compiler option sets instead.')
     register('--fatal-warnings-disabled-args', advanced=True, type=list, fingerprint=True,
-             default=list(cls.get_fatal_warnings_disabled_args_default()),
-             help='Extra compiler args to use when fatal warnings are disabled.')
+             default=cls.get_fatal_warnings_disabled_args_default,
+             help='Extra compiler args to use when fatal warnings are disabled.',
+             removal_version='1.14.0.dev2',
+             removal_hint='Use compiler option sets instead.')
     register('--compiler-option-sets-enabled-args', advanced=True, type=dict, fingerprint=True,
-             default=cls.get_compiler_option_sets_enabled_default_value(),
+             default=cls.get_compiler_option_sets_enabled_default_value,
              help='Extra compiler args to use for each enabled option set.')
     register('--compiler-option-sets-disabled-args', advanced=True, type=dict, fingerprint=True,
-             default=cls.get_compiler_option_sets_disabled_default_value(),
+             default=cls.get_compiler_option_sets_disabled_default_value,
              help='Extra compiler args to use for each disabled option set.')
 
-  @property
+  @classproperty
   def compiler_option_sets(self):
     """For every element in this list, enable the corresponding flags on compilation
     of targets.
@@ -35,7 +41,7 @@ class CompilerOptionSetsMixin(object):
     """
     return self.get_options().compiler_option_sets
 
-  @property
+  @classproperty
   def compiler_option_sets_enabled_args(self):
     """For every element in this list, enable the corresponding flags on compilation
     of targets.
@@ -43,7 +49,7 @@ class CompilerOptionSetsMixin(object):
     """
     return self.get_options().compiler_option_sets_enabled_args
 
-  @property
+  @classproperty
   def compiler_option_sets_disabled_args(self):
     """For every element in this list, enable the corresponding flags on compilation
     of targets.
@@ -51,22 +57,22 @@ class CompilerOptionSetsMixin(object):
     """
     return self.get_options().compiler_option_sets_disabled_args
 
-  @classmethod
+  @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):
     """Override to set default for this option."""
     return {}
 
-  @classmethod
+  @classproperty
   def get_compiler_option_sets_disabled_default_value(cls):
     """Override to set default for this option."""
     return {}
 
-  @classmethod
+  @classproperty
   def get_fatal_warnings_enabled_args_default(cls):
     """Override to set default for this option."""
     return ()
 
-  @classmethod
+  @classproperty
   def get_fatal_warnings_disabled_args_default(cls):
     """Override to set default for this option."""
     return ()
