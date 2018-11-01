@@ -215,8 +215,16 @@ class TestProcessManager(TestBase):
     self.assertEqual(self.pm.get_subprocess_output(['echo', '-n', test_str]), test_str)
 
   def test_get_subprocess_output_interleaved(self):
-    cmd_payload = 'import sys; ' + ('sys.stderr.write("9"); sys.stdout.write("3"); ' * 3)
+    cmd_payload = 'import sys; ' + ('sys.stderr.write("9"); sys.stderr.flush(); sys.stdout.write("3"); sys.stdout.flush();' * 3)
     cmd = [sys.executable, '-c', cmd_payload]
+
+    self.assertEqual(self.pm.get_subprocess_output(cmd), '333')
+    self.assertEqual(self.pm.get_subprocess_output(cmd, ignore_stderr=False), '939393')
+    self.assertEqual(self.pm.get_subprocess_output(cmd, stderr=subprocess.STDOUT), '939393')
+
+  def test_get_subprocess_output_interleaved_bash(self):
+    cmd_payload = 'printf "9">&2; printf "3";' * 3
+    cmd = ['/bin/bash', '-c', cmd_payload]
 
     self.assertEqual(self.pm.get_subprocess_output(cmd), '333')
     self.assertEqual(self.pm.get_subprocess_output(cmd, ignore_stderr=False), '939393')
