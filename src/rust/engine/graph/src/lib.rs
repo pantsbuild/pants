@@ -1064,6 +1064,10 @@ mod tests {
     fn digest(_result: Self::Item) -> Option<Digest> {
       None
     }
+
+    fn cacheable(&self) -> bool {
+      true
+    }
   }
 
   impl TNode {

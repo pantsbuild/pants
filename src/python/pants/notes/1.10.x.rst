@@ -3,7 +3,7 @@
 
 This document describes releases leading up to the ``1.10.x`` ``stable`` series.
 
-1.10.0rc2 (10/10/2018)
+1.10.0rc2 (10/30/2018)
 ----------------------
 
 Bugfixes
@@ -13,6 +13,15 @@ Bugfixes
   `Pex Issue #561, <https://github.com/pantsbuild/pex/issues/561>`_
   `Pants PR #6568 <https://github.com/pantsbuild/pants/pull/6568>`_
   `Pex PR #562 <https://github.com/pantsbuild/pex/pull/562>`_
+
+* More pinning to fix jupyter floats. (#6600)
+  `PR #6600 <https://github.com/pantsbuild/pants/pull/6600>`_
+
+* Move ivy/coursier link farms under versioned task directories (#6686)
+  `PR #6686 <https://github.com/pantsbuild/pants/pull/6686>`_
+
+* Pause all PantsService threads before forking a pantsd-runner (#6671)
+  `PR #6671 <https://github.com/pantsbuild/pants/pull/6671>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -31,6 +40,15 @@ Refactoring, Improvements, and Tooling
 
 * Switch synchronization primitive usage to parking_lot (#6564)
   `PR #6564 <https://github.com/pantsbuild/pants/pull/6564>`_
+
+* Fix bugs in the parent/child relationship in ProcessManager (#6670)
+  `PR #6670 <https://github.com/pantsbuild/pants/pull/6670>`_
+
+* Remove the FSEventService pool in favor of execution on the dedicated service thread. (#6667)
+  `PR #6667 <https://github.com/pantsbuild/pants/pull/6667>`_
+
+* Make PailgunServer multithreaded in order to avoid blocking the PailgunService thread. (#6669)
+  `PR #6669 <https://github.com/pantsbuild/pants/pull/6669>`_
 
 1.10.0rc1 (09/17/2018)
 ----------------------

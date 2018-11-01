@@ -52,7 +52,7 @@ class RscCompileIntegration(BaseCompileIT):
         path = os.path.join(
           workdir,
           'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/rsc',
-          'outline/META-INF/semanticdb/out.semanticdb')
+          'm.jar')
         self.assertTrue(os.path.exists(path))
         path = os.path.join(
           workdir,

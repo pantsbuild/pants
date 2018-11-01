@@ -14,7 +14,7 @@ from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks import pex_build_util
+from pants.backend.python.tasks.pex_build_util import PexBuilderWrapper
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
@@ -30,7 +30,8 @@ from pants.util.dirutil import safe_concurrent_creation
 from pants.util.memo import memoized_classproperty, memoized_property
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
-from pkg_resources import DistributionNotFound, Requirement, WorkingSet
+from pex.platforms import Platform
+from pkg_resources import DistributionNotFound, Environment, Requirement, WorkingSet
 
 from pants.contrib.python.checks.checker import checker
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import \
@@ -122,37 +123,43 @@ class Checkstyle(LintTaskMixin, Task):
     if not os.path.exists(pex_path):
       with self.context.new_workunit(name='build-checker'):
         with safe_concurrent_creation(pex_path) as chroot:
-          builder = PEXBuilder(path=chroot, interpreter=interpreter)
+          pex_builder = PexBuilderWrapper(
+            PEXBuilder(path=chroot, interpreter=interpreter),
+            PythonRepos.global_instance(),
+            PythonSetup.global_instance(), self.context.log)
+
           # Constraining is required to guard against the case where the user
           # has a pexrc file set.
-          builder.add_interpreter_constraint(str(interpreter.identity.requirement))
+          pex_builder.add_interpreter_constraint(str(interpreter.identity.requirement))
 
           if pants_dev_mode:
-            pex_build_util.dump_sources(builder, tgt=self.checker_target, log=self.context.log)
+            pex_builder.add_sources_from(self.checker_target)
             req_libs = [tgt for tgt in self.checker_target.closure()
                         if isinstance(tgt, PythonRequirementLibrary)]
-            pex_build_util.dump_requirement_libs(builder,
-                                                 interpreter=interpreter,
-                                                 req_libs=req_libs,
-                                                 log=self.context.log)
+
+            pex_builder.add_requirement_libs_from(req_libs=req_libs)
           else:
             try:
               # The checker is already on sys.path, eg: embedded in pants.pex.
+              platform = Platform.current()
+              platform_name = platform.platform
+              env = Environment(search_path=sys.path,
+                                platform=platform_name,
+                                python=interpreter.version_string)
               working_set = WorkingSet(entries=sys.path)
-              for dist in working_set.resolve([Requirement.parse(self._CHECKER_REQ)]):
-                for req in dist.requires():
-                  builder.add_requirement(req)
-                builder.add_distribution(dist)
-              builder.add_requirement(self._CHECKER_REQ)
-            except DistributionNotFound:
+              for dist in working_set.resolve([Requirement.parse(self._CHECKER_REQ)], env=env):
+                pex_builder.add_direct_requirements(dist.requires())
+                # NB: We add the dist location instead of the dist itself to make sure its a
+                # distribution style pex knows how to package.
+                pex_builder.add_dist_location(dist.location)
+              pex_builder.add_direct_requirements([self._CHECKER_REQ])
+            except (DistributionNotFound, PEXBuilder.InvalidDistribution):
               # We need to resolve the checker from a local or remote distribution repo.
-              pex_build_util.dump_requirements(builder,
-                                               interpreter=interpreter,
-                                               reqs=[PythonRequirement(self._CHECKER_REQ)],
-                                               log=self.context.log)
+              pex_builder.add_resolved_requirements(
+                [PythonRequirement(self._CHECKER_REQ)])
 
-          builder.set_entry_point(self._CHECKER_ENTRYPOINT)
-          builder.freeze()
+          pex_builder.set_entry_point(self._CHECKER_ENTRYPOINT)
+          pex_builder.freeze()
 
     return PEX(pex_path, interpreter=interpreter)
 

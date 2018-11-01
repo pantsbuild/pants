@@ -115,13 +115,15 @@ class RscCompileTest(TaskTestBase):
 
   def test_desandbox_fn(self):
     # TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
-    desandbox = _create_desandboxify_fn(['.pants.d/cool/beans', '.pants.d/c/r/c'])
+    desandbox = _create_desandboxify_fn(['.pants.d/cool/beans.*', '.pants.d/c/r/c/.*'])
     self.assertEqual(desandbox('/some/path/.pants.d/cool/beans'), '.pants.d/cool/beans')
     self.assertEqual(desandbox('/some/path/.pants.d/c/r/c/beans'), '.pants.d/c/r/c/beans')
     self.assertEqual(desandbox(
       '/some/path/.pants.d/exec-location/.pants.d/c/r/c/beans'),
       '.pants.d/c/r/c/beans')
     self.assertEqual(desandbox('/some/path/outside/workdir'), '/some/path/outside/workdir')
+    # NB ensure that a path outside the workdir that partially matches won't be truncated
+    self.assertEqual(desandbox('/some/path/outside/workdir.pants.d/cool/beans/etc'), '/some/path/outside/workdir.pants.d/cool/beans/etc')
     self.assertEqual(desandbox(None), None)
     # ensure that temp workdirs are discovered relative to the buildroot
     desandbox = _create_desandboxify_fn(['.pants.d/tmp.pants.d/cool/beans', '.pants.d/tmp.pants.d/c/r/c'])

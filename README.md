@@ -6,9 +6,9 @@ many distinct projects.
 
 Friendly documentation: http://www.pantsbuild.org/
 
-We release to [PyPI](https://pypi.python.org/pypi)
-[![version](https://img.shields.io/pypi/v/pantsbuild.pants.svg)](https://pypi.python.org/pypi/pantsbuild.pants)
-[![license](https://img.shields.io/pypi/l/pantsbuild.pants.svg)](https://pypi.python.org/pypi/pantsbuild.pants)
+We release to [PyPI](https://pypi.org/pypi)
+[![version](https://img.shields.io/pypi/v/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
+[![license](https://img.shields.io/pypi/l/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
 
 We use [Travis CI](https://travis-ci.org) to verify the build
 [![Build Status](https://travis-ci.org/pantsbuild/pants.svg?branch=master)](https://travis-ci.org/pantsbuild/pants/branches).

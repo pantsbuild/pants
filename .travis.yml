@@ -56,8 +56,10 @@ cache:
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
   - Test Pants
-  - name: Deploy Pants Pex
+  - name: &build_stable Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
+  - name: &build_unstable Deploy Pants Pex Unstable
+    if: tag IS NOT present AND type != pull_request
 
 default_test_config: &default_test_config
   os: linux
@@ -83,6 +85,9 @@ default_test_config: &default_test_config
     - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
     - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
     - jdk_switcher use oraclejdk8
+    # Increase the max number of user watches to ensure that watchman is able to watch all
+    # files in the working copy.
+    - sudo sysctl fs.inotify.max_user_watches=524288
 
 matrix:
   include:
@@ -128,11 +133,11 @@ matrix:
       after_failure:
         - build-support/bin/ci-failure.sh
 
-    # Deploy Pex
+    # Deploy Pex Stable
     - name: "Deploy Pants PEX"
       os: linux
       language: python
-      stage: Deploy Pants Pex
+      stage: *build_stable
       env:
         - PANTS_PEX_RELEASE=stable
       script:
@@ -150,6 +155,16 @@ matrix:
           # We only release a pex for Pants releases, which are tagged.
           tags: true
           repo: pantsbuild/pants
+
+    # Deploy Pex Unstable to s3
+    - name: "Deploy Pants PEX Unstable"
+      os: linux
+      language: python
+      stage: *build_unstable
+      env:
+        - PREPARE_DEPLOY=1
+      script:
+        - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
     - <<: *default_test_config
       name: "Self checks, lint, and JVM tests"

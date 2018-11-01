@@ -264,8 +264,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--watchman-startup-timeout', type=float, advanced=True, default=30.0,
              help='The watchman socket timeout (in seconds) for the initial `watch-project` command. '
                   'This may need to be set higher for larger repos due to watchman startup cost.')
-    register('--watchman-socket-timeout', type=float, advanced=True, default=5.0,
-             help='The watchman client socket timeout in seconds.')
+    register('--watchman-socket-timeout', type=float, advanced=True, default=0.1,
+             help='The watchman client socket timeout in seconds. Setting this to too high a '
+                  'value can negatively impact the latency of runs forked by pantsd.')
     register('--watchman-socket-path', type=str, advanced=True, default=None,
              help='The path to the watchman UNIX socket. This can be overridden if the default '
                   'absolute path length exceeds the maximum allowed by the OS.')
@@ -332,6 +333,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Enables execution of v1 Tasks.')
     register('--v2', advanced=True, type=bool, default=False,
              help='Enables execution of v2 @console_rules.')
+    register('--v2-ui', default=False, type=bool, daemon=False,
+             help='Whether to show v2 engine execution progress. '
+                  'This requires the --v2 flag to take effect.')
 
     loop_flag = '--loop'
     register(loop_flag, type=bool,
@@ -375,3 +379,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                          '`--v2 --no-v1` to function as expected.')
     if opts.loop and not opts.enable_pantsd:
       raise OptionsError('The --loop option requires `--enable-pantsd`, in order to watch files.')
+
+    if opts.v2_ui and not opts.v2:
+      raise OptionsError('The --v2-ui option requires --v2 to be enabled together.')

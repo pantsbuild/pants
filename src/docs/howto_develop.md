@@ -99,7 +99,7 @@ You'll need to setup some files one-time in your own repo:
         "https://pantsbuild.github.io/cheeseshop/third_party/python/index.html"
       ]
 
-    indexes: ["https://pypi.python.org/simple/"]
+    indexes: ["https://pypi.org/simple/"]
 
 To (re-)generate a `pants.pex` you then run these 2 commands:
 
