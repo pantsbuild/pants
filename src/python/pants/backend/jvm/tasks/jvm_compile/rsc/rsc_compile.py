@@ -432,39 +432,7 @@ class RscCompile(ZincCompile):
             tgt=tgt,
             input_files=target_sources + metai_classpath + metacp_jar_classpath_rel,
             input_snapshot=ctx.target.sources_snapshot(scheduler=self.context._scheduler),
-            output_dir=rsc_outline_dir)
-          rsc_classpath = [rsc_outline_dir]
-
-          # Step 2.5: Postprocess the rsc outputs
-          # TODO: This is only necessary as a workaround for https://github.com/twitter/rsc/issues/199.
-          # Ideally, Rsc would do this on its own.
-          self._run_metai_tool(distribution,
-            rsc_classpath,
-            rsc_outline_dir,
-            tgt,
-            extra_input_files=(rsc_out,))
-
-
-          # Step 3: Convert SemanticDB into an mjar
-          # ---------------------------------------
-          rsc_mjar_file = fast_relpath(ctx.rsc_mjar_file, get_buildroot())
-          args = [
-            '-out', rsc_mjar_file,
-            os.pathsep.join(rsc_classpath),
-          ]
-          self._runtool(
-            'scala.meta.cli.Mjar',
-            'mjar',
-            args,
-            distribution,
-            tgt=tgt,
-            input_files=(rsc_out,),
-            output_dir=os.path.dirname(rsc_mjar_file)
-            )
-          self.context.products.get_data('rsc_classpath').add_for_target(
-            ctx.target,
-            [(conf, ctx.rsc_mjar_file) for conf in self._confs],
-          )
+            output_dir=os.path.dirname(rsc_mjar_file))
 
         self._record_target_stats(tgt,
                                   len(cp_entries),
@@ -753,13 +721,12 @@ class RscCompile(ZincCompile):
         cmd.extend([main])
         cmd.extend(args)
 
-        input_directory_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
-        print('*'*100)
-        print(input_directory_digest)
-        print(input_snapshot)
+        input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
+        input_files = self.context._scheduler.merge_directories((
+          input_snapshot.directory_digest, input_digest)) if input_snapshot else input_digest
         epr = ExecuteProcessRequest(
           argv=tuple(cmd),
-          input_files=scheduler.merge_directories(input_snapshot.directory_digest if input_snapshot, input_directory_digest)
+          input_files=input_files,
           output_files=tuple(),
           output_directories=(output_dir,),
           timeout_seconds=15*60,
