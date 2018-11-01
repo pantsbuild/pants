@@ -30,7 +30,8 @@ from pants.util.dirutil import safe_concurrent_creation
 from pants.util.memo import memoized_classproperty, memoized_property
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
-from pkg_resources import DistributionNotFound, Requirement, WorkingSet
+from pex.platforms import Platform
+from pkg_resources import DistributionNotFound, Environment, Requirement, WorkingSet
 
 from pants.contrib.python.checks.checker import checker
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import \
@@ -140,12 +141,19 @@ class Checkstyle(LintTaskMixin, Task):
           else:
             try:
               # The checker is already on sys.path, eg: embedded in pants.pex.
+              platform = Platform.current()
+              platform_name = platform.platform
+              env = Environment(search_path=sys.path,
+                                platform=platform_name,
+                                python=interpreter.version_string)
               working_set = WorkingSet(entries=sys.path)
-              for dist in working_set.resolve([Requirement.parse(self._CHECKER_REQ)]):
+              for dist in working_set.resolve([Requirement.parse(self._CHECKER_REQ)], env=env):
                 pex_builder.add_direct_requirements(dist.requires())
-                pex_builder.add_distribution(dist)
+                # NB: We add the dist location instead of the dist itself to make sure its a
+                # distribution style pex knows how to package.
+                pex_builder.add_dist_location(dist.location)
               pex_builder.add_direct_requirements([self._CHECKER_REQ])
-            except DistributionNotFound:
+            except (DistributionNotFound, PEXBuilder.InvalidDistribution):
               # We need to resolve the checker from a local or remote distribution repo.
               pex_builder.add_resolved_requirements(
                 [PythonRequirement(self._CHECKER_REQ)])
