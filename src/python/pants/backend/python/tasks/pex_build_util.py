@@ -290,5 +290,8 @@ class PexBuilderWrapper(object):
   def add_distribution(self, dist):
     self._builder.add_distribution(dist)
 
+  def add_dist_location(self, location):
+    self._builder.add_dist_location(location)
+
   def set_script(self, script):
     self._builder.set_script(script)
