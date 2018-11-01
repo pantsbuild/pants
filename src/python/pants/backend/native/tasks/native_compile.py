@@ -27,7 +27,6 @@ class NativeCompileRequest(datatype([
     # TODO: add type checking for Collection.of(<type>)!
     'include_dirs',
     'sources',
-    ('fatal_warnings', bool),
     'compiler_options',
     'output_dir',
 ])): pass
@@ -177,9 +176,6 @@ class NativeCompile(NativeTask, AbstractClass):
       compiler=self._compiler,
       include_dirs=include_dirs,
       sources=sources_and_headers,
-      fatal_warnings=(self._compile_settings
-                         .native_build_step_settings
-                         .get_fatal_warnings_value_for_target(target)),
       compiler_options=(self._compile_settings
                             .native_build_step_settings
                             .get_merged_args_for_compiler_option_sets(compiler_option_sets)),
@@ -188,14 +184,12 @@ class NativeCompile(NativeTask, AbstractClass):
   def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
     compiler = compile_request.compiler
-    err_flags = ['-Werror'] if compile_request.fatal_warnings else []
     compiler_options = compile_request.compiler_options
     # We are going to execute in the target output, so get absolute paths for everything.
     buildroot = get_buildroot()
     argv = (
       [compiler.exe_filename] +
       compiler.extra_args +
-      err_flags +
       # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
       ['-c', '-fPIC'] +
       compiler_options +

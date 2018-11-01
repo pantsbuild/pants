@@ -9,6 +9,7 @@ from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
+from pants.util.meta import classproperty
 
 
 class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsystem):
@@ -16,7 +17,6 @@ class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin
   options_scope = 'native-build-step-settings'
 
   mirrored_option_to_kwarg_map = {
-    'fatal_warnings': 'fatal_warnings',
     'compiler_option_sets': 'compiler_option_sets',
   }
 
@@ -24,20 +24,17 @@ class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin
   def register_options(cls, register):
     super(NativeBuildStepSettings, cls).register_options(register)
 
-    register('--fatal-warnings', type=bool, default=True, fingerprint=True, advanced=True,
-             help='The default for the "fatal_warnings" argument for targets of this language.',
-             removal_version='1.14.0.dev2',
-             removal_hint='Use compiler option sets instead.')
     register('--compiler-option-sets', advanced=True, default=(), type=list,
              fingerprint=True,
              help='The default for the "compiler_option_sets" argument '
                   'for targets of this language.')
 
-  def get_fatal_warnings_value_for_target(self, target):
-    return self.get_target_mirrored_option('fatal_warnings', target)
-
   def get_compiler_option_sets_for_target(self, target):
     return self.get_target_mirrored_option('compiler_option_sets', target)
+
+  @classproperty
+  def get_compiler_option_sets_enabled_default_value(cls):
+    return {"fatal_warnings": ["-Werror"]}
 
 
 class CCompileSettings(Subsystem):

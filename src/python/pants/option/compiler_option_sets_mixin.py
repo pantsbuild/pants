@@ -34,30 +34,6 @@ class CompilerOptionSetsMixin(object):
              help='Extra compiler args to use for each disabled option set.')
 
   @classproperty
-  def compiler_option_sets(self):
-    """For every element in this list, enable the corresponding flags on compilation
-    of targets.
-    :rtype: list
-    """
-    return self.get_options().compiler_option_sets
-
-  @classproperty
-  def compiler_option_sets_enabled_args(self):
-    """For every element in this list, enable the corresponding flags on compilation
-    of targets.
-    :rtype: list
-    """
-    return self.get_options().compiler_option_sets_enabled_args
-
-  @classproperty
-  def compiler_option_sets_disabled_args(self):
-    """For every element in this list, enable the corresponding flags on compilation
-    of targets.
-    :rtype: list
-    """
-    return self.get_options().compiler_option_sets_disabled_args
-
-  @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):
     """Override to set default for this option."""
     return {}
