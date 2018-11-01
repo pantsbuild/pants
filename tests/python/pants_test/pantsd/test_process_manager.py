@@ -222,6 +222,14 @@ class TestProcessManager(TestBase):
     self.assertEqual(self.pm.get_subprocess_output(cmd, ignore_stderr=False), '939393')
     self.assertEqual(self.pm.get_subprocess_output(cmd, stderr=subprocess.STDOUT), '939393')
 
+  def test_get_subprocess_output_interleaved_bash(self):
+    cmd_payload = 'printf "9">&2; printf "3";' * 3
+    cmd = ['/bin/bash', '-c', cmd_payload]
+
+    self.assertEqual(self.pm.get_subprocess_output(cmd), '333')
+    self.assertEqual(self.pm.get_subprocess_output(cmd, ignore_stderr=False), '939393')
+    self.assertEqual(self.pm.get_subprocess_output(cmd, stderr=subprocess.STDOUT), '939393')
+
   def test_get_subprocess_output_oserror_exception(self):
     with self.assertRaises(ProcessManager.ExecutionError):
       self.pm.get_subprocess_output(['i_do_not_exist'])
