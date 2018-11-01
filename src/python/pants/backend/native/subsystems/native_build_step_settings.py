@@ -14,7 +14,7 @@ from pants.util.meta import classproperty
 
 class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsystem):
 
-  options_scope = 'native-build-step-settings'
+  options_scope = 'native-build-step'
 
   mirrored_option_to_kwarg_map = {
     'compiler_option_sets': 'compiler_option_sets',

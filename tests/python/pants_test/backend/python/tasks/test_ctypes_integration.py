@@ -160,7 +160,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       self._binary_target_with_compiler_option_sets
     ]
     pants_run = self.run_pants(command=command, config={
-      'native-build-step-settings.cpp-compile-settings': {
+      'native-build-step.cpp-compile-settings': {
         'compiler_option_sets_enabled_args': {
           'ndebug': ['-DNDEBUG'],
           'asdf': ['-DASDF=1'],
