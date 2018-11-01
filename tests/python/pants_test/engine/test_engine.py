@@ -213,7 +213,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     self.assert_equal_with_printing(dedent('''
       Rules with errors: 1
         (MyFloat, [Select(MyInt)], upcast):
-          No root rule found to compute MyInt. Maybe declare it as a RootRule(MyInt).
+          No rule was available to compute MyInt. Maybe declare it as a RootRule(MyInt)?
         ''').strip(),
       str(cm.exception)
     )
