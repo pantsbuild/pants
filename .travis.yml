@@ -59,7 +59,7 @@ stages:
   - name: &build_stable Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
   - name: &build_unstable Deploy Pants Pex Unstable
-    if: tag IS NOT present
+    if: tag IS NOT present AND type != pull_request
 
 default_test_config: &default_test_config
   os: linux
