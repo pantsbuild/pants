@@ -5,7 +5,7 @@
     #if _ASDF == 0
         #define SOMETHING 800000
     #else
-        #define SOMETHING 1
+        #define SOMETHING 100000
     #endif
 #else
     #define SOMETHING -1

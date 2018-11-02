@@ -170,4 +170,4 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       },
     })
     self.assert_success(pants_run)
-    self.assertIn('x=3, f(x)=126', pants_run.stdout_data)
+    self.assertIn('x=3, f(x)=12600000', pants_run.stdout_data)
