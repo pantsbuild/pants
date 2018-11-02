@@ -15,9 +15,6 @@ from pants.build_graph.target import Target
 
 class BuildFileAliasesTest(unittest.TestCase):
 
-  class RedTarget(Target):
-    pass
-
   class BlueTarget(Target):
     pass
 
@@ -26,7 +23,7 @@ class BuildFileAliasesTest(unittest.TestCase):
       lambda ctx: ctx.create_object(self.BlueTarget,
                                     type_alias='jill',
                                     name=os.path.basename(ctx.rel_path)),
-      self.BlueTarget, self.RedTarget)
+      self.BlueTarget)
 
   def test_create(self):
     self.assertEqual(BuildFileAliases(targets={},
@@ -126,5 +123,5 @@ class BuildFileAliasesTest(unittest.TestCase):
 
   def test_target_types_by_alias(self):
     aliases = BuildFileAliases(targets={'jake': Target, 'jill': self.target_macro_factory})
-    self.assertEqual({'jake': {Target}, 'jill': {self.BlueTarget, self.RedTarget}},
+    self.assertEqual({'jake': {Target}, 'jill': {self.BlueTarget}},
                      aliases.target_types_by_alias)
