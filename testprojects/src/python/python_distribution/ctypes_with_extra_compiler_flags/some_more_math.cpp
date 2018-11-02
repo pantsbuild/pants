@@ -2,8 +2,6 @@
 #include <assert.h>
 
 int mangled_function(int x) {
-  double y = -1.0;
-  assert(y >= 0.0);
   return x * SOMETHING;
 }
 

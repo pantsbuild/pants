@@ -162,11 +162,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command, config={
       'native-build-step.cpp-compile-settings': {
         'compiler_option_sets_enabled_args': {
-          'ndebug': ['-DNDEBUG'],
-          'asdf': ['-DASDF=1'],
+          'asdf': ['-D_ASDF=1'],
         },
         'compiler_option_sets_disabled_args': {
-          'asdf': ['-DASDF=0'],
+          'asdf': ['-D_ASDF=0'],
         }
       },
     })
