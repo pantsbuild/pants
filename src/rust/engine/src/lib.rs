@@ -64,6 +64,7 @@ extern crate reqwest;
 extern crate resettable;
 extern crate smallvec;
 extern crate tempfile;
+extern crate indexmap;
 extern crate tokio;
 extern crate ui;
 extern crate url;

@@ -13,6 +13,7 @@ use context::{Context, Core};
 use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
 use graph::{EntryId, Graph, InvalidationResult, Node, NodeContext};
 use log::{debug, info, warn};
+use indexmap::IndexMap;
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use parking_lot::Mutex;
 use rule_graph;
@@ -291,11 +292,34 @@ impl Scheduler {
       .map(|s| s.into())
       .collect();
 
+    // This map keeps the k most relevant jobs in assigned possitions.
+    // Keys are positions in the display (display workers) and the values are the actual jobs to print.
+    let mut tasks_to_display = IndexMap::new();
+
     let results = loop {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
       } else if let Some(display) = optional_display.as_mut() {
-        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display);
+        // Update the graph. To do that, we iterate over heavy hitters
+        let mut heavy_hitters: Vec<(String, Duration)> = self
+          .core
+          .graph
+          .heavy_hitters(&roots, display.worker_count());
+        println!("BL: Heavy_hitters {:?}", heavy_hitters);
+        println!("BL: Tasks_to_dispay: {:?}", &tasks_to_display);
+        // Tasks that should be displayed but aren't in tasks_to_display yet
+        for (task, duration) in &heavy_hitters {
+          // TODO I don't really want to trigger the clone unconditionally, but using an
+          // if x.contains {} here seems to kind of defeat the purpose of using a set
+          tasks_to_display.insert(task.clone(), *duration);
+        }
+        for (task, duration) in tasks_to_display.clone().into_iter() {
+          let mut remove = false;
+          if !heavy_hitters.contains(&(task.to_string(), duration)) {
+            tasks_to_display.swap_remove(&task);
+          }
+        }
+        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, &tasks_to_display);
       }
     };
     if let Some(display) = optional_display.as_mut() {
@@ -310,18 +334,24 @@ impl Scheduler {
       .collect()
   }
 
-  fn display_ongoing_tasks(graph: &Graph<NodeKey>, roots: &[NodeKey], display: &mut EngineDisplay) {
+  fn display_ongoing_tasks(
+    graph: &Graph<NodeKey>,
+    roots: &[NodeKey],
+    display: &mut EngineDisplay,
+    tasks_to_display: &IndexMap<String, Duration>,
+  ) {
     let display_worker_count = display.worker_count();
-    let ongoing_tasks = graph.heavy_hitters(&roots, display_worker_count);
-    for (i, task) in ongoing_tasks.iter().enumerate() {
-      display.update(i.to_string(), format!("{:?}", task));
+    let ongoing_tasks = tasks_to_display;
+    for (i, id) in ongoing_tasks.iter().enumerate() {
+      // TODO Maybe we want to print something else besides the ID here.
+      display.update(i.to_string(), format!("{:?}", id));
     }
     // If the number of ongoing tasks is less than the number of workers,
     // fill the rest of the workers with empty string.
     // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666
-    for i in ongoing_tasks.len()..display_worker_count {
-      display.update(i.to_string(), "".to_string());
-    }
+    //    for i in ongoing_tasks.len()..display_worker_count {
+    //      display.update(i.to_string(), "".to_string());
+    //    }
     display.render();
   }
 }
