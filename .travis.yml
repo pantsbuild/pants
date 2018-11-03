@@ -199,37 +199,37 @@ matrix:
     - <<: *default_test_config
       name: "Python integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 0/7
+        - ./build-support/bin/travis-ci.sh -c3 -i 0/7
 
     - <<: *default_test_config
       name: "Python integration tests for pants - shard 2"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 1/7
+        - ./build-support/bin/travis-ci.sh -c3 -i 1/7
 
     - <<: *default_test_config
       name: "Python integration tests for pants - shard 3"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 2/7
+        - ./build-support/bin/travis-ci.sh -c3 -i 2/7
 
     - <<: *default_test_config
       name: "Python integration tests for pants - shard 4"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 3/7
+        - ./build-support/bin/travis-ci.sh -c3 -i 3/7
 
     - <<: *default_test_config
       name: "Python integration tests for pants - shard 5"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 4/7
+        - ./build-support/bin/travis-ci.sh -c3 -i 4/7
 
     - <<: *default_test_config
       name: "Python integration tests for pants - shard 6"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 5/7
+        - ./build-support/bin/travis-ci.sh -c3 -i 5/7
 
     - <<: *default_test_config
       name: "Python integration tests for pants - shard 7"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 6/7
+        - ./build-support/bin/travis-ci.sh -c3 -i 6/7
 
     # Rust on linux
     - name: "Rust Tests Linux"
