@@ -20,6 +20,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/testutils:py2_compat',
   ]
 )
 

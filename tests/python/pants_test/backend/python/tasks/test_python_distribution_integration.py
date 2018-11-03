@@ -14,6 +14,7 @@ from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import is_executable
 from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
@@ -42,7 +43,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self._assert_native_greeting(output)
       # Check that we have exactly one wheel output.
       single_wheel_output = assert_single_element(glob.glob(os.path.join(tmp_dir, '*.whl')))
-      self.assertRegexpMatches(os.path.basename(single_wheel_output),
+      assertRegex(self, os.path.basename(single_wheel_output),
                                r'\A{}'.format(re.escape('fasthello-1.0.0+')))
 
   def test_pants_run(self):

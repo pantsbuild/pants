@@ -9,6 +9,7 @@ import os
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_open
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class MarkdownIntegrationTest(PantsRunIntegrationTest):
@@ -36,13 +37,13 @@ class MarkdownIntegrationTest(PantsRunIntegrationTest):
     with safe_open(out_path, 'r') as outfile:
       page_html = outfile.read()
       # should get Sense and Sensibility in title (or TITLE, sheesh):
-      self.assertRegexpMatches(page_html,
+      assertRegex(self, page_html,
                                r'(?i).*<title[^>]*>\s*Sense\s+and\s+Sensibility\s*</title')
       # should get formatted with h1:
-      self.assertRegexpMatches(page_html,
+      assertRegex(self, page_html,
                                r'(?i).*<h1[^>]*>\s*They\s+Heard\s+Her\s+With\s+Surprise\s*</h1>')
       # should get formatted with _something_
-      self.assertRegexpMatches(page_html, r'.*>\s*inhabiting\s*</')
-      self.assertRegexpMatches(page_html, r'.*>\s*civilly\s*</')
+      assertRegex(self, page_html, r'.*>\s*inhabiting\s*</')
+      assertRegex(self, page_html, r'.*>\s*civilly\s*</')
       # there should be a link that has href="http://www.calderdale.gov.uk/"
-      self.assertRegexpMatches(page_html, r'.*<a [^>]*href\s*=\s*[\'"]http://www.calderdale')
+      assertRegex(self, page_html, r'.*<a [^>]*href\s*=\s*[\'"]http://www.calderdale')
