@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from future.utils import PY3
+
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -14,7 +16,10 @@ class PantsEngineIntegrationTest(PantsRunIntegrationTest):
     self.assertRegexpMatches(pants_run.stderr_data, 'build_graph is: .*LegacyBuildGraph')
     self.assertRegexpMatches(pants_run.stderr_data,
                              'computed \d+ nodes in')
-    self.assertNotRegexpMatches(pants_run.stderr_data, 'pantsd is running at pid \d+')
+    if PY3:
+      self.assertNotRegex(pants_run.stderr_data, 'pantsd is running at pid \d+')
+    else:
+      self.assertNotRegexpMatches(pants_run.stderr_data, 'pantsd is running at pid \d+')
 
   def test_engine_binary(self):
     self.assert_success(
