@@ -14,7 +14,7 @@ mock==2.0.0
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.0
-pex==1.5.1
+pex==1.5.2
 psutil==4.3.0
 pycodestyle==2.4.0
 pyflakes==2.0.0
