@@ -60,9 +60,9 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
 """)
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
       self._assert_unhandled_exception_log_matches(
-        pants_run.pid, read_file(pid_specific_log_file))
+        pants_run.pid, read_file(pid_specific_log_file, binary_mode=False))
       self._assert_unhandled_exception_log_matches(
-        pants_run.pid, read_file(shared_log_file))
+        pants_run.pid, read_file(shared_log_file, binary_mode=False))
 
   def _assert_graceful_signal_log_matches(self, pid, signum, contents):
     self.assertRegexpMatches(contents, """\
@@ -110,9 +110,9 @@ Signal {signum} was raised. Exiting with failure. \\(backtrace omitted\\)
       # Check that the logs show a graceful exit by SIGTERM.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
       self._assert_graceful_signal_log_matches(
-        waiter_run.pid, signal.SIGTERM, read_file(pid_specific_log_file))
+        waiter_run.pid, signal.SIGTERM, read_file(pid_specific_log_file, binary_mode=False))
       self._assert_graceful_signal_log_matches(
-          waiter_run.pid, signal.SIGTERM, read_file(shared_log_file))
+          waiter_run.pid, signal.SIGTERM, read_file(shared_log_file, binary_mode=False))
 
   def test_dumps_traceback_on_sigabrt(self):
     # SIGABRT sends a traceback to the log file for the current process thanks to
@@ -120,13 +120,13 @@ Signal {signum} was raised. Exiting with failure. \\(backtrace omitted\\)
     with self._send_signal_to_waiter_handle(signal.SIGABRT) as (workdir, waiter_run):
       # Check that the logs show an abort signal and the beginning of a traceback.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
-      self.assertRegexpMatches(read_file(pid_specific_log_file), """\
+      self.assertRegexpMatches(read_file(pid_specific_log_file, binary_mode=False), """\
 Fatal Python error: Aborted
 
 Thread [^\n]+ \\(most recent call first\\):
 """)
       # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
-      self.assertEqual('', read_file(shared_log_file))
+      self.assertEqual('', read_file(shared_log_file, binary_mode=False))
 
   def test_prints_traceback_on_sigusr2(self):
     with self._make_waiter_handle() as (workdir, waiter_handle):
@@ -198,4 +198,4 @@ Current thread [^\n]+ \\(most recent call first\\):
       # The Exiter prints the final error message to whatever the interactive output stream is set
       # to, so when it's redirected it won't be in stderr.
       self.assertNotIn('erroneous!', redirected_pants_run.stderr_data)
-      self.assertIn('erroneous!', read_file(some_file))
+      self.assertIn('erroneous!', read_file(some_file, binary_mode=False))
