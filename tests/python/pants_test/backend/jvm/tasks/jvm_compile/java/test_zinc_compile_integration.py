@@ -412,7 +412,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       },
     }
     with self.temporary_workdir() as workdir:
-      with self.temporary_file_content("readme.txt", "yo"):
+      with self.temporary_file_content("readme.txt", b"yo"):
         pants_run = self.run_pants_with_workdir(
           [
             'run',
@@ -437,7 +437,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     }
 
     with self.temporary_workdir() as workdir:
-      with self.temporary_file_content("readme.txt", "yo"):
+      with self.temporary_file_content("readme.txt", b"yo"):
         pants_run = self.run_pants_with_workdir(
           [
             'run',
@@ -466,7 +466,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     }
 
     with self.temporary_workdir() as workdir:
-      with self.temporary_file_content("readme.txt", "yo"):
+      with self.temporary_file_content("readme.txt", b"yo"):
         pants_run = self.run_pants_with_workdir(
           [
             'run',
