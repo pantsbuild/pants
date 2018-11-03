@@ -57,7 +57,8 @@ def fingerprint_file(workspace, filename):
   """
   content = read_file(os.path.join(workspace, filename))
   fingerprint = hashlib.sha256(content)
-  return 'sha256={}'.format(base64.b64encode(fingerprint.digest())), str(len(content))
+  b64_encoded = base64.b64encode(fingerprint.digest())
+  return 'sha256={}'.format(b64_encoded.decode('utf-8')), str(len(content))
 
 
 def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
@@ -77,7 +78,8 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
     raise Exception('Malformed whl or bad globs: `{}` was not rewritten.'.format(src_record_file))
 
   output_records = []
-  for line in read_file(os.path.join(workspace, dst_record_file)).splitlines():
+  file_name = os.path.join(workspace, dst_record_file)
+  for line in read_file(file_name, binary_mode=False).splitlines():
     filename, fingerprint_str, size_str = line.rsplit(',', 3)
     if filename in mutated_files:
       fingerprint_str, size_str = fingerprint_file(workspace, filename)
@@ -86,7 +88,7 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
       output_line = line
     output_records.append(output_line)
 
-  safe_file_dump(os.path.join(workspace, dst_record_file), '\r\n'.join(output_records) + '\r\n', binary_mode=False)
+  safe_file_dump(file_name, '\r\n'.join(output_records) + '\r\n', binary_mode=False)
 
 
 # The wheel METADATA file will contain a line like: `Version: 1.11.0.dev3+7951ec01`.

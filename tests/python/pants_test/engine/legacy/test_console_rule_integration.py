@@ -78,7 +78,7 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
       rel_tmpdir = fast_relpath(tmpdir, get_buildroot())
 
       def dump(content):
-        safe_file_dump(os.path.join(tmpdir, 'BUILD'), content)
+        safe_file_dump(os.path.join(tmpdir, 'BUILD'), content, mode="w")
 
       # Dump an initial target before starting the loop.
       dump('target(name="one")')

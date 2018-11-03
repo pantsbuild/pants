@@ -80,7 +80,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # Execute the binary and ensure its output is correct.
       binary_run_output = invoke_pex_for_output(pex)
-      self.assertEqual('x=3, f(x)=17\n', binary_run_output)
+      self.assertEqual(b'x=3, f(x)=17\n', binary_run_output)
 
   def test_ctypes_native_language_interop(self):
     # TODO: consider making this mock_buildroot/run_pants_with_workdir into a
