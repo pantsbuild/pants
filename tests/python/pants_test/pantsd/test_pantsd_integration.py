@@ -12,6 +12,8 @@ import time
 import unittest
 from builtins import open, range, zip
 
+from future.utils import PY3
+
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import read_pantsd_log
@@ -80,7 +82,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           continue
 
         # Check if the line begins with W or E to check if it is a warning or error line.
-        self.assertNotRegexpMatches(line, r'^[WE].*')
+        if PY3:
+          self.assertNotRegex(line, r'^[WE].*')
+        else:
+          self.assertNotRegexpMatches(line, r'^[WE].*')
 
   def test_pantsd_broken_pipe(self):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -361,12 +366,18 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))", binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
+        if PY3:
+          self.assertNotRegex(result.stdout_data, has_source_root_regex)
+        else:
+          self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))", binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
+        if PY3:
+          self.assertNotRegex(result.stdout_data, has_source_root_regex)
+        else:
+          self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_src_file, 'import this\n', binary_mode=False)
         result = pantsd_run(export_cmd)

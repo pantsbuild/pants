@@ -180,7 +180,8 @@ python_tests(
   name = 'pants_engine_integration',
   sources = ['test_pants_engine_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test'
+    'tests/python/pants_test:int-test',
+    '3rdparty/python:future',
   ],
   tags = {'integration'}
 )
