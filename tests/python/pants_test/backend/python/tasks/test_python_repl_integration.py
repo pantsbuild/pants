@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants_test.testutils.py2_compat import assertRegex
 
+
 class PythonReplIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_daemon

@@ -14,6 +14,7 @@ from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):

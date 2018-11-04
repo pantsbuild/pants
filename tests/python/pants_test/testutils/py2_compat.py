@@ -2,7 +2,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 from future.utils import PY3
+
 
 def assertRegex(self, text, expected_regex):
   """Call unit test assertion to ensure regex matches.
@@ -11,9 +14,9 @@ def assertRegex(self, text, expected_regex):
   our helper function assertNotRegex, which *is* required for Py2-3 compatibility.
   """
   if PY3:
-    self.assertRegex(text, unexpected_regex)
+    self.assertRegex(text, expected_regex)
   else:
-    self.assertRegexpMatches(text, unexpected_regex)
+    self.assertRegexpMatches(text, expected_regex)
 
 
 def assertNotRegex(self, text, unexpected_regex):

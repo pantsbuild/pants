@@ -12,14 +12,12 @@ import time
 import unittest
 from builtins import open, range, zip
 
-from future.utils import PY3
-
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
-from pants_test.testutils.py2_compat import assertRegex, assertNotRegex
+from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 
 
 def launch_file_toucher(f):

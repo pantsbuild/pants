@@ -15,6 +15,7 @@ from pants.init.logging import setup_logging
 from pants.util.contextutil import temporary_dir
 from pants_test.testutils.py2_compat import assertRegex
 
+
 class SetupTest(unittest.TestCase):
   @contextmanager
   def log_dir(self, file_logging):

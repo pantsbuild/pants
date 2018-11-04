@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.py2_compat import assertRegex
 
+
 class GoRunIntegrationTest(PantsRunIntegrationTest):
 
   def test_go_run_simple(self):
