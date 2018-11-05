@@ -195,14 +195,9 @@ if [[ "${run_python:-false}" == "true" ]]; then
   fi
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
-    if [[ "${python_three:-false}" == "true" ]]; then
-      targets="$(comm -23 <(./pants.pex --tag='-integration' list tests/python:: | grep '.' | sort) <(sort "${REPO_ROOT}/build-support/known_py3_failures.txt"))"
-    else
-      targets="tests/python::"
-    fi
     ./pants.pex --tag='-integration' test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
-      $targets -- ${PYTEST_PASSTHRU_ARGS}
+      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Core python test failure"
   end_travis_section
 fi
