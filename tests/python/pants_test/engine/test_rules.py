@@ -91,7 +91,7 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
                        (A, [Select(B)], noop):
-                         no rule was available to compute B with parameter type SubA
+                         No rule was available to compute B with parameter type SubA
                      """).strip(),
                                     str(cm.exception))
 
@@ -124,8 +124,8 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
                        (A, [Select(B), Select(C)], noop):
-                         no rule was available to compute B with parameter type SubA
-                         no rule was available to compute C with parameter type SubA
+                         No rule was available to compute B with parameter type SubA
+                         No rule was available to compute C with parameter type SubA
                      """).strip(),
       str(cm.exception))
 
@@ -145,9 +145,9 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 2
                                         (A, [Select(B)], noop):
-                                          no rule was available to compute B with parameter type C
+                                          No rule was available to compute B with parameter type C
                                         (B, [Select(SubA)], noop):
-                                          no rule was available to compute SubA with parameter type C
+                                          No rule was available to compute SubA with parameter type C
                                       """).strip(),
                                     str(cm.exception))
 
@@ -172,7 +172,7 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 1
                                         (D, [Select(C)], noop):
-                                          no rule was available to compute C with parameter type A
+                                          No rule was available to compute C with parameter type A
                                       """).strip(),
                                     str(cm.exception))
 
@@ -191,9 +191,9 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 2
                         (B, [Select(D)], noop):
-                          no rule was available to compute D with parameter type SubA
+                          No rule was available to compute D with parameter type SubA
                         (D, [Select(A), Select(SubA)], [Get(A, C)], noop):
-                          no rule was available to compute A with parameter type SubA
+                          No rule was available to compute A with parameter type SubA
                       """).strip(),
         str(cm.exception))
 
