@@ -17,6 +17,7 @@ from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
+from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 
 
 def launch_file_toucher(f):
@@ -80,7 +81,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           continue
 
         # Check if the line begins with W or E to check if it is a warning or error line.
-        self.assertNotRegexpMatches(line, r'^[WE].*')
+        assertNotRegex(self, line, r'^[WE].*')
 
   def test_pantsd_broken_pipe(self):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -295,7 +296,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         return '\n'.join(read_pantsd_log(workdir))
 
       # Check the logs.
-      self.assertRegexpMatches(
+      assertRegex(
+        self,
         full_pantsd_log(),
         r'watching invalidating files:.*{}'.format(test_file)
       )
@@ -361,17 +363,17 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))", binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
+        assertNotRegex(self, result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))", binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
+        assertNotRegex(self, result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_src_file, 'import this\n', binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertRegexpMatches(result.stdout_data, has_source_root_regex)
+        assertRegex(self, result.stdout_data, has_source_root_regex)
     finally:
       rm_rf(test_path)
 
@@ -442,7 +444,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
       # Ensure that we saw the pantsd-runner process's failure in the client's stderr.
       self.assert_failure(waiter_run)
-      self.assertRegexpMatches(waiter_run.stderr_data, """\
+      assertRegex(self, waiter_run.stderr_data, """\
 Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
 """.format(signum=signal.SIGTERM))
       # NB: testing stderr is an "end-to-end" test, as it requires pants knowing the correct remote
