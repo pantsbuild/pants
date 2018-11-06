@@ -20,7 +20,7 @@ use hashing;
 use process_execution::{self, CommandRunner};
 use rule_graph;
 use selectors;
-use tasks::{self, Intrinsic, IntrinsicKind};
+use tasks::{self, Intrinsic};
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 
@@ -145,46 +145,25 @@ impl Select {
     }
   }
 
-  fn snapshot(
+  fn select_product(
     &self,
     context: &Context,
-    entry: &rule_graph::Entry,
-  ) -> NodeFuture<Arc<fs::Snapshot>> {
+    product: TypeConstraint,
+    caller_description: &str,
+  ) -> NodeFuture<Value> {
     let edges = context
       .core
       .rule_graph
-      .edges_for_inner(entry)
-      .expect("Expected edges to exist for Snapshot intrinsic.");
-    // Compute PathGlobs for the subject.
+      .edges_for_inner(&self.entry)
+      .ok_or_else(|| {
+        throw(&format!(
+          "Tried to select product {} for {} but found no edges",
+          externs::key_to_str(&product.0),
+          caller_description
+        ))
+      });
     let context = context.clone();
-    Select::new(context.core.types.path_globs, self.params.clone(), &edges)
-      .run(context.clone())
-      .and_then(move |path_globs_val| context.get(Snapshot(externs::key_for(path_globs_val))))
-      .to_boxed()
-  }
-
-  fn execute_process(
-    &self,
-    context: &Context,
-    entry: &rule_graph::Entry,
-  ) -> NodeFuture<ProcessResult> {
-    let edges = &context
-      .core
-      .rule_graph
-      .edges_for_inner(entry)
-      .expect("Expected edges to exist for ExecuteProcess intrinsic.");
-    // Compute an ExecuteProcessRequest for the subject.
-    let context = context.clone();
-    Select::new(
-      context.core.types.process_request,
-      self.params.clone(),
-      edges,
-    ).run(context.clone())
-    .and_then(|process_request_val| {
-      ExecuteProcess::lift(&process_request_val)
-        .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
-    }).and_then(move |process_request| context.get(process_request))
-    .to_boxed()
+    Select::new(product, self.params.clone(), &try_future!(edges)).run(context.clone())
   }
 
   ///
@@ -207,38 +186,51 @@ impl Select {
             task: task.clone(),
             entry: Arc::new(self.entry.clone()),
           }),
-          &rule_graph::Rule::Intrinsic(Intrinsic {
-            kind: IntrinsicKind::Snapshot,
-            ..
-          }) => {
+          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+            if product == context.core.types.snapshot && input == context.core.types.path_globs =>
+          {
             let context = context.clone();
+            let core = context.core.clone();
             self
-              .snapshot(&context, &self.entry)
-              .map(move |snapshot| Snapshot::store_snapshot(&context.core, &snapshot))
+              .select_product(&context, context.core.types.path_globs, "intrinsic")
+              .and_then(move |val| context.get(Snapshot(externs::key_for(val))))
+              .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
               .to_boxed()
           }
-          &rule_graph::Rule::Intrinsic(Intrinsic {
-            kind: IntrinsicKind::FilesContent,
-            ..
-          }) => {
-            let edges = &context
-              .core
-              .rule_graph
-              .edges_for_inner(&self.entry)
-              .expect("Expected edges to exist for FilesContent intrinsic.");
+          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+            if product == context.core.types.directory_digest
+              && input == context.core.types.merged_directories =>
+          {
+            let request =
+              self.select_product(&context, context.core.types.merged_directories, "intrinsic");
+            let core = context.core.clone();
+            request
+              .and_then(move |request| {
+                let digests: Result<Vec<hashing::Digest>, Failure> =
+                  externs::project_multi(&request, "directories")
+                    .into_iter()
+                    .map(|val| lift_digest(&val).map_err(|str| throw(&str)))
+                    .collect();
+                fs::Snapshot::merge_directories(core.store(), try_future!(digests))
+                  .map_err(|err| throw(&err))
+                  .map(move |digest| Snapshot::store_directory(&core, &digest))
+                  .to_boxed()
+              }).to_boxed()
+          }
+          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+            if product == context.core.types.files_content
+              && input == context.core.types.directory_digest =>
+          {
             let context = context.clone();
-            Select::new(
-              context.core.types.directory_digest,
-              self.params.clone(),
-              edges,
-            ).run(context.clone())
-            .and_then(|directory_digest_val| {
-              lift_digest(&directory_digest_val).map_err(|str| throw(&str))
-            }).and_then(move |digest| {
-              let store = context.core.store.clone();
-              context
+            self
+              .select_product(&context, context.core.types.directory_digest, "intrinsic")
+              .and_then(|directory_digest_val| {
+                lift_digest(&directory_digest_val).map_err(|str| throw(&str))
+              }).and_then(move |digest| {
+                let store = context.core.store();
+                context
                 .core
-                .store
+                .store()
                 .load_directory(digest)
                 .map_err(|str| throw(&str))
                 .and_then(move |maybe_directory| {
@@ -250,27 +242,33 @@ impl Select {
                     .contents_for_directory(&directory)
                     .map_err(|str| throw(&str))
                 }).map(move |files_content| Snapshot::store_files_content(&context, &files_content))
-            }).to_boxed()
+              }).to_boxed()
           }
-          &rule_graph::Rule::Intrinsic(Intrinsic {
-            kind: IntrinsicKind::ProcessExecution,
-            ..
-          }) => {
+          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+            if product == context.core.types.process_result
+              && input == context.core.types.process_request =>
+          {
             let context = context.clone();
+            let core = context.core.clone();
             self
-              .execute_process(&context, &self.entry)
+              .select_product(&context, context.core.types.process_request, "intrinsic")
+              .and_then(|request| {
+                ExecuteProcess::lift(&request)
+                  .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
+              }).and_then(move |process_request| context.get(process_request))
               .map(move |result| {
                 externs::unsafe_call(
-                  &context.core.types.construct_process_result,
+                  &core.types.construct_process_result,
                   &[
                     externs::store_bytes(&result.0.stdout),
                     externs::store_bytes(&result.0.stderr),
                     externs::store_i64(result.0.exit_code.into()),
-                    Snapshot::store_directory(&context.core, &result.0.output_directory),
+                    Snapshot::store_directory(&core, &result.0.output_directory),
                   ],
                 )
               }).to_boxed()
           }
+          &rule_graph::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
         }
       }
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Root(_))
@@ -407,7 +405,7 @@ impl WrappedNode for ExecuteProcess {
 
     context
       .core
-      .command_runner
+      .command_runner()
       .run(request)
       .map(ProcessResult)
       .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
@@ -470,7 +468,7 @@ impl WrappedNode for DigestFile {
       .and_then(move |c| {
         context
           .core
-          .store
+          .store()
           .store_file_bytes(c.content, true)
           .map_err(|e| throw(&e))
       }).to_boxed()
@@ -527,7 +525,7 @@ impl Snapshot {
       .expand(path_globs)
       .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
       .and_then(move |path_stats| {
-        fs::Snapshot::from_path_stats(context.core.store.clone(), &context, path_stats)
+        fs::Snapshot::from_path_stats(context.core.store(), &context, path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
       }).map_err(|e| throw(&e))
       .to_boxed()
@@ -910,10 +908,11 @@ impl Node for NodeKey {
         typstr(&s.selector.product)
       ),
       &NodeKey::Task(ref s) => format!(
-        "Task({}, {}, {})",
+        "Task({}, {}, {}, {})",
         externs::project_str(&externs::val_for(&s.task.func.0), "__name__"),
         keystr(&s.params.expect_single()),
-        typstr(&s.product)
+        typstr(&s.product),
+        s.task.cacheable,
       ),
       &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
     }
@@ -927,6 +926,15 @@ impl Node for NodeKey {
       | NodeResult::ProcessResult(_)
       | NodeResult::Snapshot(_)
       | NodeResult::Value(_) => None,
+    }
+  }
+
+  fn cacheable(&self) -> bool {
+    match self {
+      &NodeKey::Task(ref s) => s.task.cacheable,
+      // TODO Select nodes are made uncacheable as a workaround to #6146. Will be worked on in #6598
+      &NodeKey::Select(_) => false,
+      _ => true,
     }
   }
 }

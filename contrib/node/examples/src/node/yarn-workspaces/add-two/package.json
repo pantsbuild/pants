@@ -1,0 +1,16 @@
+{
+  "name": "add-two",
+  "license": "MIT",
+  "author": "pantsbuild",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node index.js",
+    "test": "mocha ./test/add-two-test.js"
+  },
+  "main": "index.js",
+  "description": "Pantsbuild app for Node.js with source-level deps",
+  "dependencies": {
+    "mocha": "^5.2.0"
+  }
+}

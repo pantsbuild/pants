@@ -90,17 +90,18 @@ impl Tasks {
   pub fn intrinsics_set(&mut self, types: &Types) {
     self.intrinsics = vec![
       Intrinsic {
-        kind: IntrinsicKind::Snapshot,
         product: types.snapshot,
         input: types.path_globs,
       },
       Intrinsic {
-        kind: IntrinsicKind::FilesContent,
         product: types.files_content,
         input: types.directory_digest,
       },
       Intrinsic {
-        kind: IntrinsicKind::ProcessExecution,
+        product: types.directory_digest,
+        input: types.merged_directories,
+      },
+      Intrinsic {
         product: types.process_result,
         input: types.process_request,
       },
@@ -124,14 +125,14 @@ impl Tasks {
   ///
   /// The following methods define the Task registration lifecycle.
   ///
-  pub fn task_begin(&mut self, func: Function, product: TypeConstraint) {
+  pub fn task_begin(&mut self, func: Function, product: TypeConstraint, cacheable: bool) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
     );
 
     self.preparing = Some(Task {
-      cacheable: true,
+      cacheable: cacheable,
       product: product,
       clause: Vec::new(),
       gets: Vec::new(),
@@ -182,14 +183,6 @@ impl Tasks {
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub struct Intrinsic {
-  pub kind: IntrinsicKind,
   pub product: TypeConstraint,
   pub input: TypeConstraint,
-}
-
-#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
-pub enum IntrinsicKind {
-  Snapshot,
-  FilesContent,
-  ProcessExecution,
 }

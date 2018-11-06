@@ -168,7 +168,7 @@ Key key_for(Handle);
 Handle val_for(Key);
 
 Tasks* tasks_create(void);
-void tasks_task_begin(Tasks*, Function, TypeConstraint);
+void tasks_task_begin(Tasks*, Function, TypeConstraint, _Bool);
 void tasks_add_get(Tasks*, TypeConstraint, TypeId);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_task_end(Tasks*);
@@ -196,12 +196,16 @@ Scheduler* scheduler_create(Tasks*,
                             TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
+                            TypeConstraint,
                             TypeId,
                             TypeId,
                             Buffer,
                             Buffer,
                             BufferBuffer,
                             TypeIdBuffer,
+                            Buffer,
+                            Buffer,
+                            Buffer,
                             Buffer,
                             Buffer,
                             uint64_t,
@@ -217,7 +221,7 @@ void scheduler_destroy(Scheduler*);
 Session* session_create(Scheduler*);
 void session_destroy(Session*);
 
-ExecutionRequest* execution_request_create(void);
+ExecutionRequest* execution_request_create(_Bool, uint64_t);
 void execution_request_destroy(ExecutionRequest*);
 
 uint64_t graph_len(Scheduler*);
@@ -682,19 +686,26 @@ class Native(object):
   def visualize_to_dir(self):
     return self._visualize_to_dir
 
+  class BinaryLocationError(Exception): pass
+
   @memoized_property
   def binary(self):
     """Load and return the path to the native engine binary."""
     lib_name = '{}.so'.format(NATIVE_ENGINE_MODULE)
     lib_path = os.path.join(safe_mkdtemp(), lib_name)
-    with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
-      # NB: The header stripping code here must be coordinated with header insertion code in
-      #     build-support/bin/native/bootstrap_code.sh
-      engine_version = input_fp.readline().decode('utf-8').strip()
-      repo_version = input_fp.readline().decode('utf-8').strip()
-      logger.debug('using {} built at {}'.format(engine_version, repo_version))
-      with open(lib_path, 'wb') as output_fp:
-        output_fp.write(input_fp.read())
+    try:
+      with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
+        # NB: The header stripping code here must be coordinated with header insertion code in
+        #     build-support/bin/native/bootstrap_code.sh
+        engine_version = input_fp.readline().decode('utf-8').strip()
+        repo_version = input_fp.readline().decode('utf-8').strip()
+        logger.debug('using {} built at {}'.format(engine_version, repo_version))
+        with open(lib_path, 'wb') as output_fp:
+          output_fp.write(input_fp.read())
+    except (IOError, OSError) as e:
+      raise self.BinaryLocationError(
+        "Error unpacking the native engine binary to path {}: {}".format(lib_path, e),
+        e)
     return lib_path
 
   @memoized_property
@@ -777,8 +788,10 @@ class Native(object):
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 
-  def new_execution_request(self):
-    return self.gc(self.lib.execution_request_create(), self.lib.execution_request_destroy)
+  def new_execution_request(self, v2_ui, ui_worker_count):
+    return self.gc(
+      self.lib.execution_request_create(v2_ui, ui_worker_count),
+      self.lib.execution_request_destroy)
 
   def new_session(self, scheduler):
     return self.gc(self.lib.session_create(scheduler), self.lib.session_destroy)
@@ -803,6 +816,7 @@ class Native(object):
                     constraint_path_globs,
                     constraint_directory_digest,
                     constraint_snapshot,
+                    constraint_merge_snapshots_request,
                     constraint_files_content,
                     constraint_dir,
                     constraint_file,
@@ -834,6 +848,7 @@ class Native(object):
         tc(constraint_path_globs),
         tc(constraint_directory_digest),
         tc(constraint_snapshot),
+        tc(constraint_merge_snapshots_request),
         tc(constraint_files_content),
         tc(constraint_dir),
         tc(constraint_file),
@@ -853,11 +868,14 @@ class Native(object):
         # We can't currently pass Options to the rust side, so we pass empty strings for None.
         self.context.utf8_buf(execution_options.remote_store_server or ""),
         self.context.utf8_buf(execution_options.remote_execution_server or ""),
+        self.context.utf8_buf(execution_options.remote_instance_name or ""),
+        self.context.utf8_buf(execution_options.remote_ca_certs_path or ""),
+        self.context.utf8_buf(execution_options.remote_oauth_bearer_token_path or ""),
         execution_options.remote_store_thread_count,
         execution_options.remote_store_chunk_bytes,
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.process_execution_parallelism,
-        execution_options.process_execution_cleanup_local_dirs
+        execution_options.process_execution_cleanup_local_dirs,
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
 

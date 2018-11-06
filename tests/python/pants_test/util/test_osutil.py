@@ -6,7 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 
-from pants.util.osutil import OS_ALIASES, known_os_names, normalize_os_name
+from pants.util.osutil import (OS_ALIASES, get_closest_mac_host_platform_pair, known_os_names,
+                               normalize_os_name)
 from pants_test.test_base import TestBase
 
 
@@ -34,3 +35,34 @@ class OsutilTest(TestBase):
       normalize_os_name(name)
       self.assertEqual(1, len(captured.warnings()),
                        'Expected exactly one warning, but got: {}'.format(captured.warnings()))
+
+  def test_get_closest_mac_host_platform_pair(self):
+    # Note the gaps in darwin versions.
+    platform_name_map = {
+      ('linux', 'x86_64'): ('linux', 'x86_64'),
+      ('linux', 'amd64'): ('linux', 'x86_64'),
+      ('darwin', '10'): ('mac', '10.6'),
+      ('darwin', '13'): ('mac', '10.9'),
+      ('darwin', '14'): ('mac', '10.10'),
+      ('darwin', '16'): ('mac', '10.12'),
+      ('darwin', '17'): ('mac', '10.13'),
+    }
+
+    def get_macos_version(darwin_version):
+      host, version = get_closest_mac_host_platform_pair(
+        darwin_version, platform_name_map=platform_name_map)
+      if host is not None:
+        self.assertEqual('mac', host)
+      return version
+
+    self.assertEqual('10.13', get_macos_version('19'))
+    self.assertEqual('10.13', get_macos_version('18'))
+    self.assertEqual('10.13', get_macos_version('17'))
+    self.assertEqual('10.12', get_macos_version('16'))
+    self.assertEqual('10.10', get_macos_version('15'))
+    self.assertEqual('10.10', get_macos_version('14'))
+    self.assertEqual('10.9', get_macos_version('13'))
+    self.assertEqual('10.6', get_macos_version('12'))
+    self.assertEqual('10.6', get_macos_version('11'))
+    self.assertEqual('10.6', get_macos_version('10'))
+    self.assertEqual(None, get_macos_version('9'))

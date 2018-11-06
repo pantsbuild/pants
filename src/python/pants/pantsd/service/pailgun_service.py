@@ -18,7 +18,9 @@ class PailgunService(PantsService):
   def __init__(self, bind_addr, runner_class, scheduler_service):
     """
     :param tuple bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
-    :param class runner_class: The `PantsRunner` class to be used for Pailgun runs.
+    :param class runner_class: The `PantsRunner` class to be used for Pailgun runs. Generally this
+      will be `DaemonPantsRunner`, but this decoupling avoids a cycle between the `pants.pantsd` and
+      `pants.bin` packages.
     :param SchedulerService scheduler_service: The SchedulerService instance for access to the
                                                resident scheduler.
     """
@@ -48,13 +50,16 @@ class PailgunService(PantsService):
         sock,
         arguments,
         environment,
-        self._scheduler_service
+        self.services,
+        self._scheduler_service,
       )
 
     # Plumb the daemon's lifecycle lock to the `PailgunServer` to safeguard teardown.
+    # This indirection exists to allow the server to be created before PantsService.setup
+    # has been called to actually initialize the `services` field.
     @contextmanager
     def lifecycle_lock():
-      with self.lifecycle_lock:
+      with self.services.lifecycle_lock:
         yield
 
     return PailgunServer(self._bind_addr, runner_factory, lifecycle_lock)
@@ -65,11 +70,14 @@ class PailgunService(PantsService):
 
     try:
       # Manually call handle_request() in a loop vs serve_forever() for interruptability.
-      while not self.is_killed:
+      while not self._state.is_terminating:
         self.pailgun.handle_request()
-    except select.error:
+        self._state.maybe_pause()
+    except select.error as e:
       # SocketServer can throw `error: (9, 'Bad file descriptor')` on teardown. Ignore it.
-      self._logger.warning('pailgun service shutting down')
+      self._logger.warning('pailgun service shutting down due to an error: {}'.format(e))
+    finally:
+      self._logger.info('pailgun service on port {} shutting down'.format(self.pailgun_port))
 
   def terminate(self):
     """Override of PantsService.terminate() that cleans up when the Pailgun server is terminated."""

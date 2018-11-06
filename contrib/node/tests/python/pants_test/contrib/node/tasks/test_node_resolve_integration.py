@@ -26,3 +26,9 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
                'contrib/node/examples/src/node/preinstalled-project:unit']
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
+
+  def test_resolve_source_deps_project(self):
+    command = ['resolve',
+               'contrib/node/examples/src/node/yarn-workspaces']
+    pants_run = self.run_pants(command=command)
+    self.assert_success(pants_run)

@@ -67,6 +67,7 @@ extern crate resettable;
 #[macro_use]
 extern crate smallvec;
 extern crate tokio;
+extern crate ui;
 
 use std::ffi::CStr;
 use std::fs::File;
@@ -238,6 +239,7 @@ pub extern "C" fn scheduler_create(
   type_path_globs: TypeConstraint,
   type_directory_digest: TypeConstraint,
   type_snapshot: TypeConstraint,
+  type_merge_directories_request: TypeConstraint,
   type_files_content: TypeConstraint,
   type_dir: TypeConstraint,
   type_file: TypeConstraint,
@@ -253,6 +255,9 @@ pub extern "C" fn scheduler_create(
   root_type_ids: TypeIdBuffer,
   remote_store_server: Buffer,
   remote_execution_server: Buffer,
+  remote_instance_name: Buffer,
+  remote_root_ca_certs_path_buffer: Buffer,
+  remote_oauth_bearer_token_path_buffer: Buffer,
   remote_store_thread_count: u64,
   remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
@@ -277,6 +282,7 @@ pub extern "C" fn scheduler_create(
     path_globs: type_path_globs,
     directory_digest: type_directory_digest,
     snapshot: type_snapshot,
+    merged_directories: type_merge_directories_request,
     files_content: type_files_content,
     dir: type_dir,
     file: type_file,
@@ -296,6 +302,28 @@ pub extern "C" fn scheduler_create(
   let remote_execution_server_string = remote_execution_server
     .to_string()
     .expect("remote_execution_server was not valid UTF8");
+  let remote_instance_name_string = remote_instance_name
+    .to_string()
+    .expect("remote_instance_name was not valid UTF8");
+
+  let remote_root_ca_certs_path = {
+    let path = remote_root_ca_certs_path_buffer.to_os_string();
+    if path.is_empty() {
+      None
+    } else {
+      Some(PathBuf::from(path))
+    }
+  };
+
+  let remote_oauth_bearer_token_path = {
+    let path = remote_oauth_bearer_token_path_buffer.to_os_string();
+    if path.is_empty() {
+      None
+    } else {
+      Some(PathBuf::from(path))
+    }
+  };
+
   Box::into_raw(Box::new(Scheduler::new(Core::new(
     root_type_ids.clone(),
     tasks,
@@ -313,6 +341,13 @@ pub extern "C" fn scheduler_create(
     } else {
       Some(remote_execution_server_string)
     },
+    if remote_instance_name_string.is_empty() {
+      None
+    } else {
+      Some(remote_instance_name_string)
+    },
+    remote_root_ca_certs_path,
+    remote_oauth_bearer_token_path,
     remote_store_thread_count as usize,
     remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
@@ -426,9 +461,10 @@ pub extern "C" fn tasks_task_begin(
   tasks_ptr: *mut Tasks,
   func: Function,
   output_type: TypeConstraint,
+  cacheable: bool,
 ) {
   with_tasks(tasks_ptr, |tasks| {
-    tasks.task_begin(func, output_type);
+    tasks.task_begin(func, output_type, cacheable);
   })
 }
 
@@ -537,8 +573,14 @@ pub extern "C" fn session_destroy(ptr: *mut Session) {
 }
 
 #[no_mangle]
-pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
-  Box::into_raw(Box::new(ExecutionRequest::new()))
+pub extern "C" fn execution_request_create(
+  should_render_ui: bool,
+  ui_worker_count: u64,
+) -> *const ExecutionRequest {
+  Box::into_raw(Box::new(ExecutionRequest::new(
+    should_render_ui,
+    ui_worker_count,
+  )))
 }
 
 #[no_mangle]
@@ -611,7 +653,10 @@ pub extern "C" fn set_panic_handler() {
 #[no_mangle]
 pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
-    match scheduler.core.store.garbage_collect() {
+    match scheduler.core.store().garbage_collect(
+      fs::DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+      fs::ShrinkBehavior::Fast,
+    ) {
       Ok(_) => {}
       Err(err) => error!("{}", err),
     }
@@ -622,7 +667,7 @@ pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
 pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
     let digests = scheduler.core.graph.all_digests();
-    match scheduler.core.store.lease_all(digests.iter()) {
+    match scheduler.core.store().lease_all(digests.iter()) {
       Ok(_) => {}
       Err(err) => error!("{}", &err),
     }
@@ -688,7 +733,7 @@ pub extern "C" fn merge_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    fs::Snapshot::merge_directories(scheduler.core.store.clone(), digests)
+    fs::Snapshot::merge_directories(scheduler.core.store(), digests)
       .wait()
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
@@ -722,7 +767,7 @@ pub extern "C" fn materialize_directories(
     futures::future::join_all(
       dir_and_digests
         .into_iter()
-        .map(|(dir, digest)| scheduler.core.store.materialize_directory(dir, digest))
+        .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
         .collect::<Vec<_>>(),
     )
   }).map(|_| ())

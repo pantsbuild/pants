@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import multiprocessing
 import os
 import time
 from builtins import object, open, str, zip
@@ -15,12 +16,13 @@ from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (DirectoryDigest, DirectoryToMaterialize, FileContent, FilesContent,
-                             Path, PathGlobs, PathGlobsAndRoot, Snapshot)
+                             MergedDirectories, Path, PathGlobs, PathGlobsAndRoot, Snapshot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Select, constraint_for
+from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.objects import Collection, datatype
@@ -101,7 +103,6 @@ class Scheduler(object):
 
     self._native = native
     self.include_trace_on_error = include_trace_on_error
-
     # Validate and register all provided and intrinsic tasks.
     rule_index = RuleIndex.create(list(rules))
     self._root_subject_types = sorted(rule_index.roots, key=repr)
@@ -132,6 +133,7 @@ class Scheduler(object):
       constraint_path_globs=constraint_for(PathGlobs),
       constraint_directory_digest=constraint_for(DirectoryDigest),
       constraint_snapshot=constraint_for(Snapshot),
+      constraint_merge_snapshots_request=constraint_for(MergedDirectories),
       constraint_files_content=constraint_for(FilesContent),
       constraint_dir=constraint_for(Dir),
       constraint_file=constraint_for(File),
@@ -225,7 +227,7 @@ class Scheduler(object):
   def _register_task(self, output_constraint, rule):
     """Register the given TaskRule with the native scheduler."""
     func = Function(self._to_key(rule.func))
-    self._native.lib.tasks_task_begin(self._tasks, func, output_constraint)
+    self._native.lib.tasks_task_begin(self._tasks, func, output_constraint, rule.cacheable)
     for selector in rule.input_selectors:
       selector_type = type(selector)
       product_constraint = self._to_constraint(selector.product)
@@ -420,13 +422,13 @@ class SchedulerSession(object):
   def visualize_rule_graph_to_file(self, filename):
     self._scheduler.visualize_rule_graph_to_file(filename)
 
-  def execution_request_literal(self, request_specs):
-    native_execution_request = self._scheduler._native.new_execution_request()
+  def execution_request_literal(self, request_specs, v2_ui):
+    native_execution_request = self._scheduler._native.new_execution_request(v2_ui, multiprocessing.cpu_count())
     for subject, product in request_specs:
       self._scheduler.add_root_selection(native_execution_request, subject, product)
     return ExecutionRequest(request_specs, native_execution_request)
 
-  def execution_request(self, products, subjects):
+  def execution_request(self, products, subjects, v2_ui=False):
     """Create and return an ExecutionRequest for the given products and subjects.
 
     The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
@@ -440,10 +442,11 @@ class SchedulerSession(object):
     :param subjects: A list of Spec and/or PathGlobs objects.
     :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
       :class:`pants.engine.fs.PathGlobs` objects.
+    :param bool v2_ui: whether to render the v2 engine UI
     :returns: An ExecutionRequest for the given products and subjects.
     """
     roots = (tuple((s, p) for s in subjects for p in products))
-    return self.execution_request_literal(roots)
+    return self.execution_request_literal(roots, v2_ui)
 
   def invalidate_files(self, direct_filenames):
     """Invalidates the given filenames in an internal product Graph instance."""
@@ -511,6 +514,53 @@ class SchedulerSession(object):
     except TaskError as e:
       return ExecutionResult.failure(e)
 
+  def _trace_on_error(self, unique_exceptions, request):
+    exception_noun = pluralize(len(unique_exceptions), 'Exception')
+    if self._scheduler.include_trace_on_error:
+      cumulative_trace = '\n'.join(self.trace(request))
+      raise ExecutionError(
+        '{} encountered:\n{}'.format(exception_noun, cumulative_trace),
+        unique_exceptions,
+      )
+    else:
+      raise ExecutionError(
+        '{} encountered:\n  {}'.format(
+          exception_noun,
+          '\n  '.join('{}: {}'.format(type(t).__name__, str(t)) for t in unique_exceptions)),
+        unique_exceptions
+      )
+
+  def run_console_rule(self, product, subject, v2_ui):
+    """
+
+    :param product: product type for the request.
+    :param subject: subject for the request.
+    :param v2_ui: whether to render the v2 engine UI
+    :return: A dict from product type to lists of products each with length matching len(subjects).
+    """
+    request = self.execution_request([product], [subject], v2_ui)
+    result = self.execute(request)
+    if result.error:
+      raise result.error
+
+    self._state_validation(result)
+    assert len(result.root_products) == 1
+    root, state = result.root_products[0]
+    if type(state) is Throw:
+      exc = state.exc
+      if isinstance(exc, GracefulTerminationException):
+        raise exc
+      self._trace_on_error([exc], request)
+    return {result.root_products[0]: [state.value]}
+
+  def _state_validation(self, result):
+    # State validation.
+    unknown_state_types = tuple(
+      type(state) for _, state in result.root_products if type(state) not in (Throw, Return)
+    )
+    if unknown_state_types:
+      State.raise_unrecognized(unknown_state_types)
+
   def products_request(self, products, subjects):
     """Executes a request for multiple products for some subjects, and returns the products.
 
@@ -523,33 +573,14 @@ class SchedulerSession(object):
     if result.error:
       raise result.error
 
-    # State validation.
-    unknown_state_types = tuple(
-      type(state) for _, state in result.root_products if type(state) not in (Throw, Return)
-    )
-    if unknown_state_types:
-      State.raise_unrecognized(unknown_state_types)
+    self._state_validation(result)
 
     # Throw handling.
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
     throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
       unique_exceptions = tuple({t.exc for t in throw_root_states})
-      exception_noun = pluralize(len(unique_exceptions), 'Exception')
-
-      if self._scheduler.include_trace_on_error:
-        cumulative_trace = '\n'.join(self.trace(request))
-        raise ExecutionError(
-          '{} encountered:\n{}'.format(exception_noun, cumulative_trace),
-          unique_exceptions,
-        )
-      else:
-        raise ExecutionError(
-          '{} encountered:\n  {}'.format(
-            exception_noun,
-            '\n  '.join('{}: {}'.format(type(t).__name__, str(t)) for t in unique_exceptions)),
-          unique_exceptions
-        )
+      self._trace_on_error(unique_exceptions, request)
 
     # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
     # order in output lists.

@@ -18,7 +18,8 @@ from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
-from pants.util.contextutil import hard_exit_handler, maybe_profiled
+from pants.rules.core.exceptions import GracefulTerminationException
+from pants.util.contextutil import maybe_profiled
 
 
 logger = logging.getLogger(__name__)
@@ -89,9 +90,6 @@ class LocalPantsRunner(object):
     )
     global_options = options.for_global_scope()
 
-    # Apply exiter options.
-    exiter.apply_options(options)
-
     # Option values are usually computed lazily on demand,
     # but command line options are eagerly computed for validation.
     for scope in options.scope_to_flags.keys():
@@ -157,7 +155,7 @@ class LocalPantsRunner(object):
     self._run_start_time = start_time
 
   def run(self):
-    with hard_exit_handler(), maybe_profiled(self._profile_path):
+    with maybe_profiled(self._profile_path):
       self._run()
 
   def _maybe_run_v1(self, run_tracker, reporting):
@@ -186,15 +184,19 @@ class LocalPantsRunner(object):
     # If we're a pure --v2 run, validate goals - otherwise some goals specified
     # may be provided by the --v1 task paths.
     if not self._global_options.v1:
-      self._graph_session.validate_goals(self._options.goals)
+      self._graph_session.validate_goals(self._options.goals_and_possible_v2_goals)
 
     try:
       self._graph_session.run_console_rules(
-        self._options.goals,
-        self._target_roots
+        self._options.goals_and_possible_v2_goals,
+        self._target_roots,
+        self._global_options.v2_ui
       )
+    except GracefulTerminationException as e:
+      logger.debug('Encountered graceful termination exception {}; exiting'.format(e))
+      return e.exit_code
     except Exception as e:
-      logger.warn('Encountered unhandled exception {!r} during rule execution!'
+      logger.warn('Encountered unhandled exception {} during rule execution!'
                   .format(e))
       return 1
     else:

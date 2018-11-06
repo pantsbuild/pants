@@ -9,33 +9,34 @@ import os
 import signal
 import threading
 import time
+import unittest
 from builtins import open, range, zip
-from concurrent.futures import ThreadPoolExecutor
-
-import pytest
 
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
-from pants_test.pantsd.pantsd_integration_test_base import (PantsDaemonIntegrationTestBase,
-                                                            full_pantsd_log, read_pantsd_log)
+from pants_test.pants_run_integration_test import read_pantsd_log
+from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
+from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 
 
 def launch_file_toucher(f):
   """Launch a loop to touch the given file, and return a function to call to stop and join it."""
-  executor = ThreadPoolExecutor(max_workers=1)
-  halt = threading.Event()
+  if not os.path.isfile(f):
+    raise AssertionError('Refusing to touch a non-file.')
 
+  halt = threading.Event()
   def file_toucher():
     while not halt.isSet():
       touch(f)
       time.sleep(1)
-
-  future = executor.submit(file_toucher)
+  thread = threading.Thread(target=file_toucher)
+  thread.daemon = True
+  thread.start()
 
   def join():
     halt.set()
-    future.result(timeout=10)
+    thread.join(timeout=10)
 
   return join
 
@@ -80,7 +81,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           continue
 
         # Check if the line begins with W or E to check if it is a warning or error line.
-        self.assertNotRegexpMatches(line, r'^[WE].*')
+        assertNotRegex(self, line, r'^[WE].*')
 
   def test_pantsd_broken_pipe(self):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -230,10 +231,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_started()
 
       # Launch a separate thread to poke files in 3rdparty.
-      join = launch_file_toucher('3rdparty/BUILD')
+      join = launch_file_toucher('3rdparty/jvm/com/google/auto/value/BUILD')
 
       # Repeatedly re-list 3rdparty while the file is being invalidated.
-      for _ in range(0, 8):
+      for _ in range(0, 16):
         pantsd_run(cmd)
         checker.assert_running()
 
@@ -291,9 +292,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Let any fs events quiesce.
       time.sleep(5)
 
+      def full_pantsd_log():
+        return '\n'.join(read_pantsd_log(workdir))
+
       # Check the logs.
-      self.assertRegexpMatches(
-        full_pantsd_log(workdir),
+      assertRegex(
+        self,
+        full_pantsd_log(),
         r'watching invalidating files:.*{}'.format(test_file)
       )
 
@@ -303,7 +308,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       time.sleep(10)
       checker.assert_stopped()
 
-      self.assertIn('saw file events covered by invalidation globs', full_pantsd_log(workdir))
+      self.assertIn('saw file events covered by invalidation globs', full_pantsd_log())
 
   def test_pantsd_pid_deleted(self):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
@@ -358,17 +363,17 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))", binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
+        assertNotRegex(self, result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))", binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
+        assertNotRegex(self, result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_src_file, 'import this\n', binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertRegexpMatches(result.stdout_data, has_source_root_regex)
+        assertRegex(self, result.stdout_data, has_source_root_regex)
     finally:
       rm_rf(test_path)
 
@@ -414,7 +419,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
-  def test_pantsd_killed_run(self):
+  def test_pantsd_parent_runner_killed(self):
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
       file_to_make = os.path.join(workdir, 'some_magic_file')
@@ -425,22 +430,71 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       )
 
       # Wait for the python run to be running.
-      time.sleep(15)
+      time.sleep(5)
       checker.assert_started()
 
       # Locate the single "parent" pantsd-runner process, and kill it.
       pantsd_runner_processes = [p for p in checker.runner_process_context.current_processes()
                                  if p.ppid() == 1]
       self.assertEquals(1, len(pantsd_runner_processes))
-      pantsd_runner_processes[0].terminate()
+      parent_runner_process = pantsd_runner_processes[0]
+      # Send SIGTERM
+      parent_runner_process.terminate()
       waiter_run = waiter_handle.join()
 
-      # Ensure that we saw the failure in the client's stdout, and that we got a remote exception.
+      # Ensure that we saw the pantsd-runner process's failure in the client's stderr.
       self.assert_failure(waiter_run)
-      self.assertIn('abruptly lost active connection to pantsd runner', waiter_run.stderr_data)
+      assertRegex(self, waiter_run.stderr_data, """\
+Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
+""".format(signum=signal.SIGTERM))
+      # NB: testing stderr is an "end-to-end" test, as it requires pants knowing the correct remote
+      # pid and reading those files to print their content to stderr, so we don't necessarily need
+      # to test the log files themselves here.
 
-      pytest.xfail("Expected to fail due to https://github.com/pantsbuild/pants/issues/6530")
-      self.assertIn('Remote exception:', waiter_run.stderr_data)
+  def _assert_pantsd_keyboardinterrupt_signal(self, signum):
+    # TODO: This tests that pantsd-runner processes actually die after the thin client receives the
+    # specified signal.
+    with self.pantsd_test_context() as (workdir, config, checker):
+      # Launch a run that will wait for a file to be created (but do not create that file).
+      file_to_make = os.path.join(workdir, 'some_magic_file')
+      waiter_handle = self.run_pants_with_workdir_without_waiting(
+        ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
+        workdir,
+        config,
+      )
+
+      time.sleep(5)
+      checker.assert_started()
+
+      # Get all the pantsd-runner processes while they're still around.
+      pantsd_runner_processes = checker.runner_process_context.current_processes()
+      # This should kill the pantsd-runner processes through the RemotePantsRunner SIGINT handler.
+      os.kill(waiter_handle.process.pid, signum)
+      waiter_run = waiter_handle.join()
+      self.assert_failure(waiter_run)
+      self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
+
+      # TODO: SIGTERM should be tested as well, but the expected behavior is a little different --
+      # we should test that the pantsd-runner process exits with failure (if possible -- see the
+      # caveat on psutil below), and then check the remote process's fatal error log to confirm the
+      # remote pantsd-runner receives a SIGTERM and dies.
+
+      time.sleep(1)
+      for proc in pantsd_runner_processes:
+        # TODO: we could be checking the return codes of the subprocesses, but psutil is currently
+        # limited on non-Windows hosts -- see https://psutil.readthedocs.io/en/latest/#processes.
+        # The pantsd-runner processes should be dead, and they should have exited with 1.
+        self.assertFalse(proc.is_running())
+
+  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
+  def test_pantsd_control_c(self):
+    self._assert_pantsd_keyboardinterrupt_signal(signal.SIGINT)
+
+  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
+  def test_pantsd_sigquit(self):
+    # We convert a local SIGQUIT in the thin client process -> SIGINT on the remote end in
+    # RemotePantsRunner.
+    self._assert_pantsd_keyboardinterrupt_signal(signal.SIGQUIT)
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env

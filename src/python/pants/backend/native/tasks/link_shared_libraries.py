@@ -7,17 +7,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 
 from pants.backend.native.config.environment import Linker, LLVMCppToolchain, Platform
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import NativeLibrary
-from pants.backend.native.tasks.native_compile import NativeTargetDependencies, ObjectFiles
+from pants.backend.native.tasks.native_compile import ObjectFiles
 from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFiles
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.util.collections import assert_single_element
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
+from pants.util.objects import SubclassesOf, datatype
 from pants.util.process_handler import subprocess
 
 
@@ -32,22 +30,16 @@ class LinkSharedLibraryRequest(datatype([
     ('external_lib_dirs', tuple),
     ('external_lib_names', tuple),
 ])):
-
-  @classmethod
-  def with_external_libs_product(cls, external_libs_product=None, *args, **kwargs):
-    if external_libs_product is None:
-      lib_dirs = ()
-      lib_names = ()
-    else:
-      lib_dirs = (external_libs_product.lib_dir,)
-      lib_names = external_libs_product.lib_names
-
-    return cls(*args, external_lib_dirs=lib_dirs, external_lib_names=lib_names, **kwargs)
+  pass
 
 
 class LinkSharedLibraries(NativeTask):
 
   options_scope = 'link-shared-libraries'
+
+  # TODO(#6486): change this to include ExternalNativeLibrary, then add a test that strict-deps
+  # works on external libs.
+  source_target_constraint = SubclassesOf(NativeLibrary)
 
   @classmethod
   def product_types(cls):
@@ -56,7 +48,6 @@ class LinkSharedLibraries(NativeTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(LinkSharedLibraries, cls).prepare(options, round_manager)
-    round_manager.require(NativeTargetDependencies)
     round_manager.require(ObjectFiles)
     round_manager.optional_product(NativeExternalLibraryFiles)
 
@@ -66,17 +57,9 @@ class LinkSharedLibraries(NativeTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(LinkSharedLibraries, cls).implementation_version() + [('LinkSharedLibraries', 0)]
+    return super(LinkSharedLibraries, cls).implementation_version() + [('LinkSharedLibraries', 1)]
 
   class LinkSharedLibrariesError(TaskError): pass
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(LinkSharedLibraries, cls).subsystem_dependencies() + (NativeToolchain.scoped(cls),)
-
-  @memoized_property
-  def _native_toolchain(self):
-    return NativeToolchain.scoped_instance(self)
 
   @memoized_property
   def _cpp_toolchain(self):
@@ -91,17 +74,8 @@ class LinkSharedLibraries(NativeTask):
     # TODO: convert this to a v2 engine dependency injection.
     return Platform.create()
 
-  def _retrieve_single_product_at_target_base(self, product_mapping, target):
-    self.context.log.debug("product_mapping: {}".format(product_mapping))
-    self.context.log.debug("target: {}".format(target))
-    product = product_mapping.get(target)
-    single_base_dir = assert_single_element(product.keys())
-    single_product = assert_single_element(product[single_base_dir])
-    return single_product
-
   def execute(self):
     targets_providing_artifacts = self.context.targets(NativeLibrary.produces_ctypes_native_library)
-    native_target_deps_product = self.context.products.get(NativeTargetDependencies)
     compiled_objects_product = self.context.products.get(ObjectFiles)
     shared_libs_product = self.context.products.get(SharedLibrary)
     external_libs_product = self.context.products.get_data(NativeExternalLibraryFiles)
@@ -118,7 +92,7 @@ class LinkSharedLibraries(NativeTask):
           # perform a link to every native_external_library for all targets in the closure.
           # https://github.com/pantsbuild/pants/issues/6178
           link_request = self._make_link_request(
-            vt, compiled_objects_product, native_target_deps_product, external_libs_product)
+            vt, compiled_objects_product, external_libs_product)
           self.context.log.debug("link_request: {}".format(link_request))
           shared_library = self._execute_link_request(link_request)
 
@@ -133,7 +107,7 @@ class LinkSharedLibraries(NativeTask):
         else:
           all_shared_libs_by_name[shared_library.name] = shared_library
 
-        shared_libs_product.add(vt.target, vt.target.target_base).append(shared_library)
+        self._add_product_at_target_base(shared_libs_product, vt.target, shared_library)
 
   def _retrieve_shared_lib_from_cache(self, vt):
     native_artifact = vt.target.ctypes_native_library
@@ -144,43 +118,41 @@ class LinkSharedLibraries(NativeTask):
                                           .format(path_to_cached_lib))
     return SharedLibrary(name=native_artifact.lib_name, path=path_to_cached_lib)
 
-  def _make_link_request(self,
-                         vt,
-                         compiled_objects_product,
-                         native_target_deps_product,
-                         external_libs_product):
+  def _make_link_request(self, vt, compiled_objects_product, external_libs_product):
     self.context.log.debug("link target: {}".format(vt.target))
 
-    deps = self._retrieve_single_product_at_target_base(native_target_deps_product, vt.target)
+    deps = self.native_deps(vt.target)
 
     all_compiled_object_files = []
-
     for dep_tgt in deps:
-      self.context.log.debug("dep_tgt: {}".format(dep_tgt))
-      object_files = self._retrieve_single_product_at_target_base(compiled_objects_product, dep_tgt)
-      self.context.log.debug("object_files: {}".format(object_files))
-      object_file_paths = object_files.file_paths()
-      self.context.log.debug("object_file_paths: {}".format(object_file_paths))
-      all_compiled_object_files.extend(object_file_paths)
+      if compiled_objects_product.get(dep_tgt):
+        self.context.log.debug("dep_tgt: {}".format(dep_tgt))
+        object_files = self._retrieve_single_product_at_target_base(compiled_objects_product, dep_tgt)
+        self.context.log.debug("object_files: {}".format(object_files))
+        object_file_paths = object_files.file_paths()
+        self.context.log.debug("object_file_paths: {}".format(object_file_paths))
+        all_compiled_object_files.extend(object_file_paths)
 
-    return LinkSharedLibraryRequest.with_external_libs_product(
+    external_lib_dirs = []
+    external_lib_names = []
+    if external_libs_product is not None:
+      for nelf in external_libs_product.get_for_targets(deps):
+        if nelf.lib_dir:
+          external_lib_dirs.append(nelf.lib_dir)
+        external_lib_names.extend(nelf.lib_names)
+
+    return LinkSharedLibraryRequest(
       linker=self.linker,
       object_files=tuple(all_compiled_object_files),
       native_artifact=vt.target.ctypes_native_library,
       output_dir=vt.results_dir,
-      external_libs_product=external_libs_product)
+      external_lib_dirs=tuple(external_lib_dirs),
+      external_lib_names=tuple(external_lib_names))
 
   _SHARED_CMDLINE_ARGS = {
     'darwin': lambda: ['-Wl,-dylib'],
     'linux': lambda: ['-shared'],
   }
-
-  def _get_third_party_lib_args(self, link_request):
-    ext_libs = link_request.external_libs_info
-    if not ext_libs:
-      return []
-
-    return ext_libs.get_third_party_lib_args()
 
   def _execute_link_request(self, link_request):
     object_files = link_request.object_files
@@ -200,6 +172,8 @@ class LinkSharedLibraries(NativeTask):
            self.platform.resolve_platform_specific(self._SHARED_CMDLINE_ARGS) +
            linker.extra_args +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
+           ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +
+           ['-l{}'.format(lib_name) for lib_name in link_request.external_lib_names] +
            [os.path.abspath(obj) for obj in object_files])
     self.context.log.debug("linker command: {}".format(cmd))
 

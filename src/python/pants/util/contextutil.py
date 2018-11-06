@@ -374,19 +374,6 @@ def maybe_profiled(profile_path):
     )
 
 
-class HardSystemExit(SystemExit):
-  """A SystemExit subclass that incurs an os._exit() via special handling."""
-
-
-@contextmanager
-def hard_exit_handler():
-  """An exit helper for the daemon/fork'd context that provides for deferred os._exit(0) calls."""
-  try:
-    yield
-  except HardSystemExit:
-    os._exit(0)
-
-
 @contextmanager
 def with_overwritten_file_content(file_path):
   """A helper that resets a file after the method runs.

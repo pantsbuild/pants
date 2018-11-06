@@ -86,12 +86,44 @@ fn main() {
            If unspecified, local execution will be performed.",
         ),
     )
-    .arg(
+      .arg(
+        Arg::with_name("execution-root-ca-cert-file")
+            .help("Path to file containing root certificate authority certificates for the execution server. If not set, TLS will not be used when connecting to the execution server.")
+            .takes_value(true)
+            .long("execution-root-ca-cert-file")
+            .required(false)
+      )
+      .arg(
+        Arg::with_name("execution-oauth-bearer-token-path")
+            .help("Path to file containing oauth bearer token for communication with the execution server. If not set, no authorization will be provided to remote servers.")
+            .takes_value(true)
+            .long("execution-oauth-bearer-token-path")
+            .required(false)
+      )
+      .arg(
       Arg::with_name("cas-server")
         .long("cas-server")
         .takes_value(true)
         .help("The host:port of the gRPC CAS server to connect to."),
     )
+      .arg(
+        Arg::with_name("cas-root-ca-cert-file")
+            .help("Path to file containing root certificate authority certificates for the CAS server. If not set, TLS will not be used when connecting to the CAS server.")
+            .takes_value(true)
+            .long("cas-root-ca-cert-file")
+            .required(false)
+      )
+      .arg(
+        Arg::with_name("cas-oauth-bearer-token-path")
+            .help("Path to file containing oauth bearer token for communication with the CAS server. If not set, no authorization will be provided to remote servers.")
+            .takes_value(true)
+            .long("cas-oauth-bearer-token-path")
+            .required(false)
+      )
+      .arg(Arg::with_name("remote-instance-name")
+          .takes_value(true)
+          .long("remote-instance-name")
+          .required(false))
       .arg(
         Arg::with_name("upload-chunk-bytes")
             .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
@@ -149,15 +181,31 @@ fn main() {
     .unwrap_or_else(fs::Store::default_path);
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let server_arg = args.value_of("server");
+  let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {
       let chunk_size =
         value_t!(args.value_of("upload-chunk-bytes"), usize).expect("Bad upload-chunk-bytes flag");
 
+      let root_ca_certs = if let Some(path) = args.value_of("cas-root-ca-cert-file") {
+        Some(std::fs::read(path).expect("Error reading root CA certs file"))
+      } else {
+        None
+      };
+
+      let oauth_bearer_token = if let Some(path) = args.value_of("cas-oauth-bearer-token-path") {
+        Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
+      } else {
+        None
+      };
+
       fs::Store::with_remote(
         local_store_path,
         pool.clone(),
-        cas_server.to_owned(),
+        cas_server,
+        remote_instance_arg.clone(),
+        root_ca_certs,
+        oauth_bearer_token,
         1,
         chunk_size,
         Duration::from_secs(30),
@@ -190,11 +238,29 @@ fn main() {
   };
 
   let runner: Box<process_execution::CommandRunner> = match server_arg {
-    Some(address) => Box::new(process_execution::remote::CommandRunner::new(
-      address.to_owned(),
-      1,
-      store,
-    )),
+    Some(address) => {
+      let root_ca_certs = if let Some(path) = args.value_of("execution-root-ca-cert-file") {
+        Some(std::fs::read(path).expect("Error reading root CA certs file"))
+      } else {
+        None
+      };
+
+      let oauth_bearer_token =
+        if let Some(path) = args.value_of("execution-oauth-bearer-token-path") {
+          Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
+        } else {
+          None
+        };
+
+      Box::new(process_execution::remote::CommandRunner::new(
+        address,
+        remote_instance_arg,
+        root_ca_certs,
+        oauth_bearer_token,
+        1,
+        store,
+      ))
+    }
     None => Box::new(process_execution::local::CommandRunner::new(
       store, pool, work_dir, true,
     )),

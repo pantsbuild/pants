@@ -117,6 +117,10 @@ class Snapshot(datatype([('directory_digest', DirectoryDigest), ('path_stats', t
     return [p.stat for p in self.files]
 
 
+class MergedDirectories(datatype([('directories', tuple)])):
+  pass
+
+
 class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest', DirectoryDigest)])):
   """A request to materialize the contents of a directory digest at the provided path."""
   pass
@@ -143,5 +147,6 @@ def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
     RootRule(DirectoryDigest),
+    RootRule(MergedDirectories),
     RootRule(PathGlobs),
   ]

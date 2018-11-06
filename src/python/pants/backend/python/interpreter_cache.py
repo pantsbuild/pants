@@ -14,7 +14,6 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 from pex.variables import Variables
 
-from pants.backend.python.pex_util import expand_and_maybe_adjust_platform
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -73,8 +72,15 @@ class PythonInterpreterCache(object):
     safe_mkdir(cache_dir)
     return cache_dir
 
-  def select_interpreter_for_targets(self, targets):
-    """Pick an interpreter compatible with all the specified targets."""
+  def partition_targets_by_compatibility(self, targets):
+    """Partition targets by their compatibility constraints.
+
+    :param targets: a list of `PythonTarget` objects
+    :returns: (tgts_by_compatibilities, filters): a dict that maps compatibility constraints
+      to a list of matching targets, the aggregate set of compatibility constraints imposed
+      by the target set
+    :rtype: (dict(str, list), set)
+    """
     tgts_by_compatibilities = defaultdict(list)
     filters = set()
 
@@ -83,8 +89,13 @@ class PythonInterpreterCache(object):
         c = self._python_setup.compatibility_or_constraints(target)
         tgts_by_compatibilities[c].append(target)
         filters.update(c)
+    return tgts_by_compatibilities, filters
 
-    allowed_interpreters = set(self.setup(filters=filters))
+  def select_interpreter_for_targets(self, targets):
+    """Pick an interpreter compatible with all the specified targets."""
+
+    tgts_by_compatibilities, total_filter_set = self.partition_targets_by_compatibility(targets)
+    allowed_interpreters = set(self.setup(filters=total_filter_set))
 
     # Constrain allowed_interpreters based on each target's compatibility requirements.
     for compatibility in tgts_by_compatibilities:
@@ -222,24 +233,22 @@ class PythonInterpreterCache(object):
     # Explicitly set the precedence to avoid resolution of wheels or distillation of sdists into
     # wheels.
     precedence = (EggPackage, SourcePackage)
-    distributions = resolve(requirements=[requirement],
-                            fetchers=self._python_repos.get_fetchers(),
-                            interpreter=interpreter,
-                            platform=expand_and_maybe_adjust_platform(
-                              interpreter=interpreter,
-                              # The local interpreter cache is, by definition, composed of
-                              # interpreters for the 'current' platform.
-                              platform='current'),
-                            context=self._python_repos.get_network_context(),
-                            precedence=precedence)
-    if not distributions:
+    resolved_dists = resolve(requirements=[requirement],
+                             fetchers=self._python_repos.get_fetchers(),
+                             interpreter=interpreter,
+                             # The local interpreter cache is, by definition, composed of
+                             #  interpreters for the 'current' platform.
+                             platform='current',
+                             context=self._python_repos.get_network_context(),
+                             precedence=precedence)
+    if not resolved_dists:
       return None
 
-    assert len(distributions) == 1, ('Expected exactly 1 distribution to be resolved for {}, '
+    assert len(resolved_dists) == 1, ('Expected exactly 1 distribution to be resolved for {}, '
                                      'found:\n\t{}'.format(requirement,
-                                                           '\n\t'.join(map(str, distributions))))
+                                                           '\n\t'.join(map(str, resolved_dists))))
 
-    dist_location = distributions[0].location
+    dist_location = resolved_dists[0].distribution.location
     target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
     shutil.move(dist_location, target_location)
     _safe_link(target_location, target_link)

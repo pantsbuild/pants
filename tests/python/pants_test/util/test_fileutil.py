@@ -14,7 +14,8 @@ from builtins import open
 from mock import mock
 
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
-from pants.util.fileutil import atomic_copy, create_size_estimators, safe_hardlink_or_copy
+from pants.util.fileutil import (atomic_copy, create_size_estimators, safe_hardlink_or_copy,
+                                 safe_temp_edit)
 
 
 class FileutilTest(unittest.TestCase):
@@ -94,3 +95,26 @@ class FileutilTest(unittest.TestCase):
 
         # Make sure they are separate copies
         self.assertFalse(self._is_hard_link(dst.name, src_path))
+
+  def test_safe_temp_edit(self):
+    content = b'hello'
+
+    with temporary_file() as temp_file:
+      temp_file.write(content)
+      temp_file.close()
+
+      with open(temp_file.name, 'rb') as f:
+        self.assertEqual(content, f.read())
+
+      temp_content = b'hello world'
+      with safe_temp_edit(temp_file.name) as temp_edit_file:
+        with open(temp_edit_file, 'wb') as t_f:
+          t_f.write(temp_content)
+
+        # Make sure the edit is actually happening in temp_file
+        with open(temp_file.name, 'rb') as f:
+          self.assertEqual(temp_content, f.read())
+
+      # Test that temp_file has been safely recovered.
+      with open(temp_file.name, 'rb') as f:
+        self.assertEqual(content, f.read())

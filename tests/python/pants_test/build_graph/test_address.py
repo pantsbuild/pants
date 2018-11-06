@@ -111,19 +111,46 @@ class ParseSpecTest(unittest.TestCase):
                         subproject_roots=[
                           'subprojectA',
                           'path/to/subprojectB',
-                        ])[0]
+                        ])
 
     # Ensure that a spec in subprojectA is determined correctly.
-    subprojectA_spec = parse('src/python/alib', 'subprojectA/src/python')
-    self.assertEqual(subprojectA_spec, 'subprojectA/src/python/alib')
+    spec_path, target_name = parse('src/python/alib', 'subprojectA/src/python')
+    self.assertEqual('subprojectA/src/python/alib', spec_path)
+    self.assertEqual('alib', target_name)
+
+    spec_path, target_name = parse('src/python/alib:jake', 'subprojectA/src/python/alib')
+    self.assertEqual('subprojectA/src/python/alib', spec_path)
+    self.assertEqual('jake', target_name)
+
+    spec_path, target_name = parse(':rel', 'subprojectA/src/python/alib')
+    self.assertEqual('subprojectA/src/python/alib', spec_path)
+    self.assertEqual('rel', target_name)
 
     # Ensure that a spec in subprojectB, which is more complex, is correct.
-    subprojectB_spec = parse('src/python/blib', 'path/to/subprojectB/src/python')
-    self.assertEqual(subprojectB_spec, 'path/to/subprojectB/src/python/blib')
+    spec_path, target_name = parse('src/python/blib', 'path/to/subprojectB/src/python')
+    self.assertEqual('path/to/subprojectB/src/python/blib', spec_path)
+    self.assertEqual('blib', target_name)
+
+    spec_path, target_name = parse('src/python/blib:jane', 'path/to/subprojectB/src/python/blib')
+    self.assertEqual('path/to/subprojectB/src/python/blib', spec_path)
+    self.assertEqual('jane', target_name)
+
+    spec_path, target_name = parse(':rel', 'path/to/subprojectB/src/python/blib')
+    self.assertEqual('path/to/subprojectB/src/python/blib', spec_path)
+    self.assertEqual('rel', target_name)
 
     # Ensure that a spec in the parent project is not mapped.
-    parent_spec = parse('src/python/parent', 'src/python')
-    self.assertEqual(parent_spec, 'src/python/parent')
+    spec_path, target_name = parse('src/python/parent', 'src/python')
+    self.assertEqual('src/python/parent', spec_path)
+    self.assertEqual('parent', target_name)
+
+    spec_path, target_name = parse('src/python/parent:george', 'src/python')
+    self.assertEqual('src/python/parent', spec_path)
+    self.assertEqual('george', target_name)
+
+    spec_path, target_name = parse(':rel', 'src/python/parent')
+    self.assertEqual('src/python/parent', spec_path)
+    self.assertEqual('rel', target_name)
 
 
 class BaseAddressTest(unittest.TestCase):

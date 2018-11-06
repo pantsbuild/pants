@@ -19,6 +19,9 @@ class _FakeOptionValues(object):
   def __init__(self, option_values):
     self._option_values = option_values
 
+  def __iter__(self):
+    return iter(self._option_values.keys())
+
   def __getitem__(self, key):
     return getattr(self, key)
 

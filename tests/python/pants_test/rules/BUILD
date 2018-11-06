@@ -1,0 +1,21 @@
+python_tests(
+  name='test',
+  sources=['test_test.py'],
+  dependencies=[
+    '3rdparty/python:future',
+    'src/python/pants/backend/python/rules',
+    'src/python/pants/util:objects',
+    'tests/python/pants_test:test_base',
+    'tests/python/pants_test/engine:scheduler_test_base',
+    'tests/python/pants_test/engine/examples:scheduler_inputs',
+  ]
+)
+
+python_tests(
+  name='test_integration',
+  sources=['test_test_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+)

@@ -12,12 +12,17 @@ from builtins import object, str
 
 from future.utils import PY2, PY3, text_type
 
-from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
+from pants.util.objects import (Collection, Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
                                 TypedDatatypeInstanceConstructionError, datatype, enum)
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class TypeConstraintTestBase(BaseTest):
+class CollectionTest(TestBase):
+  def test_collection_iteration(self):
+    self.assertEqual([1, 2], [x for x in Collection.of(int)([1, 2])])
+
+
+class TypeConstraintTestBase(TestBase):
   class A(object):
     pass
 
@@ -199,7 +204,7 @@ class ReturnsNotImplemented(object):
 class SomeEnum(enum('x', [1, 2])): pass
 
 
-class DatatypeTest(BaseTest):
+class DatatypeTest(TestBase):
 
   def test_eq_with_not_implemented_super(self):
     class DatatypeSuperNotImpl(datatype(['val']), ReturnsNotImplemented, tuple):
@@ -303,7 +308,7 @@ class DatatypeTest(BaseTest):
       bar(other=1)
 
 
-class TypedDatatypeTest(BaseTest):
+class TypedDatatypeTest(TestBase):
 
   def test_class_construction_errors(self):
     # NB: datatype subclasses declared at top level are the success cases

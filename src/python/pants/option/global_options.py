@@ -37,6 +37,9 @@ class ExecutionOptions(datatype([
   'remote_store_chunk_upload_timeout_seconds',
   'process_execution_parallelism',
   'process_execution_cleanup_local_dirs',
+  'remote_instance_name',
+  'remote_ca_certs_path',
+  'remote_oauth_bearer_token_path',
 ])):
   """A collection of all options related to (remote) execution of processes.
 
@@ -54,6 +57,9 @@ class ExecutionOptions(datatype([
       remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
       process_execution_parallelism=bootstrap_options.process_execution_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
+      remote_instance_name=bootstrap_options.remote_instance_name,
+      remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
+      remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
     )
 
 
@@ -65,6 +71,9 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_upload_timeout_seconds=60,
     process_execution_parallelism=multiprocessing.cpu_count()*2,
     process_execution_cleanup_local_dirs=True,
+    remote_instance_name=None,
+    remote_ca_certs_path=None,
+    remote_oauth_bearer_token_path=None,
   )
 
 
@@ -193,7 +202,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'project depends on.')
     register('--owner-of', type=list, default=[], daemon=False, fromfile=True, metavar='<path>',
              help='Select the targets that own these files. '
-                  'This is the third target calculation strategy along with the --changed '
+                  'This is the third target calculation strategy along with the --changed-* '
                   'options and specifying the targets directly. These three types of target '
                   'selection are mutually exclusive.')
 
@@ -241,6 +250,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
     register('--pantsd-fs-event-workers', advanced=True, type=int, default=4,
+             removal_version='1.14.0.dev2',
+             removal_hint='Filesystem events are now handled by a single dedicated thread.',
              help='The number of workers to use for the filesystem event service executor pool.')
     register('--pantsd-invalidation-globs', advanced=True, type=list, fromfile=True, default=[],
              help='Filesystem events matching any of these globs will trigger a daemon restart.')
@@ -253,8 +264,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--watchman-startup-timeout', type=float, advanced=True, default=30.0,
              help='The watchman socket timeout (in seconds) for the initial `watch-project` command. '
                   'This may need to be set higher for larger repos due to watchman startup cost.')
-    register('--watchman-socket-timeout', type=float, advanced=True, default=5.0,
-             help='The watchman client socket timeout in seconds.')
+    register('--watchman-socket-timeout', type=float, advanced=True, default=0.1,
+             help='The watchman client socket timeout in seconds. Setting this to too high a '
+                  'value can negatively impact the latency of runs forked by pantsd.')
     register('--watchman-socket-path', type=str, advanced=True, default=None,
              help='The path to the watchman UNIX socket. This can be overridden if the default '
                   'absolute path length exceeds the maximum allowed by the OS.')
@@ -278,13 +290,24 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--remote-store-chunk-upload-timeout-seconds', type=int, advanced=True,
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
              help='Timeout (in seconds) for uploads of individual chunks to the remote file store.')
+    register('--remote-instance-name', advanced=True,
+             help='Name of the remote execution instance to use. Used for routing within '
+                  '--remote-execution-server and --remote-store-server.')
+    register('--remote-ca-certs-path', advanced=True,
+             help='Path to a PEM file containing CA certificates used for verifying secure '
+                  'connections to --remote-execution-server and --remote-store-server. '
+                  'If not specified, TLS will not be used.')
+    register('--remote-oauth-bearer-token-path', advanced=True,
+             help='Path to a file containing an oauth token to use for grpc connections to '
+                  '--remote-execution-server and --remote-store-server. If not specified, no '
+                  'authorization will be performed.')
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.
     register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
              advanced=True,
              help='Number of concurrent processes that may be executed either locally and remotely.')
-    register('--process-execution-cleanup-local-dirs', type=bool, default=True,
+    register('--process-execution-cleanup-local-dirs', type=bool, default=True, advanced=True,
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')
 
@@ -310,6 +333,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Enables execution of v1 Tasks.')
     register('--v2', advanced=True, type=bool, default=False,
              help='Enables execution of v2 @console_rules.')
+    register('--v2-ui', default=False, type=bool, daemon=False,
+             help='Whether to show v2 engine execution progress. '
+                  'This requires the --v2 flag to take effect.')
 
     loop_flag = '--loop'
     register(loop_flag, type=bool,
@@ -353,3 +379,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                          '`--v2 --no-v1` to function as expected.')
     if opts.loop and not opts.enable_pantsd:
       raise OptionsError('The --loop option requires `--enable-pantsd`, in order to watch files.')
+
+    if opts.v2_ui and not opts.v2:
+      raise OptionsError('The --v2-ui option requires --v2 to be enabled together.')

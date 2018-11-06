@@ -11,7 +11,7 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from twitter.common.collections import OrderedSet
 
-from pants.backend.python.tasks.pex_build_util import (dump_sources, has_python_sources,
+from pants.backend.python.tasks.pex_build_util import (PexBuilderWrapper, has_python_sources,
                                                        has_resources, is_python_target)
 from pants.base.exceptions import TaskError
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -82,7 +82,12 @@ class GatherSources(Task):
     return PEX(source_pex_path, interpreter=interpreter)
 
   def _build_pex(self, interpreter, path, targets):
-    builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
+    pex_builder = PexBuilderWrapper(
+      PEXBuilder(path=path, interpreter=interpreter, copy=True),
+      python_repos_subsystem=None,
+      python_setup_subsystem=None,
+      log=self.context.log)
+
     for target in targets:
-      dump_sources(builder, target, self.context.log)
-    builder.freeze()
+      pex_builder.add_sources_from(target)
+    pex_builder.freeze()

@@ -6,8 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
-import traceback
-from concurrent.futures import ThreadPoolExecutor
 
 from pants.pantsd.service.pants_service import PantsService
 from pants.pantsd.watchman import Watchman
@@ -25,31 +23,16 @@ class FSEventService(PantsService):
 
   PANTS_PID_SUBSCRIPTION_NAME = 'pantsd_pid'
 
-  def __init__(self, watchman, build_root, worker_count):
+  def __init__(self, watchman, build_root):
     """
     :param Watchman watchman: The Watchman instance as provided by the WatchmanLauncher subsystem.
     :param str build_root: The current build root.
-    :param int worker_count: The total number of workers to use for the internally managed
-                             ThreadPoolExecutor.
     """
     super(FSEventService, self).__init__()
     self._logger = logging.getLogger(__name__)
     self._watchman = watchman
     self._build_root = os.path.realpath(build_root)
-    self._worker_count = worker_count
-    self._executor = None
     self._handlers = {}
-
-  def setup(self, lifecycle_lock, executor=None):
-    super(FSEventService, self).setup(lifecycle_lock)
-    self._executor = executor or ThreadPoolExecutor(max_workers=self._worker_count)
-
-  def terminate(self):
-    """An extension of PantsService.terminate() that shuts down the executor if so configured."""
-    if self._executor:
-      self._logger.info('shutting down threadpool')
-      self._executor.shutdown()
-    super(FSEventService, self).terminate()
 
   def register_all_files_handler(self, callback, name='all_files'):
     """Registers a subscription for all files under a given watch path.
@@ -128,33 +111,14 @@ class FSEventService(PantsService):
     # Enable watchman for the build root.
     self._watchman.watch_project(self._build_root)
 
-    futures = {}
-    id_counter = 0
     subscriptions = list(self._handlers.values())
 
     # Setup subscriptions and begin the main event firing loop.
     for handler_name, event_data in self._watchman.subscribed(self._build_root, subscriptions):
-      # On death, break from the loop and contextmgr to terminate callback threads.
-      if self.is_killed: break
+      self._state.maybe_pause()
+      if self._state.is_terminating:
+        break
 
       if event_data:
-        # As we receive events from watchman, submit them asynchronously to the executor.
-        future = self._executor.submit(self.fire_callback, handler_name, event_data)
-        futures[future] = handler_name
-
-      # Process and log results for completed futures.
-      for completed_future in [_future for _future in futures if _future.done()]:
-        handler_name = futures.pop(completed_future)
-        id_counter += 1
-
-        try:
-          result = completed_future.result()
-        except Exception:
-          result = traceback.format_exc()
-
-        if result is not None:
-          # Truthy results or those that raise exceptions are treated as failures.
-          self._logger.warning('callback ID {} for {} failed: {}'
-                               .format(id_counter, handler_name, result))
-        else:
-          self._logger.debug('callback ID {} for {} succeeded'.format(id_counter, handler_name))
+        # As we receive events from watchman, trigger the relevant handlers.
+        self.fire_callback(handler_name, event_data)

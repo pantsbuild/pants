@@ -272,14 +272,13 @@ class InvalidationCacheManager(object):
                fingerprint_strategy=None,
                invalidation_report=None,
                task_name=None,
-               task_version=None,
+               task_version_slug=None,
                artifact_write_callback=lambda _: None):
     """
     :API: public
     """
     self._cache_key_generator = cache_key_generator
     self._task_name = task_name or 'UNKNOWN'
-    self._task_version = task_version or 'Unknown_0'
     self._invalidate_dependents = invalidate_dependents
     self._invalidator = build_invalidator
     self._fingerprint_strategy = fingerprint_strategy
@@ -288,9 +287,7 @@ class InvalidationCacheManager(object):
 
     # Create the task-versioned prefix of the results dir, and a stable symlink to it
     # (useful when debugging).
-    task_version_sha = sha1(self._task_version.encode('utf-8')).hexdigest()[:12]
-    self._results_dir_prefix = os.path.join(results_dir_root,
-                                            task_version_sha)
+    self._results_dir_prefix = os.path.join(results_dir_root, task_version_slug)
     safe_mkdir(self._results_dir_prefix)
     stable_prefix = os.path.join(results_dir_root, self._STABLE_DIR_NAME)
     safe_delete(stable_prefix)

@@ -7,14 +7,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import functools
 import os
 import time
-from builtins import open
 from contextlib import contextmanager
 
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.collections import recursively_update
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, read_pantsd_log
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
 
 
@@ -22,17 +21,6 @@ def banner(s):
   print(cyan('=' * 63))
   print(cyan('- {} {}'.format(s, '-' * (60 - len(s)))))
   print(cyan('=' * 63))
-
-
-def read_pantsd_log(workdir):
-  # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
-  with open('{}/pantsd/pantsd.log'.format(workdir), 'r') as f:
-    for line in f:
-      yield line.strip()
-
-
-def full_pantsd_log(workdir):
-  return '\n'.join(read_pantsd_log(workdir))
 
 
 class PantsDaemonMonitor(ProcessManager):
@@ -95,7 +83,10 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
           recursively_update(pantsd_config, extra_config)
         print('>>> config: \n{}\n'.format(pantsd_config))
         checker = PantsDaemonMonitor(runner_process_context, pid_dir)
-        self.assert_runner(workdir, pantsd_config, ['kill-pantsd'])
+        # TODO(#6574): this should be 1, but when we kill pantsd with a signal it doesn't make sure
+        # to close the run tracker -- we can easily address this by moving that cleanup into the
+        # Exiter.
+        self.assert_runner(workdir, pantsd_config, ['kill-pantsd'], expected_runs=1)
         try:
           yield workdir, pantsd_config, checker
         finally:
@@ -107,7 +98,8 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
             workdir,
             pantsd_config,
             ['kill-pantsd'],
-            expected_runs=expected_runs,
+            # TODO(#6574): this should be 1, see above.
+            expected_runs=1,
           )
           checker.assert_stopped()
 
@@ -117,7 +109,8 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
       yield context
 
   @contextmanager
-  def pantsd_run_context(self, log_level='info', extra_config=None, extra_env=None, success=True):
+  def pantsd_run_context(self, log_level='info', extra_config=None, extra_env=None, success=True,
+                         no_track_run_counts=False):
     with self.pantsd_test_context(log_level, extra_config) as (workdir, pantsd_config, checker):
       yield (
         functools.partial(
@@ -157,6 +150,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     elapsed = time.time() - start_time
     print(bold(cyan('\ncompleted in {} seconds'.format(elapsed))))
 
+    # TODO: uncomment this and add an issue link!
     runs_created = self._run_count(workdir) - run_count
     self.assertEqual(
         runs_created,

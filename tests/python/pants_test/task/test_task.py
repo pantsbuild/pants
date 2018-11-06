@@ -346,16 +346,18 @@ files(
     one = '1\n'
     two = '2\n'
 
+    def vt_for_implementation_version(version, content):
+      DummyTask._implementation_version = version
+      DummyTask.implementation_version_slug.clear()
+      self._create_clean_file(content)
+      task = self._task(incremental=True)
+      vt, _ = task.execute()
+      self.assertContent(vt, content)
+      return vt
+
     # Run twice, with a different implementation version the second time.
-    DummyTask._implementation_version = 0
-    self._create_clean_file(one)
-    task = self._task(incremental=True)
-    vtA, _ = task.execute()
-    self.assertContent(vtA, one)
-    DummyTask._implementation_version = 1
-    self._create_clean_file(two)
-    task = self._task(incremental=True)
-    vtB, _ = task.execute()
+    vtA = vt_for_implementation_version(0, one)
+    vtB = vt_for_implementation_version(1, two)
 
     # No incrementalism.
     self.assertFalse(vtA.is_incremental)

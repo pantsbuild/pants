@@ -127,7 +127,7 @@ class BuildGraph(AbstractClass):
     """
     self._target_by_address = OrderedDict()
     self._target_dependencies_by_address = defaultdict(OrderedSet)
-    self._target_dependees_by_address = defaultdict(set)
+    self._target_dependees_by_address = defaultdict(OrderedSet)
     self._derived_from_by_derivative = {}  # Address -> Address.
     self._derivatives_by_derived_from = defaultdict(list)   # Address -> list of Address.
     self.synthetic_addresses = set()

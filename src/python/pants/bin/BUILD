@@ -10,6 +10,8 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:exception_sink',
     'src/python/pants/base:exiter',
     'src/python/pants/base:project_tree',
     'src/python/pants/base:specs',
@@ -45,6 +47,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
     'src/python/pants/util:memo',
+    'src/python/pants/util:osutil',
   ],
 )
 
@@ -68,7 +71,7 @@ python_binary(
   entry_point='pants.bin.pants_loader:main',
   dependencies=[
     ':bin',
-    'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle:all',
+    'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
     'pants-plugins/src/python/internal_backend:plugins',
   ],
 )

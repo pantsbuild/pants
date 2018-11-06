@@ -8,7 +8,7 @@ import os
 from builtins import object
 from collections import namedtuple
 
-from pants.util.dirutil import longest_dir_prefix
+from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
 
@@ -73,12 +73,13 @@ def parse_spec(spec, relative_to=None, subproject_roots=None):
 
   spec_parts = spec.rsplit(':', 1)
   if len(spec_parts) == 1:
-    spec_path = prefix_subproject(normalize_absolute_refs(spec_parts[0]))
+    default_target_spec = spec_parts[0]
+    spec_path = prefix_subproject(normalize_absolute_refs(default_target_spec))
     target_name = os.path.basename(spec_path)
   else:
     spec_path, target_name = spec_parts
-    if not spec_path and not subproject and relative_to:
-      spec_path = relative_to
+    if not spec_path and relative_to:
+      spec_path = fast_relpath(relative_to, subproject) if subproject else relative_to
     spec_path = prefix_subproject(normalize_absolute_refs(spec_path))
 
   return spec_path, target_name

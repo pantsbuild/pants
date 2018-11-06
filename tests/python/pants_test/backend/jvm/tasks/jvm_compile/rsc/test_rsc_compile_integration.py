@@ -15,7 +15,8 @@ class RscCompileIntegration(BaseCompileIT):
     with temporary_dir() as cache_dir:
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir]},
-        'jvm-platform': {'compiler': 'rsc'}
+        'jvm-platform': {'compiler': 'rsc'},
+        'compile.rsc': {'execution_strategy': 'subprocess'},
       }
 
       pants_run = self.run_pants(
@@ -51,7 +52,7 @@ class RscCompileIntegration(BaseCompileIT):
         path = os.path.join(
           workdir,
           'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/rsc',
-          'outline/META-INF/semanticdb/out.semanticdb')
+          'm.jar')
         self.assertTrue(os.path.exists(path))
         path = os.path.join(
           workdir,

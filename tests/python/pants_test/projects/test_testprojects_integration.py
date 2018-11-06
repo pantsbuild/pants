@@ -101,6 +101,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/pants-plugins/*',
       'testprojects/src/python/python_distribution/ctypes:ctypes_test',
       'testprojects/src/python/python_distribution/ctypes_with_third_party:ctypes_test',
+      'testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin',
     ]
 
     targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 +

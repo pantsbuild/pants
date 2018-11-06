@@ -41,7 +41,7 @@ class IvyResolutionStep(object):
   # It also specifies the abstract methods that define the components of resolution steps.
 
   def __init__(self, confs, hash_name, pinned_artifacts, soft_excludes, ivy_resolution_cache_dir,
-               ivy_repository_cache_dir, global_ivy_workdir):
+               ivy_repository_cache_dir, ivy_workdir):
     """
     :param confs: A tuple of string ivy confs to resolve for.
     :param hash_name: A unique string name for this resolve.
@@ -50,7 +50,7 @@ class IvyResolutionStep(object):
                           fact.
     :param ivy_repository_cache_dir: The cache directory used by Ivy for repository cache data.
     :param ivy_resolution_cache_dir: The cache directory used by Ivy for resolution cache data.
-    :param global_ivy_workdir: The workdir that all ivy outputs live in.
+    :param ivy_workdir: A task-specific workdir that all ivy outputs live in.
     """
 
     self.confs = confs
@@ -60,7 +60,7 @@ class IvyResolutionStep(object):
 
     self.ivy_repository_cache_dir = ivy_repository_cache_dir
     self.ivy_resolution_cache_dir = ivy_resolution_cache_dir
-    self.global_ivy_workdir = global_ivy_workdir
+    self.ivy_workdir = ivy_workdir
 
     self.workdir_reports_by_conf = {c: self.resolve_report_path(c) for c in confs}
 
@@ -83,7 +83,7 @@ class IvyResolutionStep(object):
 
   @property
   def workdir(self):
-    return os.path.join(self.global_ivy_workdir, self.hash_name)
+    return os.path.join(self.ivy_workdir, self.hash_name)
 
   @property
   def hardlink_classpath_filename(self):
@@ -99,7 +99,7 @@ class IvyResolutionStep(object):
 
   @property
   def hardlink_dir(self):
-    return os.path.join(self.global_ivy_workdir, 'jars')
+    return os.path.join(self.ivy_workdir, 'jars')
 
   @abstractmethod
   def ivy_xml_path(self):
@@ -174,7 +174,7 @@ class IvyFetchStep(IvyResolutionStep):
 
     if not result.all_linked_artifacts_exist():
       raise IvyResolveMappingError(
-        'Some artifacts were not linked to {} for {}'.format(self.global_ivy_workdir,
+        'Some artifacts were not linked to {} for {}'.format(self.ivy_workdir,
                                                              result))
     return result
 
@@ -240,7 +240,7 @@ class IvyResolveStep(IvyResolutionStep):
 
     if not result.all_linked_artifacts_exist():
       raise IvyResolveMappingError(
-        'Some artifacts were not linked to {} for {}'.format(self.global_ivy_workdir,
+        'Some artifacts were not linked to {} for {}'.format(self.ivy_workdir,
                                                              result))
 
     frozen_resolutions_by_conf = result.get_frozen_resolutions_by_conf(targets)

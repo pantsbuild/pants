@@ -6,19 +6,18 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from abc import abstractmethod
-from builtins import filter
 from collections import defaultdict
 
 from pants.backend.native.config.environment import Executable
+from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFiles
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.build_graph.dependency_context import DependencyContext
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass
+from pants.util.meta import AbstractClass, classproperty
 from pants.util.objects import SubclassesOf, datatype
 from pants.util.process_handler import subprocess
 
@@ -28,7 +27,7 @@ class NativeCompileRequest(datatype([
     # TODO: add type checking for Collection.of(<type>)!
     'include_dirs',
     'sources',
-    ('fatal_warnings', bool),
+    'compiler_options',
     'output_dir',
 ])): pass
 
@@ -40,26 +39,25 @@ class ObjectFiles(datatype(['root_dir', 'filenames'])):
     return [os.path.join(self.root_dir, fname) for fname in self.filenames]
 
 
-# TODO: this is a temporary hack -- we could introduce something like a "NativeRequirement" with
-# dependencies, header, object file, library name (more?) instead of using multiple products.
-class NativeTargetDependencies(datatype(['native_deps'])): pass
-
-
 class NativeCompile(NativeTask, AbstractClass):
   # `NativeCompile` will use the `source_target_constraint` to determine what targets have "sources"
   # to compile, and the `dependent_target_constraint` to determine which dependent targets to
   # operate on for `strict_deps` calculation.
   # NB: `source_target_constraint` must be overridden.
   source_target_constraint = None
-  dependent_target_constraint = SubclassesOf(NativeLibrary)
+  dependent_target_constraint = SubclassesOf(ExternalNativeLibrary, NativeLibrary)
+
+  HEADER_EXTENSIONS = ('.h', '.hpp')
 
   # `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
   # compiler process. `workunit_label` must be set to a string.
-  workunit_label = None
+  @classproperty
+  def workunit_label(cls):
+    raise NotImplementedError('subclasses of NativeCompile must override workunit_label!')
 
   @classmethod
   def product_types(cls):
-    return [ObjectFiles, NativeTargetDependencies]
+    return [ObjectFiles]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -70,20 +68,9 @@ class NativeCompile(NativeTask, AbstractClass):
   def cache_target_dirs(self):
     return True
 
-  @abstractmethod
-  def get_compile_settings(self):
-    """An instance of `NativeCompileSettings` which is used in `NativeCompile`.
-
-    :return: :class:`pants.backend.native.subsystems.native_compile_settings.NativeCompileSettings`
-    """
-
-  @memoized_property
-  def _compile_settings(self):
-    return self.get_compile_settings()
-
   @classmethod
   def implementation_version(cls):
-    return super(NativeCompile, cls).implementation_version() + [('NativeCompile', 0)]
+    return super(NativeCompile, cls).implementation_version() + [('NativeCompile', 1)]
 
   class NativeCompileError(TaskError):
     """Raised for errors in this class's logic.
@@ -91,58 +78,26 @@ class NativeCompile(NativeTask, AbstractClass):
     Subclasses are advised to create their own exception class.
     """
 
-  def native_deps(self, target):
-    return self.strict_deps_for_target(
-      target, predicate=self.dependent_target_constraint.satisfied_by)
-
-  def strict_deps_for_target(self, target, predicate=None):
-    """Get the dependencies of `target` filtered by `predicate`, accounting for 'strict_deps'.
-
-    If 'strict_deps' is on, instead of using the transitive closure of dependencies, targets will
-    only be able to see their immediate dependencies declared in the BUILD file. The 'strict_deps'
-    setting is obtained from the result of `get_compile_settings()`.
-
-    NB: This includes the current target in the result.
-    """
-    if self._compile_settings.get_subsystem_target_mirrored_field_value('strict_deps', target):
-      strict_deps = target.strict_dependencies(DependencyContext())
-      if predicate:
-        filtered_deps = list(filter(predicate, strict_deps))
-      else:
-        filtered_deps = strict_deps
-      deps = [target] + filtered_deps
-    else:
-      deps = self.context.build_graph.transitive_subgraph_of_addresses(
-        [target.address], predicate=predicate)
-
-    return deps
-
-  @staticmethod
-  def _add_product_at_target_base(product_mapping, target, value):
-    product_mapping.add(target, target.target_base).append(value)
-
   def execute(self):
     object_files_product = self.context.products.get(ObjectFiles)
-    native_deps_product = self.context.products.get(NativeTargetDependencies)
     external_libs_product = self.context.products.get_data(NativeExternalLibraryFiles)
     source_targets = self.context.targets(self.source_target_constraint.satisfied_by)
 
     with self.invalidated(source_targets, invalidate_dependents=True) as invalidation_check:
-      for vt in invalidation_check.invalid_vts:
-        deps = self.native_deps(vt.target)
-        self._add_product_at_target_base(native_deps_product, vt.target, deps)
-        compile_request = self._make_compile_request(vt, deps, external_libs_product)
-        self.context.log.debug("compile_request: {}".format(compile_request))
-        self._compile(compile_request)
-
       for vt in invalidation_check.all_vts:
+        deps = self.native_deps(vt.target)
+        if not vt.valid:
+          compile_request = self._make_compile_request(vt, deps, external_libs_product)
+          self.context.log.debug("compile_request: {}".format(compile_request))
+          self._compile(compile_request)
+
         object_files = self.collect_cached_objects(vt)
         self._add_product_at_target_base(object_files_product, vt.target, object_files)
 
   # This may be calculated many times for a target, so we memoize it.
   @memoized_method
   def _include_dirs_for_target(self, target):
-    return os.path.join(get_buildroot(), target.target_base)
+    return os.path.join(get_buildroot(), target.address.spec_path)
 
   class NativeSourcesByType(datatype(['rel_root', 'headers', 'sources'])): pass
 
@@ -178,12 +133,22 @@ class NativeCompile(NativeTask, AbstractClass):
 
     return [os.path.join(get_buildroot(), rel_root, src) for src in target_relative_sources]
 
-  # TODO(#5951): expand `Executable` to cover argv generation (where an `Executable` is subclassed
-  # to modify or extend the argument list, as declaratively as possible) to remove
-  # `extra_compile_args(self)`!
+  @abstractmethod
+  def get_compile_settings(self):
+    """Return an instance of NativeBuildStepSettings.
+
+    NB: Subclasses will be queried for the compile settings once and the result cached.
+    """
+
+  @memoized_property
+  def _compile_settings(self):
+    return self.get_compile_settings()
+
   @abstractmethod
   def get_compiler(self):
     """An instance of `Executable` which can be invoked to compile files.
+
+    NB: Subclasses will be queried for the compiler instance once and the result cached.
 
     :return: :class:`pants.backend.native.config.environment.Executable`
     """
@@ -192,42 +157,44 @@ class NativeCompile(NativeTask, AbstractClass):
   def _compiler(self):
     return self.get_compiler()
 
-  def _get_third_party_include_dirs(self, external_libs_product):
+  def _get_third_party_include_dirs(self, external_libs_product, dependencies):
     if not external_libs_product:
       return []
 
-    directory = external_libs_product.include_dir
-    return [directory] if directory else []
+    return [nelf.include_dir
+            for nelf in external_libs_product.get_for_targets(dependencies)
+            if nelf.include_dir]
 
   def _make_compile_request(self, versioned_target, dependencies, external_libs_product):
     target = versioned_target.target
 
     include_dirs = [self._include_dirs_for_target(dep_tgt) for dep_tgt in dependencies]
-    include_dirs.extend(self._get_third_party_include_dirs(external_libs_product))
-
+    include_dirs.extend(self._get_third_party_include_dirs(external_libs_product, dependencies))
     sources_and_headers = self.get_sources_headers_for_target(target)
+    compiler_option_sets = (self._compile_settings.native_build_step_settings
+                                .get_compiler_option_sets_for_target(target))
 
     return NativeCompileRequest(
       compiler=self._compiler,
       include_dirs=include_dirs,
       sources=sources_and_headers,
-      fatal_warnings=self._compile_settings.get_subsystem_target_mirrored_field_value(
-        'fatal_warnings', target),
+      compiler_options=(self._compile_settings
+                            .native_build_step_settings
+                            .get_merged_args_for_compiler_option_sets(compiler_option_sets)),
       output_dir=versioned_target.results_dir)
 
   def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
     compiler = compile_request.compiler
-    err_flags = ['-Werror'] if compile_request.fatal_warnings else []
-
+    compiler_options = compile_request.compiler_options
     # We are going to execute in the target output, so get absolute paths for everything.
-    # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
     buildroot = get_buildroot()
     argv = (
       [compiler.exe_filename] +
       compiler.extra_args +
-      err_flags +
+      # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
       ['-c', '-fPIC'] +
+      compiler_options +
       [
         '-I{}'.format(os.path.join(buildroot, inc_dir))
         for inc_dir in compile_request.include_dirs
@@ -246,7 +213,7 @@ class NativeCompile(NativeTask, AbstractClass):
     """
     sources = compile_request.sources
 
-    if len(sources) == 0:
+    if len(sources) == 0 and not any(s for s in sources if not s.endswith(self.HEADER_EXTENSIONS)):
       # TODO: do we need this log message? Should we still have it for intentionally header-only
       # libraries (that might be a confusing message to see)?
       self.context.log.debug("no sources in request {}, skipping".format(compile_request))

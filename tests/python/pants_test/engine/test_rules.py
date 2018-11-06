@@ -9,13 +9,16 @@ from builtins import object, str
 from textwrap import dedent
 
 from pants.engine.build_files import create_graph_rules
+from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import RootRule, RuleIndex, SingletonRule, TaskRule
+from pants.engine.rules import (RootRule, RuleIndex, SingletonRule, TaskRule, _GoalProduct,
+                                console_rule)
 from pants.engine.selectors import Get, Select
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import JsonParser
-from pants_test.engine.util import TargetTable, assert_equal_with_printing, create_scheduler
+from pants_test.engine.util import (TargetTable, assert_equal_with_printing, create_scheduler,
+                                    run_rule)
 
 
 class A(object):
@@ -55,6 +58,20 @@ class SubA(A):
 _suba_root_rules = [RootRule(SubA)]
 
 
+@console_rule('example', [Select(Console)])
+def a_console_rule_generator(console):
+  a = yield Get(A, str('a str!'))
+  console.print_stdout(str(a))
+
+
+class RuleTest(unittest.TestCase):
+  def test_run_rule_console_rule_generator(self):
+    res = run_rule(a_console_rule_generator, Console(), {
+        (A, str): lambda _: A(),
+      })
+    self.assertEquals(res, _GoalProduct.for_name('example')())
+
+
 class RuleIndexTest(unittest.TestCase):
   def test_creation_fails_with_bad_declaration_type(self):
     with self.assertRaises(TypeError) as cm:
@@ -74,7 +91,7 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
                        (A, [Select(B)], noop):
-                         no rule was available to compute B with parameter type SubA
+                         No rule was available to compute B with parameter type SubA
                      """).strip(),
                                     str(cm.exception))
 
@@ -107,8 +124,8 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
                        (A, [Select(B), Select(C)], noop):
-                         no rule was available to compute B with parameter type SubA
-                         no rule was available to compute C with parameter type SubA
+                         No rule was available to compute B with parameter type SubA
+                         No rule was available to compute C with parameter type SubA
                      """).strip(),
       str(cm.exception))
 
@@ -128,9 +145,9 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 2
                                         (A, [Select(B)], noop):
-                                          no rule was available to compute B with parameter type C
+                                          No rule was available to compute B with parameter type C
                                         (B, [Select(SubA)], noop):
-                                          no rule was available to compute SubA with parameter type C
+                                          No rule was available to compute SubA with parameter type C
                                       """).strip(),
                                     str(cm.exception))
 
@@ -155,7 +172,7 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 1
                                         (D, [Select(C)], noop):
-                                          no rule was available to compute C with parameter type A
+                                          No rule was available to compute C with parameter type A
                                       """).strip(),
                                     str(cm.exception))
 
@@ -174,9 +191,9 @@ class RulesetValidatorTest(unittest.TestCase):
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 2
                         (B, [Select(D)], noop):
-                          no rule was available to compute D with parameter type SubA
+                          No rule was available to compute D with parameter type SubA
                         (D, [Select(A), Select(SubA)], [Get(A, C)], noop):
-                          no rule was available to compute A with parameter type SubA
+                          No rule was available to compute A with parameter type SubA
                       """).strip(),
         str(cm.exception))
 

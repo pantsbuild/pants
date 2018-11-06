@@ -451,12 +451,20 @@ impl<'t> GraphMaker<'t> {
         // If no candidates were fulfillable, this rule is not fulfillable.
         unfulfillable_diagnostics.push(Diagnostic {
           params: params.clone(),
-          reason: format!(
-            "no rule was available to compute {} with parameter type{} {}",
-            type_constraint_str(product),
-            if params.len() > 1 { "s" } else { "" },
-            params_str(&params),
-          ),
+          reason: if params.is_empty() {
+            format!(
+              "No rule was available to compute {}. Maybe declare it as a RootRule({})?",
+              type_constraint_str(product),
+              type_constraint_str(product),
+            )
+          } else {
+            format!(
+              "No rule was available to compute {} with parameter type{} {}",
+              type_constraint_str(product),
+              if params.len() > 1 { "s" } else { "" },
+              params_str(&params),
+            )
+          },
           details: vec![],
         });
       }
@@ -861,10 +869,9 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
       rule: Rule::Intrinsic(ref intrinsic),
       ref params,
     }) => format!(
-      "({}, ({},), {:?}) for {}",
+      "({}, ({},) for {}",
       type_constraint_str(intrinsic.product),
       type_constraint_str(intrinsic.input),
-      intrinsic.kind,
       params_str(params)
     ),
     &EntryWithDeps::Root(ref root) => format!(

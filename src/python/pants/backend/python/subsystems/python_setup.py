@@ -26,11 +26,12 @@ class PythonSetup(Subsystem):
                   "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
                   "be ORed together. These constraints are applied in addition to any "
                   "compatibilities required by the relevant targets.")
-    register('--setuptools-version', advanced=True, default='33.1.1',
+    register('--setuptools-version', advanced=True, default='40.4.3',
              help='The setuptools version for this python environment.')
-    register('--wheel-version', advanced=True, default='0.29.0',
+    register('--wheel-version', advanced=True, default='0.31.1',
              help='The wheel version for this python environment.')
     register('--platforms', advanced=True, type=list, metavar='<platform>', default=['current'],
+             fingerprint=True,
              help='A list of platforms to be supported by this python environment. Each platform'
                   'is a string, as returned by pkg_resources.get_supported_platform().')
     register('--interpreter-cache-dir', advanced=True, default=None, metavar='<dir>',
@@ -57,6 +58,11 @@ class PythonSetup(Subsystem):
               'variable is defined in a pexrc file, those interpreter paths will take precedence over ' 
               'this option.')
     register('--resolver-blacklist', advanced=True, type=dict, default={},
+             removal_version='1.13.0.dev2',
+             removal_hint='Now unused. Pants, via PEX, handles blacklisting automatically via '
+                          'PEP-508 environment markers anywhere Python requirements are specified '
+                          '(e.g. `requirements.txt` and `python_requirement(...)` in BUILD files): '
+                          'https://www.python.org/dev/peps/pep-0508/#environment-markers',
              metavar='<blacklist>',
              help='A blacklist dict (str->str) that maps package name to an interpreter '
               'constraint. If a package name is in the blacklist and its interpreter '
@@ -113,10 +119,6 @@ class PythonSetup(Subsystem):
   @property
   def resolver_allow_prereleases(self):
     return self.get_options().resolver_allow_prereleases
-
-  @property
-  def resolver_blacklist(self):
-    return self.get_options().resolver_blacklist
 
   @property
   def use_manylinux(self):

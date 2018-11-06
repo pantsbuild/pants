@@ -106,6 +106,9 @@ case "${OSTYPE}" in
            ;;
 esac
 
+# We're running against a Pants clone.
+export PANTS_DEV=1
+
 if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
   FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
@@ -130,9 +133,7 @@ fi
 if [[ "${python_three:-false}" == "true" ]]; then
   # The 3.4 end of this constraint is necessary to jive with the travis ubuntu trusty image.
   banner "Setting interpreter constraints for 3!"
-  # TODO(John Sirois): Allow `<4` when the issues with `3.7` are fixed. See:
-  #   https://github.com/pantsbuild/pants/issues/6363
-  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.4,<3.7"]'
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.4,<4"]'
   # TODO: Clear interpreters, otherwise this constraint does not end up applying due to a cache
   # bug between the `./pants binary` and further runs.
   ./pants.pex clean-all
@@ -194,14 +195,9 @@ if [[ "${run_python:-false}" == "true" ]]; then
   fi
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
-    if [[ "${python_three:-false}" == "true" ]]; then
-      targets="$(comm -23 <(./pants.pex --tag='-integration' list tests/python:: | grep '.' | sort) <(sort "${REPO_ROOT}/build-support/known_py3_failures.txt"))"
-    else
-      targets="tests/python::"
-    fi
     ./pants.pex --tag='-integration' test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
-      $targets -- ${PYTEST_PASSTHRU_ARGS}
+      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Core python test failure"
   end_travis_section
 fi

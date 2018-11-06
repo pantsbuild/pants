@@ -24,6 +24,7 @@ from pants_test.backend.python.interpreter_selection_utils import (PY_27, PY_36,
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 from pants_test.test_base import TestBase
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class TestInterpreterCache(TestBase):
@@ -85,13 +86,13 @@ class TestInterpreterCache(TestBase):
         existing_dist = Package.from_href(existing_dist_location)
         requirement = '{}=={}'.format(existing_dist.name, existing_dist.raw_version)
 
-      distributions = resolve([requirement],
+      resolved_dists = resolve([requirement],
                               interpreter=self._interpreter,
                               precedence=(EggPackage, SourcePackage))
-      self.assertEqual(1, len(distributions))
-      dist_location = distributions[0].location
+      self.assertEqual(1, len(resolved_dists))
+      dist_location = resolved_dists[0].distribution.location
 
-      self.assertRegexpMatches(dist_location, r'\.egg$')
+      assertRegex(self, dist_location, r'\.egg$')
       os.symlink(dist_location, os.path.join(repo_root, os.path.basename(dist_location)))
 
       return Package.from_href(dist_location).raw_version

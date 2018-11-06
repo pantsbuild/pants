@@ -12,7 +12,7 @@ from pex.pex_info import PexInfo
 
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.tasks.pex_build_util import dump_requirements
+from pants.backend.python.tasks.pex_build_util import PexBuilderWrapper
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_executable, safe_concurrent_creation
 from pants.util.memo import memoized_property
@@ -46,9 +46,13 @@ class ExecutablePexTool(Subsystem):
         pex_info.entry_point = self.entry_point
 
       with safe_concurrent_creation(pex_file_path) as safe_path:
-        builder = PEXBuilder(interpreter=interpreter, pex_info=pex_info)
         all_reqs = list(self.base_requirements) + list(extra_reqs or [])
-        dump_requirements(builder, interpreter, all_reqs, logger, platforms=['current'])
-        builder.build(safe_path)
+        pex_builder = PexBuilderWrapper(
+          PEXBuilder(interpreter=interpreter, pex_info=pex_info),
+          PythonRepos.global_instance(),
+          PythonSetup.global_instance(),
+          logger)
+        pex_builder.add_resolved_requirements(all_reqs, platforms=['current'])
+        pex_builder.build(safe_path)
 
     return PEX(pex_file_path, interpreter)

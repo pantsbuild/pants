@@ -23,6 +23,7 @@ from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import safe_open
+from pants.util.meta import classproperty
 from pants.util.process_handler import subprocess
 
 
@@ -59,11 +60,11 @@ class JavacCompile(JvmCompile):
   def get_no_warning_args_default(cls):
     return ('-nowarn', '-Xlint:none', )
 
-  @classmethod
+  @classproperty
   def get_fatal_warnings_enabled_args_default(cls):
     return ('-Werror',)
 
-  @classmethod
+  @classproperty
   def get_fatal_warnings_disabled_args_default(cls):
     return ()
 
