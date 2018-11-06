@@ -16,7 +16,7 @@ python_tests(
   ],
   dependencies=[
     'tests/python/pants_test:int-test',
-    '3rdparty/python:future',
+    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
 )

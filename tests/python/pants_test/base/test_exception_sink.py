@@ -16,6 +16,7 @@ from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
 from pants.util.osutil import get_normalized_os_name
 from pants_test.test_base import TestBase
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class TestExceptionSink(TestBase):
@@ -99,9 +100,9 @@ pid: {pid}
            pid=pid,
            msg=msg)
       with open(cur_process_error_log_path, 'r') as cur_pid_file:
-        self.assertRegexpMatches(cur_pid_file.read(), err_rx)
+        assertRegex(self, cur_pid_file.read(), err_rx)
       with open(shared_error_log_path, 'r') as shared_log_file:
-        self.assertRegexpMatches(shared_log_file.read(), err_rx)
+        assertRegex(self, shared_log_file.read(), err_rx)
 
   def test_backup_logging_on_fatal_error(self):
     sink = self._gen_sink_subclass()
@@ -122,5 +123,5 @@ pid: {pid}
         "\nfake write failure",
       ])
 
-    self.assertRegexpMatches(str(errors[0]), format_log_rx('pid-specific'))
-    self.assertRegexpMatches(str(errors[1]), format_log_rx('shared'))
+    assertRegex(self, str(errors[0]), format_log_rx('pid-specific'))
+    assertRegex(self, str(errors[1]), format_log_rx('shared'))

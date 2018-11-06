@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from future.utils import PY3
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 
 
 class NativeEngineLoggingTest(PantsRunIntegrationTest):
@@ -15,12 +16,9 @@ class NativeEngineLoggingTest(PantsRunIntegrationTest):
     pants_run = self.run_pants([
       "-linfo", "list", "3rdparty::"
     ])
-    if PY3:
-      self.assertNotRegex(pants_run.stderr_data, "DEBUG] Launching \\d+ root")
-    else:
-      self.assertNotRegexpMatches(pants_run.stderr_data, "DEBUG] Launching \\d+ root")
+    assertNotRegex(self, pants_run.stderr_data, "DEBUG] Launching \\d+ root")
 
     pants_run = self.run_pants([
       "-ldebug", "list", "3rdparty::"
     ])
-    self.assertRegexpMatches(pants_run.stderr_data, "DEBUG] Launching \\d+ root")
+    assertRegex(self, pants_run.stderr_data, "DEBUG] Launching \\d+ root")

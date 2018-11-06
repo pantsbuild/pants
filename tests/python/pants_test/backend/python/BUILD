@@ -37,6 +37,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/testutils:git_util',
     'tests/python/pants_test/testutils:pexrc_util',
+    'tests/python/pants_test/testutils:py2_compat',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test:test_base',
   ],

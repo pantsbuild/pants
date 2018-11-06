@@ -98,6 +98,7 @@ python_tests(
     'tests/python/pants_test/backend/python:interpreter_selection_utils',
     'tests/python/pants_test/backend/python:pants_requirement_integration_test_base',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags={'integration'},
   timeout=2400

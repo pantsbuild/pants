@@ -11,6 +11,7 @@ from builtins import str
 from pants.util.contextutil import environment_as
 from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
+from pants_test.testutils.py2_compat import assertRegex
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
 
@@ -57,7 +58,7 @@ class GoDistributionTest(unittest.TestCase):
     self.assertEqual(default_gopath, go_cmd.check_output().decode('utf-8').strip())
 
     regex = GoDistributionTest._generate_go_command_regex(gopath=default_gopath, final_value='GOPATH')
-    self.assertRegexpMatches(str(go_cmd), regex)
+    assertRegex(self, str(go_cmd), regex)
 
   def test_go_command_no_gopath(self):
     self.assert_no_gopath()
@@ -79,4 +80,4 @@ class GoDistributionTest(unittest.TestCase):
     self.assertEqual(['env', 'GOROOT'], go_cmd.cmdline[1:])
 
     regex = GoDistributionTest._generate_go_command_regex(gopath='/tmp/fred', final_value='GOROOT')
-    self.assertRegexpMatches(str(go_cmd), regex)
+    assertRegex(self, str(go_cmd), regex)

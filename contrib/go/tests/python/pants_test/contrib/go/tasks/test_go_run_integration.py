@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class GoRunIntegrationTest(PantsRunIntegrationTest):
@@ -21,4 +22,4 @@ class GoRunIntegrationTest(PantsRunIntegrationTest):
     args = ['-q', 'run', 'contrib/go/examples/src/go/cgo']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
-    self.assertRegexpMatches(pants_run.stdout_data.strip(), r'^Random from C: \d+$')
+    assertRegex(self, pants_run.stdout_data.strip(), r'^Random from C: \d+$')

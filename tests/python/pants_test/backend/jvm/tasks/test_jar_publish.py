@@ -57,32 +57,39 @@ class JarPublishTest(TaskTestBase):
     )
 
   def _prepare_for_publishing(self, with_alias=False):
-    targets = {}
-    targets['a'] = self.create_library('a', 'java_library', 'a', ['A.java'],
-      provides="""artifact(org='com.example', name='nail', repo=internal)""")
+    targets = []
+    nail_target = self._create_nail_target()
+    targets.append(nail_target)
 
-    targets['b'] = self.create_library('b', 'java_library', 'b', ['B.java'],
-      provides="""artifact(org='com.example', name='shoe', repo=internal)""",
-      dependencies=['a'])
+    shoe_target = self.create_library('b', 'java_library', 'b', ['B.java'],
+      provides="artifact(org='com.example', name='shoe', repo=internal)",
+      dependencies=[nail_target.address.reference()])
+    targets.append(shoe_target)
 
+    shoe_address = shoe_target.address.reference()
     if with_alias:
       # add an alias target between c and b
-      targets['z'] = self.create_library('z', 'target', 'z', dependencies=['b'])
-      c_deps = ['z']
+      alias_target = self.create_library('z', 'target', 'z', dependencies=[shoe_address])
+      targets.append(alias_target)
+      horse_deps = [alias_target.address.reference()]
     else:
-      c_deps = ['b']
+      horse_deps = [shoe_address]
 
-    targets['c'] = self.create_library('c', 'java_library', 'c', ['C.java'],
-      provides="""artifact(org='com.example', name='horse', repo=internal)""",
-      dependencies=c_deps)
+    horse_target = self.create_library('c', 'java_library', 'c', ['C.java'],
+      provides="artifact(org='com.example', name='horse', repo=internal)",
+      dependencies=horse_deps)
+    targets.append(horse_target)
+    return targets
 
-    return list(targets.values())
+  def _create_nail_target(self):
+    return self.create_library('a', 'java_library', 'a', ['A.java'],
+                               provides="artifact(org='com.example', name='nail', repo=internal)")
 
   def _prepare_targets_with_duplicates(self):
     targets = list(self._prepare_for_publishing())
     conflict = self.create_library(
       'conflict', 'java_library', 'conflict', ['Conflict.java'],
-      provides="""artifact(org='com.example', name='nail', repo=internal)""",
+      provides="artifact(org='com.example', name='nail', repo=internal)",
     )
     targets.append(conflict)
     return targets
@@ -212,9 +219,8 @@ class JarPublishTest(TaskTestBase):
     self.assertEqual('PS', tag_message_splitlines[-1])
 
   def test_publish_retry_works(self):
-    targets = self._prepare_for_publishing()
     self.set_options(dryrun=False, scm_push_attempts=3, repos=self._get_repos())
-    task = self.create_task(self.context(target_roots=targets[0:1]))
+    task = self.create_task(self.context(target_roots=self._create_nail_target()))
     self._prepare_mocks(task)
 
     task.scm.push = Mock()
@@ -224,11 +230,9 @@ class JarPublishTest(TaskTestBase):
     self.assertEqual(2 + 1, task.scm.push.call_count)
 
   def test_publish_retry_eventually_fails(self):
-    targets = self._prepare_for_publishing()
-
     #confirm that we fail if we have too many failed push attempts
     self.set_options(dryrun=False, scm_push_attempts=3, repos=self._get_repos())
-    task = self.create_task(self.context(target_roots=targets[0:1]))
+    task = self.create_task(self.context(target_roots=self._create_nail_target()))
     self._prepare_mocks(task)
     task.scm.push = Mock()
     task.scm.push.side_effect = FailNTimes(3, Scm.RemoteException)
@@ -236,9 +240,8 @@ class JarPublishTest(TaskTestBase):
       task.execute()
 
   def test_publish_retry_fails_immediately_with_exception_on_refresh_failure(self):
-    targets = self._prepare_for_publishing()
     self.set_options(dryrun=False, scm_push_attempts=3, repos=self._get_repos())
-    task = self.create_task(self.context(target_roots=targets[0:1]))
+    task = self.create_task(self.context(target_roots=self._create_nail_target()))
 
     self._prepare_mocks(task)
     task.scm.push = Mock()

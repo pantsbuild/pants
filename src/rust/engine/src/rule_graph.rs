@@ -451,12 +451,20 @@ impl<'t> GraphMaker<'t> {
         // If no candidates were fulfillable, this rule is not fulfillable.
         unfulfillable_diagnostics.push(Diagnostic {
           params: params.clone(),
-          reason: format!(
-            "no rule was available to compute {} with parameter type{} {}",
-            type_constraint_str(product),
-            if params.len() > 1 { "s" } else { "" },
-            params_str(&params),
-          ),
+          reason: if params.is_empty() {
+            format!(
+              "No rule was available to compute {}. Maybe declare it as a RootRule({})?",
+              type_constraint_str(product),
+              type_constraint_str(product),
+            )
+          } else {
+            format!(
+              "No rule was available to compute {} with parameter type{} {}",
+              type_constraint_str(product),
+              if params.len() > 1 { "s" } else { "" },
+              params_str(&params),
+            )
+          },
           details: vec![],
         });
       }

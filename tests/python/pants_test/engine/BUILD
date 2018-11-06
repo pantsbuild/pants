@@ -170,6 +170,7 @@ python_tests(
   dependencies=[
     '3rdparty/python:future',
     'tests/python/pants_test/engine/examples:parsers',
+    'tests/python/pants_test/testutils:py2_compat',
     'src/python/pants/engine:objects',
   ]
 )

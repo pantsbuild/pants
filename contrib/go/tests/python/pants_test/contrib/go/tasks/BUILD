@@ -30,6 +30,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/testutils:file_test_util',
+    'tests/python/pants_test/testutils:py2_compat',
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},

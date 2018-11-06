@@ -12,6 +12,7 @@ from textwrap import dedent
 from pants.engine import parser
 from pants.engine.objects import Resolvable
 from pants_test.engine.examples import parsers
+from pants_test.testutils.py2_compat import assertRegex
 
 
 # A duck-typed Serializable with an `==` suitable for ease of testing.
@@ -230,7 +231,7 @@ class JsonParserTest(unittest.TestCase):
     actual_lines = [line.rstrip() for line in str(exc.exception).splitlines()]
 
     # This message from the json stdlib varies between python releases, so fuzz the match a bit.
-    self.assertRegexpMatches(actual_lines[0],
+    assertRegex(self, actual_lines[0],
                              r'Expecting (?:,|\',\'|",") delimiter: line 3 column 12 \(char 67\)')
 
     self.assertEqual(dedent("""
