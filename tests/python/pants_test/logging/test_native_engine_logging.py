@@ -4,8 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from future.utils import PY3
-
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 

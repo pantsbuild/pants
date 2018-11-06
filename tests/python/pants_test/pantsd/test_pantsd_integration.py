@@ -12,8 +12,6 @@ import time
 import unittest
 from builtins import open, range, zip
 
-from future.utils import PY3
-
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import read_pantsd_log
