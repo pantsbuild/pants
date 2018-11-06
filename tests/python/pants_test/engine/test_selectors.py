@@ -34,5 +34,6 @@ class SelectorsTest(unittest.TestCase):
 class GetTest(unittest.TestCase):
   def test_get(self):
     sub_b = SubBClass()
-    with self.assertRaises(TypeError):
+    with self.assertRaises(TypeError) as cm:
       Get(AClass, BClass, sub_b)
+    self.assertIn("Declared type did not match actual type", str(cm.exception))
