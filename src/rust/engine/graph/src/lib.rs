@@ -1025,6 +1025,55 @@ mod tests {
     );
   }
 
+  #[test]
+  fn cyclic_failure() {
+    // Confirms that an attempt to create a cycle fails.
+    let graph = Arc::new(Graph::new());
+    let top = TNode(2);
+    let context = TContext::new_with_dependencies(
+      0,
+      // Request creation of a cycle by sending the bottom most node to the top.
+      vec![(TNode(0), Some(top))].into_iter().collect(),
+      graph.clone(),
+    );
+
+    assert_eq!(graph.create(TNode(2), &context).wait(), Err(TError::Cyclic));
+  }
+
+  #[test]
+  fn cyclic_dirtying() {
+    // Confirms that a dirtied path between two nodes is able to reverse direction while being
+    // cleaned.
+    let graph = Arc::new(Graph::new());
+    let initial_top = TNode(2);
+    let initial_bot = TNode(0);
+
+    // Request with a context that creates a path downward.
+    let context_down = TContext::new(0, graph.clone());
+    assert_eq!(
+      graph.create(initial_top, &context_down).wait(),
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+    );
+
+    // Clear the bottom node, and then clean it with a context that causes the path to reverse.
+    graph.invalidate_from_roots(|n| n == &initial_bot);
+    let context_up = TContext::new_with_dependencies(
+      1,
+      // Reverse the path from bottom to top.
+      vec![
+        (TNode(2), None),
+        (TNode(1), Some(TNode(2))),
+        (TNode(0), Some(TNode(1))),
+      ].into_iter()
+      .collect(),
+      graph.clone(),
+    );
+    assert_eq!(
+      graph.create(initial_bot, &context_up).wait(),
+      Ok(vec![T(2, 1), T(1, 1), T(0, 1)])
+    );
+  }
+
   ///
   /// A token containing the id of a Node and the id of a Context, respectively. Has a short name
   /// to minimize the verbosity of tests.
