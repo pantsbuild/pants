@@ -19,18 +19,6 @@ python_library(
   ]
 )
 
-python_library(
-  name='sources',
-  sources=['sources.py'],
-  dependencies=[
-    'src/python/pants/engine:addressable',
-    'src/python/pants/engine:fs',
-    'src/python/pants/engine:struct',
-    'src/python/pants/source',
-    'src/python/pants/util:objects',
-  ]
-)
-
 resources(
   name='fs_test',
   # Note that this test data dir is bundled into a tarfile, to preserve symlink structure

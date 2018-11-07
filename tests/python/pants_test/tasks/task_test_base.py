@@ -20,7 +20,7 @@ from pants.util.process_handler import subprocess
 from pants_test.base_test import BaseTest
 
 
-deprecated_module('1.12.0.dev0', 'Use pants_test.TaskTestBase instead')
+deprecated_module('1.12.0.dev2', 'Use pants_test.TaskTestBase instead')
 
 
 # TODO: Find a better home for this?

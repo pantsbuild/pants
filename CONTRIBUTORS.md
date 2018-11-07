@@ -161,6 +161,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Shuo Li
 + Simeon Franklin
 + Stefan Sauer
++ Stephan Erb
 + Stu Hood
 + Tansy Arron-Walker
 + Ted Dziuba
