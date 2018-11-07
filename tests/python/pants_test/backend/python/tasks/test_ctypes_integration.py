@@ -115,14 +115,22 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     self.assertEqual('x=3, f(x)=299\n', pants_run_interop.stdout_data)
 
   def test_ctypes_third_party_integration(self):
-    pants_binary = self.run_pants(['binary', self._binary_target_with_third_party])
+    # This run requires a clean-all because the Conan data directory is cached in
+    # .pants.d and NOT ~./cache/pants. Blowing away .pants.d with a clean-all ensures
+    # that these tests are not relying on cached Conan packages.
+    pants_binary = self.run_pants(
+      command=['clean-all', 'binary', self._binary_target_with_third_party]
+    )
     self.assert_success(pants_binary)
 
-    pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party])
+    # See the comment above for why we clean-all here.
+    pants_run = self.run_pants(
+      command=['clean-all', 'run', self._binary_target_with_third_party]
+    )
     self.assert_success(pants_run)
     self.assertIn('Test worked!\n', pants_run.stdout_data)
 
-    # Test cached run.
+    # Test a cached run by pulling conan artifacts from the .pants.d directory.
     pants_run = self.run_pants(
       command=['-q', 'run', self._binary_target_with_third_party]
     )
@@ -136,8 +144,12 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     (2) a different platform than the one we are currently running on. The python_binary() target
     below is declared with `platforms="current"`.
     """
-    # Clean all to rebuild requirements pex.
+
+    # The clean-all is to ensure that we rebuild the requirements pex, because python_dist wheels
+    # live in the requirements pex for `./pants run`s and this helps us ensure proper behavior
+    # by eliminating the potential for false positives.
     command = [
+      'clean-all',
       'run',
       'testprojects/src/python/python_distribution/ctypes:bin'
     ]
