@@ -63,11 +63,14 @@ extern crate lazy_static;
 extern crate log;
 extern crate parking_lot;
 extern crate process_execution;
+extern crate reqwest;
 extern crate resettable;
 #[macro_use]
 extern crate smallvec;
+extern crate tempfile;
 extern crate tokio;
 extern crate ui;
+extern crate url;
 
 use std::ffi::CStr;
 use std::fs::File;
@@ -247,6 +250,7 @@ pub extern "C" fn scheduler_create(
   type_process_request: TypeConstraint,
   type_process_result: TypeConstraint,
   type_generator: TypeConstraint,
+  type_url_to_fetch: TypeConstraint,
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
@@ -290,6 +294,7 @@ pub extern "C" fn scheduler_create(
     process_request: type_process_request,
     process_result: type_process_result,
     generator: type_generator,
+    url_to_fetch: type_url_to_fetch,
     string: type_string,
     bytes: type_bytes,
   };
@@ -704,9 +709,12 @@ pub extern "C" fn capture_snapshots(
         .into_iter()
         .map(|(path_globs, root)| {
           let core = core.clone();
-          scheduler
-            .capture_snapshot_from_arbitrary_root(root, path_globs)
-            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+          fs::Snapshot::capture_snapshot_from_arbitrary_root(
+            core.store(),
+            core.fs_pool.clone(),
+            root,
+            path_globs,
+          ).map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
         }).collect::<Vec<_>>(),
     )
   }).map(|values| externs::store_tuple(&values))

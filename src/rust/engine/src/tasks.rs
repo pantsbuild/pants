@@ -20,7 +20,7 @@ pub struct Task {
 ///
 /// Registry of native (rust) Intrinsic tasks, user (python) Tasks, and Singletons.
 ///
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Tasks {
   // output product type -> Intrinsic providing it
   intrinsics: HashMap<TypeConstraint, Vec<Intrinsic>, FNV>,
@@ -92,6 +92,10 @@ impl Tasks {
       Intrinsic {
         product: types.snapshot,
         input: types.path_globs,
+      },
+      Intrinsic {
+        product: types.snapshot,
+        input: types.url_to_fetch,
       },
       Intrinsic {
         product: types.files_content,

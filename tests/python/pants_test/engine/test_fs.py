@@ -11,16 +11,23 @@ import unittest
 from builtins import object, open, str
 from contextlib import contextmanager
 
-from future.utils import text_type
+from future.utils import PY2, text_type
 
 from pants.base.project_tree import Dir, Link
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize, FilesContent,
-                             MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot,
+                             MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch,
                              create_fs_rules)
-from pants.util.contextutil import temporary_dir
+from pants.engine.scheduler import ExecutionError
+from pants.util.contextutil import http_server, temporary_dir
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.test_base import TestBase
+
+
+if PY2:
+  from BaseHTTPServer import BaseHTTPRequestHandler
+else:
+  from http.server import BaseHTTPRequestHandler
 
 
 class DirectoryListing(object):
@@ -471,3 +478,64 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
+
+  pantsbuild_digest = Digest("63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f", 18)
+
+  def test_download(self):
+    with http_server(StubHandler) as port:
+      url = UrlToFetch("http://localhost:{}/CNAME".format(port), self.pantsbuild_digest)
+      snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+      self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
+        text_type("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf"),
+        81
+      ))
+
+  def test_download_missing_file(self):
+    with http_server(StubHandler) as port:
+      url = UrlToFetch("http://localhost:{}/notfound".format(port), self.pantsbuild_digest)
+      with self.assertRaises(ExecutionError) as cm:
+        self.scheduler.product_request(Snapshot, subjects=[url])
+      self.assertIn('404', str(cm.exception))
+
+  def test_download_wrong_digest(self):
+    with http_server(StubHandler) as port:
+      url = UrlToFetch(
+        "http://localhost:{}/CNAME".format(port),
+        Digest(
+          self.pantsbuild_digest.fingerprint,
+          self.pantsbuild_digest.serialized_bytes_length + 1,
+        ),
+      )
+      with self.assertRaises(ExecutionError) as cm:
+        self.scheduler.product_request(Snapshot, subjects=[url])
+      self.assertIn('wrong digest', str(cm.exception).lower())
+
+  # It's a shame that this isn't hermetic, but setting up valid local HTTPS certificates is a pain.
+  def test_download_https(self):
+    url = UrlToFetch("https://www.pantsbuild.org/CNAME", Digest(
+      "63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f",
+      18,
+    ))
+    snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+    self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
+      text_type("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf"),
+      81
+    ))
+
+
+class StubHandler(BaseHTTPRequestHandler):
+  response_text = b"www.pantsbuild.org"
+
+  def do_HEAD(self):
+    self.send_headers()
+
+  def do_GET(self):
+    self.send_headers()
+    self.wfile.write(self.response_text)
+
+  def send_headers(self):
+    code = 200 if self.path == "/CNAME" else 404
+    self.send_response(code)
+    self.send_header("Content-Type", "text/utf-8")
+    self.send_header("Content-Length", "{}".format(len(self.response_text)))
+    self.end_headers()
