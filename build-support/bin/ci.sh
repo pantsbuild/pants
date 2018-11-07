@@ -257,9 +257,14 @@ if [[ "${run_integration:-false}" == "true" ]]; then
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
+    if [[ "${python_three:-false}" == "true" ]]; then
+      targets="$(comm -23 <(./pants.pex --tag='+integration' list tests/python:: | grep '.' | sort) <(sort "${REPO_ROOT}/build-support/known_py3_integration_failures.txt"))"
+    else
+      targets="tests/python::"
+    fi
     ./pants.pex --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
-      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+      $targets -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants Integration test failure"
   end_travis_section
 fi
