@@ -176,13 +176,9 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       self._assert_native_greeting(output)
 
   def test_pants_tests_local_dists_for_current_platform_only(self):
-    # The clean-all is to ensure that we rebuild requirements pex, because python_dist wheels
-    # live in the requirements pex for `./pants run`s and this helps us ensure proper behavior
-    # by eliminating the potential for false positives.
     with temporary_dir() as tmp_dir:
       command=[
         '--pants-distdir={}'.format(tmp_dir),
-        'clean-all',
         'test',
         '{}:fasthello'.format(self.fasthello_tests)]
       pants_run = self.run_pants(command=command, config={
@@ -199,10 +195,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       command=['run', '{}:main'.format(self.hello_setup_requires)]
       pants_run = self.run_pants(command=command)
 
-    # The clean-all is to ensure that we rebuild the requirements pex, because python_dist wheels
-    # live in the requirements pex for `./pants run`s and this clears the cache from the
-    # `./pants run` right above this comment so as to ensure proper behavior.
-    command=['clean-all', 'run', '{}:main'.format(self.hello_setup_requires)]
+    command=['run', '{}:main'.format(self.hello_setup_requires)]
     pants_run = self.run_pants(command=command)
 
     with temporary_dir() as tmp_dir:
