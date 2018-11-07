@@ -231,6 +231,11 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -c3 -i 6/7
 
+    - <<: *default_test_config
+      name: "Python 2 integration tests for pants"
+      script:
+        - ./build-support/bin/travis-ci.sh -c
+
     # Rust on linux
     - name: "Rust Tests Linux"
       os: linux
