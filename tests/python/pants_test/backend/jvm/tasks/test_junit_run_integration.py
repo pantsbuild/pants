@@ -40,14 +40,25 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   def report_file_path(self, relpath):
     return os.path.join(get_buildroot(), 'dist', relpath)
 
+  def cucumber_coverage(self, processor, xml_path, html_path, tests=(), args=()):
+    return self.coverage(
+      processor,
+      xml_path,
+      html_path,
+      'testprojects/tests/java/org/pantsbuild/testproject/unicode/cucumber',
+      'org.pantsbuild.testproject.unicode.cucumber.CucumberTest',
+      tests,
+      args
+    )
+
   @contextmanager
-  def coverage(self, processor, xml_path, html_path, tests=(), args=()):
-    def cucumber_test(test):
-      return '--test=org.pantsbuild.testproject.unicode.cucumber.CucumberTest#{}'.format(test)
+  def coverage(self, processor, xml_path, html_path, test_project, test_class='', tests=(), args=()):
+    def test_specifier_arg(test):
+      return '--test={}#{}'.format(test_class, test)
 
     with self.pants_results(['clean-all', 'test.junit'] + list(args) +
-                            [cucumber_test(name) for name in tests] +
-                            ['testprojects/tests/java/org/pantsbuild/testproject/unicode/cucumber',
+                            [test_specifier_arg(name) for name in tests] +
+                            [test_project,
                              '--test-junit-coverage-processor={}'.format(processor),
                              '--test-junit-coverage']) as results:
       self.assert_success(results)
@@ -67,11 +78,11 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   def do_test_junit_run_with_coverage_succeeds_cobertura(self, tests=(), args=()):
     html_path = ('test/junit/coverage/reports/html/'
                  'org.pantsbuild.testproject.unicode.cucumber.CucumberAnnotatedExample.html')
-    with self.coverage(processor='cobertura',
-                       xml_path='test/junit/coverage/reports/xml/coverage.xml',
-                       html_path=html_path,
-                       tests=tests,
-                       args=args) as (xml_report, html_report_string):
+    with self.cucumber_coverage(processor='cobertura',
+                                xml_path='test/junit/coverage/reports/xml/coverage.xml',
+                                html_path=html_path,
+                                tests=tests,
+                                args=args) as (xml_report, html_report_string):
 
       # Validate 100% coverage; ie a line coverage rate of 1.
       self.assertEqual('coverage', xml_report.tag)
@@ -94,11 +105,11 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   def do_test_junit_run_with_coverage_succeeds_jacoco(self, tests=(), args=()):
     html_path = ('test/junit/coverage/reports/html/'
                  'org.pantsbuild.testproject.unicode.cucumber/CucumberAnnotatedExample.html')
-    with self.coverage(processor='jacoco',
-                       xml_path='test/junit/coverage/reports/xml',
-                       html_path=html_path,
-                       tests=tests,
-                       args=args) as (xml_report, html_report_string):
+    with self.cucumber_coverage(processor='jacoco',
+                                xml_path='test/junit/coverage/reports/xml',
+                                html_path=html_path,
+                                tests=tests,
+                                args=args) as (xml_report, html_report_string):
 
       # Validate 100% coverage; ie: 0 missed instructions.
       self.assertEqual('report', xml_report.tag)
@@ -122,6 +133,23 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
                                                                 'testUnicodeClass2',
                                                                 'testUnicodeClass3'],
                                                          args=['--batch-size=2'])
+
+  def test_junit_run_with_coverage_filters_targets_jacoco(self):
+    coverage_test_project = 'testprojects/tests/java/org/pantsbuild/testproject/coverage:all'
+    html_path = ('test/junit/coverage/reports/html/'
+                 'index.html')
+    filter_arg = '--test-junit-coverage-jacoco-target-filters=one'
+
+    with self.coverage(processor='jacoco',
+                       xml_path='test/junit/coverage/reports/xml',
+                       html_path=html_path,
+                       test_project=coverage_test_project,
+                       args=[filter_arg]) as (xml_report, html_report_string):
+
+      coverage_one = xml_report.find('package/class[@name="org/pantsbuild/testproject/coverage/one/CoverageClassOne"]')
+      coverage_two = xml_report.find('package/class[@name="org/pantsbuild/testproject/coverage/two/CoverageClassTwo"]')
+      self.assertNotEqual(None, coverage_one)
+      self.assertEqual(None, coverage_two)
 
   def test_junit_run_against_invalid_class_fails(self):
     pants_run = self.run_pants(['clean-all',

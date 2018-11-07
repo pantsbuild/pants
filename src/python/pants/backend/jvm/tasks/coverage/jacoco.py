@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import functools
 import os
+import re
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
@@ -60,6 +61,16 @@ class Jacoco(CoverageEngine):
                                                    scope='jacoco')
       return Jacoco(settings, agent_path, cli_path, targets, execute_java_for_targets)
 
+  # TODO(jtrobec): deprecate these options and move them to subsystem scope
+  @staticmethod
+  def register_junit_options(register, register_jvm_tool):
+    register('--coverage-jacoco-target-filters', advanced=True, type=list,
+             help='Regex patterns passed to jacoco, specifying which targets should be '
+                  'included in reports. All targets matching any of the patters will be '
+                  'included when generating reports. If no targets are specified, all '
+                  'targets are included, which would be the same as specifying ".*" as a '
+                  'filter.')
+
   _DATAFILE_NAME = 'jacoco.exec'
 
   def __init__(self, settings, agent_path, cli_path, targets, execute_java_for_targets):
@@ -82,6 +93,7 @@ class Jacoco(CoverageEngine):
     self._cli_path = cli_path
     self._execute_java = functools.partial(execute_java_for_targets, targets)
     self._coverage_force = options.coverage_force
+    self._target_filters = options.coverage_jacoco_target_filters
 
   def _iter_datafiles(self, output_dir):
     for root, _, files in safe_walk(output_dir):
@@ -152,7 +164,16 @@ class Jacoco(CoverageEngine):
     for target in self._coverage_targets:
       paths = runtime_classpath.get_for_target(target)
       for (name, path) in paths:
-        target_paths.append(path)
+        if len(self._target_filters) == 0:
+          target_paths.append(path)
+        else:
+          for filter in self._target_filters:
+            if re.search(filter, path) is not None:
+              target_paths.append(path)
+              break
+
+    if len(target_paths) == 0:
+      raise TaskError("No classpaths matched jacoco report filters ({0})".format(self._target_filters))
 
     return self._make_multiple_arg('--classfiles', target_paths)
 
