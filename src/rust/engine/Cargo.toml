@@ -71,6 +71,7 @@ default-members = [
 
 [dependencies]
 boxfuture = { path = "boxfuture" }
+bytes = "0.4.5"
 enum_primitive = "0.1.1"
 fnv = "1.0.5"
 fs = { path = "fs" }

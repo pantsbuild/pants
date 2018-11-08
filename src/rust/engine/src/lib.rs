@@ -48,6 +48,7 @@ mod tasks;
 mod types;
 
 extern crate boxfuture;
+extern crate bytes;
 extern crate enum_primitive;
 extern crate fnv;
 extern crate fs;
