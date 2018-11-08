@@ -3,6 +3,7 @@ python_library(
     'testprojects/pants-plugins/3rdparty/python/pants',
     'testprojects/pants-plugins/src/python/test_pants_plugin/subsystems',
     'testprojects/pants-plugins/src/python/test_pants_plugin/tasks',
+    'contrib/scrooge/src/python/pants/contrib/scrooge/tasks',
   ],
   provides=setup_py(
     name='test_pants_plugin',

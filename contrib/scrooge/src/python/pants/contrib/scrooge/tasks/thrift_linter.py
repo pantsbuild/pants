@@ -46,6 +46,13 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
     cls.register_jvm_tool(register, 'scrooge-linter')
 
   @classmethod
+  def prepare(cls, options, round_manager):
+    super(ThriftLinter, cls).prepare(options, round_manager)
+    # Tasks which generate thrift or scrooge sources should add the thrift targets they generate to
+    # the 'thrift-preprocess' ProductMapping to avoid linting those targets.
+    round_manager.optional_product('thrift-preprocess')
+
+  @classmethod
   def product_types(cls):
     # Declare the product of this goal. Gen depends on thrift-linter.
     return ['thrift-linter']
@@ -105,7 +112,18 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
         'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
 
   def execute(self):
-    thrift_targets = self.get_targets(self._is_thrift)
+    preprocessed_thrift_product = self.context.products.get('thrift-preprocess')
+    if preprocessed_thrift_product:
+      preprocessed_thrift_targets = frozenset(
+        target for target, _ in
+        preprocessed_thrift_product.itermappings()
+      )
+    else:
+      preprocessed_thrift_targets = []
+    thrift_targets = [
+      t for t in self.get_targets(self._is_thrift)
+      if t not in preprocessed_thrift_targets
+    ]
     with self.invalidated(thrift_targets) as invalidation_check:
       if not invalidation_check.invalid_vts:
         return

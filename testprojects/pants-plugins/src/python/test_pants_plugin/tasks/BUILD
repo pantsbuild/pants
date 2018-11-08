@@ -6,5 +6,6 @@ python_library(
   dependencies=[
     'testprojects/pants-plugins/3rdparty/python/pants',
     'testprojects/pants-plugins/src/python/test_pants_plugin/subsystems',
+    'contrib/scrooge/src/python/pants/contrib/scrooge/tasks',
   ],
 )

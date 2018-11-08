@@ -116,3 +116,19 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(cmd, config=pants_ini_config)
     self.assert_success(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
+
+  def test_thrift_preprocess_targets_skipped(self):
+    broken_thrift_target_spec = 'testprojects/src/thrift/org/pantsbuild/broken_thrift'
+    cmd = ['lint', broken_thrift_target_spec]
+    pants_run = self.run_pants(cmd)
+    self.assert_failure(pants_run)
+    self.assertIn("com.twitter.scrooge.frontend.FileParseException: Exception parsing: testprojects/src/thrift/org/pantsbuild/broken_thrift/broken.thrift",
+                  pants_run.stdout_data)
+    pants_ini_config = {
+      'GLOBAL': {
+        'pythonpath': "+['%(buildroot)s/contrib/scrooge/src/python', '%(buildroot)s/testprojects/pants-plugins/src/python']",
+        'backend_packages': "+['pants.contrib.scrooge', 'test_pants_plugin']",
+      }
+    }
+    pants_run = self.run_pants(cmd, config=pants_ini_config)
+    self.assert_success(pants_run)
