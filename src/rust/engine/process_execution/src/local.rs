@@ -100,10 +100,10 @@ impl StreamedHermeticCommand {
   fn new<S: AsRef<OsStr>>(program: S) -> StreamedHermeticCommand {
     let mut inner = Command::new(program);
     inner
-        .env_clear()
-        // It would be really nice not to have to manually set PATH but this is sadly the only way
-        // to stop automatic PATH searching.
-        .env("PATH", "");
+      .env_clear()
+      // It would be really nice not to have to manually set PATH but this is sadly the only way
+      // to stop automatic PATH searching.
+      .env("PATH", "");
     StreamedHermeticCommand { inner }
   }
 
@@ -232,12 +232,12 @@ impl super::CommandRunner for CommandRunner {
       .materialize_directory(workdir_path.clone(), req.input_files)
       .and_then(move |()| {
         if let Some(jdk_home) = maybe_jdk_home {
-          symlink(jdk_home, workdir_path3.join(".jdk")).map_err(|err| format!("Error making symlink for local execution: {:?}", err))
+          symlink(jdk_home, workdir_path3.join(".jdk"))
+            .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
         } else {
           Ok(())
         }
-      })
-      .and_then(move |()| {
+      }).and_then(move |()| {
         StreamedHermeticCommand::new(&argv[0])
           .args(&argv[1..])
           .current_dir(&workdir_path)
@@ -261,8 +261,7 @@ impl super::CommandRunner for CommandRunner {
                 "Error making posix_fs to fetch local process execution output files: {}",
                 err
               )
-            })
-            .map(Arc::new)
+            }).map(Arc::new)
             .and_then(|posix_fs| {
               CommandRunner::construct_output_snapshot(
                 store,
@@ -270,8 +269,7 @@ impl super::CommandRunner for CommandRunner {
                 output_file_paths,
                 output_dir_paths,
               )
-            })
-            .to_boxed()
+            }).to_boxed()
         };
 
         output_snapshot
@@ -280,10 +278,8 @@ impl super::CommandRunner for CommandRunner {
             stderr: child_results.stderr,
             exit_code: child_results.exit_code,
             output_directory: snapshot.digest,
-          })
-          .to_boxed()
-      })
-      .then(move |result| {
+          }).to_boxed()
+      }).then(move |result| {
         // Force workdir not to get dropped until after we've ingested the outputs
         if !cleanup_local_dirs {
           // This consumes the `TempDir` without deleting directory on the filesystem, meaning
@@ -295,8 +291,7 @@ impl super::CommandRunner for CommandRunner {
           );
         } // Else, workdir gets dropped here
         result
-      })
-      .to_boxed()
+      }).to_boxed()
   }
 }
 

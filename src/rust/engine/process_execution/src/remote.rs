@@ -65,28 +65,26 @@ impl CommandRunner {
         .map_err(rpcerror_to_string)
     );
     stream
-        .take(1)
-        .into_future()
-        // If there was a response, drop the _stream to disconnect so that the server doesn't keep
-        // the connection alive and continue sending on it.
-        .map(|(maybe_operation, stream)| {
-          drop(stream);
-          maybe_operation
-        })
-        // If there was an error, drop the _stream to disconnect so that the server doesn't keep the
-        // connection alive and continue sending on it.
-        .map_err(|(error, stream)| {
-          drop(stream);
-          error
-        })
-        .then(|maybe_operation_result| {
-          match maybe_operation_result {
-            Ok(Some(operation)) => Ok(OperationOrStatus::Operation(operation)),
-            Ok(None) => Err("Didn't get proper stream response from server during remote execution".to_owned()),
-            Err(err) => rpcerror_to_status_or_string(err).map(OperationOrStatus::Status),
-          }
-        })
-        .to_boxed()
+      .take(1)
+      .into_future()
+      // If there was a response, drop the _stream to disconnect so that the server doesn't keep
+      // the connection alive and continue sending on it.
+      .map(|(maybe_operation, stream)| {
+        drop(stream);
+        maybe_operation
+      })
+      // If there was an error, drop the _stream to disconnect so that the server doesn't keep the
+      // connection alive and continue sending on it.
+      .map_err(|(error, stream)| {
+        drop(stream);
+        error
+      }).then(|maybe_operation_result| match maybe_operation_result {
+        Ok(Some(operation)) => Ok(OperationOrStatus::Operation(operation)),
+        Ok(None) => {
+          Err("Didn't get proper stream response from server during remote execution".to_owned())
+        }
+        Err(err) => rpcerror_to_status_or_string(err).map(OperationOrStatus::Status),
+      }).to_boxed()
   }
 }
 

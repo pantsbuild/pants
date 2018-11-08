@@ -236,17 +236,16 @@ impl EngineDisplay {
     // representing the swimlane for this worker and lay down a text label.
     for (n, (_worker_id, action)) in worker_states.iter().enumerate() {
       let line_shortened_output: String = format!(
-          "{padding}{blue}{sigil}{reset}{action}",
-          padding=self.padding,
-          blue=color::Fg(color::LightBlue),
-          sigil=self.sigil,
-          reset=color::Fg(color::Reset),
-          action=action
-        )
-        .graphemes(true)
-        // Account for control characters.
-        .take(self.terminal_size.0 as usize + 14)
-        .collect();
+        "{padding}{blue}{sigil}{reset}{action}",
+        padding = self.padding,
+        blue = color::Fg(color::LightBlue),
+        sigil = self.sigil,
+        reset = color::Fg(color::Reset),
+        action = action
+      ).graphemes(true)
+      // Account for control characters.
+      .take(self.terminal_size.0 as usize + 14)
+      .collect();
 
       self
         .write(&format!(
