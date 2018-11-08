@@ -69,6 +69,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/parallel.*',
       'testprojects/src/python/python_distribution/fasthello_with_install_requires.*',
       'testprojects/src/python/unicode/compilation_failure',
+      'testprojects/src/thrift/org/pantsbuild/broken_thrift',
     ]
 
     # May not succeed without java8 installed
