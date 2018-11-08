@@ -4,13 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.util.collections_backport import namedtuple
-
 import requests
 import www_authenticate
 
 from pants.auth.cookies import Cookies
 from pants.subsystem.subsystem import Subsystem
+from pants.util.collections_backport import namedtuple
 
 
 class BasicAuthException(Exception):
