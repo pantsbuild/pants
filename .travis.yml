@@ -55,7 +55,10 @@ cache:
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
-  - Test Pants
+  - name: &test Test Pants
+    if: type != cron
+  - name: &cron Cron
+    if: type = cron
   - name: &build_stable Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
   - name: &build_unstable Deploy Pants Pex Unstable
@@ -76,7 +79,7 @@ default_test_config: &default_test_config
         - python3
         - openssl
         - libssl-dev
-  stage: Test Pants
+  stage: *test
   language: python
   python: &python_version "2.7"
   before_install:
@@ -89,6 +92,10 @@ default_test_config: &default_test_config
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
 
+default_cron_test_congig:
+  <<: *default_test_config
+  stage: *cron
+
 matrix:
   include:
 
@@ -99,7 +106,7 @@ matrix:
       # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
       # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode8
-      stage: Test Pants
+      stage: *test
       language: generic
       env:
         - PREPARE_DEPLOY=1
@@ -109,7 +116,7 @@ matrix:
     # Build Linux engine
     - name: "Linux Native Engine Binary Builder"
       os: linux
-      stage: Test Pants
+      stage: *test
       language: generic
       services:
         - docker
@@ -236,12 +243,22 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -cw -i 1/2
 
+    - <<: *default_cron_test_config
+      name: "Python 2 integration tests for pants - shard 1"
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 0/2
+
+    - <<: *default_cron_test_config
+      name: "Python 2 integration tests for pants - shard 2"
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 1/2
+
     # Rust on linux
     - name: "Rust Tests Linux"
       os: linux
       dist: trusty
       sudo: required
-      stage: Test Pants
+      stage: *test
       language: python
       python: *python_version
       before_install:
@@ -259,7 +276,7 @@ matrix:
       os: osx
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
-      stage: Test Pants
+      stage: *test
       language: generic
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
@@ -276,7 +293,7 @@ matrix:
       os: linux
       dist: trusty
       sudo: required
-      stage: Test Pants
+      stage: *test
       language: python
       python: *python_version
       before_install:
