@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import object
-from collections import namedtuple
 
 import six
 from colors import cyan, green, red, yellow
@@ -14,6 +13,7 @@ from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.reporting.plaintext_reporter_base import PlainTextReporterBase
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter, ReporterDestination
+from pants.util.collections_backport import namedtuple
 from pants.util.memo import memoized_method
 from pants.util.strutil import ensure_binary
 

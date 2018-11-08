@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from abc import abstractmethod
-from collections import defaultdict
 
 from pants.backend.native.config.environment import Executable
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
@@ -16,6 +15,7 @@ from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.util.collections_backport import defaultdict
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass, classproperty
 from pants.util.objects import SubclassesOf, datatype

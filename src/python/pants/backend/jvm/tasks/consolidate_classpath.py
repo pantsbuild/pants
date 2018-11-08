@@ -5,11 +5,11 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from collections import defaultdict
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.build_graph.target_scopes import Scopes
+from pants.util.collections_backport import defaultdict
 
 
 class ConsolidateClasspath(JvmBinaryTask):

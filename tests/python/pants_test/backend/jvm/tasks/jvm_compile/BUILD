@@ -28,6 +28,7 @@ python_library(
   name='base_compile_integration_test',
   sources=['base_compile_integration_test.py'],
   dependencies=[
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',

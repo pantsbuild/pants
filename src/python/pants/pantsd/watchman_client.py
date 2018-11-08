@@ -4,9 +4,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from collections import deque
-
 import pywatchman
+
+from pants.util.collections_backport import deque
 
 
 # TODO(kwlzn): upstream this in pywatchman.

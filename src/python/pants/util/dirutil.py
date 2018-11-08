@@ -13,9 +13,9 @@ import tempfile
 import threading
 import uuid
 from builtins import open
-from collections import defaultdict
 from contextlib import contextmanager
 
+from pants.util.collections_backport import defaultdict
 from pants.util.strutil import ensure_text
 
 

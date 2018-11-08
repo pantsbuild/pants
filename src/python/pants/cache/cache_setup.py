@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import threading
 from builtins import object, range, str
-from collections import namedtuple
 
 from future.moves.urllib.parse import urlparse
 
@@ -18,6 +17,7 @@ from pants.cache.pinger import BestUrlSelector, Pinger
 from pants.cache.resolver import NoopResolver, Resolver, RESTfulResolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.subsystem.subsystem import Subsystem
+from pants.util.collections_backport import namedtuple
 from pants.util.memo import memoized_property
 
 

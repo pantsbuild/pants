@@ -6,11 +6,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from abc import abstractmethod
 from builtins import filter
-from collections import defaultdict
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.task.task import Task
+from pants.util.collections_backport import defaultdict
 
 
 class MutexTaskMixin(Task):

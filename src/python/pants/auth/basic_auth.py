@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from collections import namedtuple
+from pants.util.collections_backport import namedtuple
 
 import requests
 import www_authenticate

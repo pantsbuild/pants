@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import collections
 import functools
 import logging
 from builtins import next
@@ -25,6 +24,7 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
+from pants.util.collections_backport import MutableMapping, MutableSequence
 from pants.util.objects import TypeConstraintError, datatype
 
 
@@ -118,10 +118,10 @@ def resolve_unhydrated_struct(address_mapper, address):
     for key, value in sorted(item._asdict().items(), key=_key_func):
       if not AddressableDescriptor.is_addressable(item, key):
         continue
-      if isinstance(value, collections.MutableMapping):
+      if isinstance(value, MutableMapping):
         for _, v in sorted(value.items(), key=_key_func):
           maybe_append(key, v)
-      elif isinstance(value, collections.MutableSequence):
+      elif isinstance(value, MutableSequence):
         for v in value:
           maybe_append(key, v)
       else:
@@ -171,11 +171,11 @@ def hydrate_struct(symbol_table_constraint, address_mapper, unhydrated_struct):
         hydrated_args[key] = value
         continue
 
-      if isinstance(value, collections.MutableMapping):
+      if isinstance(value, MutableMapping):
         container_type = type(value)
         hydrated_args[key] = container_type((k, maybe_consume(key, v))
                                             for k, v in sorted(value.items(), key=_key_func))
-      elif isinstance(value, collections.MutableSequence):
+      elif isinstance(value, MutableSequence):
         container_type = type(value)
         hydrated_args[key] = container_type(maybe_consume(key, v) for v in value)
       else:

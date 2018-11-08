@@ -60,6 +60,7 @@ python_tests(
   name = 'build_file_parser',
   sources = ['test_build_file_parser.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/base:build_file',
     'src/python/pants/build_graph',
@@ -70,6 +71,7 @@ python_tests(
 python_tests(
   sources = ['test_build_graph.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',

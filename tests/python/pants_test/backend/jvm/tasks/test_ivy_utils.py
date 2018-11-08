@@ -8,7 +8,6 @@ import json
 import os
 import xml.etree.ElementTree as ET
 from builtins import open, str
-from collections import namedtuple
 from textwrap import dedent
 
 from future.utils import PY3
@@ -26,6 +25,7 @@ from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.util.collections_backport import namedtuple
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.test_base import TestBase

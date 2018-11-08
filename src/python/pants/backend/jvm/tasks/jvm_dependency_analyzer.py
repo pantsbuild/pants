@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import object
-from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
@@ -17,6 +16,7 @@ from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
+from pants.util.collections_backport import defaultdict
 from pants.util.memo import memoized_method, memoized_property
 
 

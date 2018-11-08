@@ -5,10 +5,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
-from collections import defaultdict
 
 from pants.base.specs import DescendantAddresses
 from pants.task.console_task import ConsoleTask
+from pants.util.collections_backport import defaultdict
 
 
 class ReverseDepmap(ConsoleTask):

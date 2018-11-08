@@ -9,10 +9,10 @@ import sys
 import threading
 import traceback
 from builtins import map, object, str
-from collections import defaultdict, deque
 from heapq import heappop, heappush
 
 from pants.base.worker_pool import Work
+from pants.util.collections_backport import defaultdict, deque
 
 
 class Job(object):

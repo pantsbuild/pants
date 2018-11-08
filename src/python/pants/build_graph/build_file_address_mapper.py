@@ -8,7 +8,6 @@ import logging
 import os
 import re
 import traceback
-from collections import defaultdict
 
 import six
 from pathspec import PathSpec
@@ -22,6 +21,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
+from pants.util.collections_backport import defaultdict
 from pants.util.dirutil import fast_relpath
 
 

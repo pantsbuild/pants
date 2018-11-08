@@ -40,6 +40,7 @@ python_library(
   name = 'interpreter_cache',
   sources = ['interpreter_cache.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python:pex',
     'src/python/pants/backend/python/targets',

@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import object
-from collections import defaultdict
 
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -17,6 +16,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
 from pants.backend.jvm.tasks.coverage.manager import CodeCoverageSettings
 from pants.java.jar.jar_dependency import JarDependency
+from pants.util.collections_backport import defaultdict
 from pants_test.test_base import TestBase
 
 

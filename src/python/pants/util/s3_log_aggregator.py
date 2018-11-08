@@ -7,9 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 from builtins import object, open
-from collections import defaultdict
 
 from s3logparse.s3logparse import parse_log_lines
+
+from pants.util.collections_backport import defaultdict
 
 
 class Measure(object):

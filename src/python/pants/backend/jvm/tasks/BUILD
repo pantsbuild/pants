@@ -54,6 +54,7 @@ python_library(
   name = 'analysis_extraction',
   sources = ['analysis_extraction.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     ':nailgun_task',
     'src/python/pants/backend/jvm/subsystems:dependency_context',
@@ -93,6 +94,7 @@ python_library(
   name = 'consolidate_classpath',
   sources = ['consolidate_classpath.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     ':jvm_binary_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
@@ -103,6 +105,7 @@ python_library(
   name = 'bootstrap_jvm_tools',
   sources = ['bootstrap_jvm_tools.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     ':ivy_task_mixin',
     ':jar_task',
@@ -174,6 +177,7 @@ python_library(
   name = 'classpath_util',
   sources = ['classpath_util.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     ':classpath_entry',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -204,6 +208,7 @@ python_library(
   name = 'detect_duplicates',
   sources = ['detect_duplicates.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     ':jvm_binary_task',
     'src/python/pants/base:exceptions',
@@ -283,6 +288,7 @@ python_library(
   name = 'coursier_resolve',
   sources = ['coursier_resolve.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     ':classpath_products',
     ':nailgun_task',
@@ -313,6 +319,7 @@ python_library(
   name='jar_import_products',
   sources=['jar_import_products.py'],
   dependencies=[
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/backend/jvm/targets:jvm',
   ]
@@ -322,6 +329,7 @@ python_library(
   name = 'jar_publish',
   sources = ['jar_publish.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':jar_publish_resources',
@@ -443,6 +451,7 @@ python_library(
   name = 'jvm_dependency_analyzer',
   sources = ['jvm_dependency_analyzer.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':classpath_util',
@@ -459,6 +468,7 @@ python_library(
   name = 'jvm_dependency_check',
   sources = ['jvm_dependency_check.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     ':jvm_dependency_analyzer',
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -479,6 +489,7 @@ python_library(
   name = 'jvm_dependency_usage',
   sources = ['jvm_dependency_usage.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -493,6 +504,7 @@ python_library(
   name = 'jvm_platform_analysis',
   sources = ['jvm_platform_analysis.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     'src/python/pants/base:exceptions',
@@ -544,6 +556,7 @@ python_library(
   name = 'jvmdoc_gen',
   sources = ['jvmdoc_gen.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     ':jvm_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries',
@@ -598,6 +611,7 @@ python_library(
   name = 'properties',
   sources = ['properties.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python:six',
   ],

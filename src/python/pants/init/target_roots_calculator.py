@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import itertools
 import logging
 from builtins import object
-from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
@@ -20,6 +19,7 @@ from pants.engine.legacy.graph import TransitiveHydratedTargets, target_types_fr
 from pants.engine.legacy.source_mapper import EngineSourceMapper
 from pants.goal.workspace import ScmWorkspace
 from pants.scm.subsystems.changed import ChangedRequest
+from pants.util.collections_backport import defaultdict
 
 
 logger = logging.getLogger(__name__)

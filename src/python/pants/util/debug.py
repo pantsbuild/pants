@@ -7,7 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import threading
 from builtins import open
-from collections import namedtuple
+
+from pants.util.collections_backport import namedtuple
 
 
 DEFAULT_LOG_PATH = '/tmp/pants_debug.log'

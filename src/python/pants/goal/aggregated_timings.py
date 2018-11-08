@@ -6,8 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import object, open
-from collections import defaultdict
 
+from pants.util.collections_backport import defaultdict
 from pants.util.dirutil import safe_mkdir_for
 
 

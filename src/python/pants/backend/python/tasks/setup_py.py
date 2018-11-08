@@ -12,9 +12,7 @@ import shutil
 import textwrap
 from abc import abstractmethod
 from builtins import bytes, map, object, str, zip
-from collections import OrderedDict, defaultdict
 
-from future.moves import collections
 from future.utils import PY2
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
@@ -36,6 +34,8 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
 from pants.task.task import Task
+from pants.util.collections_backport import (Iterable, Mapping, MutableSequence, OrderedDict, Set,
+                                             defaultdict)
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
@@ -81,7 +81,7 @@ def distutils_repr(obj):
         _write('"""{}"""'.format(ensure_text(o.replace('"""', r'\"\"\"'))))
       else:
         _write("'{}'".format(ensure_text(o.replace("'", r"\'"))))
-    elif isinstance(o, collections.Mapping):
+    elif isinstance(o, Mapping):
       _write('{' + linesep)
       for k, v in o.items():
         _write_repr(k, indent=True, level=level)
@@ -89,10 +89,10 @@ def distutils_repr(obj):
         _write_repr(v, indent=False, level=level)
         _write(',' + linesep)
       _write(pad + '}')
-    elif isinstance(o, collections.Iterable):
-      if isinstance(o, collections.MutableSequence):
+    elif isinstance(o, Iterable):
+      if isinstance(o, MutableSequence):
         open_collection, close_collection = '[]'
-      elif isinstance(o, collections.Set):
+      elif isinstance(o, Set):
         open_collection, close_collection = '{}'
       else:
         open_collection, close_collection = '()'

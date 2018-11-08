@@ -3,6 +3,7 @@
 
 python_tests(
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks/coverage',

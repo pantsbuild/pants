@@ -9,7 +9,6 @@ import logging
 import os
 import unittest
 from builtins import object, open
-from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
@@ -35,6 +34,7 @@ from pants.option.scope import GLOBAL_SCOPE
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
+from pants.util.collections_backport import defaultdict
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.option.util.fakes import create_options_for_optionables

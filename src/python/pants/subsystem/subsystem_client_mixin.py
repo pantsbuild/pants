@@ -5,12 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import object
-from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.scope import ScopeInfo
+from pants.util.collections_backport import namedtuple
 
 
 class SubsystemClientError(Exception): pass

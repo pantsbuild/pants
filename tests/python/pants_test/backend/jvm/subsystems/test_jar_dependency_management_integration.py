@@ -5,10 +5,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from collections import namedtuple
 from contextlib import contextmanager
 from unittest import expectedFailure
 
+from pants.util.collections_backport import namedtuple
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 

@@ -4,8 +4,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import collections
 from builtins import next
+
+from pants.util.collections_backport import defaultdict
 
 
 def combined_dict(*dicts):
@@ -24,7 +25,7 @@ def factory_dict(value_factory, *args, **kwargs):
   :param **kwrags: Any kwargs to pass through to `dict`.
   :rtype: dict
   """
-  class FactoryDict(collections.defaultdict):
+  class FactoryDict(defaultdict):
     @staticmethod
     def __never_called():
       raise AssertionError('The default factory should never be called since we override '

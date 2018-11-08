@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import collections
 import os
 from builtins import next, object, open
 from contextlib import contextmanager
@@ -16,6 +15,7 @@ from mock import Mock, patch
 from pants.base.exceptions import ErrorWhileTesting
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
+from pants.util.collections_backport import namedtuple
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants.util.process_handler import ProcessHandler, subprocess
@@ -26,7 +26,7 @@ class DummyTestTarget(object):
   def __init__(self, name, timeout=None):
     self.name = name
     self.timeout = timeout
-    self.address = collections.namedtuple('address', ['spec'])(name)
+    self.address = namedtuple('address', ['spec'])(name)
 
 targetA = DummyTestTarget('TargetA')
 targetB = DummyTestTarget('TargetB', timeout=1)

@@ -28,6 +28,7 @@ python_library(
   name = 'base_test',
   sources = ['base_test.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_root',
@@ -85,6 +86,7 @@ python_library(
   name = 'test_base',
   sources = ['test_base.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/base:build_root',
     'src/python/pants/base:cmd_line_spec_parser',

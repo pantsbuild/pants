@@ -7,10 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import fnmatch
 import os
 from builtins import object
-from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.util.collections_backport import defaultdict
 from pants.util.dirutil import safe_walk
 from pants.util.objects import datatype
 from pants.util.xml_parser import XmlParser

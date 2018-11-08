@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import collections
 import inspect
 from builtins import object
 from functools import update_wrapper
@@ -13,6 +12,7 @@ from future.utils import string_types
 
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Resolvable, Serializable
+from pants.util.collections_backport import MutableMapping, MutableSequence
 from pants.util.objects import Collection, TypeConstraintError
 
 
@@ -259,7 +259,7 @@ class AddressableList(AddressableDescriptor):
     if value is None:
       return None
 
-    if not isinstance(value, collections.MutableSequence):
+    if not isinstance(value, MutableSequence):
       raise TypeError('The {} property of {} must be a list, given {} of type {}'
                       .format(self._name, instance, value, type(value).__name__))
     return [super(AddressableList, self)._checked_value(instance, v) for v in value]
@@ -288,7 +288,7 @@ class AddressableDict(AddressableDescriptor):
     if value is None:
       return None
 
-    if not isinstance(value, collections.MutableMapping):
+    if not isinstance(value, MutableMapping):
       raise TypeError('The {} property of {} must be a dict, given {} of type {}'
                       .format(self._name, instance, value, type(value).__name__))
     return {k: super(AddressableDict, self)._checked_value(instance, v) for k, v in value.items()}

@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 from builtins import filter, object
-from collections import defaultdict
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
@@ -23,6 +22,7 @@ from pants.goal.workspace import ScmWorkspace
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.reporting.report import Report
 from pants.source.source_root import SourceRootConfig
+from pants.util.collections_backport import defaultdict
 
 
 class Context(object):

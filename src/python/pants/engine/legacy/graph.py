@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 from builtins import str, zip
-from collections import deque
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
@@ -26,6 +25,7 @@ from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
+from pants.util.collections_backport import deque
 from pants.util.objects import Collection, datatype
 
 

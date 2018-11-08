@@ -8,7 +8,6 @@ import functools
 import os
 import shutil
 from builtins import str
-from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
@@ -20,6 +19,7 @@ from pants.build_graph.target_scopes import Scopes
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.util import safe_classpath
 from pants.subsystem.subsystem import Subsystem
+from pants.util.collections_backport import defaultdict
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import relativize_paths, safe_mkdir, safe_mkdir_for, safe_walk, touch
 

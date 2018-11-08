@@ -181,6 +181,7 @@ python_tests(
   name = 'classpath_util',
   sources = ['test_classpath_util.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classpath_products',
@@ -328,6 +329,7 @@ python_tests(
   name = 'ivy_utils',
   sources = ['test_ivy_utils.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm:plugin',
@@ -666,6 +668,7 @@ python_tests(
   name = 'properties',
   sources = ['test_properties.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/backend/jvm/tasks:properties',
   ]

@@ -5,6 +5,7 @@ python_tests(
   name='cache_compile_integration',
   sources=['test_cache_compile_integration.py'],
   dependencies=[
+    'src/python/pants/util:collections_backport',
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/base:build_environment',
     'src/python/pants/fs',
@@ -70,6 +71,7 @@ python_tests(
   name = 'java_compile_settings_partitioning',
   sources = ['test_java_compile_settings_partitioning.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/fs',

@@ -4,11 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import collections
 import os
 from builtins import object
 from netrc import NetrcParseError
 from netrc import netrc as NetrcDb
+
+from pants.util.collections_backport import defaultdict
 
 
 class Netrc(object):
@@ -21,8 +22,8 @@ class Netrc(object):
       super(Netrc.NetrcError, self).__init__(*args, **kwargs)
 
   def __init__(self):
-    self._login = collections.defaultdict(lambda: None)
-    self._password = collections.defaultdict(lambda: None)
+    self._login = defaultdict(lambda: None)
+    self._password = defaultdict(lambda: None)
 
   def getusername(self, repository):
     self._ensure_loaded()

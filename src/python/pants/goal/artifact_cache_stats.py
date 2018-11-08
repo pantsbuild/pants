@@ -6,9 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import object, open, str, zip
-from collections import defaultdict, namedtuple
 
 from pants.cache.artifact_cache import UnreadableArtifact
+from pants.util.collections_backport import defaultdict, namedtuple
 from pants.util.dirutil import safe_mkdir
 
 

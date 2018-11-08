@@ -6,10 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
-from collections import namedtuple
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
+from pants.util.collections_backport import namedtuple
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT

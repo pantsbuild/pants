@@ -40,6 +40,7 @@ python_library(
   name = 'export',
   sources = ['export.py'],
   dependencies = [
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',

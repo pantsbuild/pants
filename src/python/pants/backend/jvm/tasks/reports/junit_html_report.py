@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import collections
 import fnmatch
 import itertools
 import logging
@@ -15,6 +14,7 @@ from builtins import map, next, object, open
 from functools import total_ordering
 
 from pants.base.mustache import MustacheRenderer
+from pants.util.collections_backport import defaultdict
 from pants.util.dirutil import safe_mkdir_for, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
@@ -55,12 +55,12 @@ class ReportTestSuite(object):
 
     logger = logger or _LOGGER
 
-    suites_by_name = collections.defaultdict(list)
+    suites_by_name = defaultdict(list)
     for report_test_suite in report_test_suites:
       suites_by_name[report_test_suite.name].append(report_test_suite)
 
     for suite_name, suites in suites_by_name.items():
-      cases_by_name = collections.defaultdict(list)
+      cases_by_name = defaultdict(list)
       for case in itertools.chain.from_iterable(s.testcases for s in suites):
         cases_by_name[case.name].append(case)
 
