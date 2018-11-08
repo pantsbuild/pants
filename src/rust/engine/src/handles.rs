@@ -4,6 +4,7 @@
 use std::os::raw;
 
 use externs;
+use lazy_static::lazy_static;
 use parking_lot::Mutex;
 
 pub type RawHandle = *const raw::c_void;

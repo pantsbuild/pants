@@ -1,12 +1,13 @@
 use FileContent;
 
 use bazel_protos;
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use dirs;
 use futures::{future, Future};
 use hashing::Digest;
 use protobuf::Message;
+use serde_derive::Serialize;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -633,6 +634,7 @@ mod local {
     self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
     RwTransaction, Transaction, WriteFlags,
   };
+  use log::{debug, error};
   use sha2::Sha256;
   use std;
   use std::collections::{BinaryHeap, HashMap};

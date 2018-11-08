@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bazel_protos;
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat, Store};
@@ -13,6 +13,7 @@ use futures::{future, Future, Stream};
 use futures_timer::Delay;
 use grpcio;
 use hashing::{Digest, Fingerprint};
+use log::debug;
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 

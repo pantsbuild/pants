@@ -1,9 +1,10 @@
 extern crate log;
 extern crate tempfile;
 
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, Snapshot, StrictGlobMatching};
 use futures::{future, Future, Stream};
+use log::info;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::ops::Neg;

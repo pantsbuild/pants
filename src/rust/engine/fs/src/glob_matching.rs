@@ -10,6 +10,7 @@ use futures::future;
 use futures::Future;
 use glob::Pattern;
 use indexmap::{map::Entry::Occupied, IndexMap, IndexSet};
+use log::warn;
 
 use {
   Dir, GitignoreStyleExcludes, GlobExpansionConjunction, GlobParsedSource, GlobSource,
