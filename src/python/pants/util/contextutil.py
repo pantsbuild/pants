@@ -10,6 +10,7 @@ import shutil
 import signal
 import sys
 import tempfile
+import threading
 import time
 import uuid
 import zipfile
@@ -17,10 +18,18 @@ from builtins import object, open
 from contextlib import closing, contextmanager
 
 from colors import green
-from future.utils import PY3, string_types
+from future.utils import PY2, PY3, string_types
 
 from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
+
+
+if PY2:
+  from Queue import Queue
+  from SocketServer import TCPServer
+else:
+  from queue import Queue
+  from socketserver import TCPServer
 
 
 class InvalidZipPath(ValueError):
@@ -393,3 +402,23 @@ def with_overwritten_file_content(file_path):
   finally:
     with open(file_path, 'w') as f:
       f.write(file_original_content)
+
+
+@contextmanager
+def http_server(handler_class):
+  def serve(port_queue, shutdown_queue):
+    httpd = TCPServer(("", 0), handler_class)
+    httpd.timeout = 0.1
+    port_queue.put(httpd.server_address[1])
+    while shutdown_queue.empty():
+      httpd.handle_request()
+
+  port_queue = Queue()
+  shutdown_queue = Queue()
+  t = threading.Thread(target=lambda: serve(port_queue, shutdown_queue))
+  t.start()
+
+  yield port_queue.get(block=True)
+
+  shutdown_queue.put(True)
+  t.join()

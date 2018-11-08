@@ -240,11 +240,14 @@ impl CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = {
       let builder = grpcio::ChannelBuilder::new(env.clone());
-      if let Some(root_ca_certs) = root_ca_certs {
+      if let Some(_root_ca_certs) = root_ca_certs {
+        panic!("Sorry, we dropped secure grpc support until we can either make openssl link properly, or switch to tower");
+      /*
         let creds = grpcio::ChannelCredentialsBuilder::new()
           .root_cert(root_ca_certs)
           .build();
         builder.secure_connect(address, creds)
+        */
       } else {
         builder.connect(address)
       }

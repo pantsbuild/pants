@@ -5,16 +5,18 @@ use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use futures::future::{self, join_all};
 use futures::Future;
+use glob_matching::GlobMatching;
 use hashing::{Digest, Fingerprint};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
+use pool::ResettablePool;
 use protobuf;
 use std::ffi::OsString;
 use std::fmt;
 use std::iter::Iterator;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use {File, PathStat, PosixFS, Store};
+use {File, PathGlobs, PathStat, PosixFS, Store};
 
 pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
@@ -291,6 +293,32 @@ impl Snapshot {
           out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
           store.record_directory(&out_dir, true)
         }).to_boxed()
+      }).to_boxed()
+  }
+
+  pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path>>(
+    store: Store,
+    fs_pool: Arc<ResettablePool>,
+    root_path: P,
+    path_globs: PathGlobs,
+  ) -> BoxFuture<Snapshot, String> {
+    // Note that we don't use a Graph here, and don't cache any intermediate steps, we just place
+    // the resultant Snapshot into the store and return it. This is important, because we're reading
+    // things from arbitrary filepaths which we don't want to cache in the graph, as we don't watch
+    // them for changes.
+    // We assume that this Snapshot is of an immutable piece of the filesystem.
+
+    let posix_fs = Arc::new(try_future!(PosixFS::new(root_path, fs_pool, &[])));
+
+    posix_fs
+      .expand(path_globs)
+      .map_err(|err| format!("Error expanding globs: {:?}", err))
+      .and_then(|path_stats| {
+        Snapshot::from_path_stats(
+          store.clone(),
+          &OneOffStoreFileByDigest::new(store, posix_fs),
+          path_stats,
+        )
       }).to_boxed()
   }
 }
