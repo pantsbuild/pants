@@ -10,8 +10,8 @@ from builtins import str
 
 from future.utils import text_type
 
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, FileContent, FilesContent,
-                             PathGlobs, Snapshot)
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, FileContent, FilesContent, PathGlobs,
+                             Snapshot)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult, ProcessExecutionFailure)
 from pants.engine.rules import RootRule, rule
@@ -152,7 +152,7 @@ class JavacCompileRequest(datatype([
 class JavacCompileResult(datatype([
   ('stdout', text_type),
   ('stderr', text_type),
-  ('directory_digest', DirectoryDigest),
+  ('directory_digest', Digest),
 ])): pass
 
 
@@ -310,7 +310,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
 
     self.assertEqual(
       execute_process_result.output_directory_digest,
-      DirectoryDigest(
+      Digest(
         fingerprint=text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         serialized_bytes_length=80,
       )

@@ -18,7 +18,7 @@ class ResolvedJar(object):
     :type coordinate: :class:`M2Coordinate`
     :param string cache_path: Path to the artifact in the ivy cache
     :param string pants_path: Path to the symlink for the artifact in the pants work directory.
-    :param DirectoryDigest directory_digest: DirectoryDigest of the artifact.
+    :param Digest directory_digest: Digest of the artifact.
     """
     self.coordinate = coordinate
     self.cache_path = cache_path

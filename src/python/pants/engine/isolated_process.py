@@ -8,7 +8,7 @@ import logging
 
 from future.utils import binary_type, text_type
 
-from pants.engine.fs import DirectoryDigest
+from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.util.objects import Exactly, TypeCheckError, datatype
@@ -21,7 +21,7 @@ _default_timeout_seconds = 15 * 60
 
 class ExecuteProcessRequest(datatype([
   ('argv', tuple),
-  ('input_files', DirectoryDigest),
+  ('input_files', Digest),
   ('description', text_type),
   ('env', tuple),
   ('output_files', tuple),
@@ -71,7 +71,7 @@ class ExecuteProcessRequest(datatype([
 
 class ExecuteProcessResult(datatype([('stdout', binary_type),
                                      ('stderr', binary_type),
-                                     ('output_directory_digest', DirectoryDigest)
+                                     ('output_directory_digest', Digest)
                                      ])):
   """Result of successfully executing a process.
 
@@ -81,7 +81,7 @@ class ExecuteProcessResult(datatype([('stdout', binary_type),
 class FallibleExecuteProcessResult(datatype([('stdout', binary_type),
                                              ('stderr', binary_type),
                                              ('exit_code', int),
-                                             ('output_directory_digest', DirectoryDigest)
+                                             ('output_directory_digest', Digest)
                                              ])):
   """Result of executing a process.
 

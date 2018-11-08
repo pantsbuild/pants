@@ -14,7 +14,7 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import addressable, addressable_dict
 from pants.engine.build_files import (ResolvedTypeMismatchError, addresses_from_address_families,
                                       create_graph_rules, parse_address_family)
-from pants.engine.fs import (DirectoryDigest, FileContent, FilesContent, Path, PathGlobs, Snapshot,
+from pants.engine.fs import (Digest, FileContent, FilesContent, Path, PathGlobs, Snapshot,
                              create_fs_rules)
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
@@ -33,8 +33,8 @@ class ParseAddressFamilyTest(unittest.TestCase):
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
     address_mapper = AddressMapper(JsonParser(TestTable()))
     af = run_rule(parse_address_family, address_mapper, Dir('/dev/null'), {
-        (Snapshot, PathGlobs): lambda _: Snapshot(DirectoryDigest('abc', 10), (File('/dev/null/BUILD'),)),
-        (FilesContent, DirectoryDigest): lambda _: FilesContent([FileContent('/dev/null/BUILD', b'')]),
+        (Snapshot, PathGlobs): lambda _: Snapshot(Digest('abc', 10), (File('/dev/null/BUILD'),)),
+        (FilesContent, Digest): lambda _: FilesContent([FileContent('/dev/null/BUILD', b'')]),
       })
     self.assertEqual(len(af.objects_by_name), 0)
 
@@ -46,7 +46,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
 
   def _snapshot(self):
     return Snapshot(
-      DirectoryDigest('xx', 2),
+      Digest('xx', 2),
       (Path('root/BUILD', File('root/BUILD')),))
 
   def _resolve_build_file_addresses(self, specs, address_family, snapshot, address_mapper):
@@ -58,7 +58,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
   def test_duplicated(self):
     """Test that matching the same Spec twice succeeds."""
     address = SingleAddress('a', 'a')
-    snapshot = Snapshot(DirectoryDigest('xx', 2),
+    snapshot = Snapshot(Digest('xx', 2),
                         (Path('a/BUILD', File('a/BUILD')),))
     address_family = AddressFamily('a', {'a': ('a/BUILD', 'this is an object!')})
     specs = Specs([address, address])
