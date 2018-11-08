@@ -66,7 +66,7 @@ python_contrib_shard="0/1"
 python_intg_shard="0/1"
 python_three="false"
 
-while getopts "h3fxbkmrjlpesu:ny:ci:tz" opt; do
+while getopts "h3fxbkmrjlpesu:ny:ci:tzw" opt; do
   case ${opt} in
     h) usage ;;
     3) python_three="true" ;;
