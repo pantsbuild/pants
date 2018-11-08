@@ -414,8 +414,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       )
-      scheduler = self.mk_scheduler(rules=create_fs_rules())
-      scheduler.materialize_directories((DirectoryToMaterialize(text_type(dir_path), digest),))
+      self.scheduler.materialize_directories((DirectoryToMaterialize(text_type(dir_path), digest),))
 
       created_file = os.path.join(dir_path, "roland")
       with open(created_file, 'r') as f:
@@ -471,9 +470,8 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     with temporary_dir() as temp_dir:
       with open(os.path.join(temp_dir, "roland"), "w") as f:
         f.write("European Burmese")
-      scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
-      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
+      snapshot = self.scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
       self.assert_snapshot_equals(snapshot, ["roland"], Digest(
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
@@ -482,45 +480,49 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
   pantsbuild_digest = Digest("63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f", 18)
 
   def test_download(self):
-    with http_server(StubHandler) as port:
-      url = UrlToFetch("http://localhost:{}/CNAME".format(port), self.pantsbuild_digest)
+    with self.isolated_local_store():
+      with http_server(StubHandler) as port:
+        url = UrlToFetch("http://localhost:{}/CNAME".format(port), self.pantsbuild_digest)
+        snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+        self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
+          text_type("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf"),
+          81
+        ))
+
+  def test_download_missing_file(self):
+    with self.isolated_local_store():
+      with http_server(StubHandler) as port:
+        url = UrlToFetch("http://localhost:{}/notfound".format(port), self.pantsbuild_digest)
+        with self.assertRaises(ExecutionError) as cm:
+          self.scheduler.product_request(Snapshot, subjects=[url])
+        self.assertIn('404', str(cm.exception))
+
+  def test_download_wrong_digest(self):
+    with self.isolated_local_store():
+      with http_server(StubHandler) as port:
+        url = UrlToFetch(
+          "http://localhost:{}/CNAME".format(port),
+          Digest(
+            self.pantsbuild_digest.fingerprint,
+            self.pantsbuild_digest.serialized_bytes_length + 1,
+          ),
+        )
+        with self.assertRaises(ExecutionError) as cm:
+          self.scheduler.product_request(Snapshot, subjects=[url])
+        self.assertIn('wrong digest', str(cm.exception).lower())
+
+  # It's a shame that this isn't hermetic, but setting up valid local HTTPS certificates is a pain.
+  def test_download_https(self):
+    with self.isolated_local_store():
+      url = UrlToFetch("https://www.pantsbuild.org/CNAME", Digest(
+        "63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f",
+        18,
+      ))
       snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
       self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
         text_type("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf"),
         81
       ))
-
-  def test_download_missing_file(self):
-    with http_server(StubHandler) as port:
-      url = UrlToFetch("http://localhost:{}/notfound".format(port), self.pantsbuild_digest)
-      with self.assertRaises(ExecutionError) as cm:
-        self.scheduler.product_request(Snapshot, subjects=[url])
-      self.assertIn('404', str(cm.exception))
-
-  def test_download_wrong_digest(self):
-    with http_server(StubHandler) as port:
-      url = UrlToFetch(
-        "http://localhost:{}/CNAME".format(port),
-        Digest(
-          self.pantsbuild_digest.fingerprint,
-          self.pantsbuild_digest.serialized_bytes_length + 1,
-        ),
-      )
-      with self.assertRaises(ExecutionError) as cm:
-        self.scheduler.product_request(Snapshot, subjects=[url])
-      self.assertIn('wrong digest', str(cm.exception).lower())
-
-  # It's a shame that this isn't hermetic, but setting up valid local HTTPS certificates is a pain.
-  def test_download_https(self):
-    url = UrlToFetch("https://www.pantsbuild.org/CNAME", Digest(
-      "63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f",
-      18,
-    ))
-    snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
-    self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
-      text_type("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf"),
-      81
-    ))
 
 
 class StubHandler(BaseHTTPRequestHandler):

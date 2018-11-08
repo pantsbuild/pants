@@ -58,18 +58,20 @@ class GraphTestBase(unittest.TestCase):
                    path_ignore_patterns=None):
 
     with temporary_dir() as work_dir:
-      path_ignore_patterns = path_ignore_patterns or []
-      build_config = build_configuration or self._default_build_config()
-      # TODO: This test should be swapped to using TestBase.
-      graph_helper = EngineInitializer.setup_legacy_graph_extended(
-        path_ignore_patterns,
-        work_dir,
-        build_file_imports_behavior,
-        build_configuration=build_config,
-        native=self._native,
-        include_trace_on_error=include_trace_on_error
-      )
-      yield graph_helper
+      with temporary_dir() as local_store_dir:
+        path_ignore_patterns = path_ignore_patterns or []
+        build_config = build_configuration or self._default_build_config()
+        # TODO: This test should be swapped to using TestBase.
+        graph_helper = EngineInitializer.setup_legacy_graph_extended(
+          path_ignore_patterns,
+          work_dir,
+          local_store_dir,
+          build_file_imports_behavior,
+          build_configuration=build_config,
+          native=self._native,
+          include_trace_on_error=include_trace_on_error
+        )
+        yield graph_helper
 
   @contextmanager
   def open_scheduler(self, specs, build_configuration=None):

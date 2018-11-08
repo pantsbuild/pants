@@ -119,6 +119,7 @@ impl Store {
     })
   }
 
+  // This default is also hard-coded into the Python options code in global_options.py
   pub fn default_path() -> PathBuf {
     match dirs::home_dir() {
       Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
