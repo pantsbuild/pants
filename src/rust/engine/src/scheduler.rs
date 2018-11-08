@@ -9,10 +9,8 @@ use std::time::Duration;
 
 use futures::future::{self, Future};
 
-use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
-use fs::{self, GlobMatching, PosixFS};
 use graph::{EntryId, Graph, Node, NodeContext};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use parking_lot::Mutex;
@@ -314,36 +312,6 @@ impl Scheduler {
       display.update(i.to_string(), "".to_string());
     }
     display.render();
-  }
-
-  pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path>>(
-    &self,
-    root_path: P,
-    path_globs: fs::PathGlobs,
-  ) -> BoxFuture<fs::Snapshot, String> {
-    // Note that we don't use a Graph here, and don't cache any intermediate steps, we just place
-    // the resultant Snapshot into the store and return it. This is important, because we're reading
-    // things from arbitrary filepaths which we don't want to cache in the graph, as we don't watch
-    // them for changes.
-    // We assume that this Snapshot is of an immutable piece of the filesystem.
-
-    let posix_fs = Arc::new(try_future!(PosixFS::new(
-      root_path,
-      self.core.fs_pool.clone(),
-      &[]
-    )));
-    let store = self.core.store();
-
-    posix_fs
-      .expand(path_globs)
-      .map_err(|err| format!("Error expanding globs: {:?}", err))
-      .and_then(|path_stats| {
-        fs::Snapshot::from_path_stats(
-          store.clone(),
-          &fs::OneOffStoreFileByDigest::new(store, posix_fs),
-          path_stats,
-        )
-      }).to_boxed()
   }
 }
 

@@ -129,6 +129,11 @@ class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest',
   """A request to materialize the contents of a directory digest at the provided path."""
   pass
 
+
+class UrlToFetch(datatype([('url', text_type), ('digest', Digest)])):
+  pass
+
+
 FilesContent = Collection.of(FileContent)
 
 
@@ -153,4 +158,5 @@ def create_fs_rules():
     RootRule(Digest),
     RootRule(MergedDirectories),
     RootRule(PathGlobs),
+    RootRule(UrlToFetch),
   ]
