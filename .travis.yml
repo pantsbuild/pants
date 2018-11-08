@@ -92,7 +92,7 @@ default_test_config: &default_test_config
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
 
-default_cron_test_congig:
+default_cron_test_config: &default_cron_test_config
   <<: *default_test_config
   stage: *cron
 
