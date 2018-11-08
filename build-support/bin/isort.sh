@@ -33,4 +33,4 @@ do
   esac
 done
 
-./pants -q --changed-parent=master fmt.isort -- ${isort_args[@]}
+./pants -q --changed-parent=master --exclude-target-regexp='testprojects/.*' fmt.isort -- ${isort_args[@]}
