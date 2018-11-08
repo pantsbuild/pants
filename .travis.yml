@@ -229,12 +229,12 @@ matrix:
     - <<: *default_test_config
       name: "Python 2 integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 0/2
+        - ./build-support/bin/travis-ci.sh -cw -i 0/2
 
     - <<: *default_test_config
       name: "Python 2 integration tests for pants - shard 2"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 1/2
+        - ./build-support/bin/travis-ci.sh -cw -i 1/2
 
     # Rust on linux
     - name: "Rust Tests Linux"
