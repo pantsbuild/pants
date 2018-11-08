@@ -23,7 +23,7 @@ pub struct Task {
 #[derive(Clone)]
 pub struct Tasks {
   // output product type -> Intrinsic providing it
-  intrinsics: HashMap<TypeConstraint, Intrinsic, FNV>,
+  intrinsics: HashMap<TypeConstraint, Vec<Intrinsic>, FNV>,
   // Singleton Values to be returned for a given TypeConstraint.
   singletons: HashMap<TypeConstraint, (Key, Value), FNV>,
   // output product type -> list of tasks providing it
@@ -79,7 +79,7 @@ impl Tasks {
     self.singletons.get(product)
   }
 
-  pub fn gen_intrinsic(&self, product: &TypeConstraint) -> Option<&Intrinsic> {
+  pub fn gen_intrinsic(&self, product: &TypeConstraint) -> Option<&Vec<Intrinsic>> {
     self.intrinsics.get(product)
   }
 
@@ -88,7 +88,7 @@ impl Tasks {
   }
 
   pub fn intrinsics_set(&mut self, types: &Types) {
-    self.intrinsics = vec![
+    let intrinsics = vec![
       Intrinsic {
         product: types.snapshot,
         input: types.path_globs,
@@ -105,9 +105,16 @@ impl Tasks {
         product: types.process_result,
         input: types.process_request,
       },
-    ].into_iter()
-    .map(|i| (i.product, i))
-    .collect();
+    ];
+
+    self.intrinsics = vec![].into_iter().collect();
+    for intrinsic in intrinsics {
+      self
+        .intrinsics
+        .entry(intrinsic.product)
+        .or_insert_with(Vec::new)
+        .push(intrinsic)
+    }
   }
 
   pub fn singleton_add(&mut self, value: Value, product: TypeConstraint) {
