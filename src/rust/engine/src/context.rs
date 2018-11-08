@@ -19,6 +19,7 @@ use handles::maybe_drop_handles;
 use log::debug;
 use nodes::{NodeKey, TryInto, WrappedNode};
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
+use reqwest;
 use resettable::Resettable;
 use rule_graph::RuleGraph;
 use tasks::Tasks;
@@ -38,6 +39,7 @@ pub struct Core {
   pub rule_graph: RuleGraph,
   pub types: Types,
   pub fs_pool: Arc<ResettablePool>,
+  pub http_client: reqwest::async::Client,
   pub runtime: Resettable<Arc<Runtime>>,
   store_and_command_runner: Resettable<(Store, BoundedCommandRunner)>,
   pub vfs: PosixFS,
@@ -140,6 +142,7 @@ impl Core {
       rule_graph: rule_graph,
       types: types,
       fs_pool: fs_pool.clone(),
+      http_client: reqwest::async::Client::new(),
       runtime: runtime,
       store_and_command_runner: store_and_command_runner,
       // TODO: Errors in initialization should definitely be exposed as python
