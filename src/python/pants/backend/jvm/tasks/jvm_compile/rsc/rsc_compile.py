@@ -410,20 +410,21 @@ class RscCompile(ZincCompile):
           # ---------------------------------------
           # If there are any un-metacp'd dependencies, metacp them so their indices can be passed to
           # Rsc.
-          # To work on
-          # - java dependencies jars
+
+          # Inputs
+          # - Java dependencies jars
           metacp_inputs = rel_java_paths
+
           # Dependencies
-          # - scalac deps
           # - 3rdparty jars
-          # - scala dependencies
+          # - non-java, ie scala, dependencies
           # - jdk
 
-          metacp_dependencies = list(jar_rsc_classpath_paths) + \
+          snapshotable_metacp_dependencies = list(jar_rsc_classpath_paths) + \
                                 list(non_java_paths) + \
-                                self._jvm_lib_jars_abs + \
                                 fast_relpath_collection(
                                   _paths_from_classpath(self._extra_compile_time_classpath))
+          metacp_dependencies = snapshotable_metacp_dependencies + self._jvm_lib_jars_abs
 
           if metacp_inputs:
             rsc_index_dir = fast_relpath(ctx.rsc_index_dir, get_buildroot())
@@ -441,7 +442,7 @@ class RscCompile(ZincCompile):
               args,
               distribution,
               tgt=tgt,
-              input_files=tuple(metacp_inputs + metacp_dependencies),
+              input_files=tuple(metacp_inputs + snapshotable_metacp_dependencies),
               output_dir=rsc_index_dir)
             metacp_stdout = stdout_contents(metacp_wu)
             metacp_result = json.loads(metacp_stdout)
