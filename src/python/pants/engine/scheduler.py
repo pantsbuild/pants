@@ -15,7 +15,7 @@ from types import GeneratorType
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.fs import (DirectoryDigest, DirectoryToMaterialize, FileContent, FilesContent,
+from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
                              MergedDirectories, Path, PathGlobs, PathGlobsAndRoot, Snapshot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
@@ -120,7 +120,7 @@ class Scheduler(object):
       work_dir=work_dir,
       ignore_patterns=project_tree.ignore_patterns,
       execution_options=execution_options,
-      construct_directory_digest=DirectoryDigest,
+      construct_directory_digest=Digest,
       construct_snapshot=Snapshot,
       construct_file_content=FileContent,
       construct_files_content=FilesContent,
@@ -131,7 +131,7 @@ class Scheduler(object):
       construct_process_result=FallibleExecuteProcessResult,
       constraint_address=constraint_for(Address),
       constraint_path_globs=constraint_for(PathGlobs),
-      constraint_directory_digest=constraint_for(DirectoryDigest),
+      constraint_directory_digest=constraint_for(Digest),
       constraint_snapshot=constraint_for(Snapshot),
       constraint_merge_snapshots_request=constraint_for(MergedDirectories),
       constraint_files_content=constraint_for(FilesContent),
@@ -345,7 +345,7 @@ class Scheduler(object):
     """Merges any number of directories.
 
     :param directory_digests: Tuple of DirectoryDigests.
-    :return: A DirectoryDigest.
+    :return: A Digest.
     """
     result = self._native.lib.merge_directories(
       self._scheduler,
@@ -384,7 +384,7 @@ class Scheduler(object):
 _PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
 
 
-_DirectoryDigests = Collection.of(DirectoryDigest)
+_DirectoryDigests = Collection.of(Digest)
 
 
 _DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)

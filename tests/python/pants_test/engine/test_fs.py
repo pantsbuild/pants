@@ -14,8 +14,8 @@ from contextlib import contextmanager
 from future.utils import text_type
 
 from pants.base.project_tree import Dir, Link
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize,
-                             FilesContent, MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot,
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize, FilesContent,
+                             MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot,
                              create_fs_rules)
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
@@ -277,7 +277,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
       snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
-      self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
+      self.assert_snapshot_equals(snapshot, ["roland"], Digest(
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
@@ -295,11 +295,11 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), text_type(temp_dir)),
       ))
       self.assertEqual(3, len(snapshots))
-      self.assert_snapshot_equals(snapshots[0], ["roland"], DirectoryDigest(
+      self.assert_snapshot_equals(snapshots[0], ["roland"], Digest(
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
-      self.assert_snapshot_equals(snapshots[1], ["susannah"], DirectoryDigest(
+      self.assert_snapshot_equals(snapshots[1], ["susannah"], Digest(
         text_type("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f"),
         82
       ))
@@ -375,13 +375,13 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       )
 
       empty_merged = self.scheduler.product_request(
-        DirectoryDigest,
+        Digest,
         [MergedDirectories((empty_snapshot.directory_digest,))],
       )[0]
       self.assertEqual(empty_snapshot.directory_digest, empty_merged)
 
       roland_merged = self.scheduler.product_request(
-        DirectoryDigest,
+        Digest,
         [MergedDirectories((roland_snapshot.directory_digest, empty_snapshot.directory_digest))],
       )[0]
       self.assertEqual(
@@ -390,7 +390,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       )
 
       both_merged = self.scheduler.product_request(
-        DirectoryDigest,
+        Digest,
         [MergedDirectories((roland_snapshot.directory_digest, susannah_snapshot.directory_digest))],
       )[0]
 
@@ -403,7 +403,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
 
     with temporary_dir() as temp_dir:
       dir_path = os.path.join(temp_dir, "containing_roland")
-      digest = DirectoryDigest(
+      digest = Digest(
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       )
@@ -467,7 +467,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
       snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
-      self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
+      self.assert_snapshot_equals(snapshot, ["roland"], Digest(
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
