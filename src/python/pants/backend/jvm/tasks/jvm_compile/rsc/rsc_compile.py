@@ -262,7 +262,7 @@ class RscCompile(ZincCompile):
 
     # Create a target for the jdk outlining so that it'll only be done once per run.
     target = Target('jdk', Address('', 'jdk'), self.context.build_graph)
-    index_dir = os.path.join(self.workdir, '--jdk--', 'index')
+    index_dir = os.path.join(self.versioned_workdir, '--jdk--', 'index')
 
     def work_for_vts_rsc_jdk():
       distribution = self._get_jvm_distribution()
