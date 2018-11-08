@@ -18,6 +18,14 @@ python_library(
 )
 
 python_library(
+  name = 'collections_backport',
+  sources = ['collections_backport.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ]
+)
+
+python_library(
   name = 'collections',
   sources = ['collections.py'],
   dependencies = [
