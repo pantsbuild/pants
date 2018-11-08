@@ -446,7 +446,8 @@ class RscCompile(ZincCompile):
             metacp_stdout = stdout_contents(metacp_wu)
             metacp_result = json.loads(metacp_stdout)
 
-            metacped_java_dependency_paths = self._collect_metai_classpath(metacp_result, rel_java_paths)
+            metacped_java_dependency_paths = self._collect_metai_classpath(metacp_result,
+              rel_java_paths)
 
             # Step 1.5: metai Index the semanticdbs
             # -------------------------------------
@@ -460,9 +461,10 @@ class RscCompile(ZincCompile):
           # ---------------------------------------------
           rsc_mjar_file = fast_relpath(ctx.rsc_mjar_file, get_buildroot())
 
+          # TODO remove non-rsc entries from non_java_rel in a better way
           rsc_semanticdb_classpath = metacped_java_dependency_paths + \
                                      metacped_jar_classpath_rel + \
-                                     [j for j in non_java_rel if 'compile/rsc/' in j] # TODO fix this in a better way
+                                     [j for j in non_java_rel if 'compile/rsc/' in j]
           target_sources = ctx.sources
           args = [
                    '-cp', os.pathsep.join(rsc_semanticdb_classpath),
@@ -476,7 +478,7 @@ class RscCompile(ZincCompile):
             tgt=tgt,
             # TODO pass the input files from the target snapshot instead of the below
             # input_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
-            input_files=target_sources + metacped_java_dependency_paths + metacped_jar_classpath_rel,
+            input_files=target_sources + rsc_semanticdb_classpath,
             output_dir=os.path.dirname(rsc_mjar_file))
 
         self._record_target_stats(tgt,
