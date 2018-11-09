@@ -726,7 +726,7 @@ impl DownloadedFile {
   ) -> BoxFuture<fs::Snapshot, String> {
     // TODO: Retry failures
     core
-      .http_client
+      .http_client()
       .get(url.clone())
       .send()
       .map_err(|err| format!("Error downloading file: {}", err))
