@@ -87,7 +87,6 @@ class CodeCoverage(Subsystem):
     # register options for coverage engines
     # TODO(jtrobec): get rid of these calls when engines are dependent subsystems
     Cobertura.register_junit_options(register, register_jvm_tool)
-    Jacoco.register_junit_options(register, register_jvm_tool)
 
   class InvalidCoverageEngine(Exception):
     """Indicates an invalid coverage engine type was selected."""

@@ -1,5 +1,1 @@
-java_library(
-  sources=[
-    'CoverageClassOne.java',
-  ],
-)
+java_library()

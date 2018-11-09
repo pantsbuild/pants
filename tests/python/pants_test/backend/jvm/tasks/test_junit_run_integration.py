@@ -135,10 +135,10 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
                                                          args=['--batch-size=2'])
 
   def test_junit_run_with_coverage_filters_targets_jacoco(self):
-    coverage_test_project = 'testprojects/tests/java/org/pantsbuild/testproject/coverage:all'
+    coverage_test_project = 'testprojects/tests/java/org/pantsbuild/testproject/coverage'
     html_path = ('test/junit/coverage/reports/html/'
                  'index.html')
-    filter_arg = '--test-junit-coverage-jacoco-target-filters=one'
+    filter_arg = '--jacoco-target-filters=one'
 
     with self.coverage(processor='jacoco',
                        xml_path='test/junit/coverage/reports/xml',
