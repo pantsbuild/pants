@@ -19,7 +19,7 @@ from pants.base.validation import assert_list
 from pants.build_graph.target import Target
 from pants.fs import archive as Archive
 from pants.source.wrapped_globs import FilesetWithSpec
-from pants.util.collections_backport import OrderedDict, namedtuple
+from collections import OrderedDict, namedtuple
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 

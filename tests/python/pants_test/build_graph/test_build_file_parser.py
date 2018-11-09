@@ -17,7 +17,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants_test.base_test import BaseTest
 
 

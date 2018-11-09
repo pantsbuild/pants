@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import inspect
 from abc import abstractmethod, abstractproperty
 
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.meta import AbstractClass
 
 

@@ -12,7 +12,7 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.manifest import Manifest
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.memo import memoized_property
 
 

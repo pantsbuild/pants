@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import cgi
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 import json
 import os
 import re

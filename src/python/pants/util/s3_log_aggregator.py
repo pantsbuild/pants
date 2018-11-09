@@ -10,7 +10,7 @@ from builtins import object, open
 
 from s3logparse.s3logparse import parse_log_lines
 
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 class Measure(object):

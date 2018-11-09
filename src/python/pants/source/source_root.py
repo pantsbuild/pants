@@ -9,7 +9,7 @@ from builtins import object, range
 
 from pants.base.project_tree_factory import get_project_tree
 from pants.subsystem.subsystem import Subsystem
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.memo import memoized_method, memoized_property
 
 

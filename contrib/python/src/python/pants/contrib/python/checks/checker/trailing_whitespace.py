@@ -8,7 +8,7 @@ import sys
 import tokenize
 from builtins import range
 
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 from pants.contrib.python.checks.checker.common import CheckstylePlugin
 

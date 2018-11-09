@@ -15,7 +15,7 @@ import uuid
 from builtins import open
 from contextlib import contextmanager
 
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.strutil import ensure_text
 
 

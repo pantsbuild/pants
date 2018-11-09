@@ -13,7 +13,6 @@ python_library(
   name = 'legacy_engine',
   sources = ['legacy_engine.py', 'round_engine.py', 'round_manager.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:exceptions',
@@ -27,7 +26,6 @@ python_library(
   name='addressable',
   sources=['addressable.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     ':objects',
     'src/python/pants/build_graph',
@@ -40,7 +38,6 @@ python_library(
   name='struct',
   sources=['struct.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     ':objects',
     'src/python/pants/util:objects',
@@ -67,7 +64,6 @@ python_library(
   name='build_files',
   sources=['build_files.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python:six',
     ':addressable',
@@ -89,7 +85,6 @@ python_library(
   name='mapper',
   sources=['mapper.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     ':objects',
     ':parser',
     'src/python/pants/build_graph',
@@ -126,7 +121,6 @@ python_library(
   name='objects',
   sources=['objects.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     'src/python/pants/util:meta',
   ]
 )
@@ -147,7 +141,6 @@ python_library(
   name='rules',
   sources=['rules.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':selectors',
@@ -171,7 +164,6 @@ python_library(
   name='scheduler',
   sources=['scheduler.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':fs',

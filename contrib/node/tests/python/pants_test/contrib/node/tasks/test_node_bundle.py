@@ -8,7 +8,7 @@ import os
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.goal.products import MultipleRootedProducts
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 from pants_test.task_test_base import TaskTestBase

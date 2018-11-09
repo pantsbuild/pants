@@ -17,7 +17,7 @@ from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.task.simple_codegen_task import SimpleCodegenTask
-from pants.util.collections_backport import defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from twitter.common.collections import OrderedSet

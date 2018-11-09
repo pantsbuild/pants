@@ -3,7 +3,6 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/util:collections_backport',
     'src/python/pants/option',
   ],
 )

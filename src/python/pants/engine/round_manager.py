@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import object
 
 from pants.goal.goal import Goal
-from pants.util.collections_backport import defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 
 
 class ProducerInfo(namedtuple('ProducerInfo', ['product_type', 'task_type', 'goal'])):

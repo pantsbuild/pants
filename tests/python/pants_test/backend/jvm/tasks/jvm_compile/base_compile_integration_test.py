@@ -8,7 +8,7 @@ import os
 from builtins import range
 from contextlib import contextmanager
 
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 

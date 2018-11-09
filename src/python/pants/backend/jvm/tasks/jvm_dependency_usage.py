@@ -19,7 +19,7 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.task.task import Task
-from pants.util.collections_backport import defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 from pants.util.fileutil import create_size_estimators
 
 

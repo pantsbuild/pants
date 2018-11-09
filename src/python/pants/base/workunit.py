@@ -10,7 +10,7 @@ import time
 import uuid
 from builtins import object, range
 
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_method
 from pants.util.rwbuf import FileBackedRWBuf

@@ -11,7 +11,7 @@ from difflib import SequenceMatcher
 from colors import strip_color
 from twitter.common.collections import OrderedSet
 
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 
 
 def normalize_classname(classname):

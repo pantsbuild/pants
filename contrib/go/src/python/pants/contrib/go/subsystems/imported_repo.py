@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 
 
 class ImportedRepo(namedtuple('_ImportedRepo', ['import_prefix', 'vcs', 'url'])):

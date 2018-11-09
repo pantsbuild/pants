@@ -24,7 +24,7 @@ from pants.build_graph.prep_command import PrepCommand
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.fs.archive import TGZ
-from pants.util.collections_backport import OrderedDict
+from collections import OrderedDict
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants_test.backend.python.interpreter_selection_utils import skip_unless_python36

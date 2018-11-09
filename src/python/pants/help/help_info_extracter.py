@@ -10,7 +10,7 @@ from future.types import newstr
 
 from pants.base import deprecated
 from pants.option.option_util import is_list_option
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',

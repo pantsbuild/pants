@@ -8,7 +8,7 @@ import os
 import shutil
 
 from pants.build_graph.address import Address
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.contextutil import temporary_dir
 from pants_test.task_test_base import TaskTestBase
 

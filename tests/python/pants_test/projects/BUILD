@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name="testprojects_integration",
   sources=['test_testprojects_integration.py'],
   dependencies=[
     '3rdparty/python:future',

@@ -8,7 +8,7 @@ import os
 from builtins import object, open, str, zip
 
 from pants.cache.artifact_cache import UnreadableArtifact
-from pants.util.collections_backport import defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 from pants.util.dirutil import safe_mkdir
 
 

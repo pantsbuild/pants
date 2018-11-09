@@ -10,7 +10,7 @@ from pants.base.specs import DescendantAddresses
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.task.task import Task
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 from pants.contrib.buildrefactor.buildozer_binary import BuildozerBinary
 

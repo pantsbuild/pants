@@ -13,7 +13,7 @@ from builtins import object, open, str
 
 from pants import version
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.util.collections_backport import OrderedDict
+from collections import OrderedDict
 from pants.util.dirutil import safe_mkdir_for
 
 

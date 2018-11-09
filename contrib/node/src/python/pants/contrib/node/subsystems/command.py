@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.process_handler import subprocess
 from pants.util.strutil import create_path_env_var
 

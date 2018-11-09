@@ -10,7 +10,7 @@ from builtins import filter
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.task.task import Task
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 class MutexTaskMixin(Task):

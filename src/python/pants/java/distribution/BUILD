@@ -4,7 +4,6 @@
 python_library(
   sources=[ 'distribution.py' ],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python:six',
     ':resources',

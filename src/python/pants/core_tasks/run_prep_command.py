@@ -10,7 +10,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.prep_command import PrepCommand
 from pants.task.task import Task
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.process_handler import subprocess
 
 

@@ -4,7 +4,6 @@
 
 python_library(
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/base:hash_utils',
     'src/python/pants/build_graph',

@@ -15,7 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.memo import memoized_property
 
 

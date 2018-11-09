@@ -8,7 +8,7 @@ import os
 from builtins import object
 
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 class SourceMapper(object):

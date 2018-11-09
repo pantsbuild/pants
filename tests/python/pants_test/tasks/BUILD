@@ -53,7 +53,6 @@ python_tests(
   name = 'execution_graph',
   sources = ['test_execution_graph.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     'src/python/pants/backend/jvm/tasks/jvm_compile:execution_graph',
     'tests/python/pants_test/testutils:py2_compat',
     ]

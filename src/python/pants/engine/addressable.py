@@ -12,7 +12,7 @@ from future.utils import string_types
 
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Resolvable, Serializable
-from pants.util.collections_backport import MutableMapping, MutableSequence
+from collections import MutableMapping, MutableSequence
 from pants.util.objects import Collection, TypeConstraintError
 
 

@@ -26,7 +26,7 @@ from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, Im
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 class Parser(object):

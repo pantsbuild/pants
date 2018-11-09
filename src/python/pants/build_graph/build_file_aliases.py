@@ -13,7 +13,7 @@ import six
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.target import Target
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.memo import memoized_property
 
 

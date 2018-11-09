@@ -34,7 +34,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_mkdir, safe_mkdtemp,
                                 safe_open, safe_rmtree)
 from pants.util.memo import memoized_method

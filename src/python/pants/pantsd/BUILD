@@ -29,7 +29,6 @@ python_library(
   name = 'watchman',
   sources = ['watchman.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:retry',
@@ -53,7 +52,6 @@ python_library(
   name = 'watchman_client',
   sources = ['watchman_client.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:pywatchman'
   ]
 )

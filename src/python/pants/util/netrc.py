@@ -9,7 +9,7 @@ from builtins import object
 from netrc import NetrcParseError
 from netrc import netrc as NetrcDb
 
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 class Netrc(object):

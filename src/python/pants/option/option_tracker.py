@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import object
 
 from pants.option.ranked_value import RankedValue
-from pants.util.collections_backport import defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 
 
 # TODO: Get rid of this? The parser should be able to lazily track.

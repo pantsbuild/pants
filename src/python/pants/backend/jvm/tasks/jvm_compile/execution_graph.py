@@ -12,7 +12,7 @@ from builtins import map, object, str
 from heapq import heappop, heappush
 
 from pants.base.worker_pool import Work
-from pants.util.collections_backport import defaultdict, deque
+from collections import defaultdict, deque
 
 
 class Job(object):

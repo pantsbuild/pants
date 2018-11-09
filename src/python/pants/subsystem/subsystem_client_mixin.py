@@ -10,7 +10,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.scope import ScopeInfo
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 
 
 class SubsystemClientError(Exception): pass

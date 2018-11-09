@@ -10,7 +10,7 @@ from builtins import object
 
 from twitter.common.collections import OrderedSet
 
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.dirutil import safe_walk
 from pants.util.objects import datatype
 from pants.util.xml_parser import XmlParser

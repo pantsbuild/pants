@@ -15,7 +15,7 @@ from mock import Mock, patch
 from pants.base.exceptions import ErrorWhileTesting
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants.util.process_handler import ProcessHandler, subprocess

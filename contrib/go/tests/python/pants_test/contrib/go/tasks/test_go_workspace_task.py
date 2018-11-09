@@ -9,7 +9,7 @@ import time
 from itertools import chain
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, touch
 from pants_test.task_test_base import TaskTestBase

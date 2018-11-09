@@ -12,7 +12,7 @@ from pants.option.parser import Parser
 from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import GLOBAL_SCOPE
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 class _FakeOptionValues(object):

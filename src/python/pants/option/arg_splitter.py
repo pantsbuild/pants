@@ -11,7 +11,7 @@ from builtins import object
 from twitter.common.collections import OrderedSet
 
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.meta import AbstractClass
 
 

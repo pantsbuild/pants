@@ -15,7 +15,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.source.source_root import SourceRootCategories
-from pants.util.collections_backport import defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 

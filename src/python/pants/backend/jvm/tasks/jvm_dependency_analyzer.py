@@ -16,7 +16,7 @@ from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.memo import memoized_method, memoized_property
 
 

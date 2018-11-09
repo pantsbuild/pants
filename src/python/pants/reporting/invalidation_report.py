@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import object
 
 from pants.build_graph.target import Target
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.dirutil import safe_open
 
 

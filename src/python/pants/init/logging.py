@@ -12,7 +12,7 @@ from logging import FileHandler, Formatter, StreamHandler
 
 from future.moves.http import client
 
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.dirutil import safe_mkdir
 
 

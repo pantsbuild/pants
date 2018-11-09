@@ -66,7 +66,6 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':structs',

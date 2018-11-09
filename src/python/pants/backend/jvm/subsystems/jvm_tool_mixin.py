@@ -10,7 +10,7 @@ from textwrap import dedent
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 
 
 class JvmToolMixin(object):

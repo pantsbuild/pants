@@ -8,7 +8,7 @@ import json
 
 from pants.base.specs import DescendantAddresses
 from pants.task.console_task import ConsoleTask
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 class ReverseDepmap(ConsoleTask):

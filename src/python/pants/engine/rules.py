@@ -16,7 +16,7 @@ from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
 from pants.engine.selectors import Get, type_or_constraint_repr
-from pants.util.collections_backport import OrderedDict
+from collections import OrderedDict
 from pants.util.meta import AbstractClass
 from pants.util.objects import Exactly, datatype
 

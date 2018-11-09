@@ -12,7 +12,7 @@ from builtins import str
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.dirutil import safe_file_dump, safe_mkdir
 from pants.util.retry import retry_on_exception
 

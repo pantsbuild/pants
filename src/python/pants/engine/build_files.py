@@ -24,7 +24,7 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
-from pants.util.collections_backport import MutableMapping, MutableSequence
+from collections import MutableMapping, MutableSequence
 from pants.util.objects import TypeConstraintError, datatype
 
 

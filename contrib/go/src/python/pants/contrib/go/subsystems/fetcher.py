@@ -8,7 +8,7 @@ import logging
 from abc import abstractmethod
 
 from pants.scm.git import Git
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.meta import AbstractClass
 
 from pants.contrib.go.subsystems.fetch_error import FetchError

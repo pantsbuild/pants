@@ -18,18 +18,9 @@ python_library(
 )
 
 python_library(
-  name = 'collections_backport',
-  sources = ['collections_backport.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
-)
-
-python_library(
   name = 'collections',
   sources = ['collections.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
   ]
 )
@@ -38,7 +29,6 @@ python_library(
   name = 'debug',
   sources = ['debug.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
   ],
 )
@@ -56,7 +46,6 @@ python_library(
   name = 'dirutil',
   sources = ['dirutil.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     ':strutil',
     '3rdparty/python:future',
   ],
@@ -107,7 +96,6 @@ python_library(
   name = 'netrc',
   sources = ['netrc.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
   ]
 )
@@ -116,7 +104,6 @@ python_library(
   name = 'objects',
   sources = ['objects.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
     ':memo',
@@ -163,7 +150,6 @@ python_library(
   name = 's3_log_aggregator',
   sources = ['s3_log_aggregator.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python:s3logparse'
   ]

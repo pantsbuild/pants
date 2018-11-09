@@ -75,7 +75,6 @@ python_tests(
   name='testrunner_task_mixin',
   sources=['test_testrunner_task_mixin.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/task',

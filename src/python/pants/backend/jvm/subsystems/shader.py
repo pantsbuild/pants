@@ -16,7 +16,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem, SubsystemError
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.contextutil import temporary_file
 
 

@@ -38,7 +38,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.memo import memoized_property
 
 

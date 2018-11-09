@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',

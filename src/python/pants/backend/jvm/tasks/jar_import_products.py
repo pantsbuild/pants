@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import object
 
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
-from pants.util.collections_backport import defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 
 
 class JarImportProducts(object):

@@ -14,7 +14,7 @@ from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method
 

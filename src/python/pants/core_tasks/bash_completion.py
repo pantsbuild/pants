@@ -15,7 +15,7 @@ from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.task.console_task import ConsoleTask
 from pants.task.task import TaskBase
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 class BashCompletion(ConsoleTask):

@@ -24,7 +24,7 @@ from pants.base.mustache import MustacheRenderer
 from pants.base.run_info import RunInfo
 from pants.pantsd.process_manager import ProcessManager
 from pants.stats.statsdb import StatsDBFactory
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 
 
 logger = logging.getLogger(__name__)

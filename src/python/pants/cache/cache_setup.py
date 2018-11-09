@@ -17,7 +17,7 @@ from pants.cache.pinger import BestUrlSelector, Pinger
 from pants.cache.resolver import NoopResolver, Resolver, RESTfulResolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.subsystem.subsystem import Subsystem
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.memo import memoized_property
 
 

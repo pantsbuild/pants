@@ -22,7 +22,7 @@ from pants.reporting.linkify import linkify
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.collections_backport import defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 from pants.util.dirutil import safe_mkdir
 
 

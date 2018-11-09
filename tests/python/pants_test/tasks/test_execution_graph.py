@@ -13,7 +13,7 @@ from future.utils import PY3
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job, JobExistsError,
                                                                  NoRootJobError, UnknownJobError)
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants_test.testutils.py2_compat import assertRegex
 
 

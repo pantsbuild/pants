@@ -19,7 +19,7 @@ from pants.engine.legacy.graph import TransitiveHydratedTargets, target_types_fr
 from pants.engine.legacy.source_mapper import EngineSourceMapper
 from pants.goal.workspace import ScmWorkspace
 from pants.scm.subsystems.changed import ChangedRequest
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 logger = logging.getLogger(__name__)

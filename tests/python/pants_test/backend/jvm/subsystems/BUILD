@@ -75,7 +75,6 @@ python_tests(
   name='jar_dependency_management_integration',
   sources=['test_jar_dependency_management_integration.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     'src/python/pants/fs',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',

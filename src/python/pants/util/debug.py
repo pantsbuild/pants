@@ -8,7 +8,7 @@ import os
 import threading
 from builtins import open
 
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 
 
 DEFAULT_LOG_PATH = '/tmp/pants_debug.log'

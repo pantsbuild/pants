@@ -15,7 +15,7 @@ from pants.build_graph.target_scopes import Scopes
 from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMixin,
                                                   SkipAndTransitiveOptionsRegistrar)
 from pants.util import desktop
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess

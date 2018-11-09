@@ -12,7 +12,6 @@ python_library(
   name='scrooge_gen',
   sources=['scrooge_gen.py'],
   dependencies=[
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     ':java_thrift_library_fingerprint_strategy',
     ':thrift_util',

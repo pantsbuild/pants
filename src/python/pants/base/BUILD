@@ -175,7 +175,6 @@ python_library(
   name = 'run_info',
   sources = ['run_info.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     ':build_environment',
     'src/python/pants/util:dirutil',
@@ -216,7 +215,6 @@ python_library(
   name = 'workunit',
   sources = ['workunit.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',

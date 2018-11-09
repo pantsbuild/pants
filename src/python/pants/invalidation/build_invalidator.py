@@ -14,7 +14,7 @@ from pants.base.hash_utils import hash_all
 from pants.build_graph.target import Target
 from pants.fs.fs import safe_filename
 from pants.subsystem.subsystem import Subsystem
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.dirutil import safe_mkdir
 from pants.util.meta import AbstractClass
 

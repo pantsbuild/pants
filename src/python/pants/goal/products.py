@@ -11,7 +11,7 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.util.collections import factory_dict
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.dirutil import fast_relpath
 
 

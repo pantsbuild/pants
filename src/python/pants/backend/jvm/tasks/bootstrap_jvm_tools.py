@@ -27,7 +27,7 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java import util
 from pants.java.executor import Executor
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
 

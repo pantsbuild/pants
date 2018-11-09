@@ -10,7 +10,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants.util.contextutil import pushd
 from pants.util.dirutil import absolute_symlink
 

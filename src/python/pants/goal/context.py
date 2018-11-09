@@ -22,7 +22,7 @@ from pants.goal.workspace import ScmWorkspace
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.reporting.report import Report
 from pants.source.source_root import SourceRootConfig
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 class Context(object):

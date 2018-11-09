@@ -16,7 +16,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
 from pants.backend.jvm.tasks.coverage.manager import CodeCoverageSettings
 from pants.java.jar.jar_dependency import JarDependency
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants_test.test_base import TestBase
 
 

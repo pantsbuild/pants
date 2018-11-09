@@ -13,7 +13,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 from pants_test.test_base import TestBase
 
 

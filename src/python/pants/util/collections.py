@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import next
 
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 def combined_dict(*dicts):

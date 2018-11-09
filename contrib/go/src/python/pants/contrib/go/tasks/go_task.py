@@ -10,7 +10,7 @@ from builtins import object, str
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.process_handler import subprocess
 from twitter.common.collections.orderedset import OrderedSet

@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import object
 
 from pants.reporting.report import Report
-from pants.util.collections_backport import namedtuple
+from collections import namedtuple
 
 
 class ReporterDestination(object):

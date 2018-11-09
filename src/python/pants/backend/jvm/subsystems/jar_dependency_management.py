@@ -17,7 +17,7 @@ from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
-from pants.util.collections_backport import defaultdict
+from collections import defaultdict
 
 
 logger = logging.getLogger(__name__)
