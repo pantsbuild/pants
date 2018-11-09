@@ -35,8 +35,8 @@ from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
 from pants.util.collections_backport import defaultdict
-from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_mkdir, safe_open,
-                                safe_rmtree)
+from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_mkdir, safe_mkdtemp,
+                                safe_open, safe_rmtree)
 from pants.util.memo import memoized_method
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
@@ -83,6 +83,7 @@ class TestBase(unittest.TestCase):
   """
 
   _scheduler = None
+  _local_store_dir = None
   _build_graph = None
   _address_mapper = None
 
@@ -341,6 +342,22 @@ class TestBase(unittest.TestCase):
       self._build_graph.reset()
       self._scheduler.invalidate_all_files()
 
+  @classmethod
+  def aggressively_reset_scheduler(cls):
+    cls._scheduler = None
+    if cls._local_store_dir is not None:
+      safe_rmtree(cls._local_store_dir)
+
+  @classmethod
+  @contextmanager
+  def isolated_local_store(cls):
+    cls.aggressively_reset_scheduler()
+    cls._init_engine()
+    try:
+      yield
+    finally:
+      cls.aggressively_reset_scheduler()
+
   @property
   def build_root(self):
     return self._build_root()
@@ -365,11 +382,15 @@ class TestBase(unittest.TestCase):
     if cls._scheduler is not None:
       return
 
+    cls._local_store_dir = os.path.realpath(safe_mkdtemp())
+    safe_mkdir(cls._local_store_dir)
+
     # NB: This uses the long form of initialization because it needs to directly specify
     # `cls.alias_groups` rather than having them be provided by bootstrap options.
     graph_session = EngineInitializer.setup_legacy_graph_extended(
       pants_ignore_patterns=None,
       workdir=cls._pants_workdir(),
+      local_store_dir=cls._local_store_dir,
       build_file_imports_behavior='allow',
       native=init_native(),
       build_configuration=cls.build_config(),

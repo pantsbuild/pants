@@ -16,6 +16,7 @@ use core::{Failure, TypeId};
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
 use handles::maybe_drop_handles;
+use log::debug;
 use nodes::{NodeKey, TryInto, WrappedNode};
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use resettable::Resettable;
@@ -51,6 +52,7 @@ impl Core {
     build_root: &Path,
     ignore_patterns: &[String],
     work_dir: PathBuf,
+    local_store_dir: PathBuf,
     remote_store_server: Option<String>,
     remote_execution_server: Option<String>,
     remote_instance_name: Option<String>,
@@ -88,13 +90,12 @@ impl Core {
 
     let fs_pool2 = fs_pool.clone();
     let store_and_command_runner = Resettable::new(move || {
-      let store_path = Store::default_path();
-
-      let store = safe_create_dir_all_ioerror(&store_path)
-        .map_err(|e| format!("Error making directory {:?}: {:?}", store_path, e))
+      let local_store_dir = local_store_dir.clone();
+      let store = safe_create_dir_all_ioerror(&local_store_dir)
+        .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
         .and_then(|()| match &remote_store_server {
           Some(ref address) => Store::with_remote(
-            store_path,
+            local_store_dir,
             fs_pool2.clone(),
             address,
             remote_instance_name.clone(),
@@ -104,7 +105,7 @@ impl Core {
             remote_store_chunk_bytes,
             remote_store_chunk_upload_timeout,
           ),
-          None => Store::local_only(store_path, fs_pool2.clone()),
+          None => Store::local_only(local_store_dir, fs_pool2.clone()),
         }).unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
       let underlying_command_runner: Box<CommandRunner> = match &remote_execution_server {

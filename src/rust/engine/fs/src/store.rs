@@ -1,12 +1,13 @@
 use FileContent;
 
 use bazel_protos;
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use dirs;
 use futures::{future, Future};
 use hashing::Digest;
 use protobuf::Message;
+use serde_derive::Serialize;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -119,6 +120,7 @@ impl Store {
     })
   }
 
+  // This default is also hard-coded into the Python options code in global_options.py
   pub fn default_path() -> PathBuf {
     match dirs::home_dir() {
       Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
@@ -633,6 +635,7 @@ mod local {
     self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
     RwTransaction, Transaction, WriteFlags,
   };
+  use log::{debug, error};
   use sha2::Sha256;
   use std;
   use std::collections::{BinaryHeap, HashMap};
@@ -846,10 +849,10 @@ mod local {
             time::UNIX_EPOCH + time::Duration::from_secs(lease_until_unix_timestamp);
 
           let expired_seconds_ago = time::SystemTime::now()
-              .duration_since(leased_until)
-              .map(|t| t.as_secs())
-              // 0 indicates unleased.
-              .unwrap_or(0);
+            .duration_since(leased_until)
+            .map(|t| t.as_secs())
+            // 0 indicates unleased.
+            .unwrap_or(0);
 
           fingerprints_by_expired_ago.push(AgedFingerprint {
             expired_seconds_ago: expired_seconds_ago,
@@ -1016,42 +1019,42 @@ mod local {
 
     fn make_env(dir: &Path) -> Result<Environment, String> {
       Environment::new()
-          // NO_SYNC
-          // =======
-          //
-          // Don't force fsync on every lmdb write transaction
-          //
-          // This significantly improves performance on slow or contended disks.
-          //
-          // On filesystems which preserve order of writes, on system crash this may lead to some
-          // transactions being rolled back. This is fine because this is just a write-once
-          // content-addressed cache. There is no risk of corruption, just compromised durability.
-          //
-          // On filesystems which don't preserve the order of writes, this may lead to lmdb
-          // corruption on system crash (but in no other circumstances, such as process crash).
-          //
-          // ------------------------------------------------------------------------------------
-          //
-          // NO_TLS
-          // ======
-          //
-          // Without this flag, each time a read transaction is started, it eats into our
-          // transaction limit (default: 126) until that thread dies.
-          //
-          // This flag makes transactions be removed from that limit when they are dropped, rather
-          // than when their thread dies. This is important, because we perform reads from a
-          // thread pool, so our threads never die. Without this flag, all read requests will fail
-          // after the first 126.
-          //
-          // The only down-side is that you need to make sure that any individual OS thread must
-          // not try to perform multiple write transactions concurrently. Fortunately, this
-          // property holds for us.
-          .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
-          // 2 DBs; one for file contents, one for leases.
-          .set_max_dbs(2)
-          .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
-          .open(dir)
-          .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))
+        // NO_SYNC
+        // =======
+        //
+        // Don't force fsync on every lmdb write transaction
+        //
+        // This significantly improves performance on slow or contended disks.
+        //
+        // On filesystems which preserve order of writes, on system crash this may lead to some
+        // transactions being rolled back. This is fine because this is just a write-once
+        // content-addressed cache. There is no risk of corruption, just compromised durability.
+        //
+        // On filesystems which don't preserve the order of writes, this may lead to lmdb
+        // corruption on system crash (but in no other circumstances, such as process crash).
+        //
+        // ------------------------------------------------------------------------------------
+        //
+        // NO_TLS
+        // ======
+        //
+        // Without this flag, each time a read transaction is started, it eats into our
+        // transaction limit (default: 126) until that thread dies.
+        //
+        // This flag makes transactions be removed from that limit when they are dropped, rather
+        // than when their thread dies. This is important, because we perform reads from a
+        // thread pool, so our threads never die. Without this flag, all read requests will fail
+        // after the first 126.
+        //
+        // The only down-side is that you need to make sure that any individual OS thread must
+        // not try to perform multiple write transactions concurrently. Fortunately, this
+        // property holds for us.
+        .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
+        // 2 DBs; one for file contents, one for leases.
+        .set_max_dbs(2)
+        .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
+        .open(dir)
+        .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))
     }
 
     // First Database is content, second is leases.

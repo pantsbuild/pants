@@ -12,6 +12,7 @@ use futures::future::{self, Future};
 use context::{Context, Core};
 use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
 use graph::{EntryId, Graph, Node, NodeContext};
+use log::debug;
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use parking_lot::Mutex;
 use rule_graph;
