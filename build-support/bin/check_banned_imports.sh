@@ -10,9 +10,9 @@ if [ -n "${bad_files}" ]; then
     exit 1
 fi
 
-bad_files="$(echo ${PYTHON_FILES} | xargs grep -l "^import collections\|^from collections import" | grep -v src/python/pants/util/collections_backport.py)"
+bad_files="$(echo ${PYTHON_FILES} | xargs grep -l "^import future.moves.collections\|^from future.moves.collections import\|^from future.moves import collections")"
 if [ -n "${bad_files}" ]; then
-    echo >&2 "Found forbidden imports. Instead of \`import collections\` you should use \`from pants.util import collections_backport\`. Bad files:"
+    echo >&2 "Found forbidden imports. \`future.moves.collections\` does not work as intended. Instead, you should use \`import collections\`. Bad files:"
     echo >&2 "${bad_files}"
     exit 1
 fi
