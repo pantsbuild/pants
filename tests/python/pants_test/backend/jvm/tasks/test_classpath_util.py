@@ -5,13 +5,13 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from collections import OrderedDict
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_products import ClasspathEntry, ClasspathProducts
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
-from collections import OrderedDict
 from pants_test.test_base import TestBase
 
 

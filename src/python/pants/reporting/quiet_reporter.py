@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
+from collections import namedtuple
 
 from colors import red
 from six import string_types
@@ -12,7 +13,6 @@ from six import string_types
 from pants.reporting.plaintext_reporter_base import PlainTextReporterBase
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter
-from collections import namedtuple
 
 
 class QuietReporter(PlainTextReporterBase):

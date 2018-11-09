@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import object
+from collections import defaultdict
 
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_util import is_list_option
@@ -12,7 +13,6 @@ from pants.option.parser import Parser
 from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import GLOBAL_SCOPE
-from collections import defaultdict
 
 
 class _FakeOptionValues(object):

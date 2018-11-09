@@ -8,6 +8,7 @@ import json
 import os
 import sys
 from builtins import next, object, open, str
+from collections import defaultdict, namedtuple
 
 from future.utils import PY3
 
@@ -19,7 +20,6 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.task.task import Task
-from collections import defaultdict, namedtuple
 from pants.util.fileutil import create_size_estimators
 
 

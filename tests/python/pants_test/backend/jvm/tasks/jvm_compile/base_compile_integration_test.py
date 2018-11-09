@@ -6,9 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import range
+from collections import defaultdict
 from contextlib import contextmanager
 
-from collections import defaultdict
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 

@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import str
+from collections import defaultdict
 
 from pex.pex import PEX
 
@@ -20,7 +21,6 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.binaries.executable_pex_tool import ExecutablePexTool
 from pants.subsystem.subsystem import Subsystem
-from collections import defaultdict
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf, datatype
 from pants.util.strutil import create_path_env_var

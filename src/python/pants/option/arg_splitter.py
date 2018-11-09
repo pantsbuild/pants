@@ -7,11 +7,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 from builtins import object
+from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-from collections import namedtuple
 from pants.util.meta import AbstractClass
 
 

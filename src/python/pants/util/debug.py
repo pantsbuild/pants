@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import threading
 from builtins import open
-
 from collections import namedtuple
 
 

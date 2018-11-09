@@ -9,6 +9,7 @@ import multiprocessing
 import os
 import time
 from builtins import object, open, str, zip
+from collections import defaultdict
 from types import GeneratorType
 
 from pants.base.exceptions import TaskError
@@ -23,7 +24,6 @@ from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Select, constraint_for
 from pants.rules.core.exceptions import GracefulTerminationException
-from collections import defaultdict
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.objects import Collection, datatype

@@ -6,12 +6,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import re
 from builtins import object
+from collections import namedtuple
 from difflib import SequenceMatcher
 
 from colors import strip_color
 from twitter.common.collections import OrderedSet
-
-from collections import namedtuple
 
 
 def normalize_classname(classname):

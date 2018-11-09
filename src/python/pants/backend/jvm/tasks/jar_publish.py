@@ -12,6 +12,7 @@ import pkgutil
 import shutil
 import sys
 from builtins import input, next, object, open, str
+from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
 from future.utils import PY3
@@ -35,7 +36,6 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.task.scm_publish_mixin import Namedver, ScmPublishMixin, Semver
 from pants.task.target_restriction_mixins import HasTransitiveOptionMixin, TransitiveOptionRegistrar
-from collections import OrderedDict, defaultdict, namedtuple
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 

@@ -8,13 +8,13 @@ import functools
 import json
 import os
 from builtins import object, open, str
+from collections import Iterable, Mapping
 from hashlib import sha1
 
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import stable_json_hash
 from pants.option.custom_types import (UnsetBool, dict_with_files_option, dir_option, file_option,
                                        target_option)
-from collections import Iterable, Mapping
 
 
 class Encoder(json.JSONEncoder):

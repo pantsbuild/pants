@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 from builtins import map, next, object
+from collections import defaultdict
 from textwrap import dedent
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -17,7 +18,6 @@ from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
-from collections import defaultdict
 
 
 logger = logging.getLogger(__name__)

@@ -8,6 +8,7 @@ import logging
 import os
 from abc import abstractmethod
 from builtins import zip
+from collections import OrderedDict
 
 from future.utils import text_type
 from twitter.common.collections import OrderedSet
@@ -20,7 +21,6 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.task.task import Task
-from collections import OrderedDict
 from pants.util.dirutil import safe_delete
 
 

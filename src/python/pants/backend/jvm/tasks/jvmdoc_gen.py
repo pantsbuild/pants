@@ -8,6 +8,7 @@ import contextlib
 import multiprocessing
 import os
 import re
+from collections import namedtuple
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
@@ -15,7 +16,6 @@ from pants.build_graph.target_scopes import Scopes
 from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMixin,
                                                   SkipAndTransitiveOptionsRegistrar)
 from pants.util import desktop
-from collections import namedtuple
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess

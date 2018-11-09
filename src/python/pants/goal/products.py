@@ -6,12 +6,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import object, str
+from collections import defaultdict
 
 import six
 from twitter.common.collections import OrderedSet
 
 from pants.util.collections import factory_dict
-from collections import defaultdict
 from pants.util.dirutil import fast_relpath
 
 

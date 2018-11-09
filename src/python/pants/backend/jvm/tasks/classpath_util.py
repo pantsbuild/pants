@@ -6,11 +6,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import filter, object
+from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
-from collections import OrderedDict
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.strutil import ensure_text

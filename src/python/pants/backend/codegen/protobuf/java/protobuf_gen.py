@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import open
+from collections import OrderedDict
 from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
@@ -21,7 +22,6 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
 from pants.task.simple_codegen_task import SimpleCodegenTask
-from collections import OrderedDict
 from pants.util.process_handler import subprocess
 
 

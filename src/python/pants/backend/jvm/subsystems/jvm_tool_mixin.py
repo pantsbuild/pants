@@ -5,12 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import object
+from collections import namedtuple
 from textwrap import dedent
 
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
-from collections import namedtuple
 
 
 class JvmToolMixin(object):

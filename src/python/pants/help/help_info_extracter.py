@@ -5,12 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import object, str
+from collections import namedtuple
 
 from future.types import newstr
 
 from pants.base import deprecated
 from pants.option.option_util import is_list_option
-from collections import namedtuple
 
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',

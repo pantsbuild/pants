@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 from builtins import open
+from collections import defaultdict
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.zinc import Zinc
@@ -15,7 +16,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
-from collections import defaultdict
 from pants.util.memo import memoized_property
 
 

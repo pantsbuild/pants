@@ -8,6 +8,7 @@ import logging
 import os
 import re
 from builtins import object
+from collections import namedtuple
 from contextlib import contextmanager
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
@@ -16,7 +17,6 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem, SubsystemError
-from collections import namedtuple
 from pants.util.contextutil import temporary_file
 
 

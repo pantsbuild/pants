@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import functools
 import logging
 from builtins import next
+from collections import MutableMapping, MutableSequence
 from os.path import dirname, join
 
 import six
@@ -24,7 +25,6 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
-from collections import MutableMapping, MutableSequence
 from pants.util.objects import TypeConstraintError, datatype
 
 

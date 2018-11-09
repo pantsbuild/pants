@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import next, object, open
+from collections import namedtuple
 from contextlib import contextmanager
 from unittest import TestCase
 from xml.etree.ElementTree import ParseError
@@ -15,7 +16,6 @@ from mock import Mock, patch
 from pants.base.exceptions import ErrorWhileTesting
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
-from collections import namedtuple
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants.util.process_handler import ProcessHandler, subprocess

@@ -8,10 +8,10 @@ import inspect
 import re
 import textwrap
 from builtins import object, range
+from collections import OrderedDict, namedtuple
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
-from collections import OrderedDict, namedtuple
 from pants.util.memo import memoized_method
 
 

@@ -13,6 +13,7 @@ import os
 import pkgutil
 import re
 from builtins import object, open, range, str, zip
+from collections import namedtuple
 from datetime import date, datetime
 from textwrap import dedent
 
@@ -24,7 +25,6 @@ from pants.base.mustache import MustacheRenderer
 from pants.base.run_info import RunInfo
 from pants.pantsd.process_manager import ProcessManager
 from pants.stats.statsdb import StatsDBFactory
-from collections import namedtuple
 
 
 logger = logging.getLogger(__name__)

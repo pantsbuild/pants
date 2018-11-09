@@ -10,13 +10,13 @@ import inspect
 import logging
 from abc import abstractproperty
 from builtins import bytes, str
+from collections import OrderedDict
 from types import GeneratorType
 
 from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
 from pants.engine.selectors import Get, type_or_constraint_repr
-from collections import OrderedDict
 from pants.util.meta import AbstractClass
 from pants.util.objects import Exactly, datatype
 

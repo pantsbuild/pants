@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import shutil
 from builtins import map, object, str
+from collections import defaultdict
 
 from pex.interpreter import PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
@@ -16,7 +17,6 @@ from pex.variables import Variables
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
-from collections import defaultdict
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 from pants.util.memo import memoized_property
 

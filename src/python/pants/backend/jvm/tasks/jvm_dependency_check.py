@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import filter, next
+from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
@@ -20,7 +21,6 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.task.task import Task
-from collections import defaultdict
 from pants.util.memo import memoized_property
 
 

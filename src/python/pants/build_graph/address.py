@@ -6,8 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import object
-
 from collections import namedtuple
+
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 

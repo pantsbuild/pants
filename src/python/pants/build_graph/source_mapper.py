@@ -6,9 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import object
+from collections import defaultdict
 
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
-from collections import defaultdict
 
 
 class SourceMapper(object):

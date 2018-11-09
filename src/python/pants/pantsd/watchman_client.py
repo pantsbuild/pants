@@ -4,9 +4,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import pywatchman
-
 from collections import deque
+
+import pywatchman
 
 
 # TODO(kwlzn): upstream this in pywatchman.

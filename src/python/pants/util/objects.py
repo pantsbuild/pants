@@ -7,11 +7,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import sys
 from abc import abstractmethod
 from builtins import object, zip
+from collections import OrderedDict, namedtuple
 
 from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
-from collections import OrderedDict, namedtuple
 from pants.util.memo import memoized, memoized_classproperty
 from pants.util.meta import AbstractClass
 

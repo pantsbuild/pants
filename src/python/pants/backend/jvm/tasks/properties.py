@@ -6,10 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import re
 from builtins import next, object, open, str
+from collections import OrderedDict
 
 import six
-
-from collections import OrderedDict
 
 
 class Properties(object):

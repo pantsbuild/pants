@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import object, range, zip
+from collections import Counter, deque
 from contextlib import contextmanager
 from multiprocessing.pool import ThreadPool
 
@@ -12,7 +13,6 @@ import requests
 from future.moves.urllib.parse import urlparse
 
 from pants.cache.artifact_cache import ArtifactCacheError
-from collections import Counter, deque
 from pants.util.contextutil import Timer
 from pants.util.memo import memoized_method
 

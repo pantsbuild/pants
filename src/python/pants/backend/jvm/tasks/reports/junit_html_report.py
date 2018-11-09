@@ -11,10 +11,10 @@ import os
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
 from builtins import map, next, object, open
+from collections import defaultdict
 from functools import total_ordering
 
 from pants.base.mustache import MustacheRenderer
-from collections import defaultdict
 from pants.util.dirutil import safe_mkdir_for, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass

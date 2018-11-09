@@ -6,10 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import object
+from collections import defaultdict
 from netrc import NetrcParseError
 from netrc import netrc as NetrcDb
-
-from collections import defaultdict
 
 
 class Netrc(object):

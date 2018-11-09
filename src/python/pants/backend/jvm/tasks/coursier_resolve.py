@@ -9,6 +9,7 @@ import itertools
 import json
 import os
 from builtins import open, str, zip
+from collections import defaultdict
 
 from future.moves.urllib import parse
 from future.utils import PY3
@@ -28,7 +29,6 @@ from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
-from collections import defaultdict
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants.util.fileutil import safe_hardlink_or_copy

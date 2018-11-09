@@ -9,10 +9,10 @@ import json
 import logging
 import os
 from builtins import str
+from collections import namedtuple
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from collections import namedtuple
 from pants.util.dirutil import safe_file_dump, safe_mkdir
 from pants.util.retry import retry_on_exception
 

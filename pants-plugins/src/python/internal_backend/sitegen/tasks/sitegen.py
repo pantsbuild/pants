@@ -5,12 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import cgi
-from collections import defaultdict
 import json
 import os
 import re
 import shutil
 from builtins import object, open, range
+from collections import defaultdict
 from datetime import datetime
 
 from pystache import Renderer

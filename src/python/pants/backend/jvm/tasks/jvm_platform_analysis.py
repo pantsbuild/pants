@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import re
 from builtins import filter, map, object, str
+from collections import defaultdict, namedtuple
 from hashlib import sha1
 
 from colors import red
@@ -17,7 +18,6 @@ from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.build_graph.build_graph import CycleException, sort_targets
 from pants.task.console_task import ConsoleTask
 from pants.task.task import Task
-from collections import defaultdict, namedtuple
 from pants.util.memo import memoized_property
 
 

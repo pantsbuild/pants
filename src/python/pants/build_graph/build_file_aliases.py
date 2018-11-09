@@ -7,13 +7,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import inspect
 from abc import abstractmethod
 from builtins import object
+from collections import defaultdict
 
 import six
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.target import Target
-from collections import defaultdict
 from pants.util.memo import memoized_property
 
 

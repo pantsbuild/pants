@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 import os
 from builtins import object, str
+from collections import defaultdict
 
 import six
 from twitter.common.collections import OrderedSet
@@ -38,7 +39,6 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
-from collections import defaultdict
 from pants.util.memo import memoized_property
 
 
