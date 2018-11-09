@@ -43,7 +43,7 @@ class Jacoco(CoverageEngine):
                               jacoco_jar(name='org.jacoco.cli')
                             ])
 
-      register('--target-filters', type=list,
+      register('--target-filters', type=list, default=[],
           help='Regex patterns passed to jacoco, specifying which targets should be '
               'included in reports. All targets matching any of the patterns will be '
               'included when generating reports. If no targets are specified, all '
