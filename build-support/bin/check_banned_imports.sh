@@ -10,8 +10,7 @@ if [ -n "${bad_files}" ]; then
     exit 1
 fi
 
-# bad_files="$(echo ${PYTHON_FILES} | grep -v "src/python/pants/util/collections_backport.py" | xargs grep -l "^import collections\|^from collections import")"
-bad_files="$(echo ${PYTHON_FILES} | xargs grep -l "^import collections\|^from collections import")"
+bad_files="$(echo ${PYTHON_FILES} | xargs grep -l "^import collections\|^from collections import" | grep -v src/python/pants/util/collections_backport.py)"
 if [ -n "${bad_files}" ]; then
     echo >&2 "Found forbidden imports. Instead of \`import collections\` you should use \`from pants.util import collections_backport\`. Bad files:"
     echo >&2 "${bad_files}"
