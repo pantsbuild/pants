@@ -195,7 +195,8 @@ class SubprocPool(object):
   @staticmethod
   def worker_init():
     # Exit quietly on sigint, otherwise we get {num_procs} keyboardinterrupt stacktraces spewn
-    signal.signal(signal.SIGINT, lambda *args: sys.exit())
+    # signal.signal(signal.SIGINT, lambda *args: sys.exit())
+    pass
 
   @classmethod
   def set_num_processes(cls, num_processes):
@@ -205,7 +206,8 @@ class SubprocPool(object):
   def foreground(cls):
     with cls._lock:
       if cls._pool is None:
-        cls._pool = multiprocessing.Pool(processes=cls._num_processes,
+        from multiprocessing.pool import ThreadPool
+        cls._pool = ThreadPool(processes=cls._num_processes,
                                          initializer=SubprocPool.worker_init)
       return cls._pool
 
