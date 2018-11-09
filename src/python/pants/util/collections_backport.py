@@ -9,10 +9,22 @@ from future.utils import PY2, PY3
 
 """Custom backport of collections, due to limitations with future.moves.
 
-In Python 3, multiple classes moved from collections to collections.abc, such as Iterable and Mapping. The backport future.moves.collections
-fails to support these values, so we must use our own custom interface.
+future.moves.collections doesn't actually work as we intended. In Python 3, abstract classes like Mapping and 
+MutableSequence were moved from collections to collections.abc. When we were using future.moves.collections,
+we expected to be able to import these values like Iterable.
 
-Refer to https://github.com/PythonCharmers/python-future/blob/master/src/future/moves/collections.py for the basis of this file.
+However, the way the source code 
+(https://github.com/PythonCharmers/python-future/blob/master/src/future/moves/collections.py) is written for
+future.moves.collections, it doesn't grab any of the values from collections.abc, so we were getting 
+AttributeError when trying to use future.moves.collections.Iterable.
+
+So, we created this proper backport that imports then reexports both collections and collections.abc regardless
+of the Python interpreter.
+
+Note that solution is technically Py2-first; the Py3-first solution would require creating a file collections_abc_backport.
+We can do this, but it seems more confusing to me to know when you can use stdlib collections vs needing our backport.
+
+Also note that although we only need to use our backport in ~5 files, we're using it everywhere for consistency.
 """
 
 from collections import *  # isort:skip  # noqa: F401,F403
