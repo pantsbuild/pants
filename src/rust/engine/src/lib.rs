@@ -251,6 +251,7 @@ pub extern "C" fn scheduler_create(
   type_bytes: TypeId,
   build_root_buf: Buffer,
   work_dir_buf: Buffer,
+  local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
   remote_store_server: Buffer,
@@ -332,6 +333,7 @@ pub extern "C" fn scheduler_create(
     build_root_buf.to_os_string().as_ref(),
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
+    PathBuf::from(local_store_dir_buf.to_os_string()),
     if remote_store_server_string.is_empty() {
       None
     } else {

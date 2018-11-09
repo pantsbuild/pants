@@ -277,6 +277,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              advanced=True,
              help='Whether to allow import statements in BUILD files')
 
+    register('--local-store-dir', advanced=True,
+             help="Directory to use for engine's local file store.",
+             # This default is also hard-coded into the engine's rust code in
+             # fs::Store::default_path
+             default=os.path.expanduser('~/.cache/pants/lmdb_store'))
     register('--remote-store-server', advanced=True,
              help='host:port of grpc server to use as remote execution file store.')
     register('--remote-store-thread-count', type=int, advanced=True,

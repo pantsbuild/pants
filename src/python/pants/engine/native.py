@@ -202,6 +202,7 @@ Scheduler* scheduler_create(Tasks*,
                             TypeId,
                             Buffer,
                             Buffer,
+                            Buffer,
                             BufferBuffer,
                             TypeIdBuffer,
                             Buffer,
@@ -802,6 +803,7 @@ class Native(object):
                     root_subject_types,
                     build_root,
                     work_dir,
+                    local_store_dir,
                     ignore_patterns,
                     execution_options,
                     construct_directory_digest,
@@ -865,6 +867,7 @@ class Native(object):
         # Project tree.
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(work_dir),
+        self.context.utf8_buf(local_store_dir),
         self.context.utf8_buf_buf(ignore_patterns),
         self.to_ids_buf(root_subject_types),
         # Remote execution config.
