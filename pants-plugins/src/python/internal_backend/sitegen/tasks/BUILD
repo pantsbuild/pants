@@ -16,6 +16,7 @@ python_library(
     'pants-plugins/3rdparty/python:beautifulsoup4',
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
-    'src/python/pants/backend/docgen/tasks'
+    'src/python/pants/backend/docgen/tasks',
+    'src/python/pants/util:collections_backport'
   ]
 )

@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import object, str
-from collections import defaultdict, namedtuple
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
@@ -16,6 +15,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.source.source_root import SourceRootCategories
+from pants.util.collections_backport import defaultdict, namedtuple
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 

@@ -11,10 +11,10 @@ import re
 import textwrap
 import tokenize
 from builtins import object, open
-from collections import Sequence
 from io import StringIO
 
 import six
+from pants.util.collections_backport import Sequence
 
 
 __all__ = (

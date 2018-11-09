@@ -20,6 +20,7 @@ python_tests(
   name='node_bundle',
   sources=['test_node_bundle.py'],
   dependencies=[
+    'src/python/pants/util:collections_backport',
     'contrib/node/src/python/pants/contrib/node/targets:node_bundle',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/tasks:node_bundle',

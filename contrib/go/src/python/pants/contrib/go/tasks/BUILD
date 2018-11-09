@@ -4,6 +4,7 @@
 python_library(
   sources=globs('*.py'),  # Need explicit sources, because `go_test.py` won't match the default.
   dependencies=[
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:ansicolors',

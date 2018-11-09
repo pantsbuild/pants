@@ -6,9 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 from abc import abstractmethod
-from collections import namedtuple
 
 from pants.scm.git import Git
+from pants.util.collections_backport import namedtuple
 from pants.util.meta import AbstractClass
 
 from pants.contrib.go.subsystems.fetch_error import FetchError

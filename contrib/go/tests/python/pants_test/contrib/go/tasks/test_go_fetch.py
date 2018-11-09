@@ -6,9 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import shutil
-from collections import defaultdict
 
 from pants.build_graph.address import Address
+from pants.util.collections_backport import defaultdict
 from pants.util.contextutil import temporary_dir
 from pants_test.task_test_base import TaskTestBase
 

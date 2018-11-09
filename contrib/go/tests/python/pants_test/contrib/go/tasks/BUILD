@@ -4,6 +4,7 @@
 python_tests(
   sources = globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
+    'src/python/pants/util:collections_backport',
     '3rdparty/python:future',
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets',

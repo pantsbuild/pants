@@ -26,6 +26,7 @@ python_library(
   name='node_build',
   sources=['node_build.py'],
   dependencies=[
+    'src/python/pants/util:collections_backport',
     ':node_paths',
     ':node_task',
     'src/python/pants/base:workunit',
