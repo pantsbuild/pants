@@ -27,10 +27,8 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-#[macro_use]
 extern crate boxfuture;
 extern crate bytes;
-#[macro_use(value_t)]
 extern crate clap;
 extern crate env_logger;
 extern crate fs;
@@ -39,18 +37,18 @@ extern crate hashing;
 extern crate parking_lot;
 extern crate protobuf;
 extern crate serde;
-#[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
 
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
-use clap::{App, Arg, SubCommand};
+use clap::{value_t, App, Arg, SubCommand};
 use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, UploadSummary};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use protobuf::Message;
+use serde_derive::Serialize;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;

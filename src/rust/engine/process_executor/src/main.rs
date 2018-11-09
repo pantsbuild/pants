@@ -22,7 +22,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-#[macro_use]
 extern crate clap;
 extern crate env_logger;
 extern crate fs;
@@ -30,7 +29,7 @@ extern crate futures;
 extern crate hashing;
 extern crate process_execution;
 
-use clap::{App, AppSettings, Arg};
+use clap::{value_t, App, AppSettings, Arg};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use std::collections::{BTreeMap, BTreeSet};

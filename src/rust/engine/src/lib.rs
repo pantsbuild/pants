@@ -47,9 +47,7 @@ mod selectors;
 mod tasks;
 mod types;
 
-#[macro_use]
 extern crate boxfuture;
-#[macro_use]
 extern crate enum_primitive;
 extern crate fnv;
 extern crate fs;
@@ -57,15 +55,12 @@ extern crate futures;
 extern crate graph;
 extern crate hashing;
 extern crate itertools;
-#[macro_use]
 extern crate lazy_static;
-#[macro_use]
 extern crate log;
 extern crate parking_lot;
 extern crate process_execution;
 extern crate reqwest;
 extern crate resettable;
-#[macro_use]
 extern crate smallvec;
 extern crate tempfile;
 extern crate tokio;
@@ -93,6 +88,7 @@ use externs::{
 use futures::Future;
 use handles::Handle;
 use hashing::Digest;
+use log::error;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;

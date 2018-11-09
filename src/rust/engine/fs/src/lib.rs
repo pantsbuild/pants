@@ -42,7 +42,6 @@ mod pool;
 pub use pool::ResettablePool;
 
 extern crate bazel_protos;
-#[macro_use]
 extern crate boxfuture;
 extern crate byteorder;
 extern crate bytes;
@@ -56,22 +55,19 @@ extern crate hashing;
 extern crate ignore;
 extern crate indexmap;
 extern crate itertools;
-#[macro_use]
 extern crate lazy_static;
 extern crate lmdb;
-#[macro_use]
 extern crate log;
 #[cfg(test)]
 extern crate mock;
 extern crate parking_lot;
 extern crate protobuf;
 extern crate serde;
+extern crate serde_derive;
 extern crate sha2;
 extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;
-#[macro_use]
-extern crate serde_derive;
 extern crate uuid;
 #[cfg(test)]
 extern crate walkdir;
@@ -83,12 +79,12 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
 
+use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::future::{self, Future};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
-
-use boxfuture::{BoxFuture, Boxable};
+use lazy_static::lazy_static;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
