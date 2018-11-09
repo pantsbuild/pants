@@ -5,10 +5,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from collections import defaultdict
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.goal.products import MultipleRootedProducts
-from collections import defaultdict
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 from pants_test.task_test_base import TaskTestBase
