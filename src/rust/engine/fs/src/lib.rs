@@ -541,6 +541,7 @@ pub struct GlobWithSource {
 ///
 /// All Stats consumed or return by this type are relative to the root.
 ///
+#[derive(Clone)]
 pub struct PosixFS {
   root: Dir,
   pool: Arc<ResettablePool>,
@@ -582,8 +583,8 @@ impl PosixFS {
     })
   }
 
-  fn scandir_sync(root: &Path, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
-    let dir_abs = root.join(&dir_relative_to_root.0);
+  fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
+    let dir_abs = self.root.0.join(&dir_relative_to_root.0);
     let mut stats: Vec<Stat> = dir_abs
       .read_dir()?
       .map(|readdir| {
@@ -595,6 +596,14 @@ impl PosixFS {
           &dir_abs,
           get_metadata,
         )
+      }).filter(|s| match s {
+        Ok(ref s) =>
+        // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
+        // git-style ignore patterns, we need to know whether a path represents a directory.
+        {
+          !self.ignore.is_ignored(s)
+        }
+        Err(_) => true,
       }).collect::<Result<Vec<_>, io::Error>>()?;
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(stats)
@@ -710,10 +719,10 @@ impl PosixFS {
 
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<DirectoryListing, io::Error> {
     let dir = dir.to_owned();
-    let root = self.root.0.clone();
+    let fs: PosixFS = self.clone();
     self
       .pool
-      .spawn_fn(move || PosixFS::scandir_sync(&root, &dir))
+      .spawn_fn(move || fs.scandir_sync(&dir))
       .map(DirectoryListing)
       .to_boxed()
   }

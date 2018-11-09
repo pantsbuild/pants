@@ -277,14 +277,10 @@ class Scheduler(object):
     filenames = set(direct_filenames)
     filenames.update(os.path.dirname(f) for f in direct_filenames)
     filenames_buf = self._native.context.utf8_buf_buf(filenames)
-    invalidated = self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
-    logger.info('invalidated %d nodes for: %s', invalidated, filenames)
-    return invalidated
+    return self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
 
   def invalidate_all_files(self):
-    invalidated =  self._native.lib.graph_invalidate_all_paths(self._scheduler)
-    logger.info('invalidated all %d nodes', invalidated)
-    return invalidated
+    return self._native.lib.graph_invalidate_all_paths(self._scheduler)
 
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)
