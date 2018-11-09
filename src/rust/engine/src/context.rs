@@ -16,6 +16,7 @@ use core::{Failure, TypeId};
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
 use handles::maybe_drop_handles;
+use log::debug;
 use nodes::{NodeKey, TryInto, WrappedNode};
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use resettable::Resettable;

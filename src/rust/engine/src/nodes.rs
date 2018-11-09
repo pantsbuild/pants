@@ -12,7 +12,7 @@ use reqwest;
 use tempfile;
 use url::Url;
 
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{try_future, BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Params, TypeConstraint, Value};
 use externs;

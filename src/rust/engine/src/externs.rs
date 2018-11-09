@@ -9,9 +9,13 @@ use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::string::FromUtf8Error;
 
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
-use enum_primitive::FromPrimitive;
+// enum_primitive is sadly un-hygienic :(
+use enum_primitive::{
+  enum_from_primitive, enum_from_primitive_impl, enum_from_primitive_impl_ty, FromPrimitive,
+};
 use handles::{DroppingHandle, Handle};
 use interning::Interns;
+use lazy_static::lazy_static;
 use log;
 use parking_lot::RwLock;
 

@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use bazel_protos;
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{try_future, BoxFuture, Boxable};
 use futures::future::{self, join_all};
 use futures::Future;
 use glob_matching::GlobMatching;
