@@ -112,11 +112,9 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
                 .map(|file_name| symbolic_path.join(file_name))
                 .map(|symbolic_stat_path| (symbolic_stat_path, stat))
             }).map(|(stat_symbolic_path, stat)| {
-              // Canonicalize matched PathStats, and filter paths that are ignored by either the
-              // context, or by local excludes. Note that we apply context ignore patterns to both
-              // the symbolic and canonical names of Links, but only apply local excludes to their
-              // symbolic names.
-              if context.is_ignored(&stat) || exclude.is_ignored(&stat) {
+              // Canonicalize matched PathStats, and filter paths that are ignored by local excludes.
+              // Context ("global") ignore patterns are applied during `scandir`.
+              if exclude.is_ignored(&stat) {
                 future::ok(None).to_boxed()
               } else {
                 match stat {
