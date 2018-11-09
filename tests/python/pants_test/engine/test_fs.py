@@ -524,6 +524,24 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         81
       ))
 
+  def test_caches_downloads(self):
+    with self.isolated_local_store():
+      with http_server(StubHandler) as port:
+        self.prime_store_with_roland_digest()
+
+        # This would error if we hit the HTTP server, because 404,
+        # but we're not going to hit the HTTP server because it's cached,
+        # so we shouldn't see an error...
+        url = UrlToFetch(
+          "http://localhost:{}/roland".format(port),
+          Digest('693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d', 16),
+        )
+        snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+        self.assert_snapshot_equals(snapshot, ["roland"], Digest(
+          text_type("9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819"),
+          82
+        ))
+
 
 class StubHandler(BaseHTTPRequestHandler):
   response_text = b"www.pantsbuild.org"

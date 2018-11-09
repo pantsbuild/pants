@@ -659,67 +659,99 @@ impl From<Snapshot> for NodeKey {
   }
 }
 
-// TODO: Check the store for the digest before downloading
-// TODO: Retry failures
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct DownloadedFile(Key);
 
-impl WrappedNode for DownloadedFile {
-  type Item = Arc<fs::Snapshot>;
-
-  fn run(self, context: Context) -> NodeFuture<Arc<fs::Snapshot>> {
-    let value = externs::val_for(&self.0);
-    let url_to_fetch = externs::project_str(&value, "url");
-
-    // Parse URL, get file
-    let url = try_future!(
-      Url::parse(&url_to_fetch).map_err(|err| throw(&format!("Error parsing URL: {}", err)))
-    );
-
+impl DownloadedFile {
+  fn load_or_download(
+    &self,
+    core: Arc<Core>,
+    url: Url,
+    digest: hashing::Digest,
+  ) -> BoxFuture<fs::Snapshot, String> {
     let file_name = try_future!(
       url
         .path_segments()
         .and_then(|ps| ps.last())
         .map(|f| f.to_owned())
-        .ok_or_else(|| throw(&format!(
-          "Error getting the file name from the parsed URL: {}",
-          url_to_fetch
-        )))
+        .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url))
     );
 
-    let expected_digest = try_future!(
-      lift_digest(&externs::project_ignoring_type(&value, "digest")).map_err(|str| throw(&str))
-    );
+    core
+      .store()
+      .load_file_bytes_with(digest, |_| ())
+      .and_then(move |maybe_bytes| match maybe_bytes {
+        Some(_) => {
+          DownloadedFile::snapshot_of_one_file(core.store(), PathBuf::from(file_name), digest)
+        }
+        None => DownloadedFile::download(&core, &url, file_name, digest),
+      }).to_boxed()
+  }
 
+  fn snapshot_of_one_file(
+    store: fs::Store,
+    name: PathBuf,
+    digest: hashing::Digest,
+  ) -> BoxFuture<fs::Snapshot, String> {
+    #[derive(Clone)]
+    struct Digester {
+      digest: hashing::Digest,
+    }
+
+    impl StoreFileByDigest<String> for Digester {
+      fn store_by_digest(&self, _: File) -> BoxFuture<hashing::Digest, String> {
+        future::ok(self.digest).to_boxed()
+      }
+    }
+
+    fs::Snapshot::from_path_stats(
+      store,
+      &Digester { digest },
+      vec![fs::PathStat::File {
+        path: name.clone(),
+        stat: fs::File {
+          path: name,
+          is_executable: true,
+        },
+      }],
+    )
+  }
+
+  fn download(
+    core: &Arc<Core>,
+    url: &Url,
+    file_name: String,
+    expected_digest: hashing::Digest,
+  ) -> BoxFuture<fs::Snapshot, String> {
     let tempdir = try_future!(
       tempfile::TempDir::new()
-        .map_err(|err| throw(&format!("Error making tempdir to download file: {}", err)))
+        .map_err(|err| format!("Error making tempdir to download file: {}", err))
     );
 
-    // Download the file
+    // TODO: Retry failures
     // TODO: Share a client which is pre-configured.
     // TODO: Async
     let actual_digest = try_future!(
       reqwest::Client::new()
-        .get(url)
+        .get(url.clone())
         .send()
-        .map_err(|err| throw(&format!("Error downloading file: {}", err)))
+        .map_err(|err| format!("Error downloading file: {}", err))
         .and_then(|response| {
           // Handle common HTTP errors.
           if response.status().is_server_error() {
-            Err(throw(&format!(
+            Err(format!(
               "Server error ({}) downloading file {} from {}",
               response.status().as_str(),
               file_name,
-              url_to_fetch,
-            )))
+              url,
+            ))
           } else if response.status().is_client_error() {
-            Err(throw(&format!(
+            Err(format!(
               "Client error ({}) downloading file {} from {}",
               response.status().as_str(),
               file_name,
-              url_to_fetch,
-            )))
+              url,
+            ))
           } else {
             Ok(response)
           }
@@ -739,25 +771,20 @@ impl WrappedNode for DownloadedFile {
               let mut hasher = hashing::WriterHasher::new(file);
               std::io::copy(&mut response, &mut hasher)?;
               Ok(hasher)
-            }).map_err(|err| {
-              throw(&format!(
-                "Error copying the downloaded file to disk: {}",
-                err
-              ))
-            })
+            }).map_err(|err| format!("Error copying the downloaded file to disk: {}", err))
         })
     ).finish();
 
     if expected_digest != actual_digest {
-      return future::err(throw(&format!(
+      return future::err(format!(
         "Wrong digest for downloaded file: want {:?} got {:?}",
         expected_digest, actual_digest
-      ))).to_boxed();
+      )).to_boxed();
     }
 
     fs::Snapshot::capture_snapshot_from_arbitrary_root(
-      context.core.store(),
-      context.core.fs_pool.clone(),
+      core.store(),
+      core.fs_pool.clone(),
       tempdir.path(),
       fs::PathGlobs::create(
         &[file_name],
@@ -770,9 +797,31 @@ impl WrappedNode for DownloadedFile {
       // Ensure tempdir lives until the snapshot is finished
       std::mem::drop(tempdir);
       snapshot
-    }).map(Arc::new)
-    .map_err(|err| throw(&err))
-    .to_boxed()
+    }).to_boxed()
+  }
+}
+
+impl WrappedNode for DownloadedFile {
+  type Item = Arc<fs::Snapshot>;
+
+  fn run(self, context: Context) -> NodeFuture<Arc<fs::Snapshot>> {
+    let value = externs::val_for(&self.0);
+    let url_to_fetch = externs::project_str(&value, "url");
+
+    let url = try_future!(
+      Url::parse(&url_to_fetch)
+        .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_to_fetch, err)))
+    );
+
+    let expected_digest = try_future!(
+      lift_digest(&externs::project_ignoring_type(&value, "digest")).map_err(|str| throw(&str))
+    );
+
+    self
+      .load_or_download(context.core.clone(), url, expected_digest)
+      .map(Arc::new)
+      .map_err(|err| throw(&err))
+      .to_boxed()
   }
 }
 

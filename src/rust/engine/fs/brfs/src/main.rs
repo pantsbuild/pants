@@ -48,7 +48,7 @@ extern crate time;
 
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use parking_lot::Mutex;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
