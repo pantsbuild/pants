@@ -721,9 +721,16 @@ class RscCompile(ZincCompile):
         cmd.extend([main])
         cmd.extend(args)
 
-        input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
-        input_files = self.context._scheduler.merge_directories((
-          input_snapshot.directory_digest, input_digest)) if input_snapshot else input_digest
+        if pathglobs:
+          # dont capture snapshot, if pathglobs is empty
+          input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
+
+        if input_snapshot and input_digest:
+          input_files = self.context._scheduler.merge_directories(
+              (input_snapshot.directory_digest, input_digest))
+        else:
+          input_files = input_digest or input_snapshot.directory_digest
+
         epr = ExecuteProcessRequest(
           argv=tuple(cmd),
           input_files=input_files,
