@@ -19,7 +19,7 @@ from pants.base.specs import SingleAddress, Spec, Specs
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
-from pants.engine.fs import DirectoryDigest, FilesContent, PathGlobs, Snapshot
+from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
@@ -50,7 +50,7 @@ def parse_address_family(address_mapper, directory):
   path_globs = PathGlobs(include=patterns,
                          exclude=address_mapper.build_ignore_patterns)
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
-  files_content = yield Get(FilesContent, DirectoryDigest, snapshot.directory_digest)
+  files_content = yield Get(FilesContent, Digest, snapshot.directory_digest)
 
   if not files_content:
     raise ResolveError('Directory "{}" does not contain any BUILD files.'.format(directory.path))

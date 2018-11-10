@@ -1,14 +1,18 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future::{self, Future};
+use reqwest;
+use tempfile;
+use url::Url;
 
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{try_future, BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Params, TypeConstraint, Value};
 use externs;
@@ -178,57 +182,69 @@ impl Select {
     }
 
     match &self.entry {
-      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
-        match inner.rule() {
-          &rule_graph::Rule::Task(ref task) => context.get(Task {
-            params: self.params.clone(),
-            product: *self.product(),
-            task: task.clone(),
-            entry: Arc::new(self.entry.clone()),
-          }),
-          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
-            if product == context.core.types.snapshot && input == context.core.types.path_globs =>
-          {
-            let context = context.clone();
-            let core = context.core.clone();
-            self
-              .select_product(&context, context.core.types.path_globs, "intrinsic")
-              .and_then(move |val| context.get(Snapshot(externs::key_for(val))))
-              .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
-              .to_boxed()
-          }
-          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
-            if product == context.core.types.directory_digest
-              && input == context.core.types.merged_directories =>
-          {
-            let request =
-              self.select_product(&context, context.core.types.merged_directories, "intrinsic");
-            let core = context.core.clone();
-            request
-              .and_then(move |request| {
-                let digests: Result<Vec<hashing::Digest>, Failure> =
-                  externs::project_multi(&request, "directories")
-                    .into_iter()
-                    .map(|val| lift_digest(&val).map_err(|str| throw(&str)))
-                    .collect();
-                fs::Snapshot::merge_directories(core.store(), try_future!(digests))
-                  .map_err(|err| throw(&err))
-                  .map(move |digest| Snapshot::store_directory(&core, &digest))
-                  .to_boxed()
-              }).to_boxed()
-          }
-          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
-            if product == context.core.types.files_content
-              && input == context.core.types.directory_digest =>
-          {
-            let context = context.clone();
-            self
-              .select_product(&context, context.core.types.directory_digest, "intrinsic")
-              .and_then(|directory_digest_val| {
-                lift_digest(&directory_digest_val).map_err(|str| throw(&str))
-              }).and_then(move |digest| {
-                let store = context.core.store();
-                context
+      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
+        .rule()
+      {
+        &rule_graph::Rule::Task(ref task) => context.get(Task {
+          params: self.params.clone(),
+          product: *self.product(),
+          task: task.clone(),
+          entry: Arc::new(self.entry.clone()),
+        }),
+        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.snapshot && input == context.core.types.path_globs =>
+        {
+          let context = context.clone();
+          let core = context.core.clone();
+          self
+            .select_product(&context, context.core.types.path_globs, "intrinsic")
+            .and_then(move |val| context.get(Snapshot(externs::key_for(val))))
+            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
+            .to_boxed()
+        }
+        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.snapshot && input == context.core.types.url_to_fetch =>
+        {
+          let context = context.clone();
+          let core = context.core.clone();
+          self
+            .select_product(&context, context.core.types.url_to_fetch, "intrinsic")
+            .and_then(move |val| context.get(DownloadedFile(externs::key_for(val))))
+            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
+            .to_boxed()
+        }
+        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.directory_digest
+            && input == context.core.types.merged_directories =>
+        {
+          let request =
+            self.select_product(&context, context.core.types.merged_directories, "intrinsic");
+          let core = context.core.clone();
+          request
+            .and_then(move |request| {
+              let digests: Result<Vec<hashing::Digest>, Failure> =
+                externs::project_multi(&request, "directories")
+                  .into_iter()
+                  .map(|val| lift_digest(&val).map_err(|str| throw(&str)))
+                  .collect();
+              fs::Snapshot::merge_directories(core.store(), try_future!(digests))
+                .map_err(|err| throw(&err))
+                .map(move |digest| Snapshot::store_directory(&core, &digest))
+                .to_boxed()
+            }).to_boxed()
+        }
+        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.files_content
+            && input == context.core.types.directory_digest =>
+        {
+          let context = context.clone();
+          self
+            .select_product(&context, context.core.types.directory_digest, "intrinsic")
+            .and_then(|directory_digest_val| {
+              lift_digest(&directory_digest_val).map_err(|str| throw(&str))
+            }).and_then(move |digest| {
+              let store = context.core.store();
+              context
                 .core
                 .store()
                 .load_directory(digest)
@@ -242,35 +258,34 @@ impl Select {
                     .contents_for_directory(&directory)
                     .map_err(|str| throw(&str))
                 }).map(move |files_content| Snapshot::store_files_content(&context, &files_content))
-              }).to_boxed()
-          }
-          &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
-            if product == context.core.types.process_result
-              && input == context.core.types.process_request =>
-          {
-            let context = context.clone();
-            let core = context.core.clone();
-            self
-              .select_product(&context, context.core.types.process_request, "intrinsic")
-              .and_then(|request| {
-                ExecuteProcess::lift(&request)
-                  .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
-              }).and_then(move |process_request| context.get(process_request))
-              .map(move |result| {
-                externs::unsafe_call(
-                  &core.types.construct_process_result,
-                  &[
-                    externs::store_bytes(&result.0.stdout),
-                    externs::store_bytes(&result.0.stderr),
-                    externs::store_i64(result.0.exit_code.into()),
-                    Snapshot::store_directory(&core, &result.0.output_directory),
-                  ],
-                )
-              }).to_boxed()
-          }
-          &rule_graph::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
+            }).to_boxed()
         }
-      }
+        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.process_result
+            && input == context.core.types.process_request =>
+        {
+          let context = context.clone();
+          let core = context.core.clone();
+          self
+            .select_product(&context, context.core.types.process_request, "intrinsic")
+            .and_then(|request| {
+              ExecuteProcess::lift(&request)
+                .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
+            }).and_then(move |process_request| context.get(process_request))
+            .map(move |result| {
+              externs::unsafe_call(
+                &core.types.construct_process_result,
+                &[
+                  externs::store_bytes(&result.0.stdout),
+                  externs::store_bytes(&result.0.stderr),
+                  externs::store_i64(result.0.exit_code.into()),
+                  Snapshot::store_directory(&core, &result.0.output_directory),
+                ],
+              )
+            }).to_boxed()
+        }
+        &rule_graph::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
+      },
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Root(_))
       | &rule_graph::Entry::Param(_)
       | &rule_graph::Entry::Singleton { .. } => {
@@ -644,6 +659,178 @@ impl From<Snapshot> for NodeKey {
   }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct DownloadedFile(Key);
+
+impl DownloadedFile {
+  fn load_or_download(
+    &self,
+    core: Arc<Core>,
+    url: Url,
+    digest: hashing::Digest,
+  ) -> BoxFuture<fs::Snapshot, String> {
+    let file_name = try_future!(
+      url
+        .path_segments()
+        .and_then(|ps| ps.last())
+        .map(|f| f.to_owned())
+        .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url))
+    );
+
+    core
+      .store()
+      .load_file_bytes_with(digest, |_| ())
+      .and_then(move |maybe_bytes| match maybe_bytes {
+        Some(_) => {
+          DownloadedFile::snapshot_of_one_file(core.store(), PathBuf::from(file_name), digest)
+        }
+        None => DownloadedFile::download(&core, &url, file_name, digest),
+      }).to_boxed()
+  }
+
+  fn snapshot_of_one_file(
+    store: fs::Store,
+    name: PathBuf,
+    digest: hashing::Digest,
+  ) -> BoxFuture<fs::Snapshot, String> {
+    #[derive(Clone)]
+    struct Digester {
+      digest: hashing::Digest,
+    }
+
+    impl StoreFileByDigest<String> for Digester {
+      fn store_by_digest(&self, _: File) -> BoxFuture<hashing::Digest, String> {
+        future::ok(self.digest).to_boxed()
+      }
+    }
+
+    fs::Snapshot::from_path_stats(
+      store,
+      &Digester { digest },
+      vec![fs::PathStat::File {
+        path: name.clone(),
+        stat: fs::File {
+          path: name,
+          is_executable: true,
+        },
+      }],
+    )
+  }
+
+  fn download(
+    core: &Arc<Core>,
+    url: &Url,
+    file_name: String,
+    expected_digest: hashing::Digest,
+  ) -> BoxFuture<fs::Snapshot, String> {
+    let tempdir = try_future!(
+      tempfile::TempDir::new()
+        .map_err(|err| format!("Error making tempdir to download file: {}", err))
+    );
+
+    // TODO: Retry failures
+    // TODO: Share a client which is pre-configured.
+    // TODO: Async
+    let actual_digest = try_future!(
+      reqwest::Client::new()
+        .get(url.clone())
+        .send()
+        .map_err(|err| format!("Error downloading file: {}", err))
+        .and_then(|response| {
+          // Handle common HTTP errors.
+          if response.status().is_server_error() {
+            Err(format!(
+              "Server error ({}) downloading file {} from {}",
+              response.status().as_str(),
+              file_name,
+              url,
+            ))
+          } else if response.status().is_client_error() {
+            Err(format!(
+              "Client error ({}) downloading file {} from {}",
+              response.status().as_str(),
+              file_name,
+              url,
+            ))
+          } else {
+            Ok(response)
+          }
+        }).and_then(|mut response| {
+          // Copy the contents of response into a file and modify its permissions.
+          let temp_file_path = tempdir.path().join(&file_name);
+          std::fs::File::create(&temp_file_path)
+            .and_then(|file| {
+              use std::os::unix::fs::PermissionsExt;
+              std::fs::metadata(temp_file_path).and_then(|metadata| {
+                let mut permissions = metadata.permissions();
+                permissions.set_mode(0o755);
+                file.set_permissions(permissions)?;
+                Ok(file)
+              })
+            }).and_then(|file| {
+              let mut hasher = hashing::WriterHasher::new(file);
+              std::io::copy(&mut response, &mut hasher)?;
+              Ok(hasher)
+            }).map_err(|err| format!("Error copying the downloaded file to disk: {}", err))
+        })
+    ).finish();
+
+    if expected_digest != actual_digest {
+      return future::err(format!(
+        "Wrong digest for downloaded file: want {:?} got {:?}",
+        expected_digest, actual_digest
+      )).to_boxed();
+    }
+
+    fs::Snapshot::capture_snapshot_from_arbitrary_root(
+      core.store(),
+      core.fs_pool.clone(),
+      tempdir.path(),
+      fs::PathGlobs::create(
+        &[file_name],
+        &[],
+        StrictGlobMatching::Ignore,
+        GlobExpansionConjunction::AllMatch,
+      ).unwrap(),
+    ).join(future::ok(tempdir))
+    .map(|(snapshot, tempdir)| {
+      // Ensure tempdir lives until the snapshot is finished
+      std::mem::drop(tempdir);
+      snapshot
+    }).to_boxed()
+  }
+}
+
+impl WrappedNode for DownloadedFile {
+  type Item = Arc<fs::Snapshot>;
+
+  fn run(self, context: Context) -> NodeFuture<Arc<fs::Snapshot>> {
+    let value = externs::val_for(&self.0);
+    let url_to_fetch = externs::project_str(&value, "url");
+
+    let url = try_future!(
+      Url::parse(&url_to_fetch)
+        .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_to_fetch, err)))
+    );
+
+    let expected_digest = try_future!(
+      lift_digest(&externs::project_ignoring_type(&value, "digest")).map_err(|str| throw(&str))
+    );
+
+    self
+      .load_or_download(context.core.clone(), url, expected_digest)
+      .map(Arc::new)
+      .map_err(|err| throw(&err))
+      .to_boxed()
+  }
+}
+
+impl From<DownloadedFile> for NodeKey {
+  fn from(n: DownloadedFile) -> Self {
+    NodeKey::DownloadedFile(n)
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   params: Params,
@@ -828,6 +1015,7 @@ impl NodeTracer<NodeKey> for Tracer {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NodeKey {
   DigestFile(DigestFile),
+  DownloadedFile(DownloadedFile),
   ExecuteProcess(Box<ExecuteProcess>),
   ReadLink(ReadLink),
   Scandir(Scandir),
@@ -843,6 +1031,7 @@ impl NodeKey {
     }
     match self {
       &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
+      &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
       &NodeKey::Select(ref s) => typstr(&s.selector.product),
       &NodeKey::Task(ref s) => typstr(&s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
@@ -865,7 +1054,8 @@ impl NodeKey {
       &NodeKey::ExecuteProcess { .. }
       | &NodeKey::Select { .. }
       | &NodeKey::Snapshot { .. }
-      | &NodeKey::Task { .. } => None,
+      | &NodeKey::Task { .. }
+      | &NodeKey::DownloadedFile { .. } => None,
     }
   }
 }
@@ -879,6 +1069,7 @@ impl Node for NodeKey {
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     match self {
       NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::DownloadedFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::ExecuteProcess(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
@@ -899,6 +1090,7 @@ impl Node for NodeKey {
     // go away in favor of the auto-derived Debug for this type.
     match self {
       &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
+      &NodeKey::DownloadedFile(ref s) => format!("DownloadedFile({:?})", s.0),
       &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
       &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),

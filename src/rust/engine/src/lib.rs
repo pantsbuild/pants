@@ -47,9 +47,7 @@ mod selectors;
 mod tasks;
 mod types;
 
-#[macro_use]
 extern crate boxfuture;
-#[macro_use]
 extern crate enum_primitive;
 extern crate fnv;
 extern crate fs;
@@ -57,17 +55,17 @@ extern crate futures;
 extern crate graph;
 extern crate hashing;
 extern crate itertools;
-#[macro_use]
 extern crate lazy_static;
-#[macro_use]
 extern crate log;
 extern crate parking_lot;
 extern crate process_execution;
+extern crate reqwest;
 extern crate resettable;
-#[macro_use]
 extern crate smallvec;
+extern crate tempfile;
 extern crate tokio;
 extern crate ui;
+extern crate url;
 
 use std::ffi::CStr;
 use std::fs::File;
@@ -90,6 +88,7 @@ use externs::{
 use futures::Future;
 use handles::Handle;
 use hashing::Digest;
+use log::error;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;
@@ -247,10 +246,12 @@ pub extern "C" fn scheduler_create(
   type_process_request: TypeConstraint,
   type_process_result: TypeConstraint,
   type_generator: TypeConstraint,
+  type_url_to_fetch: TypeConstraint,
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
   work_dir_buf: Buffer,
+  local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
   remote_store_server: Buffer,
@@ -290,6 +291,7 @@ pub extern "C" fn scheduler_create(
     process_request: type_process_request,
     process_result: type_process_result,
     generator: type_generator,
+    url_to_fetch: type_url_to_fetch,
     string: type_string,
     bytes: type_bytes,
   };
@@ -331,6 +333,7 @@ pub extern "C" fn scheduler_create(
     build_root_buf.to_os_string().as_ref(),
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
+    PathBuf::from(local_store_dir_buf.to_os_string()),
     if remote_store_server_string.is_empty() {
       None
     } else {
@@ -704,9 +707,12 @@ pub extern "C" fn capture_snapshots(
         .into_iter()
         .map(|(path_globs, root)| {
           let core = core.clone();
-          scheduler
-            .capture_snapshot_from_arbitrary_root(root, path_globs)
-            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+          fs::Snapshot::capture_snapshot_from_arbitrary_root(
+            core.store(),
+            core.fs_pool.clone(),
+            root,
+            path_globs,
+          ).map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
         }).collect::<Vec<_>>(),
     )
   }).map(|values| externs::store_tuple(&values))

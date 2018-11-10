@@ -15,8 +15,9 @@ from types import GeneratorType
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.fs import (DirectoryDigest, DirectoryToMaterialize, FileContent, FilesContent,
-                             MergedDirectories, Path, PathGlobs, PathGlobsAndRoot, Snapshot)
+from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
+                             MergedDirectories, Path, PathGlobs, PathGlobsAndRoot, Snapshot,
+                             UrlToFetch)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
@@ -82,6 +83,7 @@ class Scheduler(object):
     native,
     project_tree,
     work_dir,
+    local_store_dir,
     rules,
     execution_options,
     include_trace_on_error=True,
@@ -91,6 +93,7 @@ class Scheduler(object):
     :param native: An instance of engine.native.Native.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param work_dir: The pants work dir.
+    :param local_store_dir: The directory to use for storing the engine's LMDB store in.
     :param rules: A set of Rules which is used to compute values in the graph.
     :param execution_options: Execution options for (remote) processes.
     :param include_trace_on_error: Include the trace through the graph upon encountering errors.
@@ -118,9 +121,10 @@ class Scheduler(object):
       root_subject_types=self._root_subject_types,
       build_root=project_tree.build_root,
       work_dir=work_dir,
+      local_store_dir=local_store_dir,
       ignore_patterns=project_tree.ignore_patterns,
       execution_options=execution_options,
-      construct_directory_digest=DirectoryDigest,
+      construct_directory_digest=Digest,
       construct_snapshot=Snapshot,
       construct_file_content=FileContent,
       construct_files_content=FilesContent,
@@ -131,7 +135,7 @@ class Scheduler(object):
       construct_process_result=FallibleExecuteProcessResult,
       constraint_address=constraint_for(Address),
       constraint_path_globs=constraint_for(PathGlobs),
-      constraint_directory_digest=constraint_for(DirectoryDigest),
+      constraint_directory_digest=constraint_for(Digest),
       constraint_snapshot=constraint_for(Snapshot),
       constraint_merge_snapshots_request=constraint_for(MergedDirectories),
       constraint_files_content=constraint_for(FilesContent),
@@ -141,7 +145,9 @@ class Scheduler(object):
       constraint_process_request=constraint_for(ExecuteProcessRequest),
       constraint_process_result=constraint_for(FallibleExecuteProcessResult),
       constraint_generator=constraint_for(GeneratorType),
+      constraint_url_to_fetch=constraint_for(UrlToFetch),
     )
+
 
     # If configured, visualize the rule graph before asserting that it is valid.
     if self.visualize_to_dir() is not None:
@@ -278,14 +284,10 @@ class Scheduler(object):
     filenames = set(direct_filenames)
     filenames.update(os.path.dirname(f) for f in direct_filenames)
     filenames_buf = self._native.context.utf8_buf_buf(filenames)
-    invalidated = self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
-    logger.info('invalidated %d nodes for: %s', invalidated, filenames)
-    return invalidated
+    return self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
 
   def invalidate_all_files(self):
-    invalidated =  self._native.lib.graph_invalidate_all_paths(self._scheduler)
-    logger.info('invalidated all %d nodes', invalidated)
-    return invalidated
+    return self._native.lib.graph_invalidate_all_paths(self._scheduler)
 
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)
@@ -345,7 +347,7 @@ class Scheduler(object):
     """Merges any number of directories.
 
     :param directory_digests: Tuple of DirectoryDigests.
-    :return: A DirectoryDigest.
+    :return: A Digest.
     """
     result = self._native.lib.merge_directories(
       self._scheduler,
@@ -384,7 +386,7 @@ class Scheduler(object):
 _PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
 
 
-_DirectoryDigests = Collection.of(DirectoryDigest)
+_DirectoryDigests = Collection.of(Digest)
 
 
 _DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)

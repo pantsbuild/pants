@@ -134,6 +134,7 @@ impl Serialize for Digest {
 ///
 pub struct WriterHasher<W: Write> {
   hasher: Sha256,
+  byte_count: usize,
   inner: W,
 }
 
@@ -141,6 +142,7 @@ impl<W: Write> WriterHasher<W> {
   pub fn new(inner: W) -> WriterHasher<W> {
     WriterHasher {
       hasher: Sha256::default(),
+      byte_count: 0,
       inner: inner,
     }
   }
@@ -148,8 +150,11 @@ impl<W: Write> WriterHasher<W> {
   ///
   /// Returns the result of fingerprinting this stream, and Drops the stream.
   ///
-  pub fn finish(self) -> Fingerprint {
-    Fingerprint::from_bytes_unsafe(&self.hasher.fixed_result())
+  pub fn finish(self) -> Digest {
+    Digest(
+      Fingerprint::from_bytes_unsafe(&self.hasher.fixed_result()),
+      self.byte_count,
+    )
   }
 }
 
@@ -158,6 +163,7 @@ impl<W: Write> Write for WriterHasher<W> {
     let written = self.inner.write(buf)?;
     // Hash the bytes that were successfully written.
     self.hasher.input(&buf[0..written]);
+    self.byte_count += written;
     Ok(written)
   }
 
@@ -285,5 +291,27 @@ mod digest_tests {
       ],
     );
   }
+}
 
+#[cfg(test)]
+mod hasher_tests {
+  use std;
+
+  #[test]
+  fn hashes() {
+    let mut src = "meep".as_bytes();
+
+    let dst = Vec::with_capacity(10);
+    let mut hasher = super::WriterHasher::new(dst);
+    assert_eq!(std::io::copy(&mut src, &mut hasher).unwrap(), 4);
+    assert_eq!(
+      hasher.finish(),
+      super::Digest(
+        super::Fingerprint::from_hex_string(
+          "23e92dfba8fb0c93cfba31ad2962b4e35a47054296d1d375d7f7e13e0185de7a"
+        ).unwrap(),
+        4
+      ),
+    );
+  }
 }

@@ -10,7 +10,7 @@ from builtins import object, str
 from hashlib import sha1
 
 from six import string_types
-from twitter.common.collections import OrderedSet, maybe_list
+from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import deprecated_conditional
@@ -26,7 +26,7 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec, Globs
+from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -831,25 +831,6 @@ class Target(AbstractTarget):
   def supports_default_sources(cls):
     """Whether this target type can provide default sources if none were specified explicitly."""
     return cls.default_sources_globs is not None
-
-  @classmethod
-  def default_sources(cls, sources_rel_path):
-    """Provide sources, if they weren't specified explicitly in the BUILD file.
-
-    By default this globs over self.default_sources_globs (e.g., '*.java')
-    but subclasses can override to provide more nuanced default behavior.
-    In this case, the subclasses must also override supports_default_sources().
-    """
-    if cls.default_sources_globs is not None:
-      if cls.default_sources_exclude_globs is not None:
-        exclude = [Globs.create_fileset_with_spec(sources_rel_path,
-                                                  *maybe_list(cls.default_sources_exclude_globs))]
-      else:
-        exclude = []
-      return Globs.create_fileset_with_spec(sources_rel_path,
-                                            *maybe_list(cls.default_sources_globs),
-                                            exclude=exclude)
-    return None
 
   # TODO: Inline this as SourcesField(sources=sources) when all callers are guaranteed to pass an
   # EagerFilesetWithSpec.

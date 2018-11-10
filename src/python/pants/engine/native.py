@@ -197,8 +197,10 @@ Scheduler* scheduler_create(Tasks*,
                             TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
+                            TypeConstraint,
                             TypeId,
                             TypeId,
+                            Buffer,
                             Buffer,
                             Buffer,
                             BufferBuffer,
@@ -801,6 +803,7 @@ class Native(object):
                     root_subject_types,
                     build_root,
                     work_dir,
+                    local_store_dir,
                     ignore_patterns,
                     execution_options,
                     construct_directory_digest,
@@ -823,7 +826,8 @@ class Native(object):
                     constraint_link,
                     constraint_process_request,
                     constraint_process_result,
-                    constraint_generator):
+                    constraint_generator,
+                    constraint_url_to_fetch):
     """Create and return an ExternContext and native Scheduler."""
 
     def func(constraint):
@@ -856,12 +860,14 @@ class Native(object):
         tc(constraint_process_request),
         tc(constraint_process_result),
         tc(constraint_generator),
+        tc(constraint_url_to_fetch),
         # Types.
         TypeId(self.context.to_id(text_type)),
         TypeId(self.context.to_id(binary_type)),
         # Project tree.
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(work_dir),
+        self.context.utf8_buf(local_store_dir),
         self.context.utf8_buf_buf(ignore_patterns),
         self.to_ids_buf(root_subject_types),
         # Remote execution config.

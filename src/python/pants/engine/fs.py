@@ -64,14 +64,18 @@ class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', text_type)]
   pass
 
 
-class DirectoryDigest(datatype([('fingerprint', text_type), ('serialized_bytes_length', int)])):
-  """A DirectoryDigest is an opaque handle to a set of files known about by the engine.
+class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', int)])):
+  """A Digest is a content-digest fingerprint, and a length of underlying content.
 
-  The contents of files can be inspected by requesting a FilesContent for it.
+  These are used both to reference digests of strings/bytes/content, and as an opaque handle to a
+  set of files known about by the engine.
+
+  The contents of file sets referenced opaquely can be inspected by requesting a FilesContent for
+  it.
 
   In the future, it will be possible to inspect the file metadata by requesting a Snapshot for it,
   but at the moment we can't install rules which go both:
-   PathGlobs -> DirectoryDigest -> Snapshot
+   PathGlobs -> Digest -> Snapshot
    PathGlobs -> Snapshot
   because it would lead to an ambiguity in the engine, and we have existing code which already
   relies on the latter existing. This can be resolved when ordering is removed from Snapshots. See
@@ -79,7 +83,7 @@ class DirectoryDigest(datatype([('fingerprint', text_type), ('serialized_bytes_l
   """
 
   def __repr__(self):
-    return '''DirectoryDigest(fingerprint={}, serialized_bytes_length={})'''.format(
+    return '''Digest(fingerprint={}, serialized_bytes_length={})'''.format(
       self.fingerprint,
       self.serialized_bytes_length
     )
@@ -88,7 +92,7 @@ class DirectoryDigest(datatype([('fingerprint', text_type), ('serialized_bytes_l
     return repr(self)
 
 
-class Snapshot(datatype([('directory_digest', DirectoryDigest), ('path_stats', tuple)])):
+class Snapshot(datatype([('directory_digest', Digest), ('path_stats', tuple)])):
   """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
 
   Snapshots are used to make it easier to isolate process execution by fixing the contents
@@ -121,9 +125,14 @@ class MergedDirectories(datatype([('directories', tuple)])):
   pass
 
 
-class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest', DirectoryDigest)])):
+class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest', Digest)])):
   """A request to materialize the contents of a directory digest at the provided path."""
   pass
+
+
+class UrlToFetch(datatype([('url', text_type), ('digest', Digest)])):
+  pass
+
 
 FilesContent = Collection.of(FileContent)
 
@@ -132,7 +141,7 @@ FilesContent = Collection.of(FileContent)
 _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 
 
-EMPTY_DIRECTORY_DIGEST = DirectoryDigest(
+EMPTY_DIRECTORY_DIGEST = Digest(
   fingerprint=text_type(_EMPTY_FINGERPRINT),
   serialized_bytes_length=0
 )
@@ -146,7 +155,8 @@ EMPTY_SNAPSHOT = Snapshot(
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
-    RootRule(DirectoryDigest),
+    RootRule(Digest),
     RootRule(MergedDirectories),
     RootRule(PathGlobs),
+    RootRule(UrlToFetch),
   ]

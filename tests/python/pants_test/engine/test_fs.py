@@ -11,16 +11,23 @@ import unittest
 from builtins import object, open, str
 from contextlib import contextmanager
 
-from future.utils import text_type
+from future.utils import PY2, text_type
 
 from pants.base.project_tree import Dir, Link
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryDigest, DirectoryToMaterialize,
-                             FilesContent, MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot,
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize, FilesContent,
+                             MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch,
                              create_fs_rules)
-from pants.util.contextutil import temporary_dir
+from pants.engine.scheduler import ExecutionError
+from pants.util.contextutil import http_server, temporary_dir
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.test_base import TestBase
+
+
+if PY2:
+  from BaseHTTPServer import BaseHTTPRequestHandler
+else:
+  from http.server import BaseHTTPRequestHandler
 
 
 class DirectoryListing(object):
@@ -277,7 +284,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
       snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
-      self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
+      self.assert_snapshot_equals(snapshot, ["roland"], Digest(
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
@@ -295,11 +302,11 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), text_type(temp_dir)),
       ))
       self.assertEqual(3, len(snapshots))
-      self.assert_snapshot_equals(snapshots[0], ["roland"], DirectoryDigest(
+      self.assert_snapshot_equals(snapshots[0], ["roland"], Digest(
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
-      self.assert_snapshot_equals(snapshots[1], ["susannah"], DirectoryDigest(
+      self.assert_snapshot_equals(snapshots[1], ["susannah"], Digest(
         text_type("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f"),
         82
       ))
@@ -375,13 +382,13 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       )
 
       empty_merged = self.scheduler.product_request(
-        DirectoryDigest,
+        Digest,
         [MergedDirectories((empty_snapshot.directory_digest,))],
       )[0]
       self.assertEqual(empty_snapshot.directory_digest, empty_merged)
 
       roland_merged = self.scheduler.product_request(
-        DirectoryDigest,
+        Digest,
         [MergedDirectories((roland_snapshot.directory_digest, empty_snapshot.directory_digest))],
       )[0]
       self.assertEqual(
@@ -390,7 +397,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       )
 
       both_merged = self.scheduler.product_request(
-        DirectoryDigest,
+        Digest,
         [MergedDirectories((roland_snapshot.directory_digest, susannah_snapshot.directory_digest))],
       )[0]
 
@@ -403,12 +410,11 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
 
     with temporary_dir() as temp_dir:
       dir_path = os.path.join(temp_dir, "containing_roland")
-      digest = DirectoryDigest(
+      digest = Digest(
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       )
-      scheduler = self.mk_scheduler(rules=create_fs_rules())
-      scheduler.materialize_directories((DirectoryToMaterialize(text_type(dir_path), digest),))
+      self.scheduler.materialize_directories((DirectoryToMaterialize(text_type(dir_path), digest),))
 
       created_file = os.path.join(dir_path, "roland")
       with open(created_file, 'r') as f:
@@ -464,10 +470,92 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     with temporary_dir() as temp_dir:
       with open(os.path.join(temp_dir, "roland"), "w") as f:
         f.write("European Burmese")
-      scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
-      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
-      self.assert_snapshot_equals(snapshot, ["roland"], DirectoryDigest(
+      snapshot = self.scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
+      self.assert_snapshot_equals(snapshot, ["roland"], Digest(
         text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
         80
       ))
+
+  pantsbuild_digest = Digest("63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f", 18)
+
+  def test_download(self):
+    with self.isolated_local_store():
+      with http_server(StubHandler) as port:
+        url = UrlToFetch("http://localhost:{}/CNAME".format(port), self.pantsbuild_digest)
+        snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+        self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
+          text_type("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf"),
+          81
+        ))
+
+  def test_download_missing_file(self):
+    with self.isolated_local_store():
+      with http_server(StubHandler) as port:
+        url = UrlToFetch("http://localhost:{}/notfound".format(port), self.pantsbuild_digest)
+        with self.assertRaises(ExecutionError) as cm:
+          self.scheduler.product_request(Snapshot, subjects=[url])
+        self.assertIn('404', str(cm.exception))
+
+  def test_download_wrong_digest(self):
+    with self.isolated_local_store():
+      with http_server(StubHandler) as port:
+        url = UrlToFetch(
+          "http://localhost:{}/CNAME".format(port),
+          Digest(
+            self.pantsbuild_digest.fingerprint,
+            self.pantsbuild_digest.serialized_bytes_length + 1,
+          ),
+        )
+        with self.assertRaises(ExecutionError) as cm:
+          self.scheduler.product_request(Snapshot, subjects=[url])
+        self.assertIn('wrong digest', str(cm.exception).lower())
+
+  # It's a shame that this isn't hermetic, but setting up valid local HTTPS certificates is a pain.
+  def test_download_https(self):
+    with self.isolated_local_store():
+      url = UrlToFetch("https://www.pantsbuild.org/CNAME", Digest(
+        "63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f",
+        18,
+      ))
+      snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+      self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
+        text_type("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf"),
+        81
+      ))
+
+  def test_caches_downloads(self):
+    with self.isolated_local_store():
+      with http_server(StubHandler) as port:
+        self.prime_store_with_roland_digest()
+
+        # This would error if we hit the HTTP server, because 404,
+        # but we're not going to hit the HTTP server because it's cached,
+        # so we shouldn't see an error...
+        url = UrlToFetch(
+          "http://localhost:{}/roland".format(port),
+          Digest('693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d', 16),
+        )
+        snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
+        self.assert_snapshot_equals(snapshot, ["roland"], Digest(
+          text_type("9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819"),
+          82
+        ))
+
+
+class StubHandler(BaseHTTPRequestHandler):
+  response_text = b"www.pantsbuild.org"
+
+  def do_HEAD(self):
+    self.send_headers()
+
+  def do_GET(self):
+    self.send_headers()
+    self.wfile.write(self.response_text)
+
+  def send_headers(self):
+    code = 200 if self.path == "/CNAME" else 404
+    self.send_response(code)
+    self.send_header("Content-Type", "text/utf-8")
+    self.send_header("Content-Length", "{}".format(len(self.response_text)))
+    self.end_headers()

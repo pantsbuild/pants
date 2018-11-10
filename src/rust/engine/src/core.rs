@@ -10,7 +10,7 @@ use std::{fmt, hash};
 use externs;
 use handles::Handle;
 
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
