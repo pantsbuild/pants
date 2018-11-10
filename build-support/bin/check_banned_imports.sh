@@ -10,7 +10,7 @@ if [ -n "${bad_files}" ]; then
     exit 1
 fi
 
-bad_files="$(echo ${PYTHON_FILES} | xargs grep -l "^import future.moves.collections\|^from future.moves.collections import\|^from future.moves import collections")"
+bad_files="$(echo ${PYTHON_FILES} | xargs grep -l "^import future.moves.collections\|^from future.moves.collections import\|^from future.moves import .*collections")"
 if [ -n "${bad_files}" ]; then
     echo >&2 "Found forbidden imports. \`future.moves.collections\` does not work as intended. Instead, you should use \`import collections\`. Bad files:"
     echo >&2 "${bad_files}"
