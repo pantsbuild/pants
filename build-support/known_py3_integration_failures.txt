@@ -3,6 +3,5 @@ tests/python/pants_test/backend/jvm/tasks:checkstyle_integration
 tests/python/pants_test/backend/python/tasks:integration
 tests/python/pants_test/backend/python/tasks:python_native_code_testing
 tests/python/pants_test/engine/legacy:pants_engine_integration
-tests/python/pants_test/option:options_integration
 tests/python/pants_test/pantsd:pantsd_integration
 tests/python/pants_test/projects:testprojects_integration
