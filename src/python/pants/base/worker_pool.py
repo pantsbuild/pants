@@ -5,8 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import multiprocessing
-import signal
-import sys
+# import signal
+# import sys
 import threading
 from builtins import next, object
 from multiprocessing.pool import ThreadPool

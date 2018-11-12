@@ -525,7 +525,7 @@ pub extern "C" fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
 #[no_mangle]
 pub extern "C" fn decompress_tarball(
   tar_path: *const raw::c_char,
-  output_dir: *const raw::c_char
+  output_dir: *const raw::c_char,
 ) -> PyResult {
   let tmp_1 = unsafe { CStr::from_ptr(tar_path).to_string_lossy().into_owned() };
   let tar_path_str = PathBuf::from(tmp_1);
@@ -534,8 +534,14 @@ pub extern "C" fn decompress_tarball(
   let output_dir_str = PathBuf::from(tmp_2);
 
   tar_api::main(tar_path_str.as_path(), output_dir_str.as_path())
-          .map_err(|e| format!("Failed to untar {:?} to {:?}:\n{:?}", tar_path_str.as_path(), output_dir_str.as_path(), e))
-        .into()
+    .map_err(|e| {
+      format!(
+        "Failed to untar {:?} to {:?}:\n{:?}",
+        tar_path_str.as_path(),
+        output_dir_str.as_path(),
+        e
+      )
+    }).into()
 }
 
 #[no_mangle]
