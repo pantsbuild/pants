@@ -569,9 +569,12 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     junit_run = self.prepare_execute(self.context())
     with temporary_dir() as output_dir:
       code_coverage = CodeCoverage.global_instance()
+      source_under_test = self.make_target(spec='tests/java/org/pantsbuild/foo',
+                                      target_type=JavaLibrary,
+                                      sources=['Foo.java'])
       yield code_coverage.get_coverage_engine(task=junit_run,
                                               output_dir=output_dir,
-                                              all_targets=[],
+                                              all_targets=[source_under_test],
                                               execute_java=junit_run.execute_java_for_coverage)
 
   def _assert_coverage_engine(self, expected_engine_type):
