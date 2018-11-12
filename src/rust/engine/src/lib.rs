@@ -47,25 +47,21 @@ mod selectors;
 mod tasks;
 mod types;
 
-#[macro_use]
 extern crate boxfuture;
-#[macro_use]
-extern crate enum_primitive;
+extern crate bytes;
 extern crate fnv;
 extern crate fs;
 extern crate futures;
 extern crate graph;
 extern crate hashing;
 extern crate itertools;
-#[macro_use]
 extern crate lazy_static;
-#[macro_use]
 extern crate log;
+extern crate num_enum;
 extern crate parking_lot;
 extern crate process_execution;
 extern crate reqwest;
 extern crate resettable;
-#[macro_use]
 extern crate smallvec;
 extern crate tempfile;
 extern crate tokio;
@@ -93,6 +89,7 @@ use externs::{
 use futures::Future;
 use handles::Handle;
 use hashing::Digest;
+use log::error;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;
@@ -255,6 +252,7 @@ pub extern "C" fn scheduler_create(
   type_bytes: TypeId,
   build_root_buf: Buffer,
   work_dir_buf: Buffer,
+  local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
   remote_store_server: Buffer,
@@ -336,6 +334,7 @@ pub extern "C" fn scheduler_create(
     build_root_buf.to_os_string().as_ref(),
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
+    PathBuf::from(local_store_dir_buf.to_os_string()),
     if remote_store_server_string.is_empty() {
       None
     } else {

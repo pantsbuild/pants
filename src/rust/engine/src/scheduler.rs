@@ -11,7 +11,8 @@ use futures::future::{self, Future};
 
 use context::{Context, Core};
 use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
-use graph::{EntryId, Graph, Node, NodeContext};
+use graph::{EntryId, Graph, InvalidationResult, Node, NodeContext};
+use log::{debug, info, warn};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use parking_lot::Mutex;
 use rule_graph;
@@ -144,27 +145,37 @@ impl Scheduler {
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
   pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
-    let invalidation_result = self.core.graph.invalidate_from_roots(move |node| {
-      if let Some(fs_subject) = node.fs_subject() {
-        paths.contains(fs_subject)
-      } else {
-        false
-      }
-    });
-    // TODO: Expose.
-    invalidation_result.cleared + invalidation_result.dirtied
+    let InvalidationResult { cleared, dirtied } =
+      self.core.graph.invalidate_from_roots(move |node| {
+        if let Some(fs_subject) = node.fs_subject() {
+          paths.contains(fs_subject)
+        } else {
+          false
+        }
+      });
+    // TODO: The rust log level is not currently set correctly in a pantsd context. To ensure that
+    // we see this even at `info` level, we set it to warn. #6004 should address this by making
+    // rust logging re-configuration an explicit step in `src/python/pants/init/logging.py`.
+    warn!(
+      "invalidation: cleared {} and dirtied {} nodes for: {:?}",
+      cleared, dirtied, paths
+    );
+    cleared + dirtied
   }
 
   ///
   /// Invalidate all filesystem dependencies in the graph.
   ///
   pub fn invalidate_all_paths(&self) -> usize {
-    let invalidation_result = self
+    let InvalidationResult { cleared, dirtied } = self
       .core
       .graph
       .invalidate_from_roots(|node| node.fs_subject().is_some());
-    // TODO: Expose.
-    invalidation_result.cleared + invalidation_result.dirtied
+    info!(
+      "invalidation: cleared {} and dirtied {} nodes for all paths",
+      cleared, dirtied
+    );
+    cleared + dirtied
   }
 
   ///

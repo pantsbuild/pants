@@ -42,7 +42,6 @@ mod pool;
 pub use pool::ResettablePool;
 
 extern crate bazel_protos;
-#[macro_use]
 extern crate boxfuture;
 extern crate byteorder;
 extern crate bytes;
@@ -56,22 +55,19 @@ extern crate hashing;
 extern crate ignore;
 extern crate indexmap;
 extern crate itertools;
-#[macro_use]
 extern crate lazy_static;
 extern crate lmdb;
-#[macro_use]
 extern crate log;
 #[cfg(test)]
 extern crate mock;
 extern crate parking_lot;
 extern crate protobuf;
 extern crate serde;
+extern crate serde_derive;
 extern crate sha2;
 extern crate tempfile;
 #[cfg(test)]
 extern crate testutil;
-#[macro_use]
-extern crate serde_derive;
 extern crate uuid;
 #[cfg(test)]
 extern crate walkdir;
@@ -83,12 +79,12 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
 
+use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::future::{self, Future};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
-
-use boxfuture::{BoxFuture, Boxable};
+use lazy_static::lazy_static;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
@@ -541,6 +537,7 @@ pub struct GlobWithSource {
 ///
 /// All Stats consumed or return by this type are relative to the root.
 ///
+#[derive(Clone)]
 pub struct PosixFS {
   root: Dir,
   pool: Arc<ResettablePool>,
@@ -582,8 +579,8 @@ impl PosixFS {
     })
   }
 
-  fn scandir_sync(root: &Path, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
-    let dir_abs = root.join(&dir_relative_to_root.0);
+  fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
+    let dir_abs = self.root.0.join(&dir_relative_to_root.0);
     let mut stats: Vec<Stat> = dir_abs
       .read_dir()?
       .map(|readdir| {
@@ -595,6 +592,14 @@ impl PosixFS {
           &dir_abs,
           get_metadata,
         )
+      }).filter(|s| match s {
+        Ok(ref s) =>
+        // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
+        // git-style ignore patterns, we need to know whether a path represents a directory.
+        {
+          !self.ignore.is_ignored(s)
+        }
+        Err(_) => true,
       }).collect::<Result<Vec<_>, io::Error>>()?;
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(stats)
@@ -710,10 +715,10 @@ impl PosixFS {
 
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<DirectoryListing, io::Error> {
     let dir = dir.to_owned();
-    let root = self.root.0.clone();
+    let fs: PosixFS = self.clone();
     self
       .pool
-      .spawn_fn(move || PosixFS::scandir_sync(&root, &dir))
+      .spawn_fn(move || fs.scandir_sync(&dir))
       .map(DirectoryListing)
       .to_boxed()
   }

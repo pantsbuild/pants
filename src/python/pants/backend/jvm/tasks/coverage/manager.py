@@ -85,7 +85,7 @@ class CodeCoverage(Subsystem):
                   '(defaults to False, as otherwise the coverage results would be unreliable).')
 
     # register options for coverage engines
-    # TODO(jtrobec): get rid of this calls when engines are dependent subsystems
+    # TODO(jtrobec): get rid of these calls when engines are dependent subsystems
     Cobertura.register_junit_options(register, register_jvm_tool)
 
   class InvalidCoverageEngine(Exception):

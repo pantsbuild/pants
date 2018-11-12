@@ -481,9 +481,9 @@ class RscCompile(ZincCompile):
             args,
             distribution,
             tgt=tgt,
-            # TODO pass the input files from the target snapshot instead of the below
-            # input_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
-            input_files=target_sources + rsc_semanticdb_classpath,
+#            input_files=target_sources + rsc_semanticdb_classpath,
+            input_files=rsc_semanticdb_classpath,
+            input_snapshot=ctx.target.sources_snapshot(scheduler=self.context._scheduler),
             output_dir=os.path.dirname(rsc_mjar_file))
 
         self._record_target_stats(tgt,
@@ -744,7 +744,8 @@ class RscCompile(ZincCompile):
       )
     ]
 
-  def _runtool(self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), output_dir=None):
+  def _runtool(
+    self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_snapshot=None, output_dir=None):
     if self.execution_strategy == self.HERMETIC:
       # TODO: accept input_digests as well as files.
       with self.context.new_workunit(tool_name) as wu:
@@ -757,8 +758,6 @@ class RscCompile(ZincCompile):
           PathGlobs(tuple(pathglobs)),
           text_type(get_buildroot()))
 
-        tool_snapshots = self.context._scheduler.capture_snapshots((root,))
-        input_files_directory_digest = tool_snapshots[0].directory_digest
         classpath_for_cmd = os.pathsep.join(tool_classpath)
         cmd = [
           distribution.java,
@@ -768,9 +767,19 @@ class RscCompile(ZincCompile):
         cmd.extend([main])
         cmd.extend(args)
 
+        if pathglobs:
+          # dont capture snapshot, if pathglobs is empty
+          input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
+
+        if input_snapshot and input_digest:
+          input_files = self.context._scheduler.merge_directories(
+              (input_snapshot.directory_digest, input_digest))
+        else:
+          input_files = input_digest or input_snapshot.directory_digest
+
         epr = ExecuteProcessRequest(
           argv=tuple(cmd),
-          input_files=input_files_directory_digest,
+          input_files=input_files,
           output_files=tuple(),
           output_directories=(output_dir,),
           timeout_seconds=15*60,

@@ -416,9 +416,11 @@ def http_server(handler_class):
   port_queue = Queue()
   shutdown_queue = Queue()
   t = threading.Thread(target=lambda: serve(port_queue, shutdown_queue))
+  t.daemon = True
   t.start()
 
-  yield port_queue.get(block=True)
-
-  shutdown_queue.put(True)
-  t.join()
+  try:
+    yield port_queue.get(block=True)
+  finally:
+    shutdown_queue.put(True)
+    t.join()

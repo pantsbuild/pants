@@ -83,6 +83,7 @@ class Scheduler(object):
     native,
     project_tree,
     work_dir,
+    local_store_dir,
     rules,
     execution_options,
     include_trace_on_error=True,
@@ -92,6 +93,7 @@ class Scheduler(object):
     :param native: An instance of engine.native.Native.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param work_dir: The pants work dir.
+    :param local_store_dir: The directory to use for storing the engine's LMDB store in.
     :param rules: A set of Rules which is used to compute values in the graph.
     :param execution_options: Execution options for (remote) processes.
     :param include_trace_on_error: Include the trace through the graph upon encountering errors.
@@ -119,6 +121,7 @@ class Scheduler(object):
       root_subject_types=self._root_subject_types,
       build_root=project_tree.build_root,
       work_dir=work_dir,
+      local_store_dir=local_store_dir,
       ignore_patterns=project_tree.ignore_patterns,
       execution_options=execution_options,
       construct_directory_digest=Digest,
@@ -281,14 +284,10 @@ class Scheduler(object):
     filenames = set(direct_filenames)
     filenames.update(os.path.dirname(f) for f in direct_filenames)
     filenames_buf = self._native.context.utf8_buf_buf(filenames)
-    invalidated = self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
-    logger.info('invalidated %d nodes for: %s', invalidated, filenames)
-    return invalidated
+    return self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
 
   def invalidate_all_files(self):
-    invalidated =  self._native.lib.graph_invalidate_all_paths(self._scheduler)
-    logger.info('invalidated all %d nodes', invalidated)
-    return invalidated
+    return self._native.lib.graph_invalidate_all_paths(self._scheduler)
 
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)

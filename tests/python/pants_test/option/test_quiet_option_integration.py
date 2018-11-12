@@ -37,7 +37,7 @@ class TestOptionsQuietIntegration(PantsRunIntegrationTest):
       pants_run = self.run_pants(['--no-quiet', 'export', '--output-file={}'.format(f.name)])
       self.assert_success(pants_run)
 
-      json_string = f.read()
+      json_string = f.read().decode('utf8')
       # Make sure the json is valid from the file read.
       json.loads(json_string)
       # Make sure json string does not appear in stdout.
