@@ -72,7 +72,6 @@ default-members = [
 [dependencies]
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
-enum_primitive = "0.1.1"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "^0.1.16"
@@ -81,6 +80,7 @@ hashing = { path = "hashing" }
 itertools = "0.7.2"
 lazy_static = "1"
 log = "0.4"
+num_enum = "0.1.1"
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 reqwest = "0.9"
