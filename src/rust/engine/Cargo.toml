@@ -37,6 +37,7 @@ members = [
   "process_execution/bazel_protos",
   "process_executor",
   "resettable",
+  "tar_api",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -63,6 +64,7 @@ default-members = [
   "process_execution/bazel_protos",
   "process_executor",
   "resettable",
+  "tar_api",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -89,3 +91,4 @@ tokio = "0.1"
 tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
+tar_api = { path = "tar_api" }
