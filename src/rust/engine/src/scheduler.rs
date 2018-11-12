@@ -300,19 +300,18 @@ impl Scheduler {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
       } else if let Some(display) = optional_display.as_mut() {
-        // Update the graph. To do that, we iterate over heavy hitters
+        // Update the graph. To do that, we iterate over heavy hitters.
         let mut heavy_hitters: Vec<(String, Duration)> = self
           .core
           .graph
           .heavy_hitters(&roots, display.worker_count());
-        println!("BL: Heavy_hitters {:?}", heavy_hitters);
-        println!("BL: Tasks_to_dispay: {:?}", &tasks_to_display);
-        // Tasks that should be displayed but aren't in tasks_to_display yet
+        // Insert every one in the set of tasks to display.
         for (task, duration) in &heavy_hitters {
           // TODO I don't really want to trigger the clone unconditionally, but using an
           // if x.contains {} here seems to kind of defeat the purpose of using a set
           tasks_to_display.insert(task.clone(), *duration);
         }
+        // And remove the tasks that no longer should be there.
         for (task, duration) in tasks_to_display.clone().into_iter() {
           let mut remove = false;
           if !heavy_hitters.contains(&(task.to_string(), duration)) {
@@ -349,9 +348,9 @@ impl Scheduler {
     // If the number of ongoing tasks is less than the number of workers,
     // fill the rest of the workers with empty string.
     // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666
-    //    for i in ongoing_tasks.len()..display_worker_count {
-    //      display.update(i.to_string(), "".to_string());
-    //    }
+    for i in ongoing_tasks.len()..display_worker_count {
+      display.update(i.to_string(), "".to_string());
+    }
     display.render();
   }
 }
