@@ -10,6 +10,7 @@ import shutil
 import tarfile
 from builtins import object, str
 
+from pants.base.exceptions import TaskError
 from pants.engine.native import Native
 from pants.util.contextutil import open_tar
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_walk
@@ -138,10 +139,12 @@ class TarballArtifact(Artifact):
           except OSError as e:
             if e.errno != errno.EEXIST:
               raise
+        print('\n' + self._tarfile)
         result = Native.NATIVE_SINGLETON.decompress_tarball(self._tarfile.encode('utf-8'),
-                                                             self._artifact_root.encode('utf-8'))
-        print(result.is_throw)
-        tarin.extractall(self._artifact_root)
+                                                            self._artifact_root.encode('utf-8'))
+        if result.is_throw:
+          raise TaskError("untar failed.")
+        # tarin.extractall(self._artifact_root)
         self._relpaths.update(paths)
     except tarfile.ReadError as e:
       raise ArtifactError(str(e))

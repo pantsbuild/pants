@@ -719,10 +719,7 @@ class Native(object):
   @memoized_property
   def lib(self):
     """Load and return the native engine module."""
-    dlopen = self.ffi.dlopen(self.binary)
-    import pprint
-    pprint.pprint(dir(dlopen))
-    return dlopen
+    return self.ffi.dlopen(self.binary)
 
   @memoized_property
   def ffi(self):
