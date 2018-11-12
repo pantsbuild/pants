@@ -62,6 +62,7 @@ extern crate process_execution;
 extern crate reqwest;
 extern crate resettable;
 extern crate smallvec;
+extern crate tar_api;
 extern crate tempfile;
 extern crate tokio;
 extern crate ui;
@@ -440,6 +441,14 @@ pub extern "C" fn execution_add_root_select(
         .into()
     })
   })
+}
+
+#[no_mangle]
+pub extern "C" fn decompress_tarball(
+  tar_path: *const raw::c_char,
+  output_dir: *const raw::c_char
+) {
+  tar_api::main();
 }
 
 #[no_mangle]
