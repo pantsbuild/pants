@@ -3,12 +3,9 @@ scala_library(
     name="ban_packages",
     sources=["Main.scala"],
     dependency_constraints=
-        DependencyConstraints(
-            direct=[
-                DependencyConstraint.JvmPackageConstraint("scopt"),
-            ],
-            transitive=[
-                DependencyConstraint.JvmPackageConstraint("never.Triggered"),
+        DependencyConstraints([
+                JvmPackageConstraint("scopt"),
+                JvmPackageConstraint("never.Triggered"),
             ],
         ),
     dependencies=[
@@ -27,12 +24,9 @@ scala_library(
     name="ban_tags",
     sources=["Main.scala"],
     dependency_constraints=
-        DependencyConstraints(
-            direct=[
-            ],
-            transitive=[
-                DependencyConstraint.Tag("deprecated"),
-            ],
+        DependencyConstraints([
+                Tag("deprecated"),
+            ]
         ),
     dependencies=[
         ":nodeps",
@@ -50,7 +44,6 @@ scala_library(
     sources=["Main.scala"],
     dependencies=[":testlib"],
     dependency_constraints=DependencyConstraints(
-        direct=[DependencyConstraint.TestDependencies()],
-        transitive=[]
+        [TestDependencies()]
     )
 )
