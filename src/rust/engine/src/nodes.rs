@@ -3,12 +3,13 @@
 
 use std;
 use std::collections::{BTreeMap, HashMap};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future::{self, Future};
-use reqwest;
+use futures::Stream;
 use tempfile;
 use url::Url;
 
@@ -684,7 +685,7 @@ impl DownloadedFile {
         Some(_) => {
           DownloadedFile::snapshot_of_one_file(core.store(), PathBuf::from(file_name), digest)
         }
-        None => DownloadedFile::download(&core, &url, file_name, digest),
+        None => DownloadedFile::download(core, url, file_name, digest),
       }).to_boxed()
   }
 
@@ -718,86 +719,91 @@ impl DownloadedFile {
   }
 
   fn download(
-    core: &Arc<Core>,
-    url: &Url,
+    core: Arc<Core>,
+    url: Url,
     file_name: String,
     expected_digest: hashing::Digest,
   ) -> BoxFuture<fs::Snapshot, String> {
-    let tempdir = try_future!(
-      tempfile::TempDir::new()
-        .map_err(|err| format!("Error making tempdir to download file: {}", err))
-    );
-
     // TODO: Retry failures
-    // TODO: Share a client which is pre-configured.
-    // TODO: Async
-    let actual_digest = try_future!(
-      reqwest::Client::new()
-        .get(url.clone())
-        .send()
-        .map_err(|err| format!("Error downloading file: {}", err))
-        .and_then(|response| {
-          // Handle common HTTP errors.
-          if response.status().is_server_error() {
-            Err(format!(
-              "Server error ({}) downloading file {} from {}",
-              response.status().as_str(),
-              file_name,
-              url,
-            ))
-          } else if response.status().is_client_error() {
-            Err(format!(
-              "Client error ({}) downloading file {} from {}",
-              response.status().as_str(),
-              file_name,
-              url,
-            ))
-          } else {
-            Ok(response)
-          }
-        }).and_then(|mut response| {
-          // Copy the contents of response into a file and modify its permissions.
-          let temp_file_path = tempdir.path().join(&file_name);
-          std::fs::File::create(&temp_file_path)
-            .and_then(|file| {
-              use std::os::unix::fs::PermissionsExt;
-              std::fs::metadata(temp_file_path).and_then(|metadata| {
-                let mut permissions = metadata.permissions();
-                permissions.set_mode(0o755);
-                file.set_permissions(permissions)?;
-                Ok(file)
-              })
-            }).and_then(|file| {
-              let mut hasher = hashing::WriterHasher::new(file);
-              std::io::copy(&mut response, &mut hasher)?;
-              Ok(hasher)
-            }).map_err(|err| format!("Error copying the downloaded file to disk: {}", err))
-        })
-    ).finish();
+    core
+      .http_client()
+      .get(url.clone())
+      .send()
+      .map_err(|err| format!("Error downloading file: {}", err))
+      .and_then(move |response| {
+        // Handle common HTTP errors.
+        if response.status().is_server_error() {
+          Err(format!(
+            "Server error ({}) downloading file {} from {}",
+            response.status().as_str(),
+            file_name,
+            url,
+          ))
+        } else if response.status().is_client_error() {
+          Err(format!(
+            "Client error ({}) downloading file {} from {}",
+            response.status().as_str(),
+            file_name,
+            url,
+          ))
+        } else {
+          Ok((file_name, response))
+        }
+      }).and_then(move |(file_name, response)| {
+        let tempdir = try_future!(
+          tempfile::TempDir::new()
+            .map_err(|err| format!("Error making tempdir to download file: {}", err))
+        );
 
-    if expected_digest != actual_digest {
-      return future::err(format!(
-        "Wrong digest for downloaded file: want {:?} got {:?}",
-        expected_digest, actual_digest
-      )).to_boxed();
-    }
+        // Copy the contents of response into a file and modify its permissions.
+        let temp_file_path = tempdir.path().join(&file_name);
+        future::done(std::fs::File::create(&temp_file_path))
+          .and_then(|file| {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::metadata(temp_file_path).and_then(|metadata| {
+              let mut permissions = metadata.permissions();
+              permissions.set_mode(0o755);
+              file.set_permissions(permissions)?;
+              Ok(file)
+            })
+          }).map_err(|err| format!("Error making temporary file for URL fetch: {}", err))
+          .and_then(|file| {
+            let hasher = hashing::WriterHasher::new(file);
+            response
+              .into_body()
+              .map_err(|err| format!("Error reading URL fetch response: {}", err))
+              .fold(hasher, |mut hasher, chunk| {
+                hasher
+                  .write_all(&chunk)
+                  .map(|_| hasher)
+                  .map_err(|err| format!("Error hashing/writing URL fetch response: {}", err))
+              }).map(|hasher| (hasher.finish(), file_name, tempdir))
+          }).to_boxed()
+      }).and_then(move |(actual_digest, file_name, tempdir)| {
+        if expected_digest != actual_digest {
+          return future::err(format!(
+            "Wrong digest for downloaded file: want {:?} got {:?}",
+            expected_digest, actual_digest
+          )).to_boxed();
+        }
 
-    fs::Snapshot::capture_snapshot_from_arbitrary_root(
-      core.store(),
-      core.fs_pool.clone(),
-      tempdir.path(),
-      fs::PathGlobs::create(
-        &[file_name],
-        &[],
-        StrictGlobMatching::Ignore,
-        GlobExpansionConjunction::AllMatch,
-      ).unwrap(),
-    ).join(future::ok(tempdir))
-    .map(|(snapshot, tempdir)| {
-      // Ensure tempdir lives until the snapshot is finished
-      std::mem::drop(tempdir);
-      snapshot
-    }).to_boxed()
+        fs::Snapshot::capture_snapshot_from_arbitrary_root(
+          core.store(),
+          core.fs_pool.clone(),
+          tempdir.path(),
+          fs::PathGlobs::create(
+            &[file_name],
+            &[],
+            StrictGlobMatching::Ignore,
+            GlobExpansionConjunction::AllMatch,
+          ).unwrap(),
+        ).join(future::ok(tempdir))
+        .map(|(snapshot, tempdir)| {
+          // Ensure tempdir lives until the snapshot is finished
+          std::mem::drop(tempdir);
+          snapshot
+        }).to_boxed()
+      }).to_boxed()
   }
 }
 
