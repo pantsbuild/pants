@@ -279,7 +279,9 @@ class RscCompile(ZincCompile):
         items_to_report_element(metacp_inputs, 'jar'),
         ' in the jdk')
 
-      safe_mkdir(index_dir)
+      # NB: Metacp doesn't handle the existence of possibly stale semanticdb jars,
+      # so we explicitly clean the directory to keep it happy.
+      safe_mkdir(index_dir, clean=True)
 
       with Timer() as timer:
         # Step 1: Convert classpath to SemanticDB
@@ -296,7 +298,7 @@ class RscCompile(ZincCompile):
           'metacp',
           args,
           distribution,
-          tgt='jdk',
+          tgt=target,
           input_files=tuple(
             # NB: no input files because the jdk is expected to exist on the system in a known
             #     location.
@@ -310,7 +312,7 @@ class RscCompile(ZincCompile):
 
         # Step 1.5: metai Index the semanticdbs
         # -------------------------------------
-        self._run_metai_tool(distribution, metai_classpath, rsc_index_dir, tgt='jdk')
+        self._run_metai_tool(distribution, metai_classpath, rsc_index_dir, tgt=target)
 
         self._jvm_lib_metacp_classpath = [os.path.join(get_buildroot(), x) for x in metai_classpath]
 
@@ -359,27 +361,28 @@ class RscCompile(ZincCompile):
           ' (',
           ctx.target.address.spec,
           ').')
-        # things to do
-        # collect jar dependencies outlines
-        # collect non-java dependencies
-        # metacp remaining java dependencies using jar and non-java deps as deps
-        # rsc sources,
-        #   providing metacp'd
-        #    - jar deps
-        #    - non-java deps
-        #    - metacp'd java deps
 
+        # This does the following
+        # - collect jar dependencies and metacp-classpath entries for them
+        # - collect the non-java targets and their classpath entries
+        # - break out java targets and their javac'd classpath entries
+        # metacp
+        # - metacp the java targets
+        # rsc
+        # - combine the metacp outputs for jars, previous scala targets and the java metacp
+        #   classpath
+        # - run Rsc on the current target with those as dependencies
 
+        dependencies_for_target = list(
+          DependencyContext.global_instance().dependencies_respecting_strict_deps(target))
 
-        strict_dependencies_for_target = list(DependencyContext.global_instance().dependencies_respecting_strict_deps(target))
-
-        jar_deps = [t for t in strict_dependencies_for_target if isinstance(t, JarLibrary)]
+        jar_deps = [t for t in dependencies_for_target if isinstance(t, JarLibrary)]
 
         def is_java_compile_target(t):
           return isinstance(t, JavaLibrary) or t.has_sources('.java')
-        java_deps = [t for t in strict_dependencies_for_target
+        java_deps = [t for t in dependencies_for_target
                      if is_java_compile_target(t)]
-        non_java_deps = [t for t in strict_dependencies_for_target
+        non_java_deps = [t for t in dependencies_for_target
                          if not (is_java_compile_target(t)) and not isinstance(t, JarLibrary)]
 
         metacped_jar_classpath_abs = _paths_from_classpath(
@@ -391,6 +394,7 @@ class RscCompile(ZincCompile):
         jar_rsc_classpath_paths = _paths_from_classpath(
           self.context.products.get_data('rsc_classpath').get_for_targets(jar_deps),
           collection_type=set)
+        jar_rsc_classpath_rel = fast_relpath_collection(jar_rsc_classpath_paths)
 
         non_java_paths = _paths_from_classpath(
           self.context.products.get_data('rsc_classpath').get_for_targets(non_java_deps),
@@ -400,7 +404,7 @@ class RscCompile(ZincCompile):
         java_paths = _paths_from_classpath(
           self.context.products.get_data('rsc_classpath').get_for_targets(java_deps),
           collection_type=set)
-        rel_java_paths = fast_relpath_collection(java_paths)
+        java_rel = fast_relpath_collection(java_paths)
 
         ctx.ensure_output_dirs_exist()
 
@@ -408,20 +412,20 @@ class RscCompile(ZincCompile):
         with Timer() as timer:
           # Step 1: Convert classpath to SemanticDB
           # ---------------------------------------
-          # If there are any un-metacp'd dependencies, metacp them so their indices can be passed to
-          # Rsc.
+          # If there are any as yet not metacp'd dependencies, metacp them so their indices can
+          # be passed to Rsc.
+          # TODO move these to their own jobs. https://github.com/pantsbuild/pants/issues/6754
 
           # Inputs
           # - Java dependencies jars
-          metacp_inputs = rel_java_paths
+          metacp_inputs = java_rel
 
           # Dependencies
           # - 3rdparty jars
           # - non-java, ie scala, dependencies
           # - jdk
-
-          snapshotable_metacp_dependencies = list(jar_rsc_classpath_paths) + \
-                                list(non_java_paths) + \
+          snapshotable_metacp_dependencies = list(jar_rsc_classpath_rel) + \
+                                list(non_java_rel) + \
                                 fast_relpath_collection(
                                   _paths_from_classpath(self._extra_compile_time_classpath))
           metacp_dependencies = snapshotable_metacp_dependencies + self._jvm_lib_jars_abs
@@ -447,15 +451,15 @@ class RscCompile(ZincCompile):
             metacp_stdout = stdout_contents(metacp_wu)
             metacp_result = json.loads(metacp_stdout)
 
-            metacped_java_dependency_paths = self._collect_metai_classpath(metacp_result,
-              rel_java_paths)
+            metacped_java_dependency_rel = self._collect_metai_classpath(metacp_result,
+              java_rel)
 
             # Step 1.5: metai Index the semanticdbs
             # -------------------------------------
-            self._run_metai_tool(distribution, metacped_java_dependency_paths, rsc_index_dir, tgt)
+            self._run_metai_tool(distribution, metacped_java_dependency_rel, rsc_index_dir, tgt)
           else:
             # NB: there are no unmetacp'd dependencies
-            metacped_java_dependency_paths = []
+            metacped_java_dependency_rel = []
 
 
           # Step 2: Outline Scala sources into SemanticDB
@@ -463,7 +467,7 @@ class RscCompile(ZincCompile):
           rsc_mjar_file = fast_relpath(ctx.rsc_mjar_file, get_buildroot())
 
           # TODO remove non-rsc entries from non_java_rel in a better way
-          rsc_semanticdb_classpath = metacped_java_dependency_paths + \
+          rsc_semanticdb_classpath = metacped_java_dependency_rel + \
                                      metacped_jar_classpath_rel + \
                                      [j for j in non_java_rel if 'compile/rsc/' in j]
           target_sources = ctx.sources
@@ -748,7 +752,7 @@ class RscCompile(ZincCompile):
         tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
         pathglobs = list(tool_classpath)
-        pathglobs.extend(input_files)
+        pathglobs.extend(f if os.path.isfile(f) else '{}/**'.format(f) for f in input_files)
         root = PathGlobsAndRoot(
           PathGlobs(tuple(pathglobs)),
           text_type(get_buildroot()))
