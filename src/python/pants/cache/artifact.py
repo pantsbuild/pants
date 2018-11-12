@@ -10,8 +10,10 @@ import shutil
 import tarfile
 from builtins import object, str
 
+from pants.engine.native import Native
 from pants.util.contextutil import open_tar
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_walk
+from pants.util.memo import memoized
 
 
 class ArtifactError(Exception):
@@ -94,6 +96,10 @@ class TarballArtifact(Artifact):
   def exists(self):
     return os.path.isfile(self._tarfile)
 
+  @memoized
+  def native(self):
+    return Native.create({})
+
   def collect(self, paths):
     # In our tests, gzip is slightly less compressive than bzip2 on .class files,
     # but decompression times are much faster.
@@ -132,6 +138,9 @@ class TarballArtifact(Artifact):
           except OSError as e:
             if e.errno != errno.EEXIST:
               raise
+        result = Native.NATIVE_SINGLETON.decompress_tarball(self._tarfile.encode('utf-8'),
+                                                             self._artifact_root.encode('utf-8'))
+        print(result)
         tarin.extractall(self._artifact_root)
         self._relpaths.update(paths)
     except tarfile.ReadError as e:

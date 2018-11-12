@@ -674,10 +674,14 @@ class ExternContext(object):
 class Native(object):
   """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
+  NATIVE_SINGLETON = None
+
   @staticmethod
   def create(bootstrap_options):
     """:param options: Any object that provides access to bootstrap option values."""
-    return Native(bootstrap_options.native_engine_visualize_to)
+    native = Native(bootstrap_options.native_engine_visualize_to)
+    Native.NATIVE_SINGLETON = native
+    return native
 
   def __init__(self, visualize_to_dir):
     """
@@ -791,6 +795,9 @@ class Native(object):
 
   def to_ids_buf(self, types):
     return self.context.type_ids_buf([TypeId(self.context.to_id(t)) for t in types])
+
+  def decompress_tarball(self, tarfile_path, dest_dir):
+    return self.lib.decompress_tarball(tarfile_path, dest_dir)
 
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
