@@ -41,6 +41,15 @@ python_tests(
 )
 
 python_tests(
+  name='depgraph_integration',
+  sources=['test_depgraph_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],
   dependencies = [
