@@ -92,6 +92,13 @@ default_test_config: &default_test_config
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
 
+osx_test_config: &osx_test_config
+  os: osx
+  stage: *test
+  language: generic
+  script:
+    - ./pants goals && ./pants help && ./pants list :: && ./pants clean-all
+
 default_cron_test_config: &default_cron_test_config
   <<: *default_test_config
   stage: *cron
@@ -112,6 +119,14 @@ matrix:
         - PREPARE_DEPLOY=1
       script:
         - ./pants --version && ./build-support/bin/release.sh -n
+
+    - name: "OSX 10.12 Really bad name"
+      <<: *osx_test_config
+      osx_image: xcode8.3
+
+    - name: "OSX 10.13 Really bad name"
+      <<: *osx_test_config
+      osx_image: xcode9.3
 
     # Build Linux engine
     - name: "Linux Native Engine Binary Builder"
