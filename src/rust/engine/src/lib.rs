@@ -444,14 +444,6 @@ pub extern "C" fn execution_add_root_select(
 }
 
 #[no_mangle]
-pub extern "C" fn decompress_tarball(
-  tar_path: *const raw::c_char,
-  output_dir: *const raw::c_char
-) {
-  tar_api::main();
-}
-
-#[no_mangle]
 pub extern "C" fn tasks_create() -> *const Tasks {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(Box::new(Tasks::new()))
@@ -528,6 +520,16 @@ pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u
 #[no_mangle]
 pub extern "C" fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
   with_scheduler(scheduler_ptr, |scheduler| scheduler.core.graph.len() as u64)
+}
+
+#[no_mangle]
+pub extern "C" fn decompress_tarball(
+  tar_path: *const raw::c_char,
+  output_dir: *const raw::c_char
+) -> PyResult {
+  tar_api::main()
+          .map_err(|e| format!("Failed to visualize to"))
+        .into()
 }
 
 #[no_mangle]
