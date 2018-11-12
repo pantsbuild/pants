@@ -140,7 +140,7 @@ class TarballArtifact(Artifact):
               raise
         result = Native.NATIVE_SINGLETON.decompress_tarball(self._tarfile.encode('utf-8'),
                                                              self._artifact_root.encode('utf-8'))
-        print(result)
+        print(result.is_throw)
         tarin.extractall(self._artifact_root)
         self._relpaths.update(paths)
     except tarfile.ReadError as e:
