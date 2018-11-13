@@ -4,9 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 import os
 import shutil
-from builtins import map, object, str
+from builtins import map, str
 from collections import defaultdict
 
 from pex.interpreter import PythonInterpreter
@@ -14,11 +15,17 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 from pex.variables import Variables
 
+from pants.backend.python.subsystems.python_repos import PythonRepos
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
+from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 from pants.util.memo import memoized_property
+
+
+logger = logging.getLogger(__name__)
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil
@@ -30,7 +37,15 @@ def _safe_link(src, dst):
   os.symlink(src, dst)
 
 
-class PythonInterpreterCache(object):
+# TODO: Move under subsystems/ .
+class PythonInterpreterCache(Subsystem):
+  """Finds python interpreters on the local system."""
+  options_scope = 'python-interpreter-cache'
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return (super(PythonInterpreterCache, cls).subsystem_dependencies() +
+            (PythonSetup, PythonRepos))
 
   class UnsatisfiableInterpreterConstraintsError(TaskError):
     """Indicates a python interpreter matching given constraints could not be located."""
@@ -49,7 +64,7 @@ class PythonInterpreterCache(object):
   def pex_python_paths(cls):
     """A list of paths to Python interpreter binaries as defined by a
     PEX_PYTHON_PATH defined in either in '/etc/pexrc', '~/.pexrc'.
-    PEX_PYTHON_PATH defines a colon-seperated list of paths to interpreters
+    PEX_PYTHON_PATH defines a colon-separated list of paths to interpreters
     that a pex can be built and ran against.
 
     :return: paths to interpreters as specified by PEX_PYTHON_PATH
@@ -61,10 +76,13 @@ class PythonInterpreterCache(object):
     else:
       return []
 
-  def __init__(self, python_setup, python_repos, logger=None):
-    self._python_setup = python_setup
-    self._python_repos = python_repos
-    self._logger = logger or (lambda msg: True)
+  @memoized_property
+  def _python_setup(self):
+    return PythonSetup.global_instance()
+
+  @memoized_property
+  def _python_repos(self):
+    return PythonRepos.global_instance()
 
   @memoized_property
   def _cache_dir(self):
@@ -137,7 +155,7 @@ class PythonInterpreterCache(object):
       if os.path.isdir(path):
         pi = self._interpreter_from_path(path, filters=filters)
         if pi:
-          self._logger('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
+          logger.debug('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
           yield pi
 
   def _setup_paths(self, paths, filters=()):
@@ -152,10 +170,9 @@ class PythonInterpreterCache(object):
       if pi:
         yield pi
 
-  def setup(self, paths=(), filters=()):
+  def setup(self, filters=()):
     """Sets up a cache of python interpreters.
 
-    :param paths: The paths to search for a python interpreter; the system ``PATH`` by default.
     :param filters: A sequence of strings that constrain the interpreter compatibility for this
       cache, using the Requirement-style format, e.g. ``'CPython>=3', or just ['>=2.7','<3']``
       for requirements agnostic to interpreter class.
@@ -166,11 +183,10 @@ class PythonInterpreterCache(object):
     # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
     # an escape hatch.
     filters = filters if any(filters) else self._python_setup.interpreter_constraints
-    setup_paths = (paths
-                   or self.pex_python_paths()
+    setup_paths = (self.pex_python_paths()
                    or self._python_setup.interpreter_search_paths
                    or os.getenv('PATH').split(os.pathsep))
-    self._logger(
+    logger.debug(
       'Initializing Python interpreter cache matching filters `{}` from paths `{}`'.format(
         ':'.join(filters), ':'.join(setup_paths)))
 
@@ -184,13 +200,13 @@ class PythonInterpreterCache(object):
         interpreters.extend(self._setup_paths(setup_paths, filters=filters))
 
     for filt in unsatisfied_filters(interpreters):
-      self._logger('No valid interpreters found for {}!'.format(filt))
+      logger.debug('No valid interpreters found for {}!'.format(filt))
 
     matches = list(self._matching(interpreters, filters=filters))
     if len(matches) == 0:
-      self._logger('Found no valid interpreters!')
+      logger.debug('Found no valid interpreters!')
 
-    self._logger(
+    logger.debug(
       'Initialized Python interpreter cache with {}'.format(', '.join([x.binary for x in matches])))
     return matches
 
@@ -220,7 +236,7 @@ class PythonInterpreterCache(object):
     if bdist:
       return interpreter.with_extra(bdist.name, bdist.raw_version, bdist.path)
     else:
-      self._logger('Failed to resolve requirement {} for {}'.format(requirement, interpreter))
+      logger.debug('Failed to resolve requirement {} for {}'.format(requirement, interpreter))
 
   def _resolve_and_link(self, interpreter, requirement, target_link):
     # Short-circuit if there is a local copy.
@@ -252,5 +268,5 @@ class PythonInterpreterCache(object):
     target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
     shutil.move(dist_location, target_location)
     _safe_link(target_location, target_link)
-    self._logger('    installed {}'.format(target_location))
+    logger.debug('    installed {}'.format(target_location))
     return Package.from_href(target_location)
