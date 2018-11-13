@@ -5,12 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import cgi
+import collections
 import json
 import os
 import re
 import shutil
 from builtins import object, open, range
-from collections import defaultdict
 from datetime import datetime
 
 from pystache import Renderer
@@ -329,7 +329,7 @@ def generate_page_toc(soup):
   # Maybe we don't want to show all the headings. E.g., it's common for a page
   # to have just one H1, a title at the top. Our heuristic: if a page has just
   # one heading of some outline level, don't show it.
-  found_depth_counts = defaultdict(int)
+  found_depth_counts = collections.defaultdict(int)
   for tag in soup.find_all(_heading_re):
     if (tag.get('id') or tag.get('name')):
       found_depth_counts[hdepth(tag)] += 1

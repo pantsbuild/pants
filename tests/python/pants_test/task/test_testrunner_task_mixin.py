@@ -4,9 +4,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import collections
 import os
 from builtins import next, object, open
-from collections import namedtuple
 from contextlib import contextmanager
 from unittest import TestCase
 from xml.etree.ElementTree import ParseError
@@ -26,7 +26,7 @@ class DummyTestTarget(object):
   def __init__(self, name, timeout=None):
     self.name = name
     self.timeout = timeout
-    self.address = namedtuple('address', ['spec'])(name)
+    self.address = collections.namedtuple('address', ['spec'])(name)
 
 targetA = DummyTestTarget('TargetA')
 targetB = DummyTestTarget('TargetB', timeout=1)

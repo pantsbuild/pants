@@ -4,11 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import collections
 import contextlib
 import multiprocessing
 import os
 import re
-from collections import namedtuple
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
@@ -21,7 +21,7 @@ from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 
 
-Jvmdoc = namedtuple('Jvmdoc', ['tool_name', 'product_type'])
+Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])
 
 
 # TODO: Shouldn't this be a NailgunTask?
