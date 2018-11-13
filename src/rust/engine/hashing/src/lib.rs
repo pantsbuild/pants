@@ -150,10 +150,13 @@ impl<W: Write> WriterHasher<W> {
   ///
   /// Returns the result of fingerprinting this stream, and Drops the stream.
   ///
-  pub fn finish(self) -> Digest {
-    Digest(
-      Fingerprint::from_bytes_unsafe(&self.hasher.fixed_result()),
-      self.byte_count,
+  pub fn finish(self) -> (Digest, W) {
+    (
+      Digest(
+        Fingerprint::from_bytes_unsafe(&self.hasher.fixed_result()),
+        self.byte_count,
+      ),
+      self.inner,
     )
   }
 }
@@ -304,14 +307,15 @@ mod hasher_tests {
     let dst = Vec::with_capacity(10);
     let mut hasher = super::WriterHasher::new(dst);
     assert_eq!(std::io::copy(&mut src, &mut hasher).unwrap(), 4);
-    assert_eq!(
-      hasher.finish(),
+    let want = (
       super::Digest(
         super::Fingerprint::from_hex_string(
-          "23e92dfba8fb0c93cfba31ad2962b4e35a47054296d1d375d7f7e13e0185de7a"
+          "23e92dfba8fb0c93cfba31ad2962b4e35a47054296d1d375d7f7e13e0185de7a",
         ).unwrap(),
-        4
+        4,
       ),
+      "meep".as_bytes().to_vec(),
     );
+    assert_eq!(hasher.finish(), want);
   }
 }

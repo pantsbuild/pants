@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import functools
 import os
+import re
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
@@ -42,6 +43,13 @@ class Jacoco(CoverageEngine):
                               jacoco_jar(name='org.jacoco.cli')
                             ])
 
+      register('--target-filters', type=list, default=[],
+          help='Regex patterns passed to jacoco, specifying which targets should be '
+              'included in reports. All targets matching any of the patterns will be '
+              'included when generating reports. If no targets are specified, all '
+              'targets are included, which would be the same as specifying ".*" as a '
+              'filter.')
+
     def create(self, settings, targets, execute_java_for_targets):
       """
       :param settings: Generic code coverage settings.
@@ -58,11 +66,13 @@ class Jacoco(CoverageEngine):
                                                scope='jacoco')
       cli_path = self.tool_classpath_from_products(settings.context.products, 'jacoco-cli',
                                                    scope='jacoco')
-      return Jacoco(settings, agent_path, cli_path, targets, execute_java_for_targets)
+      target_filters = Jacoco.Factory.global_instance().get_options().target_filters
+
+      return Jacoco(settings, agent_path, cli_path, targets, target_filters, execute_java_for_targets)
 
   _DATAFILE_NAME = 'jacoco.exec'
 
-  def __init__(self, settings, agent_path, cli_path, targets, execute_java_for_targets):
+  def __init__(self, settings, agent_path, cli_path, targets, target_filters, execute_java_for_targets):
     """
     :param settings: Generic code coverage settings.
     :type settings: :class:`CodeCoverageSettings`
@@ -77,7 +87,8 @@ class Jacoco(CoverageEngine):
     options = settings.options
     self._context = settings.context
     self._targets = targets
-    self._coverage_targets = {t for t in targets if self.is_coverage_target(t)}
+    self._target_filters = target_filters
+    self._coverage_targets = self._get_jacoco_coverage_targets(targets)
     self._agent_path = agent_path
     self._cli_path = cli_path
     self._execute_java = functools.partial(execute_java_for_targets, targets)
@@ -145,16 +156,31 @@ class Jacoco(CoverageEngine):
     if self._settings.coverage_open:
       return os.path.join(report_dir, 'html', 'index.html')
 
+  def _get_jacoco_coverage_targets(self, targets):
+    coverage_targets = {t for t in targets if (self.is_coverage_target(t) and self._include_target(t))}
+    if len(coverage_targets) == 0:
+      raise TaskError("No coverage target specs matched jacoco report filters ({0})".format(self._target_filters))
+    return coverage_targets
+
   def _get_target_classpaths(self):
     runtime_classpath = self._context.products.get_data('runtime_classpath')
 
     target_paths = []
-    for target in self._coverage_targets:
+    for target in self._coverage_targets: 
       paths = runtime_classpath.get_for_target(target)
       for (name, path) in paths:
         target_paths.append(path)
 
     return self._make_multiple_arg('--classfiles', target_paths)
+
+  def _include_target(self, target):
+    if len(self._target_filters) == 0:
+      return True
+    else:
+      for filter in self._target_filters:
+        if re.search(filter, target.address.spec) is not None:
+          return True
+    return False
 
   def _get_source_roots(self):
     source_roots = {t.target_base for t in self._coverage_targets}
