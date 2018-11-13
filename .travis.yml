@@ -97,7 +97,7 @@ osx_test_config: &osx_test_config
   stage: *test
   language: generic
   script:
-    - ./pants goals && ./pants help && ./pants list :: && ./pants clean-all
+    - ./build-support/bin/travis-ci.sh -m
 
 default_cron_test_config: &default_cron_test_config
   <<: *default_test_config
