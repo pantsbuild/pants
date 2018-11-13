@@ -65,7 +65,6 @@ extern crate resettable;
 extern crate smallvec;
 extern crate tar_api;
 extern crate tempfile;
-extern crate tempfile;
 extern crate tokio;
 extern crate ui;
 extern crate url;
