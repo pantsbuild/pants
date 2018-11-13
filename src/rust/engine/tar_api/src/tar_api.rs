@@ -19,10 +19,13 @@ pub fn decompress_tgz(tar_path: &Path, output_dir: &Path) -> Result<(), std::io:
   Ok(())
 }
 
-fn compress() -> Result<(), std::io::Error> {
+pub fn compress() -> Result<(), std::io::Error> {
   let tar_gz = File::create("archive.tar.gz")?;
   let enc = GzEncoder::new(tar_gz, Compression::default());
   let mut tar = tar::Builder::new(enc);
-  tar.append_dir_all("backup/logs", "/var/log")?;
+  let mut f = File::open("/tmp/good/gen/scrooge/297e53822ddf/wilyns.thrift.src.main.thrift.thrift-scala/c8959dfdc97a/com/twitter/wilyns/thriftscala/LookupRequest.scala").unwrap();
+
+  tar.append_file("gen/scrooge/297e53822ddf/wilyns.thrift.src.main.thrift.thrift-scala/c8959dfdc97a/com/twitter/wilyns/thriftscala/LookupRequest.scala",
+                 &mut f )?;
   Ok(())
 }

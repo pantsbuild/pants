@@ -9,6 +9,9 @@ use std::process::exit;
 fn main() {
   let matches = &App::new("tar_api")
     .subcommand(
+      SubCommand::with_name("tar")
+    )
+    .subcommand(
       SubCommand::with_name("untar")
         .arg(Arg::with_name("file").required(true).takes_value(
           true,
@@ -34,6 +37,15 @@ fn main() {
       &tar_file,
       &dest,
     ) {
+      Ok(_) => {}
+      Err(err) => {
+        eprintln!("{}", err);
+        exit(1)
+      }
+    };
+  }
+  if let Some(sub_matches) = matches.subcommand_matches("tar") {
+    match tar_api::compress() {
       Ok(_) => {}
       Err(err) => {
         eprintln!("{}", err);
