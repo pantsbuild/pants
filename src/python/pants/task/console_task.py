@@ -26,8 +26,6 @@ class ConsoleTask(QuietTaskMixin, Task):
              help='String to use to separate results.')
     register('--output-file', metavar='<path>',
              help='Write the console output to this file instead.')
-    register('--not-really-useful-you-should-delete-me',
-             help='No really, I should be gone')
 
   def __init__(self, *args, **kwargs):
     super(ConsoleTask, self).__init__(*args, **kwargs)
