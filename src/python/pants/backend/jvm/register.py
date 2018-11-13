@@ -5,6 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.artifact import Artifact
+from pants.backend.jvm.dependency_constraints import (DependencyConstraints, JvmPackageConstraint,
+                                                      Tag, TestDependencies)
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository as repo
@@ -34,8 +36,7 @@ from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
-from pants.backend.jvm.tasks.check_banned_deps import (CheckBannedDeps, DependencyConstraints,
-                                                       JvmPackageConstraint, Tag, TestDependencies)
+from pants.backend.jvm.tasks.check_banned_deps import CheckBannedDeps
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
 from pants.backend.jvm.tasks.classmap import ClassmapTask

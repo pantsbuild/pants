@@ -15,12 +15,6 @@ scala_library(
 
 # Target that bans a tag in another target
 scala_library(
-    name="nodeps",
-    sources=["Main.scala"],
-    tags=["deprecated"],
-)
-
-scala_library(
     name="ban_tags",
     sources=["Main.scala"],
     dependency_constraints=
@@ -34,11 +28,6 @@ scala_library(
 )
 
 # Ban test dependencies
-junit_tests(
-    name="testlib",
-    sources=["Spec.scala"]
-)
-
 scala_library(
     name="ban_testdeps",
     sources=["Main.scala"],
@@ -46,4 +35,15 @@ scala_library(
     dependency_constraints=DependencyConstraints(
         [TestDependencies()]
     )
+)
+
+scala_library(
+    name="nodeps",
+    sources=["Main.scala"],
+    tags=["deprecated"],
+)
+
+junit_tests(
+    name="testlib",
+    sources=["Spec.scala"]
 )
