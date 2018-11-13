@@ -423,6 +423,8 @@ class Zinc(object):
 
   def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None):
     """Compute the compile classpath for the given target."""
+
+    # I think i need to add validation down this chain
     return list(
       entry.path
         for entry in self.compile_classpath_entries(classpath_product_key, target, extra_cp_entries)
