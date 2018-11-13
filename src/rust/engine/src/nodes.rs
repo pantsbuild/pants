@@ -3,16 +3,17 @@
 
 use std;
 use std::collections::{BTreeMap, HashMap};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future::{self, Future};
-use reqwest;
-use tempfile;
+use futures::Stream;
 use url::Url;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
+use bytes::{self, BufMut};
 use context::{Context, Core};
 use core::{throw, Failure, Key, Params, TypeConstraint, Value};
 use externs;
@@ -680,11 +681,13 @@ impl DownloadedFile {
     core
       .store()
       .load_file_bytes_with(digest, |_| ())
-      .and_then(move |maybe_bytes| match maybe_bytes {
-        Some(_) => {
-          DownloadedFile::snapshot_of_one_file(core.store(), PathBuf::from(file_name), digest)
-        }
-        None => DownloadedFile::download(&core, &url, file_name, digest),
+      .and_then(move |maybe_bytes| {
+        maybe_bytes
+          .map(|()| future::ok(()).to_boxed())
+          .unwrap_or_else(|| DownloadedFile::download(core.clone(), url, file_name.clone(), digest))
+          .and_then(move |()| {
+            DownloadedFile::snapshot_of_one_file(core.store(), PathBuf::from(file_name), digest)
+          })
       }).to_boxed()
   }
 
@@ -718,86 +721,95 @@ impl DownloadedFile {
   }
 
   fn download(
-    core: &Arc<Core>,
-    url: &Url,
+    core: Arc<Core>,
+    url: Url,
     file_name: String,
     expected_digest: hashing::Digest,
-  ) -> BoxFuture<fs::Snapshot, String> {
-    let tempdir = try_future!(
-      tempfile::TempDir::new()
-        .map_err(|err| format!("Error making tempdir to download file: {}", err))
-    );
-
+  ) -> BoxFuture<(), String> {
     // TODO: Retry failures
-    // TODO: Share a client which is pre-configured.
-    // TODO: Async
-    let actual_digest = try_future!(
-      reqwest::Client::new()
-        .get(url.clone())
-        .send()
-        .map_err(|err| format!("Error downloading file: {}", err))
-        .and_then(|response| {
-          // Handle common HTTP errors.
-          if response.status().is_server_error() {
-            Err(format!(
-              "Server error ({}) downloading file {} from {}",
-              response.status().as_str(),
-              file_name,
-              url,
-            ))
-          } else if response.status().is_client_error() {
-            Err(format!(
-              "Client error ({}) downloading file {} from {}",
-              response.status().as_str(),
-              file_name,
-              url,
-            ))
-          } else {
-            Ok(response)
+    core
+      .http_client()
+      .get(url.clone())
+      .send()
+      .map_err(|err| format!("Error downloading file: {}", err))
+      .and_then(move |response| {
+        // Handle common HTTP errors.
+        if response.status().is_server_error() {
+          Err(format!(
+            "Server error ({}) downloading file {} from {}",
+            response.status().as_str(),
+            file_name,
+            url,
+          ))
+        } else if response.status().is_client_error() {
+          Err(format!(
+            "Client error ({}) downloading file {} from {}",
+            response.status().as_str(),
+            file_name,
+            url,
+          ))
+        } else {
+          Ok(response)
+        }
+      }).and_then(move |response| {
+        struct SizeLimiter<W: std::io::Write> {
+          writer: W,
+          written: usize,
+          size_limit: usize,
+        }
+
+        impl<W: std::io::Write> Write for SizeLimiter<W> {
+          fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
+            let new_size = self.written + buf.len();
+            if new_size > self.size_limit {
+              Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Downloaded file was larger than expected digest",
+              ))
+            } else {
+              self.written = new_size;
+              self.writer.write_all(buf)?;
+              Ok(buf.len())
+            }
           }
-        }).and_then(|mut response| {
-          // Copy the contents of response into a file and modify its permissions.
-          let temp_file_path = tempdir.path().join(&file_name);
-          std::fs::File::create(&temp_file_path)
-            .and_then(|file| {
-              use std::os::unix::fs::PermissionsExt;
-              std::fs::metadata(temp_file_path).and_then(|metadata| {
-                let mut permissions = metadata.permissions();
-                permissions.set_mode(0o755);
-                file.set_permissions(permissions)?;
-                Ok(file)
-              })
-            }).and_then(|file| {
-              let mut hasher = hashing::WriterHasher::new(file);
-              std::io::copy(&mut response, &mut hasher)?;
-              Ok(hasher)
-            }).map_err(|err| format!("Error copying the downloaded file to disk: {}", err))
-        })
-    ).finish();
 
-    if expected_digest != actual_digest {
-      return future::err(format!(
-        "Wrong digest for downloaded file: want {:?} got {:?}",
-        expected_digest, actual_digest
-      )).to_boxed();
-    }
+          fn flush(&mut self) -> Result<(), std::io::Error> {
+            self.writer.flush()
+          }
+        }
 
-    fs::Snapshot::capture_snapshot_from_arbitrary_root(
-      core.store(),
-      core.fs_pool.clone(),
-      tempdir.path(),
-      fs::PathGlobs::create(
-        &[file_name],
-        &[],
-        StrictGlobMatching::Ignore,
-        GlobExpansionConjunction::AllMatch,
-      ).unwrap(),
-    ).join(future::ok(tempdir))
-    .map(|(snapshot, tempdir)| {
-      // Ensure tempdir lives until the snapshot is finished
-      std::mem::drop(tempdir);
-      snapshot
-    }).to_boxed()
+        let hasher = hashing::WriterHasher::new(SizeLimiter {
+          writer: bytes::BytesMut::with_capacity(expected_digest.1).writer(),
+          written: 0,
+          size_limit: expected_digest.1,
+        });
+
+        response
+          .into_body()
+          .map_err(|err| format!("Error reading URL fetch response: {}", err))
+          .fold(hasher, |mut hasher, chunk| {
+            hasher
+              .write_all(&chunk)
+              .map(|_| hasher)
+              .map_err(|err| format!("Error hashing/writing URL fetch response: {}", err))
+          }).map(|hasher| {
+            let (digest, bytewriter) = hasher.finish();
+            (digest, bytewriter.writer.into_inner().freeze())
+          })
+      }).and_then(move |(actual_digest, buf)| {
+        if expected_digest != actual_digest {
+          return future::err(format!(
+            "Wrong digest for downloaded file: want {:?} got {:?}",
+            expected_digest, actual_digest
+          )).to_boxed();
+        }
+
+        core
+          .store()
+          .store_file_bytes(buf, true)
+          .map(|_| ())
+          .to_boxed()
+      }).to_boxed()
   }
 }
 

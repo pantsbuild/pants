@@ -9,14 +9,11 @@ use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::string::FromUtf8Error;
 
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
-// enum_primitive is sadly un-hygienic :(
-use enum_primitive::{
-  enum_from_primitive, enum_from_primitive_impl, enum_from_primitive_impl_ty, FromPrimitive,
-};
 use handles::{DroppingHandle, Handle};
 use interning::Interns;
 use lazy_static::lazy_static;
 use log;
+use num_enum::CustomTryInto;
 use parking_lot::RwLock;
 
 pub fn eval(python: &str) -> Result<Value, Failure> {
@@ -588,8 +585,8 @@ where
 }
 
 // This is a hard-coding of constants in the standard logging python package.
-enum_from_primitive! {
-#[derive(Debug, Eq, PartialEq)]
+// TODO: Switch from CustomTryInto to TryFromPrimitive when try_from is stable.
+#[derive(Debug, Eq, PartialEq, CustomTryInto)]
 #[repr(u8)]
 enum PythonLogLevel {
   NotSet = 0,
@@ -600,7 +597,6 @@ enum PythonLogLevel {
   Warn = 30,
   Error = 40,
   Critical = 50,
-}
 }
 
 impl From<log::Level> for PythonLogLevel {
@@ -641,14 +637,14 @@ impl FfiLogger {
   // init must only be called once in the lifetime of the program. No other loggers may be init'd.
   // If either of the above are violated, expect a panic.
   pub fn init(&'static mut self, max_level: u8) {
-    let max_python_level = PythonLogLevel::from_u8(max_level);
+    let max_python_level = max_level.try_into_PythonLogLevel();
     self.level_filter = {
       match max_python_level {
-        Some(python_level) => {
+        Ok(python_level) => {
           let level: log::LevelFilter = python_level.into();
           level
         }
-        None => panic!("Unrecognised log level from python: {}", max_level),
+        Err(err) => panic!("Unrecognised log level from python: {}: {}", max_level, err),
       }
     };
 
