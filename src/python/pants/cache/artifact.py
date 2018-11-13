@@ -12,7 +12,7 @@ from builtins import object, str
 
 from pants.base.exceptions import TaskError
 from pants.engine.native import Native
-from pants.util.contextutil import open_tar
+from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_walk
 from pants.util.memo import memoized
 
@@ -130,7 +130,7 @@ class TarballArtifact(Artifact):
         for tarinfo in tarin.getmembers():
           paths.append(tarinfo.name)
           if tarinfo.isdir():
-            dirs.add(tarinfo.name)
+            dirs.add(os.path.normpath(tarinfo.name))
           else:
             dirs.add(os.path.dirname(tarinfo.name))
         for d in dirs:
@@ -139,12 +139,25 @@ class TarballArtifact(Artifact):
           except OSError as e:
             if e.errno != errno.EEXIST:
               raise
-        print('\n' + self._tarfile)
-        result = Native.NATIVE_SINGLETON.decompress_tarball(self._tarfile.encode('utf-8'),
-                                                            self._artifact_root.encode('utf-8'))
-        if result.is_throw:
-          raise TaskError("untar failed.")
-        # tarin.extractall(self._artifact_root)
+        # print('\n' + self._tarfile)
+        tarin.extractall(self._artifact_root)
         self._relpaths.update(paths)
+        with temporary_dir() as tmp_dir:
+
+          result = Native.NATIVE_SINGLETON.decompress_tarball(self._tarfile.encode('utf-8'),
+                                                              tmp_dir.encode('utf-8'))
+          if result.is_throw:
+            raise TaskError("untar failed.")
+
+          # import subprocess
+          # new = subprocess.check_output(['find', tmp_dir, '-type', 'f']).splitlines()
+          # # if len(tarin.getmembers()) + 5 != len(new):
+          # #   print(new)
+          # if len(paths) - len(dirs) != len(new):
+          #   import pdb
+          #   pdb.set_trace()
+          #   x = 5
+
+
     except tarfile.ReadError as e:
       raise ArtifactError(str(e))

@@ -206,7 +206,7 @@ class SubprocPool(object):
   def foreground(cls):
     with cls._lock:
       if cls._pool is None:
-        cls._pool = ThreadPool(processes=cls._num_processes,
+        cls._pool = ThreadPool(processes=1,
                                          initializer=SubprocPool.worker_init)
       return cls._pool
 

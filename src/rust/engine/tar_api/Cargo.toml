@@ -6,6 +6,11 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 [lib]
 path = "src/tar_api.rs"
 
+[[bin]]
+name = "tar-cli"
+path = "src/main.rs"
+
 [dependencies]
 flate2 = "1.0"
 tar = "0.4"
+clap = "2"
