@@ -12,8 +12,8 @@ use futures::future::{self, Future};
 use context::{Context, Core};
 use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
 use graph::{EntryId, Graph, InvalidationResult, Node, NodeContext};
-use log::{debug, info, warn};
 use indexmap::IndexMap;
+use log::{debug, info, warn};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use parking_lot::Mutex;
 use rule_graph;
@@ -300,25 +300,7 @@ impl Scheduler {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
       } else if let Some(display) = optional_display.as_mut() {
-        // Update the graph. To do that, we iterate over heavy hitters.
-        let mut heavy_hitters: Vec<(String, Duration)> = self
-          .core
-          .graph
-          .heavy_hitters(&roots, display.worker_count());
-        // Insert every one in the set of tasks to display.
-        for (task, duration) in &heavy_hitters {
-          // TODO I don't really want to trigger the clone unconditionally, but using an
-          // if x.contains {} here seems to kind of defeat the purpose of using a set
-          tasks_to_display.insert(task.clone(), *duration);
-        }
-        // And remove the tasks that no longer should be there.
-        for (task, duration) in tasks_to_display.clone().into_iter() {
-          let mut remove = false;
-          if !heavy_hitters.contains(&(task.to_string(), duration)) {
-            tasks_to_display.swap_remove(&task);
-          }
-        }
-        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, &tasks_to_display);
+        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, &mut tasks_to_display);
       }
     };
     if let Some(display) = optional_display.as_mut() {
@@ -337,8 +319,19 @@ impl Scheduler {
     graph: &Graph<NodeKey>,
     roots: &[NodeKey],
     display: &mut EngineDisplay,
-    tasks_to_display: &IndexMap<String, Duration>,
+    tasks_to_display: &mut IndexMap<String, Duration>,
   ) {
+    // Update the graph. To do that, we iterate over heavy hitters.
+    let heavy_hitters: Vec<(String, Duration)> =
+      graph.heavy_hitters(&roots, display.worker_count());
+    // Insert every one in the set of tasks to display.
+    tasks_to_display.extend(heavy_hitters.iter().cloned());
+    // And remove the tasks that no longer should be there.
+    for (task, duration) in tasks_to_display.clone().into_iter() {
+      if !heavy_hitters.contains(&(task.to_string(), duration)) {
+        tasks_to_display.swap_remove(&task);
+      }
+    }
     let display_worker_count = display.worker_count();
     let ongoing_tasks = tasks_to_display;
     for (i, id) in ongoing_tasks.iter().enumerate() {
