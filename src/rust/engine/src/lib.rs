@@ -48,7 +48,7 @@ mod tasks;
 mod types;
 
 extern crate boxfuture;
-extern crate enum_primitive;
+extern crate bytes;
 extern crate fnv;
 extern crate fs;
 extern crate futures;
@@ -57,6 +57,7 @@ extern crate hashing;
 extern crate itertools;
 extern crate lazy_static;
 extern crate log;
+extern crate num_enum;
 extern crate parking_lot;
 extern crate process_execution;
 extern crate reqwest;
