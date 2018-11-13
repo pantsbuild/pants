@@ -97,7 +97,7 @@ osx_test_config: &osx_test_config
   stage: *test
   language: generic
   script:
-    - ./pants goals && ./pants help && ./pants list :: && ./pants clean-all
+    - ./build-support/bin/travis-ci.sh -m
 
 default_cron_test_config: &default_cron_test_config
   <<: *default_test_config
@@ -120,11 +120,11 @@ matrix:
       script:
         - ./pants --version && ./build-support/bin/release.sh -n
 
-    - name: "OSX 10.12 Really bad name"
+    - name: "OSX 10.12 Sanity Check"
       <<: *osx_test_config
       osx_image: xcode8.3
 
-    - name: "OSX 10.13 Really bad name"
+    - name: "OSX 10.13 Sanity Check"
       <<: *osx_test_config
       osx_image: xcode9.3
 
