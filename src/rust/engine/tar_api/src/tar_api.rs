@@ -6,7 +6,7 @@ use std::fs::File;
 use std::path::Path;
 use tar::Archive;
 
-pub fn main(tar_path: &Path, output_dir: &Path) -> Result<(), std::io::Error> {
+pub fn decompress_tgz(tar_path: &Path, output_dir: &Path) -> Result<(), std::io::Error> {
   //  let path = "archive.tar.gz";
   //
   let tar_gz = File::open(tar_path)?;

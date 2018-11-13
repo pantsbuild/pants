@@ -534,7 +534,7 @@ pub extern "C" fn decompress_tarball(
 
   let output_dir_str = PathBuf::from(tmp_2);
 
-  tar_api::main(tar_path_str.as_path(), output_dir_str.as_path())
+  tar_api::decompress_tgz(tar_path_str.as_path(), output_dir_str.as_path())
     .map_err(|e| {
       format!(
         "Failed to untar {:?} to {:?}:\n{:?}",
