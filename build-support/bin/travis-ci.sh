@@ -53,4 +53,7 @@ $(list_pythons | sort -u)
 EOF
 fi
 
+stty size
+stty cols 120
+
 exec ./build-support/bin/ci.sh "$@"
