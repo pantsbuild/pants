@@ -1733,20 +1733,21 @@ mod remote {
       hasher.input(&bytes);
       let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
       let len = bytes.len();
+      let digest = Digest(fingerprint, len);
       let resource_name = format!(
         "{}/uploads/{}/blobs/{}/{}",
         self.instance_name.clone().unwrap_or_default(),
         uuid::Uuid::new_v4(),
-        fingerprint,
-        bytes.len()
+        digest.0,
+        digest.1,
       );
       match self
         .byte_stream_client
         .write_opt(self.call_option().timeout(self.upload_timeout))
       {
         Err(err) => future::err(format!(
-          "Error attempting to connect to upload fingerprint {}: {:?}",
-          fingerprint, err
+          "Error attempting to connect to upload digest {:?}: {:?}",
+          digest, err
         )).to_boxed(),
         Ok((sender, receiver)) => {
           let chunk_size_bytes = self.chunk_size_bytes;
@@ -1772,25 +1773,24 @@ mod remote {
             );
 
           future::ok(self.byte_stream_client.clone())
-            .join(sender.send_all(stream).map_err(move |e| {
-              format!(
-                "Error attempting to upload fingerprint {}: {:?}",
-                fingerprint, e
-              )
-            })).and_then(move |_| {
+            .join(
+              sender.send_all(stream).map_err(move |e| {
+                format!("Error attempting to upload digest {:?}: {:?}", digest, e)
+              }),
+            ).and_then(move |_| {
               receiver.map_err(move |e| {
                 format!(
-                  "Error from server when uploading fingerprint {}: {:?}",
-                  fingerprint, e
+                  "Error from server when uploading digest {:?}: {:?}",
+                  digest, e
                 )
               })
             }).and_then(move |received| {
               if received.get_committed_size() == len as i64 {
-                Ok(Digest(fingerprint, len))
+                Ok(digest)
               } else {
                 Err(format!(
-                  "Uploading file with fingerprint {}: want commited size {} but got {}",
-                  fingerprint,
+                  "Uploading file with digest {:?}: want commited size {} but got {}",
+                  digest,
                   len,
                   received.get_committed_size()
                 ))
@@ -2121,7 +2121,7 @@ mod remote {
         .wait()
         .expect_err("Want error");
       assert!(
-        error.contains("Error attempting to upload fingerprint"),
+        error.contains("Error attempting to upload digest"),
         format!("Bad error message, got: {}", error)
       );
     }
