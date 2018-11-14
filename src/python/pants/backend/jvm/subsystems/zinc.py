@@ -431,6 +431,7 @@ class Zinc(object):
 
     # Verify that all classpath entries are under the build root.
     for entry in classpath_entries:
-      assert entry.startswith(get_buildroot())
+      assert entry.startswith(get_buildroot()), \
+             "Classpath entry does not start with buildroot: {}".format(entry)
 
     return classpath_entries
