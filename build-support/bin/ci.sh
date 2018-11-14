@@ -270,7 +270,7 @@ if [[ "${run_integration:-false}" == "true" ]]; then
     fi
     ./pants.pex --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
-      $targets -- ${PYTEST_PASSTHRU_ARGS}
+      $targets -- ${PYTEST_PASSTHRU_ARGS} -s -k TestIntegrationTest
   ) || die "Pants Integration test failure"
   end_travis_section
 fi
