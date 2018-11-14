@@ -810,3 +810,12 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+python_tests(
+  name = 'check_banned_deps_integration',
+  sources = ['test_check_banned_deps_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
