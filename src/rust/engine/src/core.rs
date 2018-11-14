@@ -54,6 +54,30 @@ impl Params {
       .ok()
       .map(|idx| &self.0[idx])
   }
+
+  ///
+  /// Given a set of either param type or param value strings: sort, join, and render as one string.
+  ///
+  pub fn display(mut params: Vec<String>) -> String {
+    match params.len() {
+      0 => "()".to_string(),
+      1 => params.iter().next().unwrap().to_string(),
+      _ => {
+        params.sort();
+        format!("({})", params.join("+"))
+      }
+    }
+  }
+}
+
+impl fmt::Display for Params {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(
+      f,
+      "{}",
+      Self::display(self.0.iter().map(|k| format!("{}", k)).collect())
+    )
+  }
 }
 
 pub type Id = u64;
@@ -98,6 +122,12 @@ impl PartialEq for Key {
 impl hash::Hash for Key {
   fn hash<H: hash::Hasher>(&self, state: &mut H) {
     self.id.hash(state);
+  }
+}
+
+impl fmt::Display for Key {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", externs::key_to_str(self))
   }
 }
 

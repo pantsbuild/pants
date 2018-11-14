@@ -6,7 +6,7 @@ use std::io;
 
 use itertools::Itertools;
 
-use core::{Function, Key, TypeConstraint, TypeId, Value, ANY_TYPE};
+use core::{Function, Key, Params, TypeConstraint, TypeId, Value, ANY_TYPE};
 use externs;
 use selectors::{Get, Select};
 use tasks::{Intrinsic, Task, Tasks};
@@ -809,16 +809,11 @@ pub fn type_str(type_id: TypeId) -> String {
 }
 
 pub fn params_str(params: &ParamTypes) -> String {
-  let mut param_names = params
+  let param_names = params
     .iter()
     .map(|type_id| type_str(*type_id))
     .collect::<Vec<_>>();
-  param_names.sort();
-  match param_names.len() {
-    0 => "()".to_string(),
-    1 => param_names.iter().next().unwrap().to_string(),
-    _ => format!("({})", param_names.join("+")),
-  }
+  Params::display(param_names)
 }
 
 fn val_name(val: &Value) -> String {

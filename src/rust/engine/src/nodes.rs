@@ -1106,15 +1106,11 @@ impl Node for NodeKey {
       &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
       &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
-      &NodeKey::Select(ref s) => format!(
-        "Select({}, {})",
-        keystr(&s.params.expect_single()),
-        typstr(&s.selector.product)
-      ),
+      &NodeKey::Select(ref s) => format!("Select({}, {})", s.params, typstr(&s.selector.product)),
       &NodeKey::Task(ref s) => format!(
         "Task({}, {}, {}, {})",
         externs::project_str(&externs::val_for(&s.task.func.0), "__name__"),
-        keystr(&s.params.expect_single()),
+        s.params,
         typstr(&s.product),
         s.task.cacheable,
       ),
