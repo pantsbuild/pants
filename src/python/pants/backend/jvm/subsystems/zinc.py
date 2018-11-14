@@ -424,13 +424,13 @@ class Zinc(object):
   def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None):
     """Compute the compile classpath for the given target."""
 
-    classpath_entires = list(
+    classpath_entries = list(
       entry.path
         for entry in self.compile_classpath_entries(classpath_product_key, target, extra_cp_entries)
     )
 
     # Verify that all classpath entries are under the build root.
-    for entry in classpath_entires:
+    for entry in classpath_entries:
       assert entry.startswith(get_buildroot())
 
-    return classpath_entires
+    return classpath_entries
