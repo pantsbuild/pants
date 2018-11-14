@@ -13,9 +13,6 @@ class TestIntegrationTest(PantsRunIntegrationTest):
   def assert_fuzzy_string_match(self, got, want):
     want_lines = want.split('\n')
     got_lines = got.split('\n')
-    self.assertEqual(want_lines, got_lines)
-    return
-
     self.assertEqual(len(want_lines), len(got_lines), 'Wrong number of lines comparing:\nWANT:\n{}\nGOT:\n{}'.format(want, got))
 
     for line_number, (want_line, got_line) in enumerate(zip(want_lines, got_lines)):
