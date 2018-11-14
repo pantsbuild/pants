@@ -39,11 +39,9 @@ class DependencyConstraints(PayloadField):
     #      and the `classes_relevant_to_target` parameter removed from `check_target`.
     #      Ideally we would have the same interface for all the subclasses of DependencyConstraint,
     #      which I think should be check_target(target, task_context)
-    classpath = task_context.products.get_data("runtime_classpath")
-    analyzer = JvmDependencyAnalyzer(get_buildroot(), classpath)
-    classes_relevant_to_target = analyzer.classes_for_targets(DependencyConstraints.relevant_targets(target))
+    relevant_targets = DependencyConstraints.relevant_targets(target)
     for constraint in self._constraints:
-      constraint.check_target(target, task_context, classes_relevant_to_target)
+      constraint.check_target(target, task_context, relevant_targets)
 
   @staticmethod
   def relevant_targets(target):
@@ -62,12 +60,12 @@ class Constraint(PayloadField):
   """Representation of a constraint on the target's dependencies."""
 
   @abstractmethod
-  def check_target(self, target, task_context, classes_relevant_to_target):
+  def check_target(self, target, task_context, relevant_targets):
     """
     Check whether a given target complies with this constraint.
     :param target: Target to check.
     :param task_context: Context of the task, to extract from it any relevant information.
-    :param classes_relevant_to_target: Fully qualified names of the classes in the target and its dependencies.
+    :param relevant_targets: The set of targets that we have to check.
     :return:
     """
     pass
@@ -78,8 +76,14 @@ class JvmPackageConstraint(Constraint):
   def __init__(self, name):
     self.banned_package_name = name
 
-  def check_target(self, target, context, classes_relevant_to_target):
-    banned_classes = [c for c in classes_relevant_to_target if c.startswith(self.banned_package_name)]
+  def _get_classes_in_classpath(self, context, relevant_targets):
+    classpath = context.products.get_data("runtime_classpath")
+    analyzer = JvmDependencyAnalyzer(get_buildroot(), classpath)
+    return analyzer.classes_for_targets(relevant_targets)
+
+  def check_target(self, target, context, relevant_targets):
+    relevant_classes = self._get_classes_in_classpath(context, relevant_targets)
+    banned_classes = [c for c in relevant_classes if c.startswith(self.banned_package_name)]
     if banned_classes:
       raise BannedDependencyException(
         'Target {} uses rule "{}" to ban classes ({})'.format(
@@ -101,8 +105,7 @@ class Tag(Constraint):
   def _has_bad_tag(self, target):
     return self.banned_tag_name in target.tags
 
-  def check_target(self, target, task_context, classes_relevant_to_target):
-    relevant_targets = DependencyConstraints.relevant_targets(target)
+  def check_target(self, target, task_context, relevant_targets):
     forbidden_targets = [t for t in relevant_targets if self._has_bad_tag(t)]
     if forbidden_targets:
       raise BannedDependencyException(
@@ -125,8 +128,7 @@ class TestDependencies(Constraint):
   def _is_test_dependency(self, dependency):
     return isinstance(dependency, JUnitTests)
 
-  def check_target(self, target, task_context, classes_relevant_to_target):
-    relevant_targets = DependencyConstraints.relevant_targets(target)
+  def check_target(self, target, task_context, relevant_targets):
     forbidden_targets = [t for t in relevant_targets if self._is_test_dependency(t)]
     if forbidden_targets:
       raise BannedDependencyException(
