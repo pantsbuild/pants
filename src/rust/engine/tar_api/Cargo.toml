@@ -12,5 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 flate2 = "1.0"
-tar = "0.4"
+# Using a SHA because the fix isn't published yet for https://github.com/alexcrichton/tar-rs/issues/173.
+# Update to 0.4.20 when available.
+tar =  { git = "https://github.com/alexcrichton/tar-rs.git", rev = "8417a7c3694b39fc32bf936533635c20e764166b" }
 clap = "2"

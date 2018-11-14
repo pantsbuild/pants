@@ -4,17 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import errno
 import os
 import shutil
-import tarfile
-from builtins import object, str
 
-from pants.base.exceptions import TaskError
 from pants.engine.native import Native
-from pants.util.contextutil import open_tar, temporary_dir
+from pants.util.contextutil import open_tar
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_walk
-from pants.util.memo import memoized
 
 
 class ArtifactError(Exception):
@@ -97,10 +92,6 @@ class TarballArtifact(Artifact):
   def exists(self):
     return os.path.isfile(self._tarfile)
 
-  @memoized
-  def native(self):
-    return Native.create({})
-
   def collect(self, paths):
     # In our tests, gzip is slightly less compressive than bzip2 on .class files,
     # but decompression times are much faster.
@@ -116,48 +107,9 @@ class TarballArtifact(Artifact):
         self._relpaths.add(relpath)
 
   def extract(self):
-    try:
-      with open_tar(self._tarfile, 'r', errorlevel=2) as tarin:
-        # Note: We create all needed paths proactively, even though extractall() can do this for us.
-        # This is because we may be called concurrently on multiple artifacts that share directories,
-        # and there will be a race condition inside extractall(): task T1 A) sees that a directory
-        # doesn't exist and B) tries to create it. But in the gap between A) and B) task T2 creates
-        # the same directory, so T1 throws "File exists" in B).
-        # This actually happened, and was very hard to debug.
-        # Creating the paths here up front allows us to squelch that "File exists" error.
-        paths = []
-        dirs = set()
-        for tarinfo in tarin.getmembers():
-          paths.append(tarinfo.name)
-          if tarinfo.isdir():
-            dirs.add(os.path.normpath(tarinfo.name))
-          else:
-            dirs.add(os.path.dirname(tarinfo.name))
-        for d in dirs:
-          try:
-            os.makedirs(os.path.join(self._artifact_root, d))
-          except OSError as e:
-            if e.errno != errno.EEXIST:
-              raise
-        # print('\n' + self._tarfile)
-        tarin.extractall(self._artifact_root)
-        self._relpaths.update(paths)
-        with temporary_dir() as tmp_dir:
-
-          result = Native.NATIVE_SINGLETON.decompress_tarball(self._tarfile.encode('utf-8'),
-                                                              tmp_dir.encode('utf-8'))
-          if result.is_throw:
-            raise TaskError("untar failed.")
-
-          # import subprocess
-          # new = subprocess.check_output(['find', tmp_dir, '-type', 'f']).splitlines()
-          # # if len(tarin.getmembers()) + 5 != len(new):
-          # #   print(new)
-          # if len(paths) - len(dirs) != len(new):
-          #   import pdb
-          #   pdb.set_trace()
-          #   x = 5
-
-
-    except tarfile.ReadError as e:
-      raise ArtifactError(str(e))
+    # Note(yic): unlike the python implementation before, now we do not update self._relpath
+    # after the extraction.
+    result = Native.NATIVE_SINGLETON.decompress_tarball(self._tarfile.encode('utf-8'),
+                                                        self._artifact_root.encode('utf-8'))
+    if result.is_throw:
+      raise ArtifactError("untar failed.")

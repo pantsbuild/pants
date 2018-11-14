@@ -142,8 +142,6 @@ class LocalArtifactCache(BaseLocalArtifactCache):
           safe_rmtree(results_dir)
         artifact.extract()
         return True
-      # else:
-      #   print('does not exist: {}'.format(artifact._tarfile))
     except Exception as e:
       # TODO(davidt): Consider being more granular in what is caught.
       logger.warn('Error while reading {0} from local artifact cache: {1}'.format(tarfile, e))
