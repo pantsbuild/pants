@@ -13,6 +13,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
   def assert_fuzzy_string_match(self, got, want):
     want_lines = want.split('\n')
     got_lines = got.split('\n')
+    self.maxDiff = None
     self.assertEqual(want_lines, got_lines)
     return
 
