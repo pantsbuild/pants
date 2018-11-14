@@ -30,21 +30,6 @@ impl Params {
   }
 
   ///
-  /// TODO: This is a compatibility API to assist in the transition from "every Node has exactly
-  /// one Subject" to "every Node has zero or more Params". See:
-  ///   https://github.com/pantsbuild/pants/issues/6478
-  ///
-  pub fn expect_single(&self) -> &Key {
-    if self.0.len() != 1 {
-      panic!(
-        "Expect Params to contain exactly one value... contained: {:?}",
-        self.0
-      );
-    }
-    &self.0[0]
-  }
-
-  ///
   /// Returns the Key for the given TypeId if it is represented in this set of Params.
   ///
   pub fn find(&self, type_id: TypeId) -> Option<&Key> {
