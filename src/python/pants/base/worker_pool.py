@@ -5,8 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import multiprocessing
-# import signal
-# import sys
 import threading
 from builtins import next, object
 from multiprocessing.pool import ThreadPool
@@ -192,12 +190,6 @@ class SubprocPool(object):
   _lock = threading.Lock()
   _num_processes = multiprocessing.cpu_count()
 
-  @staticmethod
-  def worker_init():
-    # Exit quietly on sigint, otherwise we get {num_procs} keyboardinterrupt stacktraces spewn
-    # signal.signal(signal.SIGINT, lambda *args: sys.exit())
-    pass
-
   @classmethod
   def set_num_processes(cls, num_processes):
     cls._num_processes = num_processes
@@ -206,8 +198,7 @@ class SubprocPool(object):
   def foreground(cls):
     with cls._lock:
       if cls._pool is None:
-        cls._pool = ThreadPool(processes=cls._num_processes,
-                               initializer=SubprocPool.worker_init)
+        cls._pool = ThreadPool(processes=cls._num_processes)
       return cls._pool
 
   @classmethod

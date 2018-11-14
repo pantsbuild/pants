@@ -112,4 +112,4 @@ class TarballArtifact(Artifact):
     result = Native.NATIVE_SINGLETON.decompress_tarball(self._tarfile.encode('utf-8'),
                                                         self._artifact_root.encode('utf-8'))
     if result.is_throw:
-      raise ArtifactError("untar failed.")
+      raise ArtifactError("Extracting cache failed:\{}".format(result.value))
