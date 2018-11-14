@@ -53,4 +53,11 @@ $(list_pythons | sort -u)
 EOF
 fi
 
+# We have tests which parse pytest's output, which varies based on stty size.
+# On 2018-11-13 Travis's stty got significantly more narrow than it was, causing
+# tests in tests/python/pants_test/rules:test_integration to fail.
+# Force a consistent stty size to avoid this noise.
+stty rows 60
+stty cols 120
+
 exec ./build-support/bin/ci.sh "$@"
