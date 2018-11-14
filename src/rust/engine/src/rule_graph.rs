@@ -6,7 +6,7 @@ use std::io;
 
 use itertools::Itertools;
 
-use core::{Function, Key, Params, TypeConstraint, TypeId, Value, ANY_TYPE};
+use core::{Function, Key, Params, TypeConstraint, TypeId, Value};
 use externs;
 use selectors::{Get, Select};
 use tasks::{Intrinsic, Task, Tasks};
@@ -801,11 +801,7 @@ fn function_str(func: &Function) -> String {
 }
 
 pub fn type_str(type_id: TypeId) -> String {
-  if type_id == ANY_TYPE {
-    "Any".to_string()
-  } else {
-    externs::type_to_str(type_id)
-  }
+  format!("{}", type_id)
 }
 
 pub fn params_str(params: &ParamTypes) -> String {

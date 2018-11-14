@@ -45,7 +45,7 @@ impl Params {
   }
 
   ///
-  /// Returns the given TypeId if it is represented in this set of Params.
+  /// Returns the Key for the given TypeId if it is represented in this set of Params.
   ///
   pub fn find(&self, type_id: TypeId) -> Option<&Key> {
     self
@@ -87,6 +87,16 @@ pub type Id = u64;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(pub Id);
+
+impl fmt::Display for TypeId {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    if *self == ANY_TYPE {
+      write!(f, "Any")
+    } else {
+      write!(f, "{}", externs::type_to_str(*self))
+    }
+  }
+}
 
 // On the python side, the 0th type id is used as an anonymous id
 pub const ANY_TYPE: TypeId = TypeId(0);

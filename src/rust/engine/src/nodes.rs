@@ -1,12 +1,12 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
+use std::{self, fmt};
 
 use futures::future::{self, Future};
 use futures::Stream;
@@ -137,19 +137,6 @@ impl Select {
     &self.selector.product
   }
 
-  ///
-  /// Looks for an is-a relationship between the given value and the requested product.
-  ///
-  /// Returns the original product Value for either success or failure.
-  ///
-  fn select_literal(&self, candidate: Value) -> Result<Value, Value> {
-    if externs::satisfied_by(&self.selector.product, &candidate) {
-      Ok(candidate)
-    } else {
-      Err(candidate)
-    }
-  }
-
   fn select_product(
     &self,
     context: &Context,
@@ -170,18 +157,14 @@ impl Select {
     let context = context.clone();
     Select::new(product, self.params.clone(), &try_future!(edges)).run(context.clone())
   }
+}
 
-  ///
-  /// Return the Future for the Task that should compute the given product for the
-  /// given Params.
-  ///
-  /// TODO: This could take `self` by value and avoid cloning.
-  ///
-  fn gen_node(&self, context: &Context) -> NodeFuture<Value> {
-    if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
-      return future::ok(value.clone()).to_boxed();
-    }
+// TODO: This is a Node only because it is used as a root in the graph, but it should never be
+// requested using context.get
+impl WrappedNode for Select {
+  type Item = Value;
 
+  fn run(self, context: Context) -> NodeFuture<Value> {
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
         .rule()
@@ -287,40 +270,21 @@ impl Select {
         }
         &rule_graph::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
       },
-      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Root(_))
-      | &rule_graph::Entry::Param(_)
-      | &rule_graph::Entry::Singleton { .. } => {
-        // TODO: gen_node should be inlined, and should use these Entry types to skip
-        // any runtime checks of python objects.
+      &rule_graph::Entry::Param(type_id) => {
+        if let Some(key) = self.params.find(type_id) {
+          ok(externs::val_for(key))
+        } else {
+          err(throw(&format!(
+            "Expected a Param of type {} to be present.",
+            type_id
+          )))
+        }
+      }
+      &rule_graph::Entry::Singleton(ref key, _) => ok(externs::val_for(key)),
+      &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Root(_)) => {
         panic!("Not a runtime-executable entry! {:?}", self.entry)
       }
     }
-  }
-}
-
-// TODO: This is a Node only because it is used as a root in the graph, but it should never be
-// requested using context.get
-impl WrappedNode for Select {
-  type Item = Value;
-
-  fn run(self, context: Context) -> NodeFuture<Value> {
-    // If the Subject "is a" or "has a" Product, then we're done.
-    if let Ok(value) = self.select_literal(externs::val_for(self.params.expect_single())) {
-      return ok(value);
-    }
-
-    // Attempt to use the configured Task to compute the value.
-    self
-      .gen_node(&context)
-      .and_then(move |value| {
-        self.select_literal(value).map_err(|value| {
-          throw(&format!(
-            "{} returned a result value that did not satisfy its constraints: {:?}",
-            rule_graph::entry_str(&self.entry),
-            value
-          ))
-        })
-      }).to_boxed()
   }
 }
 
@@ -843,7 +807,7 @@ impl From<DownloadedFile> for NodeKey {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Task {
   params: Params,
   product: TypeConstraint,
@@ -912,6 +876,19 @@ impl Task {
   }
 }
 
+impl fmt::Debug for Task {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(
+      f,
+      "Task({}, {}, {}, {})",
+      externs::project_str(&externs::val_for(&self.task.func.0), "__name__"),
+      self.params,
+      externs::key_to_str(&self.product.0),
+      self.task.cacheable,
+    )
+  }
+}
+
 impl WrappedNode for Task {
   type Item = Value;
 
@@ -935,6 +912,7 @@ impl WrappedNode for Task {
 
     let func = self.task.func;
     let entry = self.entry;
+    let product = self.product;
     deps
       .then(move |deps_result| match deps_result {
         Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
@@ -943,8 +921,13 @@ impl WrappedNode for Task {
         Ok(val) => {
           if externs::satisfied_by(&context.core.types.generator, &val) {
             Self::generate(context, entry, val)
-          } else {
+          } else if externs::satisfied_by(&product, &val) {
             ok(val)
+          } else {
+            err(throw(&format!(
+              "{:?} returned a result value that did not satisfy its constraints: {:?}",
+              func, val
+            )))
           }
         }
         Err(failure) => err(failure),
@@ -1107,13 +1090,7 @@ impl Node for NodeKey {
       &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
       &NodeKey::Select(ref s) => format!("Select({}, {})", s.params, typstr(&s.selector.product)),
-      &NodeKey::Task(ref s) => format!(
-        "Task({}, {}, {}, {})",
-        externs::project_str(&externs::val_for(&s.task.func.0), "__name__"),
-        s.params,
-        typstr(&s.product),
-        s.task.cacheable,
-      ),
+      &NodeKey::Task(ref s) => format!("{:?}", s),
       &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
     }
   }
