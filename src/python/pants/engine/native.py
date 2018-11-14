@@ -126,14 +126,7 @@ typedef void Session;
 typedef void ExecutionRequest;
 
 typedef struct {
-  Key             subject;
-  TypeConstraint  product;
-  uint8_t         state_tag;
-  Handle          state_value;
-} RawNode;
-
-typedef struct {
-  RawNode*  nodes_ptr;
+  PyResult*  nodes_ptr;
   uint64_t  nodes_len;
   // NB: there are more fields in this struct, but we can safely (?)
   // ignore them because we never have collections of this type.

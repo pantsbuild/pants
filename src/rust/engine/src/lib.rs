@@ -80,7 +80,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use context::Core;
-use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
+use core::{Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, IdentifyExtern, LogExtern,
@@ -97,55 +97,17 @@ use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;
 use types::Types;
 
-#[repr(C)]
-enum RawStateTag {
-  Return = 1,
-  Throw = 2,
-  Invalidated = 3,
-}
-
-#[repr(C)]
-pub struct RawNode {
-  subject: Key,
-  product: TypeConstraint,
-  // The Handle represents a union tagged with RawStateTag.
-  state_tag: u8,
-  state_handle: Handle,
-}
-
-impl RawNode {
-  fn create(subject: &Key, product: &TypeConstraint, state: RootResult) -> RawNode {
-    let (state_tag, state_value) = match state {
-      Ok(v) => (RawStateTag::Return as u8, v),
-      Err(Failure::Throw(exc, _)) => (RawStateTag::Throw as u8, exc),
-      Err(Failure::Invalidated) => (
-        RawStateTag::Invalidated as u8,
-        externs::create_exception("Exhausted retries due to changed files."),
-      ),
-    };
-
-    RawNode {
-      subject: *subject,
-      product: *product,
-      state_tag: state_tag,
-      state_handle: state_value.into(),
-    }
-  }
-}
-
+// TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
 pub struct RawNodes {
-  nodes_ptr: *const RawNode,
+  nodes_ptr: *const PyResult,
   nodes_len: u64,
-  nodes: Vec<RawNode>,
+  nodes: Vec<PyResult>,
 }
 
 impl RawNodes {
-  fn create(node_states: Vec<(&Key, &TypeConstraint, RootResult)>) -> Box<RawNodes> {
-    let nodes = node_states
-      .into_iter()
-      .map(|(subject, product, state)| RawNode::create(subject, product, state))
-      .collect();
+  fn create(node_states: Vec<RootResult>) -> Box<RawNodes> {
+    let nodes = node_states.into_iter().map(PyResult::from).collect();
     let mut raw_nodes = Box::new(RawNodes {
       nodes_ptr: Vec::new().as_ptr(),
       nodes_len: 0,
