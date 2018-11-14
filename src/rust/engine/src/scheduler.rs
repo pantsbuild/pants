@@ -322,13 +322,13 @@ impl Scheduler {
     tasks_to_display: &mut IndexMap<String, Duration>,
   ) {
     // Update the graph. To do that, we iterate over heavy hitters.
-    let heavy_hitters: Vec<(String, Duration)> =
-      graph.heavy_hitters(&roots, display.worker_count());
+    let heavy_hitters = graph.heavy_hitters(&roots, display.worker_count());
     // Insert every one in the set of tasks to display.
-    tasks_to_display.extend(heavy_hitters.iter().cloned());
+    // For tasks already here, the durations are overwritten.
+    tasks_to_display.extend(heavy_hitters.clone().into_iter());
     // And remove the tasks that no longer should be there.
-    for (task, duration) in tasks_to_display.clone().into_iter() {
-      if !heavy_hitters.contains(&(task.to_string(), duration)) {
+    for (task, _) in tasks_to_display.clone().into_iter() {
+      if !heavy_hitters.contains_key(&task) {
         tasks_to_display.swap_remove(&task);
       }
     }
