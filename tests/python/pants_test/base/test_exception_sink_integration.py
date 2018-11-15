@@ -8,6 +8,7 @@ import os
 import signal
 import time
 from contextlib import contextmanager
+from unittest import skip
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
@@ -101,6 +102,8 @@ Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
       # Return the (failed) pants execution result.
       yield (workdir, waiter_run)
 
+  # Flaky test. Issue here: https://github.com/pantsbuild/pants/issues/6708.
+  @skip
   def test_dumps_logs_on_terminate(self):
     # Send a SIGTERM to the local pants process.
     with self._send_signal_to_waiter_handle(signal.SIGTERM) as (workdir, waiter_run):
