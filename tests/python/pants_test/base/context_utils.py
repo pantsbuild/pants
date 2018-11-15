@@ -48,6 +48,7 @@ class TestContext(Context):
 
   class DummyRunTracker(object):
     """A runtracker stand-in that does no actual tracking."""
+
     def __init__(self):
       self.logger = RunTrackerLogger(self)
 
