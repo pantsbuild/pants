@@ -193,7 +193,8 @@ class RscCompile(ZincCompile):
       # partition: list of path, list of tuples
       paths_without_digests = [p for (p, d) in path_and_digests if not d]
       if paths_without_digests:
-        raise Exception('well I didnt expect that')
+        self.context.log.debug('Expected to find digests for {}, capturing them.'
+                               .format(paths_without_digests))
       paths_with_digests = [(p, d) for (p, d) in path_and_digests if d]
       # list of path -> list path, captured snapshot -> list of path with digest
       snapshots = scheduler.capture_snapshots(tuple(pathglob_for(p) for p in paths_without_digests))
