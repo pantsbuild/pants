@@ -37,9 +37,12 @@ class CheckBannedDeps(Task):
       for target in self.context.targets():
         constraint_declaration = target.payload.get_field_value("dependency_constraints")
         if constraint_declaration:
-          relevant_targets = CheckBannedDeps.relevant_targets(target)
-          for constraint in constraint_declaration.constraints:
-            for target_under_test in relevant_targets:
-              constraint.check_target(target, self.context, target_under_test)
+          def check_constraints(dep):
+            for constraint in constraint_declaration.constraints:
+              constraint.check_target(target, self.context, dep)
+          self.context.build_graph.walk_transitive_dependency_graph(
+            [target.address],
+            check_constraints
+          )
     else:
       self.context.log.debug("Skipping banned dependency checks. To enforce this, enable the --no-compile-check-banned-deps-skip flag")

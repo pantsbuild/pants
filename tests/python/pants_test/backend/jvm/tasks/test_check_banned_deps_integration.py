@@ -21,7 +21,7 @@ class CheckBannedDepsTest(PantsRunIntegrationTest):
       self._in_testproject('ban_packages'),
       success=False)
     self.assertIn(
-      ' Target testprojects/src/scala bans package "scopt", which bans target 3rdparty/jvm with classes (',
+      'Target testprojects/src/scala bans package "scopt", which bans target 3rdparty/jvm with classes (',
       pants_run.stderr_data.strip())
 
   def test_test_dependency_constraints(self):
