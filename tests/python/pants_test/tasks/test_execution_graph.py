@@ -52,6 +52,10 @@ def raising_fn():
   raise Exception("I'm an error")
 
 
+def base_error_raising_fn():
+  raise BaseException("I'm a BaseException")
+
+
 def raising_wrapper():
   raising_fn()
 
@@ -133,6 +137,15 @@ class ExecutionGraphTest(unittest.TestCase):
 
   def test_one_failure_raises_exception(self):
     exec_graph = ExecutionGraph([self.job("A", raising_fn, [])], False)
+    with self.assertRaises(ExecutionFailure) as cm:
+      self.execute(exec_graph)
+
+    self.assertEqual("Failed jobs: A", str(cm.exception))
+
+  def test_base_exception_failure_raises_exception(self):
+    # BaseException happens for lower level issues, not catching and propagating it makes debugging
+    # difficult.
+    exec_graph = ExecutionGraph([self.job("A", base_error_raising_fn, [])], False)
     with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 

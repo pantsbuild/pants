@@ -57,6 +57,7 @@ QUEUED = 'Queued'
 SUCCESSFUL = 'Successful'
 FAILED = 'Failed'
 CANCELED = 'Canceled'
+RUNNING = 'Running'
 
 
 class StatusTable(object):
@@ -264,15 +265,17 @@ class ExecutionGraph(object):
 
     def put_jobs_into_heap(job_keys):
       for job_key in job_keys:
+        status_table.mark_queued(job_key)
         # minus because jobs with larger priority should go first
         heappush(heap, (-self._job_priority[job_key], job_key))
 
     def try_to_submit_jobs_from_heap():
       def worker(worker_key, work):
+        status_table.mark_as(RUNNING, worker_key)
         try:
           work()
           result = (worker_key, SUCCESSFUL, None)
-        except Exception:
+        except BaseException:
           _, exc_value, exc_traceback = sys.exc_info()
           result = (worker_key, FAILED, (exc_value, traceback.format_tb(exc_traceback)))
         finished_queue.put(result)
@@ -281,7 +284,6 @@ class ExecutionGraph(object):
       while len(heap) > 0 and jobs_in_flight.get() < pool.num_workers:
         priority, job_key = heappop(heap)
         jobs_in_flight.increment()
-        status_table.mark_queued(job_key)
         pool.submit_async_work(Work(worker, [(job_key, (self._jobs[job_key]))]))
 
     def submit_jobs(job_keys):
@@ -295,8 +297,8 @@ class ExecutionGraph(object):
         try:
           finished_key, result_status, value = finished_queue.get(timeout=10)
         except queue.Empty:
-          log.debug("Waiting on \n  {}\n".format("\n  ".join(
-            "{}: {}".format(key, state) for key, state in status_table.unfinished_items())))
+          self.log_progress(log, status_table)
+
           try_to_submit_jobs_from_heap()
           continue
 
@@ -351,3 +353,16 @@ class ExecutionGraph(object):
 
     if status_table.has_failures():
       raise ExecutionFailure("Failed jobs: {}".format(', '.join(status_table.failed_keys())))
+
+  def log_progress(self, log, status_table):
+    running_jobs = sorted(i for (i, s) in status_table.unfinished_items() if s is RUNNING)
+    queued_jobs = sorted(i for (i, s) in status_table.unfinished_items() if s is QUEUED)
+    unstarted_jobs = sorted(i for (i, s) in status_table.unfinished_items() if s is UNSTARTED)
+    log.debug("Running   ({}):\n  {}\n"
+              "Queued    ({}):\n  {}\n"
+              "Unstarted ({}):\n  {}\n"
+      .format(
+      len(running_jobs), '\n  '.join(running_jobs),
+      len(queued_jobs), '\n  '.join(queued_jobs),
+      len(unstarted_jobs), '\n  '.join(unstarted_jobs),
+    ))
