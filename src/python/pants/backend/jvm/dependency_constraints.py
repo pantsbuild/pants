@@ -27,25 +27,10 @@ class DependencyConstraints(PayloadField):
     :param direct: Constraints on direct dependencies.
     :param transitive: Constraints on transitive dependencies.
     """
-    self._constraints = constraints
+    self.constraints = constraints
 
   def _compute_fingerprint(self):
-    return combine_hashes([c.fingerprint() for c in self._constraints])
-
-  def check_all(self, target, task_context):
-    # TODO Execution is currently n^2.
-    relevant_targets = DependencyConstraints.relevant_targets(target)
-    for constraint in self._constraints:
-      constraint.check_target(target, task_context, relevant_targets)
-
-  @staticmethod
-  def relevant_targets(target):
-    """
-    Modify this method when the criteria changes
-    (e.g. the target itself should be included in the checks).
-    """
-    return target.dependencies
-
+    return combine_hashes([c.fingerprint() for c in self.constraints])
 
 class BannedDependencyException(Exception):
   pass

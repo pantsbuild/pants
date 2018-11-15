@@ -24,11 +24,22 @@ class CheckBannedDeps(Task):
     super(CheckBannedDeps, cls).prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')
 
+  @staticmethod
+  def relevant_targets(target):
+    """
+    Modify this method when the criteria changes
+    (e.g. the target itself should be included in the checks).
+    """
+    return set(target.dependencies)
+
   def execute(self):
     if not self.get_options().skip:
       for target in self.context.targets():
-        constraints = target.payload.get_field_value("dependency_constraints")
-        if constraints:
-          constraints.check_all(target, self.context)
+        constraint_declaration = target.payload.get_field_value("dependency_constraints")
+        if constraint_declaration:
+          relevant_targets = CheckBannedDeps.relevant_targets(target)
+          for constraint in constraint_declaration.constraints:
+            constraint.check_target(target, self.context, relevant_targets)
+
     else:
       self.context.log.debug("Skipping banned dependency checks. To enforce this, enable the --compile-check-banned-deps-skip flag")
