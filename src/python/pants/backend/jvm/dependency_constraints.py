@@ -39,7 +39,7 @@ class BannedDependencyException(Exception):
 class Constraint(PayloadField):
   """Representation of a constraint on the target's dependencies."""
 
-  def check_target(self, target, task_context, relevant_targets):
+  def check_target(self, target, task_context, target_under_test):
     """
     Check whether a given target complies with this constraint.
 
@@ -47,26 +47,27 @@ class Constraint(PayloadField):
     Therefore, this flow is left general in purpose to accomodate for both requirements.
     :param target: Target to check.
     :param task_context: Context of the task, to extract from it any relevant information.
-    :param relevant_targets: The set of targets that we have to check.
+    :param target_under_test: The target that we want the constraint to apply to.
     :return:
     """
-    items = self.get_collection_to_constrain(task_context, relevant_targets)
+    items = self.get_collection_to_constrain(task_context, target_under_test)
     bad_elements = [item for item in items if self.predicate(item)]
     if bad_elements:
-      raise BannedDependencyException(self.get_error_message(target, bad_elements))
+      raise BannedDependencyException(self.get_error_message(target, target_under_test, bad_elements))
 
-  def get_collection_to_constrain(self, context, relevant_targets):
+  def get_collection_to_constrain(self, context, target_under_test):
     """
     Method to specify what the constraint applies to.
     It will usually be targets, but there are some that apply to classes.
     Overriding this method allows the user to express that.
     """
-    return relevant_targets
+    return [target_under_test]
 
   @abstractmethod
-  def get_error_message(self, target, bad_elements):
+  def get_error_message(self, target, target_under_test, bad_elements):
     """Error message to show when a constraint bans an element.
     :param target Target that was examined.
+    :param target_under_test Target that was tested by the constraint.
     :param bad_elements Elements that were banned by the constraint.
                         These may be classes, targets or something else.
     :return A string with the error message.
@@ -89,20 +90,21 @@ class JvmPackageConstraint(Constraint):
     self.banned_package_name = name
 
   @staticmethod
-  def _get_classes_in_classpath(context, relevant_targets):
+  def _get_classes_in_classpath(context, target):
     classpath = context.products.get_data("runtime_classpath")
     analyzer = JvmDependencyAnalyzer(get_buildroot(), classpath)
-    return analyzer.classes_for_targets(relevant_targets)
+    return analyzer.classes_for_targets([target])
 
-  def get_collection_to_constrain(self, context, relevant_targets):
+  def get_collection_to_constrain(self, context, target_under_test):
     # TODO we actually ignore this, bit since this is a method override, python guides said that we should call it.
-    super(JvmPackageConstraint, self).get_collection_to_constrain(context, relevant_targets)
-    return self._get_classes_in_classpath(context, relevant_targets)
+    super(JvmPackageConstraint, self).get_collection_to_constrain(context, target_under_test)
+    return self._get_classes_in_classpath(context, target_under_test)
 
-  def get_error_message(self, target, banned_classes):
-    return 'Target {} uses rule "{}" to ban classes ({})'.format(
+  def get_error_message(self, target, checked_target, banned_classes):
+    return 'Target {} bans package "{}", which bans target {} with classes ({})'.format(
       target.target_base,
       self.banned_package_name,
+      checked_target.target_base,
       ", ".join(banned_classes)
     )
 
@@ -122,12 +124,11 @@ class Tag(Constraint):
   def _compute_fingerprint(self):
     return stable_json_hash(self.banned_tag_name)
 
-
-  def get_error_message(self, target, forbidden_targets):
-    return 'Target {} has baned tag "{}", but these targets have it ({})'.format(
+  def get_error_message(self, target, checked_target, bad_element):
+    return 'Target {} has baned tag "{}", but these target has it {}'.format(
       target.target_base,
       self.banned_tag_name,
-      ", ".join([t.target_base for t in forbidden_targets])
+      checked_target.target_base
     )
 
   def predicate(self, target):
@@ -142,10 +143,10 @@ class TestDependencies(Constraint):
   def _compute_fingerprint(self):
     return stable_json_hash(self.name)
 
-  def get_error_message(self, target, forbidden_targets):
-    return 'Target {} has test dependencies on targets ({})'.format(
+  def get_error_message(self, target, checked_target, bad_element):
+    return 'Target {} has test dependencies on target {}'.format(
       target.target_base,
-      ", ".join([t.target_base for t in forbidden_targets])
+      checked_target.target_base
     )
 
   def predicate(self, dependency):

@@ -39,7 +39,7 @@ class CheckBannedDeps(Task):
         if constraint_declaration:
           relevant_targets = CheckBannedDeps.relevant_targets(target)
           for constraint in constraint_declaration.constraints:
-            constraint.check_target(target, self.context, relevant_targets)
-
+            for target_under_test in relevant_targets:
+              constraint.check_target(target, self.context, target_under_test)
     else:
-      self.context.log.debug("Skipping banned dependency checks. To enforce this, enable the --compile-check-banned-deps-skip flag")
+      self.context.log.debug("Skipping banned dependency checks. To enforce this, enable the --no-compile-check-banned-deps-skip flag")

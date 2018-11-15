@@ -21,7 +21,7 @@ class CheckBannedDepsTest(PantsRunIntegrationTest):
       self._in_testproject('ban_packages'),
       success=False)
     self.assertIn(
-      'Exception message: Target testprojects/src/scala uses rule "scopt" to ban classes (',
+      ' Target testprojects/src/scala bans package "scopt", which bans target 3rdparty/jvm with classes (',
       pants_run.stderr_data.strip())
 
   def test_test_dependency_constraints(self):
@@ -31,7 +31,7 @@ class CheckBannedDepsTest(PantsRunIntegrationTest):
       self._in_testproject('ban_testdeps'),
       success=False)
     self.assertIn(
-      'Target testprojects/src/scala has test dependencies on targets (testprojects/src/scala)',
+      'Target testprojects/src/scala has test dependencies on target testprojects/src/scala',
       pants_run.stderr_data.strip())
 
   def test_tag_constraints(self):
@@ -41,5 +41,5 @@ class CheckBannedDepsTest(PantsRunIntegrationTest):
       self._in_testproject('ban_tags'),
       success=False)
     self.assertIn(
-      'Target testprojects/src/scala has baned tag "deprecated", but these targets have it (testprojects/src/scala)',
+      'Target testprojects/src/scala has baned tag "deprecated", but these target has it testprojects/src/scala',
       pants_run.stderr_data.strip())
