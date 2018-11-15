@@ -85,7 +85,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.8'),
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.9'),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -383,21 +383,6 @@ class Zinc(object):
       ),
     ))[0]
 
-  # TODO: Make rebase map work without needing to pass in absolute paths:
-  # https://github.com/pantsbuild/pants/issues/6434
-  @memoized_property
-  def rebase_map_args(self):
-    """We rebase known stable paths in zinc analysis to make it portable across machines."""
-    rebases = {
-        self.dist.real_home: '/dev/null/remapped_by_pants/java_home/',
-        get_buildroot(): '/dev/null/remapped_by_pants/buildroot/',
-        self._zinc_factory.get_options().pants_workdir: '/dev/null/remapped_by_pants/workdir/',
-      }
-    return (
-        '-rebase-map',
-        ','.join('{}:{}'.format(src, dst) for src, dst in rebases.items())
-      )
-
   @memoized_method
   def _compiler_plugins_cp_entries(self):
     """Any additional global compiletime classpath entries for compiler plugins."""
@@ -438,7 +423,15 @@ class Zinc(object):
 
   def compile_classpath(self, classpath_product_key, target, extra_cp_entries=None):
     """Compute the compile classpath for the given target."""
-    return list(
+
+    classpath_entries = list(
       entry.path
         for entry in self.compile_classpath_entries(classpath_product_key, target, extra_cp_entries)
     )
+
+    # Verify that all classpath entries are under the build root.
+    for entry in classpath_entries:
+      assert entry.startswith(get_buildroot()), \
+             "Classpath entry does not start with buildroot: {}".format(entry)
+
+    return classpath_entries
