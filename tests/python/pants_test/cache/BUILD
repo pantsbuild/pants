@@ -21,6 +21,7 @@ python_tests(
     'src/python/pants/invalidation',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test:test_base',
   ]
 )
 

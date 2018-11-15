@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import unittest
 from builtins import open, str
 from contextlib import contextmanager
 
@@ -18,13 +17,14 @@ from pants.invalidation.build_invalidator import CacheKey
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdir
 from pants_test.cache.cache_server import cache_server
+from pants_test.test_base import TestBase
 
 
 TEST_CONTENT1 = b'muppet'
 TEST_CONTENT2 = b'kermit'
 
 
-class TestArtifactCache(unittest.TestCase):
+class TestArtifactCache(TestBase):
   @contextmanager
   def setup_local_cache(self):
     with temporary_dir() as artifact_root:
@@ -51,6 +51,11 @@ class TestArtifactCache(unittest.TestCase):
       path = f.name
       f.close()
       yield path
+
+  def setUp(self):
+    super(TestArtifactCache, self).setUp()
+    # Init engine because decompression now goes through native code.
+    self._init_engine()
 
   def test_local_cache(self):
     with self.setup_local_cache() as artifact_cache:
