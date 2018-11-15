@@ -90,3 +90,4 @@ tokio = "0.1"
 tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
+indexmap = "1.0.2"
