@@ -23,6 +23,11 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         self.assertTrue(got_line.startswith(want_parts[0]), 'Line {} Want "{}" to start with "{}"'.format(line_number, got_line, want_parts[0]))
         self.assertTrue(got_line.endswith(want_parts[1]), 'Line {} Want "{}" to end with "{}"'.format(line_number, got_line, want_parts[1]))
 
+  def run_pants(self, args):
+    # Set TERM=dumb to stop pytest from trying to be clever and wrap lines which may interfere with
+    # our golden data.
+    return super(TestIntegrationTest, self).run_pants(args, extra_env={'TERM': 'dumb'})
+
   def test_passing_python_test(self):
     args = [
       '--no-v1',
