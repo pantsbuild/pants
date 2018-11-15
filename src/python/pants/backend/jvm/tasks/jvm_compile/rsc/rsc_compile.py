@@ -68,7 +68,7 @@ def load_digest(output_dir):
   read_file = maybe_read_file('{}.digest'.format(output_dir))
   if read_file:
     fingerprint, length = read_file.split(':')
-    return Digest(fingerprint, length)
+    return Digest(fingerprint, int(length))
   else:
     return None
 
@@ -180,24 +180,32 @@ class RscCompile(ZincCompile):
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
+    def pathglob_for(filename):
+      return PathGlobsAndRoot(
+        PathGlobs(
+          (fast_relpath_optional(filename, get_buildroot()),)),
+        text_type(get_buildroot()))
 
-    def cp_entry_for(maybe_file):
-      # Capture a snapshot for the file if it exists
-      if os.path.exists(maybe_file):
-        def capture_or_read_digest(scheduler, filename):
-          digest = load_digest(os.path.dirname(filename))
-          if not digest:
-            root = PathGlobsAndRoot(
-              PathGlobs(
-                (fast_relpath_optional(maybe_file, get_buildroot()),)),
-              text_type(get_buildroot()))
-            digest = scheduler.capture_snapshots((root,))[0].directory_digest
-          return digest
+    def to_classpath_entries(paths, scheduler):
+      # list of path ->
+      # list of (path, optional<digest>) ->
+      path_and_digests = [(p, load_digest(os.path.dirname(p))) for p in paths]
+      # partition: list of path, list of tuples
+      paths_without_digests = [p for (p, d) in path_and_digests if not d]
+      if paths_without_digests:
+        raise Exception('well I didnt expect that')
+      paths_with_digests = [(p, d) for (p, d) in path_and_digests if d]
+      # list of path -> list path, captured snapshot -> list of path with digest
+      snapshots = scheduler.capture_snapshots(tuple(pathglob_for(p) for p in paths_without_digests))
+      captured_paths_and_digests = [(p, s.directory_digest)
+                                    for (p, s) in zip(paths_without_digests, snapshots)]
+      # merge and classpath ify
+      return [ClasspathEntry(p, d) for (p, d) in paths_with_digests + captured_paths_and_digests]
 
-        input_digest = capture_or_read_digest(self.context._scheduler, os.path.dirname(maybe_file))
-        return ClasspathEntry(maybe_file, input_digest)
-      else:
-        return maybe_file
+
+    def confify(entries):
+      return [(conf, e) for e in entries for conf in self._confs]
+
     # TODO when digests are added, if the target is valid,
     # the digest should be loaded in from the cc somehow.
     # See: #6504
@@ -206,21 +214,23 @@ class RscCompile(ZincCompile):
       if self._only_zinc_compileable(target):
         self.context.products.get_data('rsc_classpath').add_for_target(
           compile_cc.target,
-          [(conf, compile_cc.jar_file) for conf in self._confs])
+          confify([compile_cc.jar_file])
+        )
       elif self._rsc_compilable(target):
         self.context.products.get_data('rsc_classpath').add_for_target(
           rsc_cc.target,
-          [(conf, cp_entry_for(rsc_cc.rsc_mjar_file)) for conf in self._confs])
+          confify(to_classpath_entries([rsc_cc.rsc_mjar_file], self.context._scheduler)))
       elif self._metacpable(target):
         # Walk the metacp results dir and add classpath entries for all the files there.
         # TODO exercise this with a test.
         # TODO, this should only list the files/directories in the first directory under the index dir
-        found_files = set()
-        for root, dirs, files in os.walk(rsc_cc.rsc_index_dir):
-          found_files.update(os.path.join(root, f) for f in files)
-        for f in found_files:
-          self._metacp_jars_classpath_product.add_for_target(
-            rsc_cc.target, [(conf, cp_entry_for(f)) for conf in self._confs])
+
+        elements_in_index_dir = [os.path.join(rsc_cc.rsc_index_dir, s)
+                                 for s in os.listdir(rsc_cc.rsc_index_dir)]
+
+        entries = to_classpath_entries(elements_in_index_dir, self.context._scheduler)
+        self._metacp_jars_classpath_product.add_for_target(
+          rsc_cc.target, confify(entries))
       else:
         pass
 
