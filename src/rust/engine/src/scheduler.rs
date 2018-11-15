@@ -12,6 +12,7 @@ use futures::future::{self, Future};
 use context::{Context, Core};
 use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
 use graph::{EntryId, Graph, InvalidationResult, Node, NodeContext};
+use indexmap::IndexMap;
 use log::{debug, info, warn};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use parking_lot::Mutex;
@@ -291,11 +292,15 @@ impl Scheduler {
       .map(|s| s.into())
       .collect();
 
+    // This map keeps the k most relevant jobs in assigned possitions.
+    // Keys are positions in the display (display workers) and the values are the actual jobs to print.
+    let mut tasks_to_display = IndexMap::new();
+
     let results = loop {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
       } else if let Some(display) = optional_display.as_mut() {
-        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display);
+        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, &mut tasks_to_display);
       }
     };
     if let Some(display) = optional_display.as_mut() {
@@ -310,11 +315,28 @@ impl Scheduler {
       .collect()
   }
 
-  fn display_ongoing_tasks(graph: &Graph<NodeKey>, roots: &[NodeKey], display: &mut EngineDisplay) {
+  fn display_ongoing_tasks(
+    graph: &Graph<NodeKey>,
+    roots: &[NodeKey],
+    display: &mut EngineDisplay,
+    tasks_to_display: &mut IndexMap<String, Duration>,
+  ) {
+    // Update the graph. To do that, we iterate over heavy hitters.
+    let heavy_hitters = graph.heavy_hitters(&roots, display.worker_count());
+    // Insert every one in the set of tasks to display.
+    // For tasks already here, the durations are overwritten.
+    tasks_to_display.extend(heavy_hitters.clone().into_iter());
+    // And remove the tasks that no longer should be there.
+    for (task, _) in tasks_to_display.clone().into_iter() {
+      if !heavy_hitters.contains_key(&task) {
+        tasks_to_display.swap_remove(&task);
+      }
+    }
     let display_worker_count = display.worker_count();
-    let ongoing_tasks = graph.heavy_hitters(&roots, display_worker_count);
-    for (i, task) in ongoing_tasks.iter().enumerate() {
-      display.update(i.to_string(), format!("{:?}", task));
+    let ongoing_tasks = tasks_to_display;
+    for (i, id) in ongoing_tasks.iter().enumerate() {
+      // TODO Maybe we want to print something else besides the ID here.
+      display.update(i.to_string(), format!("{:?}", id));
     }
     // If the number of ongoing tasks is less than the number of workers,
     // fill the rest of the workers with empty string.

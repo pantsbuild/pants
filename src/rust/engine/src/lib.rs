@@ -54,6 +54,7 @@ extern crate fs;
 extern crate futures;
 extern crate graph;
 extern crate hashing;
+extern crate indexmap;
 extern crate itertools;
 extern crate lazy_static;
 extern crate log;

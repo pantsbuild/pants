@@ -79,6 +79,7 @@ fs = { path = "fs" }
 futures = "^0.1.16"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
+indexmap = "1.0.2"
 itertools = "0.7.2"
 lazy_static = "1"
 log = "0.4"

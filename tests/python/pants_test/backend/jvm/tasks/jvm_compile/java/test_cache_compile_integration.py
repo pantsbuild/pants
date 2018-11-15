@@ -11,7 +11,7 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
+from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open, safe_rmtree
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
@@ -167,8 +167,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
   def test_analysis_portability(self):
     # Tests that analysis can be relocated between workdirs and still result in incremental
     # compile.
-    with temporary_dir() as cache_dir, temporary_dir(root_dir=get_buildroot()) as src_dir:
-
+    with temporary_dir() as cache_dir, temporary_dir(root_dir=get_buildroot()) as src_dir, \
+      temporary_dir(root_dir=get_buildroot(), suffix='.pants.d') as workdir:
       config = {
         'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
       }
@@ -191,13 +191,18 @@ class CacheCompileIntegrationTest(BaseCompileIT):
            class B { def mkA: A = new A() }"""))
       self.create_file(con_build_file, "scala_library(dependencies=['{}'])".format(dep_spec))
 
-      with self.temporary_workdir() as workdir:
-        # 1) Compile in one workdir.
-        self.run_compile(con_spec, config, workdir)
+      rel_workdir = fast_relpath(workdir, get_buildroot())
+      rel_src_dir = fast_relpath(src_dir, get_buildroot())
+      with self.mock_buildroot(dirs_to_copy=[rel_src_dir, rel_workdir]) as buildroot, \
+        buildroot.pushd():
+        # 1) Compile in one buildroot.
+        self.run_compile(con_spec, config, os.path.join(buildroot.new_buildroot, rel_workdir))
 
-      with self.temporary_workdir() as workdir:
-        # 2) Compile in another workdir and check that we hit the cache.
-        run_two = self.run_compile(con_spec, config, workdir)
+      with self.mock_buildroot(dirs_to_copy=[rel_src_dir, rel_workdir]) as buildroot, \
+        buildroot.pushd():
+        # 2) Compile in another buildroot, and check that we hit the cache.
+        new_workdir = os.path.join(buildroot.new_buildroot, rel_workdir)
+        run_two = self.run_compile(con_spec, config, new_workdir)
         self.assertTrue(
             re.search(
               "\[zinc\][^[]*\[cache\][^[]*Using cached artifacts for 2 targets.",
@@ -206,11 +211,14 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
         # 3) Edit the dependency in a way that should trigger an incremental
         #    compile of the consumer.
-        self.create_file(dep_src_file, dep_src + "; /* this is a comment */")
+        mocked_dep_src_file = os.path.join(
+          buildroot.new_buildroot,
+          fast_relpath(dep_src_file, get_buildroot()))
+        self.create_file(mocked_dep_src_file, dep_src + "; /* this is a comment */")
 
         # 4) Compile and confirm that the analysis fetched from the cache in
         #    step 2 causes incrementalism: ie, zinc does not report compiling any files.
-        run_three = self.run_compile(con_spec, config, workdir)
+        run_three = self.run_compile(con_spec, config, new_workdir)
         self.assertTrue(
             re.search(
               r"/org/pantsbuild/consumer:consumer\)[^[]*\[compile\][^[]*\[zinc\]\W*\[info\] Compile success",

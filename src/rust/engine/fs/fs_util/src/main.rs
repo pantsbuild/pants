@@ -158,7 +158,7 @@ to this directory.",
                   .long("output-format")
                   .takes_value(true)
                   .default_value("binary")
-                  .possible_values(&["binary", "recursive-file-list", "text"]),
+                  .possible_values(&["binary", "recursive-file-list", "recursive-file-list-with-digests", "text"]),
               )
               .arg(Arg::with_name("fingerprint").required(true).takes_value(
                 true,
@@ -434,7 +434,16 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             maybe_v
               .map(|v| {
                 v.into_iter()
-                  .map(|f| format!("{}\n", f))
+                  .map(|(name, _digest)| format!("{}\n", name))
+                  .collect::<Vec<String>>()
+                  .join("")
+              }).map(|s| s.into_bytes())
+          }),
+          "recursive-file-list-with-digests" => expand_files(store, digest).map(|maybe_v| {
+            maybe_v
+              .map(|v| {
+                v.into_iter()
+                  .map(|(name, digest)| format!("{} {} {}\n", name, digest.0, digest.1))
                   .collect::<Vec<String>>()
                   .join("")
               }).map(|s| s.into_bytes())
@@ -501,14 +510,14 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
   }
 }
 
-fn expand_files(store: Store, digest: Digest) -> Result<Option<Vec<String>>, String> {
+fn expand_files(store: Store, digest: Digest) -> Result<Option<Vec<(String, Digest)>>, String> {
   let files = Arc::new(Mutex::new(Vec::new()));
   expand_files_helper(store, digest, String::new(), files.clone())
     .wait()
     .map(|maybe| {
       maybe.map(|()| {
         let mut v = Arc::try_unwrap(files).unwrap().into_inner();
-        v.sort();
+        v.sort_by(|(l, _), (r, _)| l.cmp(r));
         v
       })
     })
@@ -518,7 +527,7 @@ fn expand_files_helper(
   store: Store,
   digest: Digest,
   prefix: String,
-  files: Arc<Mutex<Vec<String>>>,
+  files: Arc<Mutex<Vec<(String, Digest)>>>,
 ) -> BoxFuture<Option<()>, String> {
   store
     .load_directory(digest)
@@ -527,7 +536,8 @@ fn expand_files_helper(
         {
           let mut files_unlocked = files.lock();
           for file in dir.get_files() {
-            files_unlocked.push(format!("{}{}", prefix, file.name));
+            let file_digest: Result<Digest, String> = file.get_digest().into();
+            files_unlocked.push((format!("{}{}", prefix, file.name), try_future!(file_digest)));
           }
         }
         futures::future::join_all(

@@ -8,9 +8,8 @@ import functools
 import json
 import os
 from builtins import object, open, str
+from collections import Iterable, Mapping
 from hashlib import sha1
-
-from future.moves import collections
 
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import stable_json_hash
@@ -22,7 +21,7 @@ class Encoder(json.JSONEncoder):
   def default(self, o):
     if o is UnsetBool:
       return '_UNSET_BOOL_ENCODING'
-    elif isinstance(o, collections.Iterable) and not isinstance(o, collections.Mapping):
+    elif isinstance(o, Iterable) and not isinstance(o, Mapping):
       # For things like sets which JSONEncoder doesn't handle, and raises a TypeError on.
       return list(o)
     return super(Encoder, self).default(o)
@@ -81,7 +80,7 @@ class OptionsFingerprinter(object):
 
     # The python documentation (https://docs.python.org/2/library/json.html#json.dumps) states that
     # dict keys are coerced to strings in json.dumps, but this appears to be incorrect.
-    if isinstance(option_val, collections.Mapping):
+    if isinstance(option_val, Mapping):
       option_val = {stable_json_sha1(k):v for k, v in option_val.items()}
 
     # For simplicity, we always fingerprint a list.  For non-list-valued options,
