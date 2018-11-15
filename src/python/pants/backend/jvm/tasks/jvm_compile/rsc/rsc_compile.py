@@ -203,13 +203,9 @@ class RscCompile(ZincCompile):
       # merge and classpath ify
       return [ClasspathEntry(p, d) for (p, d) in paths_with_digests + captured_paths_and_digests]
 
-
     def confify(entries):
       return [(conf, e) for e in entries for conf in self._confs]
 
-    # TODO when digests are added, if the target is valid,
-    # the digest should be loaded in from the cc somehow.
-    # See: #6504
     for target in targets:
       rsc_cc, compile_cc = compile_contexts[target]
       if self._only_zinc_compileable(target):
