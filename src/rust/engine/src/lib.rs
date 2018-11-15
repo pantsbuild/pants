@@ -529,11 +529,16 @@ pub extern "C" fn decompress_tarball(
   tar_path: *const raw::c_char,
   output_dir: *const raw::c_char,
 ) -> PyResult {
-  let tmp_1 = unsafe { CStr::from_ptr(tar_path).to_string_lossy().into_owned() };
-  let tar_path_str = PathBuf::from(tmp_1);
-  let tmp_2 = unsafe { CStr::from_ptr(output_dir).to_string_lossy().into_owned() };
-
-  let output_dir_str = PathBuf::from(tmp_2);
+  let tar_path_str = PathBuf::from(
+    unsafe { CStr::from_ptr(tar_path) }
+      .to_string_lossy()
+      .into_owned(),
+  );
+  let output_dir_str = PathBuf::from(
+    unsafe { CStr::from_ptr(output_dir) }
+      .to_string_lossy()
+      .into_owned(),
+  );
 
   tar_api::decompress_tgz(tar_path_str.as_path(), output_dir_str.as_path())
     .map_err(|e| {
