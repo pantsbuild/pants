@@ -9,3 +9,7 @@ path = "src/tar_api.rs"
 [dependencies]
 flate2 = "1.0"
 tar =  "0.4.20"
+
+[dev-dependencies]
+tempfile = "3"
+testutil = { path = "../testutil" }

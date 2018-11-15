@@ -1663,9 +1663,10 @@ dependencies = [
 name = "tar_api"
 version = "0.0.1"
 dependencies = [
- "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "flate2 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tar 0.4.20 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tempfile 3.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "testutil 0.0.1",
 ]
 
 [[package]]
