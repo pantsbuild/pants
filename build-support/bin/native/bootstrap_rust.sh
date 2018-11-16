@@ -48,7 +48,8 @@ function bootstrap_rust() {
     "${RUSTUP}" toolchain install ${RUST_TOOLCHAIN}
     "${RUSTUP}" component add --toolchain ${RUST_TOOLCHAIN} ${RUST_COMPONENTS[@]} >&2
 
-    ln -fs "$(RUSTUP_TOOLCHAIN="${RUST_TOOLCHAIN}" cargo_bin)" "${rust_toolchain_root}/${cargo_versioned}"
+    symlink_target="$(perl -e 'use File::Spec; print File::Spec->abs2rel(@ARGV) . "\n"' "$(RUSTUP_TOOLCHAIN="${RUST_TOOLCHAIN}" cargo_bin)" "${rust_toolchain_root}")"
+    ln -fs "${symlink_target}" "${rust_toolchain_root}/${cargo_versioned}"
   fi
 
   local -r symlink_farm_root="${REPO_ROOT}/build-support/bin/native"
