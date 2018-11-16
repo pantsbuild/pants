@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import shutil
 
-from pants.engine.native import Native
 from pants.util.contextutil import open_tar
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_walk
 
@@ -81,6 +80,8 @@ class DirectoryArtifact(Artifact):
 class TarballArtifact(Artifact):
   """An artifact stored in a tarball."""
 
+  NATIVE_BINARY = None
+
   # TODO: Expose `dereference` for tasks.
   # https://github.com/pantsbuild/pants/issues/3961
   def __init__(self, artifact_root, tarfile_, compression=9, dereference=True):
@@ -109,7 +110,7 @@ class TarballArtifact(Artifact):
   def extract(self):
     # Note(yic): unlike the python implementation before, now we do not update self._relpath
     # after the extraction.
-    result = Native.NATIVE_SINGLETON.decompress_tarball(self._tarfile.encode('utf-8'),
-                                                        self._artifact_root.encode('utf-8'))
+    result = self.NATIVE_BINARY.decompress_tarball(self._tarfile.encode('utf-8'),
+                                                   self._artifact_root.encode('utf-8'))
     if result.is_throw:
       raise ArtifactError("Extracting cache failed:\{}".format(result.value))

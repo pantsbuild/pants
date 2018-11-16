@@ -674,14 +674,10 @@ class ExternContext(object):
 class Native(object):
   """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
-  NATIVE_SINGLETON = None
-
   @staticmethod
   def create(bootstrap_options):
     """:param options: Any object that provides access to bootstrap option values."""
-    native = Native(bootstrap_options.native_engine_visualize_to)
-    Native.NATIVE_SINGLETON = native
-    return native
+    return Native(bootstrap_options.native_engine_visualize_to)
 
   def __init__(self, visualize_to_dir):
     """

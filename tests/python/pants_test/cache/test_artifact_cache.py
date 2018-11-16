@@ -8,6 +8,7 @@ import os
 from builtins import open, str
 from contextlib import contextmanager
 
+from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import (NonfatalArtifactCacheError, call_insert,
                                         call_use_cached_files)
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
@@ -56,6 +57,7 @@ class TestArtifactCache(TestBase):
     super(TestArtifactCache, self).setUp()
     # Init engine because decompression now goes through native code.
     self._init_engine()
+    TarballArtifact.NATIVE_BINARY = self._scheduler._scheduler._native
 
   def test_local_cache(self):
     with self.setup_local_cache() as artifact_cache:
