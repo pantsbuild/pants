@@ -13,6 +13,20 @@ scala_library(
     ],
 )
 
+# Target that bans a package in a third party dependency, but is succssful
+scala_library(
+    name="ban_packages_successful",
+    sources=["Main.scala"],
+    dependency_constraints=
+    DependencyConstraints([
+        JvmPackageConstraint("never.Triggered"),
+    ],
+    ),
+    dependencies=[
+        "3rdparty/jvm/com/github/scopt",
+    ],
+)
+
 # Target that bans a tag in another target
 scala_library(
     name="ban_tags",

@@ -39,21 +39,22 @@ class BannedDependencyException(Exception):
 class Constraint(PayloadField):
   """Representation of a constraint on the target's dependencies."""
 
-  def check_target(self, target, task_context, target_under_test):
+  def check_target(self, source, task_context, target_under_test):
     """
     Check whether a given target complies with this constraint.
 
     Note that there are constraints that apply to targets, and constraints that apply to classes.
     Therefore, this flow is left general in purpose to accomodate for both requirements.
-    :param target: Target to check.
+    :param source: Target to check.
     :param task_context: Context of the task, to extract from it any relevant information.
     :param target_under_test: The target that we want the constraint to apply to.
     :return:
     """
+    task_context.log.info("BL: Running constraint {} on target {}".format(self, target_under_test.name))
     items = self.get_collection_to_constrain(task_context, target_under_test)
     bad_elements = [item for item in items if self.predicate(item)]
     if bad_elements:
-      raise BannedDependencyException(self.get_error_message(target, target_under_test, bad_elements))
+      raise BannedDependencyException(self.get_error_message(source, target_under_test, bad_elements))
 
   def get_collection_to_constrain(self, context, target_under_test):
     """
