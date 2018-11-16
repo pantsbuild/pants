@@ -36,7 +36,7 @@ pub mod tar_tests {
     let content = "hello world".as_bytes().to_vec();
     let txt_full_path = std::fs::canonicalize(tmp_dir.path())
       .unwrap()
-      .join(&PathBuf::from("hello.txt"));
+      .join(&"hello.txt");
     make_file(&txt_full_path, &content, 0o600);
 
     let path_in_tar = "a/b/c/d.txt";
@@ -44,34 +44,16 @@ pub mod tar_tests {
       .unwrap()
       .join(&"simple.tgz");
 
-    let compress_result = compress(&txt_full_path, &path_in_tar, &tgz_path);
-    assert!(compress_result.is_ok());
+    compress(&txt_full_path, &path_in_tar, &tgz_path).expect("Error compressing.");
 
     // uncompress the tgz then make sure the content is good.
     let tmp_dest_dir = tempfile::TempDir::new().unwrap();
-    let untar_result = decompress_tgz(&tgz_path.as_path(), &tmp_dest_dir.path());
-    assert!(untar_result.is_ok());
+    decompress_tgz(&tgz_path.as_path(), &tmp_dest_dir.path()).expect("Error decompressing.");
     let expected_txt_path = std::fs::canonicalize(tmp_dest_dir.path())
       .unwrap()
       .join(&path_in_tar);
     assert!(expected_txt_path.exists());
     assert_eq!(content, contents(&expected_txt_path))
-  }
-
-  fn compress(
-    txt_full_path: &Path,
-    path_in_tar: &str,
-    tar_full_path: &Path,
-  ) -> Result<(), std::io::Error> {
-    // compress that file into a/b/c/hello.txt in the tar
-    let enc = GzEncoder::new(
-      File::create(tar_full_path.clone()).unwrap(),
-      Compression::default(),
-    );
-    let mut tar = tar::Builder::new(enc);
-    tar.append_file(path_in_tar, &mut File::open(txt_full_path.clone()).unwrap())?;
-    tar.into_inner()?;
-    Ok(())
   }
 
   #[test]
@@ -91,5 +73,21 @@ pub mod tar_tests {
     make_file(&tar_path, &content, 0o600);
     let result = decompress_tgz(&tar_path, &PathBuf::from("a_dir"));
     assert!(result.is_err())
+  }
+
+  fn compress(
+    txt_full_path: &Path,
+    path_in_tar: &str,
+    tar_full_path: &Path,
+  ) -> Result<(), std::io::Error> {
+    // compress that file into a/b/c/hello.txt in the tar
+    let enc = GzEncoder::new(
+      File::create(tar_full_path.clone()).unwrap(),
+      Compression::default(),
+    );
+    let mut tar = tar::Builder::new(enc);
+    tar.append_file(path_in_tar, &mut File::open(txt_full_path.clone()).unwrap())?;
+    tar.into_inner()?;
+    Ok(())
   }
 }
