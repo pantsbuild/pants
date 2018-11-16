@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import unittest
+
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -90,6 +92,7 @@ testprojects/tests/python/pants/dummies:failing_target                          
 """,
     )
 
+  @unittest.skip('Flaky test: https://github.com/pantsbuild/pants/issues/6782')
   def test_mixed_python_tests(self):
     args = [
       '--no-v1',
