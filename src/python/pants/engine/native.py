@@ -791,7 +791,7 @@ class Native(object):
 
   def decompress_tarball(self, tarfile_path, dest_dir):
     result = self.lib.decompress_tarball(tarfile_path, dest_dir)
-    self.context.raise_or_return(result)
+    return self.context.raise_or_return(result)
 
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
