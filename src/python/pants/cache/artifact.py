@@ -114,4 +114,4 @@ class TarballArtifact(Artifact):
       self.NATIVE_BINARY.decompress_tarball(self._tarfile.encode('utf-8'),
                                                    self._artifact_root.encode('utf-8'))
     except Exception as e:
-      raise ArtifactError("Extracting artifact failed:\{}".format(e))
+      raise ArtifactError("Extracting artifact failed:\n{}".format(e))
