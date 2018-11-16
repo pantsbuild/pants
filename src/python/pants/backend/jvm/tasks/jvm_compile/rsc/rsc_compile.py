@@ -28,12 +28,13 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import Digest, DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
-from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
+from pants.util.dirutil import (fast_relpath, fast_relpath_optional, maybe_read_file,
+                                safe_file_dump, safe_mkdir)
 
 
 #
@@ -58,6 +59,20 @@ def stdout_contents(wu):
     return f.read().rstrip()
 
 
+def dump_digest(output_dir, digest):
+  safe_file_dump('{}.digest'.format(output_dir),
+    '{}:{}'.format(digest.fingerprint, digest.serialized_bytes_length))
+
+
+def load_digest(output_dir):
+  read_file = maybe_read_file('{}.digest'.format(output_dir))
+  if read_file:
+    fingerprint, length = read_file.split(':')
+    return Digest(fingerprint, int(length))
+  else:
+    return None
+
+
 def _create_desandboxify_fn(possible_path_patterns):
   # Takes a collection of possible canonical prefixes, and returns a function that
   # if it finds a matching prefix, strips the path prior to the prefix and returns it
@@ -69,9 +84,10 @@ def _create_desandboxify_fn(possible_path_patterns):
       return path
     for r in regexes:
       match = r.search(path)
-      logger.debug('>>> matched {} with {} against {}'.format(match, r.pattern, path))
       if match:
+        logger.debug('path-cleanup: matched {} with {} against {}'.format(match, r.pattern, path))
         return match.group(1)
+    logger.debug('path-cleanup: no match for {}'.format(path))
     return path
   return desandboxify
 
@@ -122,29 +138,6 @@ class RscCompile(ZincCompile):
     rsc_toolchain_version = '0.0.0-446-c64e6937'
     scalameta_toolchain_version = '4.0.0'
 
-    # TODO: it would be better to have a less adhoc approach to handling
-    #       optional dependencies. See: https://github.com/pantsbuild/pants/issues/6390
-    cls.register_jvm_tool(
-      register,
-      'workaround-metacp-dependency-classpath',
-      classpath=[
-        JarDependency(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.11.12'),
-        JarDependency(org = 'org.scala-lang', name = 'scala-library', rev = '2.11.12'),
-        JarDependency(org = 'org.scala-lang', name = 'scala-reflect', rev = '2.11.12'),
-        JarDependency(org = 'org.scala-lang.modules', name = 'scala-partest_2.11', rev = '1.0.18'),
-        JarDependency(org = 'jline', name = 'jline', rev = '2.14.6'),
-        JarDependency(org = 'org.apache.commons', name = 'commons-lang3', rev = '3.3.2'),
-        JarDependency(org = 'org.apache.ant', name = 'ant', rev = '1.8.2'),
-        JarDependency(org = 'org.pegdown', name = 'pegdown', rev = '1.4.2'),
-        JarDependency(org = 'org.testng', name = 'testng', rev = '6.8.7'),
-        JarDependency(org = 'org.scalacheck', name = 'scalacheck_2.11', rev = '1.13.1'),
-        JarDependency(org = 'org.jmock', name = 'jmock-legacy', rev = '2.5.1'),
-        JarDependency(org = 'org.easymock', name = 'easymockclassextension', rev = '3.1'),
-        JarDependency(org = 'org.seleniumhq.selenium', name = 'selenium-java', rev = '2.35.0'),
-      ],
-      custom_rules=[
-        Shader.exclude_package('*', recursive=True),]
-    )
     cls.register_jvm_tool(
       register,
       'rsc',
@@ -187,29 +180,54 @@ class RscCompile(ZincCompile):
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
-    # TODO when digests are added, if the target is valid,
-    # the digest should be loaded in from the cc somehow.
-    # See: #6504
+    def pathglob_for(filename):
+      return PathGlobsAndRoot(
+        PathGlobs(
+          (fast_relpath_optional(filename, get_buildroot()),)),
+        text_type(get_buildroot()))
+
+    def to_classpath_entries(paths, scheduler):
+      # list of path ->
+      # list of (path, optional<digest>) ->
+      path_and_digests = [(p, load_digest(os.path.dirname(p))) for p in paths]
+      # partition: list of path, list of tuples
+      paths_without_digests = [p for (p, d) in path_and_digests if not d]
+      if paths_without_digests:
+        self.context.log.debug('Expected to find digests for {}, capturing them.'
+                               .format(paths_without_digests))
+      paths_with_digests = [(p, d) for (p, d) in path_and_digests if d]
+      # list of path -> list path, captured snapshot -> list of path with digest
+      snapshots = scheduler.capture_snapshots(tuple(pathglob_for(p) for p in paths_without_digests))
+      captured_paths_and_digests = [(p, s.directory_digest)
+                                    for (p, s) in zip(paths_without_digests, snapshots)]
+      # merge and classpath ify
+      return [ClasspathEntry(p, d) for (p, d) in paths_with_digests + captured_paths_and_digests]
+
+    def confify(entries):
+      return [(conf, e) for e in entries for conf in self._confs]
+
     for target in targets:
       rsc_cc, compile_cc = compile_contexts[target]
       if self._only_zinc_compileable(target):
         self.context.products.get_data('rsc_classpath').add_for_target(
           compile_cc.target,
-          [(conf, compile_cc.jar_file) for conf in self._confs])
+          confify([compile_cc.jar_file])
+        )
       elif self._rsc_compilable(target):
         self.context.products.get_data('rsc_classpath').add_for_target(
           rsc_cc.target,
-          [(conf, rsc_cc.rsc_mjar_file) for conf in self._confs])
+          confify(to_classpath_entries([rsc_cc.rsc_mjar_file], self.context._scheduler)))
       elif self._metacpable(target):
         # Walk the metacp results dir and add classpath entries for all the files there.
         # TODO exercise this with a test.
         # TODO, this should only list the files/directories in the first directory under the index dir
-        found_files = set()
-        for root, dirs, files in os.walk(rsc_cc.rsc_index_dir):
-          found_files.update(os.path.join(root, f) for f in files)
-        for f in found_files:
-          self._metacp_jars_classpath_product.add_for_target(
-            rsc_cc.target, [(conf, f) for conf in self._confs])
+
+        elements_in_index_dir = [os.path.join(rsc_cc.rsc_index_dir, s)
+                                 for s in os.listdir(rsc_cc.rsc_index_dir)]
+
+        entries = to_classpath_entries(elements_in_index_dir, self.context._scheduler)
+        self._metacp_jars_classpath_product.add_for_target(
+          rsc_cc.target, confify(entries))
       else:
         pass
 
@@ -217,7 +235,7 @@ class RscCompile(ZincCompile):
     return isinstance(target, JarLibrary)
 
   def _rsc_compilable(self, target):
-    return target.has_sources('.scala')
+    return target.has_sources('.scala') and not target.has_sources('.java')
 
   def _only_zinc_compileable(self, target):
     return target.has_sources('.java')
@@ -475,15 +493,15 @@ class RscCompile(ZincCompile):
                    '-cp', os.pathsep.join(rsc_semanticdb_classpath),
                    '-d', rsc_mjar_file,
                  ] + target_sources
+          sources_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
           self._runtool(
             'rsc.cli.Main',
             'rsc',
             args,
             distribution,
             tgt=tgt,
-#            input_files=target_sources + rsc_semanticdb_classpath,
-            input_files=rsc_semanticdb_classpath,
-            input_snapshot=ctx.target.sources_snapshot(scheduler=self.context._scheduler),
+            input_files=tuple(rsc_semanticdb_classpath),
+            input_digest=sources_snapshot.directory_digest,
             output_dir=os.path.dirname(rsc_mjar_file))
 
         self._record_target_stats(tgt,
@@ -500,18 +518,29 @@ class RscCompile(ZincCompile):
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)
 
     def work_for_vts_rsc_jar_library(vts, ctx):
-      metacp_dependencies = self._zinc.compile_classpath(
+      metacp_dependencies_entries = self._zinc.compile_classpath_entries(
         'compile_classpath',
         ctx.target,
         extra_cp_entries=self._extra_compile_time_classpath)
-      metacp_dependencies = fast_relpath_collection(metacp_dependencies)
 
-      # TODO use compile_classpath
-      classpath_abs = [
-        path for (conf, path) in
-        #self.context.products.get_data('rsc_classpath').get_for_target(ctx.target)
-        self.context.products.get_data('compile_classpath').get_for_target(ctx.target)
+      metacp_dependencies = fast_relpath_collection(c.path for c in metacp_dependencies_entries)
+
+
+      metacp_dependencies_digests = [c.directory_digest for c in metacp_dependencies_entries
+                                     if c.directory_digest]
+      metacp_dependencies_paths_without_digests = fast_relpath_collection(
+        c.path for c in metacp_dependencies_entries if not c.directory_digest)
+
+      classpath_entries = [
+        cp_entry for (conf, cp_entry) in
+        self.context.products.get_data('compile_classpath').get_classpath_entries_for_targets(
+          [ctx.target])
       ]
+      classpath_digests = [c.directory_digest for c in classpath_entries if c.directory_digest]
+      classpath_paths_without_digests = fast_relpath_collection(
+        c.path for c in classpath_entries if not c.directory_digest)
+
+      classpath_abs = [c.path for c in classpath_entries]
       classpath_rel = fast_relpath_collection(classpath_abs)
 
       metacp_inputs = []
@@ -556,13 +585,19 @@ class RscCompile(ZincCompile):
             '--include-scala-library-synthetics',
           ] + args
         distribution = self._get_jvm_distribution()
+
+        input_digest = self.context._scheduler.merge_directories(
+          tuple(classpath_digests + metacp_dependencies_digests))
+
         metacp_wu = self._runtool(
           'scala.meta.cli.Metacp',
           'metacp',
           args,
           distribution,
           tgt=tgt,
-          input_files=tuple(metacp_dependencies + classpath_rel),
+          input_digest=input_digest,
+          input_files=tuple(classpath_paths_without_digests +
+                            metacp_dependencies_paths_without_digests),
           output_dir=rsc_index_dir)
         metacp_result = json.loads(stdout_contents(metacp_wu))
 
@@ -745,18 +780,11 @@ class RscCompile(ZincCompile):
     ]
 
   def _runtool(
-    self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_snapshot=None, output_dir=None):
+    self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
     if self.execution_strategy == self.HERMETIC:
-      # TODO: accept input_digests as well as files.
       with self.context.new_workunit(tool_name) as wu:
         tool_classpath_abs = self.tool_classpath(tool_name)
         tool_classpath = fast_relpath_collection(tool_classpath_abs)
-
-        pathglobs = list(tool_classpath)
-        pathglobs.extend(f if os.path.isfile(f) else '{}/**'.format(f) for f in input_files)
-        root = PathGlobsAndRoot(
-          PathGlobs(tuple(pathglobs)),
-          text_type(get_buildroot()))
 
         classpath_for_cmd = os.pathsep.join(tool_classpath)
         cmd = [
@@ -767,19 +795,25 @@ class RscCompile(ZincCompile):
         cmd.extend([main])
         cmd.extend(args)
 
-        if pathglobs:
-          # dont capture snapshot, if pathglobs is empty
-          input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
+        pathglobs = list(tool_classpath)
+        pathglobs.extend(f if os.path.isfile(f) else '{}/**'.format(f) for f in input_files)
 
-        if input_snapshot and input_digest:
-          input_files = self.context._scheduler.merge_directories(
-              (input_snapshot.directory_digest, input_digest))
+        if pathglobs:
+          root = PathGlobsAndRoot(
+          PathGlobs(tuple(pathglobs)),
+          text_type(get_buildroot()))
+          # dont capture snapshot, if pathglobs is empty
+          path_globs_input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
+
+        if path_globs_input_digest and input_digest:
+          epr_input_files = self.context._scheduler.merge_directories(
+              (path_globs_input_digest, input_digest))
         else:
-          input_files = input_digest or input_snapshot.directory_digest
+          epr_input_files = path_globs_input_digest or input_digest
 
         epr = ExecuteProcessRequest(
           argv=tuple(cmd),
-          input_files=input_files,
+          input_files=epr_input_files,
           output_files=tuple(),
           output_directories=(output_dir,),
           timeout_seconds=15*60,
@@ -797,6 +831,7 @@ class RscCompile(ZincCompile):
           raise TaskError(res.stderr)
 
         if output_dir:
+          dump_digest(output_dir, res.output_directory_digest)
           self.context._scheduler.materialize_directories((
             DirectoryToMaterialize(
               # NB the first element here is the root to materialize into, not the dir to snapshot
