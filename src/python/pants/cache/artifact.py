@@ -110,7 +110,8 @@ class TarballArtifact(Artifact):
   def extract(self):
     # Note(yic): unlike the python implementation before, now we do not update self._relpath
     # after the extraction.
-    result = self.NATIVE_BINARY.decompress_tarball(self._tarfile.encode('utf-8'),
+    try:
+      self.NATIVE_BINARY.decompress_tarball(self._tarfile.encode('utf-8'),
                                                    self._artifact_root.encode('utf-8'))
-    if result.is_throw:
-      raise ArtifactError("Extracting cache failed:\{}".format(result.value))
+    except Exception as e:
+      raise ArtifactError("Extracting artifact failed:\{}".format(e))
