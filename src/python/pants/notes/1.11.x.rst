@@ -15,6 +15,9 @@ Bugfixes
 * Bump pex version to 1.5.3 (#6776)
   `PR #6776 <https://github.com/pantsbuild/pants/pull/6776>`_
 
+* Ignore paths more deeply to avoid graph impact when ignored files are added/removed (#6752)
+  `PR #6752 <https://github.com/pantsbuild/pants/pull/6752>`_
+
 1.11.0rc1 (10/31/2018)
 ----------------------
 
