@@ -419,6 +419,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
+  @unittest.skip("Broken: https://github.com/pantsbuild/pants/issues/6778")
   def test_pantsd_parent_runner_killed(self):
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
