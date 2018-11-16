@@ -3,6 +3,18 @@
 
 This document describes releases leading up to the ``1.11.x`` ``stable`` series.
 
+1.11.0rc2 (11/15/2018)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fall back to most recent known osx version for bootstrap binaries (#6681)
+  `PR #6681 <https://github.com/pantsbuild/pants/pull/6681>`_
+
+* Bump pex version to 1.5.3 (#6776)
+  `PR #6776 <https://github.com/pantsbuild/pants/pull/6776>`_
+
 1.11.0rc1 (10/31/2018)
 ----------------------
 
