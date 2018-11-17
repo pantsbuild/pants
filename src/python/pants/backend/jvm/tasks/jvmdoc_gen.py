@@ -9,6 +9,7 @@ import contextlib
 import multiprocessing
 import os
 import re
+from multiprocessing.pool import ThreadPool
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
@@ -158,7 +159,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
 
     if jobs:
       with contextlib.closing(
-            multiprocessing.Pool(processes=min(len(jobs), multiprocessing.cpu_count()))) as pool:
+          ThreadPool(processes=min(len(jobs), multiprocessing.cpu_count()))) as pool:
         # map would be a preferable api here but fails after the 1st batch with an internal:
         # ...
         #  File "...src/python/pants/backend/jvm/tasks/jar_create.py", line 170, in javadocjar
