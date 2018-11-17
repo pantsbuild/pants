@@ -4,6 +4,136 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.12.0.dev1 (11/16/2018)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* bump pex version to 1.5.3 (#6776)
+  `PR #6776 <https://github.com/pantsbuild/pants/pull/6776>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Make it easy to get a logger from a RunTracker instance. (#6771)
+  `PR #6771 <https://github.com/pantsbuild/pants/pull/6771>`_
+
+* fs_util can output recursive file list with digests (#6770)
+  `PR #6770 <https://github.com/pantsbuild/pants/pull/6770>`_
+
+* Jacoco report target filtering. (#6736)
+  `PR #6736 <https://github.com/pantsbuild/pants/pull/6736>`_
+
+Bugfixes
+~~~~~~~~
+
+* [rsc-compile] use digests from output files and include them in classpath products (#6772)
+  `PR #6772 <https://github.com/pantsbuild/pants/pull/6772>`_
+
+* [exec-graph] catch BaseException; improve inprogress debug logging (#6773)
+  `PR #6773 <https://github.com/pantsbuild/pants/pull/6773>`_
+
+* Stabilize V2 engine UI (#6761)
+  `PR #6761 <https://github.com/pantsbuild/pants/pull/6761>`_
+
+* [rsc-compile] further fixes (#6745)
+  `PR #6745 <https://github.com/pantsbuild/pants/pull/6745>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* notes for 1.11.0rc2 (#6777)
+  `PR #6777 <https://github.com/pantsbuild/pants/pull/6777>`_
+
+* Skip another flaky test. (#6781)
+  `PR #6781 <https://github.com/pantsbuild/pants/pull/6781>`_
+
+* Make cargo as relative symlink not absolute (#6780)
+  `PR #6780 <https://github.com/pantsbuild/pants/pull/6780>`_
+
+* Skip broken test_pantsd_parent_runner_killed (#6779)
+  `Issue #6778 <https://github.com/pantsbuild/pants/issues/6778>`_
+  `PR #6779 <https://github.com/pantsbuild/pants/pull/6779>`_
+
+* Skip a flaky test. (#6775)
+  `PR #6775 <https://github.com/pantsbuild/pants/pull/6775>`_
+
+* Set TERM=dumb in tests/python/pants_test/rules:test_integration (#6774)
+  `PR #6774 <https://github.com/pantsbuild/pants/pull/6774>`_
+
+* [zinc compile] Use default for rebase-map in zinc wrapper: part 2 (#6569)
+  `PR #6569 <https://github.com/pantsbuild/pants/pull/6569>`_
+
+* Add OSX 10.12 and 10.13 (#6760)
+  `PR #6760 <https://github.com/pantsbuild/pants/pull/6760>`_
+
+* Log digests, not fingerprints, when uploads fail (#6769)
+  `PR #6769 <https://github.com/pantsbuild/pants/pull/6769>`_
+
+* Force consistent stty size on travis (#6768)
+  `PR #6768 <https://github.com/pantsbuild/pants/pull/6768>`_
+
+* Python test runner uses pytest (#6661)
+  `PR #6661 <https://github.com/pantsbuild/pants/pull/6661>`_
+
+* Unblacklist some others which are flakily failing in both 2 and 3 (#6763)
+  `PR #6763 <https://github.com/pantsbuild/pants/pull/6763>`_
+
+* Fix bad usage of `future.moves.collections` (#6747)
+  `PR #6747 <https://github.com/pantsbuild/pants/pull/6747>`_
+
+* Update rust deps (#6759)
+  `PR #6759 <https://github.com/pantsbuild/pants/pull/6759>`_
+
+* Switch from enum_primitive to num_enum (#6756)
+  `PR #6756 <https://github.com/pantsbuild/pants/pull/6756>`_
+
+* Buffer downloads in memory not on disk (#6746)
+  `PR #6746 <https://github.com/pantsbuild/pants/pull/6746>`_
+
+* [rsc-compile] use already captured target sources snapshot instead of re-capturing (#6700)
+  `PR #6700 <https://github.com/pantsbuild/pants/pull/6700>`_
+
+* DownloadFile: Async and share an http Client (#6751)
+  `PR #6751 <https://github.com/pantsbuild/pants/pull/6751>`_
+
+* Fix Python 3 option integration test issue with unicode (#6755)
+  `PR #6755 <https://github.com/pantsbuild/pants/pull/6755>`_
+
+* Ignore paths more deeply to avoid graph impact when ignored files are added/removed (#6752)
+  `PR #6752 <https://github.com/pantsbuild/pants/pull/6752>`_
+
+* Run integration test against Python 3 (#6732)
+  `PR #6732 <https://github.com/pantsbuild/pants/pull/6732>`_
+
+* Cache file downloads in the Store (#6749)
+  `PR #6749 <https://github.com/pantsbuild/pants/pull/6749>`_
+
+* Allow tests to run with isolated stores (#6743)
+  `PR #6743 <https://github.com/pantsbuild/pants/pull/6743>`_
+
+* Update to rust 1.30 (#6741)
+  `PR #6741 <https://github.com/pantsbuild/pants/pull/6741>`_
+
+* Fix unit test http server threading (#6744)
+  `PR #6744 <https://github.com/pantsbuild/pants/pull/6744>`_
+
+* Add intrinsic to download a file (#6660)
+  `PR #6660 <https://github.com/pantsbuild/pants/pull/6660>`_
+
+* Rename DirectoryDigest to Digest (#6740)
+  `PR #6740 <https://github.com/pantsbuild/pants/pull/6740>`_
+
+* Allow multiple intrinsics to supply the same product type (#6739)
+  `PR #6739 <https://github.com/pantsbuild/pants/pull/6739>`_
+
+* WriterHasher returns a Digest not a Fingerprint (#6738)
+  `PR #6738 <https://github.com/pantsbuild/pants/pull/6738>`_
+
+* Minor cleanups to integration tests (#6734)
+  `PR #6734 <https://github.com/pantsbuild/pants/pull/6734>`_
+
 1.12.0.dev0 (11/06/2018)
 ------------------------
 
