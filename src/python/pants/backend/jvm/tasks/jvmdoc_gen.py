@@ -158,6 +158,8 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
         jobs[gendir] = (target, command)
 
     if jobs:
+      # Use ThreadPool as there may be dangling processes that cause identical run id and
+      # then buildstats error downstream. https://github.com/pantsbuild/pants/issues/6785
       with contextlib.closing(
           ThreadPool(processes=min(len(jobs), multiprocessing.cpu_count()))) as pool:
         # map would be a preferable api here but fails after the 1st batch with an internal:
