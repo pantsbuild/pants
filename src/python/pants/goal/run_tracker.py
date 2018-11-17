@@ -124,6 +124,9 @@ class RunTracker(Subsystem):
     # Note that multiple threads may share a name (e.g., all the threads in a pool).
     self._threadlocal = threading.local()
 
+    # A logger facade that logs into this RunTracker.
+    self._logger = RunTrackerLogger(self)
+
     # For background work.  Created lazily if needed.
     self._background_worker_pool = None
     self._background_root_workunit = None
@@ -240,6 +243,10 @@ class RunTracker(Subsystem):
   def set_root_outcome(self, outcome):
     """Useful for setup code that doesn't have a reference to a workunit."""
     self._main_root_workunit.set_outcome(outcome)
+
+  @property
+  def logger(self):
+    return self._logger
 
   @contextmanager
   def new_workunit(self, name, labels=None, cmd='', log_config=None):
@@ -607,3 +614,25 @@ class RunTracker(Subsystem):
     new_key_list = [target.address.spec, scope]
     new_key_list += keys
     self._merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)
+
+
+class RunTrackerLogger(object):
+  """A logger facade that logs into a run tracker."""
+
+  def __init__(self, run_tracker):
+    self._run_tracker = run_tracker
+
+  def debug(self, *msg_elements):
+    self._run_tracker.log(Report.DEBUG, *msg_elements)
+
+  def info(self, *msg_elements):
+    self._run_tracker.log(Report.INFO, *msg_elements)
+
+  def warn(self, *msg_elements):
+    self._run_tracker.log(Report.WARN, *msg_elements)
+
+  def error(self, *msg_elements):
+    self._run_tracker.log(Report.ERROR, *msg_elements)
+
+  def fatal(self, *msg_elements):
+    self._run_tracker.log(Report.FATAL, *msg_elements)

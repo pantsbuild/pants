@@ -14,6 +14,7 @@ from twitter.common.collections import maybe_list
 from pants.base.workunit import WorkUnit
 from pants.build_graph.target import Target
 from pants.goal.context import Context
+from pants.goal.run_tracker import RunTrackerLogger
 
 
 class TestContext(Context):
@@ -47,6 +48,10 @@ class TestContext(Context):
 
   class DummyRunTracker(object):
     """A runtracker stand-in that does no actual tracking."""
+
+    def __init__(self):
+      self.logger = RunTrackerLogger(self)
+
     class DummyArtifactCacheStats(object):
       def add_hits(self, cache_name, targets): pass
 

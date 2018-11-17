@@ -8,7 +8,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
-  timeout = 400,
+  timeout = 600,
   tags = {'integration'},
 )
 

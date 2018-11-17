@@ -48,7 +48,8 @@ function bootstrap_rust() {
     "${RUSTUP}" toolchain install ${RUST_TOOLCHAIN}
     "${RUSTUP}" component add --toolchain ${RUST_TOOLCHAIN} ${RUST_COMPONENTS[@]} >&2
 
-    ln -fs "$(RUSTUP_TOOLCHAIN="${RUST_TOOLCHAIN}" cargo_bin)" "${rust_toolchain_root}/${cargo_versioned}"
+    symlink_target="$(python -c 'import os, sys; print(os.path.relpath(*sys.argv[1:]))' "$(RUSTUP_TOOLCHAIN="${RUST_TOOLCHAIN}" cargo_bin)" "${rust_toolchain_root}")"
+    ln -fs "${symlink_target}" "${rust_toolchain_root}/${cargo_versioned}"
   fi
 
   local -r symlink_farm_root="${REPO_ROOT}/build-support/bin/native"

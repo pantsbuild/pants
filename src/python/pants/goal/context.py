@@ -21,7 +21,6 @@ from pants.engine.isolated_process import (FallibleExecuteProcessResult,
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.process.lock import OwnerPrintingInterProcessFileLock
-from pants.reporting.report import Report
 from pants.source.source_root import SourceRootConfig
 
 
@@ -37,27 +36,6 @@ class Context(object):
   :API: public
   """
 
-  class Log(object):
-    """A logger facade that logs into the pants reporting framework."""
-
-    def __init__(self, run_tracker):
-      self._run_tracker = run_tracker
-
-    def debug(self, *msg_elements):
-      self._run_tracker.log(Report.DEBUG, *msg_elements)
-
-    def info(self, *msg_elements):
-      self._run_tracker.log(Report.INFO, *msg_elements)
-
-    def warn(self, *msg_elements):
-      self._run_tracker.log(Report.WARN, *msg_elements)
-
-    def error(self, *msg_elements):
-      self._run_tracker.log(Report.ERROR, *msg_elements)
-
-    def fatal(self, *msg_elements):
-      self._run_tracker.log(Report.FATAL, *msg_elements)
-
   # TODO: Figure out a more structured way to construct and use context than this big flat
   # repository of attributes?
   def __init__(self, options, run_tracker, target_roots,
@@ -69,7 +47,7 @@ class Context(object):
     self.build_file_parser = build_file_parser
     self.address_mapper = address_mapper
     self.run_tracker = run_tracker
-    self._log = self.Log(run_tracker)
+    self._log = run_tracker.logger
     self._target_base = target_base or Target
     self._products = Products()
     self._buildroot = get_buildroot()
