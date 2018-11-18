@@ -237,6 +237,11 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
         default option was provided to use for bootstrap.
         """.format(jvm_tool.key)))
 
+  # Force non-nailgun execution because nailgun will try to bootstrap itself via coursier,
+  # and then coursier will try it run via nailgun, which creates a chicken-egg problem.
+  def force_non_nailgun_execution(self):
+    return True
+
   def _bootstrap_classpath(self, jvm_tool, targets):
     self._check_underspecified_tools(jvm_tool, targets)
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
@@ -250,12 +255,6 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
                             javadoc=False)
       coursier_classpath = [cp_entry for _, cp_entry in classpath_holder.get_for_targets(targets)]
       return coursier_classpath
-
-    # ivynames = list(sorted(os.path.basename(path) for path in ivy_classpath))
-    # coursiernames = list(sorted(os.path.basename(path) for path in coursier_classpath))
-    # if ivynames != coursiernames:
-    #   x = 5
-    # return coursier_classpath
 
   @memoized_property
   def shader(self):

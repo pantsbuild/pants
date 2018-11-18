@@ -58,6 +58,15 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
 
+  def force_non_nailgun_execution(self):
+    """
+    Provide an option for subclass tasks to overwrite the execution strategy.
+    E.g. pants.backend.jvm.tasks.bootstrap_jvm_tools.BootstrapJvmTools
+
+    :return: True to force non-nailgun.
+    """
+    return False
+
   @memoized_property
   def execution_strategy(self):
     return self.get_options().execution_strategy
@@ -68,7 +77,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     Call only in execute() or later. TODO: Enforce this.
     """
     dist = dist or self.dist
-    if self.execution_strategy == self.NAILGUN:
+    if self.force_non_nailgun_execution():
+      return SubprocessExecutor(dist)
+    elif self.execution_strategy == self.NAILGUN:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       return NailgunExecutor(self._identity,
                              self._executor_workdir,
