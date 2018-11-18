@@ -4,24 +4,18 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import object
+from builtins import str
 from textwrap import dedent
 
 # TODO: Create a dummy target type in this test and remove this dep.
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.source_mapper import LazySourceMapper, SpecSourceMapper
+from pants.engine.addressable import BuildFileAddresses
+from pants.engine.legacy.graph import OwnersRequest
 from pants_test.test_base import TestBase
 
 
-class SourceMapperTest(object):
-  def __init__(self, methodName):
-    super(SourceMapperTest, self).__init__(methodName)
-    self._mapper = None
-
-  def get_mapper(self):
-    return self._mapper
-
+class SourceMapperTest(TestBase):
   @classmethod
   def alias_groups(cls):
     return BuildFileAliases(
@@ -30,15 +24,10 @@ class SourceMapperTest(object):
       },
     )
 
-  def setUp(self):
-    super(SourceMapperTest, self).setUp()
-    self.set_mapper()
-
-  def set_mapper(self, fast=False):
-    raise NotImplementedError
-
   def owner(self, owner, f):
-    self.assertEqual(set(owner), {i.spec for i in self.get_mapper().target_addresses_for_source(f)})
+    request = OwnersRequest(sources=(f,), include_dependees=str('none'))
+    addresses, = self.scheduler.product_request(BuildFileAddresses, [request])
+    self.assertEqual(set(owner), {i.spec for i in addresses})
 
   def test_target_address_for_source_yields_unique_addresses(self):
     # NB If the mapper returns more than one copy of an address, it may cause other code to do
@@ -53,8 +42,7 @@ class SourceMapperTest(object):
     )
     '''))
 
-    self.assertEqual({'path:target', 'path:buildholder'},
-                     {a.spec for a in self.get_mapper().target_addresses_for_source('path/BUILD')})
+    self.owner(['path:target', 'path:buildholder'], 'path/BUILD')
 
   def test_joint_ownership(self):
     # A simple target with two sources.
@@ -95,30 +83,3 @@ class SourceMapperTest(object):
     self.owner(['//:top', 'text/common/const:const'], 'text/common/const/emoji.py')
     self.owner(['//:top'], 'foo.py')
     self.owner([], 'bar.py')
-
-  def test_fast_vs_correct(self):
-    self.create_library('', 'java_library', 'top', ['foo.py', 'a/b/bar.py'])
-    self.create_library('a/b', 'java_library', 'b', ['bar.py', 'baz.py'])
-
-    # With fast=False, order doesn't matter.
-    self.set_mapper(fast=False)
-    self.owner(['//:top', 'a/b:b'], 'a/b/bar.py')
-    self.owner(['//:top'], 'foo.py')
-    self.set_mapper(fast=False)
-    self.owner(['//:top'], 'foo.py')
-    self.owner(['//:top', 'a/b:b'], 'a/b/bar.py')
-
-    # With fast=False, loading a parent first vs after now affects results.
-    self.set_mapper(fast=True)
-    self.owner(['a/b:b'], 'a/b/bar.py')
-    self.owner(['//:top'], 'foo.py')
-
-
-class LazySourceMapperTest(SourceMapperTest, TestBase):
-  def set_mapper(self, fast=False):
-    self._mapper = LazySourceMapper(self.address_mapper, self.build_graph, fast)
-
-
-class SpecSourceMapperTest(SourceMapperTest, TestBase):
-  def set_mapper(self, fast=False):
-    self._mapper = SpecSourceMapper(self.address_mapper, self.build_graph, fast)

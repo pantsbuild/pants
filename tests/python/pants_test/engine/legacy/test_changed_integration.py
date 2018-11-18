@@ -16,6 +16,7 @@ from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
 from pants_test.base_test import TestGenerator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants_test.testutils.git_util import initialize_repo
+from pants_test.testutils.py2_compat import assertRegex
 
 
 def lines_to_set(str_or_list):
@@ -368,7 +369,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       safe_delete(os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/BUILD'))
       pants_run = self.run_pants(['list', '--changed-parent=HEAD', '--changed-include-dependees=transitive'])
       self.assert_failure(pants_run)
-      self.assertIn('src/resources/org/pantsbuild/resourceonly', pants_run.stderr_data)
+      assertRegex(self, pants_run.stderr_data, 'src/resources/org/pantsbuild/resourceonly:.*did not exist')
 
   def test_changed_in_directory_without_build_file(self):
     with create_isolated_git_repo() as worktree:
