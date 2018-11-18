@@ -238,7 +238,7 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
         """.format(jvm_tool.key)))
 
   # Force non-nailgun execution because nailgun will try to bootstrap itself via coursier,
-  # and then coursier will try it run via nailgun, which creates a chicken-egg problem.
+  # and then coursier will try to run via nailgun, which creates a chicken-egg problem.
   def force_non_nailgun_execution(self):
     return True
 
