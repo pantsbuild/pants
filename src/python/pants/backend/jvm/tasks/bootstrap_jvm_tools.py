@@ -16,8 +16,11 @@ from textwrap import dedent
 from future.utils import PY3
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy, IvyTaskMixin
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.exceptions import TaskError
@@ -70,7 +73,7 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
     return type(self) == type(other) and self._tuple() == other._tuple()
 
 
-class BootstrapJvmTools(IvyTaskMixin, JarTask):
+class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
   class ToolUnderspecified(Exception):
     pass
 
@@ -237,7 +240,22 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   def _bootstrap_classpath(self, jvm_tool, targets):
     self._check_underspecified_tools(jvm_tool, targets)
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
-    return self.ivy_classpath(targets, silent=True, workunit_name=workunit_name)
+    if JvmResolveSubsystem.global_instance().get_options().resolver == 'ivy':
+      ivy_classpath = self.ivy_classpath(targets, silent=True, workunit_name=workunit_name)
+      return ivy_classpath
+    else:
+      classpath_holder = ClasspathProducts(self.get_options().pants_workdir)
+      CoursierMixin.resolve(self, targets, classpath_holder,
+                            sources=False,
+                            javadoc=False)
+      coursier_classpath = [cp_entry for _, cp_entry in classpath_holder.get_for_targets(targets)]
+      return coursier_classpath
+
+    # ivynames = list(sorted(os.path.basename(path) for path in ivy_classpath))
+    # coursiernames = list(sorted(os.path.basename(path) for path in coursier_classpath))
+    # if ivynames != coursiernames:
+    #   x = 5
+    # return coursier_classpath
 
   @memoized_property
   def shader(self):

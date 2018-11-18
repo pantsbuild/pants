@@ -49,7 +49,7 @@ class CoursierSubsystem(Subsystem):
              ],
              help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
     register('--artifact-types', type=list, fingerprint=True,
-             default=['jar', 'bundle', 'test-jar', 'maven-plugin', 'src', 'doc', 'aar'],
+             default=['jar', 'bundle', 'test-jar', 'maven-plugin', 'src', 'doc'],
              help='Specify the type of artifacts to fetch. See `packaging` at https://maven.apache.org/pom.html#Maven_Coordinates, '
                   'except `src` and `doc` being coursier specific terms for sources and javadoc.')
     register('--bootstrap-jar-url', fingerprint=True,
