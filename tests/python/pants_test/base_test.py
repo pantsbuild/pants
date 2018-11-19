@@ -39,6 +39,7 @@ from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.option.util.fakes import create_options_for_optionables
 
+
 # Fix this during a dev release
 deprecated_module('1.13.0.dev1', 'Use pants_test.test_base instead')
 
