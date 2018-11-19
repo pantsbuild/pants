@@ -89,7 +89,7 @@ object Main {
 
     val Parsed(settings, residual, errors) = Settings.parse(context.getArgs)
 
-    mainImpl(settings.withAbsolutePaths(new File(context.getWorking`Directory)), errors, startTime)
+    mainImpl(settings.withAbsolutePaths(new File(context.getWorkingDirectory)), errors, startTime)
   }
 
   def mainImpl(settings: Settings, errors: Seq[String], startTime: Long): Unit = {
