@@ -6,6 +6,7 @@
 package org.pantsbuild.zinc.analysis
 
 import java.io.File
+import org.pantsbuild.zinc.util.Util
 
 /**
  * Configuration for sbt analysis and analysis output options.
@@ -20,4 +21,12 @@ case class AnalysisOptions(
     _cache.getOrElse {
       throw new RuntimeException(s"An analysis cache file is required.")
     }
+
+  def withAbsolutePaths(relativeTo: File): AnalysisOptions = {
+    this.copy(
+      _cache = Util.normaliseOpt(Some(relativeTo))(_cache),
+      cacheMap = Util.normaliseMap(Some(relativeTo))(cacheMap),
+      rebaseMap = Util.normaliseMap(Some(relativeTo))(rebaseMap)
+    )
+  }
 }
