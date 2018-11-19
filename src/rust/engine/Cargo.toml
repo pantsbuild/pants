@@ -37,6 +37,7 @@ members = [
   "process_execution/bazel_protos",
   "process_executor",
   "resettable",
+  "tar_api",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -63,6 +64,7 @@ default-members = [
   "process_execution/bazel_protos",
   "process_executor",
   "resettable",
+  "tar_api",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -77,6 +79,7 @@ fs = { path = "fs" }
 futures = "^0.1.16"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
+indexmap = "1.0.2"
 itertools = "0.7.2"
 lazy_static = "1"
 log = "0.4"
@@ -90,4 +93,4 @@ tokio = "0.1"
 tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
-indexmap = "1.0.2"
+tar_api = { path = "tar_api" }

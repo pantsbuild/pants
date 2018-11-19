@@ -7,12 +7,20 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import unittest
 
-from pants.cache.artifact import DirectoryArtifact, TarballArtifact
+from pants.cache.artifact import ArtifactError, DirectoryArtifact, TarballArtifact
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants_test.test_base import TestBase
 
 
-class TarballArtifactTest(unittest.TestCase):
+class TarballArtifactTest(TestBase):
+
+  def setUp(self):
+    super(TarballArtifactTest, self).setUp()
+    # Init engine because decompression now goes through native code.
+    self._init_engine()
+    TarballArtifact.NATIVE_BINARY = self._scheduler._scheduler._native
+
   def test_get_paths_after_collect(self):
     with temporary_dir() as tmpdir:
       artifact_root = os.path.join(tmpdir, 'artifacts')
@@ -48,10 +56,23 @@ class TarballArtifactTest(unittest.TestCase):
 
       self.assertTrue(artifact.exists())
 
-  def touch_file_in(self, artifact_root):
+  def test_non_existent_tarball_extraction(self):
+    with temporary_dir() as tmpdir:
+      artifact = TarballArtifact(artifact_root=tmpdir, tarfile_='vapor.tar')
+      with self.assertRaises(ArtifactError):
+        artifact.extract()
+
+  def test_corrupt_tarball_extraction(self):
+    with temporary_dir() as tmpdir:
+      path = self.touch_file_in(tmpdir, content='invalid')
+      artifact = TarballArtifact(artifact_root=tmpdir, tarfile_=path)
+      with self.assertRaises(ArtifactError):
+        artifact.extract()
+
+  def touch_file_in(self, artifact_root, content=''):
     path = os.path.join(artifact_root, 'some.file')
     with safe_open(path, 'w') as f:
-      f.write('')
+      f.write(content)
     return path
 
 

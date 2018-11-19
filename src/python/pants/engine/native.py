@@ -252,6 +252,8 @@ void set_panic_handler(void);
 void lease_files_in_graph(Scheduler*);
 
 void garbage_collect_store(Scheduler*);
+
+PyResult decompress_tarball(char*, char*);
 '''
 
 CFFI_EXTERNS = '''
@@ -786,6 +788,10 @@ class Native(object):
 
   def to_ids_buf(self, types):
     return self.context.type_ids_buf([TypeId(self.context.to_id(t)) for t in types])
+
+  def decompress_tarball(self, tarfile_path, dest_dir):
+    result = self.lib.decompress_tarball(tarfile_path, dest_dir)
+    return self.context.raise_or_return(result)
 
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)

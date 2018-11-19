@@ -64,6 +64,7 @@ extern crate process_execution;
 extern crate reqwest;
 extern crate resettable;
 extern crate smallvec;
+extern crate tar_api;
 extern crate tempfile;
 extern crate tokio;
 extern crate ui;
@@ -521,6 +522,33 @@ pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u
 #[no_mangle]
 pub extern "C" fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
   with_scheduler(scheduler_ptr, |scheduler| scheduler.core.graph.len() as u64)
+}
+
+#[no_mangle]
+pub extern "C" fn decompress_tarball(
+  tar_path: *const raw::c_char,
+  output_dir: *const raw::c_char,
+) -> PyResult {
+  let tar_path_str = PathBuf::from(
+    unsafe { CStr::from_ptr(tar_path) }
+      .to_string_lossy()
+      .into_owned(),
+  );
+  let output_dir_str = PathBuf::from(
+    unsafe { CStr::from_ptr(output_dir) }
+      .to_string_lossy()
+      .into_owned(),
+  );
+
+  tar_api::decompress_tgz(tar_path_str.as_path(), output_dir_str.as_path())
+    .map_err(|e| {
+      format!(
+        "Failed to untar {:?} to {:?}:\n{:?}",
+        tar_path_str.as_path(),
+        output_dir_str.as_path(),
+        e
+      )
+    }).into()
 }
 
 #[no_mangle]
