@@ -350,16 +350,21 @@ class _DependentGraph(object):
 
   def transitive_dependents_of_addresses(self, addresses):
     """Given an iterable of addresses, yield all of those addresses dependents, transitively."""
-    addresses_to_visit = OrderedSet(addresses)
-    while True:
-      dependents = self.dependents_of_addresses(addresses)
-      # If we've exhausted all dependencies or visited all remaining nodes, break.
-      if (not dependents) or dependents.issubset(addresses_to_visit):
-        break
-      addresses = dependents.difference(addresses_to_visit)
-      addresses_to_visit.update(dependents)
+    closure = set()
+    result = []
+    to_visit = deque(addresses)
 
-    return self.dependents_of_addresses(addresses_to_visit)
+    while to_visit:
+      address = to_visit.popleft()
+      if address in closure:
+        continue
+
+      closure.add(address)
+      result.append(address)
+      to_visit.extend(self._dependent_address_map[address])
+      to_visit.extend(self._implicit_dependent_address_map[address])
+
+    return result
 
 
 class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
