@@ -4,6 +4,21 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.12.0rc0 (11/19/2018)
+----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add prelude and epilogue (#6784)
+  `PR #6784 <https://github.com/pantsbuild/pants/pull/6784>`_
+
+Bugfixes
+~~~~~~~~
+
+* Use ThreadPool for cache fetching and rust tar for artifact extraction (#6748)
+  `PR #6748 <https://github.com/pantsbuild/pants/pull/6748>`_
+
 1.12.0.dev1 (11/16/2018)
 ------------------------
 
