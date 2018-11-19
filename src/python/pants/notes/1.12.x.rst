@@ -18,7 +18,6 @@ Bugfixes
 * Use ThreadPool for cache fetching and rust tar for artifact extration (#6748)
   `PR #6748 <https://github.com/pantsbuild/pants/pull/6748>`_
 
-
 1.12.0.dev1 (11/16/2018)
 ------------------------
 
