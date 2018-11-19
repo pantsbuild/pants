@@ -342,7 +342,7 @@ class _DependentGraph(object):
 
   def dependents_of_addresses(self, addresses):
     """Given an iterable of addresses, yield all of those addresses dependents."""
-    seen = set(addresses)
+    seen = OrderedSet(addresses)
     for address in addresses:
       seen.update(self._dependent_address_map[address])
       seen.update(self._implicit_dependent_address_map[address])
@@ -350,8 +350,8 @@ class _DependentGraph(object):
 
   def transitive_dependents_of_addresses(self, addresses):
     """Given an iterable of addresses, yield all of those addresses dependents, transitively."""
-    addresses_to_visit = set(addresses)
-    while 1:
+    addresses_to_visit = OrderedSet(addresses)
+    while True:
       dependents = self.dependents_of_addresses(addresses)
       # If we've exhausted all dependencies or visited all remaining nodes, break.
       if (not dependents) or dependents.issubset(addresses_to_visit):
@@ -393,15 +393,22 @@ class OwnersRequest(datatype([
   ('sources', tuple),
   ('include_dependees', str),
 ])):
-  """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
+  """A request for the owners (and optionally, transitive dependees) of a set of file paths.
+
+  TODO: `include_dependees` should become an `enum` of the choices from the
+  `--changed-include-dependees` global option.
+  """
 
 
 def find_owners(symbol_table, address_mapper, owners_request):
-  sources_set = set(owners_request.sources)
-  dirs_set = {dirname(source) for source in sources_set}
+  sources_set = OrderedSet(owners_request.sources)
+  dirs_set = OrderedSet(dirname(source) for source in sources_set)
+
   # Walk up the buildroot looking for targets that would conceivably claim changed sources.
   candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
+  candidate_targets = yield Get(HydratedTargets, Specs(candidate_specs))
 
+  # Match the source globs against the expanded candidate targets.
   def owns_any_source(legacy_target):
     """Given a `HydratedTarget` instance, check if it owns the given source file."""
     target_kwargs = legacy_target.adaptor.kwargs()
@@ -409,36 +416,36 @@ def find_owners(symbol_table, address_mapper, owners_request):
     # Handle `sources`-declaring targets.
     # NB: Deleted files can only be matched against the 'filespec' (ie, `PathGlobs`) for a target,
     # so we don't actually call `fileset.matches` here.
+    # TODO: This matching logic should be implemented using the rust `fs` crate for two reasons:
+    #  1) having two implementations isn't great
+    #  2) we're expanding sources via HydratedTarget, but it isn't necessary to do that to match
     target_sources = target_kwargs.get('sources', None)
     if target_sources and any_matches_filespec(sources_set, target_sources.filespec):
       return True
 
     return False
 
-  # Request HydratedTargets for our candidate specs, and then match their source globs against
-  # the sources set.
-  hydrated_targets = yield Get(HydratedTargets, Specs(candidate_specs))
   direct_owners = tuple(ht.adaptor.address
-                        for ht in hydrated_targets
+                        for ht in candidate_targets
                         if LegacyAddressMapper.any_is_declaring_file(ht.adaptor.address, sources_set) or
                            owns_any_source(ht))
 
-  # If the OwnersRequest does not require dependees, then we're done: otherwise, find dependees.
-  if owners_request.include_dependees not in ('direct', 'transitive'):
-    # NB: A yield without a LHS represents an early return.
+  # If the OwnersRequest does not require dependees, then we're done.
+  if owners_request.include_dependees == 'none':
     yield BuildFileAddresses(direct_owners)
-
-  all_addresses = yield Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
-  all_structs = yield [Get(symbol_table.constraint(), Address, a.to_address()) for a in all_addresses]
-
-  graph = _DependentGraph.from_iterable(target_types_from_symbol_table(symbol_table),
-                                        address_mapper,
-                                        all_structs)
-  if owners_request.include_dependees == 'direct':
-    yield BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
   else:
-    assert owners_request.include_dependees == 'transitive'
-    yield BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
+    # Otherwise: find dependees.
+    all_addresses = yield Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
+    all_structs = yield [Get(symbol_table.constraint(), Address, a.to_address()) for a in all_addresses]
+
+    graph = _DependentGraph.from_iterable(target_types_from_symbol_table(symbol_table),
+                                          address_mapper,
+                                          all_structs)
+    if owners_request.include_dependees == 'direct':
+      yield BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
+    else:
+      assert owners_request.include_dependees == 'transitive'
+      yield BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
 
 
 @rule(TransitiveHydratedTargets, [Select(BuildFileAddresses)])
@@ -563,7 +570,7 @@ def create_legacy_graph_tasks(symbol_table):
   symbol_table_constraint = symbol_table.constraint()
 
   partial_find_owners = functools.partial(find_owners, symbol_table)
-  partial_find_owners.__name__ = find_owners.__name__
+  functools.update_wrapper(partial_find_owners, find_owners)
 
   return [
     transitive_hydrated_targets,

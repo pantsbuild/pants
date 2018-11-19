@@ -52,8 +52,7 @@ class TargetRootsCalculator(object):
   @classmethod
   def changed_files(cls, scm, changes_since=None, diffspec=None):
     """Determines the files changed according to SCM/workspace and options."""
-    workspace =ScmWorkspace(scm)
-    diffspec = diffspec or diffspec
+    workspace = ScmWorkspace(scm)
     if diffspec:
       return workspace.changes_in(diffspec)
 

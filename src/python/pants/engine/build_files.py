@@ -264,7 +264,7 @@ def create_graph_rules(address_mapper, symbol_table):
   symbol_table_constraint = symbol_table.constraint()
 
   partial_hydrate_struct = functools.partial(hydrate_struct, symbol_table_constraint)
-  partial_hydrate_struct.__name__ = hydrate_struct.__name__
+  functools.update_wrapper(partial_hydrate_struct, hydrate_struct)
 
   return [
     # A singleton to provide the AddressMapper.
