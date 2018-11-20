@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import signal
 import time
+import unittest
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -14,12 +15,13 @@ from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
 
   def _assert_unhandled_exception_log_matches(self, pid, file_contents):
-    self.assertRegexpMatches(file_contents, """\
+    assertRegex(self, file_contents, """\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
@@ -52,7 +54,7 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
         # The backtrace should be omitted when --print-exception-stacktrace=False.
         print_exception_stacktrace=False)
       self.assert_failure(pants_run)
-      self.assertRegexpMatches(pants_run.stderr_data, """\\A\
+      assertRegex(self, pants_run.stderr_data, """\\A\
 timestamp: ([^\n]+)
 Exception caught: \\(pants\\.build_graph\\.address_lookup_error\\.AddressLookupError\\) \\(backtrace omitted\\)
 Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
@@ -60,12 +62,12 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
 """)
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
       self._assert_unhandled_exception_log_matches(
-        pants_run.pid, read_file(pid_specific_log_file))
+        pants_run.pid, read_file(pid_specific_log_file, binary_mode=False))
       self._assert_unhandled_exception_log_matches(
-        pants_run.pid, read_file(shared_log_file))
+        pants_run.pid, read_file(shared_log_file, binary_mode=False))
 
   def _assert_graceful_signal_log_matches(self, pid, signum, contents):
-    self.assertRegexpMatches(contents, """\
+    assertRegex(self, contents, """\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
@@ -100,19 +102,20 @@ Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
       # Return the (failed) pants execution result.
       yield (workdir, waiter_run)
 
+  @unittest.skip('Flaky: https://github.com/pantsbuild/pants/issues/6708')
   def test_dumps_logs_on_terminate(self):
     # Send a SIGTERM to the local pants process.
     with self._send_signal_to_waiter_handle(signal.SIGTERM) as (workdir, waiter_run):
-      self.assertRegexpMatches(waiter_run.stderr_data, """\
+      assertRegex(self, waiter_run.stderr_data, """\
 timestamp: ([^\n]+)
 Signal {signum} was raised. Exiting with failure. \\(backtrace omitted\\)
 """.format(signum=signal.SIGTERM))
       # Check that the logs show a graceful exit by SIGTERM.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
       self._assert_graceful_signal_log_matches(
-        waiter_run.pid, signal.SIGTERM, read_file(pid_specific_log_file))
+        waiter_run.pid, signal.SIGTERM, read_file(pid_specific_log_file, binary_mode=False))
       self._assert_graceful_signal_log_matches(
-          waiter_run.pid, signal.SIGTERM, read_file(shared_log_file))
+          waiter_run.pid, signal.SIGTERM, read_file(shared_log_file, binary_mode=False))
 
   def test_dumps_traceback_on_sigabrt(self):
     # SIGABRT sends a traceback to the log file for the current process thanks to
@@ -120,13 +123,13 @@ Signal {signum} was raised. Exiting with failure. \\(backtrace omitted\\)
     with self._send_signal_to_waiter_handle(signal.SIGABRT) as (workdir, waiter_run):
       # Check that the logs show an abort signal and the beginning of a traceback.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
-      self.assertRegexpMatches(read_file(pid_specific_log_file), """\
+      assertRegex(self, read_file(pid_specific_log_file, binary_mode=False), """\
 Fatal Python error: Aborted
 
 Thread [^\n]+ \\(most recent call first\\):
 """)
       # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
-      self.assertEqual('', read_file(shared_log_file))
+      self.assertEqual('', read_file(shared_log_file, binary_mode=False))
 
   def test_prints_traceback_on_sigusr2(self):
     with self._make_waiter_handle() as (workdir, waiter_handle):
@@ -138,7 +141,7 @@ Thread [^\n]+ \\(most recent call first\\):
       os.kill(waiter_handle.process.pid, signal.SIGKILL)
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
-      self.assertRegexpMatches(waiter_run.stderr_data, """\
+      assertRegex(self, waiter_run.stderr_data, """\
 Current thread [^\n]+ \\(most recent call first\\):
 """)
 
@@ -198,4 +201,4 @@ Current thread [^\n]+ \\(most recent call first\\):
       # The Exiter prints the final error message to whatever the interactive output stream is set
       # to, so when it's redirected it won't be in stderr.
       self.assertNotIn('erroneous!', redirected_pants_run.stderr_data)
-      self.assertIn('erroneous!', read_file(some_file))
+      self.assertIn('erroneous!', read_file(some_file, binary_mode=False))

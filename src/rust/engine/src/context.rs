@@ -16,8 +16,10 @@ use core::{Failure, TypeId};
 use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
 use handles::maybe_drop_handles;
+use log::debug;
 use nodes::{NodeKey, TryInto, WrappedNode};
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
+use reqwest;
 use resettable::Resettable;
 use rule_graph::RuleGraph;
 use tasks::Tasks;
@@ -38,7 +40,8 @@ pub struct Core {
   pub types: Types,
   pub fs_pool: Arc<ResettablePool>,
   pub runtime: Resettable<Arc<Runtime>>,
-  store_and_command_runner: Resettable<(Store, BoundedCommandRunner)>,
+  store_and_command_runner_and_http_client:
+    Resettable<(Store, BoundedCommandRunner, reqwest::async::Client)>,
   pub vfs: PosixFS,
 }
 
@@ -51,6 +54,7 @@ impl Core {
     build_root: &Path,
     ignore_patterns: &[String],
     work_dir: PathBuf,
+    local_store_dir: PathBuf,
     remote_store_server: Option<String>,
     remote_execution_server: Option<String>,
     remote_instance_name: Option<String>,
@@ -87,14 +91,13 @@ impl Core {
     };
 
     let fs_pool2 = fs_pool.clone();
-    let store_and_command_runner = Resettable::new(move || {
-      let store_path = Store::default_path();
-
-      let store = safe_create_dir_all_ioerror(&store_path)
-        .map_err(|e| format!("Error making directory {:?}: {:?}", store_path, e))
+    let store_and_command_runner_and_http_client = Resettable::new(move || {
+      let local_store_dir = local_store_dir.clone();
+      let store = safe_create_dir_all_ioerror(&local_store_dir)
+        .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
         .and_then(|()| match &remote_store_server {
           Some(ref address) => Store::with_remote(
-            store_path,
+            local_store_dir,
             fs_pool2.clone(),
             address,
             remote_instance_name.clone(),
@@ -104,7 +107,7 @@ impl Core {
             remote_store_chunk_bytes,
             remote_store_chunk_upload_timeout,
           ),
-          None => Store::local_only(store_path, fs_pool2.clone()),
+          None => Store::local_only(local_store_dir, fs_pool2.clone()),
         }).unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
       let underlying_command_runner: Box<CommandRunner> = match &remote_execution_server {
@@ -128,7 +131,9 @@ impl Core {
       let command_runner =
         BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
 
-      (store, command_runner)
+      let http_client = reqwest::async::Client::new();
+
+      (store, command_runner, http_client)
     });
 
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
@@ -140,7 +145,7 @@ impl Core {
       types: types,
       fs_pool: fs_pool.clone(),
       runtime: runtime,
-      store_and_command_runner: store_and_command_runner,
+      store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs: PosixFS::new(build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
@@ -170,7 +175,7 @@ impl Core {
       self.graph.with_exclusive(|| {
         self
           .fs_pool
-          .with_shutdown(|| self.store_and_command_runner.with_reset(f))
+          .with_shutdown(|| self.store_and_command_runner_and_http_client.with_reset(f))
       })
     });
     self
@@ -181,11 +186,15 @@ impl Core {
   }
 
   pub fn store(&self) -> Store {
-    self.store_and_command_runner.get().0
+    self.store_and_command_runner_and_http_client.get().0
   }
 
   pub fn command_runner(&self) -> BoundedCommandRunner {
-    self.store_and_command_runner.get().1
+    self.store_and_command_runner_and_http_client.get().1
+  }
+
+  pub fn http_client(&self) -> reqwest::async::Client {
+    self.store_and_command_runner_and_http_client.get().2
   }
 }
 

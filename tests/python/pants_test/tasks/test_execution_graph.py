@@ -14,6 +14,7 @@ from future.utils import PY3
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job, JobExistsError,
                                                                  NoRootJobError, UnknownJobError)
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class ImmediatelyExecutingPool(object):
@@ -49,6 +50,10 @@ def passing_fn():
 
 def raising_fn():
   raise Exception("I'm an error")
+
+
+def base_error_raising_fn():
+  raise BaseException("I'm a BaseException")
 
 
 def raising_wrapper():
@@ -132,6 +137,15 @@ class ExecutionGraphTest(unittest.TestCase):
 
   def test_one_failure_raises_exception(self):
     exec_graph = ExecutionGraph([self.job("A", raising_fn, [])], False)
+    with self.assertRaises(ExecutionFailure) as cm:
+      self.execute(exec_graph)
+
+    self.assertEqual("Failed jobs: A", str(cm.exception))
+
+  def test_base_exception_failure_raises_exception(self):
+    # BaseException happens for lower level issues, not catching and propagating it makes debugging
+    # difficult.
+    exec_graph = ExecutionGraph([self.job("A", base_error_raising_fn, [])], False)
     with self.assertRaises(ExecutionFailure) as cm:
       self.execute(exec_graph)
 
@@ -306,4 +320,4 @@ class ExecutionGraphTest(unittest.TestCase):
       "Traceback:.*in raising_wrapper.*raise Exception\\(\"I'm an error\"\\)",
       re.DOTALL,
     )
-    self.assertRegexpMatches(error_logs[1], regex)
+    assertRegex(self, error_logs[1], regex)

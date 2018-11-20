@@ -227,7 +227,7 @@ class BaseZincCompile(JvmCompile):
         )
 
       if self.get_options().use_classpath_jars:
-        # TODO: Make this work by capturing the correct DirectoryDigest and passing them around the
+        # TODO: Make this work by capturing the correct Digest and passing them around the
         # right places.
         # See https://github.com/pantsbuild/pants/issues/6432
         raise TaskError("Hermetic zinc execution currently doesn't work with classpath jars")
@@ -352,8 +352,6 @@ class BaseZincCompile(JvmCompile):
                           relative_to_exec_root(v)
                         ) for k, v in upstream_analysis.items())])
 
-    zinc_args.extend(self._zinc.rebase_map_args)
-
     zinc_args.extend(args)
     zinc_args.extend(self._get_zinc_arguments(settings))
     zinc_args.append('-transactional')
@@ -405,7 +403,7 @@ class BaseZincCompile(JvmCompile):
         for dep in relevant_classpath_entries:
           if dep.directory_digest is None:
             logger.warning(
-              "ClasspathEntry {} didn't have a DirectoryDigest, so won't be present for hermetic "
+              "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
               "execution".format(dep)
             )
 
@@ -436,7 +434,7 @@ class BaseZincCompile(JvmCompile):
         DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
       ))
 
-      # TODO: This should probably return a ClasspathEntry rather than a DirectoryDigest
+      # TODO: This should probably return a ClasspathEntry rather than a Digest
       return res.output_directory_digest
     else:
       if self.runjava(classpath=[self._zinc.zinc],

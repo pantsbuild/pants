@@ -64,6 +64,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
     'src/python/pants/goal:context',
+    'src/python/pants/goal:run_tracker',
     'tests/python/pants_test/option/util',
   ]
 )
@@ -217,6 +218,7 @@ python_tests(
     'src/python/pants/util:osutil',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/option/util',
+    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags={'platform_specific_behavior'},
 )
@@ -230,6 +232,7 @@ python_tests(
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:osutil',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'platform_specific_behavior', 'integration'},
   timeout = 360,

@@ -11,7 +11,7 @@ One notable difference between this plugin and other Error Prone integrations is
 ## Installation
 
 Error Prone support is provided by a plugin distributed to [pypi]
-(https://pypi.python.org/pypi/pantsbuild.pants.contrib.errorprone).
+(https://pypi.org/pypi/pantsbuild.pants.contrib.errorprone).
 Assuming you have already [installed pants](http://www.pantsbuild.org/install.html), you'll need to
 add the Error Prone plugin in your `pants.ini`, like so:
 ```ini

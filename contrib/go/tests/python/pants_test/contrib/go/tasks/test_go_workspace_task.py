@@ -9,6 +9,7 @@ import time
 from collections import defaultdict
 from itertools import chain
 
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, touch
 from pants_test.task_test_base import TaskTestBase
@@ -30,6 +31,10 @@ class GoWorkspaceTaskTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return MockGoWorkspaceTask
+
+  @classmethod
+  def alias_groups(cls):
+    return BuildFileAliases(targets={'go_library': GoLibrary})
 
   def test_remove_unused_links(self):
     with temporary_dir() as d:
@@ -61,7 +66,9 @@ class GoWorkspaceTaskTest(TaskTestBase):
       for src in sources:
         self.create_file(os.path.join(spec, src))
 
-      go_lib = self.make_target(spec=spec, target_type=GoLibrary)
+      self.add_to_build_file(spec, 'go_library()')
+
+      go_lib = self.target(spec)
       ws_task = self.create_task(self.context())
       gopath = ws_task.get_gopath(go_lib)
 
@@ -80,7 +87,7 @@ class GoWorkspaceTaskTest(TaskTestBase):
       # Add source file and re-make library.
       self.create_file(os.path.join(spec, 'w.go'))
       self.reset_build_graph()
-      go_lib = self.make_target(spec=spec, target_type=GoLibrary)
+      go_lib = self.target(spec)
 
       ws_task._symlink_local_src(gopath, go_lib, set())
       for src in chain(sources, ['w.go']):

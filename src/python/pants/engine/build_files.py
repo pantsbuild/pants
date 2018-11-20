@@ -4,10 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import collections
 import functools
 import logging
 from builtins import next
+from collections import MutableMapping, MutableSequence
 from os.path import dirname, join
 
 import six
@@ -19,7 +19,7 @@ from pants.base.specs import SingleAddress, Spec, Specs
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
-from pants.engine.fs import DirectoryDigest, FilesContent, PathGlobs, Snapshot
+from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
@@ -50,7 +50,7 @@ def parse_address_family(address_mapper, directory):
   path_globs = PathGlobs(include=patterns,
                          exclude=address_mapper.build_ignore_patterns)
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
-  files_content = yield Get(FilesContent, DirectoryDigest, snapshot.directory_digest)
+  files_content = yield Get(FilesContent, Digest, snapshot.directory_digest)
 
   if not files_content:
     raise ResolveError('Directory "{}" does not contain any BUILD files.'.format(directory.path))
@@ -118,10 +118,10 @@ def resolve_unhydrated_struct(address_mapper, address):
     for key, value in sorted(item._asdict().items(), key=_key_func):
       if not AddressableDescriptor.is_addressable(item, key):
         continue
-      if isinstance(value, collections.MutableMapping):
+      if isinstance(value, MutableMapping):
         for _, v in sorted(value.items(), key=_key_func):
           maybe_append(key, v)
-      elif isinstance(value, collections.MutableSequence):
+      elif isinstance(value, MutableSequence):
         for v in value:
           maybe_append(key, v)
       else:
@@ -171,11 +171,11 @@ def hydrate_struct(symbol_table_constraint, address_mapper, unhydrated_struct):
         hydrated_args[key] = value
         continue
 
-      if isinstance(value, collections.MutableMapping):
+      if isinstance(value, MutableMapping):
         container_type = type(value)
         hydrated_args[key] = container_type((k, maybe_consume(key, v))
                                             for k, v in sorted(value.items(), key=_key_func))
-      elif isinstance(value, collections.MutableSequence):
+      elif isinstance(value, MutableSequence):
         container_type = type(value)
         hydrated_args[key] = container_type(maybe_consume(key, v) for v in value)
       else:
@@ -264,7 +264,7 @@ def create_graph_rules(address_mapper, symbol_table):
   symbol_table_constraint = symbol_table.constraint()
 
   partial_hydrate_struct = functools.partial(hydrate_struct, symbol_table_constraint)
-  partial_hydrate_struct.__name__ = 'hydrate_struct'
+  functools.update_wrapper(partial_hydrate_struct, hydrate_struct)
 
   return [
     # A singleton to provide the AddressMapper.

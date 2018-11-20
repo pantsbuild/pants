@@ -28,6 +28,7 @@ import xsbti.compile.{IncOptions => ZincIncOptions}
 
 import org.pantsbuild.zinc.analysis.AnalysisOptions
 import org.pantsbuild.zinc.options.OptionSet
+import org.pantsbuild.zinc.util.Util
 
 /**
  * All parsed command-line options.
@@ -67,6 +68,26 @@ case class Settings(
         else
           None
       }
+    )
+  }
+
+  def withAbsolutePaths(relativeTo: File): Settings = {
+    def normaliseSeq(seq: Seq[File]): Seq[File] = Util.normaliseSeq(Some(relativeTo))(seq)
+    def normaliseOpt(opt: Option[File]): Option[File] = Util.normaliseOpt(Some(relativeTo))(opt)
+
+    // It's a shame that this is manually listing the args which are files, but this doesn't feel
+    // high-value enough to fold into the full options parsing
+    // (which we may delete at some point anyway)...
+    this.copy(
+      _sources = normaliseSeq(_sources),
+      classpath = normaliseSeq(classpath),
+      _classesDirectory = normaliseOpt(_classesDirectory),
+      outputJar = normaliseOpt(outputJar),
+      scala = scala.withAbsolutePaths(relativeTo),
+      javaHome = normaliseOpt(javaHome),
+      _incOptions = _incOptions.withAbsolutePaths(relativeTo),
+      analysis = analysis.withAbsolutePaths(relativeTo),
+      compiledBridgeJar = normaliseOpt(compiledBridgeJar)
     )
   }
 }
@@ -124,7 +145,23 @@ case class ScalaLocation(
   compiler: Option[File] = None,
   library: Option[File]  = None,
   extra: Seq[File]       = Seq.empty
-)
+) {
+  def withAbsolutePaths(relativeTo: File): ScalaLocation = {
+    def normaliseSeq(seq: Seq[File]): Seq[File] = Util.normaliseSeq(Some(relativeTo))(seq)
+    def normaliseOpt(opt: Option[File]): Option[File] = Util.normaliseOpt(Some(relativeTo))(opt)
+
+    // It's a shame that this is manually listing the args which are files, but this doesn't feel
+    // high-value enough to fold into the full options parsing
+    // (which we may delete at some point anyway)...
+    this.copy(
+      home = normaliseOpt(home),
+      path = normaliseSeq(path),
+      compiler = normaliseOpt(compiler),
+      library = normaliseOpt(library),
+      extra = normaliseSeq(extra)
+    )
+  }
+}
 
 object ScalaLocation {
   /**
@@ -185,6 +222,16 @@ case class IncOptions(
       Some(TransactionalManagerType.create(backup.get, log))
     else
       None
+
+  def withAbsolutePaths(relativeTo: File): IncOptions = {
+    // It's a shame that this is manually listing the args which are files, but this doesn't feel
+    // high-value enough to fold into the full options parsing
+    // (which we may delete at some point anyway)...
+    this.copy(
+      apiDumpDirectory = Util.normaliseOpt(Some(relativeTo))(apiDumpDirectory),
+      backup = Util.normaliseOpt(Some(relativeTo))(backup)
+    )
+  }
 }
 
 object Settings extends OptionSet[Settings] {

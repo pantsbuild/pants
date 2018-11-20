@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import re
 from builtins import str
+from io import StringIO
 from types import GeneratorType
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
@@ -18,6 +19,7 @@ from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.util.dirutil import safe_mkdtemp
 from pants.util.memo import memoized
 from pants.util.objects import SubclassesOf
 from pants_test.option.util.fakes import create_options_for_optionables
@@ -99,6 +101,7 @@ def create_scheduler(rules, validate=True, native=None):
     native,
     FileSystemProjectTree(os.getcwd()),
     './.pants.d',
+    safe_mkdtemp(),
     rules,
     execution_options=DEFAULT_EXECUTION_OPTIONS,
     validate=validate,
@@ -146,3 +149,23 @@ def remove_locations_from_traceback(trace):
   new_trace = location_pattern.sub('LOCATION-INFO', trace)
   new_trace = address_pattern.sub('0xEEEEEEEEE', new_trace)
   return new_trace
+
+
+class MockConsole(object):
+  """An implementation of pants.engine.console.Console which captures output."""
+
+  def __init__(self):
+    self.stdout = StringIO()
+    self.stderr = StringIO()
+
+  def write_stdout(self, payload):
+    self.stdout.write(payload)
+
+  def write_stderr(self, payload):
+    self.stderr.write(payload)
+
+  def print_stdout(self, payload):
+    print(payload, file=self.stdout)
+
+  def print_stderr(self, payload):
+    print(payload, file=self.stderr)

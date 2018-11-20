@@ -29,7 +29,6 @@
 
 extern crate async_semaphore;
 extern crate bazel_protos;
-#[macro_use]
 extern crate boxfuture;
 extern crate bytes;
 extern crate digest;
@@ -38,7 +37,6 @@ extern crate futures;
 extern crate futures_timer;
 extern crate grpcio;
 extern crate hashing;
-#[macro_use]
 extern crate log;
 #[cfg(test)]
 extern crate mock;

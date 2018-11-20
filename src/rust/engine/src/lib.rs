@@ -47,26 +47,28 @@ mod selectors;
 mod tasks;
 mod types;
 
-#[macro_use]
 extern crate boxfuture;
-#[macro_use]
-extern crate enum_primitive;
+extern crate bytes;
 extern crate fnv;
 extern crate fs;
 extern crate futures;
 extern crate graph;
 extern crate hashing;
+extern crate indexmap;
 extern crate itertools;
-#[macro_use]
 extern crate lazy_static;
-#[macro_use]
 extern crate log;
+extern crate num_enum;
 extern crate parking_lot;
 extern crate process_execution;
+extern crate reqwest;
 extern crate resettable;
-#[macro_use]
 extern crate smallvec;
+extern crate tar_api;
+extern crate tempfile;
 extern crate tokio;
+extern crate ui;
+extern crate url;
 
 use std::ffi::CStr;
 use std::fs::File;
@@ -89,6 +91,7 @@ use externs::{
 use futures::Future;
 use handles::Handle;
 use hashing::Digest;
+use log::error;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use tasks::Tasks;
@@ -246,10 +249,12 @@ pub extern "C" fn scheduler_create(
   type_process_request: TypeConstraint,
   type_process_result: TypeConstraint,
   type_generator: TypeConstraint,
+  type_url_to_fetch: TypeConstraint,
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
   work_dir_buf: Buffer,
+  local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
   remote_store_server: Buffer,
@@ -289,6 +294,7 @@ pub extern "C" fn scheduler_create(
     process_request: type_process_request,
     process_result: type_process_result,
     generator: type_generator,
+    url_to_fetch: type_url_to_fetch,
     string: type_string,
     bytes: type_bytes,
   };
@@ -330,6 +336,7 @@ pub extern "C" fn scheduler_create(
     build_root_buf.to_os_string().as_ref(),
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
+    PathBuf::from(local_store_dir_buf.to_os_string()),
     if remote_store_server_string.is_empty() {
       None
     } else {
@@ -460,9 +467,10 @@ pub extern "C" fn tasks_task_begin(
   tasks_ptr: *mut Tasks,
   func: Function,
   output_type: TypeConstraint,
+  cacheable: bool,
 ) {
   with_tasks(tasks_ptr, |tasks| {
-    tasks.task_begin(func, output_type);
+    tasks.task_begin(func, output_type, cacheable);
   })
 }
 
@@ -514,6 +522,33 @@ pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u
 #[no_mangle]
 pub extern "C" fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
   with_scheduler(scheduler_ptr, |scheduler| scheduler.core.graph.len() as u64)
+}
+
+#[no_mangle]
+pub extern "C" fn decompress_tarball(
+  tar_path: *const raw::c_char,
+  output_dir: *const raw::c_char,
+) -> PyResult {
+  let tar_path_str = PathBuf::from(
+    unsafe { CStr::from_ptr(tar_path) }
+      .to_string_lossy()
+      .into_owned(),
+  );
+  let output_dir_str = PathBuf::from(
+    unsafe { CStr::from_ptr(output_dir) }
+      .to_string_lossy()
+      .into_owned(),
+  );
+
+  tar_api::decompress_tgz(tar_path_str.as_path(), output_dir_str.as_path())
+    .map_err(|e| {
+      format!(
+        "Failed to untar {:?} to {:?}:\n{:?}",
+        tar_path_str.as_path(),
+        output_dir_str.as_path(),
+        e
+      )
+    }).into()
 }
 
 #[no_mangle]
@@ -571,8 +606,14 @@ pub extern "C" fn session_destroy(ptr: *mut Session) {
 }
 
 #[no_mangle]
-pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
-  Box::into_raw(Box::new(ExecutionRequest::new()))
+pub extern "C" fn execution_request_create(
+  should_render_ui: bool,
+  ui_worker_count: u64,
+) -> *const ExecutionRequest {
+  Box::into_raw(Box::new(ExecutionRequest::new(
+    should_render_ui,
+    ui_worker_count,
+  )))
 }
 
 #[no_mangle]
@@ -696,9 +737,12 @@ pub extern "C" fn capture_snapshots(
         .into_iter()
         .map(|(path_globs, root)| {
           let core = core.clone();
-          scheduler
-            .capture_snapshot_from_arbitrary_root(root, path_globs)
-            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+          fs::Snapshot::capture_snapshot_from_arbitrary_root(
+            core.store(),
+            core.fs_pool.clone(),
+            root,
+            path_globs,
+          ).map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
         }).collect::<Vec<_>>(),
     )
   }).map(|values| externs::store_tuple(&values))

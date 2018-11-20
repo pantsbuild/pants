@@ -12,6 +12,7 @@ from collections import namedtuple
 from future.moves.urllib.parse import urlparse
 
 from pants.base.build_environment import get_buildroot
+from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCacheError
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import BestUrlSelector, Pinger
@@ -133,6 +134,8 @@ class CacheFactory(object):
       self._resolver = RESTfulResolver(timeout=1.0, tries=3)
     else:
       self._resolver = NoopResolver()
+
+    TarballArtifact.NATIVE_BINARY = task.context._scheduler._scheduler._native
 
   @staticmethod
   def make_task_cache_dirname(task):

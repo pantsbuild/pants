@@ -71,7 +71,7 @@ def _terminated(generator, terminator):
     yield terminator
 
 
-def _make_rule(output_type, input_selectors, for_goal=None):
+def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
   :param Constraint output_type: The return/output type for the Rule. This may be either a
@@ -118,7 +118,7 @@ def _make_rule(output_type, input_selectors, for_goal=None):
     else:
       wrapped_func = func
 
-    wrapped_func._rule = TaskRule(output_type, input_selectors, wrapped_func, input_gets=list(gets))
+    wrapped_func._rule = TaskRule(output_type, input_selectors, wrapped_func, input_gets=list(gets), cacheable=cacheable)
     wrapped_func.output_type = output_type
     wrapped_func.goal = for_goal
 
@@ -132,7 +132,7 @@ def rule(output_type, input_selectors):
 
 def console_rule(goal_name, input_selectors):
   output_type = _GoalProduct.for_name(goal_name)
-  return _make_rule(output_type, input_selectors, goal_name)
+  return _make_rule(output_type, input_selectors, goal_name, False)
 
 
 class Rule(AbstractClass):
@@ -147,13 +147,13 @@ class Rule(AbstractClass):
     """An output Constraint type for the rule."""
 
 
-class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', 'func']), Rule):
+class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', 'func', 'cacheable']), Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied.
 
   TODO: Make input_gets non-optional when more/all rules are using them.
   """
 
-  def __new__(cls, output_type, input_selectors, func, input_gets=None):
+  def __new__(cls, output_type, input_selectors, func, input_gets=None, cacheable=True):
     # Validate result type.
     if isinstance(output_type, Exactly):
       constraint = output_type
@@ -175,7 +175,7 @@ class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', '
         func.__name__, type(input_gets)))
 
     # Create.
-    return super(TaskRule, cls).__new__(cls, constraint, tuple(input_selectors), tuple(input_gets), func)
+    return super(TaskRule, cls).__new__(cls, constraint, tuple(input_selectors), tuple(input_gets), func, cacheable)
 
   def __str__(self):
     return '({}, {!r}, {})'.format(type_or_constraint_repr(self.output_constraint),

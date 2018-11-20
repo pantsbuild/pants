@@ -9,15 +9,16 @@ use std::time::Duration;
 
 use futures::future::{self, Future};
 
-use boxfuture::{BoxFuture, Boxable};
 use context::{Context, Core};
 use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
-use fs::{self, GlobMatching, PosixFS};
-use graph::{EntryId, Graph, Node, NodeContext};
+use graph::{EntryId, Graph, InvalidationResult, Node, NodeContext};
+use indexmap::IndexMap;
+use log::{debug, info, warn};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use parking_lot::Mutex;
 use rule_graph;
 use selectors;
+use ui::EngineDisplay;
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
@@ -55,11 +56,18 @@ impl Session {
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,
+  // Flag used to determine whether to show engine execution progress.
+  pub should_render_ui: bool,
+  pub ui_worker_count: u64,
 }
 
 impl ExecutionRequest {
-  pub fn new() -> ExecutionRequest {
-    ExecutionRequest { roots: Vec::new() }
+  pub fn new(should_render_ui: bool, ui_worker_count: u64) -> ExecutionRequest {
+    ExecutionRequest {
+      roots: Vec::new(),
+      should_render_ui,
+      ui_worker_count,
+    }
   }
 
   ///
@@ -138,27 +146,37 @@ impl Scheduler {
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
   pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
-    let invalidation_result = self.core.graph.invalidate_from_roots(move |node| {
-      if let Some(fs_subject) = node.fs_subject() {
-        paths.contains(fs_subject)
-      } else {
-        false
-      }
-    });
-    // TODO: Expose.
-    invalidation_result.cleared + invalidation_result.dirtied
+    let InvalidationResult { cleared, dirtied } =
+      self.core.graph.invalidate_from_roots(move |node| {
+        if let Some(fs_subject) = node.fs_subject() {
+          paths.contains(fs_subject)
+        } else {
+          false
+        }
+      });
+    // TODO: The rust log level is not currently set correctly in a pantsd context. To ensure that
+    // we see this even at `info` level, we set it to warn. #6004 should address this by making
+    // rust logging re-configuration an explicit step in `src/python/pants/init/logging.py`.
+    warn!(
+      "invalidation: cleared {} and dirtied {} nodes for: {:?}",
+      cleared, dirtied, paths
+    );
+    cleared + dirtied
   }
 
   ///
   /// Invalidate all filesystem dependencies in the graph.
   ///
   pub fn invalidate_all_paths(&self) -> usize {
-    let invalidation_result = self
+    let InvalidationResult { cleared, dirtied } = self
       .core
       .graph
       .invalidate_from_roots(|node| node.fs_subject().is_some());
-    // TODO: Expose.
-    invalidation_result.cleared + invalidation_result.dirtied
+    info!(
+      "invalidation: cleared {} and dirtied {} nodes for all paths",
+      cleared, dirtied
+    );
+    cleared + dirtied
   }
 
   ///
@@ -261,11 +279,32 @@ impl Scheduler {
       core: self.core.clone(),
     };
     let (sender, receiver) = mpsc::channel();
+
+    // Setting up display
+    let mut optional_display: Option<EngineDisplay> =
+      EngineDisplay::create(request.ui_worker_count as usize, request.should_render_ui);
+
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
+    let roots: Vec<NodeKey> = request
+      .roots
+      .clone()
+      .into_iter()
+      .map(|s| s.into())
+      .collect();
+
+    // This map keeps the k most relevant jobs in assigned possitions.
+    // Keys are positions in the display (display workers) and the values are the actual jobs to print.
+    let mut tasks_to_display = IndexMap::new();
+
     let results = loop {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
+      } else if let Some(display) = optional_display.as_mut() {
+        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, &mut tasks_to_display);
       }
+    };
+    if let Some(display) = optional_display.as_mut() {
+      display.finish();
     };
 
     request
@@ -276,34 +315,36 @@ impl Scheduler {
       .collect()
   }
 
-  pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path>>(
-    &self,
-    root_path: P,
-    path_globs: fs::PathGlobs,
-  ) -> BoxFuture<fs::Snapshot, String> {
-    // Note that we don't use a Graph here, and don't cache any intermediate steps, we just place
-    // the resultant Snapshot into the store and return it. This is important, because we're reading
-    // things from arbitrary filepaths which we don't want to cache in the graph, as we don't watch
-    // them for changes.
-    // We assume that this Snapshot is of an immutable piece of the filesystem.
-
-    let posix_fs = Arc::new(try_future!(PosixFS::new(
-      root_path,
-      self.core.fs_pool.clone(),
-      &[]
-    )));
-    let store = self.core.store();
-
-    posix_fs
-      .expand(path_globs)
-      .map_err(|err| format!("Error expanding globs: {:?}", err))
-      .and_then(|path_stats| {
-        fs::Snapshot::from_path_stats(
-          store.clone(),
-          &fs::OneOffStoreFileByDigest::new(store, posix_fs),
-          path_stats,
-        )
-      }).to_boxed()
+  fn display_ongoing_tasks(
+    graph: &Graph<NodeKey>,
+    roots: &[NodeKey],
+    display: &mut EngineDisplay,
+    tasks_to_display: &mut IndexMap<String, Duration>,
+  ) {
+    // Update the graph. To do that, we iterate over heavy hitters.
+    let heavy_hitters = graph.heavy_hitters(&roots, display.worker_count());
+    // Insert every one in the set of tasks to display.
+    // For tasks already here, the durations are overwritten.
+    tasks_to_display.extend(heavy_hitters.clone().into_iter());
+    // And remove the tasks that no longer should be there.
+    for (task, _) in tasks_to_display.clone().into_iter() {
+      if !heavy_hitters.contains_key(&task) {
+        tasks_to_display.swap_remove(&task);
+      }
+    }
+    let display_worker_count = display.worker_count();
+    let ongoing_tasks = tasks_to_display;
+    for (i, id) in ongoing_tasks.iter().enumerate() {
+      // TODO Maybe we want to print something else besides the ID here.
+      display.update(i.to_string(), format!("{:?}", id));
+    }
+    // If the number of ongoing tasks is less than the number of workers,
+    // fill the rest of the workers with empty string.
+    // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666
+    for i in ongoing_tasks.len()..display_worker_count {
+      display.update(i.to_string(), "".to_string());
+    }
+    display.render();
   }
 }
 

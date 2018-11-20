@@ -95,8 +95,12 @@ class EagerFilesetWithSpec(FilesetWithSpec):
 
   @memoized_property
   def files(self):
+    return tuple(fast_relpath(path, self.rel_root) for path in self.files_relative_to_buildroot)
+
+  @memoized_property
+  def files_relative_to_buildroot(self):
     fds = self._snapshot.path_stats if self._include_dirs else self._snapshot.files
-    return tuple(fast_relpath(fd.path, self.rel_root) for fd in fds)
+    return tuple(fd.path for fd in fds)
 
   @property
   def files_hash(self):

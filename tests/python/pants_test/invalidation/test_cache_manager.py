@@ -39,6 +39,7 @@ class InvalidationCacheManagerTest(TestBase):
       cache_key_generator=CacheKeyGenerator(),
       build_invalidator=BuildInvalidator(os.path.join(self._dir, 'build_invalidator')),
       invalidate_dependents=True,
+      task_version_slug='deadbeef',
     )
 
   def tearDown(self):

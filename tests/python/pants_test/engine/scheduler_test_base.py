@@ -53,9 +53,11 @@ class SchedulerTestBase(object):
     rules = rules or []
     work_dir = work_dir or self._create_work_dir()
     project_tree = project_tree or self.mk_fs_tree(work_dir=work_dir)
+    local_store_dir = os.path.realpath(safe_mkdtemp())
     scheduler = Scheduler(self._native,
                           project_tree,
                           work_dir,
+                          local_store_dir,
                           rules,
                           DEFAULT_EXECUTION_OPTIONS,
                           include_trace_on_error=include_trace_on_error)

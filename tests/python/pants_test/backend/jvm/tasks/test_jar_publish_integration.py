@@ -248,8 +248,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
               self.assertEqual(resource_content, jar_entry.read())
 
       # Publish the same target twice with different resource content.
-      publish('one')
-      publish('two')
+      publish(b'one')
+      publish(b'two')
 
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
                    extra_env=None, success_expected=True, assert_publish_config_contents=False):

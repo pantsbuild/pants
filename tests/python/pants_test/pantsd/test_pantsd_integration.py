@@ -11,30 +11,32 @@ import threading
 import time
 import unittest
 from builtins import open, range, zip
-from concurrent.futures import ThreadPoolExecutor
 
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
-from pants_test.pantsd.pantsd_integration_test_base import (PantsDaemonIntegrationTestBase,
-                                                            full_pantsd_log, read_pantsd_log)
+from pants_test.pants_run_integration_test import read_pantsd_log
+from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
+from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 
 
 def launch_file_toucher(f):
   """Launch a loop to touch the given file, and return a function to call to stop and join it."""
-  executor = ThreadPoolExecutor(max_workers=1)
-  halt = threading.Event()
+  if not os.path.isfile(f):
+    raise AssertionError('Refusing to touch a non-file.')
 
+  halt = threading.Event()
   def file_toucher():
     while not halt.isSet():
       touch(f)
       time.sleep(1)
-
-  future = executor.submit(file_toucher)
+  thread = threading.Thread(target=file_toucher)
+  thread.daemon = True
+  thread.start()
 
   def join():
     halt.set()
-    future.result(timeout=10)
+    thread.join(timeout=10)
 
   return join
 
@@ -79,7 +81,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           continue
 
         # Check if the line begins with W or E to check if it is a warning or error line.
-        self.assertNotRegexpMatches(line, r'^[WE].*')
+        assertNotRegex(self, line, r'^[WE].*')
 
   def test_pantsd_broken_pipe(self):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -229,10 +231,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_started()
 
       # Launch a separate thread to poke files in 3rdparty.
-      join = launch_file_toucher('3rdparty/BUILD')
+      join = launch_file_toucher('3rdparty/jvm/com/google/auto/value/BUILD')
 
       # Repeatedly re-list 3rdparty while the file is being invalidated.
-      for _ in range(0, 8):
+      for _ in range(0, 16):
         pantsd_run(cmd)
         checker.assert_running()
 
@@ -290,9 +292,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Let any fs events quiesce.
       time.sleep(5)
 
+      def full_pantsd_log():
+        return '\n'.join(read_pantsd_log(workdir))
+
       # Check the logs.
-      self.assertRegexpMatches(
-        full_pantsd_log(workdir),
+      assertRegex(
+        self,
+        full_pantsd_log(),
         r'watching invalidating files:.*{}'.format(test_file)
       )
 
@@ -302,7 +308,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       time.sleep(10)
       checker.assert_stopped()
 
-      self.assertIn('saw file events covered by invalidation globs', full_pantsd_log(workdir))
+      self.assertIn('saw file events covered by invalidation globs', full_pantsd_log())
 
   def test_pantsd_pid_deleted(self):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
@@ -357,17 +363,17 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))", binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
+        assertNotRegex(self, result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))", binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
+        assertNotRegex(self, result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_src_file, 'import this\n', binary_mode=False)
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        self.assertRegexpMatches(result.stdout_data, has_source_root_regex)
+        assertRegex(self, result.stdout_data, has_source_root_regex)
     finally:
       rm_rf(test_path)
 
@@ -413,6 +419,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
+  @unittest.skip("Broken: https://github.com/pantsbuild/pants/issues/6778")
   def test_pantsd_parent_runner_killed(self):
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
@@ -438,7 +445,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
       # Ensure that we saw the pantsd-runner process's failure in the client's stderr.
       self.assert_failure(waiter_run)
-      self.assertRegexpMatches(waiter_run.stderr_data, """\
+      assertRegex(self, waiter_run.stderr_data, """\
 Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
 """.format(signum=signal.SIGTERM))
       # NB: testing stderr is an "end-to-end" test, as it requires pants knowing the correct remote

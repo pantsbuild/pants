@@ -40,7 +40,8 @@ from pants_test.base.context_utils import create_context_from_options
 from pants_test.option.util.fakes import create_options_for_optionables
 
 
-deprecated_module('1.12.0.dev0', 'Use pants_test.test_base instead')
+# Fix this during a dev release
+deprecated_module('1.13.0.dev1', 'Use pants_test.test_base instead')
 
 
 class TestGenerator(object):

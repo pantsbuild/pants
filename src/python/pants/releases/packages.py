@@ -45,7 +45,7 @@ class Package(object):
     return self.name
 
   def exists(self):
-    req = Request("https://pypi.python.org/pypi/{}".format(self.name))
+    req = Request("https://pypi.org/pypi/{}".format(self.name))
     req.get_method = lambda: "HEAD"
     try:
       urlopen(req)
@@ -56,7 +56,7 @@ class Package(object):
       raise
 
   def latest_version(self):
-    f = urlopen("https://pypi.python.org/pypi/{}/json".format(self.name))
+    f = urlopen("https://pypi.org/pypi/{}/json".format(self.name))
     j = json.load(f)
     return j["info"]["version"]
 
@@ -64,7 +64,7 @@ class Package(object):
              html_node_type='a',
              html_node_class='sidebar-section__user-gravatar',
              html_node_attr='aria-label'):
-    url = "https://pypi.python.org/pypi/{}/{}".format(self.name, self.latest_version())
+    url = "https://pypi.org/pypi/{}/{}".format(self.name, self.latest_version())
     url_content = urlopen(url).read()
     parser = BeautifulSoup(url_content, 'html.parser')
     owners = [

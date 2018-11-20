@@ -33,7 +33,7 @@ class ClasspathEntry(object):
 
     This API is experimental, and subject to change.
 
-    :rtype: pants.engine.fs.DirectoryDigest
+    :rtype: pants.engine.fs.Digest
     """
     return self._directory_digest
 

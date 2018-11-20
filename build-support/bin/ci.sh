@@ -13,7 +13,7 @@ function usage() {
   cat <<EOF
 Runs commons tests for local or hosted CI.
 
-Usage: $0 (-h|-3fxbkmrjlpuneycitzs)
+Usage: $0 (-h|-3fxbkmrjlpuneycitzsw)
  -h           print out this help message
  -3           After pants is bootstrapped, set --python-setup-interpreter-constraints such that any
               python tests run with Python 3.
@@ -46,6 +46,7 @@ Usage: $0 (-h|-3fxbkmrjlpuneycitzs)
               to run only even tests: '-i 0/2', odd: '-i 1/2'
  -t           run lint
  -z           test platform-specific behavior
+ -w           Run only blacklisted tests
 EOF
   if (( $# > 0 )); then
     die "$@"
@@ -65,7 +66,7 @@ python_contrib_shard="0/1"
 python_intg_shard="0/1"
 python_three="false"
 
-while getopts "h3fxbkmrjlpesu:ny:ci:tz" opt; do
+while getopts "h3fxbkmrjlpesu:ny:ci:tzw" opt; do
   case ${opt} in
     h) usage ;;
     3) python_three="true" ;;
@@ -87,6 +88,7 @@ while getopts "h3fxbkmrjlpesu:ny:ci:tz" opt; do
     i) python_intg_shard=${OPTARG} ;;
     t) run_lint="true" ;;
     z) test_platform_specific_behavior="true" ;;
+    w) run_blacklisted_tests_only="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -195,14 +197,9 @@ if [[ "${run_python:-false}" == "true" ]]; then
   fi
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
-    if [[ "${python_three:-false}" == "true" ]]; then
-      targets="$(comm -23 <(./pants.pex --tag='-integration' list tests/python:: | grep '.' | sort) <(sort "${REPO_ROOT}/build-support/known_py3_failures.txt"))"
-    else
-      targets="tests/python::"
-    fi
     ./pants.pex --tag='-integration' test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
-      $targets -- ${PYTEST_PASSTHRU_ARGS}
+      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Core python test failure"
   end_travis_section
 fi
@@ -262,9 +259,18 @@ if [[ "${run_integration:-false}" == "true" ]]; then
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
+    if [[ "${python_three:-false}" == "true" ]]; then
+      targets="$(comm -23 <(./pants.pex --tag='+integration' list tests/python:: | grep '.' | sort) <(sort "${REPO_ROOT}/build-support/known_py3_integration_failures.txt"))"
+    else
+       if [[ "${run_blacklisted_tests_only:-false}" == "true" ]]; then
+         targets="$(cat ${REPO_ROOT}/build-support/known_py3_integration_failures.txt)"
+       else
+         targets="tests/python::"
+       fi
+    fi
     ./pants.pex --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
-      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+      $targets -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants Integration test failure"
   end_travis_section
 fi

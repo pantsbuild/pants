@@ -463,7 +463,6 @@ class ProcessManager(ProcessMetadataManager):
       challenging. If no fork_context is passed, the fork function is called directly.
     """
 
-
     def double_fork():
       logger.debug('forking %s', self)
       pid = os.fork()
@@ -474,25 +473,26 @@ class ProcessManager(ProcessMetadataManager):
           return False, True
         else:
           if write_pid: self.write_pid(second_pid)
-          return True, False
+          return False, False
       else:
         # This prevents un-reaped, throw-away parent processes from lingering in the process table.
         os.waitpid(pid, 0)
-      return False, False
+        return True, False
 
     fork_func = functools.partial(fork_context, double_fork) if fork_context else double_fork
 
     # Perform the double fork (optionally under the fork_context). Three outcomes are possible after
-    # the double fork: we're either the original process, the double-fork parent, or the double-fork
-    # child. We assert below that a process is not somehow both the parent and the child.
+    # the double fork: we're either the original parent process, the middle double-fork process, or
+    # the child. We assert below that a process is not somehow both the parent and the child.
     self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
     is_parent, is_child = fork_func()
-    if not is_parent and not is_child:
-      return
 
     try:
-      if is_parent:
+      if not is_parent and not is_child:
+        # Middle process.
+        os._exit(0)
+      elif is_parent:
         assert not is_child
         self.post_fork_parent(**post_fork_parent_opts or {})
       else:
@@ -501,7 +501,6 @@ class ProcessManager(ProcessMetadataManager):
         self.post_fork_child(**post_fork_child_opts or {})
     except Exception:
       logger.critical(traceback.format_exc())
-    finally:
       os._exit(0)
 
   def daemon_spawn(self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None):

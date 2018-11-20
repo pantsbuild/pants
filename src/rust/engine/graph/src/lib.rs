@@ -400,7 +400,7 @@ impl<N: Node> InnerGraph<N> {
   ///
   /// Computes the K longest running entries in a Graph-aware fashion.
   ///
-  fn heavy_hitters(&self, roots: &[N], k: usize) -> Vec<(String, Duration)> {
+  fn heavy_hitters(&self, roots: &[N], k: usize) -> HashMap<String, Duration> {
     let now = Instant::now();
     let queue_entry = |id| {
       self
@@ -411,7 +411,7 @@ impl<N: Node> InnerGraph<N> {
 
     let mut queue: BinaryHeap<(Duration, EntryId)> = BinaryHeap::with_capacity(k);
     let mut visited: HashSet<EntryId, FNV> = HashSet::default();
-    let mut res = Vec::new();
+    let mut res = HashMap::new();
 
     // Initialize the queue.
     queue.extend(
@@ -435,7 +435,7 @@ impl<N: Node> InnerGraph<N> {
 
       if deps.peek().is_none() {
         // If the entry has no running deps, it is a leaf. Emit it.
-        res.push((self.unsafe_entry_for_id(id).node().format(), duration));
+        res.insert(self.unsafe_entry_for_id(id).node().format(), duration);
         if res.len() >= k {
           break;
         }
@@ -706,7 +706,7 @@ impl<N: Node> Graph<N> {
     inner.visualize(visualizer, roots, path)
   }
 
-  pub fn heavy_hitters(&self, roots: &[N], k: usize) -> Vec<(String, Duration)> {
+  pub fn heavy_hitters(&self, roots: &[N], k: usize) -> HashMap<String, Duration> {
     let inner = self.inner.lock();
     inner.heavy_hitters(roots, k)
   }
@@ -1063,6 +1063,10 @@ mod tests {
 
     fn digest(_result: Self::Item) -> Option<Digest> {
       None
+    }
+
+    fn cacheable(&self) -> bool {
+      true
     }
   }
 

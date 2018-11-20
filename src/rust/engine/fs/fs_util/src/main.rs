@@ -27,10 +27,8 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-#[macro_use]
 extern crate boxfuture;
 extern crate bytes;
-#[macro_use(value_t)]
 extern crate clap;
 extern crate env_logger;
 extern crate fs;
@@ -39,18 +37,18 @@ extern crate hashing;
 extern crate parking_lot;
 extern crate protobuf;
 extern crate serde;
-#[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
 
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
-use clap::{App, Arg, SubCommand};
+use clap::{value_t, App, Arg, SubCommand};
 use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, UploadSummary};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use protobuf::Message;
+use serde_derive::Serialize;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -160,7 +158,7 @@ to this directory.",
                   .long("output-format")
                   .takes_value(true)
                   .default_value("binary")
-                  .possible_values(&["binary", "recursive-file-list", "text"]),
+                  .possible_values(&["binary", "recursive-file-list", "recursive-file-list-with-digests", "text"]),
               )
               .arg(Arg::with_name("fingerprint").required(true).takes_value(
                 true,
@@ -436,7 +434,16 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             maybe_v
               .map(|v| {
                 v.into_iter()
-                  .map(|f| format!("{}\n", f))
+                  .map(|(name, _digest)| format!("{}\n", name))
+                  .collect::<Vec<String>>()
+                  .join("")
+              }).map(|s| s.into_bytes())
+          }),
+          "recursive-file-list-with-digests" => expand_files(store, digest).map(|maybe_v| {
+            maybe_v
+              .map(|v| {
+                v.into_iter()
+                  .map(|(name, digest)| format!("{} {} {}\n", name, digest.0, digest.1))
                   .collect::<Vec<String>>()
                   .join("")
               }).map(|s| s.into_bytes())
@@ -503,14 +510,14 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
   }
 }
 
-fn expand_files(store: Store, digest: Digest) -> Result<Option<Vec<String>>, String> {
+fn expand_files(store: Store, digest: Digest) -> Result<Option<Vec<(String, Digest)>>, String> {
   let files = Arc::new(Mutex::new(Vec::new()));
   expand_files_helper(store, digest, String::new(), files.clone())
     .wait()
     .map(|maybe| {
       maybe.map(|()| {
         let mut v = Arc::try_unwrap(files).unwrap().into_inner();
-        v.sort();
+        v.sort_by(|(l, _), (r, _)| l.cmp(r));
         v
       })
     })
@@ -520,7 +527,7 @@ fn expand_files_helper(
   store: Store,
   digest: Digest,
   prefix: String,
-  files: Arc<Mutex<Vec<String>>>,
+  files: Arc<Mutex<Vec<(String, Digest)>>>,
 ) -> BoxFuture<Option<()>, String> {
   store
     .load_directory(digest)
@@ -529,7 +536,8 @@ fn expand_files_helper(
         {
           let mut files_unlocked = files.lock();
           for file in dir.get_files() {
-            files_unlocked.push(format!("{}{}", prefix, file.name));
+            let file_digest: Result<Digest, String> = file.get_digest().into();
+            files_unlocked.push((format!("{}{}", prefix, file.name), try_future!(file_digest)));
           }
         }
         futures::future::join_all(

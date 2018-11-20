@@ -8,6 +8,7 @@ import os
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class FilemapIntegrationTest(PantsRunIntegrationTest):
@@ -61,7 +62,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.do_command('filemap',
                                   self._mk_target('exclude_strings_disallowed'),
                                   success=False)
-      self.assertRegexpMatches(pants_run.stderr_data,
+      assertRegex(self, pants_run.stderr_data,
                                r'Excludes of type `.*` are not supported')
 
   def test_exclude_list_of_strings(self):

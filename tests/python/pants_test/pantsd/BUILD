@@ -57,6 +57,7 @@ python_tests(
   coverage = ['pants.pantsd.pants_daemon'],
   dependencies = [
     ':test_deps',
+    'src/python/pants/bin',
     'src/python/pants/pantsd:pants_daemon',
     'src/python/pants/pantsd/service:pants_service',
     'src/python/pants/util:contextutil',
@@ -79,10 +80,11 @@ python_tests(
   name = 'pantsd_integration',
   sources = ['test_pantsd_integration.py'],
   dependencies = [
+    '3rdparty/python:future',
     ':pantsd_integration_test_base',
-    '3rdparty/python:futures',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/testutils:process_test_util',
+    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout = 900

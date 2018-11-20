@@ -159,11 +159,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       """Target1 docstring."""
       pass
 
-    class Target2a(Target):
-      # No docstring, so we should take the one from Target2b.
-      pass
-
-    class Target2b(Target):
+    class Target2(Target):
       """Target2 docstring."""
       pass
 
@@ -172,7 +168,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       pass
 
     # We shouldn't get as far as invoking the context factory, so it can be trivial.
-    macro_factory = TargetMacro.Factory.wrap(lambda ctx: None, Target2a, Target2b)
+    macro_factory = TargetMacro.Factory.wrap(lambda ctx: None, Target2)
 
     bfa = BuildFileAliases(targets={
         'target1': Target1,

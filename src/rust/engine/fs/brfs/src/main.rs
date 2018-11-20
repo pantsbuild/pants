@@ -37,7 +37,6 @@ extern crate fuse;
 extern crate futures;
 extern crate hashing;
 extern crate libc;
-#[macro_use]
 extern crate log;
 extern crate parking_lot;
 extern crate protobuf;
@@ -49,6 +48,7 @@ extern crate time;
 
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
+use log::{debug, error, warn};
 use parking_lot::Mutex;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;

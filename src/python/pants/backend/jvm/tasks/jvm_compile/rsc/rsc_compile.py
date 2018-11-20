@@ -8,6 +8,7 @@ import functools
 import json
 import logging
 import os
+import re
 
 from six import text_type
 
@@ -15,6 +16,7 @@ from pants.backend.jvm.subsystems.dependency_context import DependencyContext  #
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
@@ -26,12 +28,13 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import Digest, DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
-from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
+from pants.util.dirutil import (fast_relpath, fast_relpath_optional, maybe_read_file,
+                                safe_file_dump, safe_mkdir)
 
 
 #
@@ -56,20 +59,41 @@ def stdout_contents(wu):
     return f.read().rstrip()
 
 
-def _create_desandboxify_fn(possible_beginning_paths):
+def dump_digest(output_dir, digest):
+  safe_file_dump('{}.digest'.format(output_dir),
+    '{}:{}'.format(digest.fingerprint, digest.serialized_bytes_length))
+
+
+def load_digest(output_dir):
+  read_file = maybe_read_file('{}.digest'.format(output_dir))
+  if read_file:
+    fingerprint, length = read_file.split(':')
+    return Digest(fingerprint, int(length))
+  else:
+    return None
+
+
+def _create_desandboxify_fn(possible_path_patterns):
   # Takes a collection of possible canonical prefixes, and returns a function that
   # if it finds a matching prefix, strips the path prior to the prefix and returns it
   # if it doesn't it returns the original path
   # TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
+  regexes = [re.compile('/({})'.format(p)) for p in possible_path_patterns]
   def desandboxify(path):
     if not path:
       return path
-    for p in possible_beginning_paths:
-      if p in path:
-        new_path = path[path.index(p):]
-        return new_path
+    for r in regexes:
+      match = r.search(path)
+      if match:
+        logger.debug('path-cleanup: matched {} with {} against {}'.format(match, r.pattern, path))
+        return match.group(1)
+    logger.debug('path-cleanup: no match for {}'.format(path))
     return path
   return desandboxify
+
+
+def _paths_from_classpath(classpath_tuples, collection_type=list):
+  return collection_type(y[1] for y in classpath_tuples)
 
 
 class RscCompileContext(CompileContext):
@@ -82,18 +106,15 @@ class RscCompileContext(CompileContext):
                log_dir,
                zinc_args_file,
                sources,
-               rsc_index_dir,
-               rsc_outline_dir):
+               rsc_index_dir):
     super(RscCompileContext, self).__init__(target, analysis_file, classes_dir, jar_file,
                                                log_dir, zinc_args_file, sources)
     self.rsc_mjar_file = rsc_mjar_file
     self.rsc_index_dir = rsc_index_dir
-    self.rsc_outline_dir = rsc_outline_dir
 
   def ensure_output_dirs_exist(self):
     safe_mkdir(os.path.dirname(self.rsc_mjar_file))
     safe_mkdir(self.rsc_index_dir)
-    safe_mkdir(self.rsc_outline_dir)
 
 
 class RscCompile(ZincCompile):
@@ -114,32 +135,9 @@ class RscCompile(ZincCompile):
   def register_options(cls, register):
     super(RscCompile, cls).register_options(register)
 
-    rsc_toolchain_version = '0.0.0-294-d7114447'
-    scalameta_toolchain_version = '4.0.0-M10'
+    rsc_toolchain_version = '0.0.0-446-c64e6937'
+    scalameta_toolchain_version = '4.0.0'
 
-    # TODO: it would be better to have a less adhoc approach to handling
-    #       optional dependencies. See: https://github.com/pantsbuild/pants/issues/6390
-    cls.register_jvm_tool(
-      register,
-      'workaround-metacp-dependency-classpath',
-      classpath=[
-        JarDependency(org = 'org.scala-lang', name = 'scala-compiler', rev = '2.11.12'),
-        JarDependency(org = 'org.scala-lang', name = 'scala-library', rev = '2.11.12'),
-        JarDependency(org = 'org.scala-lang', name = 'scala-reflect', rev = '2.11.12'),
-        JarDependency(org = 'org.scala-lang.modules', name = 'scala-partest_2.11', rev = '1.0.18'),
-        JarDependency(org = 'jline', name = 'jline', rev = '2.14.6'),
-        JarDependency(org = 'org.apache.commons', name = 'commons-lang3', rev = '3.3.2'),
-        JarDependency(org = 'org.apache.ant', name = 'ant', rev = '1.8.2'),
-        JarDependency(org = 'org.pegdown', name = 'pegdown', rev = '1.4.2'),
-        JarDependency(org = 'org.testng', name = 'testng', rev = '6.8.7'),
-        JarDependency(org = 'org.scalacheck', name = 'scalacheck_2.11', rev = '1.13.1'),
-        JarDependency(org = 'org.jmock', name = 'jmock-legacy', rev = '2.5.1'),
-        JarDependency(org = 'org.easymock', name = 'easymockclassextension', rev = '3.1'),
-        JarDependency(org = 'org.seleniumhq.selenium', name = 'selenium-java', rev = '2.35.0'),
-      ],
-      custom_rules=[
-        Shader.exclude_package('*', recursive=True),]
-    )
     cls.register_jvm_tool(
       register,
       'rsc',
@@ -152,19 +150,6 @@ class RscCompile(ZincCompile):
       ],
       custom_rules=[
         Shader.exclude_package('rsc', recursive=True),
-      ])
-    cls.register_jvm_tool(
-      register,
-      'mjar',
-      classpath=[
-          JarDependency(
-              org='com.twitter',
-              name='mjar_2.11',
-              rev=rsc_toolchain_version,
-          ),
-      ],
-      custom_rules=[
-        Shader.exclude_package('scala', recursive=True),
       ])
     cls.register_jvm_tool(
       register,
@@ -195,27 +180,54 @@ class RscCompile(ZincCompile):
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
-    # TODO when digests are added, if the target is valid,
-    # the digest should be loaded in from the cc somehow.
-    # See: #6504
+    def pathglob_for(filename):
+      return PathGlobsAndRoot(
+        PathGlobs(
+          (fast_relpath_optional(filename, get_buildroot()),)),
+        text_type(get_buildroot()))
+
+    def to_classpath_entries(paths, scheduler):
+      # list of path ->
+      # list of (path, optional<digest>) ->
+      path_and_digests = [(p, load_digest(os.path.dirname(p))) for p in paths]
+      # partition: list of path, list of tuples
+      paths_without_digests = [p for (p, d) in path_and_digests if not d]
+      if paths_without_digests:
+        self.context.log.debug('Expected to find digests for {}, capturing them.'
+                               .format(paths_without_digests))
+      paths_with_digests = [(p, d) for (p, d) in path_and_digests if d]
+      # list of path -> list path, captured snapshot -> list of path with digest
+      snapshots = scheduler.capture_snapshots(tuple(pathglob_for(p) for p in paths_without_digests))
+      captured_paths_and_digests = [(p, s.directory_digest)
+                                    for (p, s) in zip(paths_without_digests, snapshots)]
+      # merge and classpath ify
+      return [ClasspathEntry(p, d) for (p, d) in paths_with_digests + captured_paths_and_digests]
+
+    def confify(entries):
+      return [(conf, e) for e in entries for conf in self._confs]
+
     for target in targets:
       rsc_cc, compile_cc = compile_contexts[target]
       if self._only_zinc_compileable(target):
         self.context.products.get_data('rsc_classpath').add_for_target(
           compile_cc.target,
-          [(conf, compile_cc.jar_file) for conf in self._confs])
+          confify([compile_cc.jar_file])
+        )
       elif self._rsc_compilable(target):
         self.context.products.get_data('rsc_classpath').add_for_target(
           rsc_cc.target,
-          [(conf, rsc_cc.rsc_mjar_file) for conf in self._confs])
+          confify(to_classpath_entries([rsc_cc.rsc_mjar_file], self.context._scheduler)))
       elif self._metacpable(target):
         # Walk the metacp results dir and add classpath entries for all the files there.
         # TODO exercise this with a test.
-        for root, dirs, files in os.walk(rsc_cc.rsc_index_dir):
-          self.context.products.get_data('rsc_classpath').add_for_target(
-            rsc_cc.target,
-            [(conf, os.path.join(root, f)) for conf in self._confs for f in files]
-          )
+        # TODO, this should only list the files/directories in the first directory under the index dir
+
+        elements_in_index_dir = [os.path.join(rsc_cc.rsc_index_dir, s)
+                                 for s in os.listdir(rsc_cc.rsc_index_dir)]
+
+        entries = to_classpath_entries(elements_in_index_dir, self.context._scheduler)
+        self._metacp_jars_classpath_product.add_for_target(
+          rsc_cc.target, confify(entries))
       else:
         pass
 
@@ -223,7 +235,7 @@ class RscCompile(ZincCompile):
     return isinstance(target, JarLibrary)
 
   def _rsc_compilable(self, target):
-    return target.has_sources('.scala')
+    return target.has_sources('.scala') and not target.has_sources('.java')
 
   def _only_zinc_compileable(self, target):
     return target.has_sources('.java')
@@ -268,24 +280,26 @@ class RscCompile(ZincCompile):
 
     # Create a target for the jdk outlining so that it'll only be done once per run.
     target = Target('jdk', Address('', 'jdk'), self.context.build_graph)
-    index_dir = os.path.join(self.workdir, '--jdk--', 'index')
+    index_dir = os.path.join(self.versioned_workdir, '--jdk--', 'index')
 
     def work_for_vts_rsc_jdk():
       distribution = self._get_jvm_distribution()
       jvm_lib_jars_abs = distribution.find_libs(['rt.jar', 'dt.jar', 'jce.jar', 'tools.jar'])
       self._jvm_lib_jars_abs = jvm_lib_jars_abs
 
-      cp_entries = tuple(jvm_lib_jars_abs)
+      metacp_inputs = tuple(jvm_lib_jars_abs)
 
       counter_val = str(counter()).rjust(counter.format_length(), b' ')
       counter_str = '[{}/{}] '.format(counter_val, counter.size)
       self.context.log.info(
         counter_str,
         'Metacp-ing ',
-        items_to_report_element(cp_entries, 'jar'),
+        items_to_report_element(metacp_inputs, 'jar'),
         ' in the jdk')
 
-      safe_mkdir(index_dir)
+      # NB: Metacp doesn't handle the existence of possibly stale semanticdb jars,
+      # so we explicitly clean the directory to keep it happy.
+      safe_mkdir(index_dir, clean=True)
 
       with Timer() as timer:
         # Step 1: Convert classpath to SemanticDB
@@ -295,14 +309,14 @@ class RscCompile(ZincCompile):
           '--verbose',
           # NB: The directory to dump the semanticdb jars generated by metacp.
           '--out', rsc_index_dir,
-          os.pathsep.join(cp_entries),
+          os.pathsep.join(metacp_inputs),
         ]
         metacp_wu = self._runtool(
           'scala.meta.cli.Metacp',
           'metacp',
           args,
           distribution,
-          tgt='jdk',
+          tgt=target,
           input_files=tuple(
             # NB: no input files because the jdk is expected to exist on the system in a known
             #     location.
@@ -316,7 +330,7 @@ class RscCompile(ZincCompile):
 
         # Step 1.5: metai Index the semanticdbs
         # -------------------------------------
-        self._run_metai_tool(distribution, metai_classpath, rsc_index_dir, tgt='jdk')
+        self._run_metai_tool(distribution, metai_classpath, rsc_index_dir, tgt=target)
 
         self._jvm_lib_metacp_classpath = [os.path.join(get_buildroot(), x) for x in metai_classpath]
 
@@ -351,34 +365,9 @@ class RscCompile(ZincCompile):
       # Double check the cache before beginning compilation
       hit_cache = self.check_cache(vts, counter)
       target = ctx.target
+      tgt, = vts.targets
 
       if not hit_cache:
-        cp_entries = []
-
-        distribution = self._get_jvm_distribution()
-
-        classpath_abs = self._zinc.compile_classpath(
-          'rsc_classpath',
-          ctx.target,
-          extra_cp_entries=self._extra_compile_time_classpath)
-
-        jar_deps = [t for t in DependencyContext.global_instance().dependencies_respecting_strict_deps(target)
-                    if isinstance(t, JarLibrary)]
-        metacp_jar_classpath_abs = [y[1] for y in self._metacp_jars_classpath_product.get_for_targets(
-          jar_deps
-        )]
-        metacp_jar_classpath_abs.extend(self._jvm_lib_metacp_classpath)
-        jar_jar_paths = {y[1] for y in self.context.products.get_data('rsc_classpath').get_for_targets(jar_deps)}
-
-        classpath_abs = [c for c in classpath_abs if c not in jar_jar_paths]
-
-
-        classpath_rel = fast_relpath_collection(classpath_abs)
-        metacp_jar_classpath_rel = fast_relpath_collection(metacp_jar_classpath_abs)
-        cp_entries.extend(classpath_rel)
-
-        ctx.ensure_output_dirs_exist()
-
         counter_val = str(counter()).rjust(counter.format_length(), b' ')
         counter_str = '[{}/{}] '.format(counter_val, counter.size)
         self.context.log.info(
@@ -391,22 +380,83 @@ class RscCompile(ZincCompile):
           ctx.target.address.spec,
           ').')
 
-        tgt, = vts.targets
+        # This does the following
+        # - collect jar dependencies and metacp-classpath entries for them
+        # - collect the non-java targets and their classpath entries
+        # - break out java targets and their javac'd classpath entries
+        # metacp
+        # - metacp the java targets
+        # rsc
+        # - combine the metacp outputs for jars, previous scala targets and the java metacp
+        #   classpath
+        # - run Rsc on the current target with those as dependencies
+
+        dependencies_for_target = list(
+          DependencyContext.global_instance().dependencies_respecting_strict_deps(target))
+
+        jar_deps = [t for t in dependencies_for_target if isinstance(t, JarLibrary)]
+
+        def is_java_compile_target(t):
+          return isinstance(t, JavaLibrary) or t.has_sources('.java')
+        java_deps = [t for t in dependencies_for_target
+                     if is_java_compile_target(t)]
+        non_java_deps = [t for t in dependencies_for_target
+                         if not (is_java_compile_target(t)) and not isinstance(t, JarLibrary)]
+
+        metacped_jar_classpath_abs = _paths_from_classpath(
+          self._metacp_jars_classpath_product.get_for_targets(jar_deps)
+        )
+        metacped_jar_classpath_abs.extend(self._jvm_lib_metacp_classpath)
+        metacped_jar_classpath_rel = fast_relpath_collection(metacped_jar_classpath_abs)
+
+        jar_rsc_classpath_paths = _paths_from_classpath(
+          self.context.products.get_data('rsc_classpath').get_for_targets(jar_deps),
+          collection_type=set)
+        jar_rsc_classpath_rel = fast_relpath_collection(jar_rsc_classpath_paths)
+
+        non_java_paths = _paths_from_classpath(
+          self.context.products.get_data('rsc_classpath').get_for_targets(non_java_deps),
+          collection_type=set)
+        non_java_rel = fast_relpath_collection(non_java_paths)
+
+        java_paths = _paths_from_classpath(
+          self.context.products.get_data('rsc_classpath').get_for_targets(java_deps),
+          collection_type=set)
+        java_rel = fast_relpath_collection(java_paths)
+
+        ctx.ensure_output_dirs_exist()
+
+        distribution = self._get_jvm_distribution()
         with Timer() as timer:
-          if cp_entries:
-            # Step 1: Convert classpath to SemanticDB
-            # ---------------------------------------
-            scalac_classpath_path_entries_abs = self.tool_classpath('workaround-metacp-dependency-classpath')
-            scalac_classpath_path_entries = fast_relpath_collection(scalac_classpath_path_entries_abs)
+          # Step 1: Convert classpath to SemanticDB
+          # ---------------------------------------
+          # If there are any as yet not metacp'd dependencies, metacp them so their indices can
+          # be passed to Rsc.
+          # TODO move these to their own jobs. https://github.com/pantsbuild/pants/issues/6754
+
+          # Inputs
+          # - Java dependencies jars
+          metacp_inputs = java_rel
+
+          # Dependencies
+          # - 3rdparty jars
+          # - non-java, ie scala, dependencies
+          # - jdk
+          snapshotable_metacp_dependencies = list(jar_rsc_classpath_rel) + \
+                                list(non_java_rel) + \
+                                fast_relpath_collection(
+                                  _paths_from_classpath(self._extra_compile_time_classpath))
+          metacp_dependencies = snapshotable_metacp_dependencies + self._jvm_lib_jars_abs
+
+          if metacp_inputs:
             rsc_index_dir = fast_relpath(ctx.rsc_index_dir, get_buildroot())
             args = [
               '--verbose',
-              # NB: We need to add these extra dependencies in order to be able
-              #     to find symbols used by the scalac jars.
-              '--dependency-classpath', os.pathsep.join(scalac_classpath_path_entries + list(jar_jar_paths) + self._jvm_lib_jars_abs),
+              '--stub-broken-signatures',
+              '--dependency-classpath', os.pathsep.join(metacp_dependencies),
               # NB: The directory to dump the semanticdb jars generated by metacp.
               '--out', rsc_index_dir,
-              os.pathsep.join(cp_entries),
+              os.pathsep.join(metacp_inputs),
             ]
             metacp_wu = self._runtool(
               'scala.meta.cli.Metacp',
@@ -414,82 +464,53 @@ class RscCompile(ZincCompile):
               args,
               distribution,
               tgt=tgt,
-              input_files=tuple(scalac_classpath_path_entries + classpath_rel),
+              input_files=tuple(metacp_inputs + snapshotable_metacp_dependencies),
               output_dir=rsc_index_dir)
             metacp_stdout = stdout_contents(metacp_wu)
             metacp_result = json.loads(metacp_stdout)
 
-            metai_classpath = self._collect_metai_classpath(metacp_result, classpath_rel)
+            metacped_java_dependency_rel = self._collect_metai_classpath(metacp_result,
+              java_rel)
 
             # Step 1.5: metai Index the semanticdbs
             # -------------------------------------
-            self._run_metai_tool(distribution, metai_classpath, rsc_index_dir, tgt)
+            self._run_metai_tool(distribution, metacped_java_dependency_rel, rsc_index_dir, tgt)
           else:
             # NB: there are no unmetacp'd dependencies
-            metai_classpath = []
+            metacped_java_dependency_rel = []
+
 
           # Step 2: Outline Scala sources into SemanticDB
           # ---------------------------------------------
-          rsc_outline_dir = fast_relpath(ctx.rsc_outline_dir, get_buildroot())
-          rsc_out = os.path.join(rsc_outline_dir, 'META-INF/semanticdb/out.semanticdb')
-          safe_mkdir(os.path.join(rsc_outline_dir, 'META-INF/semanticdb'))
+          rsc_mjar_file = fast_relpath(ctx.rsc_mjar_file, get_buildroot())
+
+          # TODO remove non-rsc entries from non_java_rel in a better way
+          rsc_semanticdb_classpath = metacped_java_dependency_rel + \
+                                     metacped_jar_classpath_rel + \
+                                     [j for j in non_java_rel if 'compile/rsc/' in j]
           target_sources = ctx.sources
           args = [
-            '-cp', os.pathsep.join(metai_classpath + metacp_jar_classpath_rel),
-            '-out', rsc_out,
-          ] + target_sources
+                   '-cp', os.pathsep.join(rsc_semanticdb_classpath),
+                   '-d', rsc_mjar_file,
+                 ] + target_sources
+          sources_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
           self._runtool(
             'rsc.cli.Main',
             'rsc',
             args,
             distribution,
             tgt=tgt,
-            # TODO pass the input files from the target snapshot instead of the below
-            # input_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
-            input_files=target_sources + metai_classpath + metacp_jar_classpath_rel,
-            output_dir=rsc_outline_dir)
-          rsc_classpath = [rsc_outline_dir]
-
-          # Step 2.5: Postprocess the rsc outputs
-          # TODO: This is only necessary as a workaround for https://github.com/twitter/rsc/issues/199.
-          # Ideally, Rsc would do this on its own.
-          self._run_metai_tool(distribution,
-            rsc_classpath,
-            rsc_outline_dir,
-            tgt,
-            extra_input_files=(rsc_out,))
-
-
-          # Step 3: Convert SemanticDB into an mjar
-          # ---------------------------------------
-          rsc_mjar_file = fast_relpath(ctx.rsc_mjar_file, get_buildroot())
-          args = [
-            '-out', rsc_mjar_file,
-            os.pathsep.join(rsc_classpath),
-          ]
-          self._runtool(
-            'scala.meta.cli.Mjar',
-            'mjar',
-            args,
-            distribution,
-            tgt=tgt,
-            input_files=(
-              rsc_out,
-            ),
-            output_dir=os.path.dirname(rsc_mjar_file)
-            )
-          self.context.products.get_data('rsc_classpath').add_for_target(
-            ctx.target,
-            [(conf, ctx.rsc_mjar_file) for conf in self._confs],
-          )
+            input_files=tuple(rsc_semanticdb_classpath),
+            input_digest=sources_snapshot.directory_digest,
+            output_dir=os.path.dirname(rsc_mjar_file))
 
         self._record_target_stats(tgt,
-                                  len(cp_entries),
-                                  len(target_sources),
-                                  timer.elapsed,
-                                  False,
-                                  'rsc'
-                                  )
+          len(metacp_inputs),
+          len(target_sources),
+          timer.elapsed,
+          False,
+          'rsc'
+        )
         # Write any additional resources for this target to the target workdir.
         self.write_extra_resources(ctx)
 
@@ -497,31 +518,40 @@ class RscCompile(ZincCompile):
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)
 
     def work_for_vts_rsc_jar_library(vts, ctx):
-      distribution = self._get_jvm_distribution()
-
-      # TODO use compile_classpath
-      classpath_abs = [
-        path for (conf, path) in
-        self.context.products.get_data('rsc_classpath').get_for_target(ctx.target)
-      ]
-
-      dependency_classpath = self._zinc.compile_classpath(
+      metacp_dependencies_entries = self._zinc.compile_classpath_entries(
         'compile_classpath',
         ctx.target,
         extra_cp_entries=self._extra_compile_time_classpath)
-      dependency_classpath = fast_relpath_collection(dependency_classpath)
 
+      metacp_dependencies = fast_relpath_collection(c.path for c in metacp_dependencies_entries)
+
+
+      metacp_dependencies_digests = [c.directory_digest for c in metacp_dependencies_entries
+                                     if c.directory_digest]
+      metacp_dependencies_paths_without_digests = fast_relpath_collection(
+        c.path for c in metacp_dependencies_entries if not c.directory_digest)
+
+      classpath_entries = [
+        cp_entry for (conf, cp_entry) in
+        self.context.products.get_data('compile_classpath').get_classpath_entries_for_targets(
+          [ctx.target])
+      ]
+      classpath_digests = [c.directory_digest for c in classpath_entries if c.directory_digest]
+      classpath_paths_without_digests = fast_relpath_collection(
+        c.path for c in classpath_entries if not c.directory_digest)
+
+      classpath_abs = [c.path for c in classpath_entries]
       classpath_rel = fast_relpath_collection(classpath_abs)
 
-      cp_entries = []
-      cp_entries.extend(classpath_rel)
+      metacp_inputs = []
+      metacp_inputs.extend(classpath_rel)
 
       counter_val = str(counter()).rjust(counter.format_length(), b' ')
       counter_str = '[{}/{}] '.format(counter_val, counter.size)
       self.context.log.info(
         counter_str,
         'Metacp-ing ',
-        items_to_report_element(cp_entries, 'jar'),
+        items_to_report_element(metacp_inputs, 'jar'),
         ' in ',
         items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
         ' (',
@@ -532,23 +562,19 @@ class RscCompile(ZincCompile):
 
       tgt, = vts.targets
       with Timer() as timer:
-      # Step 1: Convert classpath to SemanticDB
+        # Step 1: Convert classpath to SemanticDB
         # ---------------------------------------
-        scalac_classpath_path_entries_abs = self.tool_classpath('workaround-metacp-dependency-classpath')
-        scalac_classpath_path_entries = fast_relpath_collection(scalac_classpath_path_entries_abs)
         rsc_index_dir = fast_relpath(ctx.rsc_index_dir, get_buildroot())
         args = [
           '--verbose',
-          # NB: We need to add these extra dependencies in order to be able
-          #     to find symbols used by the scalac jars.
+          '--stub-broken-signatures',
           '--dependency-classpath', os.pathsep.join(
-            dependency_classpath +
-            scalac_classpath_path_entries +
+            metacp_dependencies +
             fast_relpath_collection(self._jvm_lib_jars_abs)
           ),
           # NB: The directory to dump the semanticdb jars generated by metacp.
           '--out', rsc_index_dir,
-          os.pathsep.join(cp_entries),
+          os.pathsep.join(metacp_inputs),
         ]
 
         # NB: If we're building a scala library jar,
@@ -558,16 +584,22 @@ class RscCompile(ZincCompile):
           args = [
             '--include-scala-library-synthetics',
           ] + args
+        distribution = self._get_jvm_distribution()
+
+        input_digest = self.context._scheduler.merge_directories(
+          tuple(classpath_digests + metacp_dependencies_digests))
+
         metacp_wu = self._runtool(
           'scala.meta.cli.Metacp',
           'metacp',
           args,
           distribution,
           tgt=tgt,
-          input_files=tuple(dependency_classpath + scalac_classpath_path_entries + classpath_rel),
+          input_digest=input_digest,
+          input_files=tuple(classpath_paths_without_digests +
+                            metacp_dependencies_paths_without_digests),
           output_dir=rsc_index_dir)
-        metacp_stdout = stdout_contents(metacp_wu)
-        metacp_result = json.loads(metacp_stdout)
+        metacp_result = json.loads(stdout_contents(metacp_wu))
 
         metai_classpath = self._collect_metai_classpath(metacp_result, classpath_rel)
 
@@ -735,7 +767,6 @@ class RscCompile(ZincCompile):
         log_dir=os.path.join(rsc_dir, 'logs'),
         sources=sources,
         rsc_index_dir=os.path.join(rsc_dir, 'index'),
-        rsc_outline_dir=os.path.join(rsc_dir, 'outline'),
       ),
       CompileContext(
         target=target,
@@ -748,21 +779,13 @@ class RscCompile(ZincCompile):
       )
     ]
 
-  def _runtool(self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), output_dir=None):
+  def _runtool(
+    self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
     if self.execution_strategy == self.HERMETIC:
-      # TODO: accept input_digests as well as files.
       with self.context.new_workunit(tool_name) as wu:
         tool_classpath_abs = self.tool_classpath(tool_name)
         tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
-        pathglobs = list(tool_classpath)
-        pathglobs.extend(input_files)
-        root = PathGlobsAndRoot(
-          PathGlobs(tuple(pathglobs)),
-          text_type(get_buildroot()))
-
-        tool_snapshots = self.context._scheduler.capture_snapshots((root,))
-        input_files_directory_digest = tool_snapshots[0].directory_digest
         classpath_for_cmd = os.pathsep.join(tool_classpath)
         cmd = [
           distribution.java,
@@ -772,9 +795,25 @@ class RscCompile(ZincCompile):
         cmd.extend([main])
         cmd.extend(args)
 
+        pathglobs = list(tool_classpath)
+        pathglobs.extend(f if os.path.isfile(f) else '{}/**'.format(f) for f in input_files)
+
+        if pathglobs:
+          root = PathGlobsAndRoot(
+          PathGlobs(tuple(pathglobs)),
+          text_type(get_buildroot()))
+          # dont capture snapshot, if pathglobs is empty
+          path_globs_input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
+
+        if path_globs_input_digest and input_digest:
+          epr_input_files = self.context._scheduler.merge_directories(
+              (path_globs_input_digest, input_digest))
+        else:
+          epr_input_files = path_globs_input_digest or input_digest
+
         epr = ExecuteProcessRequest(
           argv=tuple(cmd),
-          input_files=input_files_directory_digest,
+          input_files=epr_input_files,
           output_files=tuple(),
           output_directories=(output_dir,),
           timeout_seconds=15*60,
@@ -792,6 +831,7 @@ class RscCompile(ZincCompile):
           raise TaskError(res.stderr)
 
         if output_dir:
+          dump_digest(output_dir, res.output_directory_digest)
           self.context._scheduler.materialize_directories((
             DirectoryToMaterialize(
               # NB the first element here is the root to materialize into, not the dir to snapshot
@@ -857,10 +897,11 @@ class RscCompile(ZincCompile):
     #    TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
     desandboxify = _create_desandboxify_fn(
       [
-        os.path.join(relative_workdir, 'ivy', 'jars'),
-        os.path.join(relative_workdir, 'compile', 'rsc'),
-        os.path.join(relative_workdir, '.jdk'),
-        '.jdk'
+        os.path.join(relative_workdir, 'resolve', 'coursier', '[^/]*', 'cache', '.*'),
+        os.path.join(relative_workdir, 'resolve', 'ivy', '[^/]*', 'ivy', 'jars', '.*'),
+        os.path.join(relative_workdir, 'compile', 'rsc', '.*'),
+        os.path.join(relative_workdir, '\.jdk', '.*'),
+        os.path.join('\.jdk', '.*'),
       ]
       )
 

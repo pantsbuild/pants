@@ -21,7 +21,7 @@ from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
+from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
 from pants.util.objects import Exactly, datatype
 from pants.util.osutil import IntegerForPid
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
@@ -50,6 +50,9 @@ class PantsJoinHandle(datatype(['command', 'process', 'workdir'])):
     if stdin_data is not None:
       stdin_data = ensure_binary(stdin_data)
     (stdout_data, stderr_data) = communicate_fn(stdin_data)
+
+    if self.process.returncode != PantsRunIntegrationTest.PANTS_SUCCESS_CODE:
+      render_logs(self.workdir)
 
     return PantsResult(
       self.command,
@@ -101,26 +104,57 @@ def ensure_resolver(f):
 def ensure_daemon(f):
   """A decorator for running an integration test with and without the daemon enabled."""
   def wrapper(self, *args, **kwargs):
-    for enable_daemon in ('false', 'true',):
+    for enable_daemon in [False, True]:
       with temporary_dir() as subprocess_dir:
+        enable_daemon_str = str(enable_daemon)
         env = {
             'HERMETIC_ENV': 'PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR',
-            'PANTS_ENABLE_PANTSD': enable_daemon,
-            'PANTS_ENABLE_V2_ENGINE': enable_daemon,
+            'PANTS_ENABLE_PANTSD': enable_daemon_str,
+            'PANTS_ENABLE_V2_ENGINE': enable_daemon_str,
             'PANTS_SUBPROCESSDIR': subprocess_dir,
           }
         with environment_as(**env):
           try:
             f(self, *args, **kwargs)
-          except Exception:
-            print('Test failed with enable-pantsd={}:'.format(enable_daemon))
-            if enable_daemon == 'false':
-              print('Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false.')
-            raise
-          finally:
             if enable_daemon:
               self.assert_success(self.run_pants(['kill-pantsd']))
+          except Exception:
+            print('Test failed with enable-pantsd={}:'.format(enable_daemon))
+            if enable_daemon:
+              # If we are already raising, do not attempt to confirm that `kill-pantsd` succeeds.
+              self.run_pants(['kill-pantsd'])
+            else:
+              print('Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false.')
+            raise
   return wrapper
+
+
+def render_logs(workdir):
+  """Renders all potentially relevant logs from the given workdir to stdout."""
+  filenames = list(
+      glob.glob(os.path.join(workdir, 'logs/exceptions*log'))
+    ) + list(
+      glob.glob(os.path.join(workdir, 'pantsd/pantsd.log'))
+    )
+  for filename in filenames:
+    rel_filename = fast_relpath(filename, workdir)
+    print('{} +++ '.format(rel_filename))
+    for line in _read_log(filename):
+      print('{} >>> {}'.format(rel_filename, line))
+    print('{} --- '.format(rel_filename))
+
+
+def read_pantsd_log(workdir):
+  """Yields all lines from the pantsd log under the given workdir."""
+  # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
+  for line in _read_log('{}/pantsd/pantsd.log'.format(workdir)):
+    yield line
+
+
+def _read_log(filename):
+  with open(filename, 'r') as f:
+    for line in f:
+      yield line.strip()
 
 
 class PantsRunIntegrationTest(unittest.TestCase):

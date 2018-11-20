@@ -80,7 +80,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # Execute the binary and ensure its output is correct.
       binary_run_output = invoke_pex_for_output(pex)
-      self.assertEqual('x=3, f(x)=17\n', binary_run_output)
+      self.assertEqual(b'x=3, f(x)=17\n', binary_run_output)
 
   def test_ctypes_native_language_interop(self):
     # TODO: consider making this mock_buildroot/run_pants_with_workdir into a
@@ -122,13 +122,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertIn('Test worked!\n', pants_run.stdout_data)
 
-    # Test cached run.
-    pants_run = self.run_pants(
-      command=['-q', 'run', self._binary_target_with_third_party]
-    )
-    self.assert_success(pants_run)
-    self.assertIn('Test worked!\n', pants_run.stdout_data)
-
   def test_pants_native_source_detection_for_local_ctypes_dists_for_current_platform_only(self):
     """Test that `./pants run` respects platforms when the closure contains native sources.
 
@@ -136,7 +129,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     (2) a different platform than the one we are currently running on. The python_binary() target
     below is declared with `platforms="current"`.
     """
-    # Clean all to rebuild requirements pex.
     command = [
       'run',
       'testprojects/src/python/python_distribution/ctypes:bin'

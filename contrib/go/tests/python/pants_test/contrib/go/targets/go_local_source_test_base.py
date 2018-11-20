@@ -90,7 +90,8 @@ class GoLocalSourceTestBase(AbstractClass):
     self.create_file('src/go/src/foo/jake.hh')
     self.create_file('src/go/src/foo/jake.hpp')
     self.create_file('src/go/src/foo/jake.hxx')
-    target = self.make_target(spec='src/go/src/foo', target_type=self.target_type)
+    self.add_to_build_file('src/go/src/foo', '{}()\n'.format(self.target_type.alias()))
+    target = self.target('src/go/src/foo')
 
     self.assertEqual(sorted(['foo/jake.go',
                              'foo/jake.c',
@@ -113,7 +114,8 @@ class GoLocalSourceTestBase(AbstractClass):
     # We should grab all of these though.
     self.create_file('src/go/src/foo/jake.go')
     self.create_file('src/go/src/foo/jake.png')
-    target = self.make_target(spec='src/go/src/foo', target_type=self.target_type)
+    self.add_to_build_file('src/go/src/foo', '{}()'.format(self.target_type.alias()))
+    target = self.target('src/go/src/foo')
 
     self.assertEqual(sorted(['foo/jake.go',
                              'foo/jake.png']),

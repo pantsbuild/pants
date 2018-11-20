@@ -3,6 +3,56 @@
 
 This document describes releases leading up to the ``1.11.x`` ``stable`` series.
 
+1.11.0rc2 (11/15/2018)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fall back to most recent known osx version for bootstrap binaries (#6681)
+  `PR #6681 <https://github.com/pantsbuild/pants/pull/6681>`_
+
+* Bump pex version to 1.5.3 (#6776)
+  `PR #6776 <https://github.com/pantsbuild/pants/pull/6776>`_
+
+* Ignore paths more deeply to avoid graph impact when ignored files are added/removed (#6752)
+  `PR #6752 <https://github.com/pantsbuild/pants/pull/6752>`_
+
+1.11.0rc1 (10/31/2018)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Pause all PantsService threads before forking a pantsd-runner (#6671)
+  `PR #6671 <https://github.com/pantsbuild/pants/pull/6671>`_
+
+* Move ivy/coursier link farms under versioned task directories (#6686)
+  `PR #6686 <https://github.com/pantsbuild/pants/pull/6686>`_
+
+* Ensure that changing platforms invalidates pex binary creation (#6202)
+  `PR #6202 <https://github.com/pantsbuild/pants/pull/6202>`_
+
+* Fixup `CheckstyleTest` for local resolves. (#6707)
+  `PR #6707 <https://github.com/pantsbuild/pants/pull/6707>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix bugs in the parent/child relationship in ProcessManager (#6670)
+  `PR #6670 <https://github.com/pantsbuild/pants/pull/6670>`_
+
+* Remove the FSEventService pool in favor of execution on the dedicated service thread. (#6667)
+  `PR #6667 <https://github.com/pantsbuild/pants/pull/6667>`_
+
+* Make PailgunServer multithreaded in order to avoid blocking the PailgunService thread. (#6669)
+  `PR #6669 <https://github.com/pantsbuild/pants/pull/6669>`_
+
+* Fix python lint dependency on pyprep goal (#6606)
+  `Issue #5764 <https://github.com/pantsbuild/pants/issues/5764>`_
+  `PR #6606 <https://github.com/pantsbuild/pants/pull/6606>`_
+
+
 1.11.0rc0 (10/16/2018)
 ----------------------
 

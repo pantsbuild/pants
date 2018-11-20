@@ -20,10 +20,10 @@ pub struct Task {
 ///
 /// Registry of native (rust) Intrinsic tasks, user (python) Tasks, and Singletons.
 ///
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Tasks {
   // output product type -> Intrinsic providing it
-  intrinsics: HashMap<TypeConstraint, Intrinsic, FNV>,
+  intrinsics: HashMap<TypeConstraint, Vec<Intrinsic>, FNV>,
   // Singleton Values to be returned for a given TypeConstraint.
   singletons: HashMap<TypeConstraint, (Key, Value), FNV>,
   // output product type -> list of tasks providing it
@@ -79,7 +79,7 @@ impl Tasks {
     self.singletons.get(product)
   }
 
-  pub fn gen_intrinsic(&self, product: &TypeConstraint) -> Option<&Intrinsic> {
+  pub fn gen_intrinsic(&self, product: &TypeConstraint) -> Option<&Vec<Intrinsic>> {
     self.intrinsics.get(product)
   }
 
@@ -88,10 +88,14 @@ impl Tasks {
   }
 
   pub fn intrinsics_set(&mut self, types: &Types) {
-    self.intrinsics = vec![
+    let intrinsics = vec![
       Intrinsic {
         product: types.snapshot,
         input: types.path_globs,
+      },
+      Intrinsic {
+        product: types.snapshot,
+        input: types.url_to_fetch,
       },
       Intrinsic {
         product: types.files_content,
@@ -105,9 +109,16 @@ impl Tasks {
         product: types.process_result,
         input: types.process_request,
       },
-    ].into_iter()
-    .map(|i| (i.product, i))
-    .collect();
+    ];
+
+    self.intrinsics = vec![].into_iter().collect();
+    for intrinsic in intrinsics {
+      self
+        .intrinsics
+        .entry(intrinsic.product)
+        .or_insert_with(Vec::new)
+        .push(intrinsic)
+    }
   }
 
   pub fn singleton_add(&mut self, value: Value, product: TypeConstraint) {
@@ -125,14 +136,14 @@ impl Tasks {
   ///
   /// The following methods define the Task registration lifecycle.
   ///
-  pub fn task_begin(&mut self, func: Function, product: TypeConstraint) {
+  pub fn task_begin(&mut self, func: Function, product: TypeConstraint, cacheable: bool) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
     );
 
     self.preparing = Some(Task {
-      cacheable: true,
+      cacheable: cacheable,
       product: product,
       clause: Vec::new(),
       gets: Vec::new(),

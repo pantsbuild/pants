@@ -168,7 +168,7 @@ Key key_for(Handle);
 Handle val_for(Key);
 
 Tasks* tasks_create(void);
-void tasks_task_begin(Tasks*, Function, TypeConstraint);
+void tasks_task_begin(Tasks*, Function, TypeConstraint, _Bool);
 void tasks_add_get(Tasks*, TypeConstraint, TypeId);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_task_end(Tasks*);
@@ -197,8 +197,10 @@ Scheduler* scheduler_create(Tasks*,
                             TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
+                            TypeConstraint,
                             TypeId,
                             TypeId,
+                            Buffer,
                             Buffer,
                             Buffer,
                             BufferBuffer,
@@ -221,7 +223,7 @@ void scheduler_destroy(Scheduler*);
 Session* session_create(Scheduler*);
 void session_destroy(Session*);
 
-ExecutionRequest* execution_request_create(void);
+ExecutionRequest* execution_request_create(_Bool, uint64_t);
 void execution_request_destroy(ExecutionRequest*);
 
 uint64_t graph_len(Scheduler*);
@@ -250,6 +252,8 @@ void set_panic_handler(void);
 void lease_files_in_graph(Scheduler*);
 
 void garbage_collect_store(Scheduler*);
+
+PyResult decompress_tarball(char*, char*);
 '''
 
 CFFI_EXTERNS = '''
@@ -785,11 +789,17 @@ class Native(object):
   def to_ids_buf(self, types):
     return self.context.type_ids_buf([TypeId(self.context.to_id(t)) for t in types])
 
+  def decompress_tarball(self, tarfile_path, dest_dir):
+    result = self.lib.decompress_tarball(tarfile_path, dest_dir)
+    return self.context.raise_or_return(result)
+
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 
-  def new_execution_request(self):
-    return self.gc(self.lib.execution_request_create(), self.lib.execution_request_destroy)
+  def new_execution_request(self, v2_ui, ui_worker_count):
+    return self.gc(
+      self.lib.execution_request_create(v2_ui, ui_worker_count),
+      self.lib.execution_request_destroy)
 
   def new_session(self, scheduler):
     return self.gc(self.lib.session_create(scheduler), self.lib.session_destroy)
@@ -799,6 +809,7 @@ class Native(object):
                     root_subject_types,
                     build_root,
                     work_dir,
+                    local_store_dir,
                     ignore_patterns,
                     execution_options,
                     construct_directory_digest,
@@ -821,7 +832,8 @@ class Native(object):
                     constraint_link,
                     constraint_process_request,
                     constraint_process_result,
-                    constraint_generator):
+                    constraint_generator,
+                    constraint_url_to_fetch):
     """Create and return an ExternContext and native Scheduler."""
 
     def func(constraint):
@@ -854,12 +866,14 @@ class Native(object):
         tc(constraint_process_request),
         tc(constraint_process_result),
         tc(constraint_generator),
+        tc(constraint_url_to_fetch),
         # Types.
         TypeId(self.context.to_id(text_type)),
         TypeId(self.context.to_id(binary_type)),
         # Project tree.
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(work_dir),
+        self.context.utf8_buf(local_store_dir),
         self.context.utf8_buf_buf(ignore_patterns),
         self.to_ids_buf(root_subject_types),
         # Remote execution config.
@@ -873,7 +887,7 @@ class Native(object):
         execution_options.remote_store_chunk_bytes,
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.process_execution_parallelism,
-        execution_options.process_execution_cleanup_local_dirs
+        execution_options.process_execution_cleanup_local_dirs,
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
 

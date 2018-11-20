@@ -13,6 +13,7 @@ from io import StringIO
 
 from pants.init.logging import setup_logging
 from pants.util.contextutil import temporary_dir
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class SetupTest(unittest.TestCase):
@@ -39,7 +40,7 @@ class SetupTest(unittest.TestCase):
     has been registered as a global log level.  See options_bootstrapper.py.
     """
     self.assertEqual(2, len(lines))
-    self.assertRegexpMatches(lines[0], '^WARN\w*] warn')
+    assertRegex(self, lines[0], '^WARN\w*] warn')
     self.assertEqual('INFO] info', lines[1])
 
   def test_standard_logging(self):
@@ -66,5 +67,5 @@ class SetupTest(unittest.TestCase):
         loglines = fp.read().splitlines()
         self.assertEqual(2, len(loglines))
         glog_format = r'\d{4} \d{2}:\d{2}:\d{2}.\d{6} \d+ \w+\.py:\d+] '
-        self.assertRegexpMatches(loglines[0], r'^W{}warn$'.format(glog_format))
-        self.assertRegexpMatches(loglines[1], r'^I{}info$'.format(glog_format))
+        assertRegex(self, loglines[0], r'^W{}warn$'.format(glog_format))
+        assertRegex(self, loglines[1], r'^I{}info$'.format(glog_format))
