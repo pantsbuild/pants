@@ -368,7 +368,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       safe_delete(os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/BUILD'))
       pants_run = self.run_pants(['list', '--changed-parent=HEAD', '--changed-include-dependees=transitive'])
       self.assert_failure(pants_run)
-      self.assertIn('src/resources/org/pantsbuild/resourceonly', pants_run.stderr_data)
+      self.assertRegexpMatches(pants_run.stderr_data, 'src/resources/org/pantsbuild/resourceonly:.*did not exist')
 
   def test_changed_in_directory_without_build_file(self):
     with create_isolated_git_repo() as worktree:

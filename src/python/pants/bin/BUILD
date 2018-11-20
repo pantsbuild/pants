@@ -21,7 +21,6 @@ python_library(
     'src/python/pants/engine/legacy:address_mapper',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:parser',
-    'src/python/pants/engine/legacy:source_mapper',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:legacy_engine',

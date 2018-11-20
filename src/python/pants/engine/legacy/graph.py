@@ -4,16 +4,19 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import logging
 from builtins import str, zip
-from collections import deque
+from collections import defaultdict, deque
 from contextlib import contextmanager
+from os.path import dirname
 
+from future.utils import iteritems
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
-from pants.base.specs import SingleAddress, Specs
+from pants.base.specs import AscendantAddresses, DescendantAddresses, SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
@@ -21,10 +24,13 @@ from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
-from pants.engine.rules import TaskRule, rule
+from pants.engine.mapper import AddressMapper
+from pants.engine.rules import RootRule, TaskRule, rule
 from pants.engine.selectors import Get, Select
 from pants.option.global_options import GlobMatchErrorBehavior
+from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.objects import Collection, datatype
 
@@ -269,6 +275,98 @@ class LegacyBuildGraph(BuildGraph):
       yield hydrated_target.address
 
 
+class _DependentGraph(object):
+  """A graph for walking dependent addresses of TargetAdaptor objects.
+
+  This avoids/imitates constructing a v1 BuildGraph object, because that codepath results
+  in many references held in mutable global state (ie, memory leaks).
+
+  The long term goal is to deprecate the `changed` goal in favor of sufficiently good cache
+  hit rates, such that rather than running:
+
+    ./pants --changed-parent=master test
+
+  ...you would always be able to run:
+
+    ./pants test ::
+
+  ...and have it complete in a similar amount of time by hitting relevant caches.
+  """
+
+  @classmethod
+  def from_iterable(cls, target_types, address_mapper, adaptor_iter):
+    """Create a new DependentGraph from an iterable of TargetAdaptor subclasses."""
+    inst = cls(target_types, address_mapper)
+    all_valid_addresses = set()
+    for target_adaptor in adaptor_iter:
+      inst._inject_target(target_adaptor)
+      all_valid_addresses.add(target_adaptor.address)
+    inst._validate(all_valid_addresses)
+    return inst
+
+  def __init__(self, target_types, address_mapper):
+    # TODO: Dependencies and implicit dependencies are mapped independently, because the latter
+    # cannot be validated until:
+    #  1) Subsystems are computed in engine: #5869. Currently instantiating a subsystem to find
+    #     its injectable specs would require options parsing.
+    #  2) Targets-class Subsystem deps can be expanded in-engine (similar to Fields): #4535,
+    self._dependent_address_map = defaultdict(set)
+    self._implicit_dependent_address_map = defaultdict(set)
+    self._target_types = target_types
+    self._address_mapper = address_mapper
+
+  def _validate(self, all_valid_addresses):
+    """Validate that all of the dependencies in the graph exist in the given addresses set."""
+    for dependency, dependents in iteritems(self._dependent_address_map):
+      if dependency not in all_valid_addresses:
+        raise AddressLookupError(
+            'Dependent graph construction failed: {} did not exist. Was depended on by:\n  {}'.format(
+             dependency.spec,
+             '\n  '.join(d.spec for d in dependents)
+          )
+        )
+
+  def _inject_target(self, target_adaptor):
+    """Inject a target, respecting all sources of dependencies."""
+    target_cls = self._target_types[target_adaptor.type_alias]
+
+    declared_deps = target_adaptor.dependencies
+    implicit_deps = (Address.parse(s,
+                                   relative_to=target_adaptor.address.spec_path,
+                                   subproject_roots=self._address_mapper.subproject_roots)
+                     for s in target_cls.compute_dependency_specs(kwargs=target_adaptor.kwargs()))
+    for dep in declared_deps:
+      self._dependent_address_map[dep].add(target_adaptor.address)
+    for dep in implicit_deps:
+      self._implicit_dependent_address_map[dep].add(target_adaptor.address)
+
+  def dependents_of_addresses(self, addresses):
+    """Given an iterable of addresses, yield all of those addresses dependents."""
+    seen = OrderedSet(addresses)
+    for address in addresses:
+      seen.update(self._dependent_address_map[address])
+      seen.update(self._implicit_dependent_address_map[address])
+    return seen
+
+  def transitive_dependents_of_addresses(self, addresses):
+    """Given an iterable of addresses, yield all of those addresses dependents, transitively."""
+    closure = set()
+    result = []
+    to_visit = deque(addresses)
+
+    while to_visit:
+      address = to_visit.popleft()
+      if address in closure:
+        continue
+
+      closure.add(address)
+      result.append(address)
+      to_visit.extend(self._dependent_address_map[address])
+      to_visit.extend(self._implicit_dependent_address_map[address])
+
+    return result
+
+
 class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
   """A wrapper for a fully hydrated TargetAdaptor object.
 
@@ -294,6 +392,65 @@ class TransitiveHydratedTargets(datatype(['roots', 'closure'])):
 
 class HydratedTargets(Collection.of(HydratedTarget)):
   """An intransitive set of HydratedTarget objects."""
+
+
+class OwnersRequest(datatype([
+  ('sources', tuple),
+  ('include_dependees', str),
+])):
+  """A request for the owners (and optionally, transitive dependees) of a set of file paths.
+
+  TODO: `include_dependees` should become an `enum` of the choices from the
+  `--changed-include-dependees` global option.
+  """
+
+
+def find_owners(symbol_table, address_mapper, owners_request):
+  sources_set = OrderedSet(owners_request.sources)
+  dirs_set = OrderedSet(dirname(source) for source in sources_set)
+
+  # Walk up the buildroot looking for targets that would conceivably claim changed sources.
+  candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
+  candidate_targets = yield Get(HydratedTargets, Specs(candidate_specs))
+
+  # Match the source globs against the expanded candidate targets.
+  def owns_any_source(legacy_target):
+    """Given a `HydratedTarget` instance, check if it owns the given source file."""
+    target_kwargs = legacy_target.adaptor.kwargs()
+
+    # Handle `sources`-declaring targets.
+    # NB: Deleted files can only be matched against the 'filespec' (ie, `PathGlobs`) for a target,
+    # so we don't actually call `fileset.matches` here.
+    # TODO: This matching logic should be implemented using the rust `fs` crate for two reasons:
+    #  1) having two implementations isn't great
+    #  2) we're expanding sources via HydratedTarget, but it isn't necessary to do that to match
+    target_sources = target_kwargs.get('sources', None)
+    if target_sources and any_matches_filespec(sources_set, target_sources.filespec):
+      return True
+
+    return False
+
+  direct_owners = tuple(ht.adaptor.address
+                        for ht in candidate_targets.dependencies
+                        if LegacyAddressMapper.any_is_declaring_file(ht.adaptor.address, sources_set) or
+                           owns_any_source(ht))
+
+  # If the OwnersRequest does not require dependees, then we're done.
+  if owners_request.include_dependees == 'none':
+    yield BuildFileAddresses(direct_owners)
+  else:
+    # Otherwise: find dependees.
+    all_addresses = yield Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
+    all_structs = yield [Get(symbol_table.constraint(), Address, a.to_address()) for a in all_addresses.dependencies]
+
+    graph = _DependentGraph.from_iterable(target_types_from_symbol_table(symbol_table),
+                                          address_mapper,
+                                          all_structs)
+    if owners_request.include_dependees == 'direct':
+      yield BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
+    else:
+      assert owners_request.include_dependees == 'transitive'
+      yield BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
 
 
 @rule(TransitiveHydratedTargets, [Select(BuildFileAddresses)])
@@ -417,6 +574,9 @@ def create_legacy_graph_tasks(symbol_table):
   """Create tasks to recursively parse the legacy graph."""
   symbol_table_constraint = symbol_table.constraint()
 
+  partial_find_owners = functools.partial(find_owners, symbol_table)
+  functools.update_wrapper(partial_find_owners, find_owners)
+
   return [
     transitive_hydrated_targets,
     transitive_hydrated_target,
@@ -430,6 +590,17 @@ def create_legacy_graph_tasks(symbol_table):
         Get(HydratedField, BundlesField),
       ]
     ),
+    TaskRule(
+      BuildFileAddresses,
+      [Select(AddressMapper), Select(OwnersRequest)],
+      partial_find_owners,
+      input_gets=[
+        Get(HydratedTargets, Specs),
+        Get(BuildFileAddresses, Specs),
+        Get(symbol_table_constraint, Address),
+      ]
+    ),
     hydrate_sources,
     hydrate_bundles,
+    RootRule(OwnersRequest),
   ]

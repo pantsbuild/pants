@@ -82,16 +82,3 @@ python_library(
     'src/python/pants/util:objects',
   ],
 )
-
-python_library(
-  name='source_mapper',
-  sources=['source_mapper.py'],
-  dependencies=[
-    ':address_mapper',
-    ':graph',
-    'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
-    'src/python/pants/source',
-    '3rdparty/python:six'
-  ]
-)
