@@ -17,6 +17,7 @@ import java.util.zip.CRC32;
 import java.util.zip.CheckedInputStream;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
@@ -172,7 +173,7 @@ public class JarEntryCopierTest {
                 || "META-INF/MANIFEST.MF".equals(entry.getName()))) {
           continue;
         }
-        JarEntryCopier.copyEntry(jos, entry.getName(), jarIn, entry);
+        JarEntryCopier.copyEntry(jos, entry.getName(), jarIn, entry, Optional.<Long>absent());
       }
     } finally {
       closer.close();

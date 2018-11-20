@@ -14,6 +14,7 @@ import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
@@ -114,10 +115,18 @@ final class JarEntryCopier {
    * @throws IOException if there is a problem reading from {@code jarIn} or writing to
    *     {@code jarOut}.
    */
-  static void copyEntry(JarOutputStream jarOut, String name, JarFile jarIn, JarEntry jarEntry)
-      throws IOException {
+  static void copyEntry(
+      JarOutputStream jarOut,
+      String name,
+      JarFile jarIn,
+      JarEntry jarEntry,
+      Optional<Long> constantMtime
+  ) throws IOException {
 
     JarEntry outEntry = new JarEntry(jarEntry);
+    if (constantMtime.isPresent()) {
+      outEntry.setTime(constantMtime.get());
+    }
     ZE_NAME.set(outEntry, name);
 
     if (outEntry.isDirectory()) {

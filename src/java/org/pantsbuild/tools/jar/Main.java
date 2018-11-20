@@ -398,7 +398,7 @@ public final class Main {
     DuplicateHandler duplicateHandler =
         new DuplicateHandler(options.defaultAction, options.policies);
     try {
-      jarBuilder.write(options.compress, duplicateHandler, options.skip);
+      jarBuilder.write(options.compress, duplicateHandler, options.skip, Optional.<Long>absent());
     } catch (DuplicateEntryException e) {
       throw new ExitException(1, "Refusing to write duplicate entry: %s", e);
     } catch (IOException e) {

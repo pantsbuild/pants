@@ -42,7 +42,6 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Splitter;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.LinkedListMultimap;
@@ -972,7 +971,12 @@ public class JarBuilder implements Closeable {
       Pattern... skipPatterns)
       throws IOException {
 
-    return write(compress, duplicateHandler, ImmutableList.copyOf(skipPatterns));
+    return write(
+        compress,
+        duplicateHandler,
+        ImmutableList.copyOf(skipPatterns),
+        Optional.<Long>absent()
+    );
   }
 
   private static final Function<Pattern, Predicate<CharSequence>> AS_PATH_SELECTOR =
@@ -999,7 +1003,8 @@ public class JarBuilder implements Closeable {
   public File write(
       final boolean compress,
       DuplicateHandler duplicateHandler,
-      Iterable<Pattern> skipPatterns)
+      Iterable<Pattern> skipPatterns,
+      Optional<Long> constantMtime)
       throws DuplicateEntryException, IOException {
 
     Preconditions.checkNotNull(duplicateHandler);
@@ -1011,7 +1016,7 @@ public class JarBuilder implements Closeable {
     File tmp = File.createTempFile(target.getName(), ".tmp", target.getParentFile());
     try {
       try {
-        JarWriter writer = jarWriter(tmp, compress);
+        JarWriter writer = jarWriter(tmp, compress, constantMtime);
         writer.write(JarFile.MANIFEST_NAME, manifest == null ? DEFAULT_MANIFEST : manifest);
         List<ReadableJarEntry> jarEntries = Lists.newArrayList();
         for (ReadableEntry entry : entries) {
@@ -1021,7 +1026,7 @@ public class JarBuilder implements Closeable {
             writer.write(entry.getJarPath(), entry.contents);
           }
         }
-        copyJarFiles(writer, jarEntries);
+        copyJarFiles(writer, jarEntries, constantMtime);
 
         // Close all open files, the moveFile below might need to copy instead of just rename.
         closer.close();
@@ -1047,10 +1052,12 @@ public class JarBuilder implements Closeable {
    * @param writer target to copy JAR file entries to.
    * @param entries entries that came from a jar file
    */
-  private void copyJarFiles(JarWriter writer, Iterable<ReadableJarEntry> entries)
-      throws IOException {
+  private void copyJarFiles(
+      JarWriter writer,
+      Iterable<ReadableJarEntry> entries,
+      Optional<Long> constantMtime) throws IOException {
     // Walk the entries to bucketize by input jar file names
-    Multimap<JarSource, ReadableJarEntry> jarEntries = HashMultimap.create();
+    Multimap<JarSource, ReadableJarEntry> jarEntries = LinkedListMultimap.create();
     for (ReadableJarEntry entry : entries) {
       Preconditions.checkState(entry.getSource() instanceof JarSource);
       jarEntries.put((JarSource) entry.getSource(), entry);
@@ -1065,8 +1072,9 @@ public class JarBuilder implements Closeable {
         JarFile jarFile = jarSupplier.getInput();
         for (ReadableJarEntry readableJarEntry : jarEntries.get(source)) {
           JarEntry jarEntry = readableJarEntry.getJarEntry();
+
           String resource = jarEntry.getName();
-          writer.copy(resource, jarFile, jarEntry);
+          writer.copy(resource, jarFile, jarEntry, constantMtime);
         }
       } catch (IOException ex) {
         throw jarFileCloser.rethrow(ex);
@@ -1213,15 +1221,20 @@ public class JarBuilder implements Closeable {
   private static final class JarWriter {
     static class EntryFactory {
       private final boolean compress;
+      private final Optional<Long> constantMtime;
 
-      EntryFactory(boolean compress) {
+      EntryFactory(boolean compress, Optional<Long> constantMtime) {
         this.compress = compress;
+        this.constantMtime = constantMtime;
       }
 
       JarEntry createEntry(String path, ByteSource contents)
           throws IOException {
 
         JarEntry entry = new JarEntry(path);
+        if (constantMtime.isPresent()) {
+          entry.setTime(constantMtime.get());
+        }
         entry.setMethod(compress ? JarEntry.DEFLATED : JarEntry.STORED);
         if (!compress) {
           prepareEntry(entry, contents);
@@ -1259,9 +1272,9 @@ public class JarBuilder implements Closeable {
     private final JarOutputStream out;
     private final EntryFactory entryFactory;
 
-    private JarWriter(JarOutputStream out, boolean compress) {
+    private JarWriter(JarOutputStream out, boolean compress, Optional<Long> constantMtime) {
       this.out = out;
-      this.entryFactory = new EntryFactory(compress);
+      this.entryFactory = new EntryFactory(compress, constantMtime);
     }
 
     public void write(String path, ByteSource contents) throws IOException {
@@ -1270,9 +1283,10 @@ public class JarBuilder implements Closeable {
       contents.copyTo(out);
     }
 
-    public void copy(String path, JarFile jarIn, JarEntry srcJarEntry) throws IOException {
+    public void copy(String path, JarFile jarIn, JarEntry srcJarEntry, Optional<Long> constantMtime)
+        throws IOException {
       ensureParentDir(path);
-      JarEntryCopier.copyEntry(out, path, jarIn, srcJarEntry);
+      JarEntryCopier.copyEntry(out, path, jarIn, srcJarEntry, constantMtime);
     }
 
     private void ensureParentDir(String path) throws IOException {
@@ -1292,7 +1306,8 @@ public class JarBuilder implements Closeable {
     }
   }
 
-  private JarWriter jarWriter(File path, boolean compress) throws IOException {
+  private JarWriter jarWriter(File path, boolean compress, Optional<Long> constantMtime)
+      throws IOException {
     // The JAR-writing process seems to be I/O bound. To make writes to disk less frequent,
     // BufferedOutputStream is used. This way, compressed data is stored in a buffer before being
     // flushed to disk.
@@ -1309,7 +1324,7 @@ public class JarBuilder implements Closeable {
         jar.closeEntry();
       }
     });
-    return new JarWriter(jar, compress);
+    return new JarWriter(jar, compress, constantMtime);
   }
 
   private static ByteSource entrySupplier(final InputSupplier<JarFile> jar, final JarEntry entry) {

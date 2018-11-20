@@ -6,6 +6,7 @@ java_library(
     '3rdparty:args4j',
     '3rdparty:guava',
     '3rdparty:jsr305',
+    '3rdparty/jvm/com/facebook/buck/util/zip',
     'src/java/org/pantsbuild/args4j'
   ],
   platform='java7',
