@@ -27,7 +27,7 @@ class SourceMapperTest(TestBase):
   def owner(self, owner, f):
     request = OwnersRequest(sources=(f,), include_dependees=str('none'))
     addresses, = self.scheduler.product_request(BuildFileAddresses, [request])
-    self.assertEqual(set(owner), {i.spec for i in addresses})
+    self.assertEqual(set(owner), {i.spec for i in addresses.dependencies})
 
   def test_target_address_for_source_yields_unique_addresses(self):
     # NB If the mapper returns more than one copy of an address, it may cause other code to do
