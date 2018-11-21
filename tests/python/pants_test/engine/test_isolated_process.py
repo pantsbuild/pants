@@ -101,22 +101,16 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
     return (self.bin_path, '-version',)
 
 
-@rule(ExecuteProcessRequest, [Select(JavacVersionExecutionRequest)])
-def process_request_from_javac_version(javac_version_exe_req):
-  yield ExecuteProcessRequest(
-    argv=javac_version_exe_req.gen_argv(),
-    description=javac_version_exe_req.description,
-    input_files=EMPTY_DIRECTORY_DIGEST,
-  )
-
-
 class JavacVersionOutput(datatype([('value', text_type)])): pass
 
 
 @rule(JavacVersionOutput, [Select(JavacVersionExecutionRequest)])
 def get_javac_version_output(javac_version_command):
-  javac_version_proc_req = yield Get(
-    ExecuteProcessRequest, JavacVersionExecutionRequest, javac_version_command)
+  javac_version_proc_req = ExecuteProcessRequest(
+    argv=javac_version_command.gen_argv(),
+    description=javac_version_command.description,
+    input_files=EMPTY_DIRECTORY_DIGEST,
+  )
   javac_version_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
 
@@ -273,7 +267,6 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
   def rules(cls):
     return super(IsolatedProcessTest, cls).rules() + [
       RootRule(JavacVersionExecutionRequest),
-      process_request_from_javac_version,
       get_javac_version_output,
     ] + create_cat_stdout_rules() + create_javac_compile_rules()
 
