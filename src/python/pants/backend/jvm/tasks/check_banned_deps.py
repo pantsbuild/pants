@@ -7,6 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.task.task import Task
 
 
+class BannedDependencyException(Exception):
+  pass
+
+
 class CheckBannedDeps(Task):
   """
   This task ensures that a target does not depend on banned dependencies.
@@ -34,13 +38,48 @@ class CheckBannedDeps(Task):
 
   def execute(self):
     if not self.get_options().skip:
-      self.pairs_checked = 0
-      for target in self.context.target_roots:
-        constraint_declaration = target.payload.get_field_value("dependency_constraints")
-        if constraint_declaration:
-          relevant_targets = CheckBannedDeps.relevant_targets(target)
-          for constraint in constraint_declaration.constraints:
-            for target_under_test in relevant_targets:
-              constraint.check_target(target, self.context, target_under_test)
+      bad_elements = self.check_graph()
+      if bad_elements:
+        raise BannedDependencyException("ERROR!")
     else:
       self.context.log.debug("Skipping banned dependency checks. To enforce this, enable the --no-compile-check-banned-deps-skip flag")
+
+  def check_graph(self):
+    # self.constraint_set = set([])
+    #
+    # def check_constraints(root, target):
+    #   for constraint in self.constraint_set:
+    #     constraint.check_target(root, self.context, target)
+    #
+    # errors = []
+    # def constraint_set_union(other):
+    #   self.constraint_set |= other
+    #
+    # def constraint_set_difference(other):
+    #   self.constraint_set -= other
+    #
+    # def get_constraints(target):
+    #   constraint_declaration = target.payload.get_field_value("dependency_constraints")
+    #   if constraint_declaration:
+    #     return constraint_declaration.constraints
+    #   else:
+    #     return set([])
+    #
+    # for target in self.context.target_roots:
+    #   self.context.build_graph.walk_transitive_dependency_graph(
+    #     [target.address],
+    #     work=(lambda t: check_constraints(target, t)),
+    #     prelude=(lambda t: constraint_set_union(get_constraints(t))),
+    #     epilogue=(lambda t: constraint_set_difference(get_constraints(t))),
+    #   )
+
+    bad_elements = []
+    for target in self.context.target_roots:
+      constraint_declaration = target.payload.get_field_value("dependency_constraints")
+      if constraint_declaration:
+        relevant_targets = CheckBannedDeps.relevant_targets(target)
+        for constraint in constraint_declaration.constraints:
+          for target_under_test in relevant_targets:
+            bad_elements += constraint.check_target(target, self.context, target_under_test)
+
+    return bad_elements

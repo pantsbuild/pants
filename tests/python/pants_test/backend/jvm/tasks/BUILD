@@ -819,3 +819,13 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+python_tests(
+  name = 'check_banned_deps',
+  sources = ['test_check_banned_deps.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm:dependency_constraints',
+    'src/python/pants/backend/jvm/tasks:check_banned_deps',
+    'tests/python/pants_test:task_test_base'
+  ]
+)

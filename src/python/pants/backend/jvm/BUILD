@@ -96,3 +96,8 @@ python_library(
     'src/python/pants/base:validation',
   ],
 )
+
+python_library(
+  name='dependency_constraints',
+  sources=['dependency_constraints.py'],
+)

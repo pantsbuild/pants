@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class CheckBannedDepsTest(PantsRunIntegrationTest):
+class CheckBannedDepsIntegration(PantsRunIntegrationTest):
 
   TESTPROJECT_PATH = 'testprojects/src/scala/org/pantsbuild/testproject/banned_deps'
 
