@@ -124,7 +124,7 @@ class BaseZincCompileIntegrationTest(object):
         # Confirm that we were warned.
         self.assertIn('is not supported, and is subject to change/removal', pants_run.stdout_data)
 
-  def test_zinc_fatal_warning(self):
+  def test_zinc_fatal_warnings(self):
     def test_combination(target, expect_success, extra_args=[]):
       with self.temporary_workdir() as workdir:
         with self.temporary_cachedir() as cachedir:
@@ -146,6 +146,29 @@ class BaseZincCompileIntegrationTest(object):
       extra_args=['--compile-zinc-fatal-warnings-enabled-args=[\'-C-Werror\']'])
     test_combination('fatal', expect_success=False,
       extra_args=['--compile-zinc-fatal-warnings-disabled-args=[\'-S-Xfatal-warnings\']'])
+
+  def test_zinc_compiler_options_sets(self):
+    def test_combination(target, expect_success, extra_args=[]):
+      with self.temporary_workdir() as workdir:
+        with self.temporary_cachedir() as cachedir:
+          pants_run = self.run_test_compile(
+              workdir,
+              cachedir,
+              'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:{}'.format(
+                target),
+              extra_args=extra_args)
+
+          if expect_success:
+            self.assert_success(pants_run)
+          else:
+            self.assert_failure(pants_run)
+    test_combination('fatal', expect_success=False)
+    test_combination('nonfatal', expect_success=True)
+
+    test_combination('fatal', expect_success=True,
+      extra_args=['--compile-zinc-compiler-option-sets-enabled-args={"fatal_warnings": ["-C-Werror"]}'])
+    test_combination('fatal', expect_success=False,
+      extra_args=['--compile-zinc-compiler-option-sets-disabled-args={"fatal_warnings": ["-S-Xfatal-warnings"]}'])
 
   @unittest.expectedFailure
   def test_soft_excludes_at_compiletime(self):
