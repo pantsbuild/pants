@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import object
 
+from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
 
 
@@ -53,25 +54,42 @@ class CompilerOptionSetsMixin(object):
     """Override to set default for this option."""
     return ()
 
+  @memoized_property
+  def _use_deprecated_fatal_warnings(self):
+    """Returns true if fatal warnings should be used from their deprecated location.
+
+    The deprecated location is used only if it is explicitly specified, and no args were explicitly
+    specified in the new location. This means that either one location or the other will be used,
+    but never both.
+    """
+    set_in_deprecated_location = not self.get_options().is_default('fatal_warnings_enabled_args') or \
+                                 not self.get_options().is_default('fatal_warnings_disabled_args')
+    set_enabled_in_new_location = (not self.get_options().is_default('compiler_option_sets_enabled_args') and \
+                                   bool(self.get_options().compiler_option_sets_enabled_args.get('fatal_warnings', None)))
+    set_disabled_in_new_location = (not self.get_options().is_default('compiler_option_sets_disabled_args') and \
+                                   bool(self.get_options().compiler_option_sets_disabled_args.get('fatal_warnings', None)))
+    return set_in_deprecated_location and not (set_enabled_in_new_location or set_disabled_in_new_location)
+
   def get_merged_args_for_compiler_option_sets(self, compiler_option_sets):
     compiler_options = set()
 
-    # Fatal warnings option has special treatment for backwards compatibility.
-    # This is because previously this has had its own {enabled, disabled}_args
-    # options when these were defined in the jvm compile task.
-    if 'fatal_warnings' in compiler_option_sets:
-      compiler_options.update(self.get_options().fatal_warnings_enabled_args)
-    else:
-      compiler_options.update(self.get_options().fatal_warnings_disabled_args)
+    # Start by setting the (deprecated) magically handled fatal warnings option.
+    if self._use_deprecated_fatal_warnings:
+      if 'fatal_warnings' in compiler_option_sets:
+        compiler_options.update(self.get_options().fatal_warnings_enabled_args)
+      else:
+        compiler_options.update(self.get_options().fatal_warnings_disabled_args)
 
-    # Set values for enabled options.
+    # Set values for enabled options (ignoring fatal_warnings if it has been handled above).
     for option_set_key in compiler_option_sets:
-      val = self.get_options().compiler_option_sets_enabled_args.get(option_set_key, ())
-      compiler_options.update(val)
+      if option_set_key != 'fatal_warnings' or not self._use_deprecated_fatal_warnings:
+        val = self.get_options().compiler_option_sets_enabled_args.get(option_set_key, ())
+        compiler_options.update(val)
 
-    # Set values for disabled options.
-    for option_set, disabled_args in self.get_options().compiler_option_sets_disabled_args.items():
-      if not option_set in compiler_option_sets:
-        compiler_options.update(disabled_args)
+    # Set values for disabled options (ignoring fatal_warnings if it has been handled above).
+    for option_set_key, disabled_args in self.get_options().compiler_option_sets_disabled_args.items():
+      if not option_set_key in compiler_option_sets:
+        if option_set_key != 'fatal_warnings' or not self._use_deprecated_fatal_warnings:
+          compiler_options.update(disabled_args)
 
     return list(compiler_options)
