@@ -320,7 +320,7 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend([
       '-log-level', self.get_options().level,
       '-analysis-cache', analysis_cache,
-      '-classpath', ':'.join(relative_classpath),
+      '-cp', ','.join(relative_classpath),
       '-d', classes_dir,
     ])
     if not self.get_options().colors:
@@ -328,7 +328,7 @@ class BaseZincCompile(JvmCompile):
 
     compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
     zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
-    zinc_args.extend(['-scala-path', ':'.join(scala_path)])
+    zinc_args.extend(['-scala-path', ','.join(scala_path)])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
     # Search for scalac plugins on the classpath.
@@ -347,7 +347,7 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
-                        ','.join('{}:{}'.format(
+                        ','.join('{}={}'.format(
                           relative_to_exec_root(k),
                           relative_to_exec_root(v)
                         ) for k, v in upstream_analysis.items())])
