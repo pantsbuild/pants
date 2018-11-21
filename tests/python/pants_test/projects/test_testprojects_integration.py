@@ -61,9 +61,10 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/python/pants/dummies:failing_target',
       'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C',
       'testprojects/src/scala/org/pantsbuild/testproject/exclude_direct_dep',
-      'testprojects/src/scala/org/pantsbuild/testproject/banned_deps_test:ban_packages',
-      'testprojects/src/scala/org/pantsbuild/testproject/banned_deps_test:ban_testdeps',
-      'testprojects/src/scala/org/pantsbuild/testproject/banned_deps_test:ban_tags',
+      'testprojects/src/scala/org/pantsbuild/testproject/banned_deps:ban_packages',
+      'testprojects/src/scala/org/pantsbuild/testproject/banned_deps:ban_testdeps',
+      'testprojects/src/scala/org/pantsbuild/testproject/banned_deps:ban_tags',
+      'testprojects/src/scala/org/pantsbuild/testproject/banned_deps:ban_target_name',
       'testprojects/tests/python/pants/timeout:terminates_self',
       # These don't pass without special config.
       'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',

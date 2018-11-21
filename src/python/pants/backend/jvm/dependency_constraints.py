@@ -155,10 +155,11 @@ class TargetName(Constraint):
   """Checks that a target name is not in a dependency"""
 
   def __init__(self, banned_target_name):
+    # TODO Allow sibling specs (":some_target") by modifying the call to parse()
     self.banned_target_address = Address.parse(banned_target_name)
 
   def _compute_fingerprint(self):
-    return stable_json_hash(self.banned_target_name)
+    return stable_json_hash(self.banned_target_address.spec)
 
   def get_error_message(self, target, checked_target, bad_element):
     return 'Target {} banned target name {}'.format(

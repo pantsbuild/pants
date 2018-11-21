@@ -73,13 +73,13 @@ class CheckBannedDeps(Task):
     #     epilogue=(lambda t: constraint_set_difference(get_constraints(t))),
     #   )
 
-    bad_elements = []
+    errors = []
     for target in self.context.target_roots:
       constraint_declaration = target.payload.get_field_value("dependency_constraints")
       if constraint_declaration:
         relevant_targets = CheckBannedDeps.relevant_targets(target)
         for constraint in constraint_declaration.constraints:
           for target_under_test in relevant_targets:
-            bad_elements += constraint.check_target(target, self.context, target_under_test)
+            errors += constraint.check_target(target, self.context, target_under_test)
 
-    return bad_elements
+    return errors

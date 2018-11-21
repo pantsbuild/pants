@@ -29,28 +29,28 @@ class CheckBannedDepsIntegration(PantsRunIntegrationTest):
 
   def test_package_constraints(self):
     self.compile_with_constraints(
-      '/constraint_impl_checks:ban_packages',
+      ':ban_packages',
       success=False,
-      failure_message='Target testprojects/src/scala bans package "scopt", which bans target 3rdparty/jvm with classes ('
+      failure_message='ERROR!'
     )
 
   def test_test_dependency_constraints(self):
     self.compile_with_constraints(
-      '/constraint_impl_checks:ban_testdeps',
+      ':ban_testdeps',
       success=False,
-      failure_message='Target testprojects/src/scala has test dependencies on target testprojects/src/scala'
+      failure_message='ERROR!'
     )
 
   def test_tag_constraints(self):
     self.compile_with_constraints(
-      '/constraint_impl_checks:ban_tags',
+      ':ban_tag',
       success=False,
-      failure_message='Target testprojects/src/scala has baned tag "deprecated", but these target has it testprojects/src/scala'
+      failure_message='ERROR!'
     )
 
-  def test_graph_walk(self):
+  def test_target_name(self):
     self.compile_with_constraints(
-      '/graph_walk/T:T',
+      ':ban_target_name',
       success=False,
-      failure_message='Target testprojects/src/scala has baned tag "deprecated", but these target has it testprojects/src/scala'
+      failure_message='ERROR!'
     )

@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.dependency_constraints import (DependencyConstraints, JvmPackageConstraint,
-                                                      Tag, TestDependencies)
+                                                      Tag, TargetName, TestDependencies)
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository as repo
@@ -136,6 +136,7 @@ def build_file_aliases():
       'JvmPackageConstraint': JvmPackageConstraint,
       'Tag': Tag,
       'TestDependencies': TestDependencies,
+      'TargetName': TargetName,
     },
     context_aware_object_factories={
       'bundle': Bundle,

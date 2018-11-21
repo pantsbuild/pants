@@ -29,7 +29,7 @@ scala_library(
 
 # Target that bans a tag in another target
 scala_library(
-    name="ban_tags",
+    name="ban_tag",
     sources=["Main.scala"],
     dependency_constraints=
         DependencyConstraints([
@@ -49,6 +49,17 @@ scala_library(
     dependency_constraints=DependencyConstraints(
         [TestDependencies()]
     )
+)
+
+# Ban target name
+scala_library(
+  name="ban_target_name",
+  sources=["Main.scala"],
+  dependencies=[":nodeps"],
+  dependency_constraints=DependencyConstraints([
+    TargetName("testprojects/src/scala/org/pantsbuild/testproject/banned_deps:nodeps"),
+    # TODO Allow sibling specs like TargetName(":nodeps")
+  ])
 )
 
 scala_library(
