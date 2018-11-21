@@ -5,23 +5,13 @@
 
 package org.pantsbuild.zinc.bootstrapper
 
-import org.pantsbuild.tools.jar.JarBuilder
-import com.facebook.buck.util.zip.{ZipConstants, ZipScrubber}
-import com.google.common.base.Optional
+import com.facebook.buck.util.zip.ZipScrubber
 import java.io.File
-import java.net.URLClassLoader
-import java.util.ArrayList
-import java.util.regex.Pattern
-import sbt.io.Path
 import xsbti.compile.{
   ClasspathOptionsUtil,
   ScalaInstance => XScalaInstance
 }
-import sbt.internal.inc.{
-  AnalyzingCompiler,
-  RawCompiler,
-  ScalaInstance
-}
+import sbt.internal.inc.{AnalyzingCompiler, RawCompiler}
 import sbt.util.Logger
 
 object BootstrapperUtils {
@@ -44,20 +34,10 @@ object BootstrapperUtils {
     val tempJar = File.createTempFile("interface-", ".jar.tmp", dir)
     try {
       compile(tempJar)
-      makeReproducible(tempJar, output)
+      ZipScrubber.scrubZip(tempJar.toPath)
+      tempJar.renameTo(output)
     } finally {
       tempJar.delete()
     }
-  }
-
-  def makeReproducible(tempJar: File, output: File): Unit = {
-    new JarBuilder(tempJar).addJar(tempJar).write(
-      false,
-      JarBuilder.DuplicateHandler.always(JarBuilder.DuplicateAction.SKIP),
-      new ArrayList[Pattern](),
-      Optional.of[java.lang.Long](ZipConstants.getFakeTime)
-    )
-    ZipScrubber.scrubZip(tempJar.toPath)
-    tempJar.renameTo(output)
   }
 }

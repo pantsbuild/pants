@@ -14,7 +14,6 @@ scala_library(
     '3rdparty/jvm/org/scala-sbt:io',
     '3rdparty/jvm/com/github/scopt',
     '3rdparty/jvm/com/facebook/buck/util/zip',
-    'src/java/org/pantsbuild/tools/jar',
     'src/scala/org/pantsbuild/zinc/options',
     'src/scala/org/pantsbuild/zinc/scalautil',
   ],
