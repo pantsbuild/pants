@@ -10,6 +10,7 @@ import re
 from zipfile import ZipFile
 
 from pants.backend.native.config.environment import Platform
+from pants.backend.native.subsystems.native_build_settings import ToolchainVariant
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
@@ -43,12 +44,24 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
     self.assertEqual('x=3, f(x)=17\n', pants_run.stdout_data)
 
-  def test_ctypes_binary(self):
+  def test_ctypes_binary_creation(self):
+    """Create a python_binary() with all native toolchain variants, and test the result."""
+    # TODO: this pattern could be made more ergonomic for `enum()`, along with exhaustiveness
+    # checking.
+    for variant in ToolchainVariant.allowed_values:
+      self._assert_ctypes_binary(variant)
+
+  def _assert_ctypes_binary(self, toolchain_variant):
+    # TODO: figure out a way to check that when we select 'gnu' as the `toolchain_variant`, we use
+    # gcc to compile the C/C++ targets -- the same for 'llvm' and clang.
     with temporary_dir() as tmp_dir:
       pants_run = self.run_pants(command=['binary', self._binary_target], config={
         GLOBAL_SCOPE_CONFIG_SECTION: {
           'pants_distdir': tmp_dir,
-        }
+        },
+        'native-build-settings': {
+          'toolchain_variant': toolchain_variant,
+        },
       })
 
       self.assert_success(pants_run)
