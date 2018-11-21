@@ -4,38 +4,26 @@
 
 package org.pantsbuild.zinc.compiler
 
+import com.google.common.base.Joiner
 import java.io.File
-import sbt.internal.util.{ ConsoleLogger, ConsoleOut }
 import java.nio.file.{Files, Path}
-import java.lang.{ Boolean => JBoolean }
-import java.util.function.{ Function => JFunction }
-import java.util.{ List => JList, logging => jlogging }
-
+import java.lang.{Boolean => JBoolean}
+import java.util.function.{Function => JFunction}
+import java.util.{List => JList, logging => jlogging}
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
 import scala.util.matching.Regex
-
-import sbt.io.Path._
 import sbt.io.syntax._
 import sbt.util.{Level, Logger}
-import xsbti.compile.{
-  ClassFileManagerType,
-  CompileOrder,
-  IncOptionsUtil,
-  TransactionalManagerType
-}
+import xsbti.compile.{ClassFileManagerType, CompileOrder, TransactionalManagerType}
 import xsbti.compile.{IncOptions => ZincIncOptions}
-
 import org.pantsbuild.zinc.analysis.AnalysisOptions
-import org.pantsbuild.zinc.options.OptionSet
 import org.pantsbuild.zinc.util.Util
 
 /**
  * All parsed command-line options.
  */
 case class Settings(
-  help: Boolean                     = false,
-  version: Boolean                  = false,
   consoleLog: ConsoleOptions        = ConsoleOptions(),
   _sources: Seq[File]               = Seq.empty,
   classpath: Seq[File]              = Seq.empty,
@@ -50,7 +38,7 @@ case class Settings(
   _incOptions: IncOptions           = IncOptions(),
   analysis: AnalysisOptions         = AnalysisOptions(),
   creationTime: Long                = 0,
-  compiledBridgeJar: Option[File]= None
+  compiledBridgeJar: Option[File]   = None
 ) {
   import Settings._
 
@@ -234,76 +222,210 @@ case class IncOptions(
   }
 }
 
-object Settings extends OptionSet[Settings] {
-  val DestinationOpt = "-d"
-  val JarDestinationOpt = "-jar"
+object Settings {
+  val logLevels = Set("debug", "info", "warn", "error")
 
-  override def empty = Settings()
+  val SettingsParser = new scopt.OptionParser[Settings]("zinc-compiler") {
+    head("pants-zinc-compiler", "0.0.10")
+    help("help").text("Prints this usage message")
+    version("version").text("Print version")
 
-  override def applyResidual(t: Settings, residualArgs: Seq[String]) =
-    t.copy(_sources = residualArgs map (new File(_)))
+    opt[File]("compiled-bridge-jar")
+      .abbr("compiled-bridge-jar")
+      .required()
+      .valueName("<file>")
+      .action((x, c) => c.copy(compiledBridgeJar = Some(x)))
+      .text("Path to pre-compiled compiler interface.")
 
-  override val options = Seq(
-    header("Output options:"),
-    boolean(  ("-help", "-h"),                 "Print this usage message",                   (s: Settings) => s.copy(help = true)),
-    boolean(   "-version",                     "Print version",                              (s: Settings) => s.copy(version = true)),
+    opt[Long]("jar-creation-time")
+      .abbr("jar-creation-time")
+      .action((x, c) => c.copy(creationTime = x))
+      .text("Creation timestamp for compiled jars, default is current time")
 
-    header("Logging Options:"),
-    boolean(   "-debug",                       "Set log level for stdout to debug",
-      (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(logLevel = Level.Debug))),
-    string(    "-log-level", "level",          "Set log level for stdout (debug|info|warn|error)",
-      (s: Settings, l: String) => s.copy(consoleLog = s.consoleLog.copy(logLevel = Level.withName(l)))),
-    boolean(   "-no-color",                    "No color in logging to stdout",
-      (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(color = false))),
-    string(    "-msg-filter", "regex",         "Filter warning messages matching the given regex",
-      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(msgFilters = s.consoleLog.msgFilters :+ re.r))),
-    string(    "-file-filter", "regex",        "Filter warning messages from filenames matching the given regex",
-      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(fileFilters = s.consoleLog.fileFilters :+ re.r))),
+    opt[Unit]("debug")
+      .abbr("debug")
+      .action((x, c) => c.copy(consoleLog = c.consoleLog.copy(logLevel = Level.Debug)))
+      .text("Set log level for stdout to debug")
 
-    header("Compile options:"),
-    path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
-    file(     DestinationOpt, "directory",     "Destination for compiled classes",           (s: Settings, f: File) => s.copy(_classesDirectory = Some(f))),
-    file(     JarDestinationOpt, "directory",     "Jar destination for compiled classes",           (s: Settings, f: File) => s.copy(outputJar = Some(f))),
-    long("-jar-creation-time", "n",        "Creation timestamp for compiled jars, default is current time", (s: Settings, l: Long) => s.copy(creationTime = l)),
+    opt[String]("log-level")
+      .abbr("log-level")
+      .valueName("level")
+      .validate { level => {
+        if (logLevels.contains(level)) success else failure(s"Level must be one of $logLevels.")
+      }}
+      .action((x, c) => c.copy(consoleLog = c.consoleLog.copy(logLevel = Level.withName(x))))
+      .text(s"Set log level for stdout (${Joiner.on('|').join(logLevels.asJava)})")
 
-    header("Scala options:"),
-    file(      "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scala = s.scala.copy(home = Some(f)))),
-    path(      "-scala-path", "path",          "Specify all Scala jars directly",            (s: Settings, sp: Seq[File]) => s.copy(scala = s.scala.copy(path = sp))),
-    file(      "-scala-compiler", "file",      "Specify Scala compiler jar directly" ,       (s: Settings, f: File) => s.copy(scala = s.scala.copy(compiler = Some(f)))),
-    file(      "-scala-library", "file",       "Specify Scala library jar directly" ,        (s: Settings, f: File) => s.copy(scala = s.scala.copy(library = Some(f)))),
-    path(      "-scala-extra", "path",         "Specify extra Scala jars directly",          (s: Settings, e: Seq[File]) => s.copy(scala = s.scala.copy(extra = e))),
-    prefix(    "-S", "<scalac-option>",        "Pass option to scalac",                      (s: Settings, o: String) => s.copy(scalacOptions = s.scalacOptions :+ o)),
+    opt[Unit]("no-color")
+      .abbr("no-color")
+      .action((x, c) => c.copy(consoleLog =  c.consoleLog.copy(color = false)))
+      .text("No color in logging to stdout")
 
-    header("Java options:"),
-    file(      "-java-home", "directory",      "Select javac home directory (and fork)",     (s: Settings, f: File) => s.copy(javaHome = Some(f))),
-    string(    "-compile-order", "order",      "Compile order for Scala and Java sources",   (s: Settings, o: String) => s.copy(compileOrder = compileOrder(o))),
-    boolean(   "-java-only",                   "Don't add scala library to classpath",       (s: Settings) => s.copy(javaOnly = true)),
-    prefix(    "-C", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
+    opt[String]("msg-filter")
+      .abbr("msg-filter")
+      .valueName("<regex>")
+      .unbounded()
+      .action((x, c) => c.copy(consoleLog = c.consoleLog.copy(msgFilters = c.consoleLog.msgFilters :+ x.r)))
+      .text("Filter warning messages matching the given regex")
 
-    header("sbt options:"),
-    file("-compiled-bridge-jar", "file", "Path to pre-compiled compiler interface", (s: Settings, f: File) => s.copy(compiledBridgeJar = Some(f))),
+    opt[String]("file-filter")
+      .abbr("file-filter")
+      .valueName("<regex>")
+      .unbounded()
+      .action((x, c) => c.copy(consoleLog = c.consoleLog.copy(fileFilters = c.consoleLog.fileFilters :+ x.r)))
+      .text("Filter warning messages from filenames matching the given regex")
 
-    header("Incremental compiler options:"),
-    int(       "-transitive-step", "n",        "Steps before transitive closure",            (s: Settings, i: Int) => s.copy(_incOptions = s._incOptions.copy(transitiveStep = i))),
-    fraction(  "-recompile-all-fraction", "x", "Limit before recompiling all sources",       (s: Settings, d: Double) => s.copy(_incOptions = s._incOptions.copy(recompileAllFraction = d))),
-    boolean(   "-debug-relations",             "Enable debug logging of analysis relations", (s: Settings) => s.copy(_incOptions = s._incOptions.copy(relationsDebug = true))),
-    boolean(   "-debug-api",                   "Enable analysis API debugging",              (s: Settings) => s.copy(_incOptions = s._incOptions.copy(apiDebug = true))),
-    file(      "-api-dump", "directory",       "Destination for analysis API dump",          (s: Settings, f: File) => s.copy(_incOptions = s._incOptions.copy(apiDumpDirectory = Some(f)))),
-    int(       "-api-diff-context-size", "n",  "Diff context size (in lines) for API debug", (s: Settings, i: Int) => s.copy(_incOptions = s._incOptions.copy(apiDiffContextSize = i))),
-    boolean(   "-transactional",               "Restore previous class files on failure",    (s: Settings) => s.copy(_incOptions = s._incOptions.copy(transactional = true))),
-    boolean(   "-no-zinc-file-manager",        "Disable zinc provided file manager",           (s: Settings) => s.copy(_incOptions = s._incOptions.copy(useZincFileManager = false))),
-    file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(_incOptions = s._incOptions.copy(backup = Some(f)))),
+    opt[Seq[File]]("classpath")
+      .abbr("cp")
+      .action((x, c) => c.copy(classpath = x))
+      .text("Specify the classpath")
 
-    header("Analysis options:"),
-    file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis =
-      s.analysis.copy(_cache = Some(f)))),
-    fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",
-      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(cacheMap = m))),
-    fileMap(   "-rebase-map",                  "Source and destination paths to rebase in persisted analysis (file:file,...)",
-      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(rebaseMap = m))),
-    boolean(   "-no-clear-invalid-analysis",   "If set, zinc will fail rather than purging illegal analysis.",
-      (s: Settings) => s.copy(analysis = s.analysis.copy(clearInvalid = false)))
-  )
+    opt[File]("class-destination")
+      .abbr("d")
+      .action((x, c) => c.copy(_classesDirectory = Some(x)))
+      .text("Destination for compiled classes")
+
+    opt[File]("jar-destination")
+      .abbr("jar")
+      .action((x, c) => c.copy(outputJar =  Some(x)))
+      .text("Jar destination for compiled classes")
+
+    opt[File]("scala-home")
+      .abbr("scala-home")
+      .valueName("<directory>")
+      .action((x, c) => c.copy(scala = c.scala.copy(home = Some(x))))
+      .text("Scala home directory (for locating jars)")
+
+    opt[Seq[File]]("scala-path")
+      .abbr("scala-path")
+      .valueName("<path>")
+      .action((x, c) => c.copy(scala = c.scala.copy(path = x)))
+      .text("Specify all Scala jars directly")
+
+    opt[File]("scala-compiler")
+      .abbr("scala-compiler")
+      .valueName("<file>")
+      .action((x, c) => c.copy(scala = c.scala.copy(compiler = Some(x))))
+      .text("Specify Scala compiler jar directly")
+
+    opt[File]("scala-library")
+      .abbr("scala-library")
+      .valueName("<file>")
+      .action((x, c) => c.copy(scala = c.scala.copy(library = Some(x))))
+      .text("Specify Scala library jar directly")
+
+    opt[Seq[File]]("scala-extra")
+      .abbr("scala-extra")
+      .valueName("<path>")
+      .action((x, c) => c.copy(scala = c.scala.copy(extra = x)))
+      .text("Specify extra Scala jars directly")
+
+    opt[File]("java-home")
+      .abbr("java-home")
+      .valueName("<directory>")
+      .action((x, c) => c.copy(javaHome = Some(x)))
+      .text("Select javac home directory (and fork)")
+
+    opt[String]("compile-order")
+      .abbr("compile-order")
+      .action((x, c) => c.copy(compileOrder = compileOrder(x)))
+      .text("Compile order for Scala and Java sources")
+
+    opt[Unit]("java-only")
+      .abbr("java-only")
+      .action((x, c) => c.copy(javaOnly = true))
+      .text("Don't add scala library to classpath")
+
+    opt[Int]("transitive-step")
+      .abbr("transitive-step")
+      .action((x, c) => c.copy(_incOptions = c._incOptions.copy(transitiveStep = x)))
+      .text("Steps before transitive closure")
+
+    opt[Double]("recompile-all-fraction")
+      .abbr("recompile-all-fraction")
+      .validate{ fraction => {
+        if (0 <= fraction && fraction <= 1) success else failure("recompile-all-fraction must be between 0 and 1")
+      }}
+      .action((x, c) => c.copy(_incOptions = c._incOptions.copy(recompileAllFraction = x)))
+      .text("Limit before recompiling all sources")
+
+    opt[Unit]("debug-relations")
+      .abbr("debug-relations")
+      .action((x, c) => c.copy(_incOptions = c._incOptions.copy(relationsDebug = true)))
+      .text("Enable debug logging of analysis relations")
+
+    opt[Unit]("debug-api")
+      .abbr("debug-api")
+      .action((x, c) => c.copy(_incOptions = c._incOptions.copy(apiDebug = true)))
+      .text("Enable analysis API debugging")
+
+    opt[File]("api-dump")
+      .abbr("api-dump")
+      .valueName("directory")
+      .action((x, c) => c.copy(_incOptions = c._incOptions.copy(apiDumpDirectory = Some(x))))
+      .text("Destination for analysis API dump")
+
+    opt[Int]("api-diff-context-size")
+      .abbr("api-diff-context-size")
+      .action((x, c) => c.copy(_incOptions = c._incOptions.copy(apiDiffContextSize = x)))
+      .text("Diff context size (in lines) for API debug")
+
+    opt[Unit]("transactional")
+      .abbr("transactional")
+      .action((x, c) => c.copy(_incOptions = c._incOptions.copy(transactional = true)))
+      .text("Restore previous class files on failure")
+
+    opt[Unit]("no-zinc-file-manager")
+      .abbr("no-zinc-file-manager")
+      .action((x, c) => c.copy(_incOptions = c._incOptions.copy(useZincFileManager = false)))
+      .text("Disable zinc provided file manager")
+
+    opt[File]("backup")
+      .abbr("backup")
+      .valueName("<directory>")
+      .action((x, c) => c.copy(_incOptions = c._incOptions.copy(backup = Some(x))))
+      .text("Backup location (if transactional)")
+
+    opt[File]("analysis-cache")
+      .abbr("analysis-cache")
+      .valueName("<file>")
+      .action((x, c) => c.copy(analysis = c.analysis.copy(_cache = Some(x))))
+      .text("Cache file to compile analysis")
+
+    opt[Map[File, File]]("analysis-map")
+      .abbr("analysis-map")
+      .action((x, c) => c.copy(analysis = c.analysis.copy(cacheMap = x)))
+      .text("Upstream analysis mapping (file=file,...)")
+
+    opt[Map[File, File]]("rebase-map")
+      .abbr("rebase-map")
+      .action((x, c) => c.copy(analysis = c.analysis.copy(rebaseMap = x)))
+      .text("Source and destination paths to rebase in persisted analysis (file=file,...)")
+
+    opt[Unit]("no-clear-invalid-analysis")
+      .abbr("no-clear-invalid-analysis")
+      .action((x, c) => c.copy(analysis = c.analysis.copy(clearInvalid = false)))
+      .text("If set, zinc will fail rather than purging illegal analysis.")
+
+    opt[String]("scalac-option")
+      .abbr("S")
+      .valueName("<scalac-option>")
+      .unbounded()
+      .action((x, c) => c.copy(scalacOptions = c.scalacOptions :+ x))
+      .text("Pass option to scalac")
+
+    opt[String]("javac-option")
+      .abbr("C")
+      .valueName("<javac-option>")
+      .unbounded()
+      .action((x, c) => c.copy(javacOptions = c.javacOptions :+ x))
+      .text("Pass option to javac")
+
+    arg[File]("<file>...")
+      .unbounded()
+      .action((x, c) => c.copy(_sources = c._sources :+ x))
+      .text("Sources to compile")
+  }
 
   /**
    * Create a CompileOrder value based on string input.

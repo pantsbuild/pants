@@ -13,16 +13,12 @@ import sbt.util.Level
 import xsbti.CompileFailed
 
 import org.pantsbuild.zinc.analysis.AnalysisMap
-import org.pantsbuild.zinc.options.Parsed
 import org.pantsbuild.zinc.util.Util
 
 /**
  * Command-line main class.
  */
 object Main {
-  val Command = "zinc-compiler"
-  val Description = "scala incremental compiler"
-
   /**
    * Full zinc version info.
    */
@@ -49,12 +45,7 @@ object Main {
     else published
   }
 
-  /**
-   * Print the zinc version to standard out.
-   */
-  def printVersion(): Unit = println("%s (%s) %s" format (Command, Description, versionString))
-
-  def mkLogger(settings: Settings) = {
+  def mkLogger(settings: Settings): ConsoleLogger = {
     // If someone has not explicitly enabled log4j2 JMX, disable it.
     if (!Util.isSetProperty("log4j2.disable.jmx")) {
       Util.setProperty("log4j2.disable.jmx", "true")
@@ -73,49 +64,58 @@ object Main {
     cl
   }
 
+  def preprocessArgs(args: Array[String]): Array[String] = {
+    args.flatMap { arg =>
+      arg match {
+        case x if x.startsWith("-C") || x.startsWith("-S") => {
+          val tup = arg.splitAt(2)
+          Seq(tup._1, tup._2)
+        }
+        case arg => Seq(arg)
+      }
+    }
+  }
+
   /**
    * Run a compile.
    */
   def main(args: Array[String]): Unit = {
     val startTime = System.currentTimeMillis
 
-    val Parsed(settings, residual, errors) = Settings.parse(args)
+    val settings = Settings.SettingsParser.parse(preprocessArgs(args), Settings()) match {
+      case Some(settings) => settings
+      case None => {
+        println("See zinc-compiler --help for information about options")
+        sys.exit(1)
+      }
+    }
 
-    mainImpl(settings.withAbsolutePaths(Paths.get(".").toAbsolutePath.toFile), errors, startTime)
+    mainImpl(settings.withAbsolutePaths(Paths.get(".").toAbsolutePath.toFile), startTime)
   }
 
   def nailMain(context: NGContext): Unit = {
     val startTime = System.currentTimeMillis
 
-    val Parsed(settings, residual, errors) = Settings.parse(context.getArgs)
-
-    mainImpl(settings.withAbsolutePaths(new File(context.getWorkingDirectory)), errors, startTime)
-  }
-
-  def mainImpl(settings: Settings, errors: Seq[String], startTime: Long): Unit = {
-    val log = mkLogger(settings)
-    val isDebug = settings.consoleLog.logLevel <= Level.Debug
-
-    // bail out on any command-line option errors
-    if (errors.nonEmpty) {
-      for (error <- errors) log.error(error)
-      log.error("See %s -help for information about options" format Command)
-      sys.exit(1)
+    val settings = Settings.SettingsParser.parse(preprocessArgs(context.getArgs), Settings()) match {
+      case Some(settings) => settings
+      case None => {
+        println("See zinc-compiler --help for information about options")
+        sys.exit(1)
+      }
     }
 
-    if (settings.version) printVersion()
+    mainImpl(settings.withAbsolutePaths(new File(context.getWorkingDirectory)), startTime)
+  }
 
-    if (settings.help) Settings.printUsage(Command, residualArgs = "<sources>")
+  def mainImpl(settings: Settings, startTime: Long): Unit = {
+    val log = mkLogger(settings)
+
+    val isDebug = settings.consoleLog.logLevel <= Level.Debug
 
     // if there are no sources provided, print outputs based on current analysis if requested,
     // else print version and usage by default
     if (settings.sources.isEmpty) {
-      if (!settings.version && !settings.help) {
-        printVersion()
-        Settings.printUsage(Command)
-        sys.exit(1)
-      }
-      sys.exit(0)
+      sys.exit(1)
     }
 
     // Load the existing analysis for the destination, if any.
