@@ -50,7 +50,11 @@ class Constraint(PayloadField):
     """
     task_context.log.info("BL: Running constraint {} on target {}".format(self, target_under_test.name))
     items = self.get_collection_to_constrain(task_context, target_under_test)
-    return [item for item in items if self.predicate(item)]
+    bad_items = [item for item in items if self.predicate(item)]
+    if bad_items:
+      return [self.get_error_message(source, target_under_test, bad_items)]
+    else:
+      return []
 
   def get_collection_to_constrain(self, context, target_under_test):
     """

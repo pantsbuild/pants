@@ -39,47 +39,46 @@ class CheckBannedDeps(Task):
   def execute(self):
     if not self.get_options().skip:
       bad_elements = self.check_graph()
+      self.context.log.debug("BL: Bad elements {}".format(bad_elements))
       if bad_elements:
         raise BannedDependencyException("ERROR!")
     else:
       self.context.log.debug("Skipping banned dependency checks. To enforce this, enable the --no-compile-check-banned-deps-skip flag")
 
   def check_graph(self):
-    # self.constraint_set = set([])
-    #
-    # def check_constraints(root, target):
-    #   for constraint in self.constraint_set:
-    #     constraint.check_target(root, self.context, target)
-    #
-    # errors = []
-    # def constraint_set_union(other):
-    #   self.constraint_set |= other
-    #
-    # def constraint_set_difference(other):
-    #   self.constraint_set -= other
-    #
-    # def get_constraints(target):
-    #   constraint_declaration = target.payload.get_field_value("dependency_constraints")
-    #   if constraint_declaration:
-    #     return constraint_declaration.constraints
-    #   else:
-    #     return set([])
-    #
-    # for target in self.context.target_roots:
-    #   self.context.build_graph.walk_transitive_dependency_graph(
-    #     [target.address],
-    #     work=(lambda t: check_constraints(target, t)),
-    #     prelude=(lambda t: constraint_set_union(get_constraints(t))),
-    #     epilogue=(lambda t: constraint_set_difference(get_constraints(t))),
-    #   )
+    constraints_for = {}  # Map<Root, Set<Constraint>>
+    # Every root has independent constraints
+    for root in self.context.target_roots:
+      constraints = set([])
+      # Gather constraints by flattening the graph.
+      for target in [root] + root.dependencies:
+        constraint_declaration = target.payload.get_field_value("dependency_constraints")
+        if constraint_declaration:
+          constraints |= constraint_declaration.constraints
+      constraints_for[root.address.spec] = constraints
 
-    errors = []
-    for target in self.context.target_roots:
-      constraint_declaration = target.payload.get_field_value("dependency_constraints")
-      if constraint_declaration:
-        relevant_targets = CheckBannedDeps.relevant_targets(target)
-        for constraint in constraint_declaration.constraints:
-          for target_under_test in relevant_targets:
-            errors += constraint.check_target(target, self.context, target_under_test)
+    checked_constraints = {}  # Map<Dep, Set<Constraint>>
+    self.errors = []
 
-    return errors
+    def needs_to_expand(dep, root):
+      if dep == root:
+        return True
+      if checked_constraints.has_key(dep.address.spec):
+        return len(checked_constraints[dep.address.spec] - constraints_for[root.address.spec]) != 0
+      return True
+
+    def check_dependency(dep, root):
+      already_checked = checked_constraints.get(dep.address.spec) or set([])
+      constraints_to_apply = constraints - already_checked
+      for constraint in constraints_to_apply:
+        self.errors += constraint.check_target(root, self.context, dep)
+      checked_constraints[dep.address.spec] = constraints | already_checked
+
+    for root in self.context.target_roots:
+      # Walk the graph, applying the constraints and finding errors
+      root.walk(
+        work=lambda dep: check_dependency(dep, root),
+        predicate=lambda dep: needs_to_expand(dep, root),
+      )
+
+    return self.errors
