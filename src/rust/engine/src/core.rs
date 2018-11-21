@@ -46,7 +46,7 @@ impl Params {
   pub fn display(mut params: Vec<String>) -> String {
     match params.len() {
       0 => "()".to_string(),
-      1 => params.iter().next().unwrap().to_string(),
+      1 => params.pop().unwrap(),
       _ => {
         params.sort();
         format!("({})", params.join("+"))
