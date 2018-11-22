@@ -15,6 +15,7 @@ from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable, read_file, safe_file_dump
+from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import name_and_platform
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -51,6 +52,13 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     for variant in ToolchainVariant.allowed_values:
       self._assert_ctypes_binary(variant)
 
+  @memoized_property
+  def _compiler_names_for_variant(self):
+    return {
+      'gnu': ['gcc', 'g++'],
+      'llvm': ['clang', 'clang++'],
+    }
+
   def _assert_ctypes_binary(self, toolchain_variant):
     # TODO: figure out a way to check that when we select 'gnu' as the `toolchain_variant`, we use
     # gcc to compile the C/C++ targets -- the same for 'llvm' and clang.
@@ -65,6 +73,12 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       })
 
       self.assert_success(pants_run)
+
+      # Check that we have selected the appropriate compilers for our selected toolchain variant,
+      # for both C and C++ compilation.
+      for compiler_name in self._compiler_names_for_variant[toolchain_variant]:
+        self.assertIn("selected compiler exe name: '{}'".format(compiler_name),
+                      pants_run.stdout_data)
 
       # Check for the pex and for the wheel produced for our python_dist().
       pex = os.path.join(tmp_dir, 'bin.pex')
