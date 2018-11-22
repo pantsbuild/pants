@@ -25,7 +25,8 @@ def invoke_pex_for_output(pex_file_to_run):
 
 class CTypesIntegrationTest(PantsRunIntegrationTest):
 
-  _binary_target = 'testprojects/src/python/python_distribution/ctypes:bin'
+  _binary_target_dir = 'testprojects/src/python/python_distribution/ctypes'
+  _binary_target = '{}:bin'.format(_binary_target_dir)
   _binary_interop_target_dir = 'testprojects/src/python/python_distribution/ctypes_interop'
   _binary_target_with_interop = '{}:bin'.format(_binary_interop_target_dir)
   _wrapped_math_build_file = os.path.join(_binary_interop_target_dir, 'wrapped-math', 'BUILD')
@@ -81,6 +82,56 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       # Execute the binary and ensure its output is correct.
       binary_run_output = invoke_pex_for_output(pex)
       self.assertEqual(b'x=3, f(x)=17\n', binary_run_output)
+
+  def test_invalidation_ctypes(self):
+    """Test that the current version of a python_dist() is resolved after modifying its sources."""
+    with temporary_dir() as tmp_dir:
+      with self.mock_buildroot(
+          dirs_to_copy=[self._binary_target_dir]) as buildroot, buildroot.pushd():
+
+        def run_target(goal):
+          return self.run_pants_with_workdir(
+            command=[goal, self._binary_target],
+            workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
+            build_root=buildroot.new_buildroot,
+            config={
+              GLOBAL_SCOPE_CONFIG_SECTION: {
+                'pants_distdir': tmp_dir,
+              },
+            },
+          )
+
+        output_pex = os.path.join(tmp_dir, 'bin.pex')
+
+        initial_result_message = 'x=3, f(x)=17'
+
+        unmodified_pants_run = run_target('run')
+        self.assert_success(unmodified_pants_run)
+        self.assertIn(initial_result_message, unmodified_pants_run.stdout_data)
+
+        unmodified_pants_binary_create = run_target('binary')
+        self.assert_success(unmodified_pants_binary_create)
+        binary_run_output = invoke_pex_for_output(output_pex)
+        self.assertIn(initial_result_message, binary_run_output)
+
+        # Modify one of the source files for this target so that the output is different.
+        cpp_source_file = os.path.join(self._binary_target_dir, 'some_more_math.cpp')
+        with open(cpp_source_file, 'r') as f:
+          orig_contents = f.read()
+        modified_contents = re.sub(r'3', '4', orig_contents)
+        with open(cpp_source_file, 'w') as f:
+          f.write(modified_contents)
+
+        modified_result_message = 'x=3, f(x)=28'
+
+        modified_pants_run = run_target('run')
+        self.assert_success(modified_pants_run)
+        self.assertIn(modified_result_message, modified_pants_run.stdout_data)
+
+        modified_pants_binary_create = run_target('binary')
+        self.assert_success(modified_pants_binary_create)
+        binary_run_output = invoke_pex_for_output(output_pex)
+        self.assertIn(modified_result_message, binary_run_output)
 
   def test_ctypes_native_language_interop(self):
     # TODO: consider making this mock_buildroot/run_pants_with_workdir into a
