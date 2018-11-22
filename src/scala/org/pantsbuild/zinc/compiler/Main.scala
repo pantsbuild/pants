@@ -8,10 +8,9 @@ import com.martiansoftware.nailgun.NGContext
 import java.io.File
 import java.nio.file.Paths
 import sbt.internal.inc.IncrementalCompilerImpl
-import sbt.internal.util.{ ConsoleLogger, ConsoleOut }
+import sbt.internal.util.{ConsoleLogger, ConsoleOut}
 import sbt.util.Level
 import xsbti.CompileFailed
-
 import org.pantsbuild.zinc.analysis.AnalysisMap
 import org.pantsbuild.zinc.util.Util
 
@@ -76,6 +75,10 @@ object Main {
     }
   }
 
+  private val compilerCacheLimit = Util.intProperty("zinc.compiler.cache.limit", 5)
+
+  private val compilerCache = new CompilerCache(compilerCacheLimit)
+
   /**
    * Run a compile.
    */
@@ -96,12 +99,16 @@ object Main {
   def nailMain(context: NGContext): Unit = {
     val startTime = System.currentTimeMillis
 
-    val settings = Settings.SettingsParser.parse(preprocessArgs(context.getArgs), Settings()) match {
+    var settings = Settings.SettingsParser.parse(preprocessArgs(context.getArgs), Settings()) match {
       case Some(settings) => settings
       case None => {
         println("See zinc-compiler --help for information about options")
         sys.exit(1)
       }
+    }
+
+    if (!settings.compilerCacheDir.isDefined) {
+      settings = settings.copy(compilerCacheDir = Some(new File(System.getProperty("user.home"), ".cache/zinc/compiler-cache")))
     }
 
     mainImpl(settings.withAbsolutePaths(new File(context.getWorkingDirectory)), startTime)
@@ -122,7 +129,15 @@ object Main {
     val analysisMap = AnalysisMap.create(settings.analysis)
     val (targetAnalysisStore, previousResult) =
       InputUtils.loadDestinationAnalysis(settings, analysisMap, log)
-    val inputs = InputUtils.create(settings, analysisMap, previousResult, log)
+
+    val scalaJars = InputUtils.selectScalaJars(settings.scala)
+
+    val compilers = settings.compilerCacheDir match {
+      case Some(cacheDir) => compilerCache.get(cacheDir, scalaJars, settings.javaHome, settings.compiledBridgeJar.get)
+      case None => compilerCache.make(scalaJars, settings.javaHome, settings.compiledBridgeJar.get)
+    }
+
+    val inputs = InputUtils.create(settings, compilers, analysisMap, previousResult, log)
 
     if (isDebug) {
       log.debug(s"Inputs: $inputs")

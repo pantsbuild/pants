@@ -4,28 +4,14 @@
 
 package org.pantsbuild.zinc.compiler
 
-import java.io.{File}
-import java.util.function.{ Function => JFunction }
-
+import java.io.File
+import java.util.function.{Function => JFunction}
 import scala.compat.java8.OptionConverters._
-
-import sbt.internal.inc.ZincUtil
 import sbt.io.IO
 import sbt.util.Logger
-import xsbti.{Position, Problem, Severity, ReporterConfig, ReporterUtil}
-import xsbti.compile.{
-  AnalysisStore,
-  ClasspathOptionsUtil,
-  CompileOptions,
-  CompileOrder,
-  Compilers,
-  Inputs,
-  PreviousResult,
-  Setup
-}
+import xsbti.{Position, ReporterUtil}
+import xsbti.compile.{AnalysisStore, CompileOptions, Compilers, Inputs, PreviousResult, Setup}
 import org.pantsbuild.zinc.analysis.AnalysisMap
-import org.pantsbuild.zinc.scalautil.ScalaUtils
-import org.pantsbuild.zinc.compiler.CompilerUtils.newScalaCompiler
 
 object InputUtils {
   /**
@@ -33,16 +19,12 @@ object InputUtils {
    */
   def create(
     settings: Settings,
+    compilers: Compilers,
     analysisMap: AnalysisMap,
     previousResult: PreviousResult,
     log: Logger
   ): Inputs = {
     import settings._
-
-    val scalaJars = InputUtils.selectScalaJars(settings.scala)
-
-    val instance = ScalaUtils.scalaInstance(scalaJars.compiler, scalaJars.extra, scalaJars.library)
-    val compilers = ZincUtil.compilers(instance, ClasspathOptionsUtil.auto, settings.javaHome, newScalaCompiler(instance, settings.compiledBridgeJar.get))
 
     // TODO: Remove duplication once on Scala 2.12.x.
     val positionMapper =
@@ -133,7 +115,7 @@ object InputUtils {
   def autoClasspath(classesDirectory: File, allScalaJars: Seq[File], javaOnly: Boolean, classpath: Seq[File]): Seq[File] = {
     if (javaOnly) classesDirectory +: classpath
     else splitScala(allScalaJars) match {
-      case Some(scalaJars) => classesDirectory +: scalaJars.library +: classpath
+      case Some(scalaJars) => classesDirectory +: scalaJars.library.file +: classpath
       case None            => classesDirectory +: classpath
     }
   }
@@ -160,7 +142,7 @@ object InputUtils {
     val filtered = jars filterNot (excluded contains _.getName)
     val (compiler, other) = filtered partition (_.getName matches ScalaCompiler.pattern)
     val (library, extra) = other partition (_.getName matches ScalaLibrary.pattern)
-    if (compiler.nonEmpty && library.nonEmpty) Some(ScalaJars(compiler(0), library(0), extra)) else None
+    if (compiler.nonEmpty && library.nonEmpty) Some(ScalaJars(DigestedFile(compiler(0)), DigestedFile(library(0)), extra.map { DigestedFile(_) })) else None
   }
 
   //
@@ -178,7 +160,7 @@ object InputUtils {
     val scalaCompiler        = ScalaCompiler.default
     val scalaLibrary         = ScalaLibrary.default
     val scalaExtra           = Seq(ScalaReflect.default)
-    val scalaJars            = ScalaJars(scalaCompiler, scalaLibrary, scalaExtra)
+    val scalaJars            = ScalaJars(DigestedFile(scalaCompiler), DigestedFile(scalaLibrary), scalaExtra.map { DigestedFile(_) })
     val scalaExcluded = Set("jansi.jar", "jline.jar", "scala-partest.jar", "scala-swing.jar", "scalacheck.jar", "scalap.jar")
   }
 
@@ -200,5 +182,5 @@ object InputUtils {
   /**
    * The scala jars split into compiler, library, and extra.
    */
-  case class ScalaJars(compiler: File, library: File, extra: Seq[File])
+  case class ScalaJars(compiler: DigestedFile, library: DigestedFile, extra: Seq[DigestedFile])
 }

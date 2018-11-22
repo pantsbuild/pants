@@ -7,10 +7,7 @@ package org.pantsbuild.zinc.bootstrapper
 
 import com.facebook.buck.util.zip.ZipScrubber
 import java.io.File
-import xsbti.compile.{
-  ClasspathOptionsUtil,
-  ScalaInstance => XScalaInstance
-}
+import xsbti.compile.{ClasspathOptionsUtil, ScalaInstance}
 import sbt.internal.inc.{AnalyzingCompiler, RawCompiler}
 import sbt.util.Logger
 
@@ -18,7 +15,7 @@ object BootstrapperUtils {
   val CompilerInterfaceId = "compiler-interface"
   val JavaClassVersion = System.getProperty("java.class.version")
 
-  def compilerInterface(output: File, compilerBridgeSrc: File, compilerInterface: File, scalaInstance: XScalaInstance, log: Logger): Unit = {
+  def compilerInterface(output: File, compilerBridgeSrc: File, compilerInterface: File, scalaInstance: ScalaInstance, log: Logger): Unit = {
     def compile(targetJar: File): Unit =
       AnalyzingCompiler.compileSources(
         Seq(compilerBridgeSrc),

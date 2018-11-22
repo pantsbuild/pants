@@ -38,7 +38,8 @@ case class Settings(
   _incOptions: IncOptions           = IncOptions(),
   analysis: AnalysisOptions         = AnalysisOptions(),
   creationTime: Long                = 0,
-  compiledBridgeJar: Option[File]   = None
+  compiledBridgeJar: Option[DigestedFile]   = None,
+  compilerCacheDir: Option[File]    = None
 ) {
   import Settings._
 
@@ -75,7 +76,7 @@ case class Settings(
       javaHome = normaliseOpt(javaHome),
       _incOptions = _incOptions.withAbsolutePaths(relativeTo),
       analysis = analysis.withAbsolutePaths(relativeTo),
-      compiledBridgeJar = normaliseOpt(compiledBridgeJar)
+      compiledBridgeJar = compiledBridgeJar.map { digestedFile => digestedFile.normalise(relativeTo) }
     )
   }
 }
@@ -130,9 +131,9 @@ case class ConsoleOptions(
 case class ScalaLocation(
   home: Option[File]     = None,
   path: Seq[File]        = Seq.empty,
-  compiler: Option[File] = None,
-  library: Option[File]  = None,
-  extra: Seq[File]       = Seq.empty
+  compiler: Option[DigestedFile] = None,
+  library: Option[DigestedFile]  = None,
+  extra: Seq[DigestedFile]       = Seq.empty
 ) {
   def withAbsolutePaths(relativeTo: File): ScalaLocation = {
     def normaliseSeq(seq: Seq[File]): Seq[File] = Util.normaliseSeq(Some(relativeTo))(seq)
@@ -144,9 +145,9 @@ case class ScalaLocation(
     this.copy(
       home = normaliseOpt(home),
       path = normaliseSeq(path),
-      compiler = normaliseOpt(compiler),
-      library = normaliseOpt(library),
-      extra = normaliseSeq(extra)
+      compiler = compiler.map { _.normalise(relativeTo) },
+      library = library.map { _.normalise(relativeTo) },
+      extra = extra.map { _.normalise(relativeTo) }
     )
   }
 }
@@ -158,9 +159,9 @@ object ScalaLocation {
   def create(
     home: File,
     path: JList[File],
-    compiler: File,
-    library: File,
-    extra: JList[File]): ScalaLocation =
+    compiler: DigestedFile,
+    library: DigestedFile,
+    extra: JList[DigestedFile]): ScalaLocation =
   ScalaLocation(
     Option(home),
     path.asScala,
@@ -222,6 +223,8 @@ case class IncOptions(
   }
 }
 
+
+
 object Settings {
   val logLevels = Set("debug", "info", "warn", "error")
 
@@ -230,7 +233,7 @@ object Settings {
     help("help").text("Prints this usage message")
     version("version").text("Print version")
 
-    opt[File]("compiled-bridge-jar")
+    opt[DigestedFile]("compiled-bridge-jar")
       .abbr("compiled-bridge-jar")
       .required()
       .valueName("<file>")
@@ -302,19 +305,19 @@ object Settings {
       .action((x, c) => c.copy(scala = c.scala.copy(path = x)))
       .text("Specify all Scala jars directly")
 
-    opt[File]("scala-compiler")
+    opt[DigestedFile]("scala-compiler")
       .abbr("scala-compiler")
       .valueName("<file>")
       .action((x, c) => c.copy(scala = c.scala.copy(compiler = Some(x))))
       .text("Specify Scala compiler jar directly")
 
-    opt[File]("scala-library")
+    opt[DigestedFile]("scala-library")
       .abbr("scala-library")
       .valueName("<file>")
       .action((x, c) => c.copy(scala = c.scala.copy(library = Some(x))))
       .text("Specify Scala library jar directly")
 
-    opt[Seq[File]]("scala-extra")
+    opt[Seq[DigestedFile]]("scala-extra")
       .abbr("scala-extra")
       .valueName("<path>")
       .action((x, c) => c.copy(scala = c.scala.copy(extra = x)))
@@ -425,6 +428,11 @@ object Settings {
       .unbounded()
       .action((x, c) => c.copy(_sources = c._sources :+ x))
       .text("Sources to compile")
+
+    arg[File]("nailgun-compiler-cache-dir")
+      .optional()
+      .action((x, c) => c.copy(compilerCacheDir = Some(x)))
+      .text("Directory in which to cache compiler jar files when used in nailgun mode")
   }
 
   /**

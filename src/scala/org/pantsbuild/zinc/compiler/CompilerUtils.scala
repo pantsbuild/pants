@@ -6,41 +6,15 @@ package org.pantsbuild.zinc.compiler
 
 import java.io.File
 import java.net.URLClassLoader
-import sbt.internal.inc.{
-  AnalyzingCompiler,
-  CompileOutput,
-  IncrementalCompilerImpl,
-  RawCompiler,
-  ScalaInstance,
-  javac,
-  ZincUtil
-}
+import sbt.internal.inc.AnalyzingCompiler
 import sbt.internal.inc.classpath.ClassLoaderCache
 import sbt.io.Path
-import sbt.io.syntax._
-import sbt.util.Logger
-import xsbti.compile.{
-  ClasspathOptionsUtil,
-  CompilerCache,
-  Compilers,
-  GlobalsCache,
-  Inputs,
-  JavaTools,
-  ScalaCompiler,
-  ScalaInstance => XScalaInstance,
-  ZincCompilerUtil
-}
-
-import scala.compat.java8.OptionConverters._
-
-import org.pantsbuild.zinc.cache.Cache
-import org.pantsbuild.zinc.cache.Cache.Implicits
+import xsbti.compile.{ClasspathOptionsUtil, CompilerCache => XCompilerCache, GlobalsCache, ZincCompilerUtil, ScalaInstance}
 import org.pantsbuild.zinc.util.Util
 
 object CompilerUtils {
   val JavaClassVersion = System.getProperty("java.class.version")
 
-  private val compilerCacheLimit = Util.intProperty("zinc.compiler.cache.limit", 5)
   private val residentCacheLimit = Util.intProperty("zinc.resident.cache.limit", 0)
 
   /**
@@ -49,9 +23,9 @@ object CompilerUtils {
   private val residentCache: GlobalsCache = {
     val maxCompilers = residentCacheLimit
     if (maxCompilers <= 0)
-      CompilerCache.fresh
+      XCompilerCache.fresh
     else
-      CompilerCache.createCacheFor(maxCompilers)
+      XCompilerCache.createCacheFor(maxCompilers)
   }
 
   /**
@@ -68,7 +42,7 @@ object CompilerUtils {
   /**
    * Create a new scala compiler.
    */
-  def newScalaCompiler(instance: XScalaInstance, bridgeJar: File): AnalyzingCompiler =
+  def newScalaCompiler(instance: ScalaInstance, bridgeJar: File): AnalyzingCompiler =
     new AnalyzingCompiler(
       instance,
       ZincCompilerUtil.constantBridgeProvider(instance, bridgeJar),
