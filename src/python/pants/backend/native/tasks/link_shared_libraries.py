@@ -139,13 +139,17 @@ class LinkSharedLibraries(NativeTask):
           external_lib_dirs.append(nelf.lib_dir)
         external_lib_names.extend(nelf.lib_names)
 
-    return LinkSharedLibraryRequest(
+    link_request = LinkSharedLibraryRequest(
       linker=self.linker,
       object_files=tuple(all_compiled_object_files),
       native_artifact=vt.target.ctypes_native_library,
       output_dir=vt.results_dir,
       external_lib_dirs=tuple(external_lib_dirs),
       external_lib_names=tuple(external_lib_names))
+
+    self.context.log.debug(link_request)
+
+    return link_request
 
   _SHARED_CMDLINE_ARGS = {
     'darwin': lambda: ['-Wl,-dylib'],
@@ -173,7 +177,9 @@ class LinkSharedLibraries(NativeTask):
            ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +
            ['-l{}'.format(lib_name) for lib_name in link_request.external_lib_names] +
            [os.path.abspath(obj) for obj in object_files])
-    self.context.log.debug("linker command: {}".format(cmd))
+
+    self.context.log.info("selected linker exe name: '{}'".format(linker.exe_filename))
+    self.context.log.debug("linker argv: {}".format(cmd))
 
     env = linker.as_invocation_environment_dict
     self.context.log.debug("linker invocation environment: {}".format(env))
