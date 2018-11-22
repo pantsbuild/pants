@@ -4,10 +4,16 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
+
 from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
   MirroredTargetOptionMixin
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_property
 from pants.util.objects import enum
+
+
+logger = logging.getLogger(__name__)
 
 
 class ToolchainVariant(enum('descriptor', ['gnu', 'llvm'])): pass
@@ -40,3 +46,9 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
 
   def get_strict_deps_value_for_target(self, target):
     return self.get_target_mirrored_option('strict_deps', target)
+
+  @memoized_property
+  def toolchain_variant(self):
+    variant = ToolchainVariant.create(self.get_options().toolchain_variant)
+    logger.debug('{} was selected.'.format(variant))
+    return variant
