@@ -35,6 +35,7 @@
     "howto_develop": "dist/markdown/html/src/docs/howto_develop.html",
     "howto_plugin": "dist/markdown/html/src/docs/howto_plugin.html",
     "ide_support": "dist/markdown/html/src/docs/ide_support.html",
+    "build_graph_operations": "dist/markdown/html/src/docs/build_graph_operations.html",
     "index": "dist/markdown/html/src/docs/index.html",
     "install": "dist/markdown/html/src/docs/install.html",
     "intellij": "dist/markdown/html/src/docs/intellij.html",
@@ -117,6 +118,7 @@
     "images/pants-server-ui.png": "src/docs/images/pants-server-ui.png",
     "images/report-server-page.png": "src/docs/images/report-server-page.png",
     "images/transitive-dependencies.png": "src/docs/images/transitive-dependencies.png",
+    "images/depbanning_example_graph.png": "src/docs/images/depbanning_example_graph.png",
     "robots.txt": "src/docs/robots.txt",
     "pants-logo.ico": "src/docs/pants-logo.ico",
     "bootstrap-custom.min.css": "src/docs/bootstrap-custom.min.css",
@@ -147,7 +149,8 @@
                     "options",
                     "invoking",
                     "reporting_server",
-                    "ide_support"
+                    "ide_support",
+                    "build_graph_operations"
                 ]
        },
        {"collapsible_heading": "JVM Support",

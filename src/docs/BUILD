@@ -65,6 +65,11 @@ page(
 )
 
 page(
+  name='build_graph_operations',
+  source='build_graph_operations.md',
+)
+
+page(
   name='index',
   source='index.md',
   links=[
@@ -84,6 +89,7 @@ page(
     ':target_addresses',
     ':tshoot',
     ':ide_support',
+    ':build_graph_operations',
     ':why_use_pants',
     'examples/src/java/org/pantsbuild/example:page',
     'examples/src/java/org/pantsbuild/example:readme',

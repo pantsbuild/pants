@@ -1,0 +1,7 @@
+digraph example {
+   T2 [label="T2|C3"];
+   D2 [label="D2|C3"];
+   T1 -> D1 -> D3;
+   T1 -> D2;
+   T2 -> D1;
+}
