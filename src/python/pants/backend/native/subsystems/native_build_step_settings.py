@@ -37,32 +37,42 @@ class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin
     return {"fatal_warnings": ["-Werror"]}
 
 
-class CCompileSettings(Subsystem):
+class CompileSettingsBase(Subsystem):
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(CompileSettingsBase, cls).subsystem_dependencies() + (
+      NativeBuildStepSettings.scoped(cls),
+    )
+
+  header_file_extensions_default = None
+
+  @classmethod
+  def register_options(cls, register):
+    super(CompileSettingsBase, cls).register_options(register)
+    register('--header-file-extensions', advanced=True, default=cls.header_file_extensions_default,
+             type=list, fingerprint=True,
+             help="The file extensions which should not be provided to the compiler command line.")
+
+  @memoized_property
+  def native_build_step_settings(self):
+    return NativeBuildStepSettings.scoped_instance(self)
+
+  @memoized_property
+  def header_file_extensions(self):
+    return self.get_options().header_file_extensions
+
+
+class CCompileSettings(CompileSettingsBase):
   options_scope = 'c-compile-settings'
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(CCompileSettings, cls).subsystem_dependencies() + (
-      NativeBuildStepSettings.scoped(cls),
-    )
-
-  @memoized_property
-  def native_build_step_settings(self):
-    return NativeBuildStepSettings.scoped_instance(self)
+  header_file_extensions_default = ['.h']
 
 
-class CppCompileSettings(Subsystem):
+class CppCompileSettings(CompileSettingsBase):
   options_scope = 'cpp-compile-settings'
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(CppCompileSettings, cls).subsystem_dependencies() + (
-      NativeBuildStepSettings.scoped(cls),
-    )
-
-  @memoized_property
-  def native_build_step_settings(self):
-    return NativeBuildStepSettings.scoped_instance(self)
+  header_file_extensions_default = ['.h', '.hpp', '.hxx', '.tpp']
 
 
 # TODO: add a fatal_warnings kwarg to NativeArtifact and make a LinkSharedLibrariesSettings subclass

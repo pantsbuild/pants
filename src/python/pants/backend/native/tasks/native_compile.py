@@ -29,6 +29,7 @@ class NativeCompileRequest(datatype([
     'sources',
     'compiler_options',
     'output_dir',
+    'header_file_extensions',
 ])): pass
 
 
@@ -181,9 +182,23 @@ class NativeCompile(NativeTask, AbstractClass):
       compiler_options=(self._compile_settings
                             .native_build_step_settings
                             .get_merged_args_for_compiler_option_sets(compiler_option_sets)),
-      output_dir=versioned_target.results_dir)
+      output_dir=versioned_target.results_dir,
+      header_file_extensions=self._compile_settings
+                                 .header_file_extensions)
 
-  def _make_compile_argv(self, compile_request):
+  def _split_sources_and_headers(self, sources, header_file_extensions):
+    sources_for_compiler = []
+    header_files = []
+    for s in sources:
+      for ext in header_file_extensions:
+        if s.endswith(ext):
+          header_files.append(s)
+          break
+      else:
+        sources_for_compiler.append(s)
+    return (sources_for_compiler, header_files)
+
+  def _make_compile_argv(self, compile_request, sources_minus_headers):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
     compiler = compile_request.compiler
     compiler_options = compile_request.compiler_options
@@ -199,7 +214,7 @@ class NativeCompile(NativeTask, AbstractClass):
         '-I{}'.format(os.path.join(buildroot, inc_dir))
         for inc_dir in compile_request.include_dirs
       ] +
-      [os.path.join(buildroot, src) for src in compile_request.sources])
+      [os.path.join(buildroot, src) for src in sources_minus_headers])
 
     self.context.log.debug("compile argv: {}".format(argv))
 
@@ -211,18 +226,16 @@ class NativeCompile(NativeTask, AbstractClass):
     NB: This method must arrange the output files so that `collect_cached_objects()` can collect all
     of the results (or vice versa)!
     """
-    sources = compile_request.sources
+    sources, _ = self._split_sources_and_headers(
+      compile_request.sources, compile_request.header_file_extensions)
 
-    if len(sources) == 0 and not any(s for s in sources if not s.endswith(self.HEADER_EXTENSIONS)):
-      # TODO: do we need this log message? Should we still have it for intentionally header-only
-      # libraries (that might be a confusing message to see)?
-      self.context.log.debug("no sources in request {}, skipping".format(compile_request))
+    if len(sources) == 0:
       return
 
     compiler = compile_request.compiler
     output_dir = compile_request.output_dir
 
-    argv = self._make_compile_argv(compile_request)
+    argv = self._make_compile_argv(compile_request, sources)
     env = compiler.as_invocation_environment_dict
 
     with self.context.new_workunit(
