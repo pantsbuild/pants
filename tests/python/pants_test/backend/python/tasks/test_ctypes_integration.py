@@ -63,8 +63,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   }
 
   def _assert_ctypes_binary(self, toolchain_variant):
-    # TODO: figure out a way to check that when we select 'gnu' as the `toolchain_variant`, we use
-    # gcc to compile the C/C++ targets -- the same for 'llvm' and clang.
     with temporary_dir() as tmp_dir:
       pants_run = self.run_pants(command=['binary', self._binary_target], config={
         GLOBAL_SCOPE_CONFIG_SECTION: {
@@ -82,6 +80,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       for compiler_name in self._compiler_names_for_variant[toolchain_variant]:
         self.assertIn("selected compiler exe name: '{}'".format(compiler_name),
                       pants_run.stdout_data)
+
       for linker_name in self._linker_names_for_variant[toolchain_variant]:
         self.assertIn("selected linker exe name: '{}'".format(linker_name),
                       pants_run.stdout_data)
