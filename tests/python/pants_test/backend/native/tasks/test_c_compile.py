@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 from textwrap import dedent
 
 from pants.backend.native.targets.native_library import CLibrary
@@ -16,6 +17,21 @@ class CCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
   @classmethod
   def task_type(cls):
     return CCompile
+
+  def create_header_only_alternate_c_library(self, ext, **kwargs):
+    header_filename = 'test{}'.format(ext)
+    self.create_file('src/c/test/{}'.format(header_filename), contents=dedent("""
+      #ifndef __TEST_H__
+      #define __TEST_H__
+
+      int test(int);
+
+      #endif
+"""))
+    return self.make_target(spec='src/c/test',
+                            target_type=CLibrary,
+                            sources=[header_filename],
+                            **kwargs)
 
   def create_simple_c_library(self, **kwargs):
     self.create_file('src/c/test/test.h', contents=dedent("""
@@ -37,6 +53,21 @@ class CCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
                             target_type=CLibrary,
                             sources=['test.h', 'test.c'],
                             **kwargs)
+
+  def test_header_only_noop_with_alternate_header_extension(self):
+    alternate_extension = '.asdf'
+    c = self.create_header_only_alternate_c_library(alternate_extension)
+    context = self.prepare_context_for_compile(target_roots=[c], options={
+      'c-compile-settings': {
+        'header_file_extensions': [alternate_extension],
+      },
+    })
+    c_compile = self.create_task(context)
+
+    with self.captured_logging(level=logging.INFO) as logs:
+      c_compile.execute()
+      info = list(logs.infos())[-1]
+      self.assertIn('is a header-only library', info)
 
   def test_caching(self):
     c = self.create_simple_c_library()

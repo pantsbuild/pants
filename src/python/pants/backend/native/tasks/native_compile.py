@@ -48,8 +48,6 @@ class NativeCompile(NativeTask, AbstractClass):
   source_target_constraint = None
   dependent_target_constraint = SubclassesOf(ExternalNativeLibrary, NativeLibrary)
 
-  HEADER_EXTENSIONS = ('.h', '.hpp')
-
   # `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
   # compiler process. `workunit_label` must be set to a string.
   @classproperty
@@ -230,6 +228,7 @@ class NativeCompile(NativeTask, AbstractClass):
       compile_request.sources, compile_request.header_file_extensions)
 
     if len(sources) == 0:
+      self.context.log.info('{} is a header-only library'.format(compile_request))
       return
 
     compiler = compile_request.compiler
