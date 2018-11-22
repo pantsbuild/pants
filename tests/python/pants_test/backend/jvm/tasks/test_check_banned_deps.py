@@ -27,16 +27,24 @@ class CheckBannedDepsTest(TaskTestBase):
       **kwargs
     )
 
-  def _t(self, dependencies=None, constraints=None, **kwargs):
-    return self._target("T", dependencies, constraints, **kwargs)
+  # TODO Assigning IDs like this is clunky
+  def _t(self, dependencies=None, constraints=None, id='', **kwargs):
+    return self._target("T{}".format(id), dependencies, constraints, **kwargs)
 
   def _d(self, id, dependencies=None, constraints=None, **kwargs):
     return self._target("D{}".format(id), dependencies, constraints, **kwargs)
 
-  def _check_fails(self, targets):
+  def _check_run_logs(self, targets, error_number):
     context = self.context(target_roots=targets)
     task = self.create_task(context)
-    self.assertTrue(len(task.check_graph()) > 0)
+    errors = task.check_graph()
+    self.assertEqual(len(errors), error_number)
+
+  def _check_fails(self, targets, error_number):
+    self._check_run_logs(targets, error_number)
+
+  def _check_succeeds(self, targets):
+    self._check_run_logs(targets, 0)
 
   def test_direct_dependency(self):
     """If T depends on D1 and T bans D1, T should fail."""
@@ -44,14 +52,14 @@ class CheckBannedDepsTest(TaskTestBase):
       [self._d(1)],
       [TargetName(":D1")]
     )
-    self._check_fails([graph])
+    self._check_fails([graph], 1)
 
   def test_dependency_bans_target(self):
     """If T depends on D1, and D1 bans T, T should fail."""
     graph = self._t(
       [self._d(1, [], [TargetName(":T")])],
     )
-    self._check_fails([graph])
+    self._check_fails([graph], 1)
 
   def test_constraints_in_unrelated_targets(self):
     """If T depends on D1 and D2, and D1 bans D2, T should fail."""
@@ -59,4 +67,26 @@ class CheckBannedDepsTest(TaskTestBase):
       self._d(1, [], [TargetName(":D2")]),
       self._d(2)
     ])
-    self._check_fails([graph])
+    self._check_fails([graph], 1)
+
+  def test_multiple_roots(self):
+    """If T1 bans a dependency of T2, checking both should not fail"""
+    graph = [
+      self._t([self._d(1)], id="1"),
+      self._t([], [TargetName(":D1")], id="2"),
+    ]
+    self._check_succeeds(graph)
+
+  def test_multiple_errors(self):
+    """If T bans two dependencies, two errors should trigger"""
+    graph = [self._t([
+      self._d(1, [
+        self._d(2)
+      ]),
+      self._d(3)
+    ], [
+      TargetName(":D1"),
+      TargetName(":D2")
+    ])]
+
+    self._check_fails(graph, 2)

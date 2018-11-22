@@ -102,10 +102,10 @@ class JvmPackageConstraint(Constraint):
     return self._get_classes_in_classpath(context, target_under_test)
 
   def get_error_message(self, target, checked_target, banned_classes):
-    return 'Target {} bans package "{}", which bans target {} with classes ({})'.format(
-      target.target_base,
+    return 'Target {} bans JVM package "{}", which bans target {} with classes ({})'.format(
+      target.address,
       self.banned_package_name,
-      checked_target.target_base,
+      checked_target.address,
       ", ".join(banned_classes)
     )
 
@@ -127,9 +127,9 @@ class Tag(Constraint):
 
   def get_error_message(self, target, checked_target, bad_element):
     return 'Target {} has baned tag "{}", but these target has it {}'.format(
-      target.target_base,
+      target.address,
       self.banned_tag_name,
-      checked_target.target_base
+      checked_target.address
     )
 
   def predicate(self, target):
@@ -147,8 +147,8 @@ class TestDependencies(Constraint):
 
   def get_error_message(self, target, checked_target, bad_element):
     return 'Target {} has test dependencies on target {}'.format(
-      target.target_base,
-      checked_target.target_base
+      target.address,
+      checked_target.address
     )
 
   def predicate(self, dependency):
@@ -165,10 +165,10 @@ class TargetName(Constraint):
   def _compute_fingerprint(self):
     return stable_json_hash(self.banned_target_address.spec)
 
-  def get_error_message(self, target, checked_target, bad_element):
-    return 'Target {} banned target name {}'.format(
-      target.target_base,
-      checked_target.target_base
+  def get_error_message(self, target, checked_target, bad_elements):
+    return 'Root {} or one of its dependencies banned TargetName {}'.format(
+      target.address,
+      checked_target.address
     )
 
   def predicate(self, target_under_test):
