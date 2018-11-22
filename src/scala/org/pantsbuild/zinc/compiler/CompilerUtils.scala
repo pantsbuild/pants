@@ -44,11 +44,6 @@ object CompilerUtils {
   private val residentCacheLimit = Util.intProperty("zinc.resident.cache.limit", 0)
 
   /**
-   * Static cache for zinc compilers.
-   */
-  private val compilerCache = Cache[CompilerCacheKey, Compilers](compilerCacheLimit)
-
-  /**
    * Static cache for resident scala compilers.
    */
   private val residentCache: GlobalsCache = {
@@ -81,25 +76,6 @@ object CompilerUtils {
       _ => (),
       classLoaderCache
     )
-
-  /**
-   * Create the scala instance for the compiler. Includes creating the classloader.
-   */
-  def scalaInstance(setup: CompilerCacheKey): XScalaInstance = {
-    import setup.{scalaCompiler, scalaExtra, scalaLibrary}
-    val allJars = scalaLibrary +: scalaCompiler +: scalaExtra
-    val allJarsLoader = scalaLoader(allJars)
-    val libraryOnlyLoader = scalaLoader(scalaLibrary +: scalaExtra)
-    new ScalaInstance(
-      scalaVersion(allJarsLoader).getOrElse("unknown"),
-      allJarsLoader,
-      libraryOnlyLoader,
-      scalaLibrary,
-      scalaCompiler,
-      allJars.toArray,
-      None
-    )
-  }
 
   /**
    * Create a new classloader with the root loader as parent (to avoid zinc itself being included).
