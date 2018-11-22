@@ -238,4 +238,4 @@ def register_goals():
   task(name='test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
   task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
   task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)
-  task(name='check-banned-deps', action=CheckBannedDeps).install('compile')
+  task(name='check-deps', action=CheckBannedDeps).install('compile')

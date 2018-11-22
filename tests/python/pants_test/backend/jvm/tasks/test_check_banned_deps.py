@@ -34,17 +34,19 @@ class CheckBannedDepsTest(TaskTestBase):
   def _d(self, id, dependencies=None, constraints=None, **kwargs):
     return self._target("D{}".format(id), dependencies, constraints, **kwargs)
 
-  def _check_run_logs(self, targets, error_number):
+  def _check_run_logs(self, targets, error_number, allow_constraints_in_dependencies=False):
     context = self.context(target_roots=targets)
     task = self.create_task(context)
-    errors = task.check_graph()
-    self.assertEqual(len(errors), error_number)
+    if allow_constraints_in_dependencies:
+      self.assertEqual(len(task.check_graph()), error_number)
+    else:
+      self.assertEqual(len(task.check_roots()), error_number)
 
-  def _check_fails(self, targets, error_number):
-    self._check_run_logs(targets, error_number)
+  def _check_fails(self, targets, error_number, allow_constraints_in_dependencies=False):
+    self._check_run_logs(targets, error_number, allow_constraints_in_dependencies)
 
-  def _check_succeeds(self, targets):
-    self._check_run_logs(targets, 0)
+  def _check_succeeds(self, targets, allow_constraints_in_dependencies=False):
+    self._check_run_logs(targets, 0, allow_constraints_in_dependencies)
 
   def test_direct_dependency(self):
     """If T depends on D1 and T bans D1, T should fail."""
@@ -55,30 +57,33 @@ class CheckBannedDepsTest(TaskTestBase):
     self._check_fails([graph], 1)
 
   def test_dependency_bans_target(self):
-    """If T depends on D1, and D1 bans T, T should fail."""
+    """If T depends on D1, and D1 bans T, and we allow constraints in deps, T should fail."""
     graph = self._t(
       [self._d(1, [], [TargetName(":T")])],
     )
-    self._check_fails([graph], 1)
+    self._check_succeeds([graph])
+    self._check_fails([graph], 1, True)
 
   def test_constraints_in_unrelated_targets(self):
-    """If T depends on D1 and D2, and D1 bans D2, T should fail."""
+    """If T depends on D1 and D2, and D1 bans D2, T should fail if we allow constraints in deps."""
     graph = self._t([
       self._d(1, [], [TargetName(":D2")]),
       self._d(2)
     ])
-    self._check_fails([graph], 1)
+    self._check_succeeds([graph])
+    self._check_fails([graph], 1, True)
 
   def test_multiple_roots(self):
-    """If T1 bans a dependency of T2, checking both should not fail"""
+    """If T1 bans a dependency of T2, checking both should not fail."""
     graph = [
       self._t([self._d(1)], id="1"),
       self._t([], [TargetName(":D1")], id="2"),
     ]
     self._check_succeeds(graph)
+    self._check_succeeds(graph, True)
 
   def test_multiple_errors(self):
-    """If T bans two dependencies, two errors should trigger"""
+    """If T bans two dependencies, two errors should trigger."""
     graph = [self._t([
       self._d(1, [
         self._d(2)

@@ -37,7 +37,7 @@ class DependencyConstraints(PayloadField):
 class Constraint(PayloadField):
   """Representation of a constraint on the target's dependencies."""
 
-  def check_target(self, source, task_context, target_under_test):
+  def check_target(self, target_under_test, task_context, source):
     """
     Check whether a given target complies with this constraint.
 
@@ -55,6 +55,9 @@ class Constraint(PayloadField):
       return [self.get_error_message(source, target_under_test, bad_items)]
     else:
       return []
+
+  def fails_on(self, *args):
+    return len(self.check_target(*args)) > 0
 
   def get_collection_to_constrain(self, context, target_under_test):
     """
