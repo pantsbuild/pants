@@ -310,7 +310,7 @@ pub extern "C" fn scheduler_create(
     .expect("remote_execution_server was not valid UTF8");
   let remote_execution_cache_key_gen_version_string = remote_execution_cache_key_gen_version
     .to_string()
-    .expect("remote_instance_name was not valid UTF8");
+    .expect("remote_execution_cache_key_gen_version was not valid UTF8");
   let remote_instance_name_string = remote_instance_name
     .to_string()
     .expect("remote_instance_name was not valid UTF8");

@@ -20,6 +20,9 @@ use sha2::Sha256;
 use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
 use std::cmp::min;
 
+// Environment variable which is exclusively used for cache key invalidation.
+// This may be not specified in an ExecuteProcessRequest, and may be populated only by the
+// CommandRunner.
 const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
 #[derive(Debug)]
