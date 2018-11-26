@@ -97,8 +97,12 @@ pub struct Select {
 }
 
 impl Select {
-  pub fn new(params: Params, product: TypeConstraint, entry: rule_graph::Entry) -> Select {
-    // TODO: Need to filter the parameters to what is actually used by this Entry.
+  pub fn new(mut params: Params, product: TypeConstraint, entry: rule_graph::Entry) -> Select {
+    params.retain(|k| match &entry {
+      &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
+      &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
+      &rule_graph::Entry::Singleton { .. } => false,
+    });
     Select {
       params,
       product,
@@ -801,16 +805,13 @@ pub struct Task {
 impl Task {
   fn gen_get(
     context: &Context,
+    params: &Params,
     entry: &Arc<rule_graph::Entry>,
     gets: Vec<externs::Get>,
   ) -> NodeFuture<Vec<Value>> {
     let get_futures = gets
       .into_iter()
       .map(|externs::Get(product, subject)| {
-        // TODO: The subject of the get is a new parameter, but params from the context should be
-        // included as well. Additionally, params should be filtered to what is used by the Entry.
-        //   see https://github.com/pantsbuild/pants/issues/6478
-        let params = Params::new_single(subject);
         let select_key = rule_graph::SelectKey::JustGet(selectors::Get {
           product: product,
           subject: *subject.type_id(),
@@ -827,6 +828,10 @@ impl Task {
               entry, select_key
             )
           }).clone();
+        // The subject of the get is a new parameter that replaces an existing param of the same
+        // type.
+        let mut params = params.clone();
+        params.put(subject);
         Select::new(params, product, entry).run(context.clone())
       }).collect::<Vec<_>>();
     future::join_all(get_futures).to_boxed()
@@ -838,20 +843,26 @@ impl Task {
   ///
   fn generate(
     context: Context,
+    params: Params,
     entry: Arc<rule_graph::Entry>,
     generator: Value,
   ) -> NodeFuture<Value> {
     future::loop_fn(externs::eval("None").unwrap(), move |input| {
       let context = context.clone();
+      let params = params.clone();
       let entry = entry.clone();
       future::result(externs::generator_send(&generator, &input)).and_then(move |response| {
         match response {
-          externs::GeneratorResponse::Get(get) => Self::gen_get(&context, &entry, vec![get])
-            .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
-            .to_boxed(),
-          externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, &entry, gets)
-            .map(|vs| future::Loop::Continue(externs::store_tuple(&vs)))
-            .to_boxed(),
+          externs::GeneratorResponse::Get(get) => {
+            Self::gen_get(&context, &params, &entry, vec![get])
+              .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
+              .to_boxed()
+          }
+          externs::GeneratorResponse::GetMulti(gets) => {
+            Self::gen_get(&context, &params, &entry, gets)
+              .map(|vs| future::Loop::Continue(externs::store_tuple(&vs)))
+              .to_boxed()
+          }
           externs::GeneratorResponse::Break(val) => future::ok(future::Loop::Break(val)).to_boxed(),
         }
       })
@@ -876,13 +887,13 @@ impl WrappedNode for Task {
   type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
+    let params = self.params;
     let deps = {
       let edges = &context
         .core
         .rule_graph
         .edges_for_inner(&self.entry)
         .expect("edges for task exist.");
-      let params = self.params;
       future::join_all(
         self
           .task
@@ -903,7 +914,7 @@ impl WrappedNode for Task {
       }).then(move |task_result| match task_result {
         Ok(val) => {
           if externs::satisfied_by(&context.core.types.generator, &val) {
-            Self::generate(context, entry, val)
+            Self::generate(context, params, entry, val)
           } else if externs::satisfied_by(&product, &val) {
             ok(val)
           } else {

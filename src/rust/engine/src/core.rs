@@ -30,14 +30,34 @@ impl Params {
   }
 
   ///
+  /// Adds the given param Key to these Params, replacing an existing param with the same type if
+  /// it exists.
+  ///
+  pub fn put(&mut self, param: Key) {
+    match self.binary_search(param.type_id) {
+      Ok(idx) => self.0[idx] = param,
+      Err(idx) => self.0.insert(idx, param),
+    }
+  }
+
+  ///
+  /// Filters this Params object in-place to contain only params matching the given predicate.
+  ///
+  pub fn retain<F: FnMut(&mut Key) -> bool>(&mut self, f: F) {
+    self.0.retain(f)
+  }
+
+  ///
   /// Returns the Key for the given TypeId if it is represented in this set of Params.
   ///
   pub fn find(&self, type_id: TypeId) -> Option<&Key> {
+    self.binary_search(type_id).ok().map(|idx| &self.0[idx])
+  }
+
+  fn binary_search(&self, type_id: TypeId) -> Result<usize, usize> {
     self
       .0
       .binary_search_by(|probe| probe.type_id().cmp(&type_id))
-      .ok()
-      .map(|idx| &self.0[idx])
   }
 
   ///

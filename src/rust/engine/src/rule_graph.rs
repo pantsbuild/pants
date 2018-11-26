@@ -39,7 +39,7 @@ pub enum EntryWithDeps {
 }
 
 impl EntryWithDeps {
-  fn params(&self) -> &ParamTypes {
+  pub fn params(&self) -> &ParamTypes {
     match self {
       &EntryWithDeps::Inner(ref ie) => &ie.params,
       &EntryWithDeps::Root(ref re) => &re.params,
