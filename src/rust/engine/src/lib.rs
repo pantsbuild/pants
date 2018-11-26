@@ -259,7 +259,7 @@ pub extern "C" fn scheduler_create(
   root_type_ids: TypeIdBuffer,
   remote_store_server: Buffer,
   remote_execution_server: Buffer,
-  remote_execution_cache_key_gen_version: Buffer,
+  remote_execution_process_cache_namespace: Buffer,
   remote_instance_name: Buffer,
   remote_root_ca_certs_path_buffer: Buffer,
   remote_oauth_bearer_token_path_buffer: Buffer,
@@ -308,9 +308,9 @@ pub extern "C" fn scheduler_create(
   let remote_execution_server_string = remote_execution_server
     .to_string()
     .expect("remote_execution_server was not valid UTF8");
-  let remote_execution_cache_key_gen_version_string = remote_execution_cache_key_gen_version
+  let remote_execution_process_cache_namespace_string = remote_execution_process_cache_namespace
     .to_string()
-    .expect("remote_execution_cache_key_gen_version was not valid UTF8");
+    .expect("remote_execution_process_cache_namespace was not valid UTF8");
   let remote_instance_name_string = remote_instance_name
     .to_string()
     .expect("remote_instance_name was not valid UTF8");
@@ -351,10 +351,10 @@ pub extern "C" fn scheduler_create(
     } else {
       Some(remote_execution_server_string)
     },
-    if remote_execution_cache_key_gen_version_string.is_empty() {
+    if remote_execution_process_cache_namespace_string.is_empty() {
       None
     } else {
-      Some(remote_execution_cache_key_gen_version_string)
+      Some(remote_execution_process_cache_namespace_string)
     },
     if remote_instance_name_string.is_empty() {
       None

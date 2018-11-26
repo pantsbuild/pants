@@ -57,7 +57,7 @@ impl Core {
     local_store_dir: PathBuf,
     remote_store_server: Option<String>,
     remote_execution_server: Option<String>,
-    remote_execution_cache_key_gen_version: Option<String>,
+    remote_execution_process_cache_namespace: Option<String>,
     remote_instance_name: Option<String>,
     remote_root_ca_certs_path: Option<PathBuf>,
     remote_oauth_bearer_token_path: Option<PathBuf>,
@@ -114,7 +114,7 @@ impl Core {
       let underlying_command_runner: Box<CommandRunner> = match &remote_execution_server {
         Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
           address,
-          remote_execution_cache_key_gen_version.clone(),
+          remote_execution_process_cache_namespace.clone(),
           remote_instance_name.clone(),
           root_ca_certs.clone(),
           oauth_bearer_token.clone(),

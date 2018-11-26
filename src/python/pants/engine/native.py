@@ -881,7 +881,7 @@ class Native(object):
         # We can't currently pass Options to the rust side, so we pass empty strings for None.
         self.context.utf8_buf(execution_options.remote_store_server or ""),
         self.context.utf8_buf(execution_options.remote_execution_server or ""),
-        self.context.utf8_buf(execution_options.remote_execution_cache_key_gen_version or ""),
+        self.context.utf8_buf(execution_options.remote_execution_process_cache_namespace or ""),
         self.context.utf8_buf(execution_options.remote_instance_name or ""),
         self.context.utf8_buf(execution_options.remote_ca_certs_path or ""),
         self.context.utf8_buf(execution_options.remote_oauth_bearer_token_path or ""),

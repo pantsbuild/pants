@@ -37,7 +37,7 @@ class ExecutionOptions(datatype([
   'remote_store_chunk_upload_timeout_seconds',
   'process_execution_parallelism',
   'process_execution_cleanup_local_dirs',
-  'remote_execution_cache_key_gen_version',
+  'remote_execution_process_cache_namespace',
   'remote_instance_name',
   'remote_ca_certs_path',
   'remote_oauth_bearer_token_path',
@@ -58,7 +58,7 @@ class ExecutionOptions(datatype([
       remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
       process_execution_parallelism=bootstrap_options.process_execution_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
-      remote_execution_cache_key_gen_version=bootstrap_options.remote_execution_cache_key_gen_version,
+      remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
       remote_instance_name=bootstrap_options.remote_instance_name,
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
       remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
@@ -73,7 +73,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_upload_timeout_seconds=60,
     process_execution_parallelism=multiprocessing.cpu_count()*2,
     process_execution_cleanup_local_dirs=True,
-    remote_execution_cache_key_gen_version=None,
+    remote_execution_process_cache_namespace=None,
     remote_instance_name=None,
     remote_ca_certs_path=None,
     remote_oauth_bearer_token_path=None,
@@ -298,9 +298,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--remote-store-chunk-upload-timeout-seconds', type=int, advanced=True,
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
              help='Timeout (in seconds) for uploads of individual chunks to the remote file store.')
-    register('--remote-execution-cache-key-gen-version', advanced=True,
-             help="The cache key generation for remote execution."
-                  "Bump this to invalidate every artifact's remote execution.")
+    register('--remote-execution-process-cache-namespace', advanced=True,
+             help="The cache namespace for remote process execution. "
+                  "Bump this to invalidate every artifact's remote execution. "
+                  "This is the remote execution equivalent of the legacy cache-key-gen-version "
+                  "flag.")
     register('--remote-instance-name', advanced=True,
              help='Name of the remote execution instance to use. Used for routing within '
                   '--remote-execution-server and --remote-store-server.')
