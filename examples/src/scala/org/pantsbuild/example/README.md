@@ -152,6 +152,7 @@ compilation for `fmt` and `lint`:
         '-S-Yrangepos',
       ]
 
+    [scala]
     scalac_plugins: [
         'semanticdb',
       ]
