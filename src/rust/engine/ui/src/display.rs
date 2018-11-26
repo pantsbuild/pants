@@ -327,5 +327,6 @@ impl EngineDisplay {
         clear_after_cursor = clear::AfterCursor,
         reveal_cursor = termion::cursor::Show
       )).expect("could not write to terminal");
+    self.flush();
   }
 }

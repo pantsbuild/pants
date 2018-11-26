@@ -304,6 +304,7 @@ impl Scheduler {
       }
     };
     if let Some(display) = optional_display.as_mut() {
+      // Ran after printing the result of a console_rule.
       display.finish();
     };
 
