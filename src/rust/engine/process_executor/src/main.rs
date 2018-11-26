@@ -123,6 +123,10 @@ fn main() {
           .takes_value(true)
           .long("remote-instance-name")
           .required(false))
+      .arg(Arg::with_name("cache-key-gen-version")
+          .takes_value(true)
+          .long("cache-key-gen-version")
+          .required(false))
       .arg(
         Arg::with_name("upload-chunk-bytes")
             .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
@@ -253,6 +257,7 @@ fn main() {
 
       Box::new(process_execution::remote::CommandRunner::new(
         address,
+        args.value_of("cache-key-gen-version").map(str::to_owned),
         remote_instance_arg,
         root_ca_certs,
         oauth_bearer_token,

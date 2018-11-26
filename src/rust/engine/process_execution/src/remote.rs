@@ -20,6 +20,8 @@ use sha2::Sha256;
 use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
 use std::cmp::min;
 
+const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
+
 #[derive(Debug)]
 enum OperationOrStatus {
   Operation(bazel_protos::operations::Operation),
@@ -28,6 +30,7 @@ enum OperationOrStatus {
 
 #[derive(Clone)]
 pub struct CommandRunner {
+  cache_key_gen_version: Option<String>,
   instance_name: Option<String>,
   authorization_header: Option<String>,
   channel: grpcio::Channel,
@@ -113,7 +116,8 @@ impl super::CommandRunner for CommandRunner {
     let operations_client = self.operations_client.clone();
 
     let store = self.store.clone();
-    let execute_request_result = make_execute_request(&req, &self.instance_name);
+    let execute_request_result =
+      make_execute_request(&req, &self.instance_name, &self.cache_key_gen_version);
 
     let ExecuteProcessRequest {
       description,
@@ -230,6 +234,7 @@ impl CommandRunner {
 
   pub fn new(
     address: &str,
+    cache_key_gen_version: Option<String>,
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
@@ -259,6 +264,7 @@ impl CommandRunner {
     ));
 
     CommandRunner {
+      cache_key_gen_version,
       instance_name,
       authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
       channel,
@@ -616,6 +622,7 @@ impl CommandRunner {
 fn make_execute_request(
   req: &ExecuteProcessRequest,
   instance_name: &Option<String>,
+  cache_key_gen_version: &Option<String>,
 ) -> Result<
   (
     bazel_protos::remote_execution::Action,
@@ -627,9 +634,21 @@ fn make_execute_request(
   let mut command = bazel_protos::remote_execution::Command::new();
   command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
   for (ref name, ref value) in &req.env {
+    if name.as_str() == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME {
+      return Err(format!(
+        "Cannot set env var with name {} as that is reserved for internal use by pants",
+        CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
+      ));
+    }
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(name.to_string());
     env.set_value(value.to_string());
+    command.mut_environment_variables().push(env);
+  }
+  if let Some(cache_key_gen_version) = cache_key_gen_version {
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name(CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_string());
+    env.set_value(cache_key_gen_version.to_string());
     command.mut_environment_variables().push(env);
   }
   let mut output_files = req
@@ -863,7 +882,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None),
+      super::make_execute_request(&req, &None, &None),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -935,7 +954,84 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &Some("dark-tower".to_owned())),
+      super::make_execute_request(&req, &Some("dark-tower".to_owned()), &None),
+      Ok((want_action, want_command, want_execute_request))
+    );
+  }
+
+  #[test]
+  fn make_execute_request_with_cache_key_gen_version() {
+    let input_directory = TestDirectory::containing_roland();
+    let req = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "yo"]),
+      env: vec![("SOME".to_owned(), "value".to_owned())]
+        .into_iter()
+        .collect(),
+      input_files: input_directory.digest(),
+      // Intentionally poorly sorted:
+      output_files: vec!["path/to/file", "other/file"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
+      output_directories: vec!["directory/name"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
+      timeout: Duration::from_millis(1000),
+      description: "some description".to_owned(),
+      jdk_home: None,
+    };
+
+    let mut want_command = bazel_protos::remote_execution::Command::new();
+    want_command.mut_arguments().push("/bin/echo".to_owned());
+    want_command.mut_arguments().push("yo".to_owned());
+    want_command.mut_environment_variables().push({
+      let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+      env.set_name("SOME".to_owned());
+      env.set_value("value".to_owned());
+      env
+    });
+    want_command.mut_environment_variables().push({
+      let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+      env.set_name(super::CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_owned());
+      env.set_value("meep".to_owned());
+      env
+    });
+    want_command
+      .mut_output_files()
+      .push("other/file".to_owned());
+    want_command
+      .mut_output_files()
+      .push("path/to/file".to_owned());
+    want_command
+      .mut_output_directories()
+      .push("directory/name".to_owned());
+
+    let mut want_action = bazel_protos::remote_execution::Action::new();
+    want_action.set_command_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "1a95e3482dd235593df73dc12b808ec7d922733a40d97d8233c1a32c8610a56d",
+        ).unwrap(),
+        109,
+      ))
+        .into(),
+    );
+    want_action.set_input_root_digest((&input_directory.digest()).into());
+
+    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
+    want_execute_request.set_action_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "0ee5d4c8ac12513a87c8d949c6883ac533a264d30215126af71a9028c4ab6edf",
+        ).unwrap(),
+        140,
+      ))
+        .into(),
+    );
+
+    assert_eq!(
+      super::make_execute_request(&req, &None, &Some("meep".to_owned())),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -988,7 +1084,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None),
+      super::make_execute_request(&req, &None, &None),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1012,6 +1108,7 @@ mod tests {
             jdk_home: None,
           },
           &None,
+          &None,
         ).unwrap()
         .2,
         vec![],
@@ -1034,7 +1131,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None)
+        super::make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1122,7 +1219,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&echo_roland_request(), &None)
+        super::make_execute_request(&echo_roland_request(), &None, &None)
           .unwrap()
           .2,
         vec![make_successful_operation(
@@ -1150,7 +1247,7 @@ mod tests {
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let cmd_runner = CommandRunner::new(&mock_server.address(), None, None, None, 1, store);
+    let cmd_runner = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store);
     let result = cmd_runner.run(echo_roland_request()).wait();
     assert_eq!(
       result,
@@ -1193,7 +1290,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None)
+        super::make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         Vec::from_iter(
@@ -1243,7 +1340,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None)
+        super::make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1268,7 +1365,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None)
+        super::make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1306,7 +1403,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None)
+        super::make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1344,7 +1441,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None)
+        super::make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![MockOperation::new({
@@ -1376,7 +1473,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None)
+        super::make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1411,7 +1508,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None)
+        super::make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![MockOperation::new({
@@ -1437,7 +1534,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None)
+        super::make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1466,7 +1563,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None)
+        super::make_execute_request(&cat_roland_request(), &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1504,7 +1601,7 @@ mod tests {
       .wait()
       .expect("Saving file bytes to store");
 
-    let result = CommandRunner::new(&mock_server.address(), None, None, None, 1, store)
+    let result = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store)
       .run(cat_roland_request())
       .wait();
     assert_eq!(
@@ -1544,7 +1641,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None)
+        super::make_execute_request(&cat_roland_request(), &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1583,7 +1680,7 @@ mod tests {
       .wait()
       .expect("Saving file bytes to store");
 
-    let result = CommandRunner::new(&mock_server.address(), None, None, None, 1, store)
+    let result = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store)
       .run(cat_roland_request())
       .wait();
     assert_eq!(
@@ -1610,7 +1707,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None)
+        super::make_execute_request(&cat_roland_request(), &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1639,7 +1736,7 @@ mod tests {
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let error = CommandRunner::new(&mock_server.address(), None, None, None, 1, store)
+    let error = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store)
       .run(cat_roland_request())
       .wait()
       .expect_err("Want error");
@@ -1851,7 +1948,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, &None)
+          super::make_execute_request(&execute_request, &None, &None)
             .unwrap()
             .2,
           vec![
@@ -1884,7 +1981,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, &None)
+          super::make_execute_request(&execute_request, &None, &None)
             .unwrap()
             .2,
           vec![
@@ -2205,7 +2302,7 @@ mod tests {
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, 1, store)
+    CommandRunner::new(&address, None, None, None, None, 1, store)
   }
 
   fn extract_execute_response(
