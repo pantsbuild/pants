@@ -175,7 +175,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
       # On OSX, this uses the libc++ (LLVM) C++ standard library implementation. This is
       # feature-complete for OSX, but not for Linux (see https://libcxx.llvm.org/ for more info).
       extra_args=(llvm_cpp_compiler_args + provided_clangpp.extra_args + xcode_clang.extra_args))
-    linking_library_dirs = []
+    extra_linking_library_dirs = []
     linker_extra_args = []
   else:
     gcc_install = yield Get(GCCInstallLocationForLLVM, GCC, native_toolchain._gcc)
@@ -186,7 +186,8 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
       # NB: we use g++'s headers on Linux, and therefore their C++ standard library.
       include_dirs=provided_gpp.include_dirs,
       extra_args=(llvm_cpp_compiler_args + provided_clangpp.extra_args + gcc_install.as_clang_argv))
-    linking_library_dirs = provided_gpp.library_dirs + provided_clangpp.library_dirs
+    # TODO: why are these necessary? this is very mysterious.
+    extra_linking_library_dirs = provided_gpp.library_dirs + provided_clangpp.library_dirs
     # Ensure we use libstdc++, provided by g++, during the linking stage.
     linker_extra_args=['-stdlib=libstdc++']
 
@@ -198,7 +199,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     exe_filename=working_cpp_compiler.exe_filename,
     library_dirs=(base_linker.library_dirs + working_cpp_compiler.library_dirs),
     linking_library_dirs=(base_linker.linking_library_dirs +
-                          linking_library_dirs +
+                          extra_linking_library_dirs +
                           libc_dev.get_libc_dirs(platform)),
     extra_args=(base_linker.extra_args + linker_extra_args))
 
@@ -235,7 +236,8 @@ def select_gcc_c_toolchain(platform, native_toolchain):
     path_entries=(working_c_compiler.path_entries + base_linker.path_entries),
     exe_filename=working_c_compiler.exe_filename,
     library_dirs=(base_linker.library_dirs + working_c_compiler.library_dirs),
-    linking_library_dirs=(base_linker.linking_library_dirs + libc_dev.get_libc_dirs(platform)))
+    linking_library_dirs=(base_linker.linking_library_dirs +
+                          libc_dev.get_libc_dirs(platform)))
 
   yield GCCCToolchain(CToolchain(working_c_compiler, working_linker))
 
@@ -255,8 +257,11 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
     # entirely).
     xcode_clangpp = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     new_include_dirs = xcode_clangpp.include_dirs + provided_gpp.include_dirs
+    extra_linking_library_dirs = []
   else:
+    provided_clangpp = yield Get(CppCompiler, LLVM, native_toolchain._llvm)
     new_include_dirs = provided_gpp.include_dirs
+    extra_linking_library_dirs = provided_gpp.library_dirs + provided_clangpp.library_dirs
 
   working_cpp_compiler = provided_gpp.copy(
     path_entries=(provided_gpp.path_entries + assembler.path_entries),
@@ -273,7 +278,9 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
     path_entries=(working_cpp_compiler.path_entries + base_linker.path_entries),
     exe_filename=working_cpp_compiler.exe_filename,
     library_dirs=(base_linker.library_dirs + working_cpp_compiler.library_dirs),
-    linking_library_dirs=(base_linker.linking_library_dirs + libc_dev.get_libc_dirs(platform)))
+    linking_library_dirs=(base_linker.linking_library_dirs +
+                          extra_linking_library_dirs +
+                          libc_dev.get_libc_dirs(platform)))
 
   yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
 

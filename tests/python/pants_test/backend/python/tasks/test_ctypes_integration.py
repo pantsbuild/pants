@@ -165,7 +165,12 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         binary_run_output = invoke_pex_for_output(output_pex)
         self.assertIn(modified_result_message, binary_run_output)
 
-  def test_ctypes_native_language_interop(self):
+  _include_not_found_message_for_variant = {
+    'gnu': "fatal error: some_math.h: No such file or directory",
+    'llvm': "fatal error: 'some_math.h' file not found"
+  }
+
+  def _assert_ctypes_interop_with_mock_buildroot(self, toolchain_variant):
     # TODO: consider making this mock_buildroot/run_pants_with_workdir into a
     # PantsRunIntegrationTest method!
     with self.mock_buildroot(
@@ -182,20 +187,31 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       pants_binary_strict_deps_failure = self.run_pants_with_workdir(
         command=['binary', self._binary_target_with_interop],
         # Explicitly set to True (although this is the default).
-        config={'native-build-settings': {'strict_deps': True}},
+        config={
+          # TODO: don't make it possible to forget to add the toolchain_variant option!
+          'native-build-settings': {
+            'toolchain_variant': toolchain_variant,
+            'strict_deps': True,
+          },
+        },
         workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
         build_root=buildroot.new_buildroot)
       self.assert_failure(pants_binary_strict_deps_failure)
-      self.assertIn("fatal error: 'some_math.h' file not found",
+      self.assertIn(self._include_not_found_message_for_variant[toolchain_variant],
                     pants_binary_strict_deps_failure.stdout_data)
 
     pants_run_interop = self.run_pants(['-q', 'run', self._binary_target_with_interop], config={
       'native-build-settings': {
+        'toolchain_variant': toolchain_variant,
         'strict_deps': False,
       },
     })
     self.assert_success(pants_run_interop)
     self.assertEqual('x=3, f(x)=299\n', pants_run_interop.stdout_data)
+
+  def test_ctypes_native_language_interop(self):
+    for variant in ToolchainVariant.allowed_values:
+      self._assert_ctypes_interop_with_mock_buildroot(variant)
 
   def test_ctypes_third_party_integration(self):
     pants_binary = self.run_pants(['binary', self._binary_target_with_third_party])
