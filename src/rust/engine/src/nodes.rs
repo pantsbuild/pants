@@ -92,49 +92,32 @@ pub trait WrappedNode: Into<NodeKey> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
   pub params: Params,
-  pub selector: selectors::Select,
+  pub product: TypeConstraint,
   entry: rule_graph::Entry,
 }
 
 impl Select {
-  pub fn new(product: TypeConstraint, params: Params, edges: &rule_graph::RuleEdges) -> Select {
-    Self::new_with_selector(selectors::Select::new(product), params, edges)
-  }
-
-  pub fn new_with_entries(
-    product: TypeConstraint,
-    params: Params,
-    entry: rule_graph::Entry,
-  ) -> Select {
-    let selector = selectors::Select::new(product);
+  pub fn new(params: Params, product: TypeConstraint, entry: rule_graph::Entry) -> Select {
+    // TODO: Need to filter the parameters to what is actually used by this Entry.
     Select {
-      selector,
       params,
+      product,
       entry,
     }
   }
 
-  pub fn new_with_selector(
-    selector: selectors::Select,
+  pub fn new_from_edges(
     params: Params,
+    product: TypeConstraint,
     edges: &rule_graph::RuleEdges,
   ) -> Select {
-    let select_key = rule_graph::SelectKey::JustSelect(selector.clone());
+    let select_key = rule_graph::SelectKey::JustSelect(selectors::Select::new(product.clone()));
     // TODO: Is it worth propagating an error here?
-    // TODO: Need to filter the parameters to what is actually used by this Entry.
     let entry = edges
       .entry_for(&select_key)
-      .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, selector))
+      .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product))
       .clone();
-    Select {
-      selector,
-      params,
-      entry,
-    }
-  }
-
-  fn product(&self) -> &TypeConstraint {
-    &self.selector.product
+    Select::new(params, product, entry)
   }
 
   fn select_product(
@@ -155,7 +138,7 @@ impl Select {
         ))
       });
     let context = context.clone();
-    Select::new(product, self.params.clone(), &try_future!(edges)).run(context.clone())
+    Select::new_from_edges(self.params.clone(), product, &try_future!(edges)).run(context.clone())
   }
 }
 
@@ -171,7 +154,7 @@ impl WrappedNode for Select {
       {
         &rule_graph::Rule::Task(ref task) => context.get(Task {
           params: self.params.clone(),
-          product: *self.product(),
+          product: self.product.clone(),
           task: task.clone(),
           entry: Arc::new(self.entry.clone()),
         }),
@@ -844,7 +827,7 @@ impl Task {
               entry, select_key
             )
           }).clone();
-        Select::new_with_entries(product, params, entry).run(context.clone())
+        Select::new(params, product, entry).run(context.clone())
       }).collect::<Vec<_>>();
     future::join_all(get_futures).to_boxed()
   }
@@ -905,7 +888,7 @@ impl WrappedNode for Task {
           .task
           .clause
           .into_iter()
-          .map(|s| Select::new_with_selector(s, params.clone(), edges).run(context.clone()))
+          .map(|s| Select::new_from_edges(params.clone(), s.product, edges).run(context.clone()))
           .collect::<Vec<_>>(),
       )
     };
@@ -1027,7 +1010,7 @@ impl NodeKey {
     match self {
       &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
-      &NodeKey::Select(ref s) => typstr(&s.selector.product),
+      &NodeKey::Select(ref s) => typstr(&s.product),
       &NodeKey::Task(ref s) => typstr(&s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
       &NodeKey::DigestFile(..) => "DigestFile".to_string(),
@@ -1089,7 +1072,7 @@ impl Node for NodeKey {
       &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
       &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
-      &NodeKey::Select(ref s) => format!("Select({}, {})", s.params, typstr(&s.selector.product)),
+      &NodeKey::Select(ref s) => format!("Select({}, {})", s.params, typstr(&s.product)),
       &NodeKey::Task(ref s) => format!("{:?}", s),
       &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
     }

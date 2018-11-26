@@ -118,9 +118,11 @@ impl Scheduler {
       subject.type_id().clone(),
       &selectors::Select::new(product),
     )?;
-    request
-      .roots
-      .push(Select::new(product, Params::new_single(subject), &edges));
+    request.roots.push(Select::new_from_edges(
+      Params::new_single(subject),
+      product,
+      &edges,
+    ));
     Ok(())
   }
 
