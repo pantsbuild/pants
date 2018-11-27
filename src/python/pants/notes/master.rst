@@ -8,6 +8,11 @@ not undergo the vetting associated with ``stable`` releases.
 1.13.0.dev0 (11/26/2018)
 ------------------------
 
+New features
+~~~~~~~~~~~~
+* Header file extensions as options for C/C++ targets (#6802)
+  `PR #6802 <https://github.com/pantsbuild/pants/pull/6802>`_
+
 API Changes
 ~~~~~~~~~~~
 * Use both the deprecated and new locations of fatal_warnings args (#6798)
@@ -40,6 +45,9 @@ Refactoring, Improvements, and Tooling
 
 * Remove Params::expect_single compatibility API (#6766)
   `PR #6766 <https://github.com/pantsbuild/pants/pull/6766>`_
+
+* add integration test for invalidation of ctypes c++ sources (#6801)
+  `PR #6801 <https://github.com/pantsbuild/pants/pull/6801>`_
 
 
 1.12.0rc0 (11/19/2018)
