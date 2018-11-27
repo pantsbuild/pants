@@ -84,6 +84,7 @@ class XCodeCLITools(Subsystem):
   # NB: We use @memoized_method in this file for methods which may raise.
   @memoized_method
   def _get_existing_subdirs(self, subdir_name):
+    # TODO: consume ArchiveFileMapper instead of doing all that logic over again in this file.
     maybe_subdirs = [os.path.join(pfx, subdir_name) for pfx in self._all_existing_install_prefixes]
     existing_dirs = [existing_dir for existing_dir in maybe_subdirs if is_readable_dir(existing_dir)]
 
@@ -123,7 +124,7 @@ class XCodeCLITools(Subsystem):
     return self._get_existing_subdirs('lib')
 
   @memoized_method
-  def include_dirs(self):
+  def include_dirs(self, include_cpp_inc=False):
     base_inc_dirs = self._get_existing_subdirs('include')
 
     all_inc_dirs = base_inc_dirs
@@ -132,6 +133,12 @@ class XCodeCLITools(Subsystem):
       secure_inc_dir = os.path.join(d, 'secure')
       if is_readable_dir(secure_inc_dir):
         all_inc_dirs.append(secure_inc_dir)
+
+      # TODO: figure out why we need to specify this directory separately.
+      if include_cpp_inc:
+        cpp_inc_dir = os.path.join(d, 'c++/v1')
+        if is_readable_dir(cpp_inc_dir):
+          all_inc_dirs.append(cpp_inc_dir)
 
     return all_inc_dirs
 
@@ -166,7 +173,7 @@ class XCodeCLITools(Subsystem):
       path_entries=self.path_entries(),
       exe_filename='clang++',
       library_dirs=self.lib_dirs(),
-      include_dirs=self.include_dirs(),
+      include_dirs=self.include_dirs(include_cpp_inc=True),
       extra_args=[MIN_OSX_VERSION_ARG])
 
 

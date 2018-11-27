@@ -119,9 +119,11 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 
   def _invoke_compiler(self, compiler, args):
     cmd = [compiler.exe_filename] + compiler.extra_args + args
-    return self._invoke_capturing_output(
-      cmd,
-      compiler.as_invocation_environment_dict)
+    env = compiler.as_invocation_environment_dict
+    # TODO: add an `extra_args`-like field to `Executable`s which allows for overriding env vars
+    # like this, but declaratively!
+    env['LC_ALL'] = 'C'
+    return self._invoke_capturing_output(cmd, env)
 
   def _invoke_linker(self, linker, args):
     cmd = [linker.exe_filename] + linker.extra_args + args
