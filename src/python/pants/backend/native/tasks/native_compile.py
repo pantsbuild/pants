@@ -190,7 +190,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   class _HeaderOnlyLibrary(Exception): pass
 
-    self.context.log.debug(compile_request)
+    self.context.log.debug(repr(compile_request))
 
     return compile_request
 
