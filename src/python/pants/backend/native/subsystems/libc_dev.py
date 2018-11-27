@@ -11,7 +11,7 @@ from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchD
 from pants.base.hash_utils import hash_file
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
 class LibcDev(Subsystem):
@@ -99,11 +99,8 @@ class LibcDev(Subsystem):
 
     return self._get_host_libc_from_host_compiler()
 
-  def get_libc_dirs(self, platform):
+  @memoized_method
+  def get_libc(self):
     if not self.get_options().enable_libc_search:
-      return []
-
-    return platform.resolve_platform_specific({
-      'darwin': lambda: [],
-      'linux': lambda: [self._host_libc.get_lib_dir()],
-    })
+      return None
+    return self._host_libc
