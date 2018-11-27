@@ -4,11 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import logging
 from textwrap import dedent
 
 from pants.backend.native.targets.native_library import CLibrary
 from pants.backend.native.tasks.c_compile import CCompile
+from pants.backend.native.tasks.native_compile import ObjectFiles
 from pants_test.backend.native.tasks.native_task_test_base import (NativeCompileTestMixin,
                                                                    NativeTaskTestBase)
 
@@ -62,17 +62,21 @@ class CCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
         'header_file_extensions': [alternate_extension],
       },
     })
-    c_compile = self.create_task(context)
 
-    with self.captured_logging(level=logging.INFO) as logs:
-      c_compile.execute()
-      info = list(logs.infos())[-1]
-      self.assertIn('is a header-only library', info)
+    # Test that the task runs without error if provided a header-only library.
+    c_compile = self.create_task(context)
+    c_compile.execute()
+
+    object_files_product = context.products.get(ObjectFiles)
+    object_files_for_target = self._retrieve_single_product_at_target_base(object_files_product, c)
+    # Test that no object files were produced.
+    self.assertEqual(0, len(object_files_for_target.filenames))
 
   def test_caching(self):
     c = self.create_simple_c_library()
     context = self.prepare_context_for_compile(target_roots=[c])
     c_compile = self.create_task(context)
 
+    # TODO: what is this testing?
     c_compile.execute()
     c_compile.execute()
