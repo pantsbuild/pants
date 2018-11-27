@@ -205,10 +205,10 @@ class NativeCompile(NativeTask, AbstractClass):
     compiler_options = compile_request.compiler_options
     # We are going to execute in the target output, so get absolute paths for everything.
     buildroot = get_buildroot()
+    # TODO: add -v to every compiler and linker invocation!
     argv = (
       [compiler.exe_filename] +
       compiler.extra_args +
-      # TODO: add -v to every compiler and linker invocation!
       # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
       ['-c', '-fPIC'] +
       compiler_options +
