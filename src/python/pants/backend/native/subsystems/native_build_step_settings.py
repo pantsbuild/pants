@@ -45,7 +45,9 @@ class CompileSettingsBase(Subsystem):
       NativeBuildStepSettings.scoped(cls),
     )
 
-  header_file_extensions_default = None
+  @classproperty
+  def header_file_extensions_default(cls):
+    raise NotImplementedError('header_file_extensions_default() must be overridden!')
 
   @classmethod
   def register_options(cls, register):
