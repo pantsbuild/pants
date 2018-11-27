@@ -115,7 +115,7 @@ impl Select {
     product: TypeConstraint,
     edges: &rule_graph::RuleEdges,
   ) -> Select {
-    let select_key = rule_graph::SelectKey::JustSelect(selectors::Select::new(product.clone()));
+    let select_key = rule_graph::SelectKey::JustSelect(selectors::Select::new(product));
     // TODO: Is it worth propagating an error here?
     let entry = edges
       .entry_for(&select_key)
@@ -158,7 +158,7 @@ impl WrappedNode for Select {
       {
         &rule_graph::Rule::Task(ref task) => context.get(Task {
           params: self.params.clone(),
-          product: self.product.clone(),
+          product: self.product,
           task: task.clone(),
           entry: Arc::new(self.entry.clone()),
         }),
