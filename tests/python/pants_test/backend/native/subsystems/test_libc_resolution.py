@@ -25,17 +25,12 @@ class TestLibcDirectorySearchFailure(TestBase):
     self.libc = global_subsystem_instance(LibcDev)
     self.platform = Platform.create()
 
-  @platform_specific('linux')
   def test_libc_search_failure(self):
     with self.assertRaises(LibcDev.HostLibcDevResolutionError) as cm:
-      self.libc.get_libc_dirs(self.platform)
+      self.libc.get_libc_objects()
     expected_msg = (
       "Could not locate crti.o in directory /does/not/exist provided by the --libc-dir option.")
     self.assertEqual(expected_msg, str(cm.exception))
-
-  @platform_specific('darwin')
-  def test_libc_search_noop_osx(self):
-    self.assertEqual([], self.libc.get_libc_dirs(self.platform))
 
 
 class TestLibcSearchDisabled(TestBase):
@@ -51,9 +46,8 @@ class TestLibcSearchDisabled(TestBase):
     self.libc = global_subsystem_instance(LibcDev)
     self.platform = Platform.create()
 
-  @platform_specific('linux')
   def test_libc_disabled_search(self):
-    self.assertEqual([], self.libc.get_libc_dirs(self.platform))
+    self.assertEqual([], self.libc.get_libc_objects())
 
 
 class TestLibcCompilerSearchFailure(TestBase):
@@ -72,7 +66,7 @@ class TestLibcCompilerSearchFailure(TestBase):
   @platform_specific('linux')
   def test_libc_compiler_search_failure(self):
     with self.assertRaises(ParseSearchDirs.ParseSearchDirsError) as cm:
-      self.libc.get_libc_dirs(self.platform)
+      self.libc.get_libc_objects()
     expected_msg = (
       "Process invocation with argv "
       "'this_executable_does_not_exist -print-search-dirs' and environment None failed.")

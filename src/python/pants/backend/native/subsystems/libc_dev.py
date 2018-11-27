@@ -100,7 +100,7 @@ class LibcDev(Subsystem):
     return self._get_host_libc_from_host_compiler()
 
   @memoized_method
-  def get_libc(self):
+  def get_libc_objects(self):
     if not self.get_options().enable_libc_search:
-      return None
-    return self._host_libc
+      return []
+    return [self._host_libc.crti_object]

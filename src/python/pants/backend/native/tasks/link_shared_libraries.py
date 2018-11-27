@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 
 from pants.backend.native.config.environment import Linker, Platform
+from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import ObjectFiles
@@ -71,6 +72,17 @@ class LinkSharedLibraries(NativeTask):
   def platform(self):
     # TODO: convert this to a v2 engine dependency injection.
     return Platform.create()
+
+  @memoized_property
+  def _libc(self):
+    return self._request_single(LibcDev, self._native_toolchain)
+
+  @memoized_property
+  def libc_objects(self):
+    return self.platform.resolve_platform_specific({
+      'darwin': lambda: [],
+      'linux': lambda: self._libc.get_libc_objects(),
+    })
 
   def execute(self):
     targets_providing_artifacts = self.context.targets(NativeLibrary.produces_ctypes_native_library)
@@ -176,7 +188,8 @@ class LinkSharedLibraries(NativeTask):
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +
            ['-l{}'.format(lib_name) for lib_name in link_request.external_lib_names] +
-           [os.path.abspath(obj) for obj in object_files])
+           [os.path.abspath(obj) for obj in object_files] +
+           self.libc_objects)
 
     self.context.log.info("selected linker exe name: '{}'".format(linker.exe_filename))
     self.context.log.debug("linker argv: {}".format(cmd))
