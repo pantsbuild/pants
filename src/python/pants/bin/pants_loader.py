@@ -9,6 +9,7 @@ import locale
 import os
 import warnings
 from builtins import object
+from textwrap import dedent
 
 
 class PantsLoader(object):
@@ -37,14 +38,17 @@ class PantsLoader(object):
     # libraries called by Pants may fail with more obscure errors.
     encoding = locale.getpreferredencoding()
     if encoding.lower() != 'utf-8' and os.environ.get(cls.ENCODING_IGNORE_ENV_VAR, None) is None:
-      raise cls.InvalidLocaleError(
-        'System preferred encoding is `{}`, but `UTF-8` is required.\n'
-        'Check and set the LC_* and LANG environment settings. Example:\n'
-        '  LC_ALL=en_US.UTF-8\n'
-        '  LANG=en_US.UTF-8\n'
-        'To bypass this error, please file an issue and then set:\n'
-        '  {}=1'.format(encoding, cls.ENCODING_IGNORE_ENV_VAR)
-      )
+      raise cls.InvalidLocaleError(dedent("""\
+        Your system's preferred encoding is `{}`, but Pants requires `UTF-8`.
+        Check and set the LC_* and LANG environment settings. Example:
+          LC_ALL=en_US.UTF-8
+          LANG=en_US.UTF-8
+        Specifically, the standard library's `locale.getpreferredencoding()` must resolve to `utf-8`.
+
+        To bypass this error, you can set the below environment variable. 
+        Note that we cannot guarantee regular behavior with this bypass set.
+          {}=1""".format(encoding, cls.ENCODING_IGNORE_ENV_VAR)
+      ))
 
   @staticmethod
   def determine_entrypoint(env_var, default):
