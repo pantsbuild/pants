@@ -13,7 +13,6 @@ from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
@@ -130,18 +129,18 @@ class ResolveRequirementsTest(TaskTestBase):
   def _resolve_requirements(self, target_roots, options=None):
     with temporary_dir() as cache_dir:
       options = options or {}
-      options.setdefault(PythonSetup.options_scope, {})['interpreter_cache_dir'] = cache_dir
-      context = self.context(target_roots=target_roots, options=options,
-                             for_subsystems=[PythonSetup, PythonRepos])
-
-      # We must get an interpreter via the cache, instead of using PythonInterpreter.get() directly,
-      # to ensure that the interpreter has setuptools and wheel support.
+      python_setup_opts = options.setdefault(PythonSetup.options_scope, {})
+      python_setup_opts['interpreter_cache_dir'] = cache_dir
       interpreter = PythonInterpreter.get()
-      interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
-                                                PythonRepos.global_instance(),
-                                                logger=context.log.debug)
-      interpreters = interpreter_cache.setup(paths=[os.path.dirname(interpreter.binary)],
-                                            filters=[str(interpreter.identity.requirement)])
+      python_setup_opts['interpreter_search_paths'] = [os.path.dirname(interpreter.binary)]
+      context = self.context(target_roots=target_roots, options=options,
+                             for_subsystems=[PythonInterpreterCache])
+
+      # We must get an interpreter via the cache, instead of using the value of
+      # PythonInterpreter.get() directly, to ensure that the interpreter has setuptools and
+      # wheel support.
+      interpreter_cache = PythonInterpreterCache.global_instance()
+      interpreters = interpreter_cache.setup(filters=[str(interpreter.identity.requirement)])
       context.products.get_data(PythonInterpreter, lambda: interpreters[0])
 
       task = self.create_task(context)

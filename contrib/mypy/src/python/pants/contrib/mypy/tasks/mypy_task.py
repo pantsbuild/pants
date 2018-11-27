@@ -8,8 +8,6 @@ import os
 from builtins import filter, open, str
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -45,6 +43,10 @@ class MypyTask(ResolveRequirementsTaskBase):
   @classmethod
   def supports_passthru_args(cls):
     return True
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(MypyTask, cls).subsystem_dependencies() + (PythonInterpreterCache,)
 
   def find_py3_interpreter(self):
     interpreters = self._interpreter_cache.setup(filters=['>=3'])
@@ -82,9 +84,7 @@ class MypyTask(ResolveRequirementsTaskBase):
 
   @memoized_property
   def _interpreter_cache(self):
-    return PythonInterpreterCache(PythonSetup.global_instance(),
-                                  PythonRepos.global_instance(),
-                                  logger=self.context.log.debug)
+    return PythonInterpreterCache.global_instance()
 
   def _run_mypy(self, py3_interpreter, mypy_args, **kwargs):
     pex_info = PexInfo.default()
