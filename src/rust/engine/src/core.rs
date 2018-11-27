@@ -30,29 +30,58 @@ impl Params {
   }
 
   ///
-  /// TODO: This is a compatibility API to assist in the transition from "every Node has exactly
-  /// one Subject" to "every Node has zero or more Params". See:
-  ///   https://github.com/pantsbuild/pants/issues/6478
+  /// Adds the given param Key to these Params, replacing an existing param with the same type if
+  /// it exists.
   ///
-  pub fn expect_single(&self) -> &Key {
-    if self.0.len() != 1 {
-      panic!(
-        "Expect Params to contain exactly one value... contained: {:?}",
-        self.0
-      );
+  pub fn put(&mut self, param: Key) {
+    match self.binary_search(param.type_id) {
+      Ok(idx) => self.0[idx] = param,
+      Err(idx) => self.0.insert(idx, param),
     }
-    &self.0[0]
   }
 
   ///
-  /// Returns the given TypeId if it is represented in this set of Params.
+  /// Filters this Params object in-place to contain only params matching the given predicate.
+  ///
+  pub fn retain<F: FnMut(&mut Key) -> bool>(&mut self, f: F) {
+    self.0.retain(f)
+  }
+
+  ///
+  /// Returns the Key for the given TypeId if it is represented in this set of Params.
   ///
   pub fn find(&self, type_id: TypeId) -> Option<&Key> {
+    self.binary_search(type_id).ok().map(|idx| &self.0[idx])
+  }
+
+  fn binary_search(&self, type_id: TypeId) -> Result<usize, usize> {
     self
       .0
       .binary_search_by(|probe| probe.type_id().cmp(&type_id))
-      .ok()
-      .map(|idx| &self.0[idx])
+  }
+
+  ///
+  /// Given a set of either param type or param value strings: sort, join, and render as one string.
+  ///
+  pub fn display(mut params: Vec<String>) -> String {
+    match params.len() {
+      0 => "()".to_string(),
+      1 => params.pop().unwrap(),
+      _ => {
+        params.sort();
+        format!("({})", params.join("+"))
+      }
+    }
+  }
+}
+
+impl fmt::Display for Params {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(
+      f,
+      "{}",
+      Self::display(self.0.iter().map(|k| format!("{}", k)).collect())
+    )
   }
 }
 
@@ -63,6 +92,16 @@ pub type Id = u64;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(pub Id);
+
+impl fmt::Display for TypeId {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    if *self == ANY_TYPE {
+      write!(f, "Any")
+    } else {
+      write!(f, "{}", externs::type_to_str(*self))
+    }
+  }
+}
 
 // On the python side, the 0th type id is used as an anonymous id
 pub const ANY_TYPE: TypeId = TypeId(0);
@@ -98,6 +137,12 @@ impl PartialEq for Key {
 impl hash::Hash for Key {
   fn hash<H: hash::Hasher>(&self, state: &mut H) {
     self.id.hash(state);
+  }
+}
+
+impl fmt::Display for Key {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", externs::key_to_str(self))
   }
 }
 
