@@ -29,6 +29,7 @@ class NativeCompileRequest(datatype([
     'sources',
     'compiler_options',
     'output_dir',
+    'header_file_extensions',
 ])): pass
 
 
@@ -46,8 +47,6 @@ class NativeCompile(NativeTask, AbstractClass):
   # NB: `source_target_constraint` must be overridden.
   source_target_constraint = None
   dependent_target_constraint = SubclassesOf(ExternalNativeLibrary, NativeLibrary)
-
-  HEADER_EXTENSIONS = ('.h', '.hpp')
 
   # `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
   # compiler process. `workunit_label` must be set to a string.
@@ -181,10 +180,23 @@ class NativeCompile(NativeTask, AbstractClass):
       compiler_options=(self._compile_settings
                             .native_build_step_settings
                             .get_merged_args_for_compiler_option_sets(compiler_option_sets)),
-      output_dir=versioned_target.results_dir)
+      output_dir=versioned_target.results_dir,
+      header_file_extensions=self._compile_settings.header_file_extensions)
+
+  def _iter_sources_minus_headers(self, compile_request):
+    for s in compile_request.sources:
+      if not s.endswith(tuple(compile_request.header_file_extensions)):
+        yield s
+
+  class _HeaderOnlyLibrary(Exception): pass
 
   def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
+
+    sources_minus_headers = list(self._iter_sources_minus_headers(compile_request))
+    if len(sources_minus_headers) == 0:
+      raise self._HeaderOnlyLibrary()
+
     compiler = compile_request.compiler
     compiler_options = compile_request.compiler_options
     # We are going to execute in the target output, so get absolute paths for everything.
@@ -199,7 +211,7 @@ class NativeCompile(NativeTask, AbstractClass):
         '-I{}'.format(os.path.join(buildroot, inc_dir))
         for inc_dir in compile_request.include_dirs
       ] +
-      [os.path.join(buildroot, src) for src in compile_request.sources])
+      [os.path.join(buildroot, src) for src in sources_minus_headers])
 
     self.context.log.debug("compile argv: {}".format(argv))
 
@@ -211,18 +223,15 @@ class NativeCompile(NativeTask, AbstractClass):
     NB: This method must arrange the output files so that `collect_cached_objects()` can collect all
     of the results (or vice versa)!
     """
-    sources = compile_request.sources
 
-    if len(sources) == 0 and not any(s for s in sources if not s.endswith(self.HEADER_EXTENSIONS)):
-      # TODO: do we need this log message? Should we still have it for intentionally header-only
-      # libraries (that might be a confusing message to see)?
-      self.context.log.debug("no sources in request {}, skipping".format(compile_request))
+    try:
+      argv = self._make_compile_argv(compile_request)
+    except self._HeaderOnlyLibrary:
+      self.context.log.debug('{} is a header-only library'.format(compile_request))
       return
 
     compiler = compile_request.compiler
     output_dir = compile_request.output_dir
-
-    argv = self._make_compile_argv(compile_request)
     env = compiler.as_invocation_environment_dict
 
     with self.context.new_workunit(

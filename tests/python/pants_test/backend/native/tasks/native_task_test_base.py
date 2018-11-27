@@ -20,6 +20,17 @@ class NativeTaskTestBase(TaskTestBase):
 
 
 class NativeCompileTestMixin(object):
+
+  def _retrieve_single_product_at_target_base(self, product_mapping, target):
+    product = product_mapping.get(target)
+    base_dirs = list(product.keys())
+    self.assertEqual(1, len(base_dirs))
+    single_base_dir = base_dirs[0]
+    all_products = product[single_base_dir]
+    self.assertEqual(1, len(all_products))
+    single_product = all_products[0]
+    return single_product
+
   def create_simple_cpp_library(self, **kwargs):
     self.create_file('src/cpp/test/test.hpp', contents=dedent("""
       #ifndef __TEST_HPP__
