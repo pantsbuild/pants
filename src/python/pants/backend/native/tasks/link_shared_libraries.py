@@ -159,7 +159,7 @@ class LinkSharedLibraries(NativeTask):
       external_lib_dirs=tuple(external_lib_dirs),
       external_lib_names=tuple(external_lib_names))
 
-    self.context.log.debug(link_request)
+    self.context.log.debug(repr(link_request))
 
     return link_request
 
