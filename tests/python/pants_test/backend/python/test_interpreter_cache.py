@@ -56,7 +56,7 @@ class TestInterpreterCache(TestBase):
 
   def _setup_cache_at(self, path, constraints=None):
     setup_options = {'interpreter_cache_dir': path}
-    if constraints:
+    if constraints is not None:
       setup_options.update(interpreter_constraints=constraints)
     return self._create_interpreter_cache(setup_options=setup_options, repos_options={})
 
@@ -66,7 +66,7 @@ class TestInterpreterCache(TestBase):
       self.assertEqual([], cache.setup())
 
   def test_cache_setup_with_no_filters_uses_repo_default(self):
-    with self._setup_cache(constraints=['']) as (cache, _):
+    with self._setup_cache(constraints=[]) as (cache, _):
       self.assertIn(self._interpreter, cache.setup())
 
   def test_cache_setup_with_filter_overrides_repo_default(self):
