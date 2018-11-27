@@ -208,6 +208,7 @@ class NativeCompile(NativeTask, AbstractClass):
     argv = (
       [compiler.exe_filename] +
       compiler.extra_args +
+      # TODO: add -v to every compiler and linker invocation!
       # TODO: If we need to produce static libs, don't add -fPIC! (could use Variants -- see #5788).
       ['-c', '-fPIC'] +
       compiler_options +
