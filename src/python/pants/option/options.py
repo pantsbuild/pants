@@ -8,11 +8,10 @@ import copy
 import re
 import sys
 from builtins import object, open, str
-from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import get_frame_info, warn_or_error
+from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_util import is_list_option
