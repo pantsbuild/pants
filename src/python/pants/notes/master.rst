@@ -4,6 +4,44 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.13.0.dev0 (11/26/2018)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+* Use both the deprecated and new locations of fatal_warnings args (#6798)
+  `PR #6798 <https://github.com/pantsbuild/pants/pull/6798>`_
+
+Bugfixes
+~~~~~~~~
+* Fix disappearing cursor (#6811)
+  `PR #6811 <https://github.com/pantsbuild/pants/pull/6811>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Add nailgun-specific main which uses paths in calling process (#6792)
+  `PR #6792 <https://github.com/pantsbuild/pants/pull/6792>`_
+
+* Move file owners computation into the engine and make lighter (#6790)
+  `PR #6790 <https://github.com/pantsbuild/pants/pull/6790>`_
+
+* Bump Conan to 1.9.2 (#6797)
+  `PR #6797 <https://github.com/pantsbuild/pants/pull/6797>`_
+
+* Make bootstrap jar reproducible (#6796)
+  `PR #6796 <https://github.com/pantsbuild/pants/pull/6796>`_
+
+* Remove unused CompilerCacheKey (#6805)
+  `PR #6805 <https://github.com/pantsbuild/pants/pull/6805>`_
+
+* Fix documentation example for using scalac_plugins (#6807)
+  `PR #6807 <https://github.com/pantsbuild/pants/pull/6807>`_
+
+* Remove Params::expect_single compatibility API (#6766)
+  `PR #6766 <https://github.com/pantsbuild/pants/pull/6766>`_
+
+
 1.12.0rc0 (11/19/2018)
 ----------------------
 
