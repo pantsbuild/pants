@@ -3474,7 +3474,7 @@ mod tests {
         ingested_file_count: 1,
         ingested_file_bytes: testroland.digest().1,
         uploaded_file_count: 1,
-        uploaded_file_bytes: testroland.digest().1
+        uploaded_file_bytes: testroland.digest().1,
         upload_wall_time: Duration::default(),
       }
     );
@@ -3495,7 +3495,7 @@ mod tests {
         ingested_file_count: 3,
         ingested_file_bytes: testdir.digest().1 + testroland.digest().1 + testcatnip.digest().1,
         uploaded_file_count: 2,
-        uploaded_file_bytes: testdir.digest().1 + testcatnip.digest().1
+        uploaded_file_bytes: testdir.digest().1 + testcatnip.digest().1,
         upload_wall_time: Duration::default(),
       }
     );

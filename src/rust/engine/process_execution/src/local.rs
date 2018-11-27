@@ -338,6 +338,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     )
   }
@@ -363,6 +364,7 @@ mod tests {
         stderr: as_bytes("bar"),
         exit_code: 1,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     )
   }
@@ -389,6 +391,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: -15,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     )
   }
@@ -490,6 +493,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     )
   }
@@ -518,6 +522,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::containing_roland().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -551,6 +556,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::recursive().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -585,6 +591,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::recursive().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -617,6 +624,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 1,
         output_directory: TestDirectory::containing_roland().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -647,6 +655,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::containing_roland().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -678,6 +687,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::nested().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -706,6 +716,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       })
     )
   }

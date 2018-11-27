@@ -407,19 +407,19 @@ impl CommandRunner {
 
           match (worker_start - enqueued).to_std() {
             Ok(duration) => attempts.current_attempt.remote_queue = Some(duration),
-            Err(_) => warn!("Got negative remote queue time"),
+            Err(err) => warn!("Got negative remote queue time: {}", err),
           }
           match (input_fetch_completed - input_fetch_start).to_std() {
             Ok(duration) => attempts.current_attempt.remote_input_fetch = Some(duration),
-            Err(_) => warn!("Got negative remote input fetch time"),
+            Err(err) => warn!("Got negative remote input fetch time: {}", err),
           }
           match (execution_completed - execution_start).to_std() {
             Ok(duration) => attempts.current_attempt.remote_execution = Some(duration),
-            Err(_) => warn!("Got negative remote execution time"),
+            Err(err) => warn!("Got negative remote execution time: {}", err),
           }
           match (output_upload_completed - output_upload_start).to_std() {
             Ok(duration) => attempts.current_attempt.remote_output_store = Some(duration),
-            Err(_) => warn!("Got negative remote output store time"),
+            Err(err) => warn!("Got negative remote output store time: {}", err),
           }
           attempts.current_attempt.was_cache_hit = execute_response.cached_result;
         }
@@ -891,7 +891,10 @@ mod tests {
   use testutil::{as_bytes, owned_string_vec};
 
   use super::super::CommandRunner as CommandRunnerTrait;
-  use super::{CommandRunner, ExecuteProcessRequest, ExecutionError, FallibleExecuteProcessResult};
+  use super::{
+    CommandRunner, ExecuteProcessRequest, ExecutionError, ExecutionHistory,
+    FallibleExecuteProcessResult,
+  };
   use mock::execution_server::MockOperation;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
@@ -1251,6 +1254,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     );
   }
@@ -1276,6 +1280,7 @@ mod tests {
         stderr: testdata_empty.bytes(),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       })
     );
   }
@@ -1301,6 +1306,7 @@ mod tests {
         stderr: testdata.bytes(),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       })
     );
   }
@@ -1352,6 +1358,7 @@ mod tests {
         stderr: test_stderr.bytes(),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       })
     );
 
@@ -1411,6 +1418,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     );
   }
@@ -1486,6 +1494,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     );
   }
@@ -1707,6 +1716,7 @@ mod tests {
         stderr: Bytes::from(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       })
     );
     {
@@ -1786,6 +1796,7 @@ mod tests {
         stderr: Bytes::from(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       })
     );
     {
@@ -1868,6 +1879,7 @@ mod tests {
       stderr: Bytes::from("simba"),
       exit_code: 17,
       output_directory: TestDirectory::nested().digest(),
+      execution_attempts: vec![],
     };
 
     let mut output_file = bazel_protos::remote_execution::OutputFile::new();
@@ -2410,8 +2422,10 @@ mod tests {
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
     command_runner
-      .extract_execute_response(super::OperationOrStatus::Operation(operation))
-      .wait()
+      .extract_execute_response(
+        super::OperationOrStatus::Operation(operation),
+        &mut ExecutionHistory::default(),
+      ).wait()
   }
 
   fn extract_output_files_from_response(
