@@ -181,23 +181,22 @@ class NativeCompile(NativeTask, AbstractClass):
                             .native_build_step_settings
                             .get_merged_args_for_compiler_option_sets(compiler_option_sets)),
       output_dir=versioned_target.results_dir,
-      header_file_extensions=self._compile_settings
-                                 .header_file_extensions)
+      header_file_extensions=self._compile_settings.header_file_extensions)
 
-  def _split_sources_and_headers(self, sources, header_file_extensions):
-    sources_for_compiler = []
-    header_files = []
-    for s in sources:
-      for ext in header_file_extensions:
-        if s.endswith(ext):
-          header_files.append(s)
-          break
-      else:
-        sources_for_compiler.append(s)
-    return (sources_for_compiler, header_files)
+  def _iter_sources_minus_headers(self, compile_request):
+    for s in compile_request.sources:
+      if not s.endswith(tuple(compile_request.header_file_extensions)):
+        yield s
 
-  def _make_compile_argv(self, compile_request, sources_minus_headers):
+  class _HeaderOnlyLibrary(Exception): pass
+
+  def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
+
+    sources_minus_headers = list(self._iter_sources_minus_headers(compile_request))
+    if len(sources_minus_headers) == 0:
+      raise self._HeaderOnlyLibrary()
+
     compiler = compile_request.compiler
     compiler_options = compile_request.compiler_options
     # We are going to execute in the target output, so get absolute paths for everything.
@@ -224,17 +223,15 @@ class NativeCompile(NativeTask, AbstractClass):
     NB: This method must arrange the output files so that `collect_cached_objects()` can collect all
     of the results (or vice versa)!
     """
-    sources, _ = self._split_sources_and_headers(
-      compile_request.sources, compile_request.header_file_extensions)
 
-    if len(sources) == 0:
-      self.context.log.info('{} is a header-only library'.format(compile_request))
+    try:
+      argv = self._make_compile_argv(compile_request)
+    except self._HeaderOnlyLibrary:
+      self.context.log.debug('{} is a header-only library'.format(compile_request))
       return
 
     compiler = compile_request.compiler
     output_dir = compile_request.output_dir
-
-    argv = self._make_compile_argv(compile_request, sources)
     env = compiler.as_invocation_environment_dict
 
     with self.context.new_workunit(
