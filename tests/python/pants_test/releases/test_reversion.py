@@ -39,8 +39,8 @@ class ReversionTest(PantsRunIntegrationTest):
       output_name = name_template.format(output_version)
       output_whl_file = os.path.join(dest_dir, output_name)
       command = [
+          '--quiet',
           'run',
-          '-q',
           'src/python/pants/releases:reversion',
           '--',
           input_whl_file,

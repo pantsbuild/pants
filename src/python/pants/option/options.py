@@ -341,49 +341,10 @@ class Options(object):
           deprecated_entity_description='scope {}'.format(deprecated_scope),
           hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys)))
 
-  _quiet_flag_regex = make_flag_regex(long_name='quiet', short_name='q')
-
-  # NB: This method can be removed entirely after the deprecation period is complete.
-  def _match_recursive_quiet_flag(self, scope, flags):
-    if scope == GLOBAL_SCOPE:
-      # NB: We do not match a global '-q' or '--quiet' flag -- those are still allowed! Returning
-      # None is explicitly checked for in the _check_deprecations() method.
-      return None
-
-    try:
-      found_flag = next(iter(filter(self._quiet_flag_regex.match, flags)))
-    except StopIteration:
-      # No
-      return None
-
-    if found_flag:
-      return dict(
-        removal_version='1.13.0.dev0',
-        deprecated_entity_description=(
-          "Using the -q or --quiet option recursively "
-          "(i.e. after a goal name on the command line)"),
-        hint=dedent("""
-The -q or --quiet flag should be specified globally by providing it on the
-command line before any other goals (e.g. `./pants -q run
-<binary_target>`). Using -q or --quiet globally will silence all pants logging
-for all tasks and only print output from a console task, which makes binaries
-run from the pants command line usable for consumption by other scripts.
-
-The flag provided was {flag!r}, in scope {scope!r}.
-        """
-        .format(flag=found_flag, scope=scope)),
-        # This shows the call to `self._match_recursive_quiet_flag(...)` in the lambda in
-        # `self.flag_matchers` in the error message so users can know to look at this method for
-        # more context.
-        frame_info=get_frame_info(stacklevel=2),
-        # This warning should always go to stderr, even if a global quiet flag is passed in.
-        ensure_stderr=True)
-
   @memoized_property
   def flag_matchers(self):
     return [
       lambda scope, _, values: self._check_deprecated_scope(scope, values),
-      lambda scope, flags, _: self._match_recursive_quiet_flag(scope, flags),
     ]
 
   def _check_deprecations(self, scope, flags, values):
