@@ -6,7 +6,7 @@ not undergo the vetting associated with ``stable`` releases.
 
 
 1.13.0.dev0 (11/26/2018)
-----------------------
+------------------------
 
 API Changes
 ~~~~~~~~~~~
