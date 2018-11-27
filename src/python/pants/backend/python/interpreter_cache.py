@@ -190,16 +190,16 @@ class PythonInterpreterCache(Subsystem):
       'Initializing Python interpreter cache matching filters `{}` from paths `{}`'.format(
         ':'.join(filters), ':'.join(setup_paths)))
 
-    def unsatisfied_filters(ipreters):
-      return [f for f in filters if len(list(self._matching(ipreters, [f]))) == 0]
-
     interpreters = []
+    def unsatisfied_filters():
+      return [f for f in filters if len(list(self._matching(interpreters, [f]))) == 0]
+
     with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, '.file_lock')):
       interpreters.extend(self._setup_cached(filters=filters))
-      if not interpreters or unsatisfied_filters(interpreters):
+      if not interpreters or unsatisfied_filters():
         interpreters.extend(self._setup_paths(setup_paths, filters=filters))
 
-    for filt in unsatisfied_filters(interpreters):
+    for filt in unsatisfied_filters():
       logger.debug('No valid interpreters found for {}!'.format(filt))
 
     matches = list(self._matching(interpreters, filters=filters))
