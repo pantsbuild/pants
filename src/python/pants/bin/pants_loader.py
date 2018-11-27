@@ -43,7 +43,7 @@ class PantsLoader(object):
         Check and set the LC_* and LANG environment settings. Example:
           LC_ALL=en_US.UTF-8
           LANG=en_US.UTF-8
-        Specifically, the standard library's `locale.getpreferredencoding()` must resolve to `utf-8`.
+        Specifically, Python's `locale.getpreferredencoding()` must resolve to `UTF-8`.
 
         To bypass this error, you can set the below environment variable. 
         Note that we cannot guarantee regular behavior with this bypass set.
