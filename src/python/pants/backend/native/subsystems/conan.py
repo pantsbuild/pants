@@ -24,6 +24,8 @@ class Conan(ExecutablePexTool):
   # a special target specified in BUILD.tools)?
   default_conan_requirements = (
     'conan==1.9.2',
+    # NB: Only versions of pylint below `2.0.0` support use in python 2.
+    'pylint==1.9.3',
   )
 
   @classmethod
