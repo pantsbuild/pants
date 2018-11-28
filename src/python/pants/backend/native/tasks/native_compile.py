@@ -183,16 +183,16 @@ class NativeCompile(NativeTask, AbstractClass):
       output_dir=versioned_target.results_dir,
       header_file_extensions=self._compile_settings.header_file_extensions)
 
+    self.context.log.debug(repr(compile_request))
+
+    return compile_request
+
   def _iter_sources_minus_headers(self, compile_request):
     for s in compile_request.sources:
       if not s.endswith(tuple(compile_request.header_file_extensions)):
         yield s
 
   class _HeaderOnlyLibrary(Exception): pass
-
-    self.context.log.debug(repr(compile_request))
-
-    return compile_request
 
   def _make_compile_argv(self, compile_request):
     """Return a list of arguments to use to compile sources. Subclasses can override and append."""
