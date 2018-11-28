@@ -44,6 +44,7 @@ python_tests(
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/backend/python/tasks/util',
     'tests/python/pants_test/engine:scheduler_test_base',
+    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags={'platform_specific_behavior', 'integration'},
   timeout=2400,
