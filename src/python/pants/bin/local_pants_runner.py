@@ -140,8 +140,8 @@ class LocalPantsRunner(object):
     options, build_config, options_bootstrapper = cls.parse_options(
       args,
       env,
-      True,
-      options_bootstrapper
+      setup_logging=True,
+      options_bootstrapper=options_bootstrapper,
     )
     global_options = options.for_global_scope()
 

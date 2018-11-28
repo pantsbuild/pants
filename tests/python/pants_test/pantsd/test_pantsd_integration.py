@@ -94,14 +94,16 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
   def test_pantsd_stacktrace_dump(self):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
-      pantsd_run(['help'])
+      pantsd_run(['-ldebug', 'help'])
       checker.assert_started()
 
+      print("BL: Checker-pid: {}".format(checker.pid))
       os.kill(checker.pid, signal.SIGUSR2)
 
       # Wait for log flush.
       time.sleep(2)
 
+      # raise Exception(read_pantsd_log(workdir))
       self.assertIn('Current thread 0x', '\n'.join(read_pantsd_log(workdir)))
 
   def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):

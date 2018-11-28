@@ -20,7 +20,7 @@ from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.logging import setup_logging
+from pants.init.logging import init_rust_logger, setup_logging
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -62,6 +62,8 @@ class _LoggerStream(object):
 
   def write(self, msg):
     msg = ensure_text(msg)
+    with open("/tmp/plog", "a") as l:
+      l.write("BL: Logging {} from stream {}\n".format(msg, self))
     for line in msg.rstrip().splitlines():
       # The log only accepts text, and will raise a decoding error if the default encoding is ascii
       # if provided a bytes input for unicode text.
@@ -306,7 +308,8 @@ class PantsDaemon(FingerprintedProcessManager):
     # for further forks.
     with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
       # Reinitialize logging for the daemon context.
-      result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME)
+      init_rust_logger(self._log_level)
+      result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME, native=self._native)
 
       # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
       # TODO: Consider giving these pipes/actual fds, in order to make them "deep" replacements
@@ -315,7 +318,7 @@ class PantsDaemon(FingerprintedProcessManager):
       sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_handler)
 
       self._logger.debug('logging initialized')
-      yield result.log_handler.stream
+      yield (result.log_handler.stream, result.log_handler.native_filename)
 
   def _setup_services(self, pants_services):
     for service in pants_services.services:
@@ -369,21 +372,28 @@ class PantsDaemon(FingerprintedProcessManager):
     """Synchronously run pantsd."""
     # Switch log output to the daemon's log stream from here forward.
     self._close_stdio()
-    with self._pantsd_logging() as log_stream:
+    with self._pantsd_logging() as (log_stream, log_filename):
+
+      self._logger.info("BL {}, Log stream {}, filename {}".format(os.getpid(), log_stream, log_filename))
       # Register an exiter using os._exit to ensure we only close stdio streams once.
       ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
 
       # We don't have any stdio streams to log to anymore, but we can get tracebacks of the pantsd
       # process by tailing the pantsd log and sending it SIGUSR2.
-      ExceptionSink.reset_interactive_output_stream(log_stream)
+      ExceptionSink.reset_interactive_output_stream(log_stream, log_filename)
 
       # Reset the log location and the backtrace preference from the global bootstrap options.
       global_bootstrap_options = self._bootstrap_options.for_global_scope()
       ExceptionSink.reset_should_print_backtrace_to_terminal(
         global_bootstrap_options.print_exception_stacktrace)
-      ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
+      # TODO Hello! I am your friendly neighborhoood log resetter. This resets the log location,
+      #  which is not nice because we have already reset the interactive output stream.
+      ExceptionSink.reset_log_location("/tmp/pantslogs")
+      # ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
 
-      self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
+      self._logger.info('pantsd starting, log level is {}, workdir {}, log_filename is {}'.format(
+        self._log_level, global_bootstrap_options.pants_workdir, log_filename))
+      # self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
       self._native.set_panic_handler()
 

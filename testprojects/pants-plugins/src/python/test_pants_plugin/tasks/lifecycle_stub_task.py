@@ -47,6 +47,6 @@ class LifecycleStubTask(Task):
     output_file = self._lifecycle_stubs.new_interactive_stream_output_file
     if output_file:
       file_stream = open(output_file, 'wb')
-      ExceptionSink.reset_interactive_output_stream(file_stream)
+      ExceptionSink.reset_interactive_output_stream(file_stream, output_file)
 
     raise Exception('erroneous!')

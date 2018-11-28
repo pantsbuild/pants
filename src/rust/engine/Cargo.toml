@@ -35,6 +35,7 @@ members = [
   "fs/fs_util",
   "graph",
   "hashing",
+  "logging",
   "process_execution",
   "process_executor",
   "resettable",
@@ -62,6 +63,7 @@ default-members = [
   "fs/fs_util",
   "graph",
   "hashing",
+  "logging",
   "process_execution",
   "process_executor",
   "resettable",
@@ -87,6 +89,7 @@ indexmap = "1.0.2"
 itertools = "0.7.2"
 lazy_static = "1"
 log = "0.4"
+logging = { path = "logging" }
 num_enum = "0.1.1"
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }

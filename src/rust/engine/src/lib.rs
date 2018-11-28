@@ -43,6 +43,16 @@ mod selectors;
 mod tasks;
 mod types;
 
+use fs;
+use futures;
+
+use hashing;
+
+use log;
+
+use tar_api;
+
+use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -69,6 +79,8 @@ use crate::types::Types;
 use futures::Future;
 use hashing::Digest;
 use log::error;
+use logging::logger::LOGGER;
+use logging::Logger;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -96,7 +108,6 @@ impl RawNodes {
 #[no_mangle]
 pub extern "C" fn externs_set(
   context: *const ExternContext,
-  log: LogExtern,
   log_level: u8,
   call: CallExtern,
   generator_send: GeneratorSendExtern,
@@ -122,7 +133,6 @@ pub extern "C" fn externs_set(
 ) {
   externs::set_externs(Externs {
     context,
-    log,
     log_level,
     call,
     generator_send,
@@ -798,6 +808,39 @@ pub extern "C" fn materialize_directories(
   .map(|_| ())
   .wait()
   .into()
+}
+
+// This is called before externs are set up, so we cannot return a PyResult
+#[no_mangle]
+pub extern "C" fn init_logging(level: u64) {
+  Logger::init(level);
+  log::debug!("Rust logger initialized with level {}", level);
+  eprintln!("BL: Rust logger initialized with level {}", level);
+}
+
+#[no_mangle]
+pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u64) -> PyResult {
+  let path_str = unsafe { CStr::from_ptr(log_file_ptr).to_string_lossy().into_owned() };
+  let path = PathBuf::from(path_str);
+  LOGGER.set_pantsd_logger(path, level).into()
+}
+
+// Might be called before externs are set, therefore can't return a PyResult
+#[no_mangle]
+pub extern "C" fn setup_stderr_logger(level: u64) {
+  LOGGER
+    .set_stderr_logger(level)
+    .expect("Error setting up STDERR logger");
+}
+
+// Might be called before externs are set, therefore can't return a PyResult
+#[no_mangle]
+pub extern "C" fn write_log(msg: *const raw::c_char, level: u64, target: *const raw::c_char) {
+  let message_str = unsafe { CStr::from_ptr(msg).to_string_lossy() };
+  let target_str = unsafe { CStr::from_ptr(target).to_string_lossy() };
+  LOGGER
+    .log_from_python(message_str.borrow(), level, target_str.borrow())
+    .expect("Error logging message");
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

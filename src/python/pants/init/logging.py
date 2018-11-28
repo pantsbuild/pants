@@ -7,12 +7,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import sys
-import time
 from collections import namedtuple
-from logging import FileHandler, Formatter, StreamHandler
+from logging import StreamHandler
 
 from future.moves.http import client
 
+from pants.engine.native import Native
 from pants.util.dirutil import safe_mkdir
 
 
@@ -42,13 +42,70 @@ def _maybe_configure_extended_logging(logger):
     _configure_requests_debug_logging()
 
 
+def init_rust_logger(level):
+  native = Native()
+  levelno = get_numeric_level(level)
+  print("BL: {}, I want to init logging with level {}".format(os.getpid(), level))
+  native.init_rust_logging(levelno)
+
+
+def setup_logging_to_stderr(python_logger, level):
+  native = Native()
+  levelno = get_numeric_level(level)
+  handler = create_native_stderr_log_handler(levelno, native, stream=sys.stderr)
+  python_logger.addHandler(handler)
+  python_logger.setLevel("TRACE")
+
+
 def setup_logging_from_options(bootstrap_options):
   # N.B. quiet help says 'Squelches all console output apart from errors'.
   level = 'ERROR' if bootstrap_options.quiet else bootstrap_options.level.upper()
-  return setup_logging(level, console_stream=sys.stderr, log_dir=bootstrap_options.logdir)
+  native = Native()
+  return setup_logging(level, console_stream=sys.stderr, log_dir=bootstrap_options.logdir, native=native)
 
 
-def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None):
+class NativeHandler(StreamHandler):
+
+  def __init__(self, level, native=None, stream=None, native_filename=None):
+    super(NativeHandler, self).__init__(stream)
+    self.native = native
+    self.native_filename = native_filename
+    self.setLevel(level)
+
+  def emit(self, record):
+    msg = ("{}:{} - {}".format(record.name, os.getpid(), self.format(record)))
+    # msg = ("{}".format(self.format(record)))
+    self.native.write_log(msg, record.levelno, record.name)
+
+
+def create_native_pantsd_file_log_handler(level, native, native_filename):
+  try:
+    native.setup_pantsd_logger(native_filename, get_numeric_level(level))
+  except Exception as e:
+    print("Error setting up pantsd logger: {}".format(e), file=sys.stderr)
+    raise e
+
+  return NativeHandler(level, native, native_filename=native_filename)
+
+
+def create_native_stderr_log_handler(level, native, stream=None):
+  try:
+    native.setup_stderr_logger(get_numeric_level(level))
+  except Exception as e:
+    print("Error setting up pantsd logger: {}".format(e), file=sys.stderr)
+    raise e
+
+  return NativeHandler(level, native, stream)
+
+
+# TODO This function relies on logging._checkLevel, which is private.
+# There is currently no good way to convert string levels to numeric values,
+# but if there is ever one, it may be worth changing this.
+def get_numeric_level(level):
+  return logging._checkLevel(level)
+
+
+def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None, native=None):
   """Configures logging for a given scope, by default the global scope.
 
   :param str level: The logging level to enable, must be one of the level names listed here:
@@ -63,6 +120,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
                     The '.' separator providing the scope hierarchy.  By default the root logger is
                     configured.
   :param str log_name: The base name of the log file (defaults to 'pants.log').
+  :param Native native: An instance of the Native FFI lib, to register rust logging.
   :returns: The full path to the main log file if file logging is configured or else `None`.
   :rtype: str
   """
@@ -88,43 +146,22 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   for handler in logger.handlers:
     logger.removeHandler(handler)
 
+  print("BL: {}, Setup logging with log_dir {}, console_stream {}, level {}".format(os.getpid(), log_dir, console_stream, level))
+
   if console_stream:
-    console_handler = StreamHandler(stream=console_stream)
-    console_handler.setFormatter(Formatter(fmt='%(levelname)s] %(message)s'))
-    console_handler.setLevel(level)
-    logger.addHandler(console_handler)
+    native_handler = create_native_stderr_log_handler(level, native, stream=console_stream)
+    logger.addHandler(native_handler)
 
   if log_dir:
     safe_mkdir(log_dir)
     log_filename = os.path.join(log_dir, log_name or 'pants.log')
-    file_handler = FileHandler(log_filename)
 
-    class GlogFormatter(Formatter):
-      LEVEL_MAP = {
-        logging.FATAL: 'F',
-        logging.ERROR: 'E',
-        logging.WARN: 'W',
-        logging.INFO: 'I',
-        logging.DEBUG: 'D',
-        TRACE: 'T'
-      }
+    native_handler = create_native_pantsd_file_log_handler(level, native, log_filename)
+    file_handler = native_handler
+    print("BL: {}, Configured file handler".format(os.getpid()))
+    logger.addHandler(native_handler)
 
-      def format(self, record):
-        datetime = time.strftime('%m%d %H:%M:%S', time.localtime(record.created))
-        micros = int((record.created - int(record.created)) * 1e6)
-        return '{levelchar}{datetime}.{micros:06d} {process} {filename}:{lineno}] {msg}'.format(
-          levelchar=self.LEVEL_MAP[record.levelno],
-          datetime=datetime,
-          micros=micros,
-          process=record.process,
-          filename=record.filename,
-          lineno=record.lineno,
-          msg=record.getMessage()
-        )
-
-    file_handler.setFormatter(GlogFormatter())
-    file_handler.setLevel(level)
-    logger.addHandler(file_handler)
+    #raise ValueError("BL: {} I don't feel like initializing logging with level {}".format(os.getpid(), level))
 
   logger.setLevel(level)
 
