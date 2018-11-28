@@ -328,10 +328,10 @@ matrix:
         - sudo sysctl -w kern.maxfiles=$NOFILE
         - sudo sysctl -w kern.maxfilesperproc=$NOFILE
         - sudo launchctl limit maxfiles $NOFILE $NOFILE
-        - ulimit -n $NOFILE
-        - ulimit -S -n $NOFILE
-        - ulimit -c unlimited
-        - ulimit -a
+        - sudo ulimit -n $NOFILE
+        - sudo ulimit -S -n $NOFILE
+        - sudo ulimit -c unlimited
+        - sudo ulimit -a
       script:
         # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and
         # set -z to run the platform-specific tests.
