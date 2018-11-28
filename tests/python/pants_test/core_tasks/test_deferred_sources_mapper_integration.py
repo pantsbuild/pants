@@ -121,7 +121,7 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
         if target['is_synthetic'] and target['pants_target_type'] == 'java_protobuf_library':
           synthetic_proto_libraries.append(target)
 
-      self.assertEqual(2, len(synthetic_proto_libraries),
+      self.assertEqual(3, len(synthetic_proto_libraries),
                        'Got unexpected number of synthetic proto libraries.')
 
       synthetic7, synthetic8, synthetic_other = sorted(
