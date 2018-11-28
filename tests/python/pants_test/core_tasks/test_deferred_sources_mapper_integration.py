@@ -43,7 +43,7 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
         dest=java_protobuf_library,
         sources_target=':other-external-source',
         args=dict(
-          platform='java8',
+          platform='java9',
         ),
         dependencies=[
           ':proto-sources',
@@ -97,6 +97,7 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
           'platforms': {
             'java7': {'source': '7', 'target': '7', 'args': []},
             'java8': {'source': '8', 'target': '8', 'args': []},
+            'java9': {'source': '9', 'target': '9', 'args': []},
           },
         },
       },
