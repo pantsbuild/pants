@@ -328,14 +328,14 @@ matrix:
         - sudo sysctl -w kern.maxfiles=$NOFILE
         - sudo sysctl -w kern.maxfilesperproc=$NOFILE
         - sudo launchctl limit maxfiles $NOFILE $NOFILE
-        - sudo ulimit -n $NOFILE
-        - sudo ulimit -S -n $NOFILE
-        - sudo ulimit -c unlimited
-        - sudo ulimit -a
+        - ulimit -n $NOFILE
+        - ulimit -S -n $NOFILE
+        - ulimit -c unlimited
+        - ulimit -a
       script:
         # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and
         # set -z to run the platform-specific tests.
-        - ./build-support/bin/travis-ci.sh -ez
+        - ./pants test tests/python/pants_test/backend/python/tasks:python_native_code_testing -- -vs
 
     # Rust Clippy on Linux
     - name: "Rust Clippy on Linux"
