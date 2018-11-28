@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class ExternalUrlGenerator(BinaryToolUrlGenerator):
 
   def generate_urls(self, version, host_platform):
-    return ['https://example.com/some-binary', 'https://example.com/same-binary']
+    return ['https://www.pantsbuild.org/some-binary', 'https://www.pantsbuild.org/same-binary']
 
   # Make the __str__ deterministic, for testing exception messages.
   def __str__(self):
@@ -311,9 +311,9 @@ class BinaryUtilTest(TestBase):
       "name=name, platform_dependent=False, "
       "external_url_generator=ExternalUrlGenerator(<example __str__()>), archiver=None): "
       "Failed to fetch name binary from any source: (Failed to fetch binary from "
-      "https://example.com/some-binary: Fetch of https://example.com/some-binary failed with "
-      "status code 404, Failed to fetch binary from https://example.com/same-binary: Fetch of "
-      "https://example.com/same-binary failed with status code 404)'")
+      "https://www.pantsbuild.org/some-binary: Fetch of https://www.pantsbuild.org/some-binary failed with "
+      "status code 404, Failed to fetch binary from https://www.pantsbuild.org/same-binary: Fetch of "
+      "https://www.pantsbuild.org/same-binary failed with status code 404)'")
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_disallowing_external_urls(self):
