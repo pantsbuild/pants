@@ -58,6 +58,7 @@ class DeferredSourcesMapper(Task):
 
     snapshot_specs = []
     filespecs = []
+    unpack_dirs = []
     for target in remote_sources_targets:
       sources, rel_unpack_dir = unpacked_sources[target.sources_target]
       sources_in_dir = tuple(os.path.join(rel_unpack_dir, source) for source in sources)
@@ -66,9 +67,11 @@ class DeferredSourcesMapper(Task):
         get_buildroot(),
       ))
       filespecs.append({'globs': sources_in_dir})
+      unpack_dirs.append(rel_unpack_dir)
 
     snapshots = self.context._scheduler.capture_snapshots(tuple(snapshot_specs))
-    for target, snapshot, filespec in zip(remote_sources_targets, snapshots, filespecs):
+    for target, snapshot, filespec, rel_unpack_dir in \
+      zip(remote_sources_targets, snapshots, filespecs, unpack_dirs):
       synthetic_target = self.context.add_new_target(
         address=Address(os.path.relpath(self.workdir, get_buildroot()), target.id),
         target_type=target.destination_target_type,

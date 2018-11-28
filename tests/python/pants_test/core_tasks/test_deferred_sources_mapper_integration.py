@@ -38,6 +38,18 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
         ],
       )
 
+      # A target with a separate sources_target
+      remote_sources(name='proto-other',
+        dest=java_protobuf_library,
+        sources_target=':other-external-source',
+        args=dict(
+          platform='java8',
+        ),
+        dependencies=[
+          ':proto-sources',
+        ],
+      )
+
       remote_sources(name='proto-sources',
         dest=resources,
         sources_target=':external-source',
@@ -50,13 +62,26 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
         ],
       )
 
+      remote_sources(name='other-proto-sources',
+        dest=resources,
+        sources_target=':other-external-source',
+      )
+
+      unpacked_jars(name='other-external-source',
+        libraries=[':external-source-jars'],
+        include_patterns=[
+          'com/squareup/testing/*.proto',
+        ],
+      )
+
       jar_library(name='external-source-jars',
         jars=[
           jar(org='com.squareup.testing.protolib', name='protolib-external-test', rev='0.0.2'),
         ],
       )
       """))
-    return ['{}:proto-{}'.format(os.path.relpath(workdir, get_buildroot()), num) for num in (7, 8)]
+    return ['{}:proto-{}'.format(os.path.relpath(workdir, get_buildroot()), suffix)
+            for suffix in (7, 8, 'other')]
 
   def _configured_pants_run(self, command, workdir):
     pants_run = self.run_pants_with_workdir(
@@ -85,8 +110,9 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
 
   def test_deferred_sources_export_successfully(self):
     with self.temporary_workdir() as workdir:
-      proto7, proto8 = self._emit_targets(workdir)
-      pants_run = self._configured_pants_run(['export', proto7, proto8], workdir)
+      proto7, proto8, proto_other = self._emit_targets(workdir)
+      pants_run = self._configured_pants_run(['export', proto7, proto8, proto_other], workdir)
+
       self.assert_success(pants_run)
       export_data = json.loads(pants_run.stdout_data)
 
@@ -98,9 +124,11 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
       self.assertEqual(2, len(synthetic_proto_libraries),
                        'Got unexpected number of synthetic proto libraries.')
 
-      synthetic7, synthetic8 = sorted(synthetic_proto_libraries, key=lambda t: t['platform'])
+      synthetic7, synthetic8, synthetic_other = sorted(
+        synthetic_proto_libraries, key=lambda t: t['platform'])
 
       self.assertIn('proto-7', synthetic7['id'])
       self.assertIn('proto-8', synthetic8['id'])
+      self.assertIn('proto-other', synthetic_other['id'])
       self.assertEqual('java7', synthetic7['platform'])
       self.assertEqual('java8', synthetic8['platform'])
