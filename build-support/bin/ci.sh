@@ -240,7 +240,7 @@ if [[ "${run_cargo_audit:-false}" == "true" ]]; then
   (
     "${REPO_ROOT}/build-support/bin/native/cargo" ensure-installed --package=cargo-audit --version=0.5.2
     "${REPO_ROOT}/build-support/bin/native/cargo" audit -f "${REPO_ROOT}/src/rust/engine/Cargo.lock"
-  ) || die "Pants clippy failure"
+  ) || die "Cargo audit failure"
 fi
 
 
