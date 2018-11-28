@@ -4,11 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import errno
 import os
 import shutil
-import tarfile
-from builtins import object, str
 
 from pants.util.contextutil import open_tar
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_walk
@@ -83,6 +80,8 @@ class DirectoryArtifact(Artifact):
 class TarballArtifact(Artifact):
   """An artifact stored in a tarball."""
 
+  NATIVE_BINARY = None
+
   # TODO: Expose `dereference` for tasks.
   # https://github.com/pantsbuild/pants/issues/3961
   def __init__(self, artifact_root, tarfile_, compression=9, dereference=True):
@@ -109,30 +108,10 @@ class TarballArtifact(Artifact):
         self._relpaths.add(relpath)
 
   def extract(self):
+    # Note(yic): unlike the python implementation before, now we do not update self._relpath
+    # after the extraction.
     try:
-      with open_tar(self._tarfile, 'r', errorlevel=2) as tarin:
-        # Note: We create all needed paths proactively, even though extractall() can do this for us.
-        # This is because we may be called concurrently on multiple artifacts that share directories,
-        # and there will be a race condition inside extractall(): task T1 A) sees that a directory
-        # doesn't exist and B) tries to create it. But in the gap between A) and B) task T2 creates
-        # the same directory, so T1 throws "File exists" in B).
-        # This actually happened, and was very hard to debug.
-        # Creating the paths here up front allows us to squelch that "File exists" error.
-        paths = []
-        dirs = set()
-        for tarinfo in tarin.getmembers():
-          paths.append(tarinfo.name)
-          if tarinfo.isdir():
-            dirs.add(tarinfo.name)
-          else:
-            dirs.add(os.path.dirname(tarinfo.name))
-        for d in dirs:
-          try:
-            os.makedirs(os.path.join(self._artifact_root, d))
-          except OSError as e:
-            if e.errno != errno.EEXIST:
-              raise
-        tarin.extractall(self._artifact_root)
-        self._relpaths.update(paths)
-    except tarfile.ReadError as e:
-      raise ArtifactError(str(e))
+      self.NATIVE_BINARY.decompress_tarball(self._tarfile.encode('utf-8'),
+                                            self._artifact_root.encode('utf-8'))
+    except Exception as e:
+      raise ArtifactError("Extracting artifact failed:\n{}".format(e))

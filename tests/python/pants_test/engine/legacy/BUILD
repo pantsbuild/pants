@@ -49,6 +49,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test/testutils:git_util',
+    'tests/python/pants_test/testutils:py2_compat',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test:int-test',
   ],

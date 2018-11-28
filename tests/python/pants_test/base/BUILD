@@ -64,6 +64,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
     'src/python/pants/goal:context',
+    'src/python/pants/goal:run_tracker',
     'tests/python/pants_test/option/util',
   ]
 )

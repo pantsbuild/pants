@@ -118,9 +118,11 @@ impl Scheduler {
       subject.type_id().clone(),
       &selectors::Select::new(product),
     )?;
-    request
-      .roots
-      .push(Select::new(product, Params::new_single(subject), &edges));
+    request.roots.push(Select::new_from_edges(
+      Params::new_single(subject),
+      product,
+      &edges,
+    ));
     Ok(())
   }
 
@@ -263,11 +265,7 @@ impl Scheduler {
   ///
   /// Compute the results for roots in the given request.
   ///
-  pub fn execute<'e>(
-    &self,
-    request: &'e ExecutionRequest,
-    session: &Session,
-  ) -> Vec<(&'e Key, &'e TypeConstraint, RootResult)> {
+  pub fn execute(&self, request: &ExecutionRequest, session: &Session) -> Vec<RootResult> {
     // Bootstrap tasks for the roots, and then wait for all of them.
     debug!("Launching {} roots.", request.roots.len());
 
@@ -304,15 +302,11 @@ impl Scheduler {
       }
     };
     if let Some(display) = optional_display.as_mut() {
+      // Ran after printing the result of a console_rule.
       display.finish();
     };
 
-    request
-      .roots
-      .iter()
-      .zip(results.into_iter())
-      .map(|(s, r)| (s.params.expect_single(), &s.selector.product, r))
-      .collect()
+    results
   }
 
   fn display_ongoing_tasks(

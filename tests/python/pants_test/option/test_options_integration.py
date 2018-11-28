@@ -237,12 +237,6 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     self.assert_success(self.run_pants(['goals', '--bundle-jvm-archive=zip']))
     self.assert_failure(self.run_pants(['goals', '--jvm-invalid=zip']))
 
-  def test_recursive_quiet_deprecated(self):
-    pants_run = self.run_pants(['options', '-q'])
-    self.assert_success(pants_run)
-    self.assertIn("DeprecationWarning: DEPRECATED: Using the -q or --quiet option recursively",
-                  pants_run.stderr_data)
-
   def test_non_recursive_quiet_no_output(self):
     pants_run = self.run_pants(['-q', 'compile'])
     self.assert_success(pants_run)

@@ -25,7 +25,7 @@ import xsbti.compile.{
 }
 import org.pantsbuild.zinc.analysis.AnalysisMap
 import org.pantsbuild.zinc.scalautil.ScalaUtils
-import org.pantsbuild.zinc.compiler.CompilerUtils.{compilerCache, newScalaCompiler, scalaInstance}
+import org.pantsbuild.zinc.compiler.CompilerUtils.newScalaCompiler
 
 object InputUtils {
   /**

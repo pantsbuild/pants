@@ -145,6 +145,46 @@ class BuildGraphTest(TestBase):
     assertDependencyWalk(a, [a, b, c, d, e])
     assertDependencyWalk(a, [c, d, b, e, a], postorder=True)
 
+  def test_dependency_walk_prelude_epilogue(self):
+    def assertDependencyWalkPreludeEpilogue(target, results, postorder=False):
+      names = []
+      self.build_graph.walk_transitive_dependency_graph([target.address],
+        lambda x: names.append(x.name),
+        postorder=postorder,
+        prelude=lambda x: names.append(x.name + "-pre"),
+        epilogue=lambda x: names.append(x.name + "-epi"),
+      )
+      self.assertEqual(results, names)
+
+    a = self.make_target('a')
+    b = self.make_target('b', dependencies=[a])
+
+    assertDependencyWalkPreludeEpilogue(a, ['a', 'a-pre', 'a-epi'])
+    assertDependencyWalkPreludeEpilogue(b, ['b', 'b-pre', 'a', 'a-pre', 'a-epi', 'b-epi'])
+
+    assertDependencyWalkPreludeEpilogue(a, ['a-pre', 'a-epi', 'a'], postorder=True)
+    assertDependencyWalkPreludeEpilogue(b, ['b-pre', 'a-pre', 'a-epi', 'a', 'b-epi', 'b'], postorder=True)
+
+  def test_dependee_walk_prelude_epilogue(self):
+    def assertDependeeWalkPreludeEpilogue(target, results, postorder=False):
+      names = []
+      self.build_graph.walk_transitive_dependee_graph([target.address],
+        lambda x: names.append(x.name),
+        postorder=postorder,
+        prelude=lambda x: names.append(x.name + "-pre"),
+        epilogue=lambda x: names.append(x.name + "-epi"),
+      )
+      self.assertEqual(results, names)
+
+    a = self.make_target('a')
+    b = self.make_target('b', dependencies=[a])
+
+    assertDependeeWalkPreludeEpilogue(a, ['a', 'a-pre', 'b', 'b-pre', 'b-epi', 'a-epi'])
+    assertDependeeWalkPreludeEpilogue(b, ['b', 'b-pre', 'b-epi'])
+
+    assertDependeeWalkPreludeEpilogue(a, ['a-pre', 'b-pre', 'b-epi', 'b', 'a-epi', 'a'], postorder=True)
+    assertDependeeWalkPreludeEpilogue(b, ['b-pre', 'b-epi', 'b'], postorder=True)
+
   def test_target_closure(self):
     a = self.make_target('a')
     self.assertEqual([a], a.closure())
