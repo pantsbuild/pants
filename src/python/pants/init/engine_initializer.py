@@ -141,9 +141,9 @@ def _tuplify(v):
 class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table', 'console', 'goal_map'])):
   """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
 
-  def new_session(self):
-    session = self.scheduler.new_session()
-    return LegacyGraphSession(session, self.symbol_table, self.console, self.goal_map)
+  def new_session(self, v2_ui):
+    session = self.scheduler.new_session(v2_ui)
+    return LegacyGraphSession(session, self.symbol_table, self.goal_map)
 
 
 class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'console', 'goal_map'])):
@@ -189,14 +189,13 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'console
     if invalid_goals:
       raise self.InvalidGoals(invalid_goals)
 
-  def run_console_rules(self, goals, target_roots, v2_ui):
+  def run_console_rules(self, goals, target_roots):
     """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
 
     For retryable failures, raises scheduler.ExecutionError.
 
     :param list goals: The list of requested goal names as passed on the commandline.
     :param TargetRoots target_roots: The targets root of the request.
-    :param bool v2_ui: whether to render the v2 engine UI
     """
     # Reduce to only applicable goals - with validation happening by way of `validate_goals()`.
     goals = [goal for goal in goals if goal in self.goal_map]
@@ -207,9 +206,9 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'console
       try:
         goal_product = self.goal_map[goal]
         logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
-        self.scheduler_session.run_console_rule(goal_product, subjects[0], v2_ui)
+        self.scheduler_session.run_console_rule(goal_product, subjects[0])
       finally:
-        self.console.flush()
+        console.flush()
 
   def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.

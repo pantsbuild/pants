@@ -549,9 +549,17 @@ pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 }
 
 #[no_mangle]
-pub extern "C" fn session_create(scheduler_ptr: *mut Scheduler) -> *const Session {
+pub extern "C" fn session_create(
+  scheduler_ptr: *mut Scheduler,
+  should_render_ui: bool,
+  ui_worker_count: u64,
+) -> *const Session {
   with_scheduler(scheduler_ptr, |scheduler| {
-    Box::into_raw(Box::new(Session::new(scheduler)))
+    Box::into_raw(Box::new(Session::new(
+      scheduler,
+      should_render_ui,
+      ui_worker_count as usize,
+    )))
   })
 }
 
@@ -561,14 +569,8 @@ pub extern "C" fn session_destroy(ptr: *mut Session) {
 }
 
 #[no_mangle]
-pub extern "C" fn execution_request_create(
-  should_render_ui: bool,
-  ui_worker_count: u64,
-) -> *const ExecutionRequest {
-  Box::into_raw(Box::new(ExecutionRequest::new(
-    should_render_ui,
-    ui_worker_count,
-  )))
+pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
+  Box::into_raw(Box::new(ExecutionRequest::new()))
 }
 
 #[no_mangle]

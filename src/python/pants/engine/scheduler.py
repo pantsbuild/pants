@@ -354,9 +354,9 @@ class Scheduler(object):
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
 
-  def new_session(self):
+  def new_session(self, v2_ui):
     """Creates a new SchedulerSession for this Scheduler."""
-    return SchedulerSession(self, self._native.new_session(self._scheduler))
+    return SchedulerSession(self, self._native.new_session(self._scheduler), v2_ui)
 
 
 _PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
@@ -377,10 +377,11 @@ class SchedulerSession(object):
 
   execution_error_type = ExecutionError
 
-  def __init__(self, scheduler, session):
+  def __init__(self, scheduler, session, v2_ui):
     self._scheduler = scheduler
     self._session = session
     self._run_count = 0
+    self.v2_ui = v2_ui
 
   def graph_len(self):
     return self._scheduler.graph_len()
@@ -400,13 +401,13 @@ class SchedulerSession(object):
   def visualize_rule_graph_to_file(self, filename):
     self._scheduler.visualize_rule_graph_to_file(filename)
 
-  def execution_request_literal(self, request_specs, v2_ui):
-    native_execution_request = self._scheduler._native.new_execution_request(v2_ui, multiprocessing.cpu_count())
+  def execution_request_literal(self, request_specs):
+    native_execution_request = self._scheduler._native.new_execution_request()
     for subject, product in request_specs:
       self._scheduler.add_root_selection(native_execution_request, subject, product)
     return ExecutionRequest(request_specs, native_execution_request)
 
-  def execution_request(self, products, subjects, v2_ui=False):
+  def execution_request(self, products, subjects):
     """Create and return an ExecutionRequest for the given products and subjects.
 
     The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
@@ -424,7 +425,7 @@ class SchedulerSession(object):
     :returns: An ExecutionRequest for the given products and subjects.
     """
     roots = (tuple((s, p) for s in subjects for p in products))
-    return self.execution_request_literal(roots, v2_ui)
+    return self.execution_request_literal(roots)
 
   def invalidate_files(self, direct_filenames):
     """Invalidates the given filenames in an internal product Graph instance."""
@@ -492,7 +493,7 @@ class SchedulerSession(object):
         unique_exceptions
       )
 
-  def run_console_rule(self, product, subject, v2_ui):
+  def run_console_rule(self, product, subject):
     """
     :param product: product type for the request.
     :param subject: subject for the request.
