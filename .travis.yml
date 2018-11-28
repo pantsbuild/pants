@@ -322,8 +322,16 @@ matrix:
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
+        # TODO: These filehandle adjustments should be made generic across the OSX environments
+        # once #6549 lands.
+        - NOFILE=20480
+        - sudo sysctl -w kern.maxfiles=$NOFILE
+        - sudo sysctl -w kern.maxfilesperproc=$NOFILE
+        - sudo launchctl limit maxfiles $NOFILE $NOFILE
+        - ulimit -n $NOFILE
+        - ulimit -S -n $NOFILE
         - ulimit -c unlimited
-        - ulimit -n 8192
+        - ulimit -a
       script:
         # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and
         # set -z to run the platform-specific tests.
