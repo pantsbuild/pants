@@ -103,6 +103,13 @@ default_cron_test_config: &default_cron_test_config
   <<: *default_test_config
   stage: *cron
 
+linux_with_fuse: &linux_with_fuse
+  before_install:
+    - sudo apt-get install -y pkg-config fuse libfuse-dev
+    - sudo modprobe fuse
+    - sudo chmod 666 /dev/fuse
+    - sudo chown root:$USER /etc/fuse.conf
+
 matrix:
   include:
 
@@ -190,12 +197,8 @@ matrix:
         - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
     - <<: *default_test_config
+      <<: *linux_with_fuse
       name: "Self checks, lint, and JVM tests"
-      before_install:
-        - sudo apt-get install -y pkg-config fuse libfuse-dev
-        - sudo modprobe fuse
-        - sudo chmod 666 /dev/fuse
-        - sudo chown root:$USER /etc/fuse.conf
       script:
         - ./build-support/bin/travis-ci.sh -fkmrjt
 
@@ -295,18 +298,14 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c -i 6/7
 
     # Rust on linux
-    - name: "Rust Tests Linux"
+    - <<: *linux_with_fuse
+      name: "Rust Tests Linux"
       os: linux
       dist: trusty
       sudo: required
       stage: *test
       language: python
       python: *python_version
-      before_install:
-        - sudo apt-get install -y pkg-config fuse libfuse-dev
-        - sudo modprobe fuse
-        - sudo chmod 666 /dev/fuse
-        - sudo chown root:$USER /etc/fuse.conf
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
@@ -330,23 +329,29 @@ matrix:
         - ./build-support/bin/travis-ci.sh -ez
 
     # Rust Clippy on Linux
-    - name: "Rust Clippy on Linux"
+    - <<: *linux_with_fuse
+      name: "Rust Clippy on Linux"
       os: linux
       dist: trusty
       sudo: required
       stage: *test
       language: python
       python: *python_version
-      before_install:
-        - sudo apt-get install -y pkg-config fuse libfuse-dev
-        - sudo modprobe fuse
-        - sudo chmod 666 /dev/fuse
-        - sudo chown root:$USER /etc/fuse.conf
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
       script:
         - ./build-support/bin/travis-ci.sh -bs
+
+    # Cargo audit
+    - <<: *linux_with_fuse
+      name: "Cargo audit"
+      os: linux
+      dist: trusty
+      sudo: required
+      stage: *cron
+      script:
+        - ./build-support/bin/travis-ci.sh -ba
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
