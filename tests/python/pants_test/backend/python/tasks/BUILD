@@ -21,85 +21,8 @@ python_library(
   ]
 )
 
-python_native_code_test_files = [
-  'test_build_local_python_distributions.py',
-  'test_python_distribution_integration.py',
-  'test_ctypes.py',
-  'test_ctypes_integration.py',
-]
-
 python_tests(
-  name='python_native_code_testing_3',
-  sources=[
-    python_native_code_test_files[0],
-  ],
-  dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/native',
-    'src/python/pants/backend/native/targets',
-    'src/python/pants/backend/python:plugin',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/backend/python/tasks',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/backend/python/tasks/util',
-    'tests/python/pants_test/engine:scheduler_test_base',
-    'tests/python/pants_test/testutils:py2_compat',
-  ],
-  tags={'platform_specific_behavior', 'integration'},
-  timeout=2400,
-)
-
-python_tests(
-  name='python_native_code_testing_2',
-  sources=[
-    python_native_code_test_files[1],
-  ],
-  dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/native',
-    'src/python/pants/backend/native/targets',
-    'src/python/pants/backend/python:plugin',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/backend/python/tasks',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/backend/python/tasks/util',
-    'tests/python/pants_test/engine:scheduler_test_base',
-    'tests/python/pants_test/testutils:py2_compat',
-  ],
-  tags={'platform_specific_behavior', 'integration'},
-  timeout=2400,
-)
-
-python_tests(
-  name='python_native_code_testing_1',
-  sources=python_native_code_test_files[2:],
-  dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/native',
-    'src/python/pants/backend/native/targets',
-    'src/python/pants/backend/python:plugin',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/backend/python/tasks',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/backend/python/tasks/util',
-    'tests/python/pants_test/engine:scheduler_test_base',
-    'tests/python/pants_test/testutils:py2_compat',
-  ],
-  tags={'platform_specific_behavior', 'integration'},
-  timeout=2400,
-)
-
-python_tests(
-  sources=globs('test_*.py', exclude=([globs('*_integration.py')] + python_native_code_test_files)),
+  sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
@@ -137,7 +60,7 @@ python_tests(
 
 python_tests(
   name='integration',
-  sources=globs('*_integration.py', exclude=python_native_code_test_files),
+  sources=globs('*_integration.py'),
   dependencies=[
     '3rdparty/python:pex',
     'src/python/pants/base:build_environment',
@@ -151,29 +74,4 @@ python_tests(
   ],
   tags={'integration'},
   timeout=2400
-)
-
-python_tests(
-  name='isort_run_integration',
-  sources=['test_isort_run_integration.py'],
-  dependencies=[
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
-  ],
-  tags={'integration'},
-)
-
-python_tests(
-  name='isort_run',
-  sources=['test_isort_run.py'],
-  dependencies=[
-    '3rdparty/python:future',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
-  ],
-  timeout=300
 )
