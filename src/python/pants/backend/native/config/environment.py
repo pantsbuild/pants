@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 from abc import abstractproperty
 from builtins import object
 
@@ -93,13 +94,21 @@ class LinkerMixin(Executable):
   def linking_library_dirs(self):
     """Directories to search for libraries needed at link time."""
 
+  @abstractproperty
+  def extra_object_files(self):
+    """???"""
+
   @property
   def as_invocation_environment_dict(self):
     ret = super(LinkerMixin, self).as_invocation_environment_dict.copy()
 
+    full_library_path_dirs = self.linking_library_dirs + [
+      os.path.dirname(f) for f in self.extra_object_files
+    ]
+
     ret.update({
       'LDSHARED': self.exe_filename,
-      'LIBRARY_PATH': create_path_env_var(self.linking_library_dirs),
+      'LIBRARY_PATH': create_path_env_var(full_library_path_dirs),
     })
 
     return ret

@@ -72,8 +72,8 @@ class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTe
       'sources': ['cpp_math_lib.cpp', 'cpp_math_lib.hpp'],
       'filemap': {
         'src/python/plat_specific_cpp_dist/cpp_math_lib.cpp': dedent("""\
-#include "cpp_math_lib.h"
-int add_two(int x) { return (x++)++; }
+#include "cpp_math_lib.hpp"
+int add_two(int x) { return (x++) + 1; }
 """),
         'src/python/plat_specific_cpp_dist/cpp_math_lib.hpp': dedent("""\
 int add_two(int);

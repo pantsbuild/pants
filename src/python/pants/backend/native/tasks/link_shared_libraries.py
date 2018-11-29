@@ -168,6 +168,7 @@ class LinkSharedLibraries(NativeTask):
     output_dir = link_request.output_dir
     resulting_shared_lib_path = os.path.join(output_dir,
                                              native_artifact.as_shared_lib(self.platform))
+
     self.context.log.debug("resulting_shared_lib_path: {}".format(resulting_shared_lib_path))
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
@@ -176,8 +177,7 @@ class LinkSharedLibraries(NativeTask):
            ['-o', os.path.abspath(resulting_shared_lib_path)] +
            ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +
            ['-l{}'.format(lib_name) for lib_name in link_request.external_lib_names] +
-           [os.path.abspath(obj) for obj in object_files] +
-           linker.extra_object_files)
+           [os.path.abspath(obj) for obj in object_files])
 
     self.context.log.info("selected linker exe name: '{}'".format(linker.exe_filename))
     self.context.log.debug("linker argv: {}".format(cmd))
