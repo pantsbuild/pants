@@ -8,13 +8,14 @@ import os
 import re
 from contextlib import contextmanager
 
-from pants.backend.native.config.environment import (GCCCppToolchain, GCCCToolchain,
-                                                     LLVMCppToolchain, LLVMCToolchain, Platform)
+from pants.backend.native.config.environment import Platform
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
 from pants.backend.native.subsystems.libc_dev import LibcDev
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.backend.native.subsystems.native_toolchain import (GCCCppToolchain, GCCCToolchain,
+                                                              LLVMCppToolchain, LLVMCToolchain,
+                                                              NativeToolchain)
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
 from pants.util.process_handler import subprocess
