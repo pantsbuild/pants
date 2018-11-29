@@ -8,6 +8,7 @@ import re
 from builtins import next
 
 from pants.backend.native.register import rules as native_backend_rules
+from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
@@ -113,7 +114,13 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
     context = self._scheduling_context(
       target_roots=([python_dist_target] + extra_targets),
       for_task_types=(all_synthesized_task_types),
-      for_subsystems=[PythonRepos])
+      for_subsystems=[PythonRepos, LibcDev],
+      # TODO(#???): we should be testing all of these with both of our toolchains.
+      options={
+        'libc-dev': {
+          'enable_libc_search': True,
+        },
+      })
     self.assertEqual(set(self._all_specified_targets()), set(context.build_graph.targets()))
 
     all_other_task_instances = [
