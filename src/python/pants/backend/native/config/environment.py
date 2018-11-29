@@ -111,6 +111,7 @@ class Linker(datatype([
     'library_dirs',
     'linking_library_dirs',
     'extra_args',
+    'extra_object_files',
 ]), LinkerMixin): pass
 
 

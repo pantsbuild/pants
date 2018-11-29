@@ -32,7 +32,9 @@ class Binutils(NativeTool):
       exe_filename='ld',
       library_dirs=[],
       linking_library_dirs=[],
-      extra_args=[])
+      extra_args=[],
+      extra_object_files=[],
+    )
 
 
 @rule(Assembler, [Select(Binutils)])

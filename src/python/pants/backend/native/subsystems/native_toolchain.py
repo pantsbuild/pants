@@ -67,6 +67,12 @@ class NativeToolchain(Subsystem):
 class LibcObjects(datatype(['crti_object_paths'])): pass
 
 
+class GCCLinker(datatype([('linker', Linker)])): pass
+
+
+class LLVMLinker(datatype([('linker', Linker)])): pass
+
+
 class GCCCToolchain(datatype([('c_toolchain', CToolchain)])): pass
 
 
@@ -112,10 +118,23 @@ def select_base_linker(platform, native_toolchain):
     linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)
-  libc_objects = yield Get(LibcObjects, NativeToolchain, native_toolchain)
-  linker_with_libc = linker.copy(extra_args=(linker.extra_args + libc_objects.crti_object_paths))
-  base_linker = BaseLinker(linker=linker_with_libc)
+  base_linker = BaseLinker(linker=linker)
   yield base_linker
+
+
+@rule(GCCLinker, [Select(NativeToolchain)])
+def select_gcc_linker(native_toolchain):
+  base_linker = yield Get(BaseLinker, NativeToolchain, native_toolchain)
+  linker = base_linker.linker
+  libc_objects = yield Get(LibcObjects, NativeToolchain, native_toolchain)
+  linker_with_libc = linker.copy(
+    extra_object_files=(linker.extra_object_files + libc_objects.crti_object_paths))
+  yield GCCLinker(linker_with_libc)
+
+
+@rule(LLVMLinker, [Select(BaseLinker)])
+def select_llvm_linker(base_linker):
+  return LLVMLinker(base_linker.linker)
 
 
 class GCCInstallLocationForLLVM(datatype(['toolchain_dir'])):
@@ -160,13 +179,14 @@ def select_llvm_c_toolchain(platform, native_toolchain):
       include_dirs=provided_gcc.include_dirs,
       extra_args=(llvm_c_compiler_args + provided_clang.extra_args + gcc_install.as_clang_argv))
 
-  base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
-  base_linker = base_linker_wrapper.linker
+  llvm_linker_wrapper = yield Get(LLVMLinker, NativeToolchain, native_toolchain)
+  llvm_linker = llvm_linker_wrapper.linker
 
-  working_linker = base_linker.copy(
-    path_entries=(base_linker.path_entries + working_c_compiler.path_entries),
+  # TODO: create an algebra so these changes are more clear!
+  working_linker = llvm_linker.copy(
+    path_entries=(llvm_linker.path_entries + working_c_compiler.path_entries),
     exe_filename=working_c_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_c_compiler.library_dirs),
+    library_dirs=(llvm_linker.library_dirs + working_c_compiler.library_dirs),
   )
 
   yield LLVMCToolchain(CToolchain(working_c_compiler, working_linker))
@@ -211,15 +231,16 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     # Ensure we use libstdc++, provided by g++, during the linking stage.
     linker_extra_args=['-stdlib=libstdc++']
 
-  base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
-  base_linker = base_linker_wrapper.linker
-  working_linker = base_linker.copy(
-    path_entries=(base_linker.path_entries + working_cpp_compiler.path_entries),
+  llvm_linker_wrapper = yield Get(LLVMLinker, NativeToolchain, native_toolchain)
+  llvm_linker = llvm_linker_wrapper.linker
+
+  working_linker = llvm_linker.copy(
+    path_entries=(llvm_linker.path_entries + working_cpp_compiler.path_entries),
     exe_filename=working_cpp_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_cpp_compiler.library_dirs),
-    linking_library_dirs=(base_linker.linking_library_dirs +
+    library_dirs=(llvm_linker.library_dirs + working_cpp_compiler.library_dirs),
+    linking_library_dirs=(llvm_linker.linking_library_dirs +
                           extra_linking_library_dirs),
-    extra_args=(base_linker.extra_args + linker_extra_args),
+    extra_args=(llvm_linker.extra_args + linker_extra_args),
   )
 
   yield LLVMCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
@@ -248,13 +269,13 @@ def select_gcc_c_toolchain(platform, native_toolchain):
     include_dirs=new_include_dirs,
     extra_args=['-x', 'c', '-std=c11'])
 
-  base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
-  base_linker = base_linker_wrapper.linker
+  gcc_linker_wrapper = yield Get(GCCLinker, NativeToolchain, native_toolchain)
+  gcc_linker = gcc_linker_wrapper.linker
 
-  working_linker = base_linker.copy(
-    path_entries=(working_c_compiler.path_entries + base_linker.path_entries),
+  working_linker = gcc_linker.copy(
+    path_entries=(working_c_compiler.path_entries + gcc_linker.path_entries),
     exe_filename=working_c_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_c_compiler.library_dirs),
+    library_dirs=(gcc_linker.library_dirs + working_c_compiler.library_dirs),
   )
 
   yield GCCCToolchain(CToolchain(working_c_compiler, working_linker))
@@ -293,13 +314,14 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
     )
     extra_linking_library_dirs = provided_gpp.library_dirs + provided_clangpp.library_dirs
 
-  base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
-  base_linker = base_linker_wrapper.linker
-  working_linker = base_linker.copy(
-    path_entries=(working_cpp_compiler.path_entries + base_linker.path_entries),
+  gcc_linker_wrapper = yield Get(GCCLinker, NativeToolchain, native_toolchain)
+  gcc_linker = gcc_linker_wrapper.linker
+
+  working_linker = gcc_linker.copy(
+    path_entries=(working_cpp_compiler.path_entries + gcc_linker.path_entries),
     exe_filename=working_cpp_compiler.exe_filename,
-    library_dirs=(base_linker.library_dirs + working_cpp_compiler.library_dirs),
-    linking_library_dirs=(base_linker.linking_library_dirs + extra_linking_library_dirs),
+    library_dirs=(gcc_linker.library_dirs + working_cpp_compiler.library_dirs),
+    linking_library_dirs=(gcc_linker.linking_library_dirs + extra_linking_library_dirs),
   )
 
   yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
@@ -337,6 +359,8 @@ def create_native_toolchain_rules():
     select_libc_objects,
     select_assembler,
     select_base_linker,
+    select_gcc_linker,
+    select_llvm_linker,
     select_gcc_install_location,
     select_llvm_c_toolchain,
     select_llvm_cpp_toolchain,

@@ -156,7 +156,9 @@ class XCodeCLITools(Subsystem):
       exe_filename='ld',
       library_dirs=[],
       linking_library_dirs=[],
-      extra_args=[MIN_OSX_VERSION_ARG])
+      extra_args=[MIN_OSX_VERSION_ARG],
+      extra_object_files=[],
+    )
 
   @memoized_method
   def c_compiler(self):
