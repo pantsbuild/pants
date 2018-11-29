@@ -217,6 +217,8 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     pants_binary = self.run_pants(['binary', self._binary_target_with_third_party])
     self.assert_success(pants_binary)
 
+    # TODO(#???): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
+    # be available on the runtime library path.
     pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party])
     self.assert_success(pants_run)
     self.assertIn('Test worked!\n', pants_run.stdout_data)
