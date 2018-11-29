@@ -31,7 +31,7 @@ python_native_code_test_files = [
 python_tests(
   name='python_native_code_testing_3',
   sources=[
-    'test_build_local_python_distributions.py',
+    python_native_code_test_files[0],
   ],
   dependencies=[
     '3rdparty/python:future',
@@ -55,7 +55,7 @@ python_tests(
 python_tests(
   name='python_native_code_testing_2',
   sources=[
-    'test_python_distribution_integration.py',
+    python_native_code_test_files[1],
   ],
   dependencies=[
     '3rdparty/python:future',
@@ -78,10 +78,7 @@ python_tests(
 
 python_tests(
   name='python_native_code_testing_1',
-  sources=[
-    'test_ctypes.py',
-    'test_ctypes_integration.py',
-  ],
+  sources=python_native_code_test_files[2:],
   dependencies=[
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
