@@ -354,9 +354,9 @@ class Scheduler(object):
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
 
-  def new_session(self, v2_ui):
+  def new_session(self, v2_ui=False):
     """Creates a new SchedulerSession for this Scheduler."""
-    return SchedulerSession(self, self._native.new_session(self._scheduler), v2_ui)
+    return SchedulerSession(self, self._native.new_session(self._scheduler, v2_ui, multiprocessing.cpu_count()))
 
 
 _PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
@@ -377,11 +377,10 @@ class SchedulerSession(object):
 
   execution_error_type = ExecutionError
 
-  def __init__(self, scheduler, session, v2_ui):
+  def __init__(self, scheduler, session):
     self._scheduler = scheduler
     self._session = session
     self._run_count = 0
-    self.v2_ui = v2_ui
 
   def graph_len(self):
     return self._scheduler.graph_len()

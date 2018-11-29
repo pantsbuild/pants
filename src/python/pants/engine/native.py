@@ -644,10 +644,8 @@ class Native(Singleton):
       self.lib.execution_request_create(),
       self.lib.execution_request_destroy)
 
-  def new_session(self, scheduler):
-    count = 4
-    should_render = True
-    return self.gc(self.lib.session_create(scheduler, should_render, count), self.lib.session_destroy)
+  def new_session(self, scheduler, should_render_ui, ui_worker_count):
+    return self.gc(self.lib.session_create(scheduler, should_render_ui, ui_worker_count), self.lib.session_destroy)
 
   def new_scheduler(self,
                     tasks,
