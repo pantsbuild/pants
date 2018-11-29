@@ -14,6 +14,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
@@ -77,9 +78,6 @@ class Options(object):
     - None.
   """
 
-  class OptionTrackerRequiredError(Exception):
-    """Options requires an OptionTracker instance."""
-
   class FrozenOptionsError(Exception):
     """Options are frozen and can't be mutated."""
 
@@ -110,8 +108,7 @@ class Options(object):
     return ret
 
   @classmethod
-  def create(cls, env, config, known_scope_infos, args=None, bootstrap_option_values=None,
-             option_tracker=None):
+  def create(cls, env, config, known_scope_infos, args=None, bootstrap_option_values=None):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
@@ -120,8 +117,6 @@ class Options(object):
     :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
     :param bootstrap_option_values: An optional namespace containing the values of bootstrap
            options. We can use these values when registering other options.
-    :param :class:`pants.option.option_tracker.OptionTracker` option_tracker: option tracker
-           instance to record how option values were assigned.
     """
     # We need parsers for all the intermediate scopes, so inherited option values
     # can propagate through them.
@@ -130,8 +125,7 @@ class Options(object):
     args = sys.argv if args is None else args
     goals, scope_to_flags, target_specs, passthru, passthru_owner, unknown_scopes = splitter.split_args(args)
 
-    if not option_tracker:
-      raise cls.OptionTrackerRequiredError()
+    option_tracker = OptionTracker()
 
     if bootstrap_option_values:
       target_spec_files = bootstrap_option_values.target_spec_files

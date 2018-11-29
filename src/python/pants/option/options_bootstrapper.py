@@ -16,7 +16,6 @@ from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
 from pants.util.strutil import ensure_text
 
@@ -72,7 +71,6 @@ class OptionsBootstrapper(object):
     self._args = sys.argv if args is None else args
     self._bootstrap_options = None  # We memoize the bootstrap options here.
     self._full_options = {}  # We memoize the full options here.
-    self._option_tracker = OptionTracker()
 
   def produce_and_set_bootstrap_options(self):
     """Cooperatively populates the internal bootstrap_options cache with
@@ -114,7 +112,6 @@ class OptionsBootstrapper(object):
         config=config,
         known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()],
         args=bargs,
-        option_tracker=self._option_tracker
       )
 
       def register_global(*args, **kwargs):
@@ -188,8 +185,7 @@ class OptionsBootstrapper(object):
                                                self._post_bootstrap_config,
                                                known_scope_infos,
                                                args=self._args,
-                                               bootstrap_option_values=bootstrap_option_values,
-                                               option_tracker=self._option_tracker)
+                                               bootstrap_option_values=bootstrap_option_values)
     return self._full_options[key]
 
   def verify_configs_against_options(self, options):
