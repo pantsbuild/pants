@@ -198,7 +198,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         build_root=buildroot.new_buildroot)
       self.assert_failure(pants_binary_strict_deps_failure)
       self.assertIn(self._include_not_found_message_for_variant[toolchain_variant],
-                    pants_binary_strict_deps_failure.stdout_dMata)
+                    pants_binary_strict_deps_failure.stdout_data)
 
     # TODO(#???): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
     # DYLD_LIBRARY_PATH during the 'run' goal somehow.
