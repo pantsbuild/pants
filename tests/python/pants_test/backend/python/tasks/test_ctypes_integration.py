@@ -198,16 +198,23 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         build_root=buildroot.new_buildroot)
       self.assert_failure(pants_binary_strict_deps_failure)
       self.assertIn(self._include_not_found_message_for_variant[toolchain_variant],
-                    pants_binary_strict_deps_failure.stdout_data)
+                    pants_binary_strict_deps_failure.stdout_dMata)
 
-    pants_run_interop = self.run_pants(['-q', 'run', self._binary_target_with_interop], config={
-      'native-build-settings': {
-        'toolchain_variant': toolchain_variant,
-        'strict_deps': False,
-      },
+    # TODO(#???): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
+    # DYLD_LIBRARY_PATH during the 'run' goal somehow.
+    attempt_pants_run = Platform.create().resolve_platform_specific({
+      'darwin': lambda: toolchain_variant != 'gnu',
+      'linux': lambda: True,
     })
-    self.assert_success(pants_run_interop)
-    self.assertEqual('x=3, f(x)=299\n', pants_run_interop.stdout_data)
+    if attempt_pants_run:
+      pants_run_interop = self.run_pants(['-q', 'run', self._binary_target_with_interop], config={
+        'native-build-settings': {
+          'toolchain_variant': toolchain_variant,
+          'strict_deps': False,
+        },
+      })
+      self.assert_success(pants_run_interop)
+      self.assertEqual('x=3, f(x)=299\n', pants_run_interop.stdout_data)
 
   def test_ctypes_native_language_interop(self):
     for variant in ToolchainVariant.allowed_values:
