@@ -175,7 +175,7 @@ impl EngineDisplay {
       Console::Terminal(ref mut t) => t.write(msg.as_bytes()),
       Console::Pipe(ref mut p) => p.write(msg.as_bytes()),
     };
-    self.flush();
+    self.flush()?;
     res
   }
 
