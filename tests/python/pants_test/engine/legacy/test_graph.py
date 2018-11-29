@@ -42,10 +42,9 @@ class GraphTestBase(unittest.TestCase):
     options.for_global_scope.return_value = mock.Mock(owner_of=None)
     return options
 
-  def _default_build_config(self, build_file_aliases=None):
+  def _default_build_config(self, options_bootstrapper, build_file_aliases=None):
     # TODO: Get default BuildFileAliases by extending BaseTest post
     #   https://github.com/pantsbuild/pants/issues/4401
-    options_bootstrapper = OptionsBootstrapper.create()
     build_config = BuildConfigInitializer.get(options_bootstrapper)
     if build_file_aliases:
       build_config.register_aliases(build_file_aliases)
@@ -61,13 +60,15 @@ class GraphTestBase(unittest.TestCase):
     with temporary_dir() as work_dir:
       with temporary_dir() as local_store_dir:
         path_ignore_patterns = path_ignore_patterns or []
-        build_config = build_configuration or self._default_build_config()
+        options_bootstrapper = OptionsBootstrapper.create()
+        build_config = build_configuration or self._default_build_config(options_bootstrapper)
         # TODO: This test should be swapped to using TestBase.
         graph_helper = EngineInitializer.setup_legacy_graph_extended(
           path_ignore_patterns,
           work_dir,
           local_store_dir,
           build_file_imports_behavior,
+          options_bootstrapper=options_bootstrapper,
           build_configuration=build_config,
           native=self._native,
           include_trace_on_error=include_trace_on_error
@@ -185,7 +186,7 @@ class GraphInvalidationTest(GraphTestBase):
     tag_macro = functools.partial(macro, target_cls, tag)
     target_symbols = {'target': TargetMacro.Factory.wrap(tag_macro, target_cls)}
 
-    build_config = self._default_build_config(BuildFileAliases(targets=target_symbols))
+    build_config = self._default_build_config(OptionsBootstrapper.create(), BuildFileAliases(targets=target_symbols))
 
     # Confirm that python_tests in a small directory are marked.
     with self.open_scheduler([spec], build_configuration=build_config) as (graph, addresses, _):

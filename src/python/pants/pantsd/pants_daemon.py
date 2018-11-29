@@ -142,7 +142,7 @@ class PantsDaemon(FingerprintedProcessManager):
         native = Native.create(bootstrap_options_values)
         build_config = BuildConfigInitializer.get(options_bootstrapper)
         legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(native,
-                                                                      bootstrap_options_values,
+                                                                      options_bootstrapper,
                                                                       build_config)
         services = cls._setup_services(
           build_root,

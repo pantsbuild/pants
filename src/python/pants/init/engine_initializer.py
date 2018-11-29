@@ -39,7 +39,6 @@ from pants.engine.scheduler import Scheduler
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.global_options import (DEFAULT_EXECUTION_OPTIONS, ExecutionOptions,
                                          GlobMatchErrorBehavior)
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.rules.core.register import create_core_rules
 from pants.util.objects import datatype
 
@@ -249,13 +248,15 @@ class EngineInitializer(object):
     return goal_map
 
   @staticmethod
-  def setup_legacy_graph(native, bootstrap_options, build_configuration):
+  def setup_legacy_graph(native, options_bootstrapper, build_configuration):
     """Construct and return the components necessary for LegacyBuildGraph construction."""
+    bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
     return EngineInitializer.setup_legacy_graph_extended(
       bootstrap_options.pants_ignore,
       bootstrap_options.pants_workdir,
       bootstrap_options.local_store_dir,
       bootstrap_options.build_file_imports,
+      options_bootstrapper,
       build_configuration,
       native=native,
       glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
@@ -272,6 +273,7 @@ class EngineInitializer(object):
     workdir,
     local_store_dir,
     build_file_imports_behavior,
+    options_bootstrapper,
     build_configuration,
     build_root=None,
     native=None,
@@ -293,6 +295,8 @@ class EngineInitializer(object):
     :type build_file_imports_behavior: string
     :param str build_root: A path to be used as the build root. If None, then default is used.
     :param Native native: An instance of the native-engine subsystem.
+    :param options_bootstrapper: A `OptionsBootstrapper` object containing bootstrap options.
+    :type options_bootstrapper: :class:`pants.options.options_bootstrapper.OptionsBootstrapper`
     :param build_configuration: The `BuildConfiguration` object to get build file aliases from.
     :type build_configuration: :class:`pants.build_graph.build_configuration.BuildConfiguration`
     :param glob_match_error_behavior: How to behave if a glob specified for a target's sources or
@@ -311,7 +315,6 @@ class EngineInitializer(object):
     """
 
     build_root = build_root or get_buildroot()
-    options_bootstrapper = OptionsBootstrapper.create()
     build_configuration = build_configuration or BuildConfigInitializer.get(options_bootstrapper)
     build_file_aliases = build_configuration.registered_aliases()
     rules = build_configuration.rules()
