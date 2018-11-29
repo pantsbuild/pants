@@ -17,7 +17,10 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
+from pants.util.objects import datatype, enum
+
+
+class ToolchainVariant(enum('descriptor', ['gnu', 'llvm'])): pass
 
 
 class NativeToolchain(Subsystem):
@@ -44,6 +47,17 @@ class NativeToolchain(Subsystem):
       XCodeCLITools.scoped(cls),
     )
 
+  @classmethod
+  def register_options(cls, register):
+    super(NativeToolchain, cls).register_options(register)
+
+    register('--toolchain-variant', type=str,
+             choices=ToolchainVariant.allowed_values,
+             default=ToolchainVariant.default_value,
+             advanced=True,
+             help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
+                  "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
+
   @memoized_property
   def _binutils(self):
     return Binutils.scoped_instance(self)
@@ -64,10 +78,41 @@ class NativeToolchain(Subsystem):
   def _libc_dev(self):
     return LibcDev.scoped_instance(self)
 
+  @memoized_property
+  def _toolchain_variant(self):
+    return ToolchainVariant.create(self.get_options().toolchain_variant)
 
-@rule(LibcDev, [Select(NativeToolchain)])
-def select_libc_dev(native_toolchain):
-  yield native_toolchain._libc_dev
+
+@rule(CToolchain, [Select(NativeToolchain)])
+def select_c_toolchain(native_toolchain):
+  # TODO: make an enum exhaustiveness checking method that works with `yield Get(...)` statements!
+  if native_toolchain._toolchain_variant == 'gnu':
+    toolchain_resolved = yield Get(GCCCToolchain, NativeToolchain, native_toolchain)
+  else:
+    toolchain_resolved = yield Get(LLVMCToolchain, NativeToolchain, native_toolchain)
+  yield toolchain_resolved.c_toolchain
+
+
+@rule(CppToolchain, [Select(NativeToolchain)])
+def select_cpp_toolchain(native_toolchain):
+  # TODO: make an enum exhaustiveness checking method that works with `yield Get(...)` statements!
+  if native_toolchain._toolchain_variant == 'gnu':
+    toolchain_resolved = yield Get(GCCCppToolchain, NativeToolchain, native_toolchain)
+  else:
+    toolchain_resolved = yield Get(LLVMCppToolchain, NativeToolchain, native_toolchain)
+  yield toolchain_resolved.cpp_toolchain
+
+
+class LibcObjects(datatype(['crti_object_paths'])): pass
+
+
+@rule(LibcObjects, [Select(Platform), Select(NativeToolchain)])
+def select_libc_objects(platform, native_toolchain):
+  paths = platform.resolve_platform_specific({
+    'darwin': lambda: [],
+    'linux': lambda: native_toolchain._libc_dev.get_libc_objects(),
+  })
+  yield LibcObjects(paths)
 
 
 @rule(Assembler, [Select(Platform), Select(NativeToolchain)])
@@ -94,7 +139,9 @@ def select_base_linker(platform, native_toolchain):
     linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)
-  base_linker = BaseLinker(linker=linker)
+  libc_objects = yield Get(LibcObjects, NativeToolchain, native_toolchain)
+  linker_with_libc = linker.copy(extra_args=(linker.extra_args + libc_objects.crti_object_paths))
+  base_linker = BaseLinker(linker=linker_with_libc)
   yield base_linker
 
 
@@ -287,7 +334,7 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
 
 def create_native_toolchain_rules():
   return [
-    select_libc_dev,
+    select_libc_objects,
     select_assembler,
     select_base_linker,
     select_gcc_install_location,
@@ -295,5 +342,8 @@ def create_native_toolchain_rules():
     select_llvm_cpp_toolchain,
     select_gcc_c_toolchain,
     select_gcc_cpp_toolchain,
+    # TODO: can these go at the top of this list?
+    select_c_toolchain,
+    select_cpp_toolchain,
     RootRule(NativeToolchain),
   ]

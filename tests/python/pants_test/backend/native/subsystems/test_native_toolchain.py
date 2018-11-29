@@ -37,7 +37,6 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 
     self.platform = Platform.create()
     self.toolchain = global_subsystem_instance(NativeToolchain)
-    self.libc_dev = global_subsystem_instance(LibcDev)
     self.rules = native_backend_rules()
 
     gcc_subsystem = global_subsystem_instance(GCC)
@@ -159,14 +158,9 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       ['-c', source_file, '-o', intermediate_obj_file_name])
     self.assertTrue(os.path.isfile(intermediate_obj_file_name))
 
-    libc_objects = self.platform.resolve_platform_specific({
-      'darwin': lambda: [],
-      'linux': lambda: self.libc_dev.get_libc_objects(),
-    })
-
     self._invoke_linker(
       linker,
-      [intermediate_obj_file_name, '-o', outfile] + libc_objects)
+      [intermediate_obj_file_name, '-o', outfile])
     self.assertTrue(is_executable(outfile))
 
     program_out = self._invoke_capturing_output([os.path.abspath(outfile)])

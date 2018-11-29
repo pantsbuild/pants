@@ -12,7 +12,7 @@ import shutil
 from pex import pep425tags
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.native.config.environment import LLVMCppToolchain, LLVMCToolchain, Platform
+from pants.backend.native.config.environment import CppToolchain, CToolchain, Platform
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
@@ -96,15 +96,11 @@ class BuildLocalPythonDistributions(Task):
 
   @memoized_property
   def _c_toolchain(self):
-    llvm_c_toolchain = self._request_single(
-      LLVMCToolchain, self._python_native_code_settings.native_toolchain)
-    return llvm_c_toolchain.c_toolchain
+    return self._request_single(CToolchain, self._python_native_code_settings.native_toolchain)
 
   @memoized_property
   def _cpp_toolchain(self):
-    llvm_cpp_toolchain = self._request_single(
-      LLVMCppToolchain, self._python_native_code_settings.native_toolchain)
-    return llvm_cpp_toolchain.cpp_toolchain
+    return self._request_single(CppToolchain, self._python_native_code_settings.native_toolchain)
 
   # TODO: This should probably be made into an @classproperty (see PR #5901).
   @property
