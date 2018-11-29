@@ -71,8 +71,13 @@ class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTe
       'ctypes_native_library': NativeArtifact(lib_name='cpp-math-lib'),
       'sources': ['cpp_math_lib.cpp', 'cpp_math_lib.hpp'],
       'filemap': {
-        'src/python/plat_specific_cpp_dist/cpp_math_lib.cpp': '',
-        'src/python/plat_specific_cpp_dist/cpp_math_lib.hpp': '',
+        'src/python/plat_specific_cpp_dist/cpp_math_lib.cpp': dedent("""\
+#include "cpp_math_lib.h"
+int add_two(int x) { return (x++)++; }
+"""),
+        'src/python/plat_specific_cpp_dist/cpp_math_lib.hpp': dedent("""\
+int add_two(int);
+"""),
       },
     }),
 

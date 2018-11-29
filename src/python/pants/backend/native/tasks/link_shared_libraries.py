@@ -189,6 +189,7 @@ class LinkSharedLibraries(NativeTask):
            ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +
            ['-l{}'.format(lib_name) for lib_name in link_request.external_lib_names] +
            [os.path.abspath(obj) for obj in object_files] +
+           # TODO: this should be moved back to the Linker's extra_args!
            self.libc_objects)
 
     self.context.log.info("selected linker exe name: '{}'".format(linker.exe_filename))
