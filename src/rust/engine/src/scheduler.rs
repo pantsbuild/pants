@@ -273,6 +273,10 @@ impl Scheduler {
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks_to_display = IndexMap::new();
 
+    if let Some(ref mut display) = *maybe_display {
+      display.start();
+    }
+
     let results = loop {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
