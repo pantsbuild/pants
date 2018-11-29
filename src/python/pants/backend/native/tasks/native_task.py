@@ -6,8 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import filter
 
-from pants.backend.native.config.environment import (GCCCppToolchain, GCCCToolchain,
-                                                     LLVMCppToolchain, LLVMCToolchain)
+from pants.backend.native.config.environment import CppToolchain, CToolchain
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
@@ -62,47 +61,17 @@ class NativeTask(Task):
   def _native_build_settings(self):
     return NativeBuildSettings.global_instance()
 
-  # TODO: consume this in native_toolchain.py's v2 @rules to provide the CCompiler, Linker, etc to
-  # avoid the boilerplate to select a toolchain within this task.
-  @memoized_property
-  def _toolchain_variant(self):
-    return self._native_build_settings.get_options().toolchain_variant
-
   @memoized_property
   def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
 
   @memoized_method
   def get_c_toolchain_variant(self):
-    # TODO: add exhaustiveness checking for `enum()` like we do in
-    # `Platform#resolve_platform_specific()`?
-    if self._toolchain_variant == 'gnu':
-      return self._gcc_c_toolchain
-    else:
-      return self._llvm_c_toolchain
+    return self._request_single(CToolchain, NativeToolchain, self._native_toolchain)
 
   @memoized_method
   def get_cpp_toolchain_variant(self):
-    if self._toolchain_variant == 'gnu':
-      return self._gcc_cpp_toolchain
-    else:
-      return self._llvm_cpp_toolchain
-
-  @memoized_property
-  def _gcc_c_toolchain(self):
-    return self._request_single(GCCCToolchain, self._native_toolchain)
-
-  @memoized_property
-  def _gcc_cpp_toolchain(self):
-    return self._request_single(GCCCppToolchain, self._native_toolchain)
-
-  @memoized_property
-  def _llvm_c_toolchain(self):
-    return self._request_single(LLVMCToolchain, self._native_toolchain)
-
-  @memoized_property
-  def _llvm_cpp_toolchain(self):
-    return self._request_single(LLVMCppToolchain, self._native_toolchain)
+    return self._request_single(CppToolchain, NativeToolchain, self._native_toolchain)
 
   def native_deps(self, target):
     return self.strict_deps_for_target(
