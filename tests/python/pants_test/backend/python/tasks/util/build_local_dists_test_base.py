@@ -117,8 +117,8 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
       for_subsystems=[PythonRepos, LibcDev],
       # TODO(#???): we should be testing all of these with both of our toolchains.
       options={
-        'libc-dev': {
-          'enable_libc_search': True,
+        'native-build-settings': {
+          'toolchain_variant': 'llvm',
         },
       })
     self.assertEqual(set(self._all_specified_targets()), set(context.build_graph.targets()))
