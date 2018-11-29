@@ -127,7 +127,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     return self._invoke_capturing_output(cmd, env)
 
   def _invoke_linker(self, linker, args):
-    cmd = [linker.exe_filename] + linker.extra_args + args
+    cmd = [linker.exe_filename] + linker.extra_args + args + linker.extra_object_files
     return self._invoke_capturing_output(
       cmd,
       linker.as_invocation_environment_dict)
