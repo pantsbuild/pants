@@ -87,18 +87,18 @@ class PantsDaemon(FingerprintedProcessManager):
 
   class Factory(object):
     @classmethod
-    def maybe_launch(cls, bootstrap_options=None):
+    def maybe_launch(cls, options_bootstrapper):
       """Creates and launches a daemon instance if one does not already exist.
 
-      :param Options bootstrap_options: The bootstrap options, if available.
+      :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
       :returns: A Handle for the running pantsd instance.
       :rtype: PantsDaemon.Handle
       """
-      stub_pantsd = cls.create(bootstrap_options, full_init=False)
+      stub_pantsd = cls.create(options_bootstrapper, full_init=False)
       with stub_pantsd._services.lifecycle_lock:
         if stub_pantsd.needs_restart(stub_pantsd.options_fingerprint):
           # Once we determine we actually need to launch, recreate with full initialization.
-          pantsd = cls.create(bootstrap_options)
+          pantsd = cls.create(options_bootstrapper)
           return pantsd.launch()
         else:
           # We're already launched.
@@ -108,31 +108,29 @@ class PantsDaemon(FingerprintedProcessManager):
             )
 
     @classmethod
-    def restart(cls, bootstrap_options=None):
+    def restart(cls, options_bootstrapper):
       """Restarts a running daemon instance.
 
-      :param Options bootstrap_options: The bootstrap options, if available.
+      :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
       :returns: A Handle for the pantsd instance.
       :rtype: PantsDaemon.Handle
       """
-      pantsd = cls.create(bootstrap_options)
+      pantsd = cls.create(options_bootstrapper)
       with pantsd._services.lifecycle_lock:
         # N.B. This will call `pantsd.terminate()` before starting.
         return pantsd.launch()
 
     @classmethod
-    def create(cls, bootstrap_options=None, full_init=True):
+    def create(cls, options_bootstrapper, full_init=True):
       """
-      :param Options bootstrap_options: The bootstrap options, if available.
+      :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
       :param bool full_init: Whether or not to fully initialize an engine et al for the purposes
                              of spawning a new daemon. `full_init=False` is intended primarily
                              for lightweight lifecycle checks (since there is a ~1s overhead to
                              initialize the engine). See the impl of `maybe_launch` for an example
                              of the intended usage.
       """
-      # TODO: This method should receive an OptionsBootstrapper instead, to avoid re-parsing.
-      options_bootstrapper = OptionsBootstrapper.create() if full_init or not bootstrap_options else None
-      bootstrap_options = bootstrap_options or options_bootstrapper.bootstrap_options
+      bootstrap_options = options_bootstrapper.bootstrap_options
       bootstrap_options_values = bootstrap_options.for_global_scope()
       # TODO: https://github.com/pantsbuild/pants/issues/3479
       watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
@@ -434,4 +432,4 @@ class PantsDaemon(FingerprintedProcessManager):
 
 def launch():
   """An external entrypoint that spawns a new pantsd instance."""
-  PantsDaemon.Factory.create().run_sync()
+  PantsDaemon.Factory.create(OptionsBootstrapper.create()).run_sync()

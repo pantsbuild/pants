@@ -40,12 +40,12 @@ class RemotePantsRunner(object):
     NailgunClient.NailgunExecutionError
   )
 
-  def __init__(self, exiter, args, env, bootstrap_options, stdin=None, stdout=None, stderr=None):
+  def __init__(self, exiter, args, env, options_bootstrapper, stdin=None, stdout=None, stderr=None):
     """
     :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (e.g. sys.argv) for this run.
     :param dict env: The environment (e.g. os.environ) for this run.
-    :param Options bootstrap_options: The Options bag containing the bootstrap options.
+    :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
     :param file stdin: The stream representing stdin.
     :param file stdout: The stream representing stdout.
     :param file stderr: The stream representing stderr.
@@ -54,7 +54,8 @@ class RemotePantsRunner(object):
     self._exiter = exiter
     self._args = args
     self._env = env
-    self._bootstrap_options = bootstrap_options
+    self._options_bootstrapper = options_bootstrapper
+    self._bootstrap_options = options_bootstrapper.bootstrap_options
     self._stdin = stdin or sys.stdin
     self._stdout = stdout or sys.stdout
     self._stderr = stderr or sys.stderr
@@ -178,10 +179,10 @@ class RemotePantsRunner(object):
       nailgun_error, exception_suffix))
 
   def _restart_pantsd(self):
-    return PantsDaemon.Factory.restart(bootstrap_options=self._bootstrap_options)
+    return PantsDaemon.Factory.restart(options_bootstrapper=self._options_bootstrapper)
 
   def _maybe_launch_pantsd(self):
-    return PantsDaemon.Factory.maybe_launch(bootstrap_options=self._bootstrap_options)
+    return PantsDaemon.Factory.maybe_launch(options_bootstrapper=self._options_bootstrapper)
 
   def run(self, args=None):
     self._setup_logging()

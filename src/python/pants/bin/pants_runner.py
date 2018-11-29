@@ -37,7 +37,7 @@ class PantsRunner(object):
     ExceptionSink.reset_exiter(self._exiter)
 
     options_bootstrapper = OptionsBootstrapper.create(env=self._env, args=self._args)
-    bootstrap_options = options_bootstrapper.get_bootstrap_options()
+    bootstrap_options = options_bootstrapper.bootstrap_options
     global_bootstrap_options = bootstrap_options.for_global_scope()
 
     ExceptionSink.reset_should_print_backtrace_to_terminal(global_bootstrap_options.print_exception_stacktrace)
@@ -45,7 +45,7 @@ class PantsRunner(object):
 
     if global_bootstrap_options.enable_pantsd:
       try:
-        return RemotePantsRunner(self._exiter, self._args, self._env, bootstrap_options).run()
+        return RemotePantsRunner(self._exiter, self._args, self._env, options_bootstrapper).run()
       except RemotePantsRunner.Fallback as e:
         logger.warn('caught client exception: {!r}, falling back to non-daemon mode'.format(e))
 
