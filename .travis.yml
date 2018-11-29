@@ -336,7 +336,7 @@ matrix:
         # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and
         # set -z to run the platform-specific tests.
         - export MODE=debug
-        - ./pants test tests/python/pants_test/backend/python/tasks:python_native_code_testing -- -vs -k test_ctypes_binary
+        - ./pants test tests/python/pants_test/backend/python/tasks:python_native_code_testing -- -vs
 
     # Rust Clippy on Linux
     - name: "Rust Clippy on Linux"
