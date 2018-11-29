@@ -192,6 +192,11 @@ If at any point you need to make changes that will fundamentally overhaul a revi
 consider temporarily removing the `reviewable` label in order to let reviewers know
 to hold off until the code is ready.
 
+**Pro tip:** If your pull request fails in travis, you can look at the shard logs to see the
+failure cause. From that log, you can figure out what tests you need to run to reproduce the failure
+locally. If the failure looks unrelated to your change, please open an issue for it with the label
+`flaky-test` (<a pantsref="dev_run_all_tests">More on checking CI test runs here</a>).
+
 ### Committing a Change
 
 At this point you've made a change, had it reviewed (and received one or more Ship Its!) and
