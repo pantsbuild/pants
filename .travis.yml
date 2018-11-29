@@ -319,6 +319,8 @@ matrix:
       osx_image: xcode8.3
       stage: *test
       language: generic
+      before_install:
+        - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
         # TODO: These filehandle adjustments should be made generic across the OSX environments
         # once #6549 lands.
@@ -334,7 +336,7 @@ matrix:
         # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and
         # set -z to run the platform-specific tests.
         - export MODE=debug
-        - ./pants --cache-test-ignore test tests/python/pants_test/backend/python/tasks:python_native_code_testing
+        - ./pants test tests/python/pants_test/backend/python/tasks:python_native_code_testing -- -vs
 
     # Rust Clippy on Linux
     - name: "Rust Clippy on Linux"
