@@ -10,6 +10,7 @@ import itertools
 import os
 from builtins import open
 from contextlib import contextmanager
+from hashlib import sha1
 
 import six
 from backports import configparser
@@ -18,6 +19,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.util.eval import parse_expression
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 class Config(AbstractClass):
@@ -51,7 +53,7 @@ class Config(AbstractClass):
 
     @contextmanager
     def opener(file_content):
-      with io.StringIO(file_content.content.decode('utf-8')) as fh:
+      with io.BytesIO(file_content.content) as fh:
         yield fh
 
     return cls._meta_load(opener, file_contents, seed_values)
@@ -72,7 +74,7 @@ class Config(AbstractClass):
 
     @contextmanager
     def opener(f):
-      with open(f, 'r') as fh:
+      with open(f, 'rb') as fh:
         yield fh
 
     return cls._meta_load(opener, config_paths, seed_values)
@@ -86,11 +88,13 @@ class Config(AbstractClass):
     for config_item in config_items:
       parser = cls._create_parser(seed_values)
       with open_ctx(config_item) as ini:
-        parser.read_file(ini)
+        content = ini.read()
+        content_digest = sha1(content).hexdigest()
+        parser.read_string(content.decode('utf-8'))
       config_path = config_item.path if hasattr(config_item, 'path') else config_item
-      single_file_configs.append(_SingleFileConfig(config_path, parser))
+      single_file_configs.append(_SingleFileConfig(config_path, content_digest, parser))
 
-    return _ChainedConfig(single_file_configs)
+    return _ChainedConfig(tuple(reversed(single_file_configs)))
 
   @classmethod
   def _create_parser(cls, seed_values=None):
@@ -183,7 +187,7 @@ class Config(AbstractClass):
     raise NotImplementedError
 
 
-class _EmptyConfig(Config):
+class _EmptyConfig(datatype([]), Config):
   """A dummy config with no data at all."""
 
   def sources(self):
@@ -209,11 +213,18 @@ class _EmptyConfig(Config):
 
 
 class _SingleFileConfig(Config):
-  """Config read from a single file."""
+  """Config read from a single file.
 
-  def __init__(self, configpath, configparser):
+  NB: In order to have:
+    1. a specialized implementation of __eq__ and __hash__ that avoids comparing file contents
+    2. equality ignore the ConfigParser instance
+  ...this is not a datatype.
+  """
+
+  def __init__(self, configpath, content_digest, configparser):
     super(_SingleFileConfig, self).__init__()
     self.configpath = configpath
+    self.content_digest = content_digest
     self.configparser = configparser
 
   def configs(self):
@@ -239,20 +250,26 @@ class _SingleFileConfig(Config):
       return self.sources()[0]
     return None
 
+  def __eq__(self, other):
+    return self.configpath == other.configpath and self.content_digest == other.content_digest
 
-class _ChainedConfig(Config):
-  """Config read from multiple sources."""
+  def __hash__(self):
+    return hash(self.content_digest)
 
-  def __init__(self, configs):
-    """
-    :param configs: A list of Config instances to chain.
-                    Later instances take precedence over earlier ones.
-    """
-    super(_ChainedConfig, self).__init__()
-    self._configs = list(reversed(configs))
+
+class _ChainedConfig(datatype(['chained_configs']), Config):
+  """Config read from multiple sources.
+
+  :param configs: A tuple of Config instances to chain.
+                  Later instances take precedence over earlier ones.
+  """
+
+  @property
+  def _configs(self):
+    return self.chained_configs
 
   def configs(self):
-    return self._configs
+    return self.chained_configs
 
   def sources(self):
     # NB: Present the sources in the order we were given them.
