@@ -31,4 +31,4 @@ class CppCompile(NativeCompile):
     return CppCompileSettings.scoped_instance(self)
 
   def get_compiler(self):
-    return self.get_cpp_toolchain_variant().cpp_toolchain.cpp_compiler
+    return self.get_cpp_toolchain_variant().cpp_compiler

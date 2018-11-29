@@ -8,7 +8,8 @@ from builtins import filter
 
 from pants.backend.native.config.environment import CppToolchain, CToolchain
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.backend.native.subsystems.native_toolchain import (NativeToolchain,
+                                                              ToolchainVariantRequest)
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.build_graph.dependency_context import DependencyContext
@@ -65,13 +66,19 @@ class NativeTask(Task):
   def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
 
+  @memoized_property
+  def _toolchain_variant_request(self):
+    return ToolchainVariantRequest(
+      toolchain=self._native_toolchain,
+      variant=self._native_build_settings.toolchain_variant)
+
   @memoized_method
   def get_c_toolchain_variant(self):
-    return self._request_single(CToolchain, NativeToolchain, self._native_toolchain)
+    return self._request_single(CToolchain, self._toolchain_variant_request)
 
   @memoized_method
   def get_cpp_toolchain_variant(self):
-    return self._request_single(CppToolchain, NativeToolchain, self._native_toolchain)
+    return self._request_single(CppToolchain, self._toolchain_variant_request)
 
   def native_deps(self, target):
     return self.strict_deps_for_target(

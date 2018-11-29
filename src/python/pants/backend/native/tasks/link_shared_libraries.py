@@ -65,7 +65,7 @@ class LinkSharedLibraries(NativeTask):
   def linker(self):
     # NB: we are using the C++ toolchain here for linking every type of input, including compiled C
     # source files.
-    return self.get_cpp_toolchain_variant().cpp_toolchain.cpp_linker
+    return self.get_cpp_toolchain_variant().cpp_linker
 
   @memoized_property
   def platform(self):

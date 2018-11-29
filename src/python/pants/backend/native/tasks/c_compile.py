@@ -31,4 +31,4 @@ class CCompile(NativeCompile):
     return CCompileSettings.scoped_instance(self)
 
   def get_compiler(self):
-    return self.get_c_toolchain_variant().c_toolchain.c_compiler
+    return self.get_c_toolchain_variant().c_compiler

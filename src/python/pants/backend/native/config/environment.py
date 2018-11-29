@@ -164,26 +164,10 @@ class CppCompiler(datatype([
     return ret
 
 
-# NB: These wrapper classes for LLVM and GCC toolchains are performing the work of variants. A
-# CToolchain cannot be requested directly, but native_toolchain.py provides an LLVMCToolchain,
-# which contains a CToolchain representing the clang compiler and a linker paired to work with
-# objects compiled by that compiler.
 class CToolchain(datatype([('c_compiler', CCompiler), ('c_linker', Linker)])): pass
 
 
-class LLVMCToolchain(datatype([('c_toolchain', CToolchain)])): pass
-
-
-class GCCCToolchain(datatype([('c_toolchain', CToolchain)])): pass
-
-
 class CppToolchain(datatype([('cpp_compiler', CppCompiler), ('cpp_linker', Linker)])): pass
-
-
-class LLVMCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
-
-
-class GCCCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
 
 
 # TODO: make this an @rule, after we can automatically produce LibcDev and other subsystems in the
