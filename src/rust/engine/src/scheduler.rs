@@ -31,8 +31,8 @@ pub struct Session {
   preceding_graph_size: usize,
   // The set of roots that have been requested within this session.
   roots: Mutex<HashSet<Root>>,
-  // Flag used to determine whether to show engine execution progress.
-  display: Arc<Mutex<Option<EngineDisplay>>>,
+  // If enabled, the display that will render the progress of the V2 engine.
+  display: Mutex<Option<EngineDisplay>>,
 }
 
 impl Session {
@@ -40,10 +40,7 @@ impl Session {
     Session {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
-      display: Arc::new(Mutex::new(EngineDisplay::create(
-        ui_worker_count,
-        should_render_ui,
-      ))),
+      display: Mutex::new(EngineDisplay::create(ui_worker_count, should_render_ui)),
     }
   }
 
@@ -265,8 +262,8 @@ impl Scheduler {
       .map(|s| s.into())
       .collect();
 
-    // Ran after printing the result of a console_rule.
-    let display_arc = session.display.clone();
+    // Lock the display for the remainder of the execution, and grab a reference to it.
+    let display_arc = &session.display;
     let mut maybe_display = display_arc.lock();
 
     // This map keeps the k most relevant jobs in assigned possitions.
