@@ -491,7 +491,7 @@ def main():
   # Parse positional arguments to the script.
   args = _create_bootstrap_binary_arg_parser().parse_args()
   # Resolve bootstrap options with a fake empty command line.
-  options_bootstrapper = OptionsBootstrapper(args=[sys.argv[0]])
+  options_bootstrapper = OptionsBootstrapper.create(args=[sys.argv[0]])
   subsystems = (GlobalOptionsRegistrar, BinaryUtil.Factory)
   known_scope_infos = reduce(set.union, (ss.known_scope_infos() for ss in subsystems), set())
   options = options_bootstrapper.get_full_options(known_scope_infos)

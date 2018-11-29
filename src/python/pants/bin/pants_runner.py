@@ -36,7 +36,7 @@ class PantsRunner(object):
     # this point onwards will use that exiter in the case of a fatal error.
     ExceptionSink.reset_exiter(self._exiter)
 
-    options_bootstrapper = OptionsBootstrapper(env=self._env, args=self._args)
+    options_bootstrapper = OptionsBootstrapper.create(env=self._env, args=self._args)
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
     global_bootstrap_options = bootstrap_options.for_global_scope()
 

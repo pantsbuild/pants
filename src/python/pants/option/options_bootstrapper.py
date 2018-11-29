@@ -8,7 +8,9 @@ import itertools
 import logging
 import os
 import sys
-from builtins import filter, next, object, open
+from builtins import filter
+
+from future.utils import iteritems
 
 from pants.base.build_environment import get_default_pants_config_file
 from pants.engine.fs import FileContent
@@ -17,14 +19,22 @@ from pants.option.config import Config
 from pants.option.custom_types import ListValueComponent
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
+from pants.util.dirutil import read_file
+from pants.util.memo import memoized_method, memoized_property
+from pants.util.objects import SubclassesOf, datatype
 from pants.util.strutil import ensure_text
 
 
 logger = logging.getLogger(__name__)
 
 
-class OptionsBootstrapper(object):
-  """An object that knows how to create options in two stages: bootstrap, and then full options."""
+class OptionsBootstrapper(datatype([
+  ('env_tuples', tuple),
+  ('bootstrap_args', tuple),
+  ('args', tuple),
+  ('config', SubclassesOf(Config)),
+])):
+  """Holds the result of the first stage of options parsing, and assists with parsing full options."""
 
   @staticmethod
   def get_config_file_paths(env, args):
@@ -59,24 +69,41 @@ class OptionsBootstrapper(object):
 
     return ListValueComponent.merge(path_list_values).val
 
+  @staticmethod
+  def parse_bootstrap_options(env, args, config):
+    bootstrap_options = Options.create(
+      env=env,
+      config=config,
+      known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()],
+      args=args,
+    )
+
+    def register_global(*args, **kwargs):
+      ## Only use of Options.register?
+      bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
+
+    GlobalOptionsRegistrar.register_bootstrap_options(register_global)
+    return bootstrap_options
+
   @classmethod
   def from_options_parse_request(cls, parse_request):
-    inst = cls(env=dict(parse_request.env), args=parse_request.args)
-    inst.construct_and_set_bootstrap_options()
-    return inst
+    return cls.create(env=dict(parse_request.env), args=parse_request.args)
 
-  def __init__(self, env=None, args=None):
-    self._env = env if env is not None else os.environ.copy()
-    self._post_bootstrap_config = None  # Will be set later.
-    self._args = sys.argv if args is None else args
-    self._bootstrap_options = None  # We memoize the bootstrap options here.
-    self._full_options = {}  # We memoize the full options here.
+  @classmethod
+  def create(cls, env=None, args=None):
+    """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
-  def produce_and_set_bootstrap_options(self):
-    """Cooperatively populates the internal bootstrap_options cache with
-    a producer of `FileContent`."""
+    :param env: An environment dictionary, or None to use `os.environ`.
+    :param args: An args array, or None to use `sys.argv`.
+    """
+    env = os.environ.copy() if env is None else env
+    args = tuple(sys.argv if args is None else args)
+
     flags = set()
     short_flags = set()
+
+    def filecontent_for(path):
+      return FileContent(ensure_text(path), read_file(path))
 
     def capture_the_flags(*args, **kwargs):
       for arg in args:
@@ -100,28 +127,13 @@ class OptionsBootstrapper(object):
     # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
     # Stop before '--' since args after that are pass-through and may have duplicate names to our
     # bootstrap options.
-    bargs = list(filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', self._args)))
+    bargs = tuple(filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', args)))
 
-    config_file_paths = self.get_config_file_paths(env=self._env, args=self._args)
-    config_files_products = yield config_file_paths
+    config_file_paths = cls.get_config_file_paths(env=env, args=args)
+    config_files_products = [filecontent_for(p) for p in config_file_paths]
     pre_bootstrap_config = Config.load_file_contents(config_files_products)
 
-    def bootstrap_options_from_config(config):
-      bootstrap_options = Options.create(
-        env=self._env,
-        config=config,
-        known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()],
-        args=bargs,
-      )
-
-      def register_global(*args, **kwargs):
-        ## Only use of Options.register?
-        bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
-
-      GlobalOptionsRegistrar.register_bootstrap_options(register_global)
-      return bootstrap_options
-
-    initial_bootstrap_options = bootstrap_options_from_config(pre_bootstrap_config)
+    initial_bootstrap_options = cls.parse_bootstrap_options(env, bargs, pre_bootstrap_config)
     bootstrap_option_values = initial_bootstrap_options.for_global_scope()
 
     # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
@@ -132,41 +144,45 @@ class OptionsBootstrapper(object):
       existing_rcfiles = list(filter(os.path.exists, rcfiles))
       full_configpaths.extend(existing_rcfiles)
 
-    full_config_files_products = yield full_configpaths
-    self._post_bootstrap_config = Config.load_file_contents(
+    full_config_files_products = [filecontent_for(p) for p in full_configpaths]
+    post_bootstrap_config = Config.load_file_contents(
       full_config_files_products,
       seed_values=bootstrap_option_values
     )
 
-    # Now recompute the bootstrap options with the full config. This allows us to pick up
-    # bootstrap values (such as backends) from a config override file, for example.
-    self._bootstrap_options = bootstrap_options_from_config(self._post_bootstrap_config)
+    env_tuples = tuple(sorted(iteritems(env), key=lambda x: x[0]))
+    return cls(env_tuples=env_tuples, bootstrap_args=bargs, args=args, config=post_bootstrap_config)
 
-  def construct_and_set_bootstrap_options(self):
-    """Populates the internal bootstrap_options cache."""
-    def filecontent_for(path):
-      with open(path, 'rb') as fh:
-        path = ensure_text(path)
-        return FileContent(path, fh.read())
+  @memoized_property
+  def env(self):
+    return dict(self.env_tuples)
 
-    # N.B. This adaptor is meant to simulate how we would co-operatively invoke options bootstrap
-    # via an `@rule` after we have a solution in place for producing `FileContent` of abspaths.
-    producer = self.produce_and_set_bootstrap_options()
-    next_item = None
-    while 1:
-      try:
-        files = next_item or next(producer)
-        next_item = producer.send([filecontent_for(f) for f in files])
-      except StopIteration:
-        break
+  @memoized_property
+  def bootstrap_options(self):
+    """The post-bootstrap options, computed from the env, args, and fully discovered Config.
+
+    Re-computing options after Config has been fully expanded allows us to pick up bootstrap values
+    (such as backends) from a config override file, for example.
+
+    Because this can be computed from the in-memory representation of these values, it is not part
+    of the object's identity.
+    """
+    return self.parse_bootstrap_options(self.env, self.bootstrap_args, self.config)
 
   def get_bootstrap_options(self):
     """:returns: an Options instance that only knows about the bootstrap options.
     :rtype: :class:`Options`
     """
-    if not self._bootstrap_options:
-      self.construct_and_set_bootstrap_options()
-    return self._bootstrap_options
+    return self.bootstrap_options
+
+  @memoized_method
+  def _full_options(self, known_scope_infos):
+    bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
+    return Options.create(self.env,
+                          self.config,
+                          known_scope_infos,
+                          args=self.args,
+                          bootstrap_option_values=bootstrap_option_values)
 
   def get_full_options(self, known_scope_infos):
     """Get the full Options instance bootstrapped by this object for the given known scopes.
@@ -176,17 +192,7 @@ class OptionsBootstrapper(object):
               scopes.
     :rtype: :class:`Options`
     """
-    key = frozenset(sorted(known_scope_infos))
-    if key not in self._full_options:
-      # Note: Don't inline this into the Options() call, as this populates
-      # self._post_bootstrap_config, which is another argument to that call.
-      bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
-      self._full_options[key] = Options.create(self._env,
-                                               self._post_bootstrap_config,
-                                               known_scope_infos,
-                                               args=self._args,
-                                               bootstrap_option_values=bootstrap_option_values)
-    return self._full_options[key]
+    return self._full_options(tuple(sorted(set(known_scope_infos))))
 
   def verify_configs_against_options(self, options):
     """Verify all loaded configs have correct scopes and options.
@@ -195,7 +201,7 @@ class OptionsBootstrapper(object):
     :return: None.
     """
     error_log = []
-    for config in self._post_bootstrap_config.configs():
+    for config in self.config.configs():
       for section in config.sections():
         if section == GLOBAL_SCOPE_CONFIG_SECTION:
           scope = GLOBAL_SCOPE

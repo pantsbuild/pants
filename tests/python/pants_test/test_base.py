@@ -621,7 +621,7 @@ class TestBase(unittest.TestCase):
     """
     # Can't parse any options without a pants.ini.
     self.create_file('pants.ini')
-    return OptionsBootstrapper(args=cli_options).get_bootstrap_options().for_global_scope()
+    return OptionsBootstrapper.create(args=cli_options).bootstrap_options.for_global_scope()
 
   class LoggingRecorder(object):
     """Simple logging handler to record warnings."""

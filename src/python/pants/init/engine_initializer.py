@@ -311,7 +311,8 @@ class EngineInitializer(object):
     """
 
     build_root = build_root or get_buildroot()
-    build_configuration = build_configuration or BuildConfigInitializer.get(OptionsBootstrapper())
+    options_bootstrapper = OptionsBootstrapper.create()
+    build_configuration = build_configuration or BuildConfigInitializer.get(options_bootstrapper)
     build_file_aliases = build_configuration.registered_aliases()
     rules = build_configuration.rules()
     console = Console()

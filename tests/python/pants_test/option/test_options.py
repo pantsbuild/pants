@@ -696,8 +696,8 @@ class OptionsTest(unittest.TestCase):
       cmdline = './pants --target-spec-file={filename} --pants-config-files="[]" ' \
                 'compile morx:tgt fleem:tgt'.format(
         filename=tmp.name)
-      bootstrapper = OptionsBootstrapper(args=shlex.split(cmdline))
-      bootstrap_options = bootstrapper.get_bootstrap_options().for_global_scope()
+      bootstrapper = OptionsBootstrapper.create(args=shlex.split(cmdline))
+      bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
       options = self._parse(cmdline, bootstrap_option_values=bootstrap_options)
       sorted_specs = sorted(options.target_specs)
       self.assertEqual(['bar', 'fleem:tgt', 'foo', 'morx:tgt'], sorted_specs)

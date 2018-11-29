@@ -30,7 +30,7 @@ class LocalPantsRunner(object):
 
   @staticmethod
   def parse_options(args, env, setup_logging=False, options_bootstrapper=None):
-    options_bootstrapper = options_bootstrapper or OptionsBootstrapper(args=args, env=env)
+    options_bootstrapper = options_bootstrapper or OptionsBootstrapper.create(args=args, env=env)
     bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
     if setup_logging:
       # Bootstrap logging and then fully initialize options.

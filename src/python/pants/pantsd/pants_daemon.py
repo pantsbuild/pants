@@ -130,7 +130,9 @@ class PantsDaemon(FingerprintedProcessManager):
                              initialize the engine). See the impl of `maybe_launch` for an example
                              of the intended usage.
       """
-      bootstrap_options = bootstrap_options or cls._parse_bootstrap_options()
+      # TODO: This method should receive an OptionsBootstrapper instead, to avoid re-parsing.
+      options_bootstrapper = OptionsBootstrapper.create() if full_init or not bootstrap_options else None
+      bootstrap_options = bootstrap_options or options_bootstrapper.bootstrap_options
       bootstrap_options_values = bootstrap_options.for_global_scope()
       # TODO: https://github.com/pantsbuild/pants/issues/3479
       watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
@@ -138,7 +140,6 @@ class PantsDaemon(FingerprintedProcessManager):
       if full_init:
         build_root = get_buildroot()
         native = Native.create(bootstrap_options_values)
-        options_bootstrapper = OptionsBootstrapper()
         build_config = BuildConfigInitializer.get(options_bootstrapper)
         legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(native,
                                                                       bootstrap_options_values,
@@ -163,10 +164,6 @@ class PantsDaemon(FingerprintedProcessManager):
         metadata_base_dir=bootstrap_options_values.pants_subprocessdir,
         bootstrap_options=bootstrap_options
       )
-
-    @staticmethod
-    def _parse_bootstrap_options():
-      return OptionsBootstrapper().get_bootstrap_options()
 
     @staticmethod
     def _setup_services(build_root, bootstrap_options, legacy_graph_scheduler, watchman):

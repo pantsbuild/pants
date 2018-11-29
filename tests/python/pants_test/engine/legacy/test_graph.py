@@ -45,7 +45,8 @@ class GraphTestBase(unittest.TestCase):
   def _default_build_config(self, build_file_aliases=None):
     # TODO: Get default BuildFileAliases by extending BaseTest post
     #   https://github.com/pantsbuild/pants/issues/4401
-    build_config = BuildConfigInitializer.get(OptionsBootstrapper())
+    options_bootstrapper = OptionsBootstrapper.create()
+    build_config = BuildConfigInitializer.get(options_bootstrapper)
     if build_file_aliases:
       build_config.register_aliases(build_file_aliases)
     return build_config
