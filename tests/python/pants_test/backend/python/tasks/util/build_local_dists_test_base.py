@@ -115,7 +115,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
       target_roots=([python_dist_target] + extra_targets),
       for_task_types=(all_synthesized_task_types),
       for_subsystems=[PythonRepos, LibcDev],
-      # TODO(#???): we should be testing all of these with both of our toolchains.
+      # TODO(#6848): we should be testing all of these with both of our toolchains.
       options={
         'native-build-settings': {
           'toolchain_variant': 'llvm',

@@ -96,7 +96,10 @@ class LinkerMixin(Executable):
 
   @abstractproperty
   def extra_object_files(self):
-    """???"""
+    """A list of object files required to perform a successful link.
+
+    This includes crti.o from libc for gcc on Linux, for example.
+    """
 
   @property
   def as_invocation_environment_dict(self):
