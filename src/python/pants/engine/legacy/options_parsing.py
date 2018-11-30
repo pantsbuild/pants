@@ -4,40 +4,45 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
-from pants.init.options_initializer import OptionsInitializer
+from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.option.option_value_container import OptionValueContainer
+from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.scope import Scope
 from pants.util.objects import datatype
 
 
-class OptionsParseRequest(datatype(['args', 'env'])):
-  """Represents a request for Options computation."""
-
-  @classmethod
-  def create(cls, args, env):
-    assert isinstance(args, (list, tuple))
-    return cls(
-      tuple(args),
-      tuple(sorted(env.items() if isinstance(env, dict) else env))
-    )
+class _Options(datatype([('options', Options)])):
+  """A wrapper around bootstrapped options values: not for direct consumption."""
 
 
-class Options(datatype(['options', 'build_config'])):
-  """Represents the result of an Options computation."""
+class ScopedOptions(datatype([
+  ('scope', Scope),
+  ('options', OptionValueContainer),
+])):
+  """A wrapper around options selected for a particular Scope."""
 
 
-# TODO: Accommodate file_option, dir_option, etc.
-@rule(Options, [Select(OptionsBootstrapper), Select(BuildConfiguration)])
-def parse_options(options_bootstrapper, build_config):
-  options = OptionsInitializer.create(options_bootstrapper, build_config)
-  options.freeze()
-  return Options(options, build_config)
+@rule(_Options, [Select(OptionsBootstrapper)])
+def parse_options(options_bootstrapper):
+  # TODO: Because _OptionsBootstapper is currently provided as a Param, this @rule relies on options
+  # remaining relatively stable in order to be efficient. See #6845 for a discussion of how to make
+  # minimize the size of that value.
+  build_config = BuildConfigInitializer.get(options_bootstrapper)
+  return _Options(OptionsInitializer.create(options_bootstrapper, build_config, init_subsystems=False))
+
+
+@rule(ScopedOptions, [Select(Scope), Select(_Options)])
+def scope_options(scope, options):
+  return ScopedOptions(scope, options.options.for_scope(scope.scope))
 
 
 def create_options_parsing_rules():
   return [
+    scope_options,
     parse_options,
+    RootRule(Scope),
     RootRule(OptionsBootstrapper),
   ]
