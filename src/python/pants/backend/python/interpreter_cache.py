@@ -13,7 +13,6 @@ from collections import defaultdict
 from pex.interpreter import PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
-from pex.variables import Variables
 
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -59,22 +58,6 @@ class PythonInterpreterCache(Subsystem):
     for interpreter in interpreters:
       if cls._matches(interpreter, filters=filters):
         yield interpreter
-
-  @classmethod
-  def pex_python_paths(cls):
-    """A list of paths to Python interpreter binaries as defined by a
-    PEX_PYTHON_PATH defined in either in '/etc/pexrc', '~/.pexrc'.
-    PEX_PYTHON_PATH defines a colon-separated list of paths to interpreters
-    that a pex can be built and ran against.
-
-    :return: paths to interpreters as specified by PEX_PYTHON_PATH
-    :rtype: list
-    """
-    ppp = Variables.from_rc().get('PEX_PYTHON_PATH')
-    if ppp:
-      return ppp.split(os.pathsep)
-    else:
-      return []
 
   @memoized_property
   def _python_setup(self):
@@ -183,9 +166,7 @@ class PythonInterpreterCache(Subsystem):
     # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
     # an escape hatch.
     filters = filters if any(filters) else self._python_setup.interpreter_constraints
-    setup_paths = (self.pex_python_paths()
-                   or self._python_setup.interpreter_search_paths
-                   or os.getenv('PATH').split(os.pathsep))
+    setup_paths = self._python_setup.interpreter_search_paths
     logger.debug(
       'Initializing Python interpreter cache matching filters `{}` from paths `{}`'.format(
         ':'.join(filters), ':'.join(setup_paths)))

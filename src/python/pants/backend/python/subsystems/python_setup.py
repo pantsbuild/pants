@@ -4,12 +4,19 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 import os
 
+from pex.variables import Variables
 from pkg_resources import Requirement
 
 from pants.option.custom_types import UnsetBool
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
+
+
+logger = logging.getLogger(__name__)
 
 
 class PythonSetup(Subsystem):
@@ -52,11 +59,12 @@ class PythonSetup(Subsystem):
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the python artifact cache. '
                   'If unspecified, a standard path under the workdir is used.')
-    register('--interpreter-search-paths', advanced=True, type=list, default=[],
-             metavar='<binary-paths>',
-             help='A list of paths to search for python interpreters. Note that if a PEX_PYTHON_PATH '
-              'variable is defined in a pexrc file, those interpreter paths will take precedence over ' 
-              'this option.')
+    register('--interpreter-search-paths', advanced=True, type=list,
+             default=['<PEXRC_PATH>', '<PATH>'], metavar='<binary-paths>',
+             help='A list of paths to search for python interpreters. The following special '
+                  'strings are supported: "<PATH>" (the contents of the PATH env var), '
+                  '"<PEXRC_PATH>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
+                  '"<PYENV>" (all python versions under $(pyenv root)/versions).')
     register('--resolver-blacklist', advanced=True, type=dict, default={},
              removal_version='1.13.0.dev2',
              removal_hint='Now unused. Pants, via PEX, handles blacklisting automatically via '
@@ -81,9 +89,9 @@ class PythonSetup(Subsystem):
   def interpreter_constraints(self):
     return tuple(self.get_options().interpreter_constraints)
 
-  @property
+  @memoized_property
   def interpreter_search_paths(self):
-    return self.get_options().interpreter_search_paths
+    return self.expand_interpreter_search_paths(self.get_options().interpreter_search_paths)
 
   @property
   def setuptools_version(self):
@@ -160,3 +168,64 @@ class PythonSetup(Subsystem):
       return Requirement.parse(requirement, replacement=False)
     except TypeError:
       return Requirement.parse(requirement)
+
+  @classmethod
+  def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):
+    special_strings = {
+      '<PEXRC_PATH>': cls.get_pex_python_paths,
+      '<PATH>': cls.get_environment_paths,
+      '<PYENV>': lambda: cls.get_pyenv_paths(pyenv_root_func=pyenv_root_func)
+    }
+    expanded = []
+    for s in interpreter_search_paths:
+      if s in special_strings:
+        expanded.extend(special_strings[s]())
+      else:
+        expanded.append(s)
+    return expanded
+
+  @staticmethod
+  def get_environment_paths():
+    """Returns a list of paths specified by the PATH env var."""
+    return os.getenv('PATH').split(os.pathsep)
+
+  @staticmethod
+  def get_pex_python_paths():
+    """Returns a list of paths to Python interpreters as defined in a pexrc file.
+
+    These are provided by a PEX_PYTHON_PATH in either of '/etc/pexrc', '~/.pexrc'.
+    PEX_PYTHON_PATH defines a colon-separated list of paths to interpreters
+    that a pex can be built and run against.
+    """
+    ppp = Variables.from_rc().get('PEX_PYTHON_PATH')
+    if ppp:
+      return ppp.split(os.pathsep)
+    else:
+      return []
+
+  @staticmethod
+  def get_pyenv_paths(pyenv_root_func=None):
+    """Returns a list of paths to Python interpreters managed by pyenv.
+
+    :param pyenv_root_func: A no-arg function that returns the pyenv root. Defaults to
+                            running `pyenv root`, but can be overridden for testing.
+    """
+    pyenv_root_func = pyenv_root_func or get_pyenv_root
+    pyenv_root = pyenv_root_func()
+    if pyenv_root is None:
+      return []
+    versions_dir = os.path.join(pyenv_root, 'versions')
+    paths = []
+    for version in sorted(os.listdir(versions_dir)):
+      path = os.path.join(versions_dir, version, 'bin')
+      if os.path.isdir(path):
+        paths.append(path)
+    return paths
+
+
+def get_pyenv_root():
+  try:
+    return subprocess.check_output(['pyenv', 'root']).decode('utf-8').strip()
+  except (OSError, subprocess.CalledProcessError):
+    logger.info('No pyenv binary found. Will not use pyenv interpreters.')
+  return None

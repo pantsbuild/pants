@@ -49,15 +49,17 @@ class TestInterpreterCache(TestBase):
     return PythonInterpreterCache.global_instance()
 
   @contextmanager
-  def _setup_cache(self, constraints=None):
+  def _setup_cache(self, constraints=None, search_paths=None):
     with temporary_dir() as path:
-      cache = self._setup_cache_at(path, constraints=constraints)
+      cache = self._setup_cache_at(path, constraints=constraints, search_paths=search_paths)
       yield cache, path
 
-  def _setup_cache_at(self, path, constraints=None):
+  def _setup_cache_at(self, path, constraints=None, search_paths=None):
     setup_options = {'interpreter_cache_dir': path}
     if constraints is not None:
       setup_options.update(interpreter_constraints=constraints)
+    if search_paths is not None:
+      setup_options.update(interpreter_search_paths=search_paths)
     return self._create_interpreter_cache(setup_options=setup_options, repos_options={})
 
   def test_cache_setup_with_no_filters_uses_repo_default_excluded(self):
@@ -147,22 +149,18 @@ class TestInterpreterCache(TestBase):
                        'interpreter cache path contains tmp dirs!')
 
   @skip_unless_python27_and_python36
-  def test_pex_python_paths(self):
-    """Test pex python path helper method of PythonInterpreterCache."""
-    py27_path, py36_path = python_interpreter_path(PY_27), python_interpreter_path(PY_36)
-    with setup_pexrc_with_pex_python_path([py27_path, py36_path]):
-      with self._setup_cache() as (cache, _):
-        pex_python_paths = cache.pex_python_paths()
-        self.assertEqual(pex_python_paths, [py27_path, py36_path])
-
-  @skip_unless_python27_and_python36
   def test_interpereter_cache_setup_using_pex_python_paths(self):
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
+    # self.context(for_subsystems=[PythonInterpreterCache], options={
+    #   'python-setup': {'interpreter_search_paths': ['<PEXRC_PATH>']},
+    # })
     py27_path, py36_path = python_interpreter_path(PY_27), python_interpreter_path(PY_36)
     with setup_pexrc_with_pex_python_path([py27_path, py36_path]):
-      with self._setup_cache(constraints=['CPython>=2.7,<3']) as (cache, _):
+      with self._setup_cache(constraints=['CPython>=2.7,<3'],
+                             search_paths=['<PEXRC_PATH>']) as (cache, _):
         self.assertIn(py27_path, {pi.binary for pi in cache.setup()})
-      with self._setup_cache(constraints=['CPython>=3.6,<4']) as (cache, _):
+      with self._setup_cache(constraints=['CPython>=3.6,<4'],
+                             search_paths=['<PEXRC_PATH>']) as (cache, _):
         self.assertIn(py36_path, {pi.binary for pi in cache.setup()})
 
   def test_setup_cached_warm(self):
