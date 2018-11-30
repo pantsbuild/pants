@@ -185,7 +185,7 @@ the pull request.
 If your CI-build failed in Travis-CI, and the failure looks like it's not due to
 your change, please open an issue with the part of the CI log containing the test failure and label
 the issue with `flaky-test`. If an issue already exists, add a comment to it noting that you
-encountered it too. After you've done that, you can ask in chat for someone to restart the shard.
+encountered it too. After you've done that, you can ask in slack for someone to restart the shard.
 That will cause the shard to re-run its tests.
 
 
