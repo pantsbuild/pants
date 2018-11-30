@@ -188,7 +188,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         command=['binary', self._binary_target_with_interop],
         # Explicitly set to True (although this is the default).
         config={
-          # TODO: don't make it possible to forget to add the toolchain_variant option!
+          # TODO(#6848): don't make it possible to forget to add the toolchain_variant option!
           'native-build-settings': {
             'toolchain_variant': toolchain_variant,
             'strict_deps': True,
@@ -200,7 +200,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       self.assertIn(self._include_not_found_message_for_variant[toolchain_variant],
                     pants_binary_strict_deps_failure.stdout_data)
 
-    # TODO(#???): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
+    # TODO(#6848): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
     # DYLD_LIBRARY_PATH during the 'run' goal somehow.
     attempt_pants_run = Platform.create().resolve_platform_specific({
       'darwin': lambda: toolchain_variant != 'gnu',
@@ -224,7 +224,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     pants_binary = self.run_pants(['binary', self._binary_target_with_third_party])
     self.assert_success(pants_binary)
 
-    # TODO(#???): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
+    # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
     pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party])
     self.assert_success(pants_run)
