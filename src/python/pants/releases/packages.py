@@ -8,6 +8,7 @@ import json
 import os
 import sys
 from builtins import object
+from collections import defaultdict
 from configparser import ConfigParser
 from distutils.util import get_platform
 from functools import total_ordering
@@ -174,13 +175,21 @@ def all_packages():
 
 
 def build_and_print_packages(version):
+  packages_by_flags = defaultdict(list)
   for package in sorted(all_packages()):
-    args = ("./pants", "setup-py", "--run=bdist_wheel") + package.bdist_wheel_flags + (package.target,)
+    packages_by_flags[package.bdist_wheel_flags].append(package)
+
+  for (flags, packages) in packages_by_flags.items():
+    args = ("./pants", "setup-py", "--run=bdist_wheel") + flags + tuple(package.target for package in packages)
     try:
       subprocess.check_call(args)
       print(package.name)
     except subprocess.CalledProcessError:
-      print("Failed to build package {name}-{version} with target {target}".format(name=package.name, version=version, target=package.target), file=sys.stderr)
+      print("Failed to build packages {names} for {version} with targets {targets}".format(
+        names=','.join(package.name for package in packages),
+        version=version,
+        targets=' '.join(package.target for package in packages),
+      ), file=sys.stderr)
       raise
 
 
