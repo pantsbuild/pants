@@ -415,7 +415,14 @@ def _initialize_externs(ffi):
     """Return an Ident containing the __hash__ and TypeId for the given Handle."""
     c = ffi.from_handle(context_handle)
     obj = ffi.from_handle(val[0])
-    hash_ = hash(obj)
+    try:
+      hash_ = hash(obj)
+    except TypeError:
+      # NB: There are no instances of unhashable types currently used as Keys, and we should keep it
+      # that way. But we currently warn-and-fallback rather than adjusting the entire interface to
+      # support erroring in a situation that is not technically fatal.
+      logger.warn('failed to hash type `{}`'.format(type(obj)))
+      hash_ = hash(id(obj))
     type_id = c.to_id(type(obj))
     return (hash_, TypeId(type_id))
 

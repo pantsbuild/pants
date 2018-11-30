@@ -123,6 +123,12 @@ class TargetAdaptor(StructWithDeps):
     """
     pass
 
+  def __hash__(self):
+    # TODO: Structs do not extend datatype, and frequently contain unhashable fields. Overriding
+    # hash using the address should be more than sufficient to avoid collisions, but we should
+    # try to continue to simplify Struct via #4535.
+    return hash(self.address)
+
 
 class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
