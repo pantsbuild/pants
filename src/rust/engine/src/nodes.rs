@@ -15,7 +15,7 @@ use url::Url;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use context::{Context, Core};
-use core::{throw, Failure, Key, Params, TypeConstraint, Value};
+use core::{throw, Args, Failure, Function, Key, Params, TypeConstraint, Value};
 use externs;
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
@@ -156,12 +156,9 @@ impl WrappedNode for Select {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
         .rule()
       {
-        &rule_graph::Rule::Task(ref task) => context.get(Task {
-          params: self.params.clone(),
-          product: self.product,
-          task: task.clone(),
-          entry: Arc::new(self.entry.clone()),
-        }),
+        &rule_graph::Rule::Task(ref task) => {
+          Task::apply(context, self.entry.clone(), task, self.params.clone())
+        }
         &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.snapshot && input == context.core.types.path_globs =>
         {
@@ -796,13 +793,65 @@ impl From<DownloadedFile> for NodeKey {
 
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Task {
-  params: Params,
+  // A Task has Args that are computed for its Selects in Task::apply, and also a set of Params
+  // that are used as the inputs to Gets.
+  args: Args,
+  get_params: Params,
   product: TypeConstraint,
-  task: tasks::Task,
+  func: Function,
+  cacheable: bool,
   entry: Arc<rule_graph::Entry>,
 }
 
 impl Task {
+  ///
+  /// Constructs, runs, and memoizes a Task node. This involves first using (a subset of) the given
+  /// Params to compute the arguments to the Task (which will define its identity), and then
+  /// actually executing it using its args and the remaining Params.
+  ///
+  /// The effect of pre-computing the known arguments of the Task before instantiating it is that
+  /// Task nodes with identical arguments are de-duped in the graph.
+  ///
+  fn apply(
+    context: Context,
+    entry: rule_graph::Entry,
+    task: &tasks::Task,
+    params: Params,
+  ) -> NodeFuture<Value> {
+    let func = task.func.clone();
+    let product = task.product.clone();
+    let cacheable = task.cacheable;
+    // TODO: construct Tasks directly with their InnerEntry type to avoid the panics here.
+    let edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(&entry)
+      .expect("edges for task exist.");
+    let args_res = future::join_all(
+      task
+        .clause
+        .iter()
+        .map(|s| Select::new_from_edges(params.clone(), s.product, &edges).run(context.clone()))
+        .collect::<Vec<_>>(),
+    );
+    let get_params = {
+      let mut params = params.clone();
+      edges.retain_get_params(&mut params);
+      params
+    };
+    args_res
+      .and_then(move |args| {
+        context.get(Task {
+          args: Args(args.into_iter().map(|v| externs::key_for(v)).collect()),
+          get_params,
+          func: func,
+          product: product,
+          cacheable: cacheable,
+          entry: Arc::new(entry),
+        })
+      }).to_boxed()
+  }
+
   fn gen_get(
     context: &Context,
     params: &Params,
@@ -875,10 +924,10 @@ impl fmt::Debug for Task {
     write!(
       f,
       "Task({}, {}, {}, {})",
-      externs::project_str(&externs::val_for(&self.task.func.0), "__name__"),
-      self.params,
+      externs::project_str(&externs::val_for(&self.func.0), "__name__"),
+      self.args,
       externs::key_to_str(&self.product.0),
-      self.task.cacheable,
+      self.cacheable,
     )
   }
 }
@@ -887,34 +936,21 @@ impl WrappedNode for Task {
   type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
-    let params = self.params;
-    let deps = {
-      let edges = &context
-        .core
-        .rule_graph
-        .edges_for_inner(&self.entry)
-        .expect("edges for task exist.");
-      future::join_all(
-        self
-          .task
-          .clause
-          .into_iter()
-          .map(|s| Select::new_from_edges(params.clone(), s.product, edges).run(context.clone()))
-          .collect::<Vec<_>>(),
-      )
-    };
-
-    let func = self.task.func;
+    let args = self
+      .args
+      .0
+      .iter()
+      .map(|k| externs::val_for(k))
+      .collect::<Vec<_>>();
+    let get_params = self.get_params;
+    let func = self.func;
     let entry = self.entry;
     let product = self.product;
-    deps
-      .then(move |deps_result| match deps_result {
-        Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
-        Err(failure) => Err(failure),
-      }).then(move |task_result| match task_result {
+    future::result(externs::call(&externs::val_for(&func.0), &args))
+      .then(move |task_result| match task_result {
         Ok(val) => {
           if externs::satisfied_by(&context.core.types.generator, &val) {
-            Self::generate(context, params, entry, val)
+            Self::generate(context, get_params, entry, val)
           } else if externs::satisfied_by(&product, &val) {
             ok(val)
           } else {
@@ -1102,7 +1138,7 @@ impl Node for NodeKey {
 
   fn cacheable(&self) -> bool {
     match self {
-      &NodeKey::Task(ref s) => s.task.cacheable,
+      &NodeKey::Task(ref s) => s.cacheable,
       // TODO Select nodes are made uncacheable as a workaround to #6146. Will be worked on in #6598
       &NodeKey::Select(_) => false,
       _ => true,

@@ -1074,6 +1074,7 @@ impl RuleGraph {
 #[derive(Eq, PartialEq, Clone, Debug, Default)]
 pub struct RuleEdges {
   dependencies: HashMap<SelectKey, Vec<Entry>>,
+  get_params: ParamTypes,
 }
 
 impl RuleEdges {
@@ -1084,11 +1085,28 @@ impl RuleEdges {
       .and_then(|entries| entries.first())
   }
 
+  ///
+  /// Filter the given Params to the set that are relevant to `SelectKey::Get` entries in this
+  /// Task.
+  ///
+  pub fn retain_get_params(&self, params: &mut Params) {
+    params.retain(|p| self.get_params.contains(p.type_id()));
+  }
+
   pub fn all_dependencies(&self) -> impl Iterator<Item = &Entry> {
     Itertools::flatten(self.dependencies.values())
   }
 
   fn add_edge(&mut self, select_key: SelectKey, new_dependency: Entry) {
+    if let SelectKey::JustGet(_) = &select_key {
+      match &new_dependency {
+        &Entry::Param(type_id) => {
+          self.get_params.insert(type_id);
+        }
+        &Entry::WithDeps(ref with_deps) => self.get_params.extend(with_deps.params()),
+        &Entry::Singleton { .. } => (),
+      }
+    };
     self
       .dependencies
       .entry(select_key)

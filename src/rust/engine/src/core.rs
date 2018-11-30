@@ -85,6 +85,27 @@ impl fmt::Display for Params {
   }
 }
 
+///
+/// The arguments to a Task. Unlike Params, these are unordered, and may or may not represent
+/// distinct types or values.
+///
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Args(pub SmallVec<[Key; 4]>);
+
+impl fmt::Display for Args {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "[")?;
+    let mut args = self.0.iter();
+    if let Some(arg) = args.next() {
+      write!(f, "{}", externs::key_to_str(arg))?;
+    }
+    for arg in args {
+      write!(f, ", {}", externs::key_to_str(arg))?;
+    }
+    write!(f, "]")
+  }
+}
+
 pub type Id = u64;
 
 // The type of a python object (which itself has a type, but which is not represented
