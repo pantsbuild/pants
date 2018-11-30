@@ -225,6 +225,12 @@ function build_pants_packages() {
     end_travis_section
   done
 
+  pants_version_reset
+}
+
+function build_fs_util() {
+  local version=$1
+
   start_travis_section "fs_util" "Building fs_util binary"
   # fs_util is a standalone tool which can be used to inspect and manipulate
   # Pants's engine's file store, and interact with content addressable storage
@@ -241,8 +247,6 @@ function build_pants_packages() {
     cp "${ROOT}/src/rust/engine/target/release/fs_util" "${dst_dir}/"
   ) || die "Failed to build fs_util"
   end_travis_section
-
-  pants_version_reset
 }
 
 function activate_tmp_venv() {
@@ -718,7 +722,7 @@ if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
 elif [[ "${dry_run}" == "true" ]]; then
   banner "Performing a dry run release" && \
   (
-    dry_run_install && \
+    dry_run_install && build_fs_util "${PANTS_UNSTABLE_VERSION}" && \
     banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
