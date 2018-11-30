@@ -8,8 +8,8 @@ from setuptools import setup, find_packages
 from distutils.core import Extension
 
 
-c_module = Extension(b'c_greet', sources=[b'c_greet.c'])
-cpp_module = Extension(b'cpp_greet', sources=[b'cpp_greet.cpp'])
+c_module = Extension('c_greet', sources=['c_greet.c'])
+cpp_module = Extension('cpp_greet', sources=['cpp_greet.cpp'])
 
 setup(
   name='fasthello',
