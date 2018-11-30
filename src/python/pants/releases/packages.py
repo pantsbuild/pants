@@ -9,6 +9,7 @@ import os
 import sys
 from builtins import object
 from configparser import ConfigParser
+from distutils.util import get_platform
 from functools import total_ordering
 
 from bs4 import BeautifulSoup
@@ -29,8 +30,12 @@ def banner(message):
 @total_ordering
 class Package(object):
 
-  def __init__(self, name):
+  def __init__(self, name, target, bdist_wheel_flags=None):
     self.name = name
+    self.target = target
+    # Update the --python-tag default in lockstep with other changes as described in
+    #   https://github.com/pantsbuild/pants/issues/6450
+    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py27")
 
   def __lt__(self, other):
     return self.name < other.name
@@ -75,21 +80,108 @@ class Package(object):
     return {owner.lower() for owner in owners}
 
 
+def find_platform_name():
+  # See: https://www.python.org/dev/peps/pep-0425/#id13
+  return get_platform().replace("-", "_").replace(".", "_")
+
+
 core_packages = {
-  Package("pantsbuild.pants"),
-  Package("pantsbuild.pants.testinfra"),
+  Package(
+    "pantsbuild.pants",
+    "//src/python/pants:pants-packaged",
+    bdist_wheel_flags=("--python-tag", "cp27", "--plat-name", find_platform_name()),
+  ),
+  Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
 }
 
 
 def contrib_packages():
-  output = subprocess.check_output(
-    ('bash', '-c', 'source contrib/release_packages.sh ; for pkg in "${CONTRIB_PACKAGES[@]}"; do echo "${!pkg}"; done')
-  ).decode('utf-8')
-  return {Package(name) for name in output.strip().split('\n')}
+  return {
+    Package(
+      "pantsbuild.pants.contrib.scrooge",
+      "//contrib/scrooge/src/python/pants/contrib/scrooge:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.buildgen",
+      "//contrib/buildgen/src/python/pants/contrib/buildgen:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.go",
+      "//contrib/go/src/python/pants/contrib/go:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.node",
+      "//contrib/node/src/python/pants/contrib/node:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.scalajs",
+      "//contrib/scalajs/src/python/pants/contrib/scalajs:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.python.checks",
+      "//contrib/python/src/python/pants/contrib/python/checks:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.python.checks.checker",
+      "//contrib/python/src/python/pants/contrib/python/checks/checker",
+      bdist_wheel_flags=("--universal"),
+    ),
+    Package(
+      "pantsbuild.pants.contrib.findbugs",
+      "//contrib/findbugs/src/python/pants/contrib/findbugs:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.cpp",
+      "//contrib/cpp/src/python/pants/contrib/cpp:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.confluence",
+      "//contrib/confluence/src/python/pants/contrib/confluence:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.errorprone",
+      "//contrib/errorprone/src/python/pants/contrib/errorprone:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.codeanalysis",
+      "//contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.jax_ws",
+      "//contrib/jax_ws/src/python/pants/contrib/jax_ws:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.mypy",
+      "//contrib/mypy/src/python/pants/contrib/mypy:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.avro",
+      "//contrib/avro/src/python/pants/contrib/avro:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.thrifty",
+      "//contrib/thrifty/src/python/pants/contrib/thrifty:plugin",
+    ),
+    Package(
+      "pantsbuild.pants.contrib.googlejavaformat",
+      "//contrib/googlejavaformat/src/python/pants/contrib/googlejavaformat:plugin",
+    ),
+  }
 
 
 def all_packages():
   return core_packages.union(contrib_packages())
+
+
+def build_and_print_packages(version):
+  for package in sorted(all_packages()):
+    args = ("./pants", "setup-py", "--run=bdist_wheel") + package.bdist_wheel_flags + (package.target,)
+    try:
+      subprocess.check_call(args)
+      print(package.name)
+    except subprocess.CalledProcessError:
+      print("Failed to build package {name}-{version} with target {target}".format(name=package.name, version=version, target=package.target), file=sys.stderr)
+      raise
 
 
 def get_pypi_config(section, option):
@@ -139,6 +231,8 @@ def check_ownership(users, minimum_owner_count=3):
 
 if sys.argv[1:] == ["list"]:
   print('\n'.join(package.name for package in sorted(all_packages())))
+elif sys.argv[1:] == ["list", "--with-packages"]:
+  print('\n'.join('{} {} {}'.format(package.name, package.target, " ".join(package.bdist_wheel_flags)) for package in sorted(all_packages())))
 elif sys.argv[1:] == ["list-owners"]:
   for package in sorted(all_packages()):
     if not package.exists():
@@ -150,5 +244,7 @@ elif sys.argv[1:] == ["list-owners"]:
 elif sys.argv[1:] == ["check-my-ownership"]:
   me = get_pypi_config('server-login', 'username')
   check_ownership({me})
+elif len(sys.argv) == 3 and sys.argv[1] == "build_and_print":
+  build_and_print_packages(sys.argv[2])
 else:
   raise Exception("Didn't recognise arguments {}".format(sys.argv[1:]))
