@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from abc import abstractproperty
+from abc import abstractmethod, abstractproperty
 
 from pants.engine.rules import SingletonRule
 from pants.util.meta import AbstractClass
@@ -19,7 +19,29 @@ class Platform(enum('normalized_os_name', all_normalized_os_names())):
   default_value = get_normalized_os_name()
 
 
-class Executable(AbstractClass):
+class ExtensibleAlgebraic(AbstractClass):
+
+  # NB: prototypal inheritance seems *deeply* linked with the idea here!
+
+  # TODO: populate these for the `Executable` class with a decorator that checks if the fields are
+  # defined? basically just don't require everything to be repeated here.
+  list_fields = []
+
+  @abstractmethod
+  def copy(self, **kwargs):
+    """Analogous to a `datatype()`'s `copy()` method."""
+
+  # TODO: x
+  def sequence(self, other):
+    """
+    - THE RETURN TYPE IS THE TYPE OF THIS OBJECT (or whatever .copy() does!)
+      - but the `other` can be any `ExtensibleAlgebraic`
+    - for this particular operation: "add" all of the list_fields together, for the fields common to
+      both types
+    """
+
+
+class Executable(ExtensibleAlgebraic):
 
   @abstractproperty
   def path_entries(self):
@@ -74,6 +96,12 @@ class Executable(AbstractClass):
       'PATH': create_path_env_var(self.path_entries),
       lib_env_var: create_path_env_var(self.library_dirs),
     }
+
+  def prepend_argv(self, argv):
+    return self.copy(extra_args=(argv + self.extra_args))
+
+  def append_argv(self, argv):
+    return self.copy(extra_args=(self.extra_args + argv))
 
 
 class Assembler(datatype([
