@@ -13,7 +13,7 @@ from textwrap import dedent
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import UnhydratedStruct, create_graph_rules
+from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
@@ -136,13 +136,13 @@ class AddressFamilyTest(unittest.TestCase):
                                        {'one': Thing(name='one', age=37)})])
 
 
-UnhydratedStructs = Collection.of(UnhydratedStruct)
+Structs = Collection.of(Struct)
 
 
-@rule(UnhydratedStructs, [Select(BuildFileAddresses)])
+@rule(Structs, [Select(BuildFileAddresses)])
 def unhydrated_structs(build_file_addresses):
-  uhs = yield [Get(UnhydratedStruct, Address, a) for a in build_file_addresses.addresses]
-  yield UnhydratedStructs(uhs)
+  uhs = yield [Get(Struct, Address, a) for a in build_file_addresses.addresses]
+  yield Structs(uhs)
 
 
 class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
@@ -168,7 +168,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              type_alias='target')
 
   def resolve(self, spec):
-    uhs, = self.scheduler.product_request(UnhydratedStructs, [Specs(tuple([spec]))])
+    uhs, = self.scheduler.product_request(Structs, [Specs(tuple([spec]))])
     return uhs.dependencies
 
   def resolve_multi(self, spec):

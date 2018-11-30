@@ -62,19 +62,6 @@ def parse_address_family(address_mapper, directory):
   yield AddressFamily.create(directory.path, address_maps)
 
 
-class UnhydratedStruct(datatype(['address', 'struct', 'dependencies'])):
-  """A product type that holds a Struct which has not yet been hydrated.
-
-  A Struct counts as "hydrated" when all of its members (which are not themselves dependencies
-  lists) have been resolved from the graph. This means that hydrating a struct is eager in terms
-  of inline addressable fields, but lazy in terms of the complete graph walk represented by
-  the `dependencies` field of StructWithDeps.
-  """
-
-  def __hash__(self):
-    return hash(self.struct)
-
-
 def _raise_did_you_mean(address_family, name, source=None):
   names = [a.target_name for a in address_family.addressables]
   possibilities = '\n  '.join(':{}'.format(target_name) for target_name in sorted(names))
@@ -89,11 +76,10 @@ def _raise_did_you_mean(address_family, name, source=None):
     raise resolve_error
 
 
-@rule(UnhydratedStruct, [Select(AddressMapper), Select(Address)])
-def resolve_unhydrated_struct(address_mapper, address):
-  """Given an AddressMapper and an Address, resolve an UnhydratedStruct.
+def hydrate_struct(symbol_table_constraint, address_mapper, address):
+  """Given an AddressMapper and an Address, create a HydratedStruct.
 
-  Recursively collects any embedded addressables within the Struct, but will not walk into a
+  Recursively expands any embedded addressables within the Struct, but will not walk into a
   dependencies field, since those should be requested explicitly by rules.
   """
 
@@ -129,21 +115,10 @@ def resolve_unhydrated_struct(address_mapper, address):
 
   collect_dependencies(struct)
 
-  yield UnhydratedStruct(
-    next(build_address for build_address in addresses if build_address == address),
-    struct,
-    dependencies)
+  dependencies = yield [Get(symbol_table_constraint, Address, a) for a in dependencies]
 
-
-def hydrate_struct(symbol_table_constraint, address_mapper, unhydrated_struct):
-  """Hydrates a Struct from an UnhydratedStruct and its satisfied embedded addressable deps.
-
-  Note that this relies on the guarantee that DependenciesNode provides dependencies in the
-  order they were requested.
-  """
-  dependencies = yield [Get(symbol_table_constraint, Address, a) for a in unhydrated_struct.dependencies]
-  address = unhydrated_struct.address
-  struct = unhydrated_struct.struct
+  # Convert from an input Address to the more specific BuildFileAddress.
+  address = next(build_address for build_address in addresses if build_address == address)
 
   def maybe_consume(outer_key, value):
     if isinstance(value, six.string_types):
@@ -273,11 +248,13 @@ def create_graph_rules(address_mapper, symbol_table):
     TaskRule(
       symbol_table_constraint,
       [Select(AddressMapper),
-       Select(UnhydratedStruct)],
+       Select(Address)],
       partial_hydrate_struct,
-      input_gets=[Get(symbol_table_constraint, Address)],
+      input_gets=[
+        Get(AddressFamily, Dir),
+        Get(symbol_table_constraint, Address),
+      ],
     ),
-    resolve_unhydrated_struct,
     # BUILD file parsing.
     parse_address_family,
     # Spec handling: locate directories that contain build files, and request
