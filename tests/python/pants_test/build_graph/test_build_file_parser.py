@@ -18,7 +18,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 class ErrorTarget(Target):
@@ -26,19 +26,19 @@ class ErrorTarget(Target):
     assert False, "This fake target should never be initialized in this test!"
 
 
-class BaseTestWithParser(BaseTest):
+class BaseTestWithParser(TestBase):
   def setUp(self):
     super(BaseTestWithParser, self).setUp()
 
     build_configuration = BuildConfiguration()
-    build_configuration.register_aliases(self.alias_groups)
+    build_configuration.register_aliases(self.alias_groups())
     self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
 
 
 class BuildFileParserBasicsTest(BaseTestWithParser):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={'jvm_binary': ErrorTarget,
                                      'java_library': ErrorTarget})
 
@@ -126,8 +126,8 @@ class BuildFileParserBasicsTest(BaseTestWithParser):
 
 
 class BuildFileParserTargetTest(BaseTestWithParser):
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(targets={'fake': ErrorTarget})
 
   def create_buildfile(self, path):
@@ -217,8 +217,8 @@ class BuildFileParserTargetTest(BaseTestWithParser):
 
 class BuildFileParserExposedObjectTest(BaseTestWithParser):
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(objects={'fake_object': object()})
 
   def test_exposed_object(self):
@@ -288,31 +288,28 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTestWithParser):
 
     return real_create_java_libraries
 
-  def setUp(self):
-    super(BuildFileParserExposedContextAwareObjectFactoryTest, self).setUp()
-    self._paths = set()
-
-  def path_relative_util(self, parse_context):
+  @classmethod
+  def path_relative_util(cls, parse_context):
     def real_path_relative_util(path):
-      self._paths.add(os.path.join(parse_context.rel_path, path))
+      assert os.path.join(parse_context.rel_path, path) == '3rdparty/baz'
     return real_path_relative_util
 
-  @property
-  def alias_groups(self):
+  @classmethod
+  def alias_groups(cls):
     return BuildFileAliases(
       targets={
-        'jar_library': self.JarLibrary,
-        'java_library': self.JavaLibrary,
-        'scala_library': self.ScalaLibrary,
+        'jar_library': cls.JarLibrary,
+        'java_library': cls.JavaLibrary,
+        'scala_library': cls.ScalaLibrary,
       },
       context_aware_object_factories={
-        'make_lib': self.make_lib,
-        'create_java_libraries': self.create_java_libraries,
-        'path_util': self.path_relative_util,
+        'make_lib': cls.make_lib,
+        'create_java_libraries': cls.create_java_libraries,
+        'path_util': cls.path_relative_util,
       },
       objects={
-        'artifact': self.Artifact,
-        'jar': self.Jar,
+        'artifact': cls.Artifact,
+        'jar': cls.Jar,
       }
     )
 
@@ -321,7 +318,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTestWithParser):
                  create_java_libraries(base_name="create-java-libraries",
                                        provides_java_name="test-java",
                                        provides_scala_name="test-scala")
-                 make_lib("com.foo.test", "does_not_exists", "1.0")
+                 make_lib("com.foo.test", "does_not_exist", "1.0")
                  path_util("baz")
                """)
     self.create_file('3rdparty/BUILD', contents)
@@ -335,15 +332,13 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTestWithParser):
     for target_proxy in registered_proxies:
       targets_created[target_proxy.addressed_name] = target_proxy.addressed_type
 
-    self.assertEqual({'does_not_exists',
+    self.assertEqual({'does_not_exist',
                       'create-java-libraries-scala',
                       'create-java-libraries-java'},
                      set(targets_created.keys()))
-    self.assertEqual(targets_created['does_not_exists'], self.JarLibrary)
+    self.assertEqual(targets_created['does_not_exist'], self.JarLibrary)
     self.assertEqual(targets_created['create-java-libraries-java'], self.JavaLibrary)
     self.assertEqual(targets_created['create-java-libraries-scala'], self.ScalaLibrary)
-
-    self.assertEqual({'3rdparty/baz'}, self._paths)
 
   def test_raises_parse_error(self):
     self.add_to_build_file('BUILD', 'foo(name = = "baz")')

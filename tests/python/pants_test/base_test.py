@@ -41,7 +41,7 @@ from pants_test.option.util.fakes import create_options_for_optionables
 
 
 # Fix this during a dev release
-deprecated_module('1.13.0.dev1', 'Use pants_test.test_base instead')
+deprecated_module('1.13.0.dev2', 'Use pants_test.test_base instead')
 
 
 class TestGenerator(object):

@@ -32,9 +32,10 @@ python_tests(
   dependencies = [
     '3rdparty/python:future',
     'src/python/pants/base:cmd_line_spec_parser',
+    'src/python/pants/base:project_tree',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -63,7 +64,7 @@ python_tests(
     '3rdparty/python:future',
     'src/python/pants/base:build_file',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
