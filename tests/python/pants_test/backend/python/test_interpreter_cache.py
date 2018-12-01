@@ -151,16 +151,13 @@ class TestInterpreterCache(TestBase):
   @skip_unless_python27_and_python36
   def test_interpereter_cache_setup_using_pex_python_paths(self):
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
-    # self.context(for_subsystems=[PythonInterpreterCache], options={
-    #   'python-setup': {'interpreter_search_paths': ['<PEXRC_PATH>']},
-    # })
     py27_path, py36_path = python_interpreter_path(PY_27), python_interpreter_path(PY_36)
     with setup_pexrc_with_pex_python_path([py27_path, py36_path]):
       with self._setup_cache(constraints=['CPython>=2.7,<3'],
-                             search_paths=['<PEXRC_PATH>']) as (cache, _):
+                             search_paths=['<PEXRC']) as (cache, _):
         self.assertIn(py27_path, {pi.binary for pi in cache.setup()})
       with self._setup_cache(constraints=['CPython>=3.6,<4'],
-                             search_paths=['<PEXRC_PATH>']) as (cache, _):
+                             search_paths=['<PEXRC>']) as (cache, _):
         self.assertIn(py36_path, {pi.binary for pi in cache.setup()})
 
   def test_setup_cached_warm(self):

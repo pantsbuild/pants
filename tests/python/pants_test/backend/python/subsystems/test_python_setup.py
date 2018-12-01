@@ -42,7 +42,7 @@ class TestPythonSetup(TestBase):
     with environment_as(PATH='/env/path1:/env/path2'):
       with setup_pexrc_with_pex_python_path(['/pexrc/path1:/pexrc/path2']):
         with fake_pyenv_root(['2.7.14', '3.5.5']) as (pyenv_root, expected_pyenv_paths):
-          paths = ['/foo', '<PATH>', '/bar', '<PEXRC_PATH>', '/baz', '<PYENV>', '/qux']
+          paths = ['/foo', '<PATH>', '/bar', '<PEXRC>', '/baz', '<PYENV>', '/qux']
           expanded_paths = PythonSetup.expand_interpreter_search_paths(
             paths, pyenv_root_func=lambda: pyenv_root)
 

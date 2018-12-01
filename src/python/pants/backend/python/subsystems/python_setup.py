@@ -60,10 +60,11 @@ class PythonSetup(Subsystem):
              help='The parent directory for the python artifact cache. '
                   'If unspecified, a standard path under the workdir is used.')
     register('--interpreter-search-paths', advanced=True, type=list,
-             default=['<PEXRC_PATH>', '<PATH>'], metavar='<binary-paths>',
+             default=['<PEXRC>', '<PATH>'], metavar='<binary-paths>',
              help='A list of paths to search for python interpreters. The following special '
-                  'strings are supported: "<PATH>" (the contents of the PATH env var), '
-                  '"<PEXRC_PATH>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
+                  'strings are supported: '
+                  '"<PATH>" (the contents of the PATH env var), '
+                  '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
                   '"<PYENV>" (all python versions under $(pyenv root)/versions).')
     register('--resolver-blacklist', advanced=True, type=dict, default={},
              removal_version='1.13.0.dev2',
@@ -172,7 +173,7 @@ class PythonSetup(Subsystem):
   @classmethod
   def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):
     special_strings = {
-      '<PEXRC_PATH>': cls.get_pex_python_paths,
+      '<PEXRC>': cls.get_pex_python_paths,
       '<PATH>': cls.get_environment_paths,
       '<PYENV>': lambda: cls.get_pyenv_paths(pyenv_root_func=pyenv_root_func)
     }
