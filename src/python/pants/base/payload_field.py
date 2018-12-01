@@ -11,7 +11,6 @@ from hashlib import sha1
 from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated
 from pants.base.hash_utils import stable_json_hash
 from pants.util.meta import AbstractClass
 from pants.util.strutil import ensure_binary
