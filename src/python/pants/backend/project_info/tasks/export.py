@@ -23,8 +23,6 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.targets.python_tests import PythonTests
@@ -67,7 +65,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   @classmethod
   def subsystem_dependencies(cls):
     return super(ExportTask, cls).subsystem_dependencies() + (
-      DistributionLocator, JvmPlatform, PythonSetup, PythonRepos
+      DistributionLocator, JvmPlatform, PythonInterpreterCache
     )
 
   class SourceRootTypes(object):
@@ -125,9 +123,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
   @memoized_property
   def _interpreter_cache(self):
-    return PythonInterpreterCache(PythonSetup.global_instance(),
-                                  PythonRepos.global_instance(),
-                                  logger=self.context.log.debug)
+    return PythonInterpreterCache.global_instance()
 
   def check_artifact_cache_for(self, invalidation_check):
     # Export is an output dependent on the entire target set, and is not divisible

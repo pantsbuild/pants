@@ -4,6 +4,121 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.13.0.dev1 (11/30/2018)
+------------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add --remote-execution-process-cache-namespace (#6809)
+  `PR #6809 <https://github.com/pantsbuild/pants/pull/6809>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix unused error value. (#6834)
+  `PR #6834 <https://github.com/pantsbuild/pants/pull/6834>`_
+
+* [deferred-sources] fix glob expansion issue in deferred sources mappe… (#6824)
+  `PR #6824 <https://github.com/pantsbuild/pants/pull/6824>`_
+
+* Fix a bug when selecting interpreters with no constraints at all. (#6822)
+  `PR #6822 <https://github.com/pantsbuild/pants/pull/6822>`_
+
+* Pin a conan dep that was floating to a version that was not compatible with python 2. (#6825)
+  `PR #6825 <https://github.com/pantsbuild/pants/pull/6825>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [docs] add language about flaky tests / issues for them (#6837)
+  `PR #6837 <https://github.com/pantsbuild/pants/pull/6837>`_
+
+* Include uname in rust cache key (#6842)
+  `PR #6842 <https://github.com/pantsbuild/pants/pull/6842>`_
+
+* Only build fs_util as part of dryrun (#6835)
+  `PR #6835 <https://github.com/pantsbuild/pants/pull/6835>`_
+
+* ci.sh can run cargo-audit (#6549)
+  `PR #6549 <https://github.com/pantsbuild/pants/pull/6549>`_
+
+* Run cargo clippy in pre-commit (#6833)
+  `PR #6833 <https://github.com/pantsbuild/pants/pull/6833>`_
+
+* Statically link openssl for reqwest (#6816)
+  `PR #6816 <https://github.com/pantsbuild/pants/pull/6816>`_
+
+* Use pantsbuild.org not example.com (#6826)
+  `PR #6826 <https://github.com/pantsbuild/pants/pull/6826>`_
+
+* Leverage default target globs. (#6819)
+  `PR #6819 <https://github.com/pantsbuild/pants/pull/6819>`_
+
+* Make PythonInterpreterCache into a subsystem. (#6765)
+  `PR #6765 <https://github.com/pantsbuild/pants/pull/6765>`_
+
+
+1.13.0.dev0 (11/26/2018)
+------------------------
+
+New features
+~~~~~~~~~~~~
+* Header file extensions as options for C/C++ targets (#6802)
+  `PR #6802 <https://github.com/pantsbuild/pants/pull/6802>`_
+
+API Changes
+~~~~~~~~~~~
+* Use both the deprecated and new locations of fatal_warnings args (#6798)
+  `PR #6798 <https://github.com/pantsbuild/pants/pull/6798>`_
+
+Bugfixes
+~~~~~~~~
+* Fix disappearing cursor (#6811)
+  `PR #6811 <https://github.com/pantsbuild/pants/pull/6811>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Add nailgun-specific main which uses paths in calling process (#6792)
+  `PR #6792 <https://github.com/pantsbuild/pants/pull/6792>`_
+
+* Move file owners computation into the engine and make lighter (#6790)
+  `PR #6790 <https://github.com/pantsbuild/pants/pull/6790>`_
+
+* Bump Conan to 1.9.2 (#6797)
+  `PR #6797 <https://github.com/pantsbuild/pants/pull/6797>`_
+
+* Make bootstrap jar reproducible (#6796)
+  `PR #6796 <https://github.com/pantsbuild/pants/pull/6796>`_
+
+* Remove unused CompilerCacheKey (#6805)
+  `PR #6805 <https://github.com/pantsbuild/pants/pull/6805>`_
+
+* Fix documentation example for using scalac_plugins (#6807)
+  `PR #6807 <https://github.com/pantsbuild/pants/pull/6807>`_
+
+* Remove Params::expect_single compatibility API (#6766)
+  `PR #6766 <https://github.com/pantsbuild/pants/pull/6766>`_
+
+* add integration test for invalidation of ctypes c++ sources (#6801)
+  `PR #6801 <https://github.com/pantsbuild/pants/pull/6801>`_
+
+
+1.12.0rc0 (11/19/2018)
+----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add prelude and epilogue (#6784)
+  `PR #6784 <https://github.com/pantsbuild/pants/pull/6784>`_
+
+Bugfixes
+~~~~~~~~
+
+* Use ThreadPool for cache fetching and rust tar for artifact extraction (#6748)
+  `PR #6748 <https://github.com/pantsbuild/pants/pull/6748>`_
+
 1.12.0.dev1 (11/16/2018)
 ------------------------
 

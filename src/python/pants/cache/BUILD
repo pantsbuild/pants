@@ -9,6 +9,7 @@ python_library(
     '3rdparty/python:six',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:validation',
+    'src/python/pants/engine:native',
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',

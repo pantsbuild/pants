@@ -5,18 +5,13 @@
 
 package org.pantsbuild.zinc.bootstrapper
 
+import com.facebook.buck.util.zip.ZipScrubber
 import java.io.File
-import java.net.URLClassLoader
-import sbt.io.Path
 import xsbti.compile.{
   ClasspathOptionsUtil,
   ScalaInstance => XScalaInstance
 }
-import sbt.internal.inc.{
-  AnalyzingCompiler,
-  RawCompiler,
-  ScalaInstance
-}
+import sbt.internal.inc.{AnalyzingCompiler, RawCompiler}
 import sbt.util.Logger
 
 object BootstrapperUtils {
@@ -39,6 +34,7 @@ object BootstrapperUtils {
     val tempJar = File.createTempFile("interface-", ".jar.tmp", dir)
     try {
       compile(tempJar)
+      ZipScrubber.scrubZip(tempJar.toPath)
       tempJar.renameTo(output)
     } finally {
       tempJar.delete()

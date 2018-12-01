@@ -4,6 +4,9 @@
 
 package org.pantsbuild.zinc.compiler
 
+import com.martiansoftware.nailgun.NGContext
+import java.io.File
+import java.nio.file.Paths
 import sbt.internal.inc.IncrementalCompilerImpl
 import sbt.internal.util.{ ConsoleLogger, ConsoleOut }
 import sbt.util.Level
@@ -78,6 +81,18 @@ object Main {
 
     val Parsed(settings, residual, errors) = Settings.parse(args)
 
+    mainImpl(settings.withAbsolutePaths(Paths.get(".").toAbsolutePath.toFile), errors, startTime)
+  }
+
+  def nailMain(context: NGContext): Unit = {
+    val startTime = System.currentTimeMillis
+
+    val Parsed(settings, residual, errors) = Settings.parse(context.getArgs)
+
+    mainImpl(settings.withAbsolutePaths(new File(context.getWorkingDirectory)), errors, startTime)
+  }
+
+  def mainImpl(settings: Settings, errors: Seq[String], startTime: Long): Unit = {
     val log = mkLogger(settings)
     val isDebug = settings.consoleLog.logLevel <= Level.Debug
 

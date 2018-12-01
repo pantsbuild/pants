@@ -171,10 +171,12 @@ impl EngineDisplay {
 
   // Writes output to the terminal.
   fn write(&mut self, msg: &str) -> Result<usize> {
-    match self.terminal {
+    let res = match self.terminal {
       Console::Terminal(ref mut t) => t.write(msg.as_bytes()),
       Console::Pipe(ref mut p) => p.write(msg.as_bytes()),
-    }
+    };
+    self.flush()?;
+    res
   }
 
   // Renders a divider between the logs and action output.

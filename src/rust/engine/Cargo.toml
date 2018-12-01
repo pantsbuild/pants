@@ -37,6 +37,7 @@ members = [
   "process_execution/bazel_protos",
   "process_executor",
   "resettable",
+  "tar_api",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -63,6 +64,7 @@ default-members = [
   "process_execution/bazel_protos",
   "process_executor",
   "resettable",
+  "tar_api",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -77,17 +79,19 @@ fs = { path = "fs" }
 futures = "^0.1.16"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
+indexmap = "1.0.2"
 itertools = "0.7.2"
 lazy_static = "1"
 log = "0.4"
 num_enum = "0.1.1"
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
-reqwest = "0.9"
+# TODO: Includes https://github.com/seanmonstar/reqwest/pull/391.
+reqwest = { git = "https://github.com/pantsbuild/reqwest.git", rev = "983409edb6ba1693f38a6fc230dfcd34f9249649", features = ["native-tls-vendored"] }
 resettable = { path = "resettable" }
 smallvec = "0.6"
 tokio = "0.1"
 tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
-indexmap = "1.0.2"
+tar_api = { path = "tar_api" }

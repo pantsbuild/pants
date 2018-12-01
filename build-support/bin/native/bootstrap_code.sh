@@ -41,6 +41,7 @@ function calculate_current_hash() {
    cd ${REPO_ROOT}
    (echo "${MODE_FLAG}"
     echo "${RUST_TOOLCHAIN}"
+    uname
     git ls-files -c -o --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/rust-toolchain" \

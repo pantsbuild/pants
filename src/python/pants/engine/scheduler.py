@@ -316,13 +316,10 @@ class Scheduler(object):
     try:
       roots = []
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
-        if raw_root.state_tag is 1:
-          state = Return(self._from_value(raw_root.state_value))
-        elif raw_root.state_tag in (2, 3):
-          state = Throw(self._from_value(raw_root.state_value))
+        if raw_root.is_throw:
+          state = Throw(self._from_value(raw_root.value))
         else:
-          raise ValueError(
-            'Unrecognized State type `{}` on: {}'.format(raw_root.state_tag, raw_root))
+          state = Return(self._from_value(raw_root.value))
         roots.append(state)
     finally:
       self._native.lib.nodes_destroy(raw_roots)

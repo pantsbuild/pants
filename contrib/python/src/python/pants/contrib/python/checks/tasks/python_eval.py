@@ -45,7 +45,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonEval, cls).subsystem_dependencies() + (PythonRepos, PythonSetup)
+    return super(PythonEval, cls).subsystem_dependencies() + (
+      PythonRepos, PythonSetup, PythonInterpreterCache
+    )
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -72,9 +74,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
 
   @memoized_property
   def _interpreter_cache(self):
-    return PythonInterpreterCache(PythonSetup.global_instance(),
-                                  PythonRepos.global_instance(),
-                                  logger=self.context.log.debug)
+    return PythonInterpreterCache.global_instance()
 
   def _compile_targets(self, invalid_vts):
     with self.context.new_workunit(name='eval-targets', labels=[WorkUnitLabel.MULTITOOL]):

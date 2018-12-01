@@ -347,7 +347,9 @@ class BuildGraph(AbstractClass):
                                        work,
                                        predicate=None,
                                        postorder=False,
-                                       dep_predicate=None):
+                                       dep_predicate=None,
+                                       prelude=None,
+                                       epilogue=None):
     """Given a work function, walks the transitive dependency closure of `addresses` using DFS.
 
     :API: public
@@ -365,6 +367,16 @@ class BuildGraph(AbstractClass):
       the current target. If this parameter is not given, no dependencies will be filtered
       when traversing the closure. If it is given, when the predicate fails, the edge to the dependency
       will not be expanded.
+    :param function prelude: Function to run before any dependency expansion.
+      It takes the currently explored target as an argument.
+      If ``postorder`` is ``False``, it will run after the current node is visited.
+      It is not affected by ``dep_predicate``.
+      It is not run if ``predicate`` does not succeed.
+    :param function epilogue: Function to run after children nodes are visited.
+      It takes the currently explored target as an argument.
+      If ``postorder`` is ``True``, it runs before visiting the current node.
+      It is not affected by ``dep_predicate``.
+      It is not run if ``predicate`` is not passed.
     """
     walk = self._walk_factory(dep_predicate)
 
@@ -381,11 +393,17 @@ class BuildGraph(AbstractClass):
       if not postorder and walk.do_work_once(addr):
         work(target)
 
+      if prelude:
+        prelude(target)
+
       for dep_address in self._target_dependencies_by_address[addr]:
         if walk.expanded_or_worked(dep_address):
           continue
         if walk.dep_predicate(target, self._target_by_address[dep_address], level):
           _walk_rec(dep_address, level + 1)
+
+      if epilogue:
+        epilogue(target)
 
       if postorder and walk.do_work_once(addr):
         work(target)
@@ -393,7 +411,13 @@ class BuildGraph(AbstractClass):
     for address in addresses:
       _walk_rec(address)
 
-  def walk_transitive_dependee_graph(self, addresses, work, predicate=None, postorder=False):
+  def walk_transitive_dependee_graph(self,
+                                     addresses,
+                                     work,
+                                     predicate=None,
+                                     postorder=False,
+                                     prelude=None,
+                                     epilogue=None):
     """Identical to `walk_transitive_dependency_graph`, but walks dependees preorder (or postorder
     if the postorder parameter is True).
 
@@ -411,8 +435,12 @@ class BuildGraph(AbstractClass):
         if not predicate or predicate(target):
           if not postorder:
             work(target)
+          if prelude:
+            prelude(target)
           for dep_address in self._target_dependees_by_address[addr]:
             _walk_rec(dep_address)
+          if epilogue:
+            epilogue(target)
           if postorder:
             work(target)
     for address in addresses:

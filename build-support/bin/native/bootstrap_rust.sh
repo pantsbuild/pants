@@ -52,6 +52,11 @@ function bootstrap_rust() {
     ln -fs "${symlink_target}" "${rust_toolchain_root}/${cargo_versioned}"
   fi
 
+  if [[ ! -x "${CARGO_HOME}/bin/cargo-ensure-installed" ]]; then
+    "${cargo}" install cargo-ensure-installed
+  fi
+  "${cargo}" ensure-installed --package cargo-ensure-installed --version 0.2.1
+
   local -r symlink_farm_root="${REPO_ROOT}/build-support/bin/native"
   if [[ ! -x "${symlink_farm_root}/.${cargo_versioned}" ]]; then
     (

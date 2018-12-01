@@ -126,14 +126,7 @@ typedef void Session;
 typedef void ExecutionRequest;
 
 typedef struct {
-  Key             subject;
-  TypeConstraint  product;
-  uint8_t         state_tag;
-  Handle          state_value;
-} RawNode;
-
-typedef struct {
-  RawNode*  nodes_ptr;
+  PyResult*  nodes_ptr;
   uint64_t  nodes_len;
   // NB: there are more fields in this struct, but we can safely (?)
   // ignore them because we never have collections of this type.
@@ -210,6 +203,7 @@ Scheduler* scheduler_create(Tasks*,
                             Buffer,
                             Buffer,
                             Buffer,
+                            Buffer,
                             uint64_t,
                             uint64_t,
                             uint64_t,
@@ -252,6 +246,8 @@ void set_panic_handler(void);
 void lease_files_in_graph(Scheduler*);
 
 void garbage_collect_store(Scheduler*);
+
+PyResult decompress_tarball(char*, char*);
 '''
 
 CFFI_EXTERNS = '''
@@ -787,6 +783,10 @@ class Native(object):
   def to_ids_buf(self, types):
     return self.context.type_ids_buf([TypeId(self.context.to_id(t)) for t in types])
 
+  def decompress_tarball(self, tarfile_path, dest_dir):
+    result = self.lib.decompress_tarball(tarfile_path, dest_dir)
+    return self.context.raise_or_return(result)
+
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 
@@ -874,6 +874,7 @@ class Native(object):
         # We can't currently pass Options to the rust side, so we pass empty strings for None.
         self.context.utf8_buf(execution_options.remote_store_server or ""),
         self.context.utf8_buf(execution_options.remote_execution_server or ""),
+        self.context.utf8_buf(execution_options.remote_execution_process_cache_namespace or ""),
         self.context.utf8_buf(execution_options.remote_instance_name or ""),
         self.context.utf8_buf(execution_options.remote_ca_certs_path or ""),
         self.context.utf8_buf(execution_options.remote_oauth_bearer_token_path or ""),

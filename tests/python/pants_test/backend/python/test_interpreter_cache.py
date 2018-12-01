@@ -14,14 +14,11 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import Unsatisfiable, resolve
 
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
-from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.interpreter_selection_utils import (PY_27, PY_36,
                                                                    python_interpreter_path,
                                                                    skip_unless_python27_and_python36)
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
 from pants_test.test_base import TestBase
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 from pants_test.testutils.py2_compat import assertRegex
@@ -43,13 +40,13 @@ class TestInterpreterCache(TestBase):
     super(TestInterpreterCache, self).setUp()
     self._interpreter = PythonInterpreter.get()
 
-  def create_python_subsystems(self, setup_options=None, repos_options=None):
+  def _create_interpreter_cache(self, setup_options=None, repos_options=None):
     Subsystem.reset(reset_options=True)
-    def create_subsystem(subsystem_type, options=None):
-      return global_subsystem_instance(subsystem_type,
-                                       options={subsystem_type.options_scope: options or {}})
-    return (create_subsystem(PythonSetup, setup_options),
-            create_subsystem(PythonRepos, repos_options))
+    self.context(for_subsystems=[PythonInterpreterCache], options={
+      'python-setup': setup_options,
+      'python-repos': repos_options
+    })
+    return PythonInterpreterCache.global_instance()
 
   @contextmanager
   def _setup_cache(self, constraints=None):
@@ -59,10 +56,9 @@ class TestInterpreterCache(TestBase):
 
   def _setup_cache_at(self, path, constraints=None):
     setup_options = {'interpreter_cache_dir': path}
-    if constraints:
+    if constraints is not None:
       setup_options.update(interpreter_constraints=constraints)
-    python_setup, python_repos = self.create_python_subsystems(setup_options=setup_options)
-    return PythonInterpreterCache(python_setup=python_setup, python_repos=python_repos)
+    return self._create_interpreter_cache(setup_options=setup_options, repos_options={})
 
   def test_cache_setup_with_no_filters_uses_repo_default_excluded(self):
     bad_interpreter_requirement = self._make_bad_requirement(self._interpreter.identity.requirement)
@@ -70,7 +66,7 @@ class TestInterpreterCache(TestBase):
       self.assertEqual([], cache.setup())
 
   def test_cache_setup_with_no_filters_uses_repo_default(self):
-    with self._setup_cache(constraints=['']) as (cache, _):
+    with self._setup_cache(constraints=[]) as (cache, _):
       self.assertIn(self._interpreter, cache.setup())
 
   def test_cache_setup_with_filter_overrides_repo_default(self):
@@ -105,23 +101,21 @@ class TestInterpreterCache(TestBase):
 
       interpreter_requirement = self._interpreter.identity.requirement
 
-      python_setup, python_repos = self.create_python_subsystems(
+      cache = self._create_interpreter_cache(
         setup_options={
           'interpreter_cache_dir': None,
           'pants_workdir': os.path.join(root, 'workdir'),
           'constraints': [interpreter_requirement],
           'setuptools_version': setuptools_version,
           'wheel_version': wheel_version,
+          'interpreter_search_paths': [os.path.dirname(self._interpreter.binary)]
         },
         repos_options={
           'indexes': [],
           'repos': [egg_dir],
         }
       )
-      cache = PythonInterpreterCache(python_setup=python_setup, python_repos=python_repos)
-
-      interpereters = cache.setup(paths=[os.path.dirname(self._interpreter.binary)],
-                                  filters=[str(interpreter_requirement)])
+      interpereters = cache.setup(filters=[str(interpreter_requirement)])
       self.assertGreater(len(interpereters), 0)
 
       def assert_egg_extra(interpreter, name, version):

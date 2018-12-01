@@ -364,6 +364,27 @@ impl PyResult {
   }
 }
 
+impl From<Result<Value, Failure>> for PyResult {
+  fn from(result: Result<Value, Failure>) -> Self {
+    match result {
+      Ok(val) => PyResult {
+        is_throw: false,
+        handle: val.into(),
+      },
+      Err(f) => {
+        let val = match f {
+          Failure::Invalidated => create_exception("Exhausted retries due to changed files."),
+          Failure::Throw(exc, _) => exc,
+        };
+        PyResult {
+          is_throw: true,
+          handle: val.into(),
+        }
+      }
+    }
+  }
+}
+
 impl From<PyResult> for Result<Value, Failure> {
   fn from(result: PyResult) -> Self {
     let value = result.handle.into();
