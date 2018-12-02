@@ -52,13 +52,10 @@ class CoursierSubsystem(Subsystem):
              default=['jar', 'bundle', 'test-jar', 'maven-plugin', 'src', 'doc', 'aar'],
              help='Specify the type of artifacts to fetch. See `packaging` at https://maven.apache.org/pom.html#Maven_Coordinates, '
                   'except `src` and `doc` being coursier specific terms for sources and javadoc.')
+    # TODO(yic): Use a published version of Coursier. https://github.com/pantsbuild/pants/issues/6852
     register('--bootstrap-jar-url', fingerprint=True,
-             default='https://dl.dropboxusercontent.com/s/zwh074l9kxhqlwp/coursier-cli-1.1.0.cf365ea27a710d5f09db1f0a6feee129aa1fc417.jar?dl=0',
+             default='https://github.com/coursier/coursier/releases/download/pants_release_1.5.x/coursier-cli-1.1.0.cf365ea27a710d5f09db1f0a6feee129aa1fc417.jar',
              help='Location to download a bootstrap version of Coursier.')
-    # TODO(wisechengyi): currently using a custom url for fast iteration.
-    # Once the coursier builds are stable, move the logic to binary_util. https://github.com/pantsbuild/pants/issues/5381
-    # Ths sha in the version corresponds to the sha in the PR https://github.com/coursier/coursier/pull/774
-    # The jar is built by following https://github.com/coursier/coursier/blob/master/DEVELOPMENT.md#build-with-pants
     register('--version', type=str, fingerprint=True,
              default='1.1.0.cf365ea27a710d5f09db1f0a6feee129aa1fc417',
              help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')
