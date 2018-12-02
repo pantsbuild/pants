@@ -23,6 +23,7 @@ class BuildFileAddressMapperTestBase(TestBase):
   def build_file_address_mapper(self):
     return BuildFileAddressMapper(self.build_file_parser, FileSystemProjectTree(self.build_root))
 
+
 # TODO(Eric Ayers) There are methods in BuildFileAddressMapper that are missing
 # explicit unit tests: addresses_in_spec_path, spec_to_address, spec_to_addresses
 class BuildFileAddressMapperTest(BuildFileAddressMapperTestBase):
