@@ -89,7 +89,6 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
     :API: public
     """
-    print('hi')
     executor = self.create_java_executor(dist=dist)
 
     # Creating synthetic jar to work around system arg length limit is not necessary
