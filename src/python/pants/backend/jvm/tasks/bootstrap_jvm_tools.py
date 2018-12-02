@@ -250,7 +250,7 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
       return ivy_classpath
     else:
       classpath_holder = ClasspathProducts(self.get_options().pants_workdir)
-      CoursierMixin.resolve(self, targets, classpath_holder, sources=False, javadoc=False)
+      CoursierMixin.resolve(self, targets, classpath_holder, sources=False, javadoc=False, executor=None)
       coursier_classpath = [cp_entry for _, cp_entry in classpath_holder.get_for_targets(targets)]
       return coursier_classpath
 

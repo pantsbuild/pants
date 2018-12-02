@@ -77,9 +77,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     Call only in execute() or later. TODO: Enforce this.
     """
     dist = dist or self.dist
-    if self.force_non_nailgun_execution():
-      return SubprocessExecutor(dist)
-    elif self.execution_strategy == self.NAILGUN:
+    if self.execution_strategy == self.NAILGUN:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       return NailgunExecutor(self._identity,
                              self._executor_workdir,
@@ -100,6 +98,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
     :API: public
     """
+    print('hi')
     executor = self.create_java_executor(dist=dist)
 
     # Creating synthetic jar to work around system arg length limit is not necessary
