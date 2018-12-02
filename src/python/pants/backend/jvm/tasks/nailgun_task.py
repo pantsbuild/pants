@@ -58,15 +58,6 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
 
-  def force_non_nailgun_execution(self):
-    """
-    Provide an option for subclass tasks to overwrite the execution strategy.
-    E.g. pants.backend.jvm.tasks.bootstrap_jvm_tools.BootstrapJvmTools
-
-    :return: True to force non-nailgun.
-    """
-    return False
-
   @memoized_property
   def execution_strategy(self):
     return self.get_options().execution_strategy

@@ -237,11 +237,6 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
         default option was provided to use for bootstrap.
         """.format(jvm_tool.key)))
 
-  # Force non-nailgun execution because nailgun will try to bootstrap itself via coursier,
-  # and then coursier will try to run via nailgun, which creates a chicken-egg problem.
-  def force_non_nailgun_execution(self):
-    return True
-
   def _bootstrap_classpath(self, jvm_tool, targets):
     self._check_underspecified_tools(jvm_tool, targets)
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
