@@ -24,6 +24,7 @@ class JvmTaskTestBase(TaskTestBase):
     """
     super(JvmTaskTestBase, self).setUp()
     init_subsystem(JvmResolveSubsystem)
+    self.set_options_for_scope('resolver', resolver='ivy')
 
   def populate_runtime_classpath(self, context, classpath=None):
     """
