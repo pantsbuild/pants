@@ -154,7 +154,7 @@ class TestInterpreterCache(TestBase):
     py27_path, py36_path = python_interpreter_path(PY_27), python_interpreter_path(PY_36)
     with setup_pexrc_with_pex_python_path([py27_path, py36_path]):
       with self._setup_cache(constraints=['CPython>=2.7,<3'],
-                             search_paths=['<PEXRC']) as (cache, _):
+                             search_paths=['<PEXRC>']) as (cache, _):
         self.assertIn(py27_path, {pi.binary for pi in cache.setup()})
       with self._setup_cache(constraints=['CPython>=3.6,<4'],
                              search_paths=['<PEXRC>']) as (cache, _):
