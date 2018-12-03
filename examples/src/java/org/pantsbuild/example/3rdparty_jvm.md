@@ -27,6 +27,7 @@ Here, the <a pantsref="bdict_jar_library">`jar_library`</a>'s name
 defines a target address that other build targets can refer to. The
 <a pantsref="bdict_jar">`jar`</a>s refer to jars that Ivy can resolve and fetch.
 
+When [[using Scala with pants|pants('examples/src/scala/org/pantsbuild/example:readme')]], the <a pantsref="bdict_scala_jar">`scala_jar`</a> symbol will add the appropriate Scala version suffix (e.g. `_2.12`) to the `name` field automatically.
 
 Your Code's BUILD File
 ----------------------

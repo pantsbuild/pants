@@ -65,6 +65,10 @@ information about your custom Scala version.  The first two of these default to 
 addresses `//:scala-library` and `//:scala-repl` respectively, so you can simply define those
 targets (in the root `BUILD.tools` file by convention) to point to the relevant JARs.
 
+Scala 3rdparty Jars
+-------------------
+
+You can depend on Scala-specific [[3rdparty jars|pants('examples/src/java/org/pantsbuild/example:readme')]] using the <a pantsref="bdict_scala_jar">`scala_jar`</a> symbol. This will append e.g. `_2.12` to the name field of the <a pantsref="bdict_jar">`jar`</a>. The version string used is whatever the `--scala-version` is set to, or, if it is "custom", then the `--scala-suffix-version`.
 
 Scala REPL
 ----------
@@ -140,6 +144,8 @@ In a `BUILD` file at the root of the repo, define the `semanticdb` compiler plug
       name = 'scalac-plugin-dep',
       jars = [jar(org='org.scalameta', name='semanticdb-scalac_{}'.format(SCALA_REV), rev='2.0.1')],
     )
+
+Note that the explicit full scala version string (`2.11.12`) is required for the semanticdb jar we use here, which is why we can't just use <a pantsref="bdict_jar">`scala_jar`</a> (which would just append e.g. `_2.12` to the name).
 
 Then, reference it from `pants.ini` to load the plugin, and enable semantic rewrites to require
 compilation for `fmt` and `lint`:
