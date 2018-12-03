@@ -50,6 +50,9 @@ class Package(object):
   def __str__(self):
     return self.name
 
+  def __repr__(self):
+    return "Package<name={}>".format(self.name)
+
   def exists(self):
     req = Request("https://pypi.org/pypi/{}".format(self.name))
     req.get_method = lambda: "HEAD"
@@ -125,7 +128,7 @@ def contrib_packages():
     Package(
       "pantsbuild.pants.contrib.python.checks.checker",
       "//contrib/python/src/python/pants/contrib/python/checks/checker",
-      bdist_wheel_flags=("--universal"),
+      bdist_wheel_flags=("--universal",),
     ),
     Package(
       "pantsbuild.pants.contrib.findbugs",
@@ -180,10 +183,11 @@ def build_and_print_packages(version):
     packages_by_flags[package.bdist_wheel_flags].append(package)
 
   for (flags, packages) in packages_by_flags.items():
-    args = ("./pants", "setup-py", "--run=bdist_wheel") + flags + tuple(package.target for package in packages)
+    args = ("./pants", "-q", "setup-py", "--run=bdist_wheel {}".format(" ".join(flags))) + tuple(package.target for package in packages)
     try:
       subprocess.check_call(args)
-      print(package.name)
+      for package in packages:
+        print(package.name)
     except subprocess.CalledProcessError:
       print("Failed to build packages {names} for {version} with targets {targets}".format(
         names=','.join(package.name for package in packages),
