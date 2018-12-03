@@ -913,17 +913,55 @@ impl RuleGraph {
   pub fn find_root_edges<I: IntoIterator<Item = TypeId>>(
     &self,
     param_inputs: I,
-    select: Select,
-  ) -> Option<RuleEdges> {
+    select: &Select,
+  ) -> Result<RuleEdges, String> {
+    let params: ParamTypes = param_inputs.into_iter().collect();
+    let clause = vec![select.clone()];
     let root = RootEntry {
-      params: param_inputs.into_iter().collect(),
-      clause: vec![select],
+      params: params.clone(),
+      clause: clause.clone(),
       gets: vec![],
     };
-    self
+
+    // Attempt to find an exact match.
+    if let Some(re) = self.rule_dependency_edges.get(&EntryWithDeps::Root(root)) {
+      return Ok(re.clone());
+    }
+
+    // Otherwise, scan for partial/subset matches.
+    // TODO: Is it worth indexing this by product type?
+    let subset_matches = self
       .rule_dependency_edges
-      .get(&EntryWithDeps::Root(root))
-      .cloned()
+      .iter()
+      .filter_map(|(entry, edges)| match entry {
+        &EntryWithDeps::Root(ref root_entry)
+          if root_entry.clause == clause && root_entry.params.is_subset(&params) =>
+        {
+          Some((entry, edges))
+        }
+        _ => None,
+      }).collect::<Vec<_>>();
+
+    match subset_matches.len() {
+      1 => Ok(subset_matches[0].1.clone()),
+      0 => Err(format!(
+        "No installed @rules can satisfy {} for input Params {}.",
+        select_str(&select),
+        params_str(&params),
+      )),
+      _ => {
+        let match_strs = subset_matches
+          .into_iter()
+          .map(|(e, _)| entry_with_deps_str(e))
+          .collect::<Vec<_>>();
+        Err(format!(
+          "More than one set of @rules can satisfy {} for input Params {}:\n  {}",
+          select_str(&select),
+          params_str(&params),
+          match_strs.join("\n  "),
+        ))
+      }
+    }
   }
 
   ///

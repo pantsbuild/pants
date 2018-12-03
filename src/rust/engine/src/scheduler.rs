@@ -16,7 +16,6 @@ use indexmap::IndexMap;
 use log::{debug, info, warn};
 use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use parking_lot::Mutex;
-use rule_graph;
 use selectors;
 use ui::EngineDisplay;
 
@@ -114,18 +113,10 @@ impl Scheduler {
     params: Params,
     product: TypeConstraint,
   ) -> Result<(), String> {
-    let select = selectors::Select::new(product);
     let edges = self
       .core
       .rule_graph
-      .find_root_edges(params.type_ids(), select.clone())
-      .ok_or_else(|| {
-        format!(
-          "No installed @rules can satisfy {} for input Params: {}.",
-          rule_graph::select_str(&select),
-          params,
-        )
-      })?;
+      .find_root_edges(params.type_ids(), &selectors::Select::new(product))?;
     request
       .roots
       .push(Select::new_from_edges(params, product, &edges));

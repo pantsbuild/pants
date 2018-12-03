@@ -20,7 +20,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecute
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import Select, constraint_for
+from pants.engine.selectors import Params, Select, constraint_for
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
@@ -265,10 +265,14 @@ class Scheduler(object):
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)
 
-  def add_root_selection(self, execution_request, subject, product):
+  def add_root_selection(self, execution_request, subject_or_params, product):
+    if isinstance(subject_or_params, Params):
+      params = subject_or_params.params
+    else:
+      params = [subject_or_params]
     res = self._native.lib.execution_add_root_select(self._scheduler,
                                                      execution_request,
-                                                     self._to_vals_buf([subject]),
+                                                     self._to_vals_buf(params),
                                                      self._to_constraint(product))
     self._raise_or_return(res)
 
@@ -506,7 +510,7 @@ class SchedulerSession(object):
     """Executes a request for a single product for some subjects, and returns the products.
 
     :param class product: A product type for the request.
-    :param list subjects: A list of subjects for the request.
+    :param list subjects: A list of subjects or Params instances for the request.
     :returns: A list of the requested products, with length match len(subjects).
     """
     request = self.execution_request([product], subjects)

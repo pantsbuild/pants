@@ -205,6 +205,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
+    'tests/python/pants_test:test_base',
   ]
 )
 

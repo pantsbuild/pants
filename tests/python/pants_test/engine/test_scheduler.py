@@ -5,13 +5,14 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import unittest
-from builtins import object
+from builtins import object, str
 from textwrap import dedent
 
-from pants.engine.rules import RootRule, TaskRule
-from pants.engine.selectors import Select
+from pants.engine.rules import RootRule, TaskRule, rule
+from pants.engine.selectors import Params, Select
 from pants_test.engine.util import (assert_equal_with_printing, create_scheduler,
                                     remove_locations_from_traceback)
+from pants_test.test_base import TestBase
 
 
 class A(object):
@@ -28,6 +29,36 @@ def fn_raises(x):
 
 def nested_raise(x):
   fn_raises(x)
+
+
+@rule(str, [Select(A), Select(B)])
+def consumes_a_and_b(a, b):
+  return str('{} and {}'.format(a, b))
+
+
+class SchedulerTest(TestBase):
+
+  @classmethod
+  def rules(cls):
+    return super(SchedulerTest, cls).rules() + [
+      RootRule(A),
+      RootRule(B),
+      consumes_a_and_b,
+    ]
+
+  def test_use_params(self):
+    # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
+    a, b = A(), B()
+    result_str, = self.scheduler.product_request(str, [Params(a, b)])
+    self.assertEquals(result_str, consumes_a_and_b(a, b))
+
+    # And confirm that a superset of Params is also accepted.
+    result_str, = self.scheduler.product_request(str, [Params(a, b, self)])
+    self.assertEquals(result_str, consumes_a_and_b(a, b))
+
+    # But not a subset.
+    with self.assertRaises(Exception):
+      self.scheduler.product_request(str, [Params(a)])
 
 
 class SchedulerTraceTest(unittest.TestCase):
