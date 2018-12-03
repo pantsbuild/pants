@@ -14,7 +14,6 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.mapper import ResolveError
-from pants.engine.nodes import Throw
 from pants.util.dirutil import fast_relpath
 
 
@@ -67,12 +66,10 @@ class LegacyAddressMapper(AddressMapper):
     # TODO: This should really use `product_request`, but on the other hand, we need to
     # deprecate the entire `AddressMapper` interface anyway. See #4769.
     request = self._scheduler.execution_request([BuildFileAddresses], [Specs(tuple(specs))])
-    result = self._scheduler.execute(request)
-    if result.error:
-      raise self.BuildFileScanError(str(result.error))
-    (_, state), = result.root_products
+    returns, throws = self._scheduler.execute(request)
 
-    if isinstance(state, Throw):
+    if throws:
+      _, state = throws[0]
       if isinstance(state.exc, (AddressLookupError, ResolveError)):
         if missing_is_fatal:
           raise self.BuildFileScanError(
@@ -87,6 +84,7 @@ class LegacyAddressMapper(AddressMapper):
       raise self.BuildFileScanError(
         'Spec `{}` does not match any targets.'.format(self._specs_string(specs)))
 
+    _, state = returns[0]
     return set(state.value.dependencies)
 
   def scan_addresses(self, root=None):

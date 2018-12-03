@@ -180,9 +180,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
     logger.debug('warming target_roots for: %r', target_roots)
     subjects = self._determine_subjects(target_roots)
     request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
-    result = self.scheduler_session.execute(request)
-    if result.error:
-      raise result.error
+    self.scheduler_session.execute(request)
 
   def validate_goals(self, goals):
     """Checks for @console_rules that satisfy requested goals.

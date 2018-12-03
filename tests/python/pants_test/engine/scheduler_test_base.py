@@ -9,7 +9,7 @@ import shutil
 from builtins import object
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.nodes import Return, Throw
+from pants.engine.nodes import Throw
 from pants.engine.scheduler import Scheduler
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.contextutil import temporary_file_path
@@ -72,29 +72,24 @@ class SchedulerTestBase(object):
     return self.execute_literal(scheduler, request)
 
   def execute_literal(self, scheduler, execution_request):
-    result = scheduler.execute(execution_request)
-    if result.error:
-      raise result.error
-    states = [state for _, state in result.root_products]
-    if any(type(state) is not Return for state in states):
+    returns, throws = scheduler.execute(execution_request)
+    if throws:
       with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
         scheduler.visualize_graph_to_file(dot_file)
-        raise ValueError('At least one root failed: {}. Visualized as {}'.format(states, dot_file))
-    return list(state.value for state in states)
+        raise ValueError('At least one root failed: {}. Visualized as {}'.format(throws, dot_file))
+    return list(state.value for _, state in returns)
 
   def execute_expecting_one_result(self, scheduler, product, subject):
     request = scheduler.execution_request([product], [subject])
-    result = scheduler.execute(request)
+    returns, throws = scheduler.execute(request)
 
-    if result.error:
-      raise result.error
-
-    states = [state for _, state in result.root_products]
-    self.assertEqual(len(states), 1)
-
-    state = states[0]
-    if isinstance(state, Throw):
+    if throws:
+      _, state = throws[0]
       raise state.exc
+
+    self.assertEqual(len(returns), 1)
+
+    _, state = returns[0]
     return state
 
   def execute_raising_throw(self, scheduler, product, subject):
