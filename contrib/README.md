@@ -78,25 +78,25 @@ Contrib plugins should generally follow 3 basic setup steps:
    methods, but a plugin may additionally implement the `global_subsystems` entry point method, in
    which case it's `contrib_plugin` target would have a `global_subsystems=True,` entry as well.
 
-   To register with the release script, add an entry to `contrib/release_packages.sh`:
-   ```bash
-   PKG_EXAMPLE=(
-     "pantsbuild.pants.contrib.example"
+   To register with the release script, add an entry to the `contrib_packages` set in
+   `src/python/pants/releases/packages.py`:
+   ```python
+   Package(
+     "pantsbuild.pants.contrib.example",
      "//contrib/example/src/python/pants/contrib/example:plugin"
-     "pkg_example_install_test"
    )
+   ```
+
+   And add a testing function to `contrib/release_packages.sh` named by inserting the string after
+   the last `.` of the package name into the name `pkg_<name>_install_test`:
+   ```bash
    function pkg_example_install_test() {
      execute_packaged_pants_with_internal_backends \
        --plugins="['pantsbuild.pants.contrib.example==$(local_version)']" \
        goals | grep "example-goal" &> /dev/null
    }
-
-   # Once an individual (new) package is declared above, insert it into the array below)
-   CONTRIB_PACKAGES=(
-     PKG_SCROOGE
-     PKG_EXAMPLE
-   )
    ```
+
    NB: The act of releasing your contrib distribution is part of of the normal `pantsbuild.pants`
    [release process](https://www.pantsbuild.org/howto_contribute.html).  You may need to request
    a release from the owners if you have a change that should be fast-tracked before the next
