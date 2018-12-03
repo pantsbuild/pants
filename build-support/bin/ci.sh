@@ -236,7 +236,7 @@ fi
 if [[ "${run_rust_clippy:-false}" == "true" ]]; then
   start_travis_section "RustClippy" "Running Clippy on rust code"
   (
-    "${REPO_ROOT}/build-support/bin/native/cargo" clippy --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" --all
+    "${REPO_ROOT}/build-support/bin/check_clippy.sh"
   ) || die "Pants clippy failure"
 fi
 
