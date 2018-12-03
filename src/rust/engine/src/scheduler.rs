@@ -10,7 +10,7 @@ use std::time::Duration;
 use futures::future::{self, Future};
 
 use context::{Context, Core};
-use core::{Failure, Key, Params, TypeConstraint, TypeId, Value};
+use core::{Failure, Params, TypeConstraint, Value};
 use graph::{EntryId, Graph, InvalidationResult, Node, NodeContext};
 use indexmap::IndexMap;
 use log::{debug, info, warn};
@@ -111,37 +111,25 @@ impl Scheduler {
   pub fn add_root_select(
     &self,
     request: &mut ExecutionRequest,
-    subject: Key,
+    params: Params,
     product: TypeConstraint,
   ) -> Result<(), String> {
-    let edges = self.find_root_edges_or_update_rule_graph(
-      subject.type_id().clone(),
-      &selectors::Select::new(product),
-    )?;
-    request.roots.push(Select::new_from_edges(
-      Params::new_single(subject),
-      product,
-      &edges,
-    ));
-    Ok(())
-  }
-
-  fn find_root_edges_or_update_rule_graph(
-    &self,
-    subject_type: TypeId,
-    select: &selectors::Select,
-  ) -> Result<rule_graph::RuleEdges, String> {
-    self
+    let select = selectors::Select::new(product);
+    let edges = self
       .core
       .rule_graph
-      .find_root_edges(subject_type, select.clone())
+      .find_root_edges(params.type_ids(), select.clone())
       .ok_or_else(|| {
         format!(
-          "No installed rules can satisfy {} for a root subject of type {}.",
+          "No installed @rules can satisfy {} for input Params: {}.",
           rule_graph::select_str(&select),
-          rule_graph::type_str(subject_type)
+          params,
         )
-      })
+      })?;
+    request
+      .roots
+      .push(Select::new_from_edges(params, product, &edges));
+    Ok(())
   }
 
   ///

@@ -170,6 +170,9 @@ class Scheduler(object):
   def _assert_ruleset_valid(self):
     self._raise_or_return(self._native.lib.validator_run(self._scheduler))
 
+  def _to_vals_buf(self, objs):
+    return self._native.context.vals_buf(tuple(self._native.context.to_value(obj) for obj in objs))
+
   def _to_value(self, obj):
     return self._native.context.to_value(obj)
 
@@ -295,7 +298,7 @@ class Scheduler(object):
   def add_root_selection(self, execution_request, subject, product):
     res = self._native.lib.execution_add_root_select(self._scheduler,
                                                      execution_request,
-                                                     self._to_key(subject),
+                                                     self._to_vals_buf([subject]),
                                                      self._to_constraint(product))
     self._raise_or_return(res)
 

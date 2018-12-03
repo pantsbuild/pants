@@ -226,7 +226,7 @@ uint64_t graph_invalidate_all_paths(Scheduler*);
 PyResult graph_visualize(Scheduler*, Session*, char*);
 void graph_trace(Scheduler*, ExecutionRequest*, char*);
 
-PyResult  execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeConstraint);
+PyResult execution_add_root_select(Scheduler*, ExecutionRequest*, HandleBuffer, TypeConstraint);
 
 PyResult capture_snapshots(Scheduler*, Handle);
 

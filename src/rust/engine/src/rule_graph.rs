@@ -910,11 +910,13 @@ impl RuleGraph {
     GraphMaker::new(tasks, root_param_types).full_graph()
   }
 
-  pub fn find_root_edges(&self, param_type: TypeId, select: Select) -> Option<RuleEdges> {
-    // TODO: Support more than one root parameter... needs some API work.
-    //   see https://github.com/pantsbuild/pants/issues/6478
+  pub fn find_root_edges<I: IntoIterator<Item = TypeId>>(
+    &self,
+    param_inputs: I,
+    select: Select,
+  ) -> Option<RuleEdges> {
     let root = RootEntry {
-      params: vec![param_type].into_iter().collect(),
+      params: param_inputs.into_iter().collect(),
       clause: vec![select],
       gets: vec![],
     };

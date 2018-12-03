@@ -5,10 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
-from abc import abstractproperty
 from builtins import str
 
-from pants.util.meta import AbstractClass
 from pants.util.objects import Exactly, datatype
 
 
@@ -78,23 +76,17 @@ class Get(datatype(['product', 'subject'])):
     return super(Get, cls).__new__(cls, product, subject)
 
 
-class Selector(AbstractClass):
+class Params(datatype([('params', tuple)])):
+  """A set of values with distinct types.
 
-  @property
-  def type_constraint(self):
-    """The type constraint for the product type for this selector."""
-    return constraint_for(self.product)
+  Distinct types are enforced at consumption time by the rust type of the same name.
+  """
 
-  @abstractproperty
-  def optional(self):
-    """Return true if this Selector is optional. It may result in a `None` match."""
-
-  @abstractproperty
-  def product(self):
-    """The product that this selector produces."""
+  def __new__(cls, *args):
+    return super(Params, cls).__new__(cls, tuple(args))
 
 
-class Select(datatype(['product', 'optional']), Selector):
+class Select(datatype(['product', 'optional'])):
   """Selects the given Product for the Subject provided to the constructor.
 
   If optional=True and no matching product can be produced, will return None.
@@ -103,6 +95,11 @@ class Select(datatype(['product', 'optional']), Selector):
   def __new__(cls, product, optional=False):
     obj = super(Select, cls).__new__(cls, product, optional)
     return obj
+
+  @property
+  def type_constraint(self):
+    """The type constraint for the product type for this selector."""
+    return constraint_for(self.product)
 
   def __repr__(self):
     return '{}({}{})'.format(type(self).__name__,
