@@ -10,14 +10,5 @@ python_binary(
   ],
 )
 
-python_binary(
-  name = 'packages',
-  source = 'packages.py',
-  dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:configparser',
-    '3rdparty/python:beautifulsoup4',
-    'src/python/pants/util:process_handler',
-  ],
-  tags={'platform_specific_behavior'},
-)
+# Note that packages.py is not part of a target, it should be run with pex.
+# Its dependencies and such can be found in build-support/bin/release.sh.
