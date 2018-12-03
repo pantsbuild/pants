@@ -8,7 +8,7 @@ import os
 from abc import abstractmethod, abstractproperty
 
 from pants.engine.rules import SingletonRule
-from pants.util.meta import AbstractClass
+from pants.util.meta import AbstractClass, classproperty
 from pants.util.objects import datatype, enum
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var
@@ -20,6 +20,7 @@ class Platform(enum('normalized_os_name', all_normalized_os_names())):
 
 
 class ExtensibleAlgebraic(AbstractClass):
+  """A mixin to make it more concise to coalesce datatypes with related collection fields."""
 
   # NB: prototypal inheritance seems *deeply* linked with the idea here!
 
@@ -31,17 +32,52 @@ class ExtensibleAlgebraic(AbstractClass):
   def copy(self, **kwargs):
     """Analogous to a `datatype()`'s `copy()` method."""
 
-  # TODO: x
-  def sequence(self, other):
+  def _single_list_field_operation(self, field_name, list_value, prepend=True):
+    cur_value = getattr(self, field_name)
+
+    if prepend:
+      new_value = list_value + cur_value
+    else:
+      new_value = cur_value + list_value
+
+    arg_dict = {field_name: new_value}
+    return self.copy(**arg_dict)
+
+  def prepend_field(self, field_name, list_value):
+    return self._single_list_field_operation(field_name, list_value, prepend=True)
+
+  def append_field(self, field_name, list_value):
+    return self._single_list_field_operation(field_name, list_value, prepend=False)
+
+  def sequence(self, other, exclude_list_fields=None):
     """
-    - THE RETURN TYPE IS THE TYPE OF THIS OBJECT (or whatever .copy() does!)
+    - the return type is the type of this object (or just whatever .copy() does!)
       - but the `other` can be any `ExtensibleAlgebraic`
     - for this particular operation: "add" all of the list_fields together, for the fields common to
       both types
     """
+    exclude_list_fields = exclude_list_fields or []
+    overwrite_kwargs = {}
+
+    shared_list_fields = (frozenset(self.list_fields)
+                          & frozenset(other.list_fields)
+                          - frozenset(exclude_list_fields))
+    for list_field_name in shared_list_fields:
+      lhs_value = getattr(self, list_field_name)
+      rhs_value = getattr(other, list_field_name)
+      if rhs_value is None:
+        raise Exception('self: {}, other: {}, shared_list_fields: {}, lhs_value: {}, rhs_value: {}'
+                        .format(self, other, shared_list_fields, lhs_value, rhs_value))
+      overwrite_kwargs[list_field_name] = lhs_value + rhs_value
+
+    return self.copy(**overwrite_kwargs)
 
 
 class Executable(ExtensibleAlgebraic):
+
+  @classproperty
+  def list_fields(cls):
+    return ['path_entries', 'library_dirs', 'extra_args']
 
   @abstractproperty
   def path_entries(self):
@@ -66,11 +102,14 @@ class Executable(ExtensibleAlgebraic):
 
     Note: this is for libraries needed for the current Executable to run -- see LinkerMixin below
     for libraries that are needed at link time.
-
     :rtype: list of str
     """
 
-  @property
+  @abstractproperty
+  def exe_filename(self):
+    """The "entry point" -- which file to invoke when PATH is set to `path_entries()`."""
+
+  @abstractproperty
   def extra_args(self):
     """Additional arguments used when invoking this Executable.
 
@@ -78,7 +117,6 @@ class Executable(ExtensibleAlgebraic):
 
     :rtype: list of str
     """
-    return []
 
   _platform = Platform.create()
 
@@ -97,22 +135,21 @@ class Executable(ExtensibleAlgebraic):
       lib_env_var: create_path_env_var(self.library_dirs),
     }
 
-  def prepend_argv(self, argv):
-    return self.copy(extra_args=(argv + self.extra_args))
-
-  def append_argv(self, argv):
-    return self.copy(extra_args=(self.extra_args + argv))
-
 
 class Assembler(datatype([
     'path_entries',
     'exe_filename',
     'library_dirs',
+    'extra_args',
 ]), Executable):
   pass
 
 
 class LinkerMixin(Executable):
+
+  @classproperty
+  def list_fields(cls):
+    return super(LinkerMixin, cls).list_fields + ['linking_library_dirs']
 
   @abstractproperty
   def linking_library_dirs(self):
@@ -157,6 +194,10 @@ class Linker(datatype([
 
 
 class CompilerMixin(Executable):
+
+  @classproperty
+  def list_fields(cls):
+    return super(CompilerMixin, cls).list_fields + ['include_dirs']
 
   @abstractproperty
   def include_dirs(self):

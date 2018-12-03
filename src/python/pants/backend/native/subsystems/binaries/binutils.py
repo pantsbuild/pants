@@ -24,7 +24,8 @@ class Binutils(NativeTool):
     return Assembler(
       path_entries=self.path_entries(),
       exe_filename='as',
-      library_dirs=[])
+      library_dirs=[],
+      extra_args=[])
 
   def linker(self):
     return Linker(

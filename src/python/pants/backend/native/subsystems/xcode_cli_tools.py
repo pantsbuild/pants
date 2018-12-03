@@ -134,7 +134,8 @@ class XCodeCLITools(Subsystem):
     return Assembler(
       path_entries=self.path_entries(),
       exe_filename='as',
-      library_dirs=[])
+      library_dirs=[],
+      extra_args=[])
 
   @memoized_method
   def linker(self):
