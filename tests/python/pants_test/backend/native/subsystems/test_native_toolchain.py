@@ -130,8 +130,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       linker.as_invocation_environment_dict)
 
   def _invoke_capturing_output(self, cmd, env=None):
-    if env is None:
-      env = os.environ.copy()
+    env = env or {}
     try:
       with environment_as(**env):
         return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8')
