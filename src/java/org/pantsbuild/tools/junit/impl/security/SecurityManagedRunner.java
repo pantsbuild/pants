@@ -11,6 +11,9 @@ import java.util.logging.Logger;
 import org.junit.runner.Description;
 import org.junit.runner.Result;
 import org.junit.runner.Runner;
+import org.junit.runner.manipulation.Filter;
+import org.junit.runner.manipulation.Filterable;
+import org.junit.runner.manipulation.NoTestsRemainException;
 import org.junit.runner.notification.Failure;
 import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
@@ -19,14 +22,14 @@ import org.pantsbuild.junit.security.SecurityViolationException;
 /**
  * Runs tests wrapped with the reporting security manager.
  */
-public class SecurityManagedRunner extends Runner {
+public class SecurityManagedRunner extends Runner implements Filterable {
   private static Logger logger = Logger.getLogger("pants-junit");
   private final Runner wrappedRunner;
-  private final JunitSecViolationReportingManager secMgr;
+  private final JunitSecViolationReportingManager securityManager;
 
-  public SecurityManagedRunner(Runner wrappedRunner, JunitSecViolationReportingManager secMgr) {
+  public SecurityManagedRunner(Runner wrappedRunner, JunitSecViolationReportingManager securityManager) {
     this.wrappedRunner = wrappedRunner;
-    this.secMgr = secMgr;
+    this.securityManager = securityManager;
   }
 
   @Override public Description getDescription() {
@@ -37,7 +40,7 @@ public class SecurityManagedRunner extends Runner {
     // NB: SecListener needs to be the first listener, otherwise the failures it fires will not be
     // in the xml results or the console output. This is because those are constructed with
     // subsequent listeners.
-    notifier.addFirstListener(new SecListener(notifier, secMgr));
+    notifier.addFirstListener(new SecListener(notifier, securityManager));
 
     recurseThroughChildrenMarkingSuites();
     log("after add seclistener");
@@ -59,7 +62,7 @@ public class SecurityManagedRunner extends Runner {
       }
       seen.add(pop);
       if (pop.isSuite()) {
-        secMgr.startSuite(pop.getClassName());
+        securityManager.startSuite(pop.getClassName());
       }
 
       for (Description description : pop.getChildren()) {
@@ -72,6 +75,20 @@ public class SecurityManagedRunner extends Runner {
 
   private static void log(String s) {
     logger.fine(s);
+  }
+
+  // NB: Pass filter calls through.
+  // This allows filtered requests to apply to the underlying tests. In some cases, leaving this
+  // unimplemented may cause tests to run multiple times.
+  @Override
+  public void filter(Filter filter) throws NoTestsRemainException {
+    if (wrappedRunner instanceof Filterable) {
+      ((Filterable) wrappedRunner).filter(filter);
+    } else {
+      // TODO decide what to do with this case.
+      throw new RuntimeException(
+          "Internal Error: runner " + wrappedRunner.getClass() + " does not support filtering");
+    }
   }
 
   public enum TestState {
