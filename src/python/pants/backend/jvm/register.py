@@ -6,6 +6,8 @@ from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository as repo
 from pants.backend.jvm.scala_artifact import ScalaArtifact
+from pants.backend.jvm.subsystems.graal import BuildNativeImage
+from pants.backend.jvm.subsystems.graal import rules as graal_rules
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagementSetup
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
@@ -138,7 +140,7 @@ def build_file_aliases():
 
 
 def global_subsystems():
-  return (ScalaPlatform, ScoveragePlatform, )
+  return (ScalaPlatform, ScoveragePlatform, BuildNativeImage,)
 
 
 # TODO https://github.com/pantsbuild/pants/issues/604 register_goals
@@ -228,3 +230,7 @@ def register_goals():
   task(name='test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
   task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
   task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)
+
+
+def rules():
+  return graal_rules()

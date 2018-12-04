@@ -54,6 +54,7 @@ class XCodeCLITools(Subsystem):
     '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr',
     '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/9.1.0',
     '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr',
+    '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks',
   ]
 
   class XCodeToolsUnavailable(Exception):
@@ -121,7 +122,13 @@ class XCodeCLITools(Subsystem):
 
   @memoized_method
   def include_dirs(self, include_cpp_inc=False):
-    return self._get_existing_subdirs('include')
+    normal_inc_dirs = self._get_existing_subdirs('include')
+    # Some tools (like native-image) will specifically #include <CoreFoundation/CoreFoundation.h>
+    # and we want to support that convention, so this populates a top-level 'Headers/' dir when
+    # used with hermetic execution.
+    core_foundation_header_dirs = self._get_existing_subdirs(
+      'CoreFoundation.framework/Versions/A/Headers')
+    return normal_inc_dirs + core_foundation_header_dirs
 
   @memoized_method
   def assembler(self):

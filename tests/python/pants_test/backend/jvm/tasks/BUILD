@@ -661,6 +661,7 @@ python_tests(
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils'
   ],
+  timeout = 600,
 )
 
 python_tests(

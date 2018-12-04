@@ -7,6 +7,7 @@ from pants.backend.native.config.environment import CCompiler, CppCompiler, Plat
 from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFileMapper
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import rule
+from pants.util.dirutil import mergetree
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -36,7 +37,19 @@ class GCC(NativeTool):
 
   @memoized_property
   def path_entries(self):
-    return self._filemap([('bin',)])
+    bin_dir, libexec_dir = tuple(self._filemap([
+      ('bin',),
+      ('libexec/gcc/*/7.3.0',),
+    ]))
+    # Some tools (like native-image) will require the `cc1` tool, which is in the
+    # libexec/... subdirectory. We want to present an environment in which process executions in
+    # this sandbox can rely on only having to add 'bin/' to the command's PATH for it to succeed.
+    mergetree(
+      src=libexec_dir,
+      dst=bin_dir,
+      symlinks=True,
+    )
+    return [bin_dir, libexec_dir]
 
   @memoized_method
   def _common_lib_dirs(self, platform):

@@ -178,3 +178,20 @@ python_library(
     'src/python/pants/util:dirutil',
   ],
 )
+
+python_library(
+  name='graal',
+  sources=['graal.py'],
+  dependencies=[
+    'src/python/pants/backend/native/config',
+    'src/python/pants/backend/native/subsystems',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:hash_utils',
+    'src/python/pants/binaries',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:process_handler',
+    'src/python/pants/util:strutil',
+  ],
+)

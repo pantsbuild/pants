@@ -5,12 +5,14 @@ import os
 from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.backend.jvm.subsystems.graal import rules as graal_rules
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
+from pants.backend.native.register import rules as native_rules
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
@@ -23,6 +25,11 @@ from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class ScalaFmtTestBase(NailgunTaskTestBase):
+
+  @classmethod
+  def rules(cls):
+    return super(ScalaFmtTestBase, cls).rules() + native_rules() + graal_rules()
+
   @classmethod
   def alias_groups(cls):
     return super().alias_groups().merge(
@@ -137,6 +144,15 @@ class ScalaFmtCheckFormatTest(ScalaFmtTestBase):
         TaskError, 'Scalafmt failed with exit code 1; to fix run: `./pants fmt <targets>`'):
       self.execute(context)
 
+  def test_scalafmt_fail_hermetic_native_image(self):
+    self.set_options(skip=False, configuration=self.configuration,
+                     use_hermetic_execution=True,
+                     use_hermetic_native_image=True)
+    context = self.context(target_roots=self.library)
+    with self.assertRaisesWithMessage(
+        TaskError, 'Scalafmt failed with exit code 1; to fix run: `./pants fmt <targets>`'):
+      self.execute(context)
+
 
 class ScalaFmtFormatTest(ScalaFmtTestBase):
 
@@ -158,6 +174,11 @@ class ScalaFmtFormatTest(ScalaFmtTestBase):
   def test_scalafmt_format_hermetic(self):
     self.format_file_and_verify_fmt(skip=False, configuration=self.configuration,
                                     use_hermetic_execution=True)
+
+  def test_scalafmt_format_hermetic_native_image(self):
+    self.format_file_and_verify_fmt(skip=False, configuration=self.configuration,
+                                    use_hermetic_execution=True,
+                                    use_hermetic_native_image=True)
 
   @staticmethod
   @contextmanager
