@@ -7,7 +7,9 @@ python_tests(
   dependencies = [
     '3rdparty/python:future',
     'contrib/buildgen/src/python/pants/contrib/buildgen:build_file_manipulator',
+    'src/python/pants/base:build_file',
+    'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ],
 )

@@ -10,7 +10,7 @@ from pants.binaries.binary_tool import BinaryToolBase
 from pants.binaries.binary_util import (BinaryToolFetcher, BinaryToolUrlGenerator, BinaryUtil,
                                         HostPlatform)
 from pants.option.scope import GLOBAL_SCOPE
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 class DefaultVersion(BinaryToolBase):
@@ -73,7 +73,7 @@ class CustomUrls(BinaryToolBase):
 
 
 # TODO: these should have integration tests which use BinaryTool subclasses overriding archive_type.
-class BinaryToolBaseTest(BaseTest):
+class BinaryToolBaseTest(TestBase):
 
   def setUp(self):
     super(BinaryToolBaseTest, self).setUp()

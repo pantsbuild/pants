@@ -13,7 +13,7 @@ from textwrap import dedent
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
-from pants_test.base_test import TestGenerator
+from pants_test.test_base import TestGenerator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants_test.testutils.git_util import initialize_repo
 from pants_test.testutils.py2_compat import assertRegex

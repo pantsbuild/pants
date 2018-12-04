@@ -11,16 +11,6 @@ python_tests(
   ]
 )
 
-python_library(
-  name = 'build_file_test_base',
-  sources = ['build_file_test_base.py'],
-  dependencies = [
-    '3rdparty/python:pathspec',
-    'src/python/pants/base:build_file',
-    'src/python/pants/util:dirutil',
-  ]
-)
-
 python_tests(
   name = 'build_root',
   sources = ['test_build_root.py'],
@@ -84,7 +74,7 @@ python_tests(
   name = 'filesystem_build_file',
   sources = ['test_filesystem_build_file.py'],
   dependencies = [
-    ':build_file_test_base',
+    '3rdparty/python:pathspec',
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_file',

@@ -20,7 +20,7 @@ from pants_test.engine.util import init_native
 class SchedulerTestBase(object):
   """A mixin for classes (tests, presumably) which need to create temporary schedulers.
 
-  TODO: In the medium term, this should be part of pants_test.base_test.BaseTest.
+  TODO: In the medium term, this should be part of pants_test.test_base.TestBase.
   """
 
   _native = init_native()
