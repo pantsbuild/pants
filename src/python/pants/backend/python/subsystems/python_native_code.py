@@ -47,10 +47,6 @@ class PythonNativeCode(Subsystem):
   def subsystem_dependencies(cls):
     return super(PythonNativeCode, cls).subsystem_dependencies() + (
       NativeToolchain.scoped(cls),
-      # We generally have to use PythonSetup's global instance, as methods such as
-      # `dump_requirements` will use it directly.
-      # TODO: when subsystems are more easily requestable from the v2 engine, this restriction could
-      # be removed!
       PythonSetup,
     )
 

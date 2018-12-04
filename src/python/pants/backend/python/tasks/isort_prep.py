@@ -81,7 +81,6 @@ class IsortPrep(Task):
   def subsystem_dependencies(cls):
     return super(IsortPrep, cls).subsystem_dependencies() + (
       cls.Isort.Factory,
-      # PythonSetup, PythonRepos are required by dump_requirement_libs.
       PythonSetup,
       PythonRepos
     )
