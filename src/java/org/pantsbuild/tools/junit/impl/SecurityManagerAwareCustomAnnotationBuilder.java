@@ -8,9 +8,7 @@ import org.pantsbuild.tools.junit.impl.security.JunitSecViolationReportingManage
 import org.pantsbuild.tools.junit.impl.security.SecurityManagedRunner;
 
 /**
- * Needed to support retrying flaky tests as well as add support for running scala tests.
- * Using method overriding, gives us access to code in JUnit4 that cannot be customized
- * in a simpler way.
+ * TODO This could be a subclass of CustomAnnotationBuilder instead of a wrapper.
  */
 public class SecurityManagerAwareCustomAnnotationBuilder extends AllDefaultPossibilitiesBuilder {
 
@@ -38,6 +36,7 @@ public class SecurityManagerAwareCustomAnnotationBuilder extends AllDefaultPossi
   }
 
   // override annotated builder to "fake" the scala test junit runner for scala tests
+  // passing this rather than the underlying builder to access the junit4Builder
   @Override
   protected AnnotatedBuilder annotatedBuilder() {
     return new CustomAnnotationBuilder.ScalaTestAnnotatedBuilder(this);
