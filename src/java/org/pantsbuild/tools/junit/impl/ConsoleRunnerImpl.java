@@ -28,7 +28,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
 
 import org.apache.commons.io.output.TeeOutputStream;
 import org.junit.runner.Computer;
@@ -70,7 +69,6 @@ public class ConsoleRunnerImpl {
   /** Intended to be used in unit testing this class */
   private static RunListener testListener = null;
   private JunitSecViolationReportingManager securityManager;
-  private static Logger logger = Logger.getLogger("pants-junit");
 
   /**
    * A stream that allows its underlying output to be swapped.
@@ -966,5 +964,4 @@ public class ConsoleRunnerImpl {
   public static void addTestListener(RunListener listener) {
     testListener = listener;
   }
-
 }
