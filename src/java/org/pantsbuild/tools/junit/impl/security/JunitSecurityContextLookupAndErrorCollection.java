@@ -182,6 +182,9 @@ class JunitSecurityContextLookupAndErrorCollection {
   TestSecurityContext lookupContextByThreadGroup() {
     ContextKey contextKey =
         ContextKey.parseFromThreadGroupName(Thread.currentThread().getThreadGroup().getName());
+    if (contextKey ==  null) {
+      return null;
+    }
     return getContext(contextKey);
   }
 

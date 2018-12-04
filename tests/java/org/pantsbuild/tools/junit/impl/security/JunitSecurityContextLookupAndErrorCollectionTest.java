@@ -153,7 +153,7 @@ public class JunitSecurityContextLookupAndErrorCollectionTest {
       public void run() {
         assertThat(
             Thread.currentThread().getThreadGroup().getName(),
-            containsString("-m-null-Threads"));
+            containsString("⁓m⁓null⁓Threads"));
         assertThat(lookupAndErrorCollection.lookupContextByThreadGroup(), is(suiteContext));
       }
     });
@@ -202,6 +202,11 @@ public class JunitSecurityContextLookupAndErrorCollectionTest {
     assertFalse(testContext.hasActiveThreads());
 
     lookupAndErrorCollection.endTest();
+  }
+
+  @Test
+  public void contextKefForThreadGroupSetupOutsideJunitSecurityContextIsNull() {
+    assertNull(ContextKey.parseFromThreadGroupName("main"));
   }
 
   private void runThreadAwaitingLatch(TestSecurityContext testContext) {

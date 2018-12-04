@@ -7,6 +7,7 @@ import java.util.Objects;
  */
 public class ContextKey {
 
+  static final String SEPARATOR = "\u2053";
   public ContextKey(String className, String methodName) {
     this.className = className;
     this.methodName = methodName;
@@ -17,16 +18,20 @@ public class ContextKey {
   }
 
   static String createThreadGroupName(String className, String methodName) {
-    return className + "-m-" + methodName + "-Threads";
+    return className + SEPARATOR + "m" + SEPARATOR + methodName + SEPARATOR + "Threads";
   }
 
   static ContextKey parseFromThreadGroupName(String threadGroupName) {
-    String[] split = threadGroupName.split("-");
-    assert split.length == 4;
-    assert Objects.equals(split[1], "m");
-    assert Objects.equals(split[3], "Threads");
+    String[] split = threadGroupName.split(SEPARATOR);
+    if (split.length !=4 ||
+        !Objects.equals(split[1], "m") ||
+        !Objects.equals(split[3], "Threads")) {
+      // The thread group wasn't created by the junit runner, and so it doesn't have a context key.
+      return null;
+    }
+
     // if the method name is missing it is serialized as the string null
-    String methodName = split.length >= 3 && !split[2].equals("null") ? split[2] : null;
+    String methodName = split[2].equals("null") ? null : split[2];
     return new ContextKey(split[0], methodName);
   }
 
