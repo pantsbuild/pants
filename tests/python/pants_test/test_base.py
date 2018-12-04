@@ -363,6 +363,10 @@ class TestBase(unittest.TestCase):
     return self._build_root()
 
   @property
+  def build_file_parser(self):
+    return self._build_file_parser
+
+  @property
   def pants_workdir(self):
     return self._pants_workdir()
 
@@ -435,7 +439,7 @@ class TestBase(unittest.TestCase):
 
   def context(self, for_task_types=None, for_subsystems=None, options=None,
               target_roots=None, console_outstream=None, workspace=None,
-              scheduler=None, **kwargs):
+              scheduler=None, address_mapper=None, **kwargs):
     """
     :API: public
 
@@ -487,11 +491,13 @@ class TestBase(unittest.TestCase):
 
     scheduler = scheduler or self.scheduler
 
+    address_mapper = address_mapper or self.address_mapper
+
     context = create_context_from_options(fake_options,
                                           target_roots=target_roots,
                                           build_graph=self.build_graph,
                                           build_file_parser=self._build_file_parser,
-                                          address_mapper=self.address_mapper,
+                                          address_mapper=address_mapper,
                                           console_outstream=console_outstream,
                                           workspace=workspace,
                                           scheduler=scheduler)
