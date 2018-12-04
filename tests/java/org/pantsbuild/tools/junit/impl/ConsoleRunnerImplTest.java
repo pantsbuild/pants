@@ -745,25 +745,6 @@ public class ConsoleRunnerImplTest {
         NetworkHandling.allowAll);
   }
 
-  // TODO move tests into their own files
-  // TODO Consider recording where the thread was started and including that in the message
-  // TODO handle various ways to say localhost
-  // TODO look up host name and fail if it's not localhost
-  // TODO scope checks
-  // TODO assert that a fail fast does not trigger a security manager fail
-  // TODO collapse common initialization errors in test runs.
-  // TODO ensure that this has a clear error
-  //   The question here is whether it should fail before running the tests. Right now it runs them,
-  //   but the resulting error is
-  //   java.lang.ExceptionInInitializerError
-  //   at sun.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
-  //   ... 50 lines ...
-  //   Caused by: java.lang.SecurityException: System.exit calls are not allowed.
-  //   at org.pantsbuild.tools.junit.impl.security.JunitSecViolationReportingManager
-  //   I think it should either end with 0 tests run 1 error, or
-  //   2 run, 2 error, with a better error than ExceptionInInitializerError
-
-
   private String getTestLogContents(Class testClass, String extension) {
     try {
       return new String(
