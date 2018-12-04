@@ -28,6 +28,9 @@ from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.java import util
+from pants.java.distribution.distribution import DistributionLocator
+from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
@@ -38,7 +41,7 @@ class CoursierResultNotFound(Exception):
   pass
 
 
-class CoursierMixin(NailgunTask, JvmResolverBase):
+class CoursierMixin(JvmResolverBase):
   """
   Experimental 3rdparty resolver using coursier.
 
@@ -98,7 +101,7 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
 
     return jar_list, untouched_pinned_artifact
 
-  def resolve(self, targets, compile_classpath, sources, javadoc):
+  def resolve(self, targets, compile_classpath, sources, javadoc, executor):
     """
     This is the core function for coursier resolve.
 
@@ -119,11 +122,17 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
     :param compile_classpath: classpath product that holds the resolution result. IMPORTANT: this parameter will be changed.
     :param sources: if True, fetch sources for 3rdparty
     :param javadoc: if True, fetch javadoc for 3rdparty
+    :param executor: An instance of `pants.java.executor.Executor`. If None, a subprocess executor will be assigned.
     :return: n/a
     """
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
+
+    executor = executor or SubprocessExecutor(DistributionLocator.cached())
+    if not isinstance(executor, Executor):
+      raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
+        executor, type(executor)))
 
     for artifact_set, target_subset in jar_targets.items():
       # TODO(wisechengyi): this is the only place we are using IvyUtil method, which isn't specific to ivy really.
@@ -165,7 +174,7 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
                                                                                manager)
 
         results = self._get_result_from_coursier(jars_to_resolve, global_excludes, pinned_coords,
-                                                 coursier_cache_dir, sources, javadoc)
+                                                 coursier_cache_dir, sources, javadoc, executor)
 
         for conf, result_list in results.items():
           for result in result_list:
@@ -198,7 +207,7 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
     return pants_jar_base_dir
 
   def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords,
-                                coursier_cache_path, sources, javadoc):
+                                coursier_cache_path, sources, javadoc, executor):
     """
     Calling coursier and return the result per invocation.
 
@@ -209,6 +218,7 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
     :param global_excludes: List of `M2Coordinate`s to exclude globally
     :param pinned_coords: List of `M2Coordinate`s that need to be pinned.
     :param coursier_cache_path: path to where coursier cache is stored.
+    :param executor: An instance of `pants.java.executor.Executor`
 
     :return: The aggregation of results by conf from coursier. Each coursier call could return
     the following:
@@ -264,18 +274,18 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
 
     results_by_conf = self._get_default_conf_results(common_args, coursier_jar, global_excludes, jars_to_resolve,
                                                      coursier_work_temp_dir,
-                                                     pinned_coords)
+                                                     pinned_coords, executor)
     if sources or javadoc:
       non_default_conf_results = self._get_non_default_conf_results(common_args, coursier_jar, global_excludes,
                                                                     jars_to_resolve, coursier_work_temp_dir,
-                                                                    pinned_coords, sources, javadoc)
+                                                                    pinned_coords, sources, javadoc, executor)
       results_by_conf.update(non_default_conf_results)
 
     return results_by_conf
 
   def _get_default_conf_results(self, common_args, coursier_jar, global_excludes, jars_to_resolve,
                                 coursier_work_temp_dir,
-                                pinned_coords):
+                                pinned_coords, executor):
 
     # Variable to store coursier result each run.
     results = defaultdict(list)
@@ -289,13 +299,13 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
                                         coursier_work_temp_dir,
                                         output_fn)
 
-    results['default'].append(self._call_coursier(cmd_args, coursier_jar, output_fn))
+    results['default'].append(self._call_coursier(cmd_args, coursier_jar, output_fn, executor))
 
     return results
 
   def _get_non_default_conf_results(self, common_args, coursier_jar, global_excludes, jars_to_resolve,
                                     coursier_work_temp_dir, pinned_coords,
-                                    sources, javadoc):
+                                    sources, javadoc, executor):
     # To prevent improper api usage during development. User should not see this anyway.
     if not sources and not javadoc:
       raise TaskError("sources or javadoc has to be True.")
@@ -331,21 +341,19 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
     cmd_args.extend(special_args)
 
     # sources and/or javadoc share the same conf
-    results['src_doc'] = [self._call_coursier(cmd_args, coursier_jar, output_fn)]
+    results['src_doc'] = [self._call_coursier(cmd_args, coursier_jar, output_fn, executor)]
     return results
 
-  def _call_coursier(self, cmd_args, coursier_jar, output_fn):
+  def _call_coursier(self, cmd_args, coursier_jar, output_fn, executor):
 
-    labels = [WorkUnitLabel.COMPILER] if self.get_options().report else [WorkUnitLabel.TOOL]
-
-    return_code = self.runjava(
+    runner = executor.runner(
       classpath=[coursier_jar],
       main='coursier.cli.Coursier',
-      args=cmd_args,
       jvm_options=self.get_options().jvm_options,
-      workunit_name='coursier',
-      workunit_labels=labels,
-    )
+      args=cmd_args)
+
+    labels = [WorkUnitLabel.COMPILER] if self.get_options().report else [WorkUnitLabel.TOOL]
+    return_code = util.execute_runner(runner, self.context.new_workunit, 'coursier', labels)
 
     if return_code:
       raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
@@ -653,7 +661,7 @@ class CoursierMixin(NailgunTask, JvmResolverBase):
       return os.path.join(pants_jar_path_base, 'relative', os.path.relpath(jar_path, coursier_cache_path))
 
 
-class CoursierResolve(CoursierMixin):
+class CoursierResolve(CoursierMixin, NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -692,8 +700,8 @@ class CoursierResolve(CoursierMixin):
     classpath_products = self.context.products.get_data('compile_classpath',
                                                         init_func=ClasspathProducts.init_func(
                                                           self.get_options().pants_workdir))
-
-    self.resolve(self.context.targets(), classpath_products, sources=False, javadoc=False)
+    executor = self.create_java_executor()
+    self.resolve(self.context.targets(), classpath_products, sources=False, javadoc=False, executor=executor)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Coursier resolution is an output dependent on the entire target set, and is not divisible

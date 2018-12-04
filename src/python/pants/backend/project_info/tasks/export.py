@@ -113,6 +113,8 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
              help='Causes sources to be output.')
     register('--formatted', type=bool, implicit_value=False,
              help='Causes output to be a single line of JSON.')
+    register('--jvm-options', type=list, metavar='<option>...',
+             help='Run the JVM 3rdparty resolver with these jvm options.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -155,7 +157,8 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
       else:
         CoursierMixin.resolve(self, targets, compile_classpath,
                               sources=self.get_options().libraries_sources,
-                              javadoc=self.get_options().libraries_javadocs)
+                              javadoc=self.get_options().libraries_javadocs,
+                              executor=executor)
 
     return compile_classpath
 
