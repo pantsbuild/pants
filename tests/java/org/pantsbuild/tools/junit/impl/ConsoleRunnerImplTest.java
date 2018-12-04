@@ -617,6 +617,8 @@ public class ConsoleRunnerImplTest {
 
   @Test
   public void treatStaticSystemExitAsFailure() {
+    // TODO it'd be better if this case resulted in a message that said none of the tests were run
+    // because for classes with more tests, it will be difficult to understand
     Class<?> testClass = StaticSysExitTestCase.class;
     String output = runTestsExpectingFailure(
         new JunitSecurityManagerConfig(
@@ -643,6 +645,7 @@ public class ConsoleRunnerImplTest {
 
     assertThat(output, containsString("1) " + testClass.getCanonicalName() + ""));
     assertThat(output, containsString("System.exit calls are not allowed"));
+    assertThat(output, containsString("at " + testClass.getCanonicalName() + ".before("));
 
     assertThat(output, containsString("There was 1 failure:"));
     assertThat(output, containsString("Tests run: 0,  Failures: 1"));
@@ -698,6 +701,43 @@ public class ConsoleRunnerImplTest {
     assertThat(output, containsString("OK (5 tests)\n"));
   }
 
+
+  @Test
+  public void whenNetworkAccessDisallowedFailNetworkTouchingTests() {
+    Class<BoundaryNetworkTests> testClass = BoundaryNetworkTests.class;
+    BoundaryNetworkTests.setHostname("localhost");
+    String output = runTestsExpectingFailure(
+        new JunitSecurityManagerConfig(
+            SystemExitHandling.disallow,
+            ThreadHandling.allowAll,
+            NetworkHandling.disallow
+        ),
+        testClass);
+
+    String testClassName = testClass.getCanonicalName();
+
+    assertThat(output, containsString(") directNetworkCall(" + testClassName + ")"));
+    assertThat(output, containsString(") catchesNetworkCall(" + testClassName + ")"));
+    assertThat(output, containsString(") networkCallInJoinedThread(" + testClassName + ")"));
+    assertThat(output, containsString(") networkCallInNotJoinedThread(" + testClassName + ")"));
+
+    assertThat(output, containsString("There were 4 failures:"));
+    assertThat(output, containsString("Tests run: 5,  Failures: 4"));
+
+    assertThat(output, containsString(
+        ") directNetworkCall(" + testClassName + ")\n" +
+            "org.pantsbuild.junit.security.SecurityViolationException: " +
+            "DNS request for localhost is not allowed.\n"));
+    // ... some other ats
+    assertThat(output, containsString(
+        "\tat java.net.InetAddress.getAllByName0(InetAddress.java:1268)\n" +
+            "\tat java.net.InetAddress.getAllByName(InetAddress.java:1192)\n" +
+            "\tat java.net.InetAddress.getAllByName(InetAddress.java:1126)\n" +
+            "\tat java.net.InetAddress.getByName(InetAddress.java:1076)\n" +
+            "\tat java.net.InetSocketAddress.<init>(InetSocketAddress.java:220)\n" +
+            "\tat " + testClassName + ".makeNetworkCall"));
+  }
+
   private JunitSecurityManagerConfig configDisallowingSystemExitButAllowingEverythingElse() {
     return new JunitSecurityManagerConfig(
         SystemExitHandling.disallow,
@@ -705,6 +745,7 @@ public class ConsoleRunnerImplTest {
         NetworkHandling.allowAll);
   }
 
+  // TODO move tests into their own files
   // TODO Consider recording where the thread was started and including that in the message
   // TODO handle various ways to say localhost
   // TODO look up host name and fail if it's not localhost

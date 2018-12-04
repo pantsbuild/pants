@@ -59,7 +59,7 @@ public class JunitSecurityManagerConfig {
 
   public enum NetworkHandling {
     allowAll,
-    disallow, // TODO currently this is unimplemented
+    disallow,
     onlyLocalhost
   }
 }

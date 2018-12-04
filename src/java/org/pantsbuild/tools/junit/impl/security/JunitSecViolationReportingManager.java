@@ -237,6 +237,8 @@ public class JunitSecViolationReportingManager extends SecurityManager {
         return false;
       case onlyLocalhost:
         return !hostIsLocalHost(host);
+      case disallow:
+        return true;
     }
 
     return contextLookupAndErrorCollection.config.getNetworkHandling() != NetworkHandling.allowAll;
