@@ -2,6 +2,30 @@
 ======================
 This document describes releases leading up to the ``1.12.x`` ``stable`` series.
 
+1.12.0rc1 (12/04/2018)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* don't copy over the os environment to avoid an encoding error (#6846)
+  `PR #6846 <https://github.com/pantsbuild/pants/pull/6846>`_
+
+* [deferred-sources] fix glob expansion issue in deferred sources mappe… (#6824)
+  `PR #6824 <https://github.com/pantsbuild/pants/pull/6824>`_
+
+* Statically link openssl for reqwest (#6816)
+  `PR #6816 <https://github.com/pantsbuild/pants/pull/6816>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use both the deprecated and new locations of fatal_warnings args (#6798)
+  `PR #6798 <https://github.com/pantsbuild/pants/pull/6798>`_
+
+* Move file owners computation into the engine and make lighter (#6790)
+  `PR #6790 <https://github.com/pantsbuild/pants/pull/6790>`_
+
 
 1.12.0rc0 (11/19/2018)
 ----------------------
