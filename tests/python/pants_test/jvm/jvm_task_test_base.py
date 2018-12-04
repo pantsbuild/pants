@@ -6,8 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.util.dirutil import safe_file_dump, safe_mkdir, safe_mkdtemp
+from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -15,6 +17,14 @@ class JvmTaskTestBase(TaskTestBase):
   """
   :API: public
   """
+
+  def setUp(self):
+    """
+    :API: public
+    """
+    super(JvmTaskTestBase, self).setUp()
+    init_subsystem(JvmResolveSubsystem)
+    self.set_options_for_scope('resolver', resolver='ivy')
 
   def populate_runtime_classpath(self, context, classpath=None):
     """

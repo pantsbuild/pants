@@ -5,11 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
 
 
 class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
 
+  @ensure_resolver
   def test_zinc_tool_reuse_between_scala_and_java(self):
     with temporary_dir() as artifact_cache:
       bootstrap_args = [

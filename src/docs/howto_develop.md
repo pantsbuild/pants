@@ -154,7 +154,8 @@ a pull request, and allow travis to run them. You can reproduce failures by runn
     $ ./build-support/bin/ci.sh
 
 with whatever relevant flags reproduce the failure (`./build-support/bin/ci.sh -h` will list the
-available flags).
+available flags). The relevant flags are in the log for the shard on a line that looks something
+like `Executing ./build-support/bin/ci.sh "-c3 -i 0/6" ...`.
 
 To run just Pants' *unit* tests (skipping the can-be-slow integration tests), filter out
 the python tests tagged with 'integration':
@@ -180,6 +181,13 @@ Create a pull request on the `pantsbuild/pants` [repo](https://github.com/pantsb
 not your fork. If you are posting a review request, put the pull request number into the Bug
 field. Then, when you close the request, you can navigate from the bug number to easily close
 the pull request.
+
+If your CI-build failed in Travis-CI, and the failure looks like it's not due to
+your change, please open an issue with the part of the CI log containing the test failure and label
+the issue with `flaky-test`. If an issue already exists, add a comment to it noting that you
+encountered it too. After you've done that, you can ask in slack for someone to restart the shard.
+That will cause the shard to re-run its tests.
+
 
 Debugging
 ---------

@@ -16,7 +16,6 @@ from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThrif
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
 from pants.util.process_handler import subprocess
@@ -143,10 +142,9 @@ class ApacheThriftPyGenTest(TaskTestBase):
     self.assertNotEqual(synthetic_target_one.target_base, synthetic_target_two.target_base)
 
     targets = (synthetic_target_one, synthetic_target_two)
-
-    python_repos = global_subsystem_instance(PythonRepos)
-    python_setup = global_subsystem_instance(PythonSetup)
-    interpreter_cache = PythonInterpreterCache(python_setup, python_repos)
+    self.context(for_subsystems=[PythonInterpreterCache, PythonRepos])
+    interpreter_cache = PythonInterpreterCache.global_instance()
+    python_repos = PythonRepos.global_instance()
     interpreter = interpreter_cache.select_interpreter_for_targets(targets)
 
     # We need setuptools to import namespace packages (via pkg_resources), so we prime the

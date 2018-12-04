@@ -58,8 +58,8 @@ class Checkstyle(LintTaskMixin, Task):
   @classmethod
   def subsystem_dependencies(cls):
     return super(Task, cls).subsystem_dependencies() + cls.plugin_subsystems + (
-      # Needed implicitly by the pex_build_util functions we use.
-      PythonSetup, PythonRepos)
+      PythonSetup, PythonRepos, PythonInterpreterCache
+    )
 
   @classmethod
   def implementation_version(cls):
@@ -220,9 +220,7 @@ class Checkstyle(LintTaskMixin, Task):
     )
     if not python_tgts:
       return 0
-    interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
-                                               PythonRepos.global_instance(),
-                                               logger=self.context.log.debug)
+    interpreter_cache = PythonInterpreterCache.global_instance()
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
       failure_count = 0
       tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility(

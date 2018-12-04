@@ -23,6 +23,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import (CoursierResolve,
                                                       CoursierResolveFingerprintStrategy)
 from pants.base.exceptions import TaskError
+from pants.java import util
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
@@ -100,7 +101,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       compile_classpath = context.products.get_data('compile_classpath',
         init_func=ClasspathProducts.init_func(workdir)
       )
-      task.resolve([jar_lib, scala_lib], compile_classpath, sources=True, javadoc=True)
+      task.resolve([jar_lib, scala_lib], compile_classpath, sources=True, javadoc=True, executor=None)
 
       # Both javadoc and sources jars are added to the classpath product
       self.assertEqual(['default', 'src_doc', 'src_doc'],
@@ -251,7 +252,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
         # Remove coursier's cache
         safe_rmtree(couriser_cache_dir)
 
-        task.runjava = MagicMock()
+        util.execute_runner = MagicMock()
 
         # Ignore any error because runjava may fail due to undefined behavior
         try:
@@ -259,7 +260,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
         except TaskError:
           pass
 
-        task.runjava.assert_called()
+        util.execute_runner.assert_called()
 
   def test_resolve_jarless_pom(self):
     jar = JarDependency('org.apache.commons', 'commons-weaver-privilizer-parent', '1.3')

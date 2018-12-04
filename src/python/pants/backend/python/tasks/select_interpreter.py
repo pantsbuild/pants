@@ -12,7 +12,6 @@ from future.utils import PY3
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -49,7 +48,8 @@ class SelectInterpreter(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(SelectInterpreter, cls).subsystem_dependencies() + (PythonSetup, PythonRepos)
+    return super(SelectInterpreter, cls).subsystem_dependencies() + (
+      PythonSetup, PythonInterpreterCache)
 
   @classmethod
   def product_types(cls):
@@ -88,9 +88,7 @@ class SelectInterpreter(Task):
     self.context.products.register_data(PythonInterpreter, interpreter)
 
   def _create_interpreter_path_file(self, interpreter_path_file, targets):
-    interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
-                                               PythonRepos.global_instance(),
-                                               logger=self.context.log.debug)
+    interpreter_cache = PythonInterpreterCache.global_instance()
     interpreter = interpreter_cache.select_interpreter_for_targets(targets)
     safe_mkdir_for(interpreter_path_file)
     with open(interpreter_path_file, 'w') as outfile:

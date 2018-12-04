@@ -4,6 +4,60 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.13.0.dev1 (11/30/2018)
+------------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add --remote-execution-process-cache-namespace (#6809)
+  `PR #6809 <https://github.com/pantsbuild/pants/pull/6809>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix unused error value. (#6834)
+  `PR #6834 <https://github.com/pantsbuild/pants/pull/6834>`_
+
+* [deferred-sources] fix glob expansion issue in deferred sources mappe… (#6824)
+  `PR #6824 <https://github.com/pantsbuild/pants/pull/6824>`_
+
+* Fix a bug when selecting interpreters with no constraints at all. (#6822)
+  `PR #6822 <https://github.com/pantsbuild/pants/pull/6822>`_
+
+* Pin a conan dep that was floating to a version that was not compatible with python 2. (#6825)
+  `PR #6825 <https://github.com/pantsbuild/pants/pull/6825>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [docs] add language about flaky tests / issues for them (#6837)
+  `PR #6837 <https://github.com/pantsbuild/pants/pull/6837>`_
+
+* Include uname in rust cache key (#6842)
+  `PR #6842 <https://github.com/pantsbuild/pants/pull/6842>`_
+
+* Only build fs_util as part of dryrun (#6835)
+  `PR #6835 <https://github.com/pantsbuild/pants/pull/6835>`_
+
+* ci.sh can run cargo-audit (#6549)
+  `PR #6549 <https://github.com/pantsbuild/pants/pull/6549>`_
+
+* Run cargo clippy in pre-commit (#6833)
+  `PR #6833 <https://github.com/pantsbuild/pants/pull/6833>`_
+
+* Statically link openssl for reqwest (#6816)
+  `PR #6816 <https://github.com/pantsbuild/pants/pull/6816>`_
+
+* Use pantsbuild.org not example.com (#6826)
+  `PR #6826 <https://github.com/pantsbuild/pants/pull/6826>`_
+
+* Leverage default target globs. (#6819)
+  `PR #6819 <https://github.com/pantsbuild/pants/pull/6819>`_
+
+* Make PythonInterpreterCache into a subsystem. (#6765)
+  `PR #6765 <https://github.com/pantsbuild/pants/pull/6765>`_
+
 
 1.13.0.dev0 (11/26/2018)
 ------------------------

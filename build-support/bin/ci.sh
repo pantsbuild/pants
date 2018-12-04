@@ -35,6 +35,7 @@ Usage: $0 (-h|-3fxbkmrjlpuneycitzsw)
  -n           run contrib python tests
  -e           run rust tests
  -s           run clippy on rust code
+ -a           run cargo audit of rust dependencies
  -y SHARD_NUMBER/TOTAL_SHARDS
               if running contrib python tests, divide them into
               TOTAL_SHARDS shards and just run those in SHARD_NUMBER
@@ -66,7 +67,7 @@ python_contrib_shard="0/1"
 python_intg_shard="0/1"
 python_three="false"
 
-while getopts "h3fxbkmrjlpesu:ny:ci:tzw" opt; do
+while getopts "h3fxbkmrjlpeasu:ny:ci:tzw" opt; do
   case ${opt} in
     h) usage ;;
     3) python_three="true" ;;
@@ -81,6 +82,7 @@ while getopts "h3fxbkmrjlpesu:ny:ci:tzw" opt; do
     p) run_python="true" ;;
     u) python_unit_shard=${OPTARG} ;;
     e) run_rust_tests="true" ;;
+    a) run_cargo_audit="true" ;;
     s) run_rust_clippy="true" ;;
     n) run_contrib="true" ;;
     y) python_contrib_shard=${OPTARG} ;;
@@ -233,10 +235,19 @@ if [[ "${run_rust_tests:-false}" == "true" ]]; then
   end_travis_section
 fi
 
+if [[ "${run_cargo_audit:-false}" == "true" ]]; then
+  start_travis_section "CargoAudit" "Running cargo audit on rust code"
+  (
+    "${REPO_ROOT}/build-support/bin/native/cargo" ensure-installed --package=cargo-audit --version=0.5.2
+    "${REPO_ROOT}/build-support/bin/native/cargo" audit -f "${REPO_ROOT}/src/rust/engine/Cargo.lock"
+  ) || die "Cargo audit failure"
+fi
+
+
 if [[ "${run_rust_clippy:-false}" == "true" ]]; then
   start_travis_section "RustClippy" "Running Clippy on rust code"
   (
-    "${REPO_ROOT}/build-support/bin/native/cargo" clippy --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" --all
+    "${REPO_ROOT}/build-support/bin/check_clippy.sh"
   ) || die "Pants clippy failure"
 fi
 
