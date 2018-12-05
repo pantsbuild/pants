@@ -27,7 +27,9 @@ public class SecurityManagedRunner extends Runner implements Filterable {
   private final Runner wrappedRunner;
   private final JunitSecViolationReportingManager securityManager;
 
-  public SecurityManagedRunner(Runner wrappedRunner, JunitSecViolationReportingManager securityManager) {
+  public SecurityManagedRunner(
+      Runner wrappedRunner,
+      JunitSecViolationReportingManager securityManager) {
     this.wrappedRunner = wrappedRunner;
     this.securityManager = securityManager;
   }
