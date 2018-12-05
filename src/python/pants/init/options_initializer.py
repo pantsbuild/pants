@@ -91,19 +91,12 @@ class OptionsInitializer(object):
       set(Goal.get_optionables())
     )
 
-    known_scope_infos = sorted({
-      si for optionable in top_level_optionables for si in optionable.known_scope_infos()
-    })
-
-    # Now that we have the known scopes we can get the full options.
-    options = options_bootstrapper.get_full_options(known_scope_infos)
-
-    distinct_optionable_classes = sorted({si.optionable_cls for si in known_scope_infos},
-                                         key=lambda o: o.options_scope)
-    for optionable_cls in distinct_optionable_classes:
-      optionable_cls.register_options_on_scope(options)
-
-    return options
+    # Now that we have the known scopes we can get the full options. `get_full_options` will
+    # sort and de-duplicate these for us.
+    known_scope_infos = [si
+                         for optionable in top_level_optionables
+                         for si in optionable.known_scope_infos()]
+    return options_bootstrapper.get_full_options(known_scope_infos)
 
   @classmethod
   def create(cls, options_bootstrapper, build_configuration, init_subsystems=True):

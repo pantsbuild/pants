@@ -33,8 +33,9 @@ from pants.engine.legacy.structs import (AppAdaptor, JvmBinaryAdaptor, PageAdapt
                                          RemoteSourcesAdaptor, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
-from pants.engine.rules import SingletonRule
+from pants.engine.rules import RootRule, SingletonRule
 from pants.engine.scheduler import Scheduler
+from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.global_options import (DEFAULT_EXECUTION_OPTIONS, ExecutionOptions,
                                          GlobMatchErrorBehavior)
@@ -138,15 +139,15 @@ def _tuplify(v):
   return (v,)
 
 
-class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table', 'console', 'goal_map'])):
+class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table', 'goal_map'])):
   """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
 
   def new_session(self, v2_ui=False):
     session = self.scheduler.new_session(v2_ui)
-    return LegacyGraphSession(session, self.symbol_table, self.console, self.goal_map)
+    return LegacyGraphSession(session, self.symbol_table, self.goal_map)
 
 
-class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'console', 'goal_map'])):
+class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_map'])):
   """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
 
   class InvalidGoals(Exception):
@@ -189,7 +190,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'console
     if invalid_goals:
       raise self.InvalidGoals(invalid_goals)
 
-  def run_console_rules(self, goals, target_roots):
+  def run_console_rules(self, options_bootstrapper, goals, target_roots):
     """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
 
     For retryable failures, raises scheduler.ExecutionError.
@@ -200,15 +201,17 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'console
     # Reduce to only applicable goals - with validation happening by way of `validate_goals()`.
     goals = [goal for goal in goals if goal in self.goal_map]
     subjects = self._determine_subjects(target_roots)
+    console = Console()
     # Console rule can only have one subject.
     assert len(subjects) == 1
     for goal in goals:
       try:
         goal_product = self.goal_map[goal]
+        params = Params(subjects[0], options_bootstrapper, console)
         logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
-        self.scheduler_session.run_console_rule(goal_product, subjects[0])
+        self.scheduler_session.run_console_rule(goal_product, params)
       finally:
-        self.console.flush()
+        console.flush()
 
   def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.
@@ -321,7 +324,6 @@ class EngineInitializer(object):
 
     build_file_aliases = build_configuration.registered_aliases()
     rules = build_configuration.rules()
-    console = Console()
 
     symbol_table = LegacySymbolTable(build_file_aliases)
 
@@ -344,7 +346,7 @@ class EngineInitializer(object):
     # LegacyBuildGraph will explicitly request the products it needs.
     rules = (
       [
-        SingletonRule.from_instance(console),
+        RootRule(Console),
         SingletonRule.from_instance(GlobMatchErrorBehavior.create(glob_match_error_behavior)),
         SingletonRule.from_instance(build_configuration),
         SingletonRule(SymbolTable, symbol_table),
@@ -373,4 +375,4 @@ class EngineInitializer(object):
       visualize_to_dir=bootstrap_options.native_engine_visualize_to,
     )
 
-    return LegacyGraphScheduler(scheduler, symbol_table, console, goal_map)
+    return LegacyGraphScheduler(scheduler, symbol_table, goal_map)

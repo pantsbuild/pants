@@ -495,10 +495,7 @@ def select(argv):
   subsystems = (GlobalOptionsRegistrar, BinaryUtil.Factory)
   known_scope_infos = reduce(set.union, (ss.known_scope_infos() for ss in subsystems), set())
   options = options_bootstrapper.get_full_options(known_scope_infos)
-  # Set the options on all applicable scopes so BinaryUtil.Factory.create() can use the applicable
-  # bootstrap options.
-  for subsystem in subsystems:
-    subsystem.register_options_on_scope(options)
+  # Initialize Subsystems.
   Subsystem.set_options(options)
 
   # If the filename provided ends in a known archive extension (such as ".tar.gz"), then we get the
