@@ -197,7 +197,10 @@ class PythonSetup(Subsystem):
   @staticmethod
   def get_environment_paths():
     """Returns a list of paths specified by the PATH env var."""
-    return os.getenv('PATH').split(os.pathsep)
+    pathstr = os.getenv('PATH')
+    if pathstr:
+      return pathstr.split(os.pathsep)
+    return []
 
   @staticmethod
   def get_pex_python_paths():
