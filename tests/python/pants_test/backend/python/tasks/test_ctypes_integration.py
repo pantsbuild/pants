@@ -77,6 +77,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # Check that we have selected the appropriate compilers for our selected toolchain variant,
       # for both C and C++ compilation.
+      # TODO(#6866): don't parse info logs for testing!
       for compiler_name in self._compiler_names_for_variant[toolchain_variant]:
         self.assertIn("selected compiler exe name: '{}'".format(compiler_name),
                       pants_run.stdout_data)
