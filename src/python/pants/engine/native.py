@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import importlib
 import logging
 import os
+import re
 import sys
 import sysconfig
 import traceback
@@ -20,7 +21,7 @@ from future.utils import PY2, binary_type, text_type
 from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.objects import datatype
 
 
@@ -28,251 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 NATIVE_ENGINE_MODULE = 'native_engine'
-
-
-CFFI_TYPEDEFS = '''
-typedef uint64_t   Id;
-
-// Handle is declared as a typedef rather than a wrapper struct because it avoids needing to wrap
-// the inner handle/`void*` in a tuple or datatype at the ffi boundary. For most types that
-// overhead would not be worth worrying about, but Handle is used often enough that it gives a 6%
-// speedup to avoid the wrapping.
-typedef void*      Handle;
-
-typedef struct {
-  Id id_;
-} TypeId;
-
-typedef struct {
-  Id       id_;
-  TypeId   type_id;
-} Key;
-
-typedef struct {
-  Key key;
-} TypeConstraint;
-
-typedef struct {
-  Key key;
-} Function;
-
-typedef struct {
-  uint8_t*  bytes_ptr;
-  uint64_t  bytes_len;
-  Handle    handle_;
-} Buffer;
-
-typedef struct {
-  Handle*    values_ptr;
-  uint64_t   values_len;
-  Handle     handle_;
-} HandleBuffer;
-
-typedef struct {
-  TypeId*     ids_ptr;
-  uint64_t    ids_len;
-  Handle      handle_;
-} TypeIdBuffer;
-
-typedef struct {
-  Buffer*     bufs_ptr;
-  uint64_t    bufs_len;
-  Handle      handle_;
-} BufferBuffer;
-
-typedef struct {
-  _Bool  is_throw;
-  Handle value;
-} PyResult;
-
-typedef struct {
-  uint8_t       tag;
-  HandleBuffer  values;
-  HandleBuffer  constraints;
-} PyGeneratorResponse;
-
-typedef struct {
-  int64_t   hash_;
-  TypeId    type_id;
-} Ident;
-
-typedef void ExternContext;
-
-// On the rust side the integration is defined in externs.rs
-typedef void                (*extern_ptr_log)(ExternContext*, uint8_t, uint8_t*, uint64_t);
-typedef uint8_t             extern_log_level;
-typedef Ident               (*extern_ptr_identify)(ExternContext*, Handle*);
-typedef _Bool               (*extern_ptr_equals)(ExternContext*, Handle*, Handle*);
-typedef Handle              (*extern_ptr_clone_val)(ExternContext*, Handle*);
-typedef void                (*extern_ptr_drop_handles)(ExternContext*, Handle*, uint64_t);
-typedef Buffer              (*extern_ptr_type_to_str)(ExternContext*, TypeId);
-typedef Buffer              (*extern_ptr_val_to_str)(ExternContext*, Handle*);
-typedef _Bool               (*extern_ptr_satisfied_by)(ExternContext*, Handle*, Handle*);
-typedef _Bool               (*extern_ptr_satisfied_by_type)(ExternContext*, Handle*, TypeId*);
-typedef Handle              (*extern_ptr_store_tuple)(ExternContext*, Handle**, uint64_t);
-typedef Handle              (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
-typedef Handle              (*extern_ptr_store_utf8)(ExternContext*, uint8_t*, uint64_t);
-typedef Handle              (*extern_ptr_store_i64)(ExternContext*, int64_t);
-typedef HandleBuffer        (*extern_ptr_project_multi)(ExternContext*, Handle*, uint8_t*, uint64_t);
-typedef Handle              (*extern_ptr_project_ignoring_type)(ExternContext*, Handle*, uint8_t*, uint64_t);
-typedef Handle              (*extern_ptr_create_exception)(ExternContext*, uint8_t*, uint64_t);
-typedef PyResult            (*extern_ptr_call)(ExternContext*, Handle*, Handle**, uint64_t);
-typedef PyGeneratorResponse (*extern_ptr_generator_send)(ExternContext*, Handle*, Handle*);
-typedef PyResult            (*extern_ptr_eval)(ExternContext*, uint8_t*, uint64_t);
-
-typedef void Tasks;
-typedef void Scheduler;
-typedef void Session;
-typedef void ExecutionRequest;
-
-typedef struct {
-  PyResult*  nodes_ptr;
-  uint64_t  nodes_len;
-  // NB: there are more fields in this struct, but we can safely (?)
-  // ignore them because we never have collections of this type.
-} RawNodes;
-'''
-
-CFFI_HEADERS = '''
-void externs_set(ExternContext*,
-                 extern_ptr_log,
-                 extern_log_level,
-                 extern_ptr_call,
-                 extern_ptr_generator_send,
-                 extern_ptr_eval,
-                 extern_ptr_identify,
-                 extern_ptr_equals,
-                 extern_ptr_clone_val,
-                 extern_ptr_drop_handles,
-                 extern_ptr_type_to_str,
-                 extern_ptr_val_to_str,
-                 extern_ptr_satisfied_by,
-                 extern_ptr_satisfied_by_type,
-                 extern_ptr_store_tuple,
-                 extern_ptr_store_bytes,
-                 extern_ptr_store_utf8,
-                 extern_ptr_store_i64,
-                 extern_ptr_project_ignoring_type,
-                 extern_ptr_project_multi,
-                 extern_ptr_create_exception,
-                 TypeId);
-
-Key key_for(Handle);
-Handle val_for(Key);
-
-Tasks* tasks_create(void);
-void tasks_task_begin(Tasks*, Function, TypeConstraint, _Bool);
-void tasks_add_get(Tasks*, TypeConstraint, TypeId);
-void tasks_add_select(Tasks*, TypeConstraint);
-void tasks_task_end(Tasks*);
-void tasks_singleton_add(Tasks*, Handle, TypeConstraint);
-void tasks_destroy(Tasks*);
-
-Scheduler* scheduler_create(Tasks*,
-                            Function,
-                            Function,
-                            Function,
-                            Function,
-                            Function,
-                            Function,
-                            Function,
-                            Function,
-                            Function,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeConstraint,
-                            TypeId,
-                            TypeId,
-                            Buffer,
-                            Buffer,
-                            Buffer,
-                            BufferBuffer,
-                            TypeIdBuffer,
-                            Buffer,
-                            Buffer,
-                            Buffer,
-                            Buffer,
-                            Buffer,
-                            Buffer,
-                            uint64_t,
-                            uint64_t,
-                            uint64_t,
-                            uint64_t,
-                            _Bool);
-PyResult scheduler_fork_context(Scheduler*, Function);
-Handle scheduler_metrics(Scheduler*, Session*);
-RawNodes* scheduler_execute(Scheduler*, Session*, ExecutionRequest*);
-void scheduler_destroy(Scheduler*);
-
-Session* session_create(Scheduler*);
-void session_destroy(Session*);
-
-ExecutionRequest* execution_request_create(_Bool, uint64_t);
-void execution_request_destroy(ExecutionRequest*);
-
-uint64_t graph_len(Scheduler*);
-uint64_t graph_invalidate(Scheduler*, BufferBuffer);
-uint64_t graph_invalidate_all_paths(Scheduler*);
-PyResult graph_visualize(Scheduler*, Session*, char*);
-void graph_trace(Scheduler*, ExecutionRequest*, char*);
-
-PyResult execution_add_root_select(Scheduler*, ExecutionRequest*, HandleBuffer, TypeConstraint);
-
-PyResult capture_snapshots(Scheduler*, Handle);
-
-PyResult merge_directories(Scheduler*, Handle);
-
-PyResult materialize_directories(Scheduler*, Handle);
-
-PyResult validator_run(Scheduler*);
-
-void rule_graph_visualize(Scheduler*, TypeIdBuffer, char*);
-void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
-
-void nodes_destroy(RawNodes*);
-
-void set_panic_handler(void);
-
-void lease_files_in_graph(Scheduler*);
-
-void garbage_collect_store(Scheduler*);
-
-PyResult decompress_tarball(char*, char*);
-'''
-
-CFFI_EXTERNS = '''
-extern "Python" {
-  void                extern_log(ExternContext*, uint8_t, uint8_t*, uint64_t);
-  PyResult            extern_call(ExternContext*, Handle*, Handle**, uint64_t);
-  PyGeneratorResponse extern_generator_send(ExternContext*, Handle*, Handle*);
-  PyResult            extern_eval(ExternContext*, uint8_t*, uint64_t);
-  Ident               extern_identify(ExternContext*, Handle*);
-  _Bool               extern_equals(ExternContext*, Handle*, Handle*);
-  Handle              extern_clone_val(ExternContext*, Handle*);
-  void                extern_drop_handles(ExternContext*, Handle*, uint64_t);
-  Buffer              extern_type_to_str(ExternContext*, TypeId);
-  Buffer              extern_val_to_str(ExternContext*, Handle*);
-  _Bool               extern_satisfied_by(ExternContext*, Handle*, Handle*);
-  _Bool               extern_satisfied_by_type(ExternContext*, Handle*, TypeId*);
-  Handle              extern_store_tuple(ExternContext*, Handle**, uint64_t);
-  Handle              extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
-  Handle              extern_store_utf8(ExternContext*, uint8_t*, uint64_t);
-  Handle              extern_store_i64(ExternContext*, int64_t);
-  Handle              extern_project_ignoring_type(ExternContext*, Handle*, uint8_t*, uint64_t);
-  HandleBuffer        extern_project_multi(ExternContext*, Handle*, uint8_t*, uint64_t);
-  Handle              extern_create_exception(ExternContext*, uint8_t*, uint64_t);
-}
-'''
 
 # NB: This is a "patch" applied to CFFI's generated sources to remove the ifdefs that would
 # usually cause only one of the two module definition functions to be defined. Instead, we define
@@ -328,7 +84,34 @@ def get_build_cflags():
   )
 
 
-def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
+def hackily_rewrite_scheduler_bindings(bindings):
+  includes_removed = re.sub(
+    r'^(#include <.*?>)$',
+    r'// HACKY_CDEF_INCLUDE: \1',
+    bindings, flags=re.MULTILINE)
+  hidden_vec_pyresult = re.sub(
+    r'^.*Vec_PyResult nodes;.*$',
+    '// Additional fields removed',
+    includes_removed, flags=re.MULTILINE)
+  positional_fields_prefixed = re.sub(
+    r'(_[0-9]+;)$',
+    r'tup\1',
+    hidden_vec_pyresult, flags=re.MULTILINE)
+  special_python_symbols_mangled = re.sub(
+    r'\bid\b',
+    'id_',
+    positional_fields_prefixed)
+  return special_python_symbols_mangled
+
+
+def hackily_recreate_includes_for_bindings(bindings):
+  return re.sub(
+    r'^// HACKY_CDEF_INCLUDE: (.*)$',
+    r'\1',
+    bindings, flags=re.MULTILINE)
+
+
+def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_ENGINE_MODULE):
   """Bootstrap an external CFFI C source file."""
 
   safe_mkdir(output_dir)
@@ -342,11 +125,12 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
     c_file = '{}.c'.format(real_output_prefix)
     env_script = '{}.cflags'.format(real_output_prefix)
 
+    scheduler_bindings = hackily_rewrite_scheduler_bindings(read_file(scheduler_bindings_path))
+
     ffibuilder = cffi.FFI()
-    ffibuilder.cdef(CFFI_TYPEDEFS)
-    ffibuilder.cdef(CFFI_HEADERS)
-    ffibuilder.cdef(CFFI_EXTERNS)
-    ffibuilder.set_source(module_name, CFFI_TYPEDEFS + CFFI_HEADERS)
+    ffibuilder.cdef(scheduler_bindings)
+    ffibuilder.cdef(FFISpecification.format_cffi_externs())
+    ffibuilder.set_source(module_name, scheduler_bindings)
     ffibuilder.emit_c_code(temp_c_file)
 
     # Work around https://github.com/rust-lang/rust/issues/36342 by renaming initnative_engine to
@@ -366,6 +150,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
     if CFFI_C_PATCH_BEFORE not in file_content:
       raise Exception('The patch for the CFFI generated code will not apply cleanly.')
     file_content = file_content.replace(CFFI_C_PATCH_BEFORE, CFFI_C_PATCH_AFTER)
+    file_content = hackily_recreate_includes_for_bindings(file_content)
 
   _replace_file(c_file, file_content)
 
@@ -387,13 +172,71 @@ def _replace_file(path, content):
     f.write(content)
 
 
-def _initialize_externs(ffi):
-  """Initializes extern callbacks given a CFFI handle."""
+class ExternSignature(datatype([
+    ('return_type', str),
+    ('method_name', str),
+    ('arg_types', tuple),
+])):
 
-  def to_py_str(msg_ptr, msg_len):
-    return bytes(ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
+  def pretty_print(self):
+    return '  {ret}\t{name}({args});'.format(
+      ret=self.return_type,
+      name=self.method_name,
+      args=', '.join(self.arg_types))
 
-  def call(c, func, args):
+
+def extern_decl(return_type, arg_types):
+  """A decorator for methods corresponding to extern functions. All types should be strings.
+
+  The FFISpecification class is able to automatically convert these into method declarations for
+  cffi.
+  """
+  def wrapper(func):
+    signature = ExternSignature(
+      return_type=str(return_type),
+      method_name=str(func.__name__),
+      arg_types=tuple(arg_types))
+    func.extern_signature = signature
+    return func
+  return wrapper
+
+
+class FFISpecification(object):
+
+  def __init__(self, ffi):
+    self._ffi = ffi
+
+  @memoized_classproperty
+  def _extern_fields(cls):
+    return {
+      field_name: f
+      for field_name, f in cls.__dict__.items()
+      if hasattr(f, 'extern_signature')
+    }
+
+  @classmethod
+  def format_cffi_externs(cls):
+    """???/used to produce stubs for the cffi bindings from @extern_decls"""
+    extern_decls = [
+      f.extern_signature.pretty_print()
+      for _, f in cls._extern_fields.items()
+    ]
+    return (
+      'extern "Python" {\n'
+      + '\n'.join(extern_decls)
+      + '\n}\n')
+
+  def define_cffi_externs(self):
+    """???/registers the @extern_decls with our ffi instance"""
+    for field_name, _ in self._extern_fields.items():
+      bound_method = getattr(self, field_name)
+      self._ffi.def_extern()(bound_method)
+
+  def to_py_str(self, msg_ptr, msg_len):
+    return bytes(self._ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
+
+  @classmethod
+  def call(cls, c, func, args):
     try:
       val = func(*args)
       is_throw = False
@@ -404,121 +247,121 @@ def _initialize_externs(ffi):
 
     return PyResult(is_throw, c.to_value(val))
 
-  @ffi.def_extern()
-  def extern_log(context_handle, level, msg_ptr, msg_len):
+  @extern_decl('void', ['ExternContext*', 'uint8_t', 'uint8_t*', 'uint64_t'])
+  def extern_log(self, context_handle, level, msg_ptr, msg_len):
     """Given a log level and utf8 message string, log it."""
-    msg = bytes(ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
+    msg = bytes(self._ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
     logger.log(level, msg)
 
-  @ffi.def_extern()
-  def extern_identify(context_handle, val):
+  @extern_decl('Ident', ['ExternContext*', 'Handle*'])
+  def extern_identify(self, context_handle, val):
     """Return an Ident containing the __hash__ and TypeId for the given Handle."""
-    c = ffi.from_handle(context_handle)
-    obj = ffi.from_handle(val[0])
+    c = self._ffi.from_handle(context_handle)
+    obj = self._ffi.from_handle(val[0])
     hash_ = hash(obj)
     type_id = c.to_id(type(obj))
     return (hash_, TypeId(type_id))
 
-  @ffi.def_extern()
-  def extern_equals(context_handle, val1, val2):
+  @extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
+  def extern_equals(self, context_handle, val1, val2):
     """Return true if the given Handles are __eq__."""
-    return ffi.from_handle(val1[0]) == ffi.from_handle(val2[0])
+    return self._ffi.from_handle(val1[0]) == self._ffi.from_handle(val2[0])
 
-  @ffi.def_extern()
-  def extern_clone_val(context_handle, val):
+  @extern_decl('Handle', ['ExternContext*', 'Handle*'])
+  def extern_clone_val(self, context_handle, val):
     """Clone the given Handle."""
-    c = ffi.from_handle(context_handle)
-    return c.to_value(ffi.from_handle(val[0]))
+    c = self._ffi.from_handle(context_handle)
+    return c.to_value(self._ffi.from_handle(val[0]))
 
-  @ffi.def_extern()
-  def extern_drop_handles(context_handle, handles_ptr, handles_len):
+  @extern_decl('void', ['ExternContext*', 'DroppingHandle*', 'uint64_t'])
+  def extern_drop_handles(self, context_handle, handles_ptr, handles_len):
     """Drop the given Handles."""
-    c = ffi.from_handle(context_handle)
-    handles = ffi.unpack(handles_ptr, handles_len)
+    c = self._ffi.from_handle(context_handle)
+    handles = self._ffi.unpack(handles_ptr, handles_len)
     c.drop_handles(handles)
 
-  @ffi.def_extern()
-  def extern_type_to_str(context_handle, type_id):
+  @extern_decl('Buffer', ['ExternContext*', 'TypeId'])
+  def extern_type_to_str(self, context_handle, type_id):
     """Given a TypeId, write type.__name__ and return it."""
-    c = ffi.from_handle(context_handle)
-    return c.utf8_buf(text_type(c.from_id(type_id.id_).__name__))
+    c = self._ffi.from_handle(context_handle)
+    return c.utf8_buf(text_type(c.from_id(type_id.tup_0).__name__))
 
-  @ffi.def_extern()
-  def extern_val_to_str(context_handle, val):
+  @extern_decl('Buffer', ['ExternContext*', 'Handle*'])
+  def extern_val_to_str(self, context_handle, val):
     """Given a Handle for `obj`, write str(obj) and return it."""
-    c = ffi.from_handle(context_handle)
+    c = self._ffi.from_handle(context_handle)
     v = c.from_value(val[0])
     # Consistently use the empty string to indicate None.
     v_str = '' if v is None else text_type(v)
     return c.utf8_buf(v_str)
 
-  @ffi.def_extern()
-  def extern_satisfied_by(context_handle, constraint_val, val):
+  @extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
+  def extern_satisfied_by(self, context_handle, constraint_val, val):
     """Given a TypeConstraint and a Handle return constraint.satisfied_by(value)."""
-    constraint = ffi.from_handle(constraint_val[0])
-    return constraint.satisfied_by(ffi.from_handle(val[0]))
+    constraint = self._ffi.from_handle(constraint_val[0])
+    return constraint.satisfied_by(self._ffi.from_handle(val[0]))
 
-  @ffi.def_extern()
-  def extern_satisfied_by_type(context_handle, constraint_val, cls_id):
+  @extern_decl('_Bool', ['ExternContext*', 'Handle*', 'TypeId*'])
+  def extern_satisfied_by_type(self, context_handle, constraint_val, cls_id):
     """Given a TypeConstraint and a TypeId, return constraint.satisfied_by_type(type_id)."""
-    c = ffi.from_handle(context_handle)
-    constraint = ffi.from_handle(constraint_val[0])
-    return constraint.satisfied_by_type(c.from_id(cls_id.id_))
+    c = self._ffi.from_handle(context_handle)
+    constraint = self._ffi.from_handle(constraint_val[0])
+    return constraint.satisfied_by_type(c.from_id(cls_id.tup_0))
 
-  @ffi.def_extern()
-  def extern_store_tuple(context_handle, vals_ptr, vals_len):
+  @extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
+  def extern_store_tuple(self, context_handle, vals_ptr, vals_len):
     """Given storage and an array of Handles, return a new Handle to represent the list."""
-    c = ffi.from_handle(context_handle)
-    return c.to_value(tuple(c.from_value(val[0]) for val in ffi.unpack(vals_ptr, vals_len)))
+    c = self._ffi.from_handle(context_handle)
+    return c.to_value(tuple(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len)))
 
-  @ffi.def_extern()
-  def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
+  @extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
+  def extern_store_bytes(self, context_handle, bytes_ptr, bytes_len):
     """Given a context and raw bytes, return a new Handle to represent the content."""
-    c = ffi.from_handle(context_handle)
-    return c.to_value(binary_type(ffi.buffer(bytes_ptr, bytes_len)))
+    c = self._ffi.from_handle(context_handle)
+    return c.to_value(binary_type(self._ffi.buffer(bytes_ptr, bytes_len)))
 
-  @ffi.def_extern()
-  def extern_store_utf8(context_handle, utf8_ptr, utf8_len):
+  @extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
+  def extern_store_utf8(self, context_handle, utf8_ptr, utf8_len):
     """Given a context and UTF8 bytes, return a new Handle to represent the content."""
-    c = ffi.from_handle(context_handle)
-    return c.to_value(ffi.string(utf8_ptr, utf8_len).decode('utf-8'))
+    c = self._ffi.from_handle(context_handle)
+    return c.to_value(self._ffi.string(utf8_ptr, utf8_len).decode('utf-8'))
 
-  @ffi.def_extern()
-  def extern_store_i64(context_handle, i64):
+  @extern_decl('Handle', ['ExternContext*', 'int64_t'])
+  def extern_store_i64(self, context_handle, i64):
     """Given a context and int32_t, return a new Handle to represent the int32_t."""
-    c = ffi.from_handle(context_handle)
+    c = self._ffi.from_handle(context_handle)
     return c.to_value(i64)
 
-  @ffi.def_extern()
-  def extern_project_ignoring_type(context_handle, val, field_str_ptr, field_str_len):
+  @extern_decl('Handle', ['ExternContext*', 'Handle*', 'uint8_t*', 'uint64_t'])
+  def extern_project_ignoring_type(self, context_handle, val, field_str_ptr, field_str_len):
     """Given a Handle for `obj`, and a field name, project the field as a new Handle."""
-    c = ffi.from_handle(context_handle)
+    c = self._ffi.from_handle(context_handle)
     obj = c.from_value(val[0])
-    field_name = to_py_str(field_str_ptr, field_str_len)
+    field_name = self.to_py_str(field_str_ptr, field_str_len)
     projected = getattr(obj, field_name)
 
     return c.to_value(projected)
 
-  @ffi.def_extern()
-  def extern_project_multi(context_handle, val, field_str_ptr, field_str_len):
+  @extern_decl('HandleBuffer', ['ExternContext*', 'Handle*', 'uint8_t*', 'uint64_t'])
+  def extern_project_multi(self, context_handle, val, field_str_ptr, field_str_len):
     """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
-    c = ffi.from_handle(context_handle)
+    c = self._ffi.from_handle(context_handle)
     obj = c.from_value(val[0])
-    field_name = to_py_str(field_str_ptr, field_str_len)
+    field_name = self.to_py_str(field_str_ptr, field_str_len)
 
     return c.vals_buf(tuple(c.to_value(p) for p in getattr(obj, field_name)))
 
-  @ffi.def_extern()
-  def extern_create_exception(context_handle, msg_ptr, msg_len):
+  @extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
+  def extern_create_exception(self, context_handle, msg_ptr, msg_len):
     """Given a utf8 message string, create an Exception object."""
-    c = ffi.from_handle(context_handle)
-    msg = to_py_str(msg_ptr, msg_len)
+    c = self._ffi.from_handle(context_handle)
+    msg = self.to_py_str(msg_ptr, msg_len)
     return c.to_value(Exception(msg))
 
-  @ffi.def_extern()
-  def extern_generator_send(context_handle, func, arg):
+  @extern_decl('PyGeneratorResponse', ['ExternContext*', 'Handle*', 'Handle*'])
+  def extern_generator_send(self, context_handle, func, arg):
     """Given a generator, send it the given value and return a response."""
-    c = ffi.from_handle(context_handle)
+    c = self._ffi.from_handle(context_handle)
     try:
       res = c.from_value(func[0]).send(c.from_value(arg[0]))
       if isinstance(res, Get):
@@ -550,22 +393,22 @@ def _initialize_externs(ffi):
         c.vals_buf([c.to_value(v) for v in constraints])
       )
 
-  @ffi.def_extern()
-  def extern_call(context_handle, func, args_ptr, args_len):
+  @extern_decl('PyResult', ['ExternContext*', 'Handle*', 'Handle**', 'uint64_t'])
+  def extern_call(self, context_handle, func, args_ptr, args_len):
     """Given a callable, call it."""
-    c = ffi.from_handle(context_handle)
+    c = self._ffi.from_handle(context_handle)
     runnable = c.from_value(func[0])
-    args = tuple(c.from_value(arg[0]) for arg in ffi.unpack(args_ptr, args_len))
-    return call(c, runnable, args)
+    args = tuple(c.from_value(arg[0]) for arg in self._ffi.unpack(args_ptr, args_len))
+    return self.call(c, runnable, args)
 
-  @ffi.def_extern()
-  def extern_eval(context_handle, python_code_str_ptr, python_code_str_len):
+  @extern_decl('PyResult', ['ExternContext*', 'uint8_t*', 'uint64_t'])
+  def extern_eval(self, context_handle, python_code_str_ptr, python_code_str_len):
     """Given an evalable string, eval it and return a Handle for its result."""
-    c = ffi.from_handle(context_handle)
-    return call(c, eval, [to_py_str(python_code_str_ptr, python_code_str_len)])
+    c = self._ffi.from_handle(context_handle)
+    return self.call(c, eval, [self.to_py_str(python_code_str_ptr, python_code_str_len)])
 
 
-class Key(datatype(['id_', 'type_id'])):
+class Key(datatype(['tup_0', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -577,11 +420,11 @@ class TypeConstraint(datatype(['key'])):
   """Corresponds to the native object of the same name."""
 
 
-class TypeId(datatype(['id_'])):
+class TypeId(datatype(['tup_0'])):
   """Corresponds to the native object of the same name."""
 
 
-class PyResult(datatype(['is_throw', 'value'])):
+class PyResult(datatype(['is_throw', 'handle'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -639,8 +482,8 @@ class ExternContext(object):
 
   def raise_or_return(self, pyresult):
     """Consumes the given PyResult to raise/return the exception/value it represents."""
-    value = self.from_value(pyresult.value)
-    self._handles.remove(pyresult.value)
+    value = self.from_value(pyresult.handle)
+    self._handles.remove(pyresult.handle)
     if pyresult.is_throw:
       raise value
     else:
@@ -659,7 +502,7 @@ class ExternContext(object):
 
   def to_key(self, obj):
     cdata = self._lib.key_for(self.to_value(obj))
-    return Key(cdata.id_, TypeId(cdata.type_id.id_))
+    return Key(cdata.id_, TypeId(cdata.type_id.tup_0))
 
   def from_key(self, key):
     return self._lib.val_for(key)
@@ -715,7 +558,7 @@ class Native(object):
   def ffi(self):
     """A CompiledCFFI handle as imported from the native engine python module."""
     ffi = getattr(self._ffi_module, 'ffi')
-    _initialize_externs(ffi)
+    FFISpecification(ffi).define_cffi_externs()
     return ffi
 
   @memoized_property

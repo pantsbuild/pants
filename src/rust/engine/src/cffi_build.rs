@@ -1,4 +1,5 @@
 extern crate build_utils;
+extern crate cbindgen;
 extern crate cc;
 
 /*
@@ -19,6 +20,7 @@ native engine binary, allowing us to address it both as an importable python mod
 
 */
 
+use std::env;
 use std::fs;
 use std::io::{Read, Result};
 use std::path::Path;
@@ -26,7 +28,7 @@ use std::process::{exit, Command};
 
 use build_utils::BuildRoot;
 
-fn main() {
+fn main() -> Result<()> {
   // We depend on grpcio, which uses C++.
   // On Linux, with g++, some part of that compilation depends on
   // __gxx_personality_v0 which is present in the C++ standard library.
@@ -54,6 +56,16 @@ fn main() {
     println!("cargo:rustc-link-lib=static=stdc++");
   }
 
+  // Generate the scheduler.h bindings from the rust code in this crate.
+  let bindings_config_path = Path::new("cbindgen.toml");
+  mark_for_change_detection(&bindings_config_path);
+
+  let scheduler_file_path = Path::new("src/cffi/scheduler.h");
+  let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+  cbindgen::generate(crate_dir)
+    .expect("Unable to generate bindings")
+    .write_to_file(scheduler_file_path);
+
   // Generate the cffi c sources.
   let build_root = BuildRoot::find().unwrap();
   let cffi_bootstrapper = build_root.join("build-support/bin/native/bootstrap_cffi.sh");
@@ -71,6 +83,7 @@ fn main() {
 
   let result = Command::new(&cffi_bootstrapper)
     .arg(cffi_dir)
+    .arg(scheduler_file_path)
     .status()
     .expect(&format!("Failed to execute {:?}", &cffi_bootstrapper));
   if !result.success() {
@@ -94,6 +107,8 @@ fn main() {
   config.flag("-Wno-missing-field-initializers");
 
   config.compile("libnative_engine_ffi.a");
+
+  Ok(())
 }
 
 fn mark_for_change_detection(path: &Path) {

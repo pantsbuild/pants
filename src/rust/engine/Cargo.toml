@@ -17,6 +17,7 @@ crate-type = ["cdylib"]
 
 [build-dependencies]
 build_utils = { path = "build_utils" }
+cbindgen = "0.6.7"
 cc = "1.0"
 
 [workspace]
