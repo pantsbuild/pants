@@ -825,7 +825,7 @@ pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
     Err(e) => return Err(e),
   }
   match path.parent() {
-    Some(p) => try!(safe_create_dir_all_ioerror(p)),
+    Some(p) => safe_create_dir_all_ioerror(p)?,
     None => return Ok(()),
   }
   match fs::create_dir(path) {
