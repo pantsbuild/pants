@@ -30,12 +30,15 @@ class TestPinger(TestBase):
   @classmethod
   def expect_response(cls, url, timeout):
     latency = cls.latency_by_url[url]
-    body = requests.exceptions.ConnectTimeout() if latency >= timeout else ''
+
+    # TODO(John Sirois): Switch to a homomorphic response in each branch once
+    #   https://github.com/getsentry/responses/issues/234 is fixed.
+    response = requests.exceptions.ConnectTimeout() if latency >= timeout else (200, {}, '')
 
     def callback(_):
       if latency < timeout:
         time.sleep(latency)
-      return 200, {}, body
+      return response
 
     responses.add_callback(responses.HEAD, url, callback)
 
@@ -61,7 +64,7 @@ class TestPinger(TestBase):
     urls = [self.fast_url, self.slow_url]
     test = self.pinger(timeout=0.2, urls=urls)
     ping_results = dict(test.pings(urls))
-    self.assertLess(ping_results[self.fast_url], 2)
+    self.assertLess(ping_results[self.fast_url], 0.2)
     self.assertEqual(ping_results[self.slow_url], Pinger.UNREACHABLE)
 
   @responses.activate
