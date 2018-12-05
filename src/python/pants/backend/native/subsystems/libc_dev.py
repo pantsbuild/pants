@@ -101,6 +101,4 @@ class LibcDev(Subsystem):
 
   @memoized_method
   def get_libc_objects(self):
-    if not self.get_options().enable_libc_search:
-      return []
-    return [self._host_libc.crti_object]
+    return [self._host_libc.crti_object] if self.get_options().enable_libc_search else []

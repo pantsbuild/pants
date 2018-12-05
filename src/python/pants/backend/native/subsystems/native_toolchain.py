@@ -182,7 +182,7 @@ def select_llvm_c_toolchain(platform, native_toolchain):
   llvm_linker_wrapper = yield Get(LLVMLinker, NativeToolchain, native_toolchain)
   llvm_linker = llvm_linker_wrapper.linker
 
-  # TODO: create an algebra so these changes are more clear!
+  # TODO(#6855): introduce a more concise way to express these compositions of executables.
   working_linker = llvm_linker.copy(
     path_entries=(llvm_linker.path_entries + working_c_compiler.path_entries),
     exe_filename=working_c_compiler.exe_filename,

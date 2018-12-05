@@ -6,9 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from abc import abstractproperty
-from builtins import object
 
 from pants.engine.rules import SingletonRule
+from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var
@@ -42,34 +42,54 @@ class Platform(datatype(['normalized_os_name'])):
     return fun_for_platform()
 
 
-class Executable(object):
+# NB: @abstractproperty requires inheriting from AbstractClass to work!
+class Executable(AbstractClass):
 
   @abstractproperty
   def path_entries(self):
     """A list of directory paths containing this executable, to be used in a subprocess's PATH.
 
     This may be multiple directories, e.g. if the main executable program invokes any subprocesses.
+
+    :rtype: list of str
     """
 
+  @abstractproperty
+  def exe_filename(self):
+    """The "entry point" -- which file to invoke when PATH is set to `path_entries()`.
+
+    :rtype: str
+    """
+
+  # TODO(#???): rename this to 'runtime_library_dirs'!
   @abstractproperty
   def library_dirs(self):
     """Directories containing shared libraries that must be on the runtime library search path.
 
     Note: this is for libraries needed for the current Executable to run -- see LinkerMixin below
-    for libraries that are needed at link time."""
+    for libraries that are needed at link time.
 
-  @abstractproperty
-  def exe_filename(self):
-    """The "entry point" -- which file to invoke when PATH is set to `path_entries()`."""
+    :rtype: list of str
+    """
 
   @property
   def extra_args(self):
+    """Additional arguments used when invoking this Executable.
+
+    These are typically placed before the invocation-specific command line arguments.
+
+    :rtype: list of str
+    """
     return []
 
   _platform = Platform.create()
 
   @property
   def as_invocation_environment_dict(self):
+    """A dict to use as this Executable's execution environment.
+
+    :rtype: dict of string -> string
+    """
     lib_env_var = self._platform.resolve_platform_specific({
       'darwin': lambda: 'DYLD_LIBRARY_PATH',
       'linux': lambda: 'LD_LIBRARY_PATH',
@@ -92,13 +112,18 @@ class LinkerMixin(Executable):
 
   @abstractproperty
   def linking_library_dirs(self):
-    """Directories to search for libraries needed at link time."""
+    """Directories to search for libraries needed at link time.
+
+    :rtype: list of str
+    """
 
   @abstractproperty
   def extra_object_files(self):
     """A list of object files required to perform a successful link.
 
     This includes crti.o from libc for gcc on Linux, for example.
+
+    :rtype: list of str
     """
 
   @property
@@ -131,7 +156,10 @@ class CompilerMixin(Executable):
 
   @abstractproperty
   def include_dirs(self):
-    """Directories to search for header files to #include during compilation."""
+    """Directories to search for header files to #include during compilation.
+
+    :rtype: list of str
+    """
 
   @property
   def as_invocation_environment_dict(self):
