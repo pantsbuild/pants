@@ -17,7 +17,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_file import BuildFile
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.project_tree import ProjectTree
-from pants.util.dirutil import safe_open, touch, safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_open, touch
 
 
 class FilesystemBuildFileTest(unittest.TestCase):
