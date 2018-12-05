@@ -18,6 +18,5 @@ python_tests(
   dependencies=[
     '3rdparty/python:mock',
     'contrib/node/src/python/pants/contrib/node/subsystems',
-    'tests/python/pants_test:base_test',
   ]
 )

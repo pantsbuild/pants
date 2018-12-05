@@ -4,13 +4,13 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import unittest
 from builtins import object
 
 from pants.engine.addressable import (MutationError, NotSerializableError, addressable,
                                       addressable_dict, addressable_list)
 from pants.engine.objects import Resolvable, Serializable
 from pants.util.objects import Exactly, TypeConstraintError
-from pants_test.base_test import BaseTest
 
 
 class SimpleSerializable(Serializable):
@@ -42,7 +42,7 @@ class CountingResolvable(Resolvable):
     return self._resolutions
 
 
-class AddressableDescriptorTest(BaseTest):
+class AddressableDescriptorTest(unittest.TestCase):
   def test_inappropriate_application(self):
     class NotSerializable(object):
       def __init__(self, count):
@@ -57,7 +57,7 @@ class AddressableDescriptorTest(BaseTest):
       NotSerializable(42)
 
 
-class AddressableTest(BaseTest):
+class AddressableTest(unittest.TestCase):
   class Person(SimpleSerializable):
     def __init__(self, age):
       super(AddressableTest.Person, self).__init__()
@@ -114,7 +114,7 @@ class AddressableTest(BaseTest):
       person.age = 37
 
 
-class AddressableListTest(BaseTest):
+class AddressableListTest(unittest.TestCase):
   class Series(SimpleSerializable):
     def __init__(self, values):
       super(AddressableListTest.Series, self).__init__()
@@ -185,7 +185,7 @@ class AddressableListTest(BaseTest):
       series.values = [37]
 
 
-class AddressableDictTest(BaseTest):
+class AddressableDictTest(unittest.TestCase):
   class Varz(SimpleSerializable):
     def __init__(self, varz):
       super(AddressableDictTest.Varz, self).__init__()

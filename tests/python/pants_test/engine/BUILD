@@ -59,7 +59,6 @@ python_tests(
     '3rdparty/python:future',
     'src/python/pants/engine:addressable',
     'src/python/pants/util:objects',
-    'tests/python/pants_test:base_test',
   ],
 )
 

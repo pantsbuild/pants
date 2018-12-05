@@ -50,7 +50,7 @@ python_tests(
     'src/python/pants/util:process_handler',
     'tests/python/pants_test/testutils:git_util',
     'tests/python/pants_test/testutils:py2_compat',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
@@ -128,7 +128,6 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/init',
-    'tests/python/pants_test:base_test',
     'tests/python/pants_test/engine:util',
   ]
 )

@@ -83,7 +83,7 @@ class BuildFileManipulator(object):
     restrictions as well--see the comments below or check out the example targets in
     the tests for this class.
 
-    :param build_file: A FilesystemBuildFile instance to operate on.
+    :param build_file: A BuildFile instance to operate on.
     :param name: The name of the target (without the spec path or colon) to operate on.
     :target aliases: The callables injected into the build file context that we should treat
       as target declarations.

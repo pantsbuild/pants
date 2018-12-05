@@ -7,17 +7,24 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import open
 from textwrap import dedent
 
+from pants.base.build_file import BuildFile
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 from pants.contrib.buildgen.build_file_manipulator import (BuildFileManipulator,
                                                            BuildTargetParseError)
 
 
-class BuildFileManipulatorTest(BaseTest):
+class BuildFileManipulatorTest(TestBase):
+
+  def set_build_file_contents(self, content):
+    self.add_to_build_file('BUILD', content)
+    return BuildFile(self.project_tree, 'BUILD')
 
   def setUp(self):
     super(BuildFileManipulatorTest, self).setUp()
+    self.project_tree = FileSystemProjectTree(self.build_root)
     self.complicated_dep_comments = dedent(
       """\
       target_type(
@@ -112,7 +119,7 @@ class BuildFileManipulatorTest(BaseTest):
       """
     )
 
-    build_file = self.add_to_build_file('BUILD', bad_targets)
+    build_file = self.set_build_file_contents(bad_targets)
 
     bad_target_names = [
       'name_on_line',
@@ -151,7 +158,7 @@ class BuildFileManipulatorTest(BaseTest):
       """
     )
 
-    build_file = self.add_to_build_file('BUILD', simple_targets)
+    build_file = self.set_build_file_contents(simple_targets)
 
     for no_deps_name in ['no_deps', 'empty_deps', 'empty_deps_inline']:
       no_deps = BuildFileManipulator.load(build_file, no_deps_name, {'target_type'})
@@ -202,7 +209,7 @@ class BuildFileManipulatorTest(BaseTest):
       )"""
     )
 
-    build_file = self.add_to_build_file('BUILD', self.complicated_dep_comments)
+    build_file = self.set_build_file_contents(self.complicated_dep_comments)
 
     complicated_bfm = BuildFileManipulator.load(build_file, 'no_bg_no_cry', {'target_type'})
     target_str = '\n'.join(complicated_bfm.target_lines())
@@ -229,9 +236,9 @@ class BuildFileManipulatorTest(BaseTest):
       )"""
     )
 
-    build_file = self.add_to_build_file('BUILD', self.complicated_dep_comments)
+    build_file = self.set_build_file_contents(self.complicated_dep_comments)
 
-    complicated_bfm = BuildFileManipulator.load(build_file, 'no_bg_no_cry', set(['target_type']))
+    complicated_bfm = BuildFileManipulator.load(build_file, 'no_bg_no_cry', {'target_type'})
     complicated_bfm.clear_unforced_dependencies()
     target_str = '\n'.join(complicated_bfm.target_lines())
     self.assertEqual(target_str, expected_target_str)
@@ -265,7 +272,7 @@ class BuildFileManipulatorTest(BaseTest):
       # Also this one though it's weird"""
     )
 
-    build_file = self.add_to_build_file('BUILD', self.multi_target_build_string)
+    build_file = self.set_build_file_contents(self.multi_target_build_string)
 
     multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_bottom', {'target_type'})
     multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
@@ -299,7 +306,7 @@ class BuildFileManipulatorTest(BaseTest):
       # Also this one though it's weird"""
     )
 
-    build_file = self.add_to_build_file('BUILD', self.multi_target_build_string)
+    build_file = self.set_build_file_contents(self.multi_target_build_string)
 
     multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_top', {'target_type'})
     multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
@@ -333,7 +340,7 @@ class BuildFileManipulatorTest(BaseTest):
       # Also this one though it's weird"""
     )
 
-    build_file = self.add_to_build_file('BUILD', self.multi_target_build_string)
+    build_file = self.set_build_file_contents(self.multi_target_build_string)
 
     multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_middle', {'target_type'})
     multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
@@ -368,7 +375,7 @@ class BuildFileManipulatorTest(BaseTest):
       """
     )
 
-    build_file = self.add_to_build_file('BUILD', self.multi_target_build_string + '\n')
+    build_file = self.set_build_file_contents(self.multi_target_build_string + '\n')
 
     multi_targ_bfm = BuildFileManipulator.load(build_file, 'target_middle', {'target_type'})
     multi_targ_bfm.add_dependency(Address.parse(':new_dep'))
