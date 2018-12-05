@@ -141,10 +141,12 @@ class GCCInstallLocationForLLVM(datatype(['toolchain_dir'])):
   """This class is convertible into a list of command line arguments for clang and clang++.
 
   This is only used on Linux. The option --gcc-toolchain stops clang from searching for another gcc
-  on the host system. The option appears to only exist on Linux clang and clang++."""
+  on the host system. The option appears to only exist on Linux clang and clang++.
+  """
 
   @property
   def as_clang_argv(self):
+    # TODO(#6143): describe exactly what this argument does to the clang/clang++ invocation!
     return ['--gcc-toolchain={}'.format(self.toolchain_dir)]
 
 
@@ -161,6 +163,7 @@ def select_llvm_c_toolchain(platform, native_toolchain):
   llvm_c_compiler_args = [
     '-x', 'c', '-std=c11',
     '-nobuiltininc',
+    '-nostdinc',
   ]
 
   if platform.normalized_os_name == 'darwin':
@@ -203,6 +206,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     # implementation, or any from the host system. Instead, we use include dirs from the
     # XCodeCLITools or GCC.
     '-nobuiltininc',
+    '-nostdinc',
     '-nostdinc++',
   ]
 
@@ -226,7 +230,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
       # NB: we use g++'s headers on Linux, and therefore their C++ standard library.
       include_dirs=provided_gpp.include_dirs,
       extra_args=(llvm_cpp_compiler_args + provided_clangpp.extra_args + gcc_install.as_clang_argv))
-    # TODO: why are these necessary? this is very mysterious.
+    # TODO(#6855): why are these necessary? this is very mysterious.
     extra_linking_library_dirs = provided_gpp.library_dirs + provided_clangpp.library_dirs
     # Ensure we use libstdc++, provided by g++, during the linking stage.
     linker_extra_args=['-stdlib=libstdc++']
@@ -253,12 +257,15 @@ def select_gcc_c_toolchain(platform, native_toolchain):
   # GCC needs an assembler, so we provide that (platform-specific) tool here.
   assembler = yield Get(Assembler, NativeToolchain, native_toolchain)
 
+  gcc_c_compiler_args = [
+    '-x', 'c', '-std=c11',
+    '-nostdinc',
+  ]
+
   if platform.normalized_os_name == 'darwin':
     # GCC needs access to some headers that are only provided by the XCode toolchain
     # currently (e.g. "_stdio.h"). These headers are unlikely to change across versions, so this is
     # probably safe.
-    # TODO: we should be providing all of these (so we can eventually phase out XCodeCLITools
-    # entirely).
     xcode_clang = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     new_include_dirs = provided_gcc.include_dirs + xcode_clang.include_dirs
   else:
@@ -267,7 +274,7 @@ def select_gcc_c_toolchain(platform, native_toolchain):
   working_c_compiler = provided_gcc.copy(
     path_entries=(provided_gcc.path_entries + assembler.path_entries),
     include_dirs=new_include_dirs,
-    extra_args=['-x', 'c', '-std=c11'])
+    extra_args=gcc_c_compiler_args)
 
   gcc_linker_wrapper = yield Get(GCCLinker, NativeToolchain, native_toolchain)
   gcc_linker = gcc_linker_wrapper.linker
@@ -290,6 +297,7 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
 
   gcc_cpp_compiler_args = [
     '-x', 'c++', '-std=c++11',
+    '-nostdinc',
     '-nostdinc++',
   ]
 
