@@ -12,15 +12,12 @@ from pex.fetcher import Fetcher
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
-from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 
@@ -85,69 +82,6 @@ def dump_sources(builder, tgt, log):
     # switching to the new python pipeline will be a great opportunity to fix that.
     raise TaskError('Old-style resources not supported for target {}.  '
                     'Depend on resources() targets instead.'.format(tgt.address.spec))
-
-
-def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None):
-  """Multi-platform dependency resolution for PEX files.
-
-  :param builder: Dump the requirements into this builder.
-  :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
-  :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
-  :param log: Use this logger.
-  :param platforms: A list of :class:`Platform`s to resolve requirements for.
-                    Defaults to the platforms specified by PythonSetup.
-  """
-  deprecated('1.11.0.dev0',
-    'This function has been moved onto the PexBuilderWrapper class.')
-  PexBuilderWrapper(
-    builder,
-    PythonRepos.global_instance(),
-    PythonSetup.global_instance(),
-    log
-  ).add_requirement_libs_from(req_libs, platforms)
-
-
-def dump_requirements(builder, interpreter, reqs, log, platforms=None):
-  """Multi-platform dependency resolution for PEX files.
-
-  :param builder: Dump the requirements into this builder.
-  :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
-  :param reqs: A list of :class:`PythonRequirement` to resolve.
-  :param log: Use this logger.
-  :param platforms: A list of :class:`Platform`s to resolve requirements for.
-                    Defaults to the platforms specified by PythonSetup.
-  """
-  deprecated('1.11.0.dev0',
-    'This function has been moved onto the PexBuilderWrapper class.')
-  PexBuilderWrapper(
-    builder,
-    PythonRepos.global_instance(),
-    PythonSetup.global_instance(),
-    log
-  ).add_resolved_requirements(reqs, platforms)
-
-
-def resolve_multi(interpreter, requirements, platforms, find_links):
-  """Multi-platform dependency resolution for PEX files.
-
-  Returns a list of distributions that must be included in order to satisfy a set of requirements.
-  That may involve distributions for multiple platforms.
-
-  :param interpreter: The :class:`PythonInterpreter` to resolve for.
-  :param requirements: A list of :class:`PythonRequirement` objects to resolve.
-  :param platforms: A list of :class:`Platform`s to resolve for.
-  :param find_links: Additional paths to search for source packages during resolution.
-  :return: Map of platform name -> list of :class:`pkg_resources.Distribution` instances needed
-           to satisfy the requirements on that platform.
-  """
-  deprecated('1.11.0.dev0',
-    'This function has been moved onto the PexBuilderWrapper class.')
-  python_setup = PythonSetup.global_instance()
-  python_repos = PythonRepos.global_instance()
-  return PexBuilderWrapper(builder=None,
-    python_repos_subsystem=python_repos,
-    python_setup_subsystem=python_setup, log=None
-  )._resolve_multi(interpreter, requirements, platforms, find_links)
 
 
 class PexBuilderWrapper(object):

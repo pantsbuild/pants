@@ -27,9 +27,6 @@ class ExecutablePexTool(Subsystem):
 
   base_requirements = []
 
-  # NB: The `dump_requirements` method uses PythonSetup and PythonRepos (the global instances)
-  # behind your back - you need to declare subsystem dependencies on these two as things stand to be
-  # safe.
   @classmethod
   def subsystem_dependencies(cls):
     return super(ExecutablePexTool, cls).subsystem_dependencies() + (PythonRepos, PythonSetup)
