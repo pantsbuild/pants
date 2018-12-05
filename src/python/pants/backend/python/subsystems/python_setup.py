@@ -178,11 +178,20 @@ class PythonSetup(Subsystem):
       '<PYENV>': lambda: cls.get_pyenv_paths(pyenv_root_func=pyenv_root_func)
     }
     expanded = []
+    from_pexrc = None
     for s in interpreter_search_paths:
       if s in special_strings:
-        expanded.extend(special_strings[s]())
+        special_paths = special_strings[s]()
+        if s == '<PEXRC>':
+          from_pexrc = special_paths
+        expanded.extend(special_paths)
       else:
         expanded.append(s)
+    # Some special-case logging to avoid misunderstandings.
+    if from_pexrc and len(expanded) > len(from_pexrc):
+      logger.info('pexrc interpreters requested and found, but other paths were also specified, '
+                  'so interpreters may not be restricted to the pexrc ones. Full search path is: '
+                  '{}'.format(':'.join(expanded)))
     return expanded
 
   @staticmethod
