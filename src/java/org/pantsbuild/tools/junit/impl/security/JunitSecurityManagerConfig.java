@@ -28,23 +28,34 @@ public class JunitSecurityManagerConfig {
   }
 
   public enum SystemExitHandling {
-    // allow tests to call system exit. Not sure why you'd want that, but ...
+    /**
+     * Allow tests to call System.exit. Not sure why you'd want that, but ...
+     */
     allow,
+    /**
+     * Disallow tests from calling System.exit
+     */
     disallow
   }
 
   public enum ThreadHandling {
-    // Allow threads, and allow them to live indefinitely.
+    /**
+     * Allow threads, and allow them to live indefinitely.
+     */
     allowAll,
-    // Do not allow threads to be started via tests.
+    /**
+     * Do not allow threads to be started via tests.
+     */
     disallow,
-
-    // disallow suites starting threads, but allow test cases to start them as long as they are
-    // killed before the end of the test case.
+    /**
+     * disallow suites starting threads, but allow test cases to start them as long as they are
+     * killed before the end of the test case.
+     */
     disallowLeakingTestCaseThreads,
-
-    // allow suites or test cases to start threads,
-    // but ensure they are killed at the end of the suite.
+    /**
+     * Allow suites or test cases to start threads,
+     * but ensure they are killed at the end of the suite.
+     */
     disallowLeakingTestSuiteThreads,
 
     // Other possible options:
@@ -58,8 +69,17 @@ public class JunitSecurityManagerConfig {
   }
 
   public enum NetworkHandling {
+    /**
+     * Allow all network requests
+     */
     allowAll,
+    /**
+     * Disallow all network requests
+     */
     disallow,
+    /**
+     * Allow network requests to localhost and deny all others.
+     */
     onlyLocalhost
   }
 }

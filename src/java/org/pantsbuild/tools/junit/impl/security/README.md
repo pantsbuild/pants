@@ -2,8 +2,9 @@
 TODOs
 --------
 
-#### Refactoring
+#### Refactoring /  code movement
 TODO move sec console runner tests into their own files
+TODO java8-ify
 
 #### Attribution / Messaging
 TODO Record where the thread was started and including that in the message
@@ -21,7 +22,7 @@ TODO ensure that this has a clear error
 
 #### Network
 TODO handle more ways to say localhost
-TODO look up host name and fail if it's not localhost
+TODO mode that allows network lookups for a host that resolves to localhost
 
 
 
@@ -42,7 +43,7 @@ TODO file access
   - onlyInCWD
   - add support on the pants side
 
-Per Target
+#### Per Target (not necessary for demoability)
 TODO per-target config.
   Qs
     - how to pass it to the tool? Config file?

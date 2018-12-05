@@ -8,23 +8,22 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Manages the lifecycles of tests and suites used by the security manager to figure out what
+ * Manages the lifecycle's of tests and suites used by the security manager to figure out what
  * context code that might call into it is calling from.
  */
 class JunitSecurityContextLookupAndErrorCollection {
 
   // lifecycle
   // execution contexts:
-  //   StaticContext
+  //   static
   //      when the class containing tests is loaded
-  //   SuiteContext
+  //   suite
   //      while the beforeclass et al are being run -- analogous to classBlock in the block runner
   //      But, classes may not always be 1:1 with suites
-  //   TestContext
+  //   test-case
   //      while the test case is running
   //
   // thread contexts:
-
   //    Test class context / might also be suite context
   //       holds threads started in the class/suite context
   //    Test case context
