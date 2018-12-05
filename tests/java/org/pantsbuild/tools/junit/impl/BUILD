@@ -11,6 +11,7 @@ target(
 junit_tests(
   name='junit',
   dependencies=[
+    ':common',
     '3rdparty:guava',
     '3rdparty:junit',
     '3rdparty/jvm/commons-io',
@@ -24,4 +25,19 @@ junit_tests(
   ],
   sources=globs('*Test.java'),
   timeout=300,
+)
+
+java_library(
+  name='common',
+  sources=globs('ConsoleRunnerImplTestSetup.java'),
+  dependencies=[
+    '3rdparty:guava',
+    '3rdparty:junit',
+    '3rdparty/jvm/commons-io',
+    '3rdparty/jvm/org/hamcrest:hamcrest-core',
+    '3rdparty/jvm/org/hamcrest:hamcrest-library',
+    'src/java/org/pantsbuild/junit/annotations',
+    'src/java/org/pantsbuild/tools/junit',
+    'src/java/org/pantsbuild/tools/junit:security-manager',
+  ],
 )
