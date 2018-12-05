@@ -83,6 +83,7 @@ python_tests(
   sources = ['test_pinger.py'],
   dependencies = [
     '3rdparty/python:future',
+    '3rdparty/python:mock',
     '3rdparty/python:responses',
     'src/python/pants/cache',
     'tests/python/pants_test:test_base',
