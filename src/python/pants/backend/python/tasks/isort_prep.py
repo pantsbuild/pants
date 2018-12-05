@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.python.subsystems.isort import Isort
-from pants.backend.python.tasks.python_tool_prep_base import PythonToolPrepBase, PythonToolInstance
+from pants.backend.python.tasks.python_tool_prep_base import PythonToolInstance, PythonToolPrepBase
 
 
 class IsortInstance(PythonToolInstance):
