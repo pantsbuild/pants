@@ -85,18 +85,27 @@ def get_build_cflags():
 
 
 def hackily_rewrite_scheduler_bindings(bindings):
+  # We need #include lines in the generated C source file, but this won't parse in the .cdef call
+  # (it can't handle preprocessor directives), so we put them behind a comment line for now.
   includes_removed = re.sub(
     r'^(#include <.*?>)$',
     r'// HACKY_CDEF_INCLUDE: \1',
     bindings, flags=re.MULTILINE)
+  # This is an opaque struct member, which is not exposed to the FFI (and errors if this is
+  # removed).
   hidden_vec_pyresult = re.sub(
     r'^.*Vec_PyResult nodes;.*$',
     '// Additional fields removed',
     includes_removed, flags=re.MULTILINE)
+  # The C bindings generated for tuple structs by default use _0, _1, etc for members. The cffi
+  # library doesn't allow leading underscores on members like that, so we produce e.g. tup_0
+  # instead. This works because the header file produced by cbindgen is reliably formatted.
   positional_fields_prefixed = re.sub(
     r'(_[0-9]+;)$',
     r'tup\1',
     hidden_vec_pyresult, flags=re.MULTILINE)
+  # Avoid clashing with common python symbols (we again assume the generated bindings are reliably
+  # formatted).
   special_python_symbols_mangled = re.sub(
     r'\bid\b',
     'id_',
@@ -105,6 +114,8 @@ def hackily_rewrite_scheduler_bindings(bindings):
 
 
 def hackily_recreate_includes_for_bindings(bindings):
+  # Undo the mangling we did for #include lines previously so that the generated C source file will
+  # have access to the necessary includes for the types produced by cbindgen.
   return re.sub(
     r'^// HACKY_CDEF_INCLUDE: (.*)$',
     r'\1',
@@ -125,6 +136,7 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     c_file = '{}.c'.format(real_output_prefix)
     env_script = '{}.cflags'.format(real_output_prefix)
 
+    # Preprocessor directives won't parse in the .cdef calls, so we have to hide them for now.
     scheduler_bindings = hackily_rewrite_scheduler_bindings(read_file(scheduler_bindings_path))
 
     ffibuilder = cffi.FFI()
@@ -150,6 +162,8 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     if CFFI_C_PATCH_BEFORE not in file_content:
       raise Exception('The patch for the CFFI generated code will not apply cleanly.')
     file_content = file_content.replace(CFFI_C_PATCH_BEFORE, CFFI_C_PATCH_AFTER)
+
+    # Extract the preprocessor directives we had to hide to get the .cdef call to parse.
     file_content = hackily_recreate_includes_for_bindings(file_content)
 
   _replace_file(c_file, file_content)
@@ -177,6 +191,7 @@ class ExternSignature(datatype([
     ('method_name', str),
     ('arg_types', tuple),
 ])):
+  """A type signature for a python-defined FFI function."""
 
   def pretty_print(self):
     return '  {ret}\t{name}({args});'.format(
@@ -216,7 +231,7 @@ class FFISpecification(object):
 
   @classmethod
   def format_cffi_externs(cls):
-    """???/used to produce stubs for the cffi bindings from @extern_decls"""
+    """Generate stubs for the cffi bindings from @extern_decl methods."""
     extern_decls = [
       f.extern_signature.pretty_print()
       for _, f in cls._extern_fields.items()
@@ -226,8 +241,8 @@ class FFISpecification(object):
       + '\n'.join(extern_decls)
       + '\n}\n')
 
-  def define_cffi_externs(self):
-    """???/registers the @extern_decls with our ffi instance"""
+  def register_cffi_externs(self):
+    """Registers the @extern_decl methods with our ffi instance."""
     for field_name, _ in self._extern_fields.items():
       bound_method = getattr(self, field_name)
       self._ffi.def_extern()(bound_method)
@@ -558,7 +573,7 @@ class Native(object):
   def ffi(self):
     """A CompiledCFFI handle as imported from the native engine python module."""
     ffi = getattr(self._ffi_module, 'ffi')
-    FFISpecification(ffi).define_cffi_externs()
+    FFISpecification(ffi).register_cffi_externs()
     return ffi
 
   @memoized_property

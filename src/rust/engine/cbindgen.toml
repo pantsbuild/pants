@@ -1,5 +1,5 @@
 header = '''
-/* TODO: add header guards! */
+/* TODO: add header guards and license info! */
 
 // Handle is declared as a typedef rather than a wrapper struct because it avoids needing to wrap
 // the inner handle/`void*` in a tuple or datatype at the ffi boundary. For most types that
