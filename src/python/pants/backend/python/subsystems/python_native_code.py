@@ -209,13 +209,18 @@ class SetupPyExecutionEnvironment(datatype([
         c_linker.path_entries +
         cpp_compiler.path_entries +
         cpp_linker.path_entries)
-      # TODO(#6273): We prepend our toolchain to the PATH instead of overwriting it -- we need
-      # better control of the distutils compilation environment if we want to actually isolate the
-      # PATH (distutils does lots of sneaky things).
-      ret['PATH'] = create_path_env_var(all_path_entries, env=os.environ.copy(), prepend=True)
 
-      # GCC will output smart quotes in a variety of situations (leading to decoding errors
-      # downstream) unless we set this environment variable.
-      ret['LC_ALL'] = 'C'
+      ret.update({
+        'CC': c_compiler.exe_filename,
+        'CXX': cpp_compiler.exe_filename,
+        # TODO(#6273): We prepend our toolchain to the PATH instead of overwriting it -- we need
+        # better control of the distutils compilation environment if we want to actually isolate the
+        # PATH (distutils does lots of sneaky things).
+        'PATH': create_path_env_var(all_path_entries, env=os.environ.copy(), prepend=True),
+        # GCC will output smart quotes in a variety of situations (leading to decoding errors
+        # downstream because pex prints directly to stderr) unless we set this environment variable,
+        # so compile errors are impossible to see otherwise.
+        'LC_ALL': 'C',
+      })
 
     return ret
