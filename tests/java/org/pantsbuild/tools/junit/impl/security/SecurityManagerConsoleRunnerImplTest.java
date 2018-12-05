@@ -291,6 +291,62 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
             "\tat " + testClassName + ".makeNetworkCall"));
   }
 
+  @Test
+  public void whenFileAccessSetToAllowAllTestsPass() {
+    Class<?> testClass = FileAccessTests.class;
+    String output = runTestsExpectingSuccess(
+        new JunitSecurityManagerConfig(
+            JunitSecurityManagerConfig.SystemExitHandling.disallow,
+            JunitSecurityManagerConfig.ThreadHandling.allowAll,
+            JunitSecurityManagerConfig.NetworkHandling.onlyLocalhost,
+            JunitSecurityManagerConfig.FileHandling.allowAll
+        ),
+        testClass);
+
+    assertThat(output, containsString("OK (3 tests)\n"));
+  }
+
+  @Test
+  public void whenFileAccessDisallowedFileAccessFails() {
+    Class<?> testClass = FileAccessTests.class;
+    String output = runTestsExpectingFailure(
+        new JunitSecurityManagerConfig(
+            JunitSecurityManagerConfig.SystemExitHandling.disallow,
+            JunitSecurityManagerConfig.ThreadHandling.allowAll,
+            JunitSecurityManagerConfig.NetworkHandling.onlyLocalhost,
+            JunitSecurityManagerConfig.FileHandling.disallow
+        ),
+        testClass);
+
+    assertThat(output, containsString("Failures: 3\n"));
+    String testClassName = "org.pantsbuild.tools.junit.lib.security.fileaccess.FileAccessTests";
+    String testFilePath = "tests/resources/org/pantsbuild/tools/junit/lib/";
+    String exceptionName = "org.pantsbuild.junit.security.SecurityViolationException";
+    assertThat(output,
+        containsString(") readAFile(" + testClassName + ")\n" +
+        exceptionName + ": Access to file: " + testFilePath + "a.file not allowed"));
+    // ...
+    assertThat(output,
+        containsString("at " + testClassName + ".readAFile(FileAccessTests.java:"));
+
+    assertThat(output,
+        containsString(") writeAFile(" + testClassName + ")\n" +
+        exceptionName + ": Access to file: " + testFilePath + "another.file not allowed"));
+    // ...
+    assertThat(output,
+        containsString("at " + testClassName + ".writeAFile(FileAccessTests.java:"));
+
+    assertThat(output,
+        containsString(
+            ") deleteAFile(" + testClassName + ")\n" +
+                exceptionName + ": Access to file: " + testFilePath + "a.different.file" +
+                " not allowed"));
+    // ...
+    assertThat(output,
+        containsString("at " + testClassName + ".deleteAFile(FileAccessTests.java:"));
+
+  }
+
   private JunitSecurityManagerConfig configDisallowingSystemExitButAllowingEverythingElse() {
     return new JunitSecurityManagerConfig(
         JunitSecurityManagerConfig.SystemExitHandling.disallow,

@@ -201,7 +201,7 @@ public class JunitSecViolationReportingManager extends SecurityManager {
   }
 
   @Override
-  public void checkConnect(final String host, final int port, Object context1) {
+  public void checkConnect(final String host, final int port, Object context) {
     doCheckConnect(host, port);
   }
 
@@ -249,29 +249,105 @@ public class JunitSecViolationReportingManager extends SecurityManager {
   }
 
   @Override
-  public void checkRead(FileDescriptor fd) {
-
-  }
-
-  @Override
   public void checkRead(String filename, Object context) {
+    TestSecurityContext testSecurityContext = lookupContext();
+    if (disallowsFileAccess(testSecurityContext, filename)) {
+      String message = disallowedFileAccessMessage(filename);
+      log("checkRead", message);
+      SecurityViolationException exception = new SecurityViolationException(message);
 
+      testSecurityContext.addFailure(exception);
+      super.checkRead(filename, context);
+      throw exception;
+    }
+    super.checkRead(filename, context);
   }
 
   @Override
   public void checkRead(String filename) {
+    TestSecurityContext testSecurityContext = lookupContext();
+    if (disallowsFileAccess(testSecurityContext, filename)) {
+      String message = disallowedFileAccessMessage(filename);
+      log("checkRead", message);
+      SecurityViolationException exception = new SecurityViolationException(message);
 
+      testSecurityContext.addFailure(exception);
+      super.checkRead(filename);
+      throw exception;
+    }
+    super.checkRead(filename);
   }
 
-  @Override
-  public void checkWrite(FileDescriptor fd) {
+  private String disallowedFileAccessMessage(String filename) {
+    return "Access to file: " + filename + " not allowed";
+  }
 
+  private boolean disallowsFileAccess(TestSecurityContext testSecurityContext, String filename) {
+    // NB: This escape hatch allows lazy loading of things like the locale jar, which is pulled from
+    //     the jre location.
+    if(filename.startsWith( System.getProperty("java.home"))) {
+      log("disallowsFileAccess", "is a framework call");
+      return false;
+    }
+
+    if (isFrameworkContext(testSecurityContext)) {
+      // calls within the framework should be passed through.
+      log("disallowsFileAccess", "is a framework call");
+      return false;
+    } else if (isRedirectedOutputFile(testSecurityContext, filename)) {
+      log("disallowsFileAccess", "is a framework call to the redirected output");
+      return false;
+    } else  {
+      return this.contextLookupAndErrorCollection.config.getFileHandling() == FileHandling.disallow;
+    }
+  }
+
+  private boolean isFrameworkContext(TestSecurityContext testSecurityContext) {
+    return testSecurityContext == null; // TODO introduce null object for framework contexts
   }
 
   @Override
   public void checkWrite(String filename) {
+    TestSecurityContext testSecurityContext = lookupContext();
+    if (disallowsFileAccess(testSecurityContext, filename)) {
+      String message = disallowedFileAccessMessage(filename);
+      log("checkWrite", "context: "+testSecurityContext+ " :: "+message);
+      SecurityViolationException exception = new SecurityViolationException(message);
 
+      testSecurityContext.addFailure(exception);
+      super.checkWrite(filename);
+      throw exception;
+    }
+    super.checkWrite(filename);
   }
+
+  private boolean isRedirectedOutputFile(TestSecurityContext testSecurityContext, String filename) {
+    // TODO make this a bit more bulletproof
+    return filename.endsWith(".out.txt") || filename.endsWith(".err.txt");
+  }
+
+  @Override
+  public void checkDelete(String filename) {
+    TestSecurityContext testSecurityContext = lookupContext();
+    if (disallowsFileAccess(testSecurityContext, filename)) {
+      String message = disallowedFileAccessMessage(filename);
+      log("checkWrite", "context: "+testSecurityContext+ " :: "+message);
+      SecurityViolationException exception = new SecurityViolationException(message);
+
+      testSecurityContext.addFailure(exception);
+      super.checkDelete(filename);
+      throw exception;
+    }
+    super.checkDelete(filename);
+  }
+
+  // Linking native libs
+  //   checkLink(String lib)
+  //
+  // NB: I expect that we aren't going to care about file descriptors since this applies only to
+  //     stdin, stdout and stderr I expect
+  //   checkRead(FileDescriptor fd)
+  //   checkWrite(FileDescriptor fd)
 
   private static void log(String methodName, String msg) {
     logger.fine("---" + methodName + ":" + msg);

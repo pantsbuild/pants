@@ -5,14 +5,27 @@ public class JunitSecurityManagerConfig {
   private final SystemExitHandling systemExitHandling;
   private final ThreadHandling threadHandling;
   private final NetworkHandling networkHandling;
+  private final FileHandling fileHandling;
 
   public JunitSecurityManagerConfig(
       SystemExitHandling systemExitHandling,
       ThreadHandling threadHandling,
       NetworkHandling networkHandling) {
+      this(systemExitHandling,
+          threadHandling,
+          networkHandling,
+          FileHandling.allowAll);
+  }
+
+  public JunitSecurityManagerConfig(
+      SystemExitHandling systemExitHandling,
+      ThreadHandling threadHandling,
+      NetworkHandling networkHandling,
+      FileHandling fileHandling) {
     this.systemExitHandling = systemExitHandling;
     this.threadHandling = threadHandling;
     this.networkHandling = networkHandling;
+    this.fileHandling = fileHandling;
   }
 
   boolean disallowSystemExit() {
@@ -25,6 +38,10 @@ public class JunitSecurityManagerConfig {
 
   public NetworkHandling getNetworkHandling() {
     return networkHandling;
+  }
+
+  public FileHandling getFileHandling() {
+    return fileHandling;
   }
 
   public enum SystemExitHandling {
@@ -81,5 +98,16 @@ public class JunitSecurityManagerConfig {
      * Allow network requests to localhost and deny all others.
      */
     onlyLocalhost
+  }
+
+  public enum FileHandling {
+    /**
+     * Allow all file operations.
+     */
+    allowAll,
+    /**
+     * Disallow any file operation.
+     */
+    disallow
   }
 }

@@ -1,0 +1,1 @@
+resources(sources=['a.file'])
