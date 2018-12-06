@@ -8,10 +8,9 @@ from builtins import str
 
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
-from pants.engine.legacy.options_parsing import ScopedOptions
 from pants.engine.rules import console_rule
 from pants.engine.selectors import Get, Select
-from pants.option.scope import Scope
+from pants.option.scope import Scope, ScopedOptions
 from pants.rules.core.exceptions import GracefulTerminationException
 
 
