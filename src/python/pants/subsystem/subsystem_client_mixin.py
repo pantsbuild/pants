@@ -9,6 +9,7 @@ from builtins import object
 from twitter.common.collections import OrderedSet
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.optionable import OptionableFactory
 from pants.option.scope import ScopeInfo
 from pants.util.objects import datatype
 
@@ -21,7 +22,7 @@ class SubsystemDependency(datatype([
   'scope',
   'removal_version',
   'removal_hint',
-])):
+]), OptionableFactory):
   """Indicates intent to use an instance of `subsystem_cls` scoped to `scope`."""
 
   def __new__(cls, subsystem_cls, scope, removal_version=None, removal_hint=None):
@@ -30,6 +31,12 @@ class SubsystemDependency(datatype([
   def is_global(self):
     return self.scope == GLOBAL_SCOPE
 
+  @property
+  def optionable_cls(self):
+    # Fills the OptionableFactory contract.
+    return self.subsystem_cls
+
+  @property
   def options_scope(self):
     """The subscope for options of `subsystem_cls` scoped to `scope`.
 

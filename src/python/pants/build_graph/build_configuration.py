@@ -8,11 +8,14 @@ import logging
 from builtins import object, str
 from collections import Iterable, namedtuple
 
+from twitter.common.collections import OrderedSet
+
 from pants.base.deprecated import deprecated
 from pants.base.parse_context import ParseContext
 from pants.build_graph.addressable import AddressableCallProxy
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target_addressable import TargetAddressable
+from pants.engine.rules import RuleIndex
 from pants.option.optionable import Optionable
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
@@ -34,8 +37,8 @@ class BuildConfiguration(object):
     self._target_macro_factory_by_alias = {}
     self._exposed_object_by_alias = {}
     self._exposed_context_aware_object_factory_by_alias = {}
-    self._optionables = set()
-    self._rules = []
+    self._optionables = OrderedSet()
+    self._rules = OrderedSet()
 
   def registered_aliases(self):
     """Return the registered aliases exposed in BUILD files.
@@ -154,21 +157,30 @@ class BuildConfiguration(object):
   def register_rules(self, rules):
     """Registers the given rules.
 
-    :param rules: The rules to register.
+    param rules: The rules to register.
     :type rules: :class:`collections.Iterable` containing
                  :class:`pants.engine.rules.Rule` instances.
     """
-
     if not isinstance(rules, Iterable):
       raise TypeError('The rules must be an iterable, given {!r}'.format(rules))
-    self._rules.extend(rules)
+
+    # "Index" the rules to normalize them and expand their dependencies.
+    indexed_rules = RuleIndex.create(rules).normalized_rules()
+
+    # Store the rules and record their dependency Optionables.
+    self._rules.update(indexed_rules)
+    dependency_optionables = {do
+                              for rule in indexed_rules
+                              for do in rule.dependency_optionables
+                              if rule.dependency_optionables}
+    self.register_optionables(dependency_optionables)
 
   def rules(self):
     """Returns the registered rules.
 
     :rtype list
     """
-    return self._rules
+    return list(self._rules)
 
   @memoized_method
   def _get_addressable_factory(self, target_type, alias):

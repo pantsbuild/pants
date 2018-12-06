@@ -339,7 +339,7 @@ class LoaderTest(unittest.TestCase):
     with self.create_register(rules=backend_rules) as backend_package:
       load_backend(self.build_configuration, backend_package)
       self.assertEqual(self.build_configuration.rules(),
-                       [example_rule, RootRule(RootType)])
+                       [example_rule.rule, RootRule(RootType)])
 
     def plugin_rules():
       return [example_plugin_rule]
@@ -347,7 +347,7 @@ class LoaderTest(unittest.TestCase):
     self.working_set.add(self.get_mock_plugin('this-plugin-rules', '0.0.1', rules=plugin_rules))
     self.load_plugins(['this-plugin-rules'])
     self.assertEqual(self.build_configuration.rules(),
-                     [example_rule, RootRule(RootType), example_plugin_rule])
+                     [example_rule.rule, RootRule(RootType), example_plugin_rule.rule])
 
   def test_backend_plugin_ordering(self):
     def reg_alias():

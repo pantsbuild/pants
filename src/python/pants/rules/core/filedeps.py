@@ -30,3 +30,9 @@ def file_deps(console, transitive_hydrated_targets):
 
   for f_path in uniq_set:
     console.print_stdout(f_path)
+
+
+def rules():
+  return [
+      file_deps,
+    ]
