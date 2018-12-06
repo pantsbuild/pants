@@ -123,6 +123,8 @@ class RscCompile(ZincCompile):
   _name = 'rsc' # noqa
   compiler_name = 'rsc'
 
+  _SCALA_VERSIONS = ['211', '212', 'other']
+
   def __init__(self, *args, **kwargs):
     super(RscCompile, self).__init__(*args, **kwargs)
     self._metacp_jars_classpath_product = ClasspathProducts(self.get_options().pants_workdir)
@@ -137,6 +139,12 @@ class RscCompile(ZincCompile):
 
     rsc_toolchain_version = '0.0.0-446-c64e6937'
     scalameta_toolchain_version = '4.0.0'
+
+    register('--abi', advanced=True, choices=cls._SCALA_VERSIONS, default='211', fingerprint=True,
+      help='Scala version to target for pickle creation.')
+
+    register('--debug', advanced=True, type=bool, default=False,
+      help='When set, execution will be in debug mode.')
 
     cls.register_jvm_tool(
       register,
@@ -429,9 +437,10 @@ class RscCompile(ZincCompile):
           rsc_semanticdb_classpath = metacped_jar_classpath_rel + \
                                      [j for j in non_java_rel if 'compile/rsc/' in j]
           target_sources = ctx.sources
-          args = [
-                   '-cp', os.pathsep.join(rsc_semanticdb_classpath),
-                   '-d', rsc_mjar_file,
+          args = ['-cp', os.pathsep.join(rsc_semanticdb_classpath),
+                  '-d', rsc_mjar_file,
+                  '-abi', self.get_options().abi
+                  + (', -debug' if self.get_options().debug else '')
                  ] + target_sources
           sources_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
           self._runtool(
@@ -751,7 +760,6 @@ class RscCompile(ZincCompile):
         cmd.extend(['-cp', classpath_for_cmd])
         cmd.extend([main])
         cmd.extend(args)
-
         pathglobs = list(tool_classpath)
         pathglobs.extend(f if os.path.isfile(f) else '{}/**'.format(f) for f in input_files)
 

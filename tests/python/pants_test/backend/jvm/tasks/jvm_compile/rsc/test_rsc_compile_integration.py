@@ -96,3 +96,46 @@ class RscCompileIntegration(BaseCompileIT):
           workdir, config)
         self.assert_success(pants_run)
         self.assertIn('Hello, Resource World!', pants_run.stdout_data)
+
+  def test_rsc_with_abi_debug_default(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.rsc': {'write_to': [cache_dir]},
+        'jvm-platform': {'compiler': 'rsc'},
+        'compile.rsc': {
+          'execution_strategy': 'hermetic',
+          'incremental': False,
+          'debug': 'True'
+        },
+      }
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          ['compile',
+            'testprojects/src/scala/org/pantsbuild/testproject/mutual:bin',
+          ],
+          workdir, config)
+        self.assert_success(pants_run)
+        self.assertIn('debug', pants_run.stdout_data)
+        self.assertIn('abi', pants_run.stdout_data)
+        self.assertIn('211', pants_run.stdout_data)
+
+  def test_rsc_with_abi(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.rsc': {'write_to': [cache_dir]},
+        'jvm-platform': {'compiler': 'rsc'},
+        'compile.rsc': {
+          'execution_strategy': 'hermetic',
+          'incremental': False,
+          'abi': '212',
+        },
+      }
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          ['compile',
+            'testprojects/src/scala/org/pantsbuild/testproject/mutual:bin',
+          ],
+          workdir, config)
+        self.assert_success(pants_run)
+        self.assertIn('abi', pants_run.stdout_data)
+        self.assertIn('212', pants_run.stdout_data)
