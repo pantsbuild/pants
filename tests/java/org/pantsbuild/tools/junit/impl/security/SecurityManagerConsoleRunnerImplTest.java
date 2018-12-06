@@ -12,6 +12,7 @@ import org.pantsbuild.tools.junit.lib.security.threads.DanglingThreadFromTestCas
 import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeClassAndJoinedAfterTest;
 import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeClassAndNotJoinedAfterTest;
 import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBeforeTest;
+import org.pantsbuild.tools.junit.lib.security.threads.ThreadStartedInBodyAndJoinedAfterTest;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -97,6 +98,23 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
   }
 
   @Test
+  public void testThreadStartedInBeforeTestAndJoinedAfterWhenSuiteLeakingDisallowed() {
+    // Expect that of the two tests, only the test that fails due to an assertion failure will fail.
+    // And that it fails due to that failure
+    Class<?> testClass = ThreadStartedInBeforeTest.class;
+    String output = runTestsExpectingFailure(
+        new JunitSecurityManagerConfig(
+            JunitSecurityManagerConfig.SystemExitHandling.disallow,
+            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestSuiteThreads,
+            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+        testClass);
+    assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
+    assertThat(output, containsString("java.lang.AssertionError: failing"));
+    assertThat(output, containsString("There was 1 failure:"));
+    assertThat(output, containsString("Tests run: 2,  Failures: 1"));
+  }
+
+  @Test
   public void testThreadStartedInBeforeClassAndJoinedAfterClassWithPerSuiteThreadLife() {
     // Expect that of the two tests, only the test that fails due to an assertion failure will fail.
     // And that it fails due to that failure.
@@ -111,6 +129,41 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
     assertThat(output, containsString("There was 1 failure:"));
     assertThat(output, containsString("Tests run: 2,  Failures: 1"));
+  }
+
+  @Test
+  public void testThreadStartedInBodyAndJoinedAfterClassWithPerSuiteThreadLife() {
+    // Expect that of the two tests, only the test that fails due to an assertion failure will fail.
+    // And that it fails due to that failure.
+    // The other failure will be ascribed to the test class instead.
+    Class<?> testClass = ThreadStartedInBodyAndJoinedAfterTest.class;
+    String output = runTestsExpectingFailure(
+        new JunitSecurityManagerConfig(
+            JunitSecurityManagerConfig.SystemExitHandling.disallow,
+            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestSuiteThreads,
+            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+        testClass);
+    assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
+    assertThat(output, containsString("There was 1 failure:"));
+    assertThat(output, containsString("Tests run: 2,  Failures: 1"));
+  }
+
+  @Test
+  public void testThreadStartedInBodyAndJoinedAfterClassWithPerTestCaseThreadLife() {
+    // Expect that of the two tests, only the test that fails due to an assertion failure will fail.
+    // And that it fails due to that failure.
+    // The other failure will be ascribed to the test class instead.
+    Class<?> testClass = ThreadStartedInBodyAndJoinedAfterTest.class;
+    String output = runTestsExpectingFailure(
+        new JunitSecurityManagerConfig(
+            JunitSecurityManagerConfig.SystemExitHandling.disallow,
+            JunitSecurityManagerConfig.ThreadHandling.disallowLeakingTestCaseThreads,
+            JunitSecurityManagerConfig.NetworkHandling.allowAll),
+        testClass);
+    assertThat(output, containsString("failing(" + testClass.getCanonicalName() + ")"));
+    assertThat(output, containsString("passing(" + testClass.getCanonicalName() + ")"));
+    assertThat(output, containsString("There were 2 failures:"));
+    assertThat(output, containsString("Tests run: 2,  Failures: 2"));
   }
 
   @Test
@@ -223,8 +276,8 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     assertThat(output, containsString(") networkCallInJoinedThread(" + testClassName + ")"));
     assertThat(output, containsString(") networkCallInNotJoinedThread(" + testClassName + ")"));
 
-    assertThat(output, containsString("There were 4 failures:"));
-    assertThat(output, containsString("Tests run: 5,  Failures: 4"));
+    assertThat(output, containsString("There were 5 failures:"));
+    assertThat(output, containsString("Tests run: 6,  Failures: 5"));
 
     assertThat(output, containsString(
         ") directNetworkCall(" + testClassName + ")\n" +
@@ -252,7 +305,7 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
         ),
         testClass);
 
-    assertThat(output, containsString("OK (5 tests)\n"));
+    assertThat(output, containsString("OK (6 tests)\n"));
   }
 
   @Test
@@ -274,8 +327,8 @@ public class SecurityManagerConsoleRunnerImplTest extends ConsoleRunnerImplTestS
     assertThat(output, containsString(") networkCallInJoinedThread(" + testClassName + ")"));
     assertThat(output, containsString(") networkCallInNotJoinedThread(" + testClassName + ")"));
 
-    assertThat(output, containsString("There were 4 failures:"));
-    assertThat(output, containsString("Tests run: 5,  Failures: 4"));
+    assertThat(output, containsString("There were 5 failures:"));
+    assertThat(output, containsString("Tests run: 6,  Failures: 5"));
 
     assertThat(output, containsString(
         ") directNetworkCall(" + testClassName + ")\n" +

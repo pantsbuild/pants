@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.AfterClass;
@@ -14,9 +15,9 @@ import org.junit.Test;
 
 public class BoundaryNetworkTests {
 
-  public static final String NETWORK_LOCATION = "http://example.com/";
   public static String hostname = "example.com";
   static CountDownLatch latch = new CountDownLatch(1);
+  static CountDownLatch latchOnOtherSide = new CountDownLatch(1);
 
   @BeforeClass
   public static void beforeAll() {
@@ -24,14 +25,10 @@ public class BoundaryNetworkTests {
   }
 
   @AfterClass
-  public static void afterAll() {
+  public static void afterAll() throws InterruptedException {
     System.out.println("=after class.");
     latch.countDown();
-    try {
-      Thread.sleep(1);
-    } catch (InterruptedException e) {
-      // ignore
-    }
+    latchOnOtherSide.await(1, TimeUnit.SECONDS);
   }
 
   public static void reset() {
@@ -55,17 +52,17 @@ public class BoundaryNetworkTests {
   @Test
   public void directNetworkCall() {
     makeNetworkCall();
-    return;
   }
 
   private void makeNetworkCall() {
     InetSocketAddress addr = new InetSocketAddress(hostname, 80);
   }
 
-  private void makeNetworkCall2() {
+  @Test
+  public void makeNetworkCall2() {
     URLConnection conn = null;
     try {
-      conn = new URL(NETWORK_LOCATION).openConnection();
+      conn = new URL("http://" + hostname).openConnection();
       conn.connect();
       conn.getOutputStream().close();
     } catch (IOException e) {
@@ -102,13 +99,17 @@ public class BoundaryNetworkTests {
       @Override
       public void run() {
         try {
-          latch.await(); // wait until after AfterClass is done
-          System.out.println("dangling thread done waiting");
-        } catch (InterruptedException e) {
-          // ignore
+          try {
+            latch.await(); // wait until after AfterClass is done
+            System.out.println("dangling thread done waiting");
+          } catch (InterruptedException e) {
+            // ignore
+          }
+          System.out.println("dangling thread now networkCalling");
+          makeNetworkCall();
+        } finally {
+          latchOnOtherSide.countDown();
         }
-        System.out.println("dangling thread now networkCalling");
-        makeNetworkCall();
       }
     });
     thread.start();

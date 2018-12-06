@@ -3,6 +3,7 @@ package org.pantsbuild.tools.junit.impl.security;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -125,13 +126,22 @@ public class SecurityManagedRunner extends Runner implements Filterable {
 
     // testRunFinished is for all of the tests.
     // TODO This currently is run for each runner. It might make sense to extract a runner that just
-    //      includes this and only runs it once.
+    //      includes this and only runs it once. I bet this will cause an issue with remote running
+    //      if this can be called from threads--but I think notifiers are synchronized so it's cool
     @Override
     public void testRunFinished(Result result) throws Exception {
+      log("run finished");
       // Mark the run as finished, and if it was previously marked, skip checks.
       if (securityManager.finished()) {
         return;
       }
+
+      // description types
+      // - test case
+      // -   parameterized
+      // - test suite
+      // - test mechanism
+      // - empty
       for (Description description : tests.keySet()) {
         if (tests.get(description) == TestState.failed) {
           // NB if it's already failed, just show the initial
@@ -140,36 +150,75 @@ public class SecurityManagedRunner extends Runner implements Filterable {
         }
         TestSecurityContext context = contextFor(description);
         if (description.isTest()) {
-          if (context.hadFailures()) {
-            handleSecurityFailure(description, context);
-          }
-          handleDanglingThreads(description, context);
+          resolveConstraintViolationsAndFailures(description, context);
         } else if (description.isSuite()) {
-          if (context.hadFailures()) {
-            handleSecurityFailure(description, context);
-          }
-          handleDanglingThreads(description, context);
+          resolveConstraintViolationsAndFailures(description, context);
         } else {
           throwNotSuiteOrTest(description);
         }
       }
-
-      Set<Class<?>> classNames = new HashSet<>();
+      // collate the testclasses and report on them separately
+      // This catches failures that hang in particular test classes
+      Set<Class<?>> classNames = new LinkedHashSet<>();
       for (Description description : tests.keySet()) {
-        classNames.add(description.getTestClass());
+        Class<?> testClass = description.getTestClass();
+        if (testClass == null) {
+          continue;
+        }
+        classNames.add(testClass);
       }
       for (Class<?> className : classNames) {
         TestSecurityContext context = securityManager.contextFor(className.getCanonicalName());
-        if (context != null) {
-          if (context.hadFailures()) {
-            handleSecurityFailure(Description.createSuiteDescription(className), context);
-          }
-          if (securityManager.perClassThreadHandling()) {
-            handleDanglingThreads(Description.createSuiteDescription(className), context);
-          }
+        if (context == null) {
+          continue;
+        }
+        Description description = Description.createSuiteDescription(className);
+        reportConstraintFailuresExceptThreads(description, context);
+        if (securityManager.perClassThreadHandling()) {
+          reportDanglingThreads(description, context);
         }
       }
+    }
 
+    private void resolveConstraintViolationsAndFailures(
+        Description description,
+        TestSecurityContext context) {
+      // fires failures for the current thing if necessary
+      reportConstraintFailuresExceptThreads(description, context);
+
+      reportDanglingThreads(description, context);
+    }
+
+    private void reportConstraintFailuresExceptThreads(
+        Description description,
+        TestSecurityContext context) {
+      // if there were constraint violations and they haven't been reported yet, report them.
+      if (context.hadFailures() && tests.get(description) != TestState.failed) {
+        Throwable cause = context.firstFailure();
+        fireFailure(description, cause);
+        tests.put(description, TestState.failed);
+      }
+    }
+
+    private void reportDanglingThreads(Description description, TestSecurityContext context) {
+      log("desc: "+description+" checking dangling");
+      // if there are threads running and the current context does not allow threads to remain,
+      // running, report a failure.
+      if (context.hasActiveThreads()) {
+        if (securityManager.disallowsThreadsFor(context)) {
+          fireFailure(description, new SecurityViolationException(
+              "Threads from " + description + " are still running (" +
+                  context.getThreadGroup().activeCount() + "):\n"
+                  + getThreadGroupListing(context.getThreadGroup())));
+          tests.put(description, TestState.failed);
+          log("desc: "+description+" failed dangling check");
+        } else {
+          tests.put(description, TestState.danglingThreads);
+          log("desc: "+description+" has, but not failed dangling check");
+        }
+      } else {
+        log("no active threads");
+      }
     }
 
     @Override
@@ -207,45 +256,17 @@ public class SecurityManagedRunner extends Runner implements Filterable {
         // failure.
         return;
       }
+      log("testFinished "+ description);
 
       TestSecurityContext context = contextFor(description);
       if (description.isTest()) {
         try {
-          if (context.hadFailures()) {
-            handleSecurityFailure(description, context);
-          }
-          handleDanglingThreads(description, context);
+          resolveConstraintViolationsAndFailures(description, context);
         } finally {
           securityManager.endTest();
         }
       } else if (description.isSuite()) {
-        if (context.hadFailures()) {
-          handleSecurityFailure(description, context);
-        }
-        handleDanglingThreads(description, context);
-      }
-    }
-
-    void handleSecurityFailure(Description description, TestSecurityContext context) {
-      if (tests.get(description) == TestState.failed) {
-        return;
-      }
-      Throwable cause = context.firstFailure();
-      fireFailure(description, cause);
-      tests.put(description, TestState.failed);
-    }
-
-    void handleDanglingThreads(Description description, TestSecurityContext context) {
-      if (context.hasActiveThreads()) {
-        if (securityManager.disallowsThreadsFor(context)) {
-          fireFailure(description, new SecurityViolationException(
-              "Threads from " + description + " are still running (" +
-                  context.getThreadGroup().activeCount() + "):\n"
-                  + getThreadGroupListing(context.getThreadGroup())));
-          tests.put(description, TestState.failed);
-        } else {
-          tests.put(description, TestState.danglingThreads);
-        }
+        resolveConstraintViolationsAndFailures(description, context);
       }
     }
 

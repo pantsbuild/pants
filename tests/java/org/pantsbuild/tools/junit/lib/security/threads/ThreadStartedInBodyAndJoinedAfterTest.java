@@ -1,20 +1,27 @@
 package org.pantsbuild.tools.junit.lib.security.threads;
 
-import org.junit.After;
 import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static org.junit.Assert.fail;
 
-public class ThreadStartedInBeforeTest {
+public class ThreadStartedInBodyAndJoinedAfterTest {
 
-  private Thread thread;
+  private static Thread thread;
 
-  @Before
-  public void startThread() {
-    System.out.println("==before.");
+  @AfterClass
+  public static void joinThread() {
+    System.out.println("==afterclass");
+    try {
+      thread.join();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+  }
+
+  @Test
+  public void passing() {
+    System.out.println("==passing");
     thread = new Thread(new Runnable() {
       @Override
       public void run() {
@@ -26,20 +33,6 @@ public class ThreadStartedInBeforeTest {
       }
     });
     thread.start();
-  }
-
-  @After
-  public void joinThread() {
-    try {
-      thread.join();
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
-  }
-
-  @Test
-  public void passing() {
-
   }
 
   @Test

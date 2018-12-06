@@ -25,6 +25,7 @@ public class ThreadStartedInBeforeClassAndJoinedAfterTest {
         }
       }
     });
+    thread.start();
   }
 
   @AfterClass
