@@ -3,6 +3,15 @@
 
 This document describes releases leading up to the ``1.11.x`` ``stable`` series.
 
+1.11.0rc3 (12/06/2018)
+----------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Move file owners computation into the engine and make lighter (#6790)
+  `PR #6790 <https://github.com/pantsbuild/pants/pull/6790>`_
+
 1.11.0rc2 (11/15/2018)
 ----------------------
 
