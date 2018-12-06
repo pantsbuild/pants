@@ -140,15 +140,15 @@ def _tuplify(v):
   return (v,)
 
 
-class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table', 'goal_map'])):
+class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table', 'console', 'goal_map'])):
   """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
 
   def new_session(self):
     session = self.scheduler.new_session()
-    return LegacyGraphSession(session, self.symbol_table, self.goal_map)
+    return LegacyGraphSession(session, self.symbol_table, self.console, self.goal_map)
 
 
-class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_map'])):
+class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'console', 'goal_map'])):
   """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
 
   class InvalidGoals(Exception):
@@ -209,6 +209,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'goal_ma
       goal_product = self.goal_map[goal]
       logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
       self.scheduler_session.run_console_rule(goal_product, subjects[0], v2_ui)
+    self.console.flush()
 
   def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.
@@ -367,4 +368,4 @@ class EngineInitializer(object):
       include_trace_on_error=include_trace_on_error,
     )
 
-    return LegacyGraphScheduler(scheduler, symbol_table, goal_map)
+    return LegacyGraphScheduler(scheduler, symbol_table, console, goal_map)
