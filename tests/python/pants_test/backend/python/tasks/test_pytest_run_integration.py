@@ -130,7 +130,12 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
     with setup_pexrc_with_pex_python_path([py27_path, py3_path]):
       with temporary_dir() as interpreters_cache:
-        pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
+        pants_ini_config = {
+          'python-setup': {
+            'interpreter_cache_dir': interpreters_cache,
+            'interpreter_search_paths': ['<PEXRC>'],
+          }
+        }
         pants_run_27 = self.run_pants(
           command=['test', '{}:test_py2'.format(os.path.join(self.testproject,
                                                              'python_3_selection_testing'))],
