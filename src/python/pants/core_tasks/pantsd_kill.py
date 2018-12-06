@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.exceptions import TaskError
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.pantsd.process_manager import ProcessManager
 from pants.task.task import Task
@@ -15,7 +16,7 @@ class PantsDaemonKill(Task):
 
   def execute(self):
     try:
-      pantsd = PantsDaemon.Factory.create(self.context.options, full_init=False)
+      pantsd = PantsDaemon.Factory.create(OptionsBootstrapper.create(), full_init=False)
       with pantsd.lifecycle_lock:
         pantsd.terminate()
     except ProcessManager.NonResponsiveProcess as e:

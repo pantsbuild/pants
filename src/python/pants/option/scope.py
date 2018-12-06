@@ -4,15 +4,20 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from collections import namedtuple
+from builtins import str
+
+from pants.util.objects import datatype
 
 
 GLOBAL_SCOPE = ''
 GLOBAL_SCOPE_CONFIG_SECTION = 'GLOBAL'
 
 
-# TODO: convert this to a datatype?
-class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls'])):
+class Scope(datatype([('scope', str)])):
+  """An options scope."""
+
+
+class ScopeInfo(datatype(['scope', 'category', 'optionable_cls'])):
   """Information about a scope."""
 
   # Symbolic constants for different categories of scope.
@@ -21,6 +26,9 @@ class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls']
   TASK = 'TASK'
   SUBSYSTEM = 'SUBSYSTEM'
   INTERMEDIATE = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.
+
+  def __new__(cls, scope, category, optionable_cls=None):
+    return super(ScopeInfo, cls).__new__(cls, scope, category, optionable_cls)
 
   @property
   def description(self):
@@ -36,7 +44,3 @@ class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls']
 
   def _optionable_cls_attr(self, name, default=None):
     return getattr(self.optionable_cls, name) if self.optionable_cls else default
-
-
-# Allow the optionable_cls to default to None.
-ScopeInfo.__new__.__defaults__ = (None, )

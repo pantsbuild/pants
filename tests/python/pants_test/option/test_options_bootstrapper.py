@@ -38,7 +38,7 @@ class BootstrapOptionsTest(unittest.TestCase):
       fp.close()
 
       args = args + self._config_path(fp.name)
-      bootstrapper = OptionsBootstrapper(env=env, args=args)
+      bootstrapper = OptionsBootstrapper.create(env=env, args=args)
       vals = bootstrapper.get_bootstrap_options().for_global_scope()
 
       vals_dict = {k: getattr(vals, k) for k in expected_entries}
@@ -116,7 +116,7 @@ class BootstrapOptionsTest(unittest.TestCase):
       """))
       fp.close()
       args = ['--pants-workdir=/qux'] + self._config_path(fp.name)
-      bootstrapper = OptionsBootstrapper(env={
+      bootstrapper = OptionsBootstrapper.create(env={
                                            'PANTS_SUPPORTDIR': '/pear'
                                          },
                                          args=args)
@@ -189,14 +189,14 @@ class BootstrapOptionsTest(unittest.TestCase):
 
   def test_create_bootstrapped_multiple_pants_config_files(self):
     def create_options_bootstrapper(*config_paths):
-      return OptionsBootstrapper(args=['--pants-config-files={}'.format(cp) for cp in config_paths])
+      return OptionsBootstrapper.create(args=['--pants-config-files={}'.format(cp) for cp in config_paths])
 
     self.do_test_create_bootstrapped_multiple_config(create_options_bootstrapper)
 
   def test_full_options_caching(self):
     with temporary_file_path() as config:
       args = self._config_path(config)
-      bootstrapper = OptionsBootstrapper(env={}, args=args)
+      bootstrapper = OptionsBootstrapper.create(env={}, args=args)
 
       opts1 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL),
                                                                ScopeInfo('foo', ScopeInfo.TASK)])
@@ -219,7 +219,7 @@ class BootstrapOptionsTest(unittest.TestCase):
   def test_bootstrap_short_options(self):
     def parse_options(*args):
       full_args = list(args) + self._config_path(None)
-      return OptionsBootstrapper(args=full_args).get_bootstrap_options().for_global_scope()
+      return OptionsBootstrapper.create(args=full_args).get_bootstrap_options().for_global_scope()
 
     # No short options passed - defaults presented.
     vals = parse_options()
@@ -238,7 +238,7 @@ class BootstrapOptionsTest(unittest.TestCase):
   def test_bootstrap_options_passthrough_dup_ignored(self):
     def parse_options(*args):
       full_args = list(args) + self._config_path(None)
-      return OptionsBootstrapper(args=full_args).get_bootstrap_options().for_global_scope()
+      return OptionsBootstrapper.create(args=full_args).get_bootstrap_options().for_global_scope()
 
     vals = parse_options('main', 'args', '-d/tmp/frogs', '--', '-d/tmp/logs')
     self.assertEqual('/tmp/frogs', vals.logdir)
@@ -285,6 +285,6 @@ class BootstrapOptionsTest(unittest.TestCase):
       with open(config2, 'w') as out2:
         out2.write('[DEFAULT]\nlogdir: logdir2\n')
 
-      ob = OptionsBootstrapper(env={}, args=["--pants-config-files=['{}']".format(config1)])
+      ob = OptionsBootstrapper.create(env={}, args=["--pants-config-files=['{}']".format(config1)])
       logdir = ob.get_bootstrap_options().for_global_scope().logdir
       self.assertEqual('logdir1', logdir)

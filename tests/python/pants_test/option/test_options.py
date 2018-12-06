@@ -26,7 +26,6 @@ from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, Im
                                  OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
                                  Shadowing)
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.option_tracker import OptionTracker
 from pants.option.optionable import Optionable
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -71,8 +70,7 @@ class OptionsTest(unittest.TestCase):
                                   config=self._create_config(config or {}),
                                   known_scope_infos=OptionsTest._known_scope_infos,
                                   args=args,
-                                  bootstrap_option_values=bootstrap_option_values,
-                                  option_tracker=OptionTracker())
+                                  bootstrap_option_values=bootstrap_option_values)
     self._register(options)
     return options
 
@@ -191,16 +189,14 @@ class OptionsTest(unittest.TestCase):
     options = Options.create(env={'PANTS_FOO_BAR': "['123','456']"},
                              config=self._create_config({}),
                              known_scope_infos=OptionsTest._known_scope_infos,
-                             args=shlex.split('./pants'),
-                             option_tracker=OptionTracker())
+                             args=shlex.split('./pants'))
     options.register(GLOBAL_SCOPE, '--foo-bar', type=list, member_type=int)
     self.assertEqual([123, 456], options.for_global_scope().foo_bar)
 
     options = Options.create(env={'PANTS_FOO_BAR': '123'},
                              config=self._create_config({}),
                              known_scope_infos=OptionsTest._known_scope_infos,
-                             args=shlex.split('./pants'),
-                             option_tracker=OptionTracker())
+                             args=shlex.split('./pants'))
     options.register(GLOBAL_SCOPE, '--foo-bar', type=int)
     self.assertEqual(123, options.for_global_scope().foo_bar)
 
@@ -576,7 +572,7 @@ class OptionsTest(unittest.TestCase):
     def assertError(expected_error, *args, **kwargs):
       with self.assertRaises(expected_error):
         options = Options.create(args=[], env={}, config=self._create_config({}),
-                                 known_scope_infos=[], option_tracker=OptionTracker())
+                                 known_scope_infos=[])
         options.register(GLOBAL_SCOPE, *args, **kwargs)
         options.for_global_scope()
 
@@ -594,7 +590,7 @@ class OptionsTest(unittest.TestCase):
 
   def test_frozen_registration(self):
     options = Options.create(args=[], env={}, config=self._create_config({}),
-                             known_scope_infos=[task('foo')], option_tracker=OptionTracker())
+                             known_scope_infos=[task('foo')])
     options.register('foo', '--arg1')
     with self.assertRaises(FrozenRegistration):
       options.register(GLOBAL_SCOPE, '--arg2')
@@ -611,8 +607,7 @@ class OptionsTest(unittest.TestCase):
     options = Options.create(env={},
                              config=self._create_config({}),
                              known_scope_infos=[task('bar'), intermediate('foo'), task('foo.bar')],
-                             args='./pants',
-                             option_tracker=OptionTracker())
+                             args='./pants')
     options.register('', '--opt1')
     options.register('foo', '-o', '--opt2')
     with self.assertRaises(Shadowing):
@@ -643,8 +638,7 @@ class OptionsTest(unittest.TestCase):
     options = Options.create(env={},
                              config=self._create_config({}),
                              known_scope_infos=[subsystem('foo')],
-                             args='./pants',
-                             option_tracker=OptionTracker())
+                             args='./pants')
     # All subsystem options are implicitly recursive (a subscope of subsystem scope represents
     # a separate instance of the subsystem, so it needs all the options).
     # We disallow explicit specification of recursive (even if set to True), to avoid confusion.
@@ -702,8 +696,8 @@ class OptionsTest(unittest.TestCase):
       cmdline = './pants --target-spec-file={filename} --pants-config-files="[]" ' \
                 'compile morx:tgt fleem:tgt'.format(
         filename=tmp.name)
-      bootstrapper = OptionsBootstrapper(args=shlex.split(cmdline))
-      bootstrap_options = bootstrapper.get_bootstrap_options().for_global_scope()
+      bootstrapper = OptionsBootstrapper.create(args=shlex.split(cmdline))
+      bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
       options = self._parse(cmdline, bootstrap_option_values=bootstrap_options)
       sorted_specs = sorted(options.target_specs)
       self.assertEqual(['bar', 'fleem:tgt', 'foo', 'morx:tgt'], sorted_specs)
@@ -1209,10 +1203,6 @@ class OptionsTest(unittest.TestCase):
     self.assertNotEqual(some, RankedValue(RankedValue.HARDCODED, 'few'))
     self.assertNotEqual(some, RankedValue(RankedValue.CONFIG, 'some'))
 
-  def test_option_tracker_required(self):
-    with self.assertRaises(Options.OptionTrackerRequiredError):
-      Options.create(None, None, [])
-
   def test_pants_global_designdoc_example(self):
     # The example from the design doc.
     # Get defaults from config and environment.
@@ -1257,8 +1247,7 @@ class OptionsTest(unittest.TestCase):
     options = Options.create(env={},
                              config=self._create_config({}),
                              known_scope_infos=OptionsTest._known_scope_infos,
-                             args=shlex.split('./pants'),
-                             option_tracker=OptionTracker())
+                             args=shlex.split('./pants'))
     options.register(GLOBAL_SCOPE, '--foo-bar')
     self.assertRaises(OptionAlreadyRegistered, lambda: options.register(GLOBAL_SCOPE, '--foo-bar'))
 
@@ -1296,8 +1285,7 @@ class OptionsTest(unittest.TestCase):
                                DummyOptionable1.get_scope_info(),
                                DummyOptionable2.get_scope_info()
                              ],
-                             args=shlex.split('./pants --new-scope1-baz=vv'),
-                             option_tracker=OptionTracker())
+                             args=shlex.split('./pants --new-scope1-baz=vv'))
 
     options.register(GLOBAL_SCOPE, '--inherited')
     options.register(DummyOptionable1.options_scope, '--foo')
@@ -1351,8 +1339,7 @@ class OptionsTest(unittest.TestCase):
                              known_scope_infos=[
                                DummyOptionable1.get_scope_info(),
                              ],
-                             args=shlex.split('./pants'),
-                             option_tracker=OptionTracker())
+                             args=shlex.split('./pants'))
 
     options.register(DummyOptionable1.options_scope, '--foo')
 

@@ -76,7 +76,7 @@ class PluginResolverTest(unittest.TestCase):
         touch(configpath)
       args = ["--pants-config-files=['{}']".format(configpath)]
 
-      options_bootstrapper = OptionsBootstrapper(env=env, args=args)
+      options_bootstrapper = OptionsBootstrapper.create(env=env, args=args)
       plugin_resolver = PluginResolver(options_bootstrapper)
       cache_dir = plugin_resolver.plugin_cache_dir
       yield plugin_resolver.resolve(WorkingSet(entries=[])), root_dir, repo_dir, cache_dir

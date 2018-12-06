@@ -30,7 +30,7 @@ class LocalPantsRunner(object):
 
   @staticmethod
   def parse_options(args, env, setup_logging=False, options_bootstrapper=None):
-    options_bootstrapper = options_bootstrapper or OptionsBootstrapper(args=args, env=env)
+    options_bootstrapper = options_bootstrapper or OptionsBootstrapper.create(args=args, env=env)
     bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
     if setup_logging:
       # Bootstrap logging and then fully initialize options.
@@ -40,15 +40,15 @@ class LocalPantsRunner(object):
     return options, build_config, options_bootstrapper
 
   @staticmethod
-  def _maybe_init_graph_session(graph_session, global_options, build_config):
+  def _maybe_init_graph_session(graph_session, options_bootstrapper, build_config):
     if graph_session:
       return graph_session
 
-    native = Native.create(global_options)
+    native = Native.create(options_bootstrapper.bootstrap_options.for_global_scope())
     native.set_panic_handler()
     graph_scheduler_helper = EngineInitializer.setup_legacy_graph(
       native,
-      global_options,
+      options_bootstrapper,
       build_config
     )
     return graph_scheduler_helper.new_session()
@@ -103,7 +103,7 @@ class LocalPantsRunner(object):
     # resident graph helper - otherwise initialize a new one here.
     graph_session = cls._maybe_init_graph_session(
       daemon_graph_session,
-      global_options,
+      options_bootstrapper,
       build_config
     )
 

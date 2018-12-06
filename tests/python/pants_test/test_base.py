@@ -397,6 +397,7 @@ class TestBase(unittest.TestCase):
       local_store_dir=cls._local_store_dir,
       build_file_imports_behavior='allow',
       native=init_native(),
+      options_bootstrapper=OptionsBootstrapper.create(args=['--pants-config-files=[]']),
       build_configuration=cls.build_config(),
       build_ignore_patterns=None,
     ).new_session()
@@ -619,9 +620,8 @@ class TestBase(unittest.TestCase):
 
     :param cli_options: An iterable of CLI flags to pass as arguments to `OptionsBootstrapper`.
     """
-    # Can't parse any options without a pants.ini.
-    self.create_file('pants.ini')
-    return OptionsBootstrapper(args=cli_options).get_bootstrap_options().for_global_scope()
+    args = tuple(['--pants-config-files=[]']) + tuple(cli_options)
+    return OptionsBootstrapper.create(args=args).bootstrap_options.for_global_scope()
 
   class LoggingRecorder(object):
     """Simple logging handler to record warnings."""
