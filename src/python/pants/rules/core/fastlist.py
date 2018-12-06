@@ -13,5 +13,5 @@ from pants.engine.selectors import Select
 @console_rule('list', [Select(Console), Select(BuildFileAddresses)])
 def fast_list(console, addresses):
   """A fast variant of `./pants list` with a reduced feature set."""
-  for address in addresses.dependencies:
+  for address in addresses:
     console.print_stdout(address.spec)

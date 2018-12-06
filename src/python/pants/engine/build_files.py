@@ -55,7 +55,7 @@ def parse_address_family(address_mapper, directory):
   if not files_content:
     raise ResolveError('Directory "{}" does not contain any BUILD files.'.format(directory.path))
   address_maps = []
-  for filecontent_product in files_content.dependencies:
+  for filecontent_product in files_content:
     address_maps.append(AddressMap.parse(filecontent_product.path,
                                          filecontent_product.content,
                                          address_mapper.parser))
@@ -222,7 +222,7 @@ def addresses_from_address_families(address_mapper, specs):
   address_family_by_directory = {af.namespace: af for af in address_families}
 
   matched_addresses = OrderedSet()
-  for spec in specs.dependencies:
+  for spec in specs:
     # NB: if a spec is provided which expands to some number of targets, but those targets match
     # --exclude-target-regexp, we do NOT fail! This is why we wait to apply the tag and exclude
     # patterns until we gather all the targets the spec would have matched without them.
@@ -250,7 +250,7 @@ def addresses_from_address_families(address_mapper, specs):
 def _spec_to_globs(address_mapper, specs):
   """Given a Specs object, return a PathGlobs object for the build files that it matches."""
   patterns = set()
-  for spec in specs.dependencies:
+  for spec in specs:
     patterns.update(spec.make_glob_patterns(address_mapper))
   return PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
 
