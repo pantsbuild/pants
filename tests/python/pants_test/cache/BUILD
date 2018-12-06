@@ -78,22 +78,15 @@ python_library(
   ]
 )
 
-python_library(
-  name = 'delay_server',
-  sources = ['delay_server.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
-)
-
 python_tests(
   name = 'pinger',
   sources = ['test_pinger.py'],
   dependencies = [
     '3rdparty/python:future',
+    '3rdparty/python:mock',
+    '3rdparty/python:responses',
     'src/python/pants/cache',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/cache:delay_server',
   ],
   timeout = 90
 )

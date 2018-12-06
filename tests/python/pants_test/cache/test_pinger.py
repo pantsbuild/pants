@@ -4,68 +4,93 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from contextlib import contextmanager
+
+import mock
+import requests
+import responses
 from future.moves.urllib.parse import urlparse
 from requests import RequestException
 
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError, Pinger
-from pants_test.cache.delay_server import setup_delayed_server
 from pants_test.test_base import TestBase
 
 
 class TestPinger(TestBase):
 
-  resolution = 1
-  fast_delay_seconds = 0
-  fast_timeout_seconds = fast_delay_seconds + resolution
-  slow_delay_seconds = fast_timeout_seconds + resolution
-  slow_timeout_seconds = slow_delay_seconds + resolution
-  unreachable_delay_seconds = slow_timeout_seconds + 10 * resolution
-  message = "This test may fail occasionally if the CPU is very busy."
+  fast_url = 'http://fast_url'
+  slow_url = 'http://slow_url'
+  unreachable_url = 'http://unreachable_url'
 
-  def setUp(self):
-    unreachable = setup_delayed_server(self.unreachable_delay_seconds)
-    slow = setup_delayed_server(self.slow_delay_seconds)
-    fast = setup_delayed_server(self.fast_delay_seconds)
-    self.servers = [unreachable, slow, fast]
-    self.fast_netloc = 'http://localhost:{}'.format(fast.socket.getsockname()[1])
-    self.slow_netloc = 'http://localhost:{}'.format(slow.socket.getsockname()[1])
-    self.unreachable_netloc = 'http://localhost:{}'.format(unreachable.socket.getsockname()[1])
-    self.https_external_netlock = 'https://github.com'
+  latency_by_url = {
+    fast_url: 0.1,
+    slow_url: 0.3,
+    unreachable_url: Pinger.UNREACHABLE
+  }
 
+  @classmethod
+  def expect_response(cls, url, timeout, times):
+    latency = cls.latency_by_url[url]
+
+    # TODO(John Sirois): Switch to a homomorphic response in each branch once
+    #   https://github.com/getsentry/responses/issues/234 is fixed.
+    response = requests.exceptions.ConnectTimeout() if latency >= timeout else (200, {}, '')
+
+    def callback(_):
+      if latency < timeout:
+        times.append(latency)
+      else:
+        # We raise a timeout exception.
+        pass
+      return response
+
+    responses.add_callback(responses.HEAD, url, callback)
+
+  @contextmanager
+  def pinger(self, timeout, urls, tries=2):
+    with mock.patch('pants.cache.pinger.Timer.elapsed', new_callable=mock.PropertyMock) as elapsed:
+      times = []
+      for url in urls:
+        for _ in range(tries):
+          self.expect_response(url, timeout, times)
+      elapsed.side_effect = times
+
+      yield Pinger(timeout=timeout, tries=tries)
+
+      # Ensure our mock Timer was used exactly the number of times we expected.
+      self.assertEqual(elapsed.call_count, len(times))
+
+  @responses.activate
   def test_pinger_times_correct(self):
-    test = Pinger(timeout=self.slow_timeout_seconds, tries=2)
-    netlocs = [self.fast_netloc, self.slow_netloc, self.unreachable_netloc]
-    ping_results = dict(test.pings(netlocs))
-    self.assertNotEqual(ping_results[self.slow_netloc], Pinger.UNREACHABLE)
-    self.assertLess(ping_results[self.fast_netloc], ping_results[self.slow_netloc])
-    self.assertEqual(ping_results[self.unreachable_netloc], Pinger.UNREACHABLE, msg=self.message)
+    urls = [self.fast_url, self.slow_url, self.unreachable_url]
+    with self.pinger(timeout=0.4, urls=urls) as test:
+      ping_results = dict(test.pings(urls))
+      self.assertEqual(ping_results[self.slow_url], 0.3)
+      self.assertLess(ping_results[self.fast_url], ping_results[self.slow_url])
+      self.assertEqual(ping_results[self.unreachable_url], Pinger.UNREACHABLE)
 
+  @responses.activate
   def test_pinger_timeout_config(self):
-    test = Pinger(timeout=self.fast_timeout_seconds, tries=2)
-    netlocs = [self.fast_netloc, self.slow_netloc]
-    ping_results = dict(test.pings(netlocs))
-    self.assertLess(ping_results[self.fast_netloc], self.fast_timeout_seconds)
-    self.assertEqual(
-      ping_results[self.slow_netloc], Pinger.UNREACHABLE, msg=self.message)
+    urls = [self.fast_url, self.slow_url]
+    with self.pinger(timeout=0.2, urls=urls) as test:
+      ping_results = dict(test.pings(urls))
+      self.assertEqual(ping_results[self.fast_url], 0.1)
+      self.assertEqual(ping_results[self.slow_url], Pinger.UNREACHABLE)
 
+  @responses.activate
   def test_global_pinger_memo(self):
-    fast_pinger = Pinger(timeout=self.fast_timeout_seconds, tries=2)
-    slow_pinger = Pinger(timeout=self.slow_timeout_seconds, tries=2)
-    self.assertEqual(
-      fast_pinger.pings([self.slow_netloc])[0][1], Pinger.UNREACHABLE, msg=self.message)
-    self.assertNotEqual(
-      slow_pinger.pings([self.slow_netloc])[0][1], Pinger.UNREACHABLE, msg=self.message)
+    urls = [self.slow_url]
+    with self.pinger(timeout=0.2, urls=urls) as fast_pinger:
+      self.assertEqual(fast_pinger.pings([self.slow_url])[0][1], Pinger.UNREACHABLE)
+    with self.pinger(timeout=0.4, urls=urls) as slow_pinger:
+      self.assertLess(slow_pinger.pings([self.slow_url])[0][1], Pinger.UNREACHABLE)
 
   def test_https_external_pinger(self):
     # NB(gmalmquist): I spent quite some time trying to spin up an HTTPS server and get it to work
     # with this test, but it appears to be more trouble than it's worth. If you're feeling
     # ambitious, feel free to give it a try.
-    pinger = Pinger(timeout=self.slow_delay_seconds, tries=2)
-    self.assertLess(pinger.ping(self.https_external_netlock), Pinger.UNREACHABLE)
-
-  def tearDown(self):
-    for server in self.servers:
-      server.shutdown()
+    pinger = Pinger(timeout=5, tries=2)
+    self.assertLess(pinger.ping('https://github.com'), Pinger.UNREACHABLE)
 
 
 class TestBestUrlSelector(TestBase):

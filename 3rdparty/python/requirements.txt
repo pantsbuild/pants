@@ -25,6 +25,7 @@ pytest-cov>=2.5,<2.6
 pytest>=3.4,<4.0
 pywatchman==1.4.1
 requests[security]>=2.5.0,<2.19
+responses==0.10.4
 scandir==1.2
 setproctitle==1.1.10
 setuptools==40.4.3
