@@ -233,3 +233,6 @@ class Specs(datatype([('dependencies', tuple), ('matcher', SpecsMatcher)])):
       dependencies=tuple(dependencies),
       matcher=SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns),
     )
+
+  def __iter__(self):
+    return iter(self.dependencies)

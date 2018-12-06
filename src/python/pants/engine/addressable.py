@@ -23,7 +23,7 @@ class BuildFileAddresses(Collection.of(BuildFileAddress)):
   @property
   def addresses(self):
     """Converts the BuildFileAddress objects in this collection to Address objects."""
-    return [bfa.to_address() for bfa in self.dependencies]
+    return [bfa.to_address() for bfa in self]
 
 
 class NotSerializableError(TypeError):
