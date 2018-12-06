@@ -13,7 +13,7 @@ class LoaderIntegrationTest(PantsRunIntegrationTest):
     bypass_env = PantsLoader.ENCODING_IGNORE_ENV_VAR
     pants_run = self.run_pants(command=['help'], extra_env={'LC_ALL': 'iNvALiD-lOcALe'})
     self.assert_failure(pants_run)
-    self.assertIn('System preferred encoding is', pants_run.stderr_data)
+    self.assertIn('Pants requires', pants_run.stderr_data)
     self.assertIn(bypass_env, pants_run.stderr_data)
 
     pants_run = self.run_pants(command=['help'], extra_env={'LC_ALL': 'iNvALiD-lOcALe',
