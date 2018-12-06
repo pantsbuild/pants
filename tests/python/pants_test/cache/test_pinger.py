@@ -53,15 +53,12 @@ class TestPinger(TestBase):
       for url in urls:
         for _ in range(tries):
           self.expect_response(url, timeout, times)
-
-      elpased_results = iter(times)
-      elapsed.side_effect = elpased_results
+      elapsed.side_effect = times
 
       yield Pinger(timeout=timeout, tries=tries)
 
       # Ensure our mock Timer was used exactly the number of times we expected.
-      with self.assertRaises(StopIteration):
-        next(elpased_results)
+      self.assertEqual(elapsed.call_count, len(times))
 
   @responses.activate
   def test_pinger_times_correct(self):
@@ -86,7 +83,7 @@ class TestPinger(TestBase):
     with self.pinger(timeout=0.2, urls=urls) as fast_pinger:
       self.assertEqual(fast_pinger.pings([self.slow_url])[0][1], Pinger.UNREACHABLE)
     with self.pinger(timeout=0.4, urls=urls) as slow_pinger:
-      self.assertNotEqual(slow_pinger.pings([self.slow_url])[0][1], Pinger.UNREACHABLE)
+      self.assertLess(slow_pinger.pings([self.slow_url])[0][1], Pinger.UNREACHABLE)
 
   def test_https_external_pinger(self):
     # NB(gmalmquist): I spent quite some time trying to spin up an HTTPS server and get it to work
