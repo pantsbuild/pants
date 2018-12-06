@@ -945,7 +945,7 @@ impl RuleGraph {
     match subset_matches.len() {
       1 => Ok(subset_matches[0].1.clone()),
       0 => Err(format!(
-        "No installed @rules can satisfy {} for input Params {}.",
+        "No installed @rules can satisfy {} for input Params({}).",
         select_str(&select),
         params_str(&params),
       )),
@@ -955,7 +955,7 @@ impl RuleGraph {
           .map(|(e, _)| entry_with_deps_str(e))
           .collect::<Vec<_>>();
         Err(format!(
-          "More than one set of @rules can satisfy {} for input Params {}:\n  {}",
+          "More than one set of @rules can satisfy {} for input Params({}):\n  {}",
           select_str(&select),
           params_str(&params),
           match_strs.join("\n  "),

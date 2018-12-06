@@ -14,7 +14,6 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.nodes import Throw
-from pants.engine.scheduler import ExecutionResult
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdir
 from pants_test.test_base import TestBase
@@ -167,7 +166,7 @@ class LegacyAddressMapperTest(TestBase):
         pass
 
       def execute(self, *args):
-        return ExecutionResult(None, [(('some-thing', None), Throw(Exception('just an exception')))])
+        return [], [(('some-thing', None), Throw(Exception('just an exception')))]
 
     with temporary_dir() as build_root:
       mapper = LegacyAddressMapper(ThrowReturningScheduler(), build_root)

@@ -80,11 +80,12 @@ class LegacyAddressMapper(AddressMapper):
           return set()
       else:
         raise self.BuildFileScanError(str(state.exc))
-    elif missing_is_fatal and not state.value.dependencies:
+
+    _, state = returns[0]
+    if missing_is_fatal and not state.value.dependencies:
       raise self.BuildFileScanError(
         'Spec `{}` does not match any targets.'.format(self._specs_string(specs)))
 
-    _, state = returns[0]
     return set(state.value.dependencies)
 
   def scan_addresses(self, root=None):
