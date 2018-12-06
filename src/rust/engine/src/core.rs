@@ -25,6 +25,28 @@ pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 pub struct Params(SmallVec<[Key; 4]>);
 
 impl Params {
+  pub fn new<I: IntoIterator<Item = Key>>(param_inputs: I) -> Result<Params, String> {
+    let mut params = param_inputs.into_iter().collect::<SmallVec<[Key; 4]>>();
+    params.sort_by_key(|k| *k.type_id());
+
+    if params.len() > 1 {
+      let mut prev = &params[0];
+      for param in &params[1..] {
+        if param.type_id() == prev.type_id() {
+          return Err(format!(
+            "Values used as `Params` must have distinct types, but the following values had the same type (`{}`):\n  {}\n  {}",
+            externs::type_to_str(*prev.type_id()),
+            externs::key_to_str(prev),
+            externs::key_to_str(param)
+          ));
+        }
+        prev = param;
+      }
+    }
+
+    Ok(Params(params))
+  }
+
   pub fn new_single(param: Key) -> Params {
     Params(smallvec![param])
   }
@@ -58,6 +80,10 @@ impl Params {
     self
       .0
       .binary_search_by(|probe| probe.type_id().cmp(&type_id))
+  }
+
+  pub fn type_ids<'a>(&'a self) -> impl Iterator<Item = TypeId> + 'a {
+    self.0.iter().map(|k| *k.type_id())
   }
 
   ///

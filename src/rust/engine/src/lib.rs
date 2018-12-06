@@ -80,13 +80,13 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use context::Core;
-use core::{Function, Key, TypeConstraint, TypeId, Value};
+use core::{Function, Key, Params, TypeConstraint, TypeId, Value};
 use externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
-  EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, IdentifyExtern, LogExtern,
-  ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, SatisfiedByExtern,
-  SatisfiedByTypeExtern, StoreBytesExtern, StoreI64Extern, StoreTupleExtern, StoreUtf8Extern,
-  TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
+  EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, HandleBuffer,
+  IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
+  SatisfiedByExtern, SatisfiedByTypeExtern, StoreBytesExtern, StoreI64Extern, StoreTupleExtern,
+  StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use futures::Future;
 use handles::Handle;
@@ -404,13 +404,13 @@ pub extern "C" fn scheduler_destroy(scheduler_ptr: *mut Scheduler) {
 pub extern "C" fn execution_add_root_select(
   scheduler_ptr: *mut Scheduler,
   execution_request_ptr: *mut ExecutionRequest,
-  subject: Key,
+  param_vals: HandleBuffer,
   product: TypeConstraint,
 ) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
-      scheduler
-        .add_root_select(execution_request, subject, product)
+      Params::new(param_vals.to_vec().into_iter().map(externs::key_for))
+        .and_then(|params| scheduler.add_root_select(execution_request, params, product))
         .into()
     })
   })

@@ -9,10 +9,8 @@ import multiprocessing
 import os
 import time
 from builtins import object, open, str, zip
-from collections import defaultdict
 from types import GeneratorType
 
-from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
@@ -20,9 +18,9 @@ from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesC
                              UrlToFetch)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
-from pants.engine.nodes import Return, State, Throw
+from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import Select, constraint_for
+from pants.engine.selectors import Params, Select, constraint_for
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
@@ -41,34 +39,6 @@ class ExecutionRequest(datatype(['roots', 'native'])):
   :param roots: Roots for this request.
   :type roots: list of tuples of subject and product.
   """
-
-
-class ExecutionResult(datatype(['error', 'root_products'])):
-  """Represents the result of a single execution."""
-
-  @classmethod
-  def finished(cls, root_products):
-    """Create a success or partial success result from a finished run.
-
-    Runs can either finish with no errors, satisfying all promises, or they can partially finish
-    if run in fail-slow mode producing as many products as possible.
-    :param root_products: List of ((subject, product), State) tuples.
-    :rtype: `ExecutionResult`
-    """
-    return cls(error=None, root_products=root_products)
-
-  @classmethod
-  def failure(cls, error):
-    """Create a failure result.
-
-    A failure result represent a run with a fatal error.  It presents the error but no
-    products.
-
-    :param error: The execution error encountered.
-    :type error: :class:`pants.base.exceptions.TaskError`
-    :rtype: `ExecutionResult`
-    """
-    return cls(error=error, root_products=None)
 
 
 class ExecutionError(Exception):
@@ -169,6 +139,9 @@ class Scheduler(object):
 
   def _assert_ruleset_valid(self):
     self._raise_or_return(self._native.lib.validator_run(self._scheduler))
+
+  def _to_vals_buf(self, objs):
+    return self._native.context.vals_buf(tuple(self._native.context.to_value(obj) for obj in objs))
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)
@@ -292,10 +265,14 @@ class Scheduler(object):
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)
 
-  def add_root_selection(self, execution_request, subject, product):
+  def add_root_selection(self, execution_request, subject_or_params, product):
+    if isinstance(subject_or_params, Params):
+      params = subject_or_params.params
+    else:
+      params = [subject_or_params]
     res = self._native.lib.execution_add_root_select(self._scheduler,
                                                      execution_request,
-                                                     self._to_key(subject),
+                                                     self._to_vals_buf(params),
                                                      self._to_constraint(product))
     self._raise_or_return(res)
 
@@ -475,12 +452,10 @@ class SchedulerSession(object):
       self._run_count += 1
       self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
 
-  def schedule(self, execution_request):
-    """Yields batches of Steps until the roots specified by the request have been completed.
+  def execute(self, execution_request):
+    """Invoke the engine for the given ExecutionRequest, returning Return and Throw states.
 
-    This method should be called by exactly one scheduling thread, but the Step objects returned
-    by this method are intended to be executed in multiple threads, and then satisfied by the
-    scheduling thread.
+    :return: A tuple of (root, Return) tuples and (root, Throw) tuples.
     """
     start_time = time.time()
     roots = list(zip(execution_request.roots,
@@ -495,23 +470,9 @@ class SchedulerSession(object):
       self._scheduler.graph_len()
     )
 
-    return roots
-
-  def execute(self, execution_request):
-    """Executes the requested build and returns the resulting root entries.
-
-    TODO: Merge with `schedule`.
-    TODO2: Use of TaskError here is... odd.
-
-    :param execution_request: The description of the goals to achieve.
-    :type execution_request: :class:`ExecutionRequest`
-    :returns: The result of the run.
-    :rtype: :class:`Engine.Result`
-    """
-    try:
-      return ExecutionResult.finished(self.schedule(execution_request))
-    except TaskError as e:
-      return ExecutionResult.failure(e)
+    returns = tuple((root, state) for root, state in roots if type(state) is Return)
+    throws = tuple((root, state) for root, state in roots if type(state) is Throw)
+    return returns, throws
 
   def _trace_on_error(self, unique_exceptions, request):
     exception_noun = pluralize(len(unique_exceptions), 'Exception')
@@ -531,71 +492,38 @@ class SchedulerSession(object):
 
   def run_console_rule(self, product, subject, v2_ui):
     """
-
     :param product: product type for the request.
     :param subject: subject for the request.
     :param v2_ui: whether to render the v2 engine UI
-    :return: A dict from product type to lists of products each with length matching len(subjects).
     """
     request = self.execution_request([product], [subject], v2_ui)
-    result = self.execute(request)
-    if result.error:
-      raise result.error
+    returns, throws = self.execute(request)
 
-    self._state_validation(result)
-    assert len(result.root_products) == 1
-    root, state = result.root_products[0]
-    if type(state) is Throw:
+    if throws:
+      _, state = throws[0]
       exc = state.exc
       if isinstance(exc, GracefulTerminationException):
         raise exc
       self._trace_on_error([exc], request)
-    return {result.root_products[0]: [state.value]}
-
-  def _state_validation(self, result):
-    # State validation.
-    unknown_state_types = tuple(
-      type(state) for _, state in result.root_products if type(state) not in (Throw, Return)
-    )
-    if unknown_state_types:
-      State.raise_unrecognized(unknown_state_types)
-
-  def products_request(self, products, subjects):
-    """Executes a request for multiple products for some subjects, and returns the products.
-
-    :param list products: A list of product type for the request.
-    :param list subjects: A list of subjects for the request.
-    :returns: A dict from product type to lists of products each with length matching len(subjects).
-    """
-    request = self.execution_request(products, subjects)
-    result = self.execute(request)
-    if result.error:
-      raise result.error
-
-    self._state_validation(result)
-
-    # Throw handling.
-    # TODO: See https://github.com/pantsbuild/pants/issues/3912
-    throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
-    if throw_root_states:
-      unique_exceptions = tuple({t.exc for t in throw_root_states})
-      self._trace_on_error(unique_exceptions, request)
-
-    # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
-    # order in output lists.
-    product_results = defaultdict(list)
-    for (_, product), state in result.root_products:
-      product_results[product].append(state.value)
-    return product_results
 
   def product_request(self, product, subjects):
     """Executes a request for a single product for some subjects, and returns the products.
 
     :param class product: A product type for the request.
-    :param list subjects: A list of subjects for the request.
+    :param list subjects: A list of subjects or Params instances for the request.
     :returns: A list of the requested products, with length match len(subjects).
     """
-    return self.products_request([product], subjects)[product]
+    request = self.execution_request([product], subjects)
+    returns, throws = self.execute(request)
+
+    # Throw handling.
+    if throws:
+      unique_exceptions = tuple({t.exc for _, t in throws})
+      self._trace_on_error(unique_exceptions, request)
+
+    # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
+    # order in output lists.
+    return [ret.value for _, ret in returns]
 
   def capture_snapshots(self, path_globs_and_roots):
     """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.
