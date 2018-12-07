@@ -10,7 +10,8 @@ from textwrap import dedent
 
 from pytest import fail
 
-from pants.backend.python.tasks.isort_run import IsortPrep, IsortRun
+from pants.backend.python.tasks.isort_prep import IsortPrep
+from pants.backend.python.tasks.isort_run import IsortRun
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import stdio_as, temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase

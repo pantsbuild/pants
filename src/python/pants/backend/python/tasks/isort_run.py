@@ -36,7 +36,7 @@ class IsortRun(FmtTaskMixin, Task):
   @classmethod
   def prepare(cls, options, round_manager):
     super(IsortRun, cls).prepare(options, round_manager)
-    round_manager.require_data(IsortPrep.Isort)
+    round_manager.require_data(IsortPrep.tool_instance_cls)
 
   def execute(self):
     targets = self.get_targets(self.is_non_synthetic_python_target)
@@ -51,7 +51,7 @@ class IsortRun(FmtTaskMixin, Task):
         logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
         return
 
-      isort = self.context.products.get_data(IsortPrep.Isort)
+      isort = self.context.products.get_data(IsortPrep.tool_instance_cls)
       args = self.get_passthru_args() + sources
 
       # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
