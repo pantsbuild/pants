@@ -294,9 +294,9 @@ class Scheduler(object):
       roots = []
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
         if raw_root.is_throw:
-          state = Throw(self._from_value(raw_root.value))
+          state = Throw(self._from_value(raw_root.handle))
         else:
-          state = Return(self._from_value(raw_root.value))
+          state = Return(self._from_value(raw_root.handle))
         roots.append(state)
     finally:
       self._native.lib.nodes_destroy(raw_roots)
