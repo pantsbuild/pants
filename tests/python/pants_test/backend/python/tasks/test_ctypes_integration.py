@@ -49,7 +49,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     # TODO: this pattern could be made more ergonomic for `enum()`, along with exhaustiveness
     # checking.
     for variant in ToolchainVariant.allowed_values:
-      self._assert_ctypes_binary(variant)
+      self._assert_ctypes_binary_creation(variant)
 
   _compiler_names_for_variant = {
     'gnu': ['gcc', 'g++'],
@@ -62,7 +62,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     'llvm': ['clang++'],
   }
 
-  def _assert_ctypes_binary(self, toolchain_variant):
+  def _assert_ctypes_binary_creation(self, toolchain_variant):
     with temporary_dir() as tmp_dir:
       pants_run = self.run_pants(command=['binary', self._binary_target], config={
         GLOBAL_SCOPE_CONFIG_SECTION: {
@@ -166,6 +166,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         binary_run_output = invoke_pex_for_output(output_pex)
         self.assertIn(modified_result_message, binary_run_output)
 
+  def test_ctypes_native_language_interop(self):
+    for variant in ToolchainVariant.allowed_values:
+      self._assert_ctypes_interop_with_mock_buildroot(variant)
+
   _include_not_found_message_for_variant = {
     'gnu': "fatal error: some_math.h: No such file or directory",
     'llvm': "fatal error: 'some_math.h' file not found"
@@ -217,19 +221,32 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run_interop)
       self.assertEqual('x=3, f(x)=299\n', pants_run_interop.stdout_data)
 
-  def test_ctypes_native_language_interop(self):
-    for variant in ToolchainVariant.allowed_values:
-      self._assert_ctypes_interop_with_mock_buildroot(variant)
-
   def test_ctypes_third_party_integration(self):
-    pants_binary = self.run_pants(['binary', self._binary_target_with_third_party])
+    for variant in ToolchainVariant.allowed_values:
+      self._assert_ctypes_third_party_integration(variant)
+
+  def _assert_ctypes_third_party_integration(self, toolchain_variant):
+    pants_binary = self.run_pants(['binary', self._binary_target_with_third_party], config={
+      'native-build-settings': {
+        'toolchain_variant': toolchain_variant,
+      },
+    })
     self.assert_success(pants_binary)
 
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
-    pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party])
-    self.assert_success(pants_run)
-    self.assertIn('Test worked!\n', pants_run.stdout_data)
+    attempt_pants_run = Platform.create().resolve_platform_specific({
+      'darwin': lambda: toolchain_variant != 'gnu',
+      'linux': lambda: True,
+    })
+    if attempt_pants_run:
+      pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party], config={
+        'native-build-settings': {
+          'toolchain_variant': toolchain_variant,
+        },
+      })
+      self.assert_success(pants_run)
+      self.assertIn('Test worked!\n', pants_run.stdout_data)
 
   def test_pants_native_source_detection_for_local_ctypes_dists_for_current_platform_only(self):
     """Test that `./pants run` respects platforms when the closure contains native sources.
@@ -256,11 +273,18 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     This target uses the ndebug and asdf option sets.
     If either of these are not present (disabled), this test will fail.
     """
+    for variant in ToolchainVariant.allowed_values:
+      self._assert_ctypes_third_party_integration(variant)
+
+  def _assert_native_compiler_option_sets_integration(self, toolchain_variant):
     command = [
       'run',
       self._binary_target_with_compiler_option_sets
     ]
     pants_run = self.run_pants(command=command, config={
+      'native-build-settings': {
+        'toolchain_variant': toolchain_variant,
+      },
       'native-build-step.cpp-compile-settings': {
         'compiler_option_sets_enabled_args': {
           'asdf': ['-D_ASDF=1'],
