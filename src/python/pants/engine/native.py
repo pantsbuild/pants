@@ -84,19 +84,23 @@ def get_build_cflags():
   )
 
 
+_preprocessor_directive_replacement_stub = 'HACKY_CDEF_PREPROCESSOR_DIRECTIVE'
+
+
 def hackily_rewrite_scheduler_bindings(bindings):
-  # We need #include lines in the generated C source file, but this won't parse in the .cdef call
-  # (it can't handle preprocessor directives), so we put them behind a comment line for now.
-  includes_removed = re.sub(
-    r'^(#include <.*?>)$',
-    r'// HACKY_CDEF_INCLUDE: \1',
+  # We need #include lines or header guards in the generated C source file, but this won't parse in
+  # the .cdef call (it can't handle any preprocessor directives), so we put them behind a comment
+  # line for now.
+  preprocessor_directives_removed = re.sub(
+    r'^(#.*)$',
+    r'// {}: \1'.format(_preprocessor_directive_replacement_stub),
     bindings, flags=re.MULTILINE)
   # This is an opaque struct member, which is not exposed to the FFI (and errors if this is
   # removed).
   hidden_vec_pyresult = re.sub(
     r'^.*Vec_PyResult nodes;.*$',
     '// Additional fields removed',
-    includes_removed, flags=re.MULTILINE)
+    preprocessor_directives_removed, flags=re.MULTILINE)
   # The C bindings generated for tuple structs by default use _0, _1, etc for members. The cffi
   # library doesn't allow leading underscores on members like that, so we produce e.g. tup_0
   # instead. This works because the header file produced by cbindgen is reliably formatted.
@@ -117,7 +121,7 @@ def hackily_recreate_includes_for_bindings(bindings):
   # Undo the mangling we did for #include lines previously so that the generated C source file will
   # have access to the necessary includes for the types produced by cbindgen.
   return re.sub(
-    r'^// HACKY_CDEF_INCLUDE: (.*)$',
+    r'^// {}: (.*)$'.format(_preprocessor_directive_replacement_stub),
     r'\1',
     bindings, flags=re.MULTILINE)
 

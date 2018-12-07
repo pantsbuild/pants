@@ -1,5 +1,10 @@
 header = '''
-/* TODO: add header guards and license info! */
+#ifndef __PANTS_SCHEDULER_CBINDGEN_H__
+#define __PANTS_SCHEDULER_CBINDGEN_H__
+/*
+ * Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+ * Licensed under the Apache License, Version 2.0 (see LICENSE).
+ */
 
 // Handle is declared as a typedef rather than a wrapper struct because it avoids needing to wrap
 // the inner handle/`void*` in a tuple or datatype at the ffi boundary. For most types that
@@ -7,6 +12,9 @@ header = '''
 // speedup to avoid the wrapping.
 
 typedef void* Handle;
+'''
+trailer = '''
+#endif // __PANTS_SCHEDULER_CBINDGEN_H__
 '''
 include_version = true
 line_length = 100
