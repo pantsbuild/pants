@@ -210,9 +210,13 @@ class SetupPyExecutionEnvironment(datatype([
         cpp_compiler.path_entries +
         cpp_linker.path_entries)
 
+      # TODO(#6273): we are constructing an informally-composed environment for consumption by
+      # distutils in order to set CC, CXX, LDSHARED, LIBRARY_PATH, and (DY)LD_LIBRARY_PATH so the
+      # compilers will run.
+      ret.update(cpp_linker.as_invocation_environment_dict)
+      ret.update(cpp_compiler.as_invocation_environment_dict)
+
       ret.update({
-        'CC': c_compiler.exe_filename,
-        'CXX': cpp_compiler.exe_filename,
         # TODO(#6273): We prepend our toolchain to the PATH instead of overwriting it -- we need
         # better control of the distutils compilation environment if we want to actually isolate the
         # PATH (distutils does lots of sneaky things).
