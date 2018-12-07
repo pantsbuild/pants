@@ -82,9 +82,8 @@ default_test_config: &default_test_config
   stage: *test
   language: python
   python: &python_version "2.7"
-  jdk: oraclejdk8
   before_install:
-    - update-java-alternatives -l
+    - update-java-alternatives -l && 1
     # Increase the max number of user watches to ensure that watchman is able to watch all
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
