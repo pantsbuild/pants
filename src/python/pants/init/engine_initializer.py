@@ -206,10 +206,12 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'console
     # Console rule can only have one subject.
     assert len(subjects) == 1
     for goal in goals:
-      goal_product = self.goal_map[goal]
-      logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
-      self.scheduler_session.run_console_rule(goal_product, subjects[0], v2_ui)
-    self.console.flush()
+      try:
+        goal_product = self.goal_map[goal]
+        logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
+        self.scheduler_session.run_console_rule(goal_product, subjects[0], v2_ui)
+      finally:
+        self.console.flush()
 
   def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.
