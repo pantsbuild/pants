@@ -89,6 +89,10 @@ def load_plugins(build_configuration, plugins, working_set):
       subsystems = entries['global_subsystems'].load()()
       build_configuration.register_subsystems(subsystems)
 
+    if 'rules' in entries:
+      rules = entries['rules'].load()()
+      build_configuration.register_rules(rules)
+
     loaded[dist.as_requirement().key] = dist
 
 
