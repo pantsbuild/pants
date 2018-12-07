@@ -66,7 +66,7 @@ stages:
 
 default_test_config: &default_test_config
   os: linux
-  dist: trusty
+  dist: xenial
   sudo: required
   addons:
     apt:
@@ -301,7 +301,7 @@ matrix:
     - <<: *linux_with_fuse
       name: "Rust Tests Linux"
       os: linux
-      dist: trusty
+      dist: xenial
       sudo: required
       stage: *test
       language: python
@@ -332,7 +332,7 @@ matrix:
     - <<: *linux_with_fuse
       name: "Rust Clippy on Linux"
       os: linux
-      dist: trusty
+      dist: xenial
       sudo: required
       stage: *test
       language: python
@@ -347,7 +347,7 @@ matrix:
     - <<: *linux_with_fuse
       name: "Cargo audit"
       os: linux
-      dist: trusty
+      dist: xenial
       sudo: required
       stage: *cron
       script:
