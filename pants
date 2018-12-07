@@ -37,6 +37,36 @@ set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
+BOOTSTRAP_VERSION="$(cat "${HERE}/src/python/pants/VERSION")"
+BOOTSTRAP_DOWNLOADED_PEX="${HERE}/pants.${BOOTSTRAP_VERSION}.pex"
+BOOTSTRAP_PEX_URL="https://github.com/pantsbuild/pants/releases/download/release_${BOOTSTRAP_VERSION}/pants.${BOOTSTRAP_VERSION}.pex"
+
+# We don't provide all the thirdparty modules without the venv in the release pex, so we have to
+# make it again here.
+BOOTSTRAP_PEX="${HERE}/pants-bootstrap.pex"
+BOOTSTRAP_ENTRY_POINT='pants.bin.pants_loader:main'
+
+BOOTSTRAP_THIRDPARTY_REQ_FILES=(
+  3rdparty/python/requirements.txt
+  3rdparty/python/twitter/commons/requirements.txt
+)
+
+if [[ ! -x "$BOOTSTRAP_PEX" ]]; then
+  set -x
+  curl --fail -L "$BOOTSTRAP_PEX_URL" -o "$BOOTSTRAP_DOWNLOADED_PEX"
+  for f in $BOOTSTRAP_THIRDPARTY_REQ_FILES; do
+    # Would use printf, but I have no clue what bash printf is trying to do with the "-r %s" format
+    # string.
+    echo '-r'
+    echo "$f"
+  done | xargs pex \
+               --pex-path="$BOOTSTRAP_DOWNLOADED_PEX" \
+               --entry-point="$BOOTSTRAP_ENTRY_POINT" --validate-entry-point \
+               -o "$BOOTSTRAP_PEX"
+  chmod +x "$BOOTSTRAP_PEX"
+  set +x
+fi
+
 # Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
 source ${HERE}/build-support/pants_venv
