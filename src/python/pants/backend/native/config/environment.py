@@ -42,7 +42,6 @@ class Platform(datatype(['normalized_os_name'])):
     return fun_for_platform()
 
 
-# NB: @abstractproperty requires inheriting from AbstractClass to work!
 class Executable(AbstractClass):
 
   @abstractproperty
@@ -61,7 +60,7 @@ class Executable(AbstractClass):
     :rtype: str
     """
 
-  # TODO(#???): rename this to 'runtime_library_dirs'!
+  # TODO: rename this to 'runtime_library_dirs'!
   @abstractproperty
   def library_dirs(self):
     """Directories containing shared libraries that must be on the runtime library search path.
