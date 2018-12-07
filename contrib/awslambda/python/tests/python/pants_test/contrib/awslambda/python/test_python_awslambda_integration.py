@@ -40,4 +40,4 @@ class PythonAWSLambdaIntegrationTest(PantsRunIntegrationTest):
       output = subprocess.check_output(env={'PEX_INTERPRETER': '1'}, args=[
         '{} -c "from lambdex_handler import handler; handler(None, None)"'.format(awslambda)
       ], shell=True)
-      self.assertEquals('Hello from United States!'.encode('utf8'), output.strip())
+      self.assertEquals(b'Hello from the United States!', output.strip())
