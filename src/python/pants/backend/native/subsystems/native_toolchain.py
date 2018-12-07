@@ -203,7 +203,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     # This flag is intended to avoid using any of the headers from our LLVM distribution's C++
     # stdlib implementation, or any from the host system, and instead, use include dirs from the
     # XCodeCLITools or GCC.
-    # TODO(#6855): Determine precisely what this flag does and why it's necessary.
+    # TODO(#6143): Determine precisely what this flag does and why it's necessary.
     '-nostdinc++',
   ]
 
@@ -296,7 +296,7 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
     # This flag is intended to avoid using any of the headers from our LLVM distribution's C++
     # stdlib implementation, or any from the host system, and instead, use include dirs from the
     # XCodeCLITools or GCC.
-    # TODO(#6855): Determine precisely what this flag does and why it's necessary.
+    # TODO(#6143): Determine precisely what this flag does and why it's necessary.
     '-nostdinc++',
   ]
 
