@@ -22,13 +22,39 @@ native engine binary, allowing us to address it both as an importable python mod
 
 use std::env;
 use std::fs;
-use std::io::{Read, Result};
+use std::io::{self, Read};
 use std::path::Path;
 use std::process::{exit, Command};
 
 use build_utils::BuildRoot;
 
-fn main() -> Result<()> {
+#[derive(Debug)]
+enum CffiBuildError {
+  IoError(io::Error),
+  EnvError(env::VarError),
+  CbindgenError(cbindgen::Error),
+}
+
+impl From<env::VarError> for CffiBuildError {
+  fn from(err: env::VarError) -> Self {
+    CffiBuildError::EnvError(err)
+  }
+}
+
+impl From<io::Error> for CffiBuildError {
+  fn from(err: io::Error) -> Self {
+    CffiBuildError::IoError(err)
+  }
+}
+
+impl From<cbindgen::Error> for CffiBuildError {
+  fn from(err: cbindgen::Error) -> Self {
+    CffiBuildError::CbindgenError(err)
+  }
+}
+
+// A message is printed to stderr, and the script fails, if main() results in a CffiBuildError.
+fn main() -> Result<(), CffiBuildError> {
   // We depend on grpcio, which uses C++.
   // On Linux, with g++, some part of that compilation depends on
   // __gxx_personality_v0 which is present in the C++ standard library.
@@ -61,13 +87,11 @@ fn main() -> Result<()> {
   mark_for_change_detection(&bindings_config_path);
 
   let scheduler_file_path = Path::new("src/cffi/scheduler.h");
-  let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-  cbindgen::generate(crate_dir)
-    .expect("Unable to generate bindings")
-    .write_to_file(scheduler_file_path);
+  let crate_dir = env::var("CARGO_MANIFEST_DIR")?;
+  cbindgen::generate(crate_dir)?.write_to_file(scheduler_file_path);
 
   // Generate the cffi c sources.
-  let build_root = BuildRoot::find().unwrap();
+  let build_root = BuildRoot::find()?;
   let cffi_bootstrapper = build_root.join("build-support/bin/native/bootstrap_cffi.sh");
   mark_for_change_detection(&cffi_bootstrapper);
 
@@ -84,8 +108,7 @@ fn main() -> Result<()> {
   let result = Command::new(&cffi_bootstrapper)
     .arg(cffi_dir)
     .arg(scheduler_file_path)
-    .status()
-    .expect(&format!("Failed to execute {:?}", &cffi_bootstrapper));
+    .status()?;
   if !result.success() {
     let exit_code = result.code();
     eprintln!(
@@ -98,8 +121,9 @@ fn main() -> Result<()> {
   // Now compile the cffi c sources.
   let mut config = cc::Build::new();
 
-  config.file(c_path.to_str().unwrap());
-  for flag in make_flags(&env_script_path).unwrap() {
+  let cfg_path = c_path.to_str().unwrap();
+  config.file(cfg_path);
+  for flag in make_flags(&env_script_path)? {
     config.flag(flag.as_str());
   }
 
@@ -117,7 +141,7 @@ fn mark_for_change_detection(path: &Path) {
   println!("cargo:rerun-if-changed={}", path.to_str().unwrap());
 }
 
-fn make_flags(env_script_path: &Path) -> Result<Vec<String>> {
+fn make_flags(env_script_path: &Path) -> Result<Vec<String>, io::Error> {
   let mut contents = String::new();
   fs::File::open(env_script_path)?.read_to_string(&mut contents)?;
   // It would be a shame if someone were to include a space in an actual quoted value.
