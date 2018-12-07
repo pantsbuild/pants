@@ -27,7 +27,7 @@ java1 = Target(
     # off / prove the capabilities of the new BUILD graph parser.
     ':nonstrict',
     ApacheThriftConfig(
-      version='0.9.2',
+      version='0.10.0',
       strict=True,
       lang='java',
       dependencies=[
@@ -38,7 +38,7 @@ java1 = Target(
 )
 
 nonstrict = ApacheThriftConfig(
-  version='0.9.2',
+  version='0.10.0',
   strict=False,
   lang='java'
 )

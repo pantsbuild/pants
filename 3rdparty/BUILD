@@ -126,14 +126,14 @@ jar_library(name='slf4j-api',
 
 # NB: we have two versions of thrift here due to scrooge requiring one version while apache
 # thrift requires another. This is not usually recommended.
-jar_library(name='libthrift-0.9.2',
+jar_library(name='libthrift-0.10.0',
             jars = [
-              jar(org='org.apache.thrift', name='libthrift', rev='0.9.2')
+              jar(org='org.apache.thrift', name='libthrift', rev='0.10.0')
             ],
             # javac uses undeclared types to build the MessageBuilder API.
             scope='forced',)
 
-target(name='thrift-0.9.2', dependencies = [':libthrift-0.9.2'])
+target(name='thrift-0.10.0', dependencies = [':libthrift-0.10.0'])
 
 jar_library(name='libthrift-0.6.1',
             jars = [
