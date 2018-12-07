@@ -87,8 +87,8 @@ def get_build_cflags():
 _preprocessor_directive_replacement_stub = 'HACKY_CDEF_PREPROCESSOR_DIRECTIVE'
 
 
-def hackily_rewrite_scheduler_bindings(bindings):
-  # We need #include lines or header guards in the generated C source file, but this won't parse in
+def _hackily_rewrite_scheduler_bindings(bindings):
+  # We need #include lines and header guards in the generated C source file, but this won't parse in
   # the .cdef call (it can't handle any preprocessor directives), so we put them behind a comment
   # line for now.
   preprocessor_directives_removed = re.sub(
@@ -117,9 +117,10 @@ def hackily_rewrite_scheduler_bindings(bindings):
   return special_python_symbols_mangled
 
 
-def hackily_recreate_includes_for_bindings(bindings):
-  # Undo the mangling we did for #include lines previously so that the generated C source file will
-  # have access to the necessary includes for the types produced by cbindgen.
+def _hackily_recreate_includes_for_bindings(bindings):
+  # Undo the mangling we did for preprocessor directives such as #include lines previously so that
+  # the generated C source file will have access to the necessary includes for the types produced by
+  # cbindgen.
   return re.sub(
     r'^// {}: (.*)$'.format(_preprocessor_directive_replacement_stub),
     r'\1',
@@ -141,11 +142,11 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     env_script = '{}.cflags'.format(real_output_prefix)
 
     # Preprocessor directives won't parse in the .cdef calls, so we have to hide them for now.
-    scheduler_bindings = hackily_rewrite_scheduler_bindings(read_file(scheduler_bindings_path))
+    scheduler_bindings = _hackily_rewrite_scheduler_bindings(read_file(scheduler_bindings_path))
 
     ffibuilder = cffi.FFI()
     ffibuilder.cdef(scheduler_bindings)
-    ffibuilder.cdef(FFISpecification.format_cffi_externs())
+    ffibuilder.cdef(_FFISpecification.format_cffi_externs())
     ffibuilder.set_source(module_name, scheduler_bindings)
     ffibuilder.emit_c_code(temp_c_file)
 
@@ -168,7 +169,7 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     file_content = file_content.replace(CFFI_C_PATCH_BEFORE, CFFI_C_PATCH_AFTER)
 
     # Extract the preprocessor directives we had to hide to get the .cdef call to parse.
-    file_content = hackily_recreate_includes_for_bindings(file_content)
+    file_content = _hackily_recreate_includes_for_bindings(file_content)
 
   _replace_file(c_file, file_content)
 
@@ -190,7 +191,7 @@ def _replace_file(path, content):
     f.write(content)
 
 
-class ExternSignature(datatype([
+class _ExternSignature(datatype([
     ('return_type', str),
     ('method_name', str),
     ('arg_types', tuple),
@@ -204,14 +205,14 @@ class ExternSignature(datatype([
       args=', '.join(self.arg_types))
 
 
-def extern_decl(return_type, arg_types):
+def _extern_decl(return_type, arg_types):
   """A decorator for methods corresponding to extern functions. All types should be strings.
 
-  The FFISpecification class is able to automatically convert these into method declarations for
+  The _FFISpecification class is able to automatically convert these into method declarations for
   cffi.
   """
   def wrapper(func):
-    signature = ExternSignature(
+    signature = _ExternSignature(
       return_type=str(return_type),
       method_name=str(func.__name__),
       arg_types=tuple(arg_types))
@@ -220,7 +221,7 @@ def extern_decl(return_type, arg_types):
   return wrapper
 
 
-class FFISpecification(object):
+class _FFISpecification(object):
 
   def __init__(self, ffi):
     self._ffi = ffi
@@ -235,7 +236,7 @@ class FFISpecification(object):
 
   @classmethod
   def format_cffi_externs(cls):
-    """Generate stubs for the cffi bindings from @extern_decl methods."""
+    """Generate stubs for the cffi bindings from @_extern_decl methods."""
     extern_decls = [
       f.extern_signature.pretty_print()
       for _, f in cls._extern_fields.items()
@@ -246,7 +247,7 @@ class FFISpecification(object):
       + '\n}\n')
 
   def register_cffi_externs(self):
-    """Registers the @extern_decl methods with our ffi instance."""
+    """Registers the @_extern_decl methods with our ffi instance."""
     for field_name, _ in self._extern_fields.items():
       bound_method = getattr(self, field_name)
       self._ffi.def_extern()(bound_method)
@@ -266,13 +267,13 @@ class FFISpecification(object):
 
     return PyResult(is_throw, c.to_value(val))
 
-  @extern_decl('void', ['ExternContext*', 'uint8_t', 'uint8_t*', 'uint64_t'])
+  @_extern_decl('void', ['ExternContext*', 'uint8_t', 'uint8_t*', 'uint64_t'])
   def extern_log(self, context_handle, level, msg_ptr, msg_len):
     """Given a log level and utf8 message string, log it."""
     msg = bytes(self._ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
     logger.log(level, msg)
 
-  @extern_decl('Ident', ['ExternContext*', 'Handle*'])
+  @_extern_decl('Ident', ['ExternContext*', 'Handle*'])
   def extern_identify(self, context_handle, val):
     """Return an Ident containing the __hash__ and TypeId for the given Handle."""
     c = self._ffi.from_handle(context_handle)
@@ -281,31 +282,31 @@ class FFISpecification(object):
     type_id = c.to_id(type(obj))
     return (hash_, TypeId(type_id))
 
-  @extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
+  @_extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
   def extern_equals(self, context_handle, val1, val2):
     """Return true if the given Handles are __eq__."""
     return self._ffi.from_handle(val1[0]) == self._ffi.from_handle(val2[0])
 
-  @extern_decl('Handle', ['ExternContext*', 'Handle*'])
+  @_extern_decl('Handle', ['ExternContext*', 'Handle*'])
   def extern_clone_val(self, context_handle, val):
     """Clone the given Handle."""
     c = self._ffi.from_handle(context_handle)
     return c.to_value(self._ffi.from_handle(val[0]))
 
-  @extern_decl('void', ['ExternContext*', 'DroppingHandle*', 'uint64_t'])
+  @_extern_decl('void', ['ExternContext*', 'DroppingHandle*', 'uint64_t'])
   def extern_drop_handles(self, context_handle, handles_ptr, handles_len):
     """Drop the given Handles."""
     c = self._ffi.from_handle(context_handle)
     handles = self._ffi.unpack(handles_ptr, handles_len)
     c.drop_handles(handles)
 
-  @extern_decl('Buffer', ['ExternContext*', 'TypeId'])
+  @_extern_decl('Buffer', ['ExternContext*', 'TypeId'])
   def extern_type_to_str(self, context_handle, type_id):
     """Given a TypeId, write type.__name__ and return it."""
     c = self._ffi.from_handle(context_handle)
     return c.utf8_buf(text_type(c.from_id(type_id.tup_0).__name__))
 
-  @extern_decl('Buffer', ['ExternContext*', 'Handle*'])
+  @_extern_decl('Buffer', ['ExternContext*', 'Handle*'])
   def extern_val_to_str(self, context_handle, val):
     """Given a Handle for `obj`, write str(obj) and return it."""
     c = self._ffi.from_handle(context_handle)
@@ -314,44 +315,44 @@ class FFISpecification(object):
     v_str = '' if v is None else text_type(v)
     return c.utf8_buf(v_str)
 
-  @extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
+  @_extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
   def extern_satisfied_by(self, context_handle, constraint_val, val):
     """Given a TypeConstraint and a Handle return constraint.satisfied_by(value)."""
     constraint = self._ffi.from_handle(constraint_val[0])
     return constraint.satisfied_by(self._ffi.from_handle(val[0]))
 
-  @extern_decl('_Bool', ['ExternContext*', 'Handle*', 'TypeId*'])
+  @_extern_decl('_Bool', ['ExternContext*', 'Handle*', 'TypeId*'])
   def extern_satisfied_by_type(self, context_handle, constraint_val, cls_id):
     """Given a TypeConstraint and a TypeId, return constraint.satisfied_by_type(type_id)."""
     c = self._ffi.from_handle(context_handle)
     constraint = self._ffi.from_handle(constraint_val[0])
     return constraint.satisfied_by_type(c.from_id(cls_id.tup_0))
 
-  @extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
+  @_extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
   def extern_store_tuple(self, context_handle, vals_ptr, vals_len):
     """Given storage and an array of Handles, return a new Handle to represent the list."""
     c = self._ffi.from_handle(context_handle)
     return c.to_value(tuple(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len)))
 
-  @extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
+  @_extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
   def extern_store_bytes(self, context_handle, bytes_ptr, bytes_len):
     """Given a context and raw bytes, return a new Handle to represent the content."""
     c = self._ffi.from_handle(context_handle)
     return c.to_value(binary_type(self._ffi.buffer(bytes_ptr, bytes_len)))
 
-  @extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
+  @_extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
   def extern_store_utf8(self, context_handle, utf8_ptr, utf8_len):
     """Given a context and UTF8 bytes, return a new Handle to represent the content."""
     c = self._ffi.from_handle(context_handle)
     return c.to_value(self._ffi.string(utf8_ptr, utf8_len).decode('utf-8'))
 
-  @extern_decl('Handle', ['ExternContext*', 'int64_t'])
+  @_extern_decl('Handle', ['ExternContext*', 'int64_t'])
   def extern_store_i64(self, context_handle, i64):
     """Given a context and int32_t, return a new Handle to represent the int32_t."""
     c = self._ffi.from_handle(context_handle)
     return c.to_value(i64)
 
-  @extern_decl('Handle', ['ExternContext*', 'Handle*', 'uint8_t*', 'uint64_t'])
+  @_extern_decl('Handle', ['ExternContext*', 'Handle*', 'uint8_t*', 'uint64_t'])
   def extern_project_ignoring_type(self, context_handle, val, field_str_ptr, field_str_len):
     """Given a Handle for `obj`, and a field name, project the field as a new Handle."""
     c = self._ffi.from_handle(context_handle)
@@ -361,7 +362,7 @@ class FFISpecification(object):
 
     return c.to_value(projected)
 
-  @extern_decl('HandleBuffer', ['ExternContext*', 'Handle*', 'uint8_t*', 'uint64_t'])
+  @_extern_decl('HandleBuffer', ['ExternContext*', 'Handle*', 'uint8_t*', 'uint64_t'])
   def extern_project_multi(self, context_handle, val, field_str_ptr, field_str_len):
     """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
     c = self._ffi.from_handle(context_handle)
@@ -370,14 +371,14 @@ class FFISpecification(object):
 
     return c.vals_buf(tuple(c.to_value(p) for p in getattr(obj, field_name)))
 
-  @extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
+  @_extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
   def extern_create_exception(self, context_handle, msg_ptr, msg_len):
     """Given a utf8 message string, create an Exception object."""
     c = self._ffi.from_handle(context_handle)
     msg = self.to_py_str(msg_ptr, msg_len)
     return c.to_value(Exception(msg))
 
-  @extern_decl('PyGeneratorResponse', ['ExternContext*', 'Handle*', 'Handle*'])
+  @_extern_decl('PyGeneratorResponse', ['ExternContext*', 'Handle*', 'Handle*'])
   def extern_generator_send(self, context_handle, func, arg):
     """Given a generator, send it the given value and return a response."""
     c = self._ffi.from_handle(context_handle)
@@ -412,7 +413,7 @@ class FFISpecification(object):
         c.vals_buf([c.to_value(v) for v in constraints])
       )
 
-  @extern_decl('PyResult', ['ExternContext*', 'Handle*', 'Handle**', 'uint64_t'])
+  @_extern_decl('PyResult', ['ExternContext*', 'Handle*', 'Handle**', 'uint64_t'])
   def extern_call(self, context_handle, func, args_ptr, args_len):
     """Given a callable, call it."""
     c = self._ffi.from_handle(context_handle)
@@ -420,7 +421,7 @@ class FFISpecification(object):
     args = tuple(c.from_value(arg[0]) for arg in self._ffi.unpack(args_ptr, args_len))
     return self.call(c, runnable, args)
 
-  @extern_decl('PyResult', ['ExternContext*', 'uint8_t*', 'uint64_t'])
+  @_extern_decl('PyResult', ['ExternContext*', 'uint8_t*', 'uint64_t'])
   def extern_eval(self, context_handle, python_code_str_ptr, python_code_str_len):
     """Given an evalable string, eval it and return a Handle for its result."""
     c = self._ffi.from_handle(context_handle)
@@ -577,7 +578,7 @@ class Native(object):
   def ffi(self):
     """A CompiledCFFI handle as imported from the native engine python module."""
     ffi = getattr(self._ffi_module, 'ffi')
-    FFISpecification(ffi).register_cffi_externs()
+    _FFISpecification(ffi).register_cffi_externs()
     return ffi
 
   @memoized_property
