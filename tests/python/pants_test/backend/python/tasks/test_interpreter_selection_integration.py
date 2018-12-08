@@ -68,7 +68,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       exe = os.path.join(distdir, binary_name + '.pex')
       proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
       (stdout_data, _) = proc.communicate()
-      return stdout_data
+      return stdout_data.decode('utf-8')
 
   def _build_pex(self, binary_target, config=None, args=None, version=PY_27):
     # By default, Avoid some known-to-choke-on interpreters.
