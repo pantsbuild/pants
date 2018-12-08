@@ -4,6 +4,73 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.13.0.dev2 (12/07/2018)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Base classes for configuring and resolving python tools. (#6870)
+  `PR #6870 <https://github.com/pantsbuild/pants/pull/6870>`_
+
+* Add the ability to consume scoped Options from @rules (#6872)
+  `PR #6872 <https://github.com/pantsbuild/pants/pull/6872>`_
+
+* Expose an API to pass multiple Params to an engine request (#6871)
+  `PR #6871 <https://github.com/pantsbuild/pants/pull/6871>`_
+
+* Respect 3rdparty resolver setting in BootstrapJvmTools (#6789)
+  `PR #6789 <https://github.com/pantsbuild/pants/pull/6789>`_
+
+Bugfixes
+~~~~~~~~
+
+* Flush the console after all @console_rules have completed (#6878)
+  `PR #6878 <https://github.com/pantsbuild/pants/pull/6878>`_
+
+* Straighten out interpreter search path configuration (#6849)
+  `PR #6849 <https://github.com/pantsbuild/pants/pull/6849>`_
+
+* Make TestPinger more robust. (#6844)
+  `PR #6844 <https://github.com/pantsbuild/pants/pull/6844>`_
+
+* Fix clippy pre-commit check when used as a commit hook. (#6859)
+  `PR #6859 <https://github.com/pantsbuild/pants/pull/6859>`_
+
+* Don't copy over the os environment to avoid an encoding error (#6846)
+  `PR #6846 <https://github.com/pantsbuild/pants/pull/6846>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* use the cbindgen crate and some decorators to DRY out the rust/python ffi (#6869)
+  `PR #6869 <https://github.com/pantsbuild/pants/pull/6869>`_
+
+* Use __iter__ instead of .dependencies in v2 rules (#6873)
+  `PR #6873 <https://github.com/pantsbuild/pants/pull/6873>`_
+
+* Improve error message for locale check (#6821)
+  `PR #6821 <https://github.com/pantsbuild/pants/pull/6821>`_
+
+* Port remaining tests to new TestBase base class. (#6864)
+  `PR #6864 <https://github.com/pantsbuild/pants/pull/6864>`_
+
+* Replace try! with ? (#6868)
+  `PR #6868 <https://github.com/pantsbuild/pants/pull/6868>`_
+
+* Remove some deprecated pex-related functions. (#6865)
+  `PR #6865 <https://github.com/pantsbuild/pants/pull/6865>`_
+
+* add `scala_jar` to the docsite (#6857)
+  `PR #6857 <https://github.com/pantsbuild/pants/pull/6857>`_
+
+* Port a few tests over to the new TestBase. (#6854)
+  `PR #6854 <https://github.com/pantsbuild/pants/pull/6854>`_
+
+* Use github release version of coursier instead of dropbox link (#6853)
+  `PR #6853 <https://github.com/pantsbuild/pants/pull/6853>`_
+
+
 1.13.0.dev1 (11/30/2018)
 ------------------------
 
