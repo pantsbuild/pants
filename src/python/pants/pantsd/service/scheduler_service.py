@@ -211,17 +211,18 @@ class SchedulerService(PantsService):
       tags=tuple(global_options.tag) if global_options.tag else tuple()
     )
 
-    if global_options.v1:
+    v1_goals, ambiguous_goals, v2_goals = options.goals_by_version
+
+    if v1_goals or (ambiguous_goals and global_options.v1):
       session.warm_product_graph(target_roots)
 
-    if global_options.v2:
-      if not global_options.v1:
-        session.validate_goals(options.goals_and_possible_v2_goals)
+    if v2_goals or (ambiguous_goals and global_options.v2):
+      goals = v2_goals + (ambiguous_goals if global_options.v2 else tuple())
 
       # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
       session.run_console_rules(
           options_bootstrapper,
-          options.goals_and_possible_v2_goals,
+          goals,
           target_roots,
         )
 

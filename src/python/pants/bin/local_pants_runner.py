@@ -15,6 +15,7 @@ from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
+from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import setup_logging_from_options
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
@@ -235,8 +236,16 @@ class LocalPantsRunner(object):
     with maybe_profiled(self._profile_path):
       self._run()
 
+  def _maybe_handle_help(self):
+    """Handle requests for `help` information."""
+    if self._options.help_request:
+      help_printer = HelpPrinter(self._options)
+      result = help_printer.print_help()
+      self._exiter(result)
+
   def _maybe_run_v1(self):
-    if not self._global_options.v1:
+    v1_goals, ambiguous_goals, _ = self._options.goals_by_version
+    if not v1_goals and (not ambiguous_goals or not self._global_options.v1):
       return PANTS_SUCCEEDED_EXIT_CODE
 
     # Setup and run GoalRunner.
@@ -255,18 +264,18 @@ class LocalPantsRunner(object):
   def _maybe_run_v2(self):
     # N.B. For daemon runs, @console_rules are invoked pre-fork -
     # so this path only serves the non-daemon run mode.
-    if self._is_daemon or not self._global_options.v2:
+    if self._is_daemon:
       return PANTS_SUCCEEDED_EXIT_CODE
 
-    # If we're a pure --v2 run, validate goals - otherwise some goals specified
-    # may be provided by the --v1 task paths.
-    if not self._global_options.v1:
-      self._graph_session.validate_goals(self._options.goals_and_possible_v2_goals)
+    _, ambiguous_goals, v2_goals = self._options.goals_by_version
+    goals = v2_goals + (ambiguous_goals if self._global_options.v2 else tuple())
+    if not goals:
+      return PANTS_SUCCEEDED_EXIT_CODE
 
     try:
       self._graph_session.run_console_rules(
         self._options_bootstrapper,
-        self._options.goals_and_possible_v2_goals,
+        goals,
         self._target_roots,
       )
     except GracefulTerminationException as e:
@@ -290,6 +299,8 @@ class LocalPantsRunner(object):
 
   def _run(self):
     try:
+      self._maybe_handle_help()
+
       engine_result = self._maybe_run_v2()
       goal_runner_result = self._maybe_run_v1()
     finally:

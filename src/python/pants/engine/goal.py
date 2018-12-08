@@ -28,6 +28,14 @@ class Goal(Optionable, AbstractClass):
       raise AssertionError('{} must have a `Goal.name` defined.'.format(cls.__name__))
     return cls.name
 
+  @classmethod
+  def subsystem_dependencies_iter(cls):
+    # NB: `Goal` quacks like a `SubsystemClientMixin` in order to allow v1 `Tasks` to depend on
+    # v2 Goals for backwards compatibility purposes. But v2 Goals should _not_ have subsystem
+    # dependencies: instead, the @rules participating (transitively) in a Goal should directly
+    # declare Subsystem deps.
+    return iter([])
+
   def __init__(self, scope, scoped_options):
     # NB: This constructor is shaped to meet the contract of `Optionable(Factory).signature`.
     super(Goal, self).__init__()

@@ -15,7 +15,6 @@ from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
-from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.ranked_value import RankedValue
 from pants.task.task import QuietTaskMixin
@@ -51,15 +50,11 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-  def _maybe_handle_help(self, help_request):
-    """Handle requests for `help` information."""
-    if help_request:
-      help_printer = HelpPrinter(self._options)
-      result = help_printer.print_help()
-      self._exiter(result)
-
-  def _determine_goals(self, address_mapper, requested_goals):
+  def _determine_goals(self, address_mapper, options):
     """Check and populate the requested goals for a given run."""
+    v1_goals, ambiguous_goals, _ = options.goals_by_version
+    requested_goals = v1_goals + ambiguous_goals
+
     spec_parser = CmdLineSpecParser(self._root_dir)
 
     for goal in requested_goals:
@@ -95,7 +90,7 @@ class GoalRunnerFactory(object):
         self._root_dir
       )
 
-      goals = self._determine_goals(address_mapper, self._options.goals)
+      goals = self._determine_goals(address_mapper, self._options)
       is_quiet = self._should_be_quiet(goals)
 
       target_root_instances = self._roots_to_targets(build_graph, self._target_roots)
@@ -122,7 +117,6 @@ class GoalRunnerFactory(object):
       return goals, context
 
   def create(self):
-    self._maybe_handle_help(self._options.help_request)
     goals, context = self._setup_context()
     return GoalRunner(context=context,
                       goals=goals,

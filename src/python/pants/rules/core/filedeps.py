@@ -15,11 +15,19 @@ from pants.engine.rules import console_rule
 class Filedeps(Goal):
   """List all source and BUILD files a target transitively depends on.
 
-  Files are listed with relative paths and any BUILD files implied in the transitive closure of
-  targets are also included.
+  Files may be listed with absolute or relative paths and any BUILD files implied in the transitive
+  closure of targets are also included.
   """
 
   name = 'filedeps'
+
+  @classmethod
+  def register_options(cls, register):
+    super(Filedeps, cls).register_options(register)
+    register('--globs', type=bool,
+             help='Instead of outputting filenames, output globs (ignoring excludes)')
+    register('--absolute', type=bool, default=True,
+             help='If True output with absolute path, else output with path relative to the build root')
 
 
 @console_rule(Filedeps, [Console, TransitiveHydratedTargets])

@@ -175,15 +175,6 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
     request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
     self.scheduler_session.execute(request)
 
-  def validate_goals(self, goals):
-    """Checks for @console_rules that satisfy requested goals.
-
-    :param list goals: The list of requested goal names as passed on the commandline.
-    """
-    invalid_goals = [goal for goal in goals if goal not in self.goal_map]
-    if invalid_goals:
-      raise self.InvalidGoals(invalid_goals)
-
   def run_console_rules(self, options_bootstrapper, goals, target_roots):
     """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
 
