@@ -5,7 +5,7 @@
 python_library(
   dependencies=[
     'src/python/pants/task',
-    'build-support/bin/native/bootstrap_plugin/subsystems',
-    'build-support/bin/native/bootstrap_plugin/targets',
+    'src/python/pants/backend/cargo_bootstrap/subsystems',
+    'src/python/pants/backend/cargo_bootstrap/targets',
   ],
 )

@@ -4,8 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from bootstrap_plugin.subsystems.rustup import CargoInstallation, Rustup
-from bootstrap_plugin.targets.cargo_dist import CargoDist
+from pants.backend.cargo_bootstrap.subsystems.rustup import CargoInstallation, Rustup
+from pants.backend.cargo_bootstrap.targets.cargo_dist import CargoDist
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task

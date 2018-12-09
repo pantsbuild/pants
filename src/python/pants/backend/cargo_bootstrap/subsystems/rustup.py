@@ -9,9 +9,9 @@ from builtins import str
 
 from future.utils import text_type
 
-from bootstrap_plugin.subsystems.cmake_for_grpc import CMakeForGRPC
-from bootstrap_plugin.subsystems.go_for_grpc import GoForGRPC
-from bootstrap_plugin.subsystems.protoc_for_grpc import ProtocForGRPC
+from pants.backend.cargo_bootstrap.subsystems.cmake_for_grpc import CMakeForGRPC
+from pants.backend.cargo_bootstrap.subsystems.go_for_grpc import GoForGRPC
+from pants.backend.cargo_bootstrap.subsystems.protoc_for_grpc import ProtocForGRPC
 from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.base.hash_utils import stable_json_hash
 from pants.binaries.binary_tool import Script
