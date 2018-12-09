@@ -17,6 +17,12 @@ from pants.util.process_handler import subprocess
 class BootstrapCargo(Task):
 
   @classmethod
+  def register_options(cls, register):
+    super(BootstrapCargo, cls).register_options(register)
+    register('--release', type=bool, default=True,
+             help='???')
+
+  @classmethod
   def subsystem_dependencies(cls):
     return super(BootstrapCargo, cls).subsystem_dependencies() + (Rustup.scoped(cls),)
 
