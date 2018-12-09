@@ -42,8 +42,9 @@ class BootstrapCargo(Task):
     with self.invalidated([cargo_dist]) as invalidation_check:
       if invalidation_check.invalid_vts:
         cargo_dist_vt = assert_single_element(invalidation_check.invalid_vts)
-        with self.context.new_workunit('bootstrap-native-engine',
-                                       labels=[WorkUnitLabel.BOOTSTRAP]) as workunit:
+        with self.context.new_workunit(
+            'bootstrap-native-engine',
+            labels=[WorkUnitLabel.COMPILER]) as workunit:
           cargo_toml = 'src/rust/engine/Cargo.toml'
           if not cargo_toml in cargo_dist_vt.target.sources_relative_to_buildroot():
             raise self.CargoBootstrapError('???: {}'.format(cargo_toml))

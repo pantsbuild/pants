@@ -135,8 +135,8 @@ class Rustup(Script):
         self._cmake.bin_dir(),
         self._go_dist.bin_dir(),
         self._protoc.bin_dir(),
-      ]
-      )
+        # TODO: execute this in a sealed path!
+      ], env=os.environ.copy(), prepend=True),
     }
 
 
@@ -209,7 +209,9 @@ def obtain_cargo_bin_location(rustup, rustup_exe):
   cargo_bin_path = which_cargo_res.stdout.strip()
   symlink_target = os.path.relpath(cargo_bin_path, update_request.toolchain_root)
 
-  cargo_bin_globs = PathGlobsAndRoot(PathGlobs([symlink_target]), update_request.toolchain_root)
+  cargo_bin_globs = PathGlobsAndRoot(
+    PathGlobs(['./cargo']),
+    text_type(os.path.dirname(cargo_bin_path)))
 
   # If rustup was already bootstrapped against a different toolchain in the past, freshen it and
   # ensure the toolchain and components we need are installed.
@@ -252,7 +254,7 @@ class CargoInstallation(datatype([
 
   @memoized_method
   def cargo_exec_env(self):
-    env = rustup.rustup_exec_env().copy()
+    env = self.rustup.rustup_exec_env().copy()
     env['PATH'] = create_path_env_var([
       os.path.dirname(self.cargo_bin.bin_path),
     ], env=env, prepend=True)
@@ -268,7 +270,8 @@ def ensure_cargo_installed(rustup, cargo_bin):
       description='install cargo-ensure-installed (???)',
       env=rustup.rustup_exec_env(),
     )
-    # yield Get(ExecuteProcessResult, ExecuteProcessRequest, cargo_install_req)
+    yield Get(ExecuteProcessResult, ExecuteProcessRequest, cargo_install_req)
+    assert(is_executable(rustup.cargo_ensure_installed_path))
 
   cargo_package_req = ExecuteProcessRequest(
     argv=('./cargo', 'ensure-installed',
