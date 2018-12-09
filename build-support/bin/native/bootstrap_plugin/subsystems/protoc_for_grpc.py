@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
+
 from pants.binaries.binary_tool import NativeTool
 
 
@@ -11,3 +13,6 @@ class ProtocForGRPC(NativeTool):
   options_scope = 'protoc-for-grpcio-sys'
   default_version = '2.4.1'
   name = 'protoc'
+
+  def bin_dir(self):
+    return os.path.dirname(self.select())

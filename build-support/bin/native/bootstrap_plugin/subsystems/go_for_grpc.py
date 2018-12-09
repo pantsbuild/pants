@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
+
 from pants.binaries.binary_tool import NativeTool
 
 
@@ -11,3 +13,6 @@ class GoForGRPC(NativeTool):
   options_scope = 'go-for-grpcio-sys'
   default_version = '1.7.3'
   archive_type = 'tgz'
+
+  def bin_dir(self):
+    return os.path.join(self.select(), 'go/bin')

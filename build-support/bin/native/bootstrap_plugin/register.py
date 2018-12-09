@@ -4,7 +4,26 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from bootstrap_plugin.subsystems.rustup import rustup_rules
+from bootstrap_plugin.subsystems.rustup import Rustup, rustup_rules
+from bootstrap_plugin.targets.cargo_dist import CargoDist
+from bootstrap_plugin.tasks.bootstrap_cargo import BootstrapCargo
+from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.goal.task_registrar import TaskRegistrar as task
+
+def build_file_aliases():
+  return BuildFileAliases(
+    targets={
+      CargoDist.alias: CargoDist,
+    },
+  )
+
+
+def global_subsystems():
+  return {Rustup}
+
+
+def register_goals():
+  task(name='bootstrap-cargo', action=BootstrapCargo).install('bootstrap-native-engine')
 
 
 def rules():

@@ -5,5 +5,7 @@ python_library(
   dependencies=[
     'src/python/pants/goal:task_registrar',
     'build-support/bin/native/bootstrap_plugin/subsystems',
+    'build-support/bin/native/bootstrap_plugin/targets',
+    'build-support/bin/native/bootstrap_plugin/tasks',
   ],
 )
