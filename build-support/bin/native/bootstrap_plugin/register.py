@@ -4,9 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.binaries.binary_tool import NativeTool
+from bootstrap_plugin.subsystems.rustup import rustup_rules
 
 
-class Cargo(NativeTool):
-  options_scope = 'cargo'
-  default_version = ''
+def rules():
+  return rustup_rules()

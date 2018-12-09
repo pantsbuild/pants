@@ -67,6 +67,10 @@ if [[ ! -x "$BOOTSTRAP_PEX" ]]; then
   set +x
 fi
 
+# "$BOOTSTRAP_PEX" \
+#   --pants-config-files="['pants.bootstrap.ini']" \
+#   options
+
 # Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
 source ${HERE}/build-support/pants_venv
