@@ -97,6 +97,15 @@ def example_rule(root_type):
   yield WrapperType(root_type.value)
 
 
+class PluginProduct(object):
+  pass
+
+
+@rule(PluginProduct, [Select(RootType)])
+def example_plugin_rule(root_type):
+  yield PluginProduct()
+
+
 class LoaderTest(unittest.TestCase):
 
   def setUp(self):
@@ -201,7 +210,7 @@ class LoaderTest(unittest.TestCase):
     with self.assertRaises(PluginNotFound):
       self.load_plugins(['Foobar'])
 
-  def get_mock_plugin(self, name, version, reg=None, alias=None, after=None):
+  def get_mock_plugin(self, name, version, reg=None, alias=None, after=None, rules=None):
     """Make a fake Distribution (optionally with entry points)
 
     Note the entry points do not actually point to code in the returned distribution --
@@ -217,6 +226,7 @@ class LoaderTest(unittest.TestCase):
     :param callable reg: Optional callable for goal registration entry point
     :param callable alias: Optional callable for build_file_aliases entry point
     :param callable after: Optional callable for load_after list entry point
+    :param callable rules: Optional callable for rules entry point
     """
 
     plugin_pkg = 'demoplugin{0}'.format(uuid.uuid4().hex)
@@ -245,6 +255,10 @@ class LoaderTest(unittest.TestCase):
     if after is not None:
       setattr(plugin, 'baz', after)
       entry_lines.append('load_after = {}:baz\n'.format(module_name))
+
+    if rules is not None:
+      setattr(plugin, 'qux', rules)
+      entry_lines.append('rules = {}:qux\n'.format(module_name))
 
     if entry_lines:
       entry_data = '[pantsbuild.plugin]\n{}\n'.format('\n'.join(entry_lines))
@@ -320,12 +334,20 @@ class LoaderTest(unittest.TestCase):
                        {DummySubsystem1, DummySubsystem2})
 
   def test_rules(self):
-    def rules():
+    def backend_rules():
       return [example_rule, RootRule(RootType)]
-    with self.create_register(rules=rules) as backend_package:
+    with self.create_register(rules=backend_rules) as backend_package:
       load_backend(self.build_configuration, backend_package)
       self.assertEqual(self.build_configuration.rules(),
                        [example_rule, RootRule(RootType)])
+
+    def plugin_rules():
+      return [example_plugin_rule]
+
+    self.working_set.add(self.get_mock_plugin('this-plugin-rules', '0.0.1', rules=plugin_rules))
+    self.load_plugins(['this-plugin-rules'])
+    self.assertEqual(self.build_configuration.rules(),
+                     [example_rule, RootRule(RootType), example_plugin_rule])
 
   def test_backend_plugin_ordering(self):
     def reg_alias():
