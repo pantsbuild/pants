@@ -74,7 +74,7 @@ class Rustup(Script):
     components = opts.rust_components
     return RustUpdateRequest(
       toolchain_root=self._toolchain_root,
-      toolchain_version=version,
+      toolchain_version=text_type(version),
       rust_components=tuple(components),
     )
 
@@ -171,7 +171,12 @@ class RustUpdateRequest(datatype([
 
   @memoized_property
   def cargo_fingerprinted_filename(self):
-    return 'cargo-{}'.format(stable_json_hash(self))
+    # TODO: add a stable json hash method to datatype()!
+    return 'cargo-{}'.format(stable_json_hash([
+      self.toolchain_root,
+      self.toolchain_version,
+      self.rust_components,
+    ]))
 
 
 class CargoBin(datatype([
@@ -189,12 +194,14 @@ def obtain_cargo_bin_location(rustup, rustup_exe):
     update_request.cargo_fingerprinted_filename,
   )
 
+  version = update_request.toolchain_version
+
   which_cargo_env = rustup.rustup_exec_env().copy()
   which_cargo_env['RUSTUP_TOOLCHAIN'] = version
 
   which_cargo_req = ExecuteProcessRequest(
     argv=('./rustup', 'which', 'cargo'),
-    input_files=rustup_exe.exe,
+    input_files=rustup_exe.exe.directory_digest,
     description='get rustup cargo bin location',
     env=which_cargo_env,
   )
@@ -202,9 +209,7 @@ def obtain_cargo_bin_location(rustup, rustup_exe):
   cargo_bin_path = which_cargo_res.stdout.strip()
   symlink_target = os.path.relpath(cargo_bin_path, update_request.toolchain_root)
 
-  cargo_bin_globs = PathGlobsAndRoot([symlink_target], update_request.toolchain_root)
-
-  version = update_request.toolchain_version
+  cargo_bin_globs = PathGlobsAndRoot(PathGlobs([symlink_target]), update_request.toolchain_root)
 
   # If rustup was already bootstrapped against a different toolchain in the past, freshen it and
   # ensure the toolchain and components we need are installed.
@@ -213,7 +218,7 @@ def obtain_cargo_bin_location(rustup, rustup_exe):
     def rustup_update_request(argv, sub_description):
       return ExecuteProcessRequest(
         argv=tuple(['./rustup'] + argv),
-        input_files=rustup_exe.exe,
+        input_files=rustup_exe.exe.directory_digest,
         description='freshen rust toolchain: {}'.format(sub_description),
         env=rustup.rustup_exec_env(),
       )
@@ -259,9 +264,9 @@ def ensure_cargo_installed(rustup, cargo_bin):
   if not is_executable(rustup.cargo_ensure_installed_path):
     cargo_install_req = ExecuteProcessRequest(
       argv=('./cargo', 'install', 'cargo-ensure-installed'),
-      input_files=cargo_bin.exe,
+      input_files=cargo_bin.exe.directory_digest,
       description='install cargo-ensure-installed (???)',
-      env=rustup_exec_env(),
+      env=rustup.rustup_exec_env(),
     )
     # yield Get(ExecuteProcessResult, ExecuteProcessRequest, cargo_install_req)
 
@@ -269,9 +274,9 @@ def ensure_cargo_installed(rustup, cargo_bin):
     argv=('./cargo', 'ensure-installed',
           '--package', 'cargo-ensure-installed',
           '--version', rustup.cargo_version),
-    input_files=cargo_bin.exe,
+    input_files=cargo_bin.exe.directory_digest,
     description='run cargo-ensure-installed (???)',
-    env=rustup_exec_env(),
+    env=rustup.rustup_exec_env(),
   )
   yield Get(ExecuteProcessResult, ExecuteProcessRequest, cargo_package_req)
 

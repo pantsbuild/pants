@@ -11,6 +11,7 @@ from pants.binaries.binary_tool import NativeTool
 
 class CMakeForGRPC(NativeTool):
   options_scope = 'cmake-for-grpcio-sys'
+  name = 'cmake'
   default_version = '3.9.5'
   archive_type = 'tgz'
 

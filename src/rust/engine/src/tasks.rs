@@ -95,6 +95,10 @@ impl Tasks {
       },
       Intrinsic {
         product: types.snapshot,
+        input: types.path_globs_and_root,
+      },
+      Intrinsic {
+        product: types.snapshot,
         input: types.url_to_fetch,
       },
       Intrinsic {

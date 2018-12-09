@@ -105,6 +105,7 @@ class Scheduler(object):
       construct_process_result=FallibleExecuteProcessResult,
       constraint_address=constraint_for(Address),
       constraint_path_globs=constraint_for(PathGlobs),
+      constraint_path_globs_and_root=constraint_for(PathGlobsAndRoot),
       constraint_directory_digest=constraint_for(Digest),
       constraint_snapshot=constraint_for(Snapshot),
       constraint_merge_snapshots_request=constraint_for(MergedDirectories),

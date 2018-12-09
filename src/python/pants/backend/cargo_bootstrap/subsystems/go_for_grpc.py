@@ -11,6 +11,7 @@ from pants.binaries.binary_tool import NativeTool
 
 class GoForGRPC(NativeTool):
   options_scope = 'go-for-grpcio-sys'
+  name = 'go'
   default_version = '1.7.3'
   archive_type = 'tgz'
 

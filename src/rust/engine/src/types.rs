@@ -12,6 +12,7 @@ pub struct Types {
   pub construct_process_result: Function,
   pub address: TypeConstraint,
   pub path_globs: TypeConstraint,
+  pub path_globs_and_root: TypeConstraint,
   pub directory_digest: TypeConstraint,
   pub snapshot: TypeConstraint,
   pub merged_directories: TypeConstraint,

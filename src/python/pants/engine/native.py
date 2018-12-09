@@ -680,6 +680,7 @@ class Native(object):
                     construct_process_result,
                     constraint_address,
                     constraint_path_globs,
+                    constraint_path_globs_and_root,
                     constraint_directory_digest,
                     constraint_snapshot,
                     constraint_merge_snapshots_request,
@@ -713,6 +714,7 @@ class Native(object):
         # TypeConstraints.
         tc(constraint_address),
         tc(constraint_path_globs),
+        tc(constraint_path_globs_and_root),
         tc(constraint_directory_digest),
         tc(constraint_snapshot),
         tc(constraint_merge_snapshots_request),

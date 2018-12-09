@@ -174,6 +174,17 @@ impl WrappedNode for Select {
             .to_boxed()
         }
         &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.snapshot && input == context.core.types.path_globs_and_root =>
+        {
+          let context = context.clone();
+          let core = context.core.clone();
+          self
+            .select_product(&context, context.core.types.path_globs_and_root, "intrinsic")
+            .and_then(move |val| context.get(Snapshot(externs::key_for(val))))
+            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
+            .to_boxed()
+        }
+        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.snapshot && input == context.core.types.url_to_fetch =>
         {
           let context = context.clone();
@@ -498,6 +509,17 @@ impl Snapshot {
       .to_boxed()
   }
 
+  fn create_from_root(context: Context, path_globs: PathGlobs, root: PathBuf) -> NodeFuture<fs::Snapshot> {
+    let core = context.core.clone();
+    fs::Snapshot::capture_snapshot_from_arbitrary_root(
+      core.store(),
+      core.fs_pool.clone(),
+      root,
+      path_globs,
+    ).map_err(|e| throw(&e))
+      .to_boxed()
+  }
+
   pub fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
     let include = externs::project_multi_strs(item, "include");
     let exclude = externs::project_multi_strs(item, "exclude");
@@ -596,12 +618,29 @@ impl WrappedNode for Snapshot {
   type Item = Arc<fs::Snapshot>;
 
   fn run(self, context: Context) -> NodeFuture<Arc<fs::Snapshot>> {
-    let lifted_path_globs = Self::lift_path_globs(&externs::val_for(&self.0));
-    future::result(lifted_path_globs)
-      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))
-      .and_then(move |path_globs| Self::create(context, path_globs))
-      .map(Arc::new)
-      .to_boxed()
+    let value = externs::val_for(&self.0);
+    if externs::satisfied_by(&context.core.types.path_globs, &value) {
+      let lifted_path_globs = Self::lift_path_globs(&value);
+      future::result(lifted_path_globs)
+        .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))
+        .and_then(move |path_globs| Self::create(context, path_globs))
+        .map(Arc::new)
+        .to_boxed()
+    } else if externs::satisfied_by(&context.core.types.path_globs_and_root, &value) {
+      let root = PathBuf::from(externs::project_str(&value, "root"));
+      let lifted_path_globs = Self::lift_path_globs(
+        &externs::project_ignoring_type(&value, "path_globs"));
+      future::result(lifted_path_globs)
+        .map_err(|e| throw(&format!("Failed to parse PathGlobsAndRoot: {}", e)))
+        .and_then(move |path_globs| Self::create_from_root(context, path_globs, root))
+        .map(Arc::new)
+        .to_boxed()
+    } else {
+      err(throw(&format!(
+        "Expected a Param of type PathGlobs or PathGlobsAndRoot, but found {}.",
+        externs::val_to_str(&value)
+      )))
+    }
   }
 }
 
