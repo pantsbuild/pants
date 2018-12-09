@@ -140,10 +140,7 @@ class Rustup(Script):
     }
 
 
-class RustupExe(datatype([
-    ('exe', Snapshot),
-    ('rustup', Rustup),
-])): pass
+class RustupExe(datatype([('exe', Snapshot)])): pass
 
 
 @rule(RustupExe, [Select(Rustup)])
@@ -163,7 +160,7 @@ def unpack_rustup(rustup):
     assert(is_executable(rustup.pants_owned_rustup_path))
 
   rustup_snapshot = yield Get(Snapshot, PathGlobsAndRoot, rustup.pants_owned_rustup_globs)
-  yield RustupExe(rustup_snapshot, rustup)
+  yield RustupExe(rustup_snapshot)
 
 
 class RustUpdateRequest(datatype([
@@ -180,13 +177,11 @@ class RustUpdateRequest(datatype([
 class CargoBin(datatype([
     'bin_path',
     ('exe', Snapshot),
-    ('rustup', Rustup),
 ])): pass
 
 
-@rule(CargoBin, [Select(RustupExe)])
-def obtain_cargo_bin_location(rustup_exe):
-  rustup = rustup_exe.rustup
+@rule(CargoBin, [Select(Rustup), Select(RustupExe)])
+def obtain_cargo_bin_location(rustup, rustup_exe):
   update_request = rustup.update_request
 
   cargo_versioned_path = os.path.join(
@@ -241,7 +236,7 @@ def obtain_cargo_bin_location(rustup_exe):
     assert(is_executable(cargo_versioned_path))
 
   cargo_exe = yield Get(Snapshot, PathGlobsAndRoot, cargo_bin_globs)
-  yield CargoBin(cargo_bin_path, cargo_exe, rustup)
+  yield CargoBin(cargo_bin_path, cargo_exe)
 
 
 class CargoInstallation(datatype([
@@ -259,9 +254,8 @@ class CargoInstallation(datatype([
     return env
 
 
-@rule(CargoInstallation, [Select(CargoBin)])
-def ensure_cargo_installed(cargo_bin):
-  rustup = carog_bin.rustup
+@rule(CargoInstallation, [Select(Rustup), Select(CargoBin)])
+def ensure_cargo_installed(rustup, cargo_bin):
   if not is_executable(rustup.cargo_ensure_installed_path):
     cargo_install_req = ExecuteProcessRequest(
       argv=('./cargo', 'install', 'cargo-ensure-installed'),
@@ -269,7 +263,7 @@ def ensure_cargo_installed(cargo_bin):
       description='install cargo-ensure-installed (???)',
       env=rustup_exec_env(),
     )
-    yield Get(ExecuteProcessResult, ExecuteProcessRequest, cargo_install_req)
+    # yield Get(ExecuteProcessResult, ExecuteProcessRequest, cargo_install_req)
 
   cargo_package_req = ExecuteProcessRequest(
     argv=('./cargo', 'ensure-installed',
