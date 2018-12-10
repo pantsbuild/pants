@@ -74,4 +74,7 @@ class BaseZincCompileJDKTest(TaskTestBase):
   def test_hermetic_jdk_being_underlying_dist(self):
     context = self.context(target_roots=[])
     zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.HERMETIC)
-    self.assertFalse(os.path.islink(zinc.dist.home))
+    self.assertFalse(
+      os.path.islink(zinc.dist.home),
+      "Expected {} to not be a link, it was.".format(zinc.dist.home)
+    )
