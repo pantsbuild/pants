@@ -202,6 +202,9 @@ public class SecurityManagedRunner extends Runner implements Filterable {
 
     private void reportDanglingThreads(Description description, TestSecurityContext context) {
       log("desc: "+description+" checking dangling");
+      if (tests.get(description) == TestState.failed) {
+        return;
+      }
       // if there are threads running and the current context does not allow threads to remain,
       // running, report a failure.
       if (context.hasActiveThreads()) {

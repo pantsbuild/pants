@@ -1,6 +1,9 @@
 package org.pantsbuild.tools.junit.impl.security;
 
-import java.io.FileDescriptor;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.Permission;
 import java.security.PrivilegedActionException;
@@ -298,7 +301,18 @@ public class JunitSecViolationReportingManager extends SecurityManager {
       log("disallowsFileAccess", "is a framework call to the redirected output");
       return false;
     } else  {
-      return this.contextLookupAndErrorCollection.config.getFileHandling() == FileHandling.disallow;
+      FileHandling fileHandling = this.contextLookupAndErrorCollection.config.getFileHandling();
+      if (fileHandling==FileHandling.onlyCWD) {
+        String workingDir = System.getProperty("user.dir");
+        try {
+          String canonicalPath = new File(filename).getCanonicalPath();
+          return !canonicalPath.startsWith(workingDir);
+        } catch (IOException e) {
+          // TODO Do something better here
+          e.printStackTrace();
+        }
+      }
+      return fileHandling == FileHandling.disallow;
     }
   }
 

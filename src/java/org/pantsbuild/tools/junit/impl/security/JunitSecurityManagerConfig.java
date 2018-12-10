@@ -106,6 +106,10 @@ public class JunitSecurityManagerConfig {
      */
     allowAll,
     /**
+     * Only files in the current working directory may be operated on.
+     */
+    onlyCWD,
+    /**
      * Disallow any file operation.
      */
     disallow

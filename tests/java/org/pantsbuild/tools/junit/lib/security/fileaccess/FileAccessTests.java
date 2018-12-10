@@ -1,8 +1,10 @@
 package org.pantsbuild.tools.junit.lib.security.fileaccess;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 
@@ -39,6 +41,30 @@ public class FileAccessTests {
     } catch (NoSuchFileException e) {
 
     }
+  }
+
+  @Test
+  public void tempfile() throws IOException {
+    try {
+      File tempFile = File.createTempFile("my-", "-tempfile");
+
+      tempFile.deleteOnExit();
+    } catch (SecurityException e) {
+      // NB: tempfile swallows the raised exception and re-throws one.
+      // This catch ensures that the expected exception is reported.
+      // It might be better to figure out a way to report both in cases where there is a constraint
+      // violation and a separate failure cause.
+    }
+  }
+
+  @Test
+  public void readNonexistentRootFile() {
+    String pathname = "/non-existent-file";
+    boolean exists = new File(pathname).exists();
+    assertThat(exists, is(false));
+
+    Path path = Paths.get(pathname);
+
   }
 
 }
