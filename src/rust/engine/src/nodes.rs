@@ -640,7 +640,7 @@ impl WrappedNode for Snapshot {
         Self::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
       future::result(lifted_path_globs)
         .map_err(|e| throw(&format!("Failed to parse PathGlobsAndRoot: {}", e)))
-        .and_then(move |path_globs| Self::create_from_root(context, path_globs, root))
+        .and_then(move |path_globs| Self::create_from_root(&context, path_globs, root))
         .map(Arc::new)
         .to_boxed()
     } else {
