@@ -1,6 +1,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+python_tests(
+    name = "test_play",
+    source = "test_play.py",
+    dependencies = [":test_legacy_engine"],
+)
+
 python_library(
   name = 'util',
   sources = ['util.py'],
