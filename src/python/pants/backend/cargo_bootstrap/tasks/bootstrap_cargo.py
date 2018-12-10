@@ -19,8 +19,8 @@ class BootstrapCargo(Task):
   @classmethod
   def register_options(cls, register):
     super(BootstrapCargo, cls).register_options(register)
-    register('--release', type=bool, default=True,
-             help='???')
+    register('--release', type=bool, default=False,
+             help='Whether to build the native engine in the release configuration.')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -53,7 +53,8 @@ class BootstrapCargo(Task):
             labels=[WorkUnitLabel.COMPILER]) as workunit:
           cargo_toml = 'src/rust/engine/Cargo.toml'
           if not cargo_toml in cargo_dist_vt.target.sources_relative_to_buildroot():
-            raise self.CargoBootstrapError('???: {}'.format(cargo_toml))
+            raise self.CargoBootstrapError('{} was not found in the cargo sources!'
+                                           .format(cargo_toml))
           try:
             subprocess.check_call(
               ['cargo', 'build',
@@ -65,5 +66,5 @@ class BootstrapCargo(Task):
             )
           except OSError as e:
             workunit.set_outcome(WorkUnit.FAILURE)
-            raise self.CargoBootstrapError('???')
+            raise self.CargoBootstrapError('Cargo build failed: {}.'.format(e))
           workunit.set_outcome(WorkUnit.SUCCESS)

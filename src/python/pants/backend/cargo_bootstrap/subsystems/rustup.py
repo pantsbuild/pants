@@ -58,14 +58,14 @@ class Rustup(Script):
   def register_options(cls, register):
     super(Rustup, cls).register_options(register)
     register('--toolchain-version', type=str, default='1.30.0',
-             help='???')
+             help='Version of the rust toolchain to use.')
     register('--rust-components', type=list_option, default=[
       'rustfmt-preview',
       'rust-src',
       'clippy-preview',
-    ], help='???')
+    ], help='Components of the rust toolchain to install.')
     register('--cargo-version', type=str, default='0.2.1',
-             help='???')
+             help='Version of the cargo build tool to use.')
 
   @memoized_property
   def update_request(self):
@@ -213,9 +213,8 @@ def obtain_cargo_bin_location(rustup, rustup_exe):
     PathGlobs(['./cargo']),
     text_type(os.path.dirname(cargo_bin_path)))
 
-  # If rustup was already bootstrapped against a different toolchain in the past, freshen it and
-  # ensure the toolchain and components we need are installed.
-  # TODO: mention what the "nightly" part does!
+  # If rustup was already bootstrapped against a different toolchain in the past (or if we are using
+  # the nightly release), freshen it and ensure the toolchain and components we need are installed.
   if not is_executable(cargo_versioned_path) or version == 'nightly':
     def rustup_update_request(argv, sub_description):
       return ExecuteProcessRequest(
@@ -267,7 +266,7 @@ def ensure_cargo_installed(rustup, cargo_bin):
     cargo_install_req = ExecuteProcessRequest(
       argv=('./cargo', 'install', 'cargo-ensure-installed'),
       input_files=cargo_bin.exe.directory_digest,
-      description='install cargo-ensure-installed (???)',
+      description='install cargo-ensure-installed',
       env=rustup.rustup_exec_env(),
     )
     yield Get(ExecuteProcessResult, ExecuteProcessRequest, cargo_install_req)
@@ -278,7 +277,7 @@ def ensure_cargo_installed(rustup, cargo_bin):
           '--package', 'cargo-ensure-installed',
           '--version', rustup.cargo_version),
     input_files=cargo_bin.exe.directory_digest,
-    description='run cargo-ensure-installed (???)',
+    description='run cargo-ensure-installed',
     env=rustup.rustup_exec_env(),
   )
   yield Get(ExecuteProcessResult, ExecuteProcessRequest, cargo_package_req)
