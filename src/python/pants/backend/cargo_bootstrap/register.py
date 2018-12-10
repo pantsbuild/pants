@@ -10,6 +10,7 @@ from pants.backend.cargo_bootstrap.tasks.bootstrap_cargo import BootstrapCargo
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
+
 def build_file_aliases():
   return BuildFileAliases(
     targets={

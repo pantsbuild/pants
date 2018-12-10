@@ -12,7 +12,7 @@ from future.utils import text_type
 from pants.backend.cargo_bootstrap.subsystems.cmake_for_grpc import CMakeForGRPC
 from pants.backend.cargo_bootstrap.subsystems.go_for_grpc import GoForGRPC
 from pants.backend.cargo_bootstrap.subsystems.protoc_for_grpc import ProtocForGRPC
-from pants.base.build_environment import get_buildroot, get_pants_cachedir
+from pants.base.build_environment import get_pants_cachedir
 from pants.base.hash_utils import stable_json_hash
 from pants.binaries.binary_tool import Script
 from pants.binaries.binary_util import BinaryToolUrlGenerator
@@ -20,14 +20,10 @@ from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
-from pants.net.http.fetcher import Fetcher
 from pants.option.custom_types import list_option
-from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import environment_as
-from pants.util.dirutil import chmod_plus_x, is_executable
+from pants.util.dirutil import is_executable
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
-from pants.util.process_handler import subprocess
 from pants.util.strutil import create_path_env_var
 
 
