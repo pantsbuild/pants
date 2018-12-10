@@ -82,10 +82,8 @@ default_test_config: &default_test_config
   language: python
   python: &python_version "2.7"
   before_install:
-    #- PATH=$(echo "$PATH" | sed -e 's/:\/usr\/local\/lib\/jvm\/openjdk11\/bin//')
-    #- JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
-    - export JAVA_HOME=$HOME/oraclejdk8
-    - $TRAVIS_BUILD_DIR/install-jdk.sh --install oraclejdk8 --target $JAVA_HOME
+    - PATH=$(echo "$PATH" | sed -e 's/:\/usr\/local\/lib\/jvm\/openjdk11\/bin//')
+    - JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
     - ls /usr/local/lib/jvm
     # Increase the max number of user watches to ensure that watchman is able to watch all
     # files in the working copy.
