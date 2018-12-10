@@ -8,13 +8,14 @@ import os
 import re
 from contextlib import contextmanager
 
-from pants.backend.native.config.environment import (GCCCppToolchain, GCCCToolchain,
-                                                     LLVMCppToolchain, LLVMCToolchain, Platform)
+from pants.backend.native.config.environment import Platform
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
 from pants.backend.native.subsystems.libc_dev import LibcDev
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
+from pants.backend.native.subsystems.native_toolchain import (GCCCppToolchain, GCCCToolchain,
+                                                              LLVMCppToolchain, LLVMCToolchain,
+                                                              NativeToolchain)
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
 from pants.util.process_handler import subprocess
@@ -119,9 +120,11 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 
   def _invoke_compiler(self, compiler, args):
     cmd = [compiler.exe_filename] + compiler.extra_args + args
-    return self._invoke_capturing_output(
-      cmd,
-      compiler.as_invocation_environment_dict)
+    env = compiler.as_invocation_environment_dict
+    # TODO: add an `extra_args`-like field to `Executable`s which allows for overriding env vars
+    # like this, but declaratively!
+    env['LC_ALL'] = 'C'
+    return self._invoke_capturing_output(cmd, env)
 
   def _invoke_linker(self, linker, args):
     cmd = [linker.exe_filename] + linker.extra_args + args

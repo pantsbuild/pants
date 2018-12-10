@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.config.environment import LLVMCToolchain
 from pants.backend.native.subsystems.native_build_step_settings import CCompileSettings
 from pants.backend.native.targets.native_library import CLibrary
 from pants.backend.native.tasks.native_compile import NativeCompile
@@ -32,4 +31,4 @@ class CCompile(NativeCompile):
     return CCompileSettings.scoped_instance(self)
 
   def get_compiler(self):
-    return self._request_single(LLVMCToolchain, self._native_toolchain).c_toolchain.c_compiler
+    return self.get_c_toolchain_variant().c_compiler
