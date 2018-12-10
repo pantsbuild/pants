@@ -58,10 +58,6 @@ function _build_native_code() {
 
   (
     cd "${REPO_ROOT}"
-    # ./pants-bootstrap.pex \
-    #   --pants-config-files="['pants.bootstrap.ini']" \
-    #   bootstrap-native-engine \
-    #   src/rust/engine:new-cargo
     "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
       --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine
   ) || die
