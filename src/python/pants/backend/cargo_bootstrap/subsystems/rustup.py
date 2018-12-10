@@ -257,7 +257,7 @@ class CargoInstallation(datatype([
     env = self.rustup.rustup_exec_env().copy()
     env['PATH'] = create_path_env_var([
       os.path.dirname(self.cargo_bin.bin_path),
-    ], env=env, prepend=True)
+    ], env=env)
     return env
 
 
