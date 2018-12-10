@@ -66,6 +66,20 @@ class SubsystemClientMixin(object):
       else:
         yield SubsystemDependency(dep, GLOBAL_SCOPE)
 
+  @classmethod
+  def subsystem_closure_iter(cls, seen=None):
+    """Iterate over the transitive closure of subsystem dependencies of this Optionable.
+
+    :rtype: :class:`collections.Iterator` of :class:`SubsystemDependency`
+    """
+    seen = seen or set()
+    for dep in cls.subsystem_dependencies_iter():
+      if dep not in seen:
+        seen.add(dep)
+        yield dep
+        for d in dep.subsystem_cls.subsystem_closure_iter(seen=seen):
+          yield d
+
   class CycleException(Exception):
     """Thrown when a circular subsystem dependency is detected."""
 
