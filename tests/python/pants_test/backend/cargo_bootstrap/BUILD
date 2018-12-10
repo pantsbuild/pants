@@ -6,5 +6,6 @@ python_tests(
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags={'integration'},
 )
