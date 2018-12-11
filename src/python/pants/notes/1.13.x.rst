@@ -1,0 +1,162 @@
+1.13.x Stable Releases
+======================
+This document describes releases leading up to the ``1.13.x`` ``stable`` series.
+
+1.13.0rc0 (12/11/2018)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* add a --toolchain-variant option to select the compiler for C/C++ (#6800)
+  `PR #6800 <https://github.com/pantsbuild/pants/pull/6800>`_
+
+* A contrib package for building AWS Lambdas from python code. (#6881)
+  `PR #6881 <https://github.com/pantsbuild/pants/pull/6881>`_
+
+* Base classes for configuring and resolving python tools. (#6870)
+  `PR #6870 <https://github.com/pantsbuild/pants/pull/6870>`_
+
+* Add the ability to consume scoped Options from @rules (#6872)
+  `PR #6872 <https://github.com/pantsbuild/pants/pull/6872>`_
+
+* Expose an API to pass multiple Params to an engine request (#6871)
+  `PR #6871 <https://github.com/pantsbuild/pants/pull/6871>`_
+
+* Respect 3rdparty resolver setting in BootstrapJvmTools (#6789)
+  `PR #6789 <https://github.com/pantsbuild/pants/pull/6789>`_
+
+* Add --remote-execution-process-cache-namespace (#6809)
+  `PR #6809 <https://github.com/pantsbuild/pants/pull/6809>`_
+
+* Header file extensions as options for C/C++ targets (#6802)
+  `PR #6802 <https://github.com/pantsbuild/pants/pull/6802>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Use both the deprecated and new locations of fatal_warnings args (#6798)
+  `PR #6798 <https://github.com/pantsbuild/pants/pull/6798>`_
+
+Buxfixes
+~~~~~~~~
+
+* Flush the console after all @console_rules have completed (#6878)
+  `PR #6878 <https://github.com/pantsbuild/pants/pull/6878>`_
+
+* Straighten out interpreter search path configuration (#6849)
+  `PR #6849 <https://github.com/pantsbuild/pants/pull/6849>`_
+
+* Make TestPinger more robust. (#6844)
+  `PR #6844 <https://github.com/pantsbuild/pants/pull/6844>`_
+
+* Fix clippy pre-commit check when used as a commit hook. (#6859)
+  `PR #6859 <https://github.com/pantsbuild/pants/pull/6859>`_
+
+* Don't copy over the os environment to avoid an encoding error (#6846)
+  `PR #6846 <https://github.com/pantsbuild/pants/pull/6846>`_
+
+* Fix unused error value. (#6834)
+  `PR #6834 <https://github.com/pantsbuild/pants/pull/6834>`_
+
+* [deferred-sources] fix glob expansion issue in deferred sources mappe… (#6824)
+  `PR #6824 <https://github.com/pantsbuild/pants/pull/6824>`_
+
+* Fix a bug when selecting interpreters with no constraints at all. (#6822)
+  `PR #6822 <https://github.com/pantsbuild/pants/pull/6822>`_
+
+* Pin a conan dep that was floating to a version that was not compatible with python 2. (#6825)
+  `PR #6825 <https://github.com/pantsbuild/pants/pull/6825>`_
+
+* Fix disappearing cursor (#6811)
+  `PR #6811 <https://github.com/pantsbuild/pants/pull/6811>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix flaky `test_process_request_*`. (#6895)
+  `PR #6895 <https://github.com/pantsbuild/pants/pull/6895>`_
+
+* Convert some of release.sh to python, batch pants invocations (#6843)
+  `PR #6843 <https://github.com/pantsbuild/pants/pull/6843>`_
+
+* [Bug fix] Fix test_interpreter_selection_integration unicode issues for Python 3 (#6887)
+  `PR #6887 <https://github.com/pantsbuild/pants/pull/6887>`_
+
+* use the cbindgen crate and some decorators to DRY out the rust/python ffi (#6869)
+  `PR #6869 <https://github.com/pantsbuild/pants/pull/6869>`_
+
+* Use __iter__ instead of .dependencies in v2 rules (#6873)
+  `PR #6873 <https://github.com/pantsbuild/pants/pull/6873>`_
+
+* Improve error message for locale check (#6821)
+  `PR #6821 <https://github.com/pantsbuild/pants/pull/6821>`_
+
+* Port remaining tests to new TestBase base class. (#6864)
+  `PR #6864 <https://github.com/pantsbuild/pants/pull/6864>`_
+
+* Replace try! with ? (#6868)
+  `PR #6868 <https://github.com/pantsbuild/pants/pull/6868>`_
+
+* Remove some deprecated pex-related functions. (#6865)
+  `PR #6865 <https://github.com/pantsbuild/pants/pull/6865>`_
+
+* add `scala_jar` to the docsite (#6857)
+  `PR #6857 <https://github.com/pantsbuild/pants/pull/6857>`_
+
+* Port a few tests over to the new TestBase. (#6854)
+  `PR #6854 <https://github.com/pantsbuild/pants/pull/6854>`_
+
+* Use github release version of coursier instead of dropbox link (#6853)
+  `PR #6853 <https://github.com/pantsbuild/pants/pull/6853>`_
+
+* [docs] add language about flaky tests / issues for them (#6837)
+  `PR #6837 <https://github.com/pantsbuild/pants/pull/6837>`_
+
+* Include uname in rust cache key (#6842)
+  `PR #6842 <https://github.com/pantsbuild/pants/pull/6842>`_
+
+* Only build fs_util as part of dryrun (#6835)
+  `PR #6835 <https://github.com/pantsbuild/pants/pull/6835>`_
+
+* ci.sh can run cargo-audit (#6549)
+  `PR #6549 <https://github.com/pantsbuild/pants/pull/6549>`_
+
+* Run cargo clippy in pre-commit (#6833)
+  `PR #6833 <https://github.com/pantsbuild/pants/pull/6833>`_
+
+* Statically link openssl for reqwest (#6816)
+  `PR #6816 <https://github.com/pantsbuild/pants/pull/6816>`_
+
+* Use pantsbuild.org not example.com (#6826)
+  `PR #6826 <https://github.com/pantsbuild/pants/pull/6826>`_
+
+* Leverage default target globs. (#6819)
+  `PR #6819 <https://github.com/pantsbuild/pants/pull/6819>`_
+
+* Make PythonInterpreterCache into a subsystem. (#6765)
+  `PR #6765 <https://github.com/pantsbuild/pants/pull/6765>`_
+
+* Add nailgun-specific main which uses paths in calling process (#6792)
+  `PR #6792 <https://github.com/pantsbuild/pants/pull/6792>`_
+
+* Move file owners computation into the engine and make lighter (#6790)
+  `PR #6790 <https://github.com/pantsbuild/pants/pull/6790>`_
+
+* Bump Conan to 1.9.2 (#6797)
+  `PR #6797 <https://github.com/pantsbuild/pants/pull/6797>`_
+
+* Make bootstrap jar reproducible (#6796)
+  `PR #6796 <https://github.com/pantsbuild/pants/pull/6796>`_
+
+* Remove unused CompilerCacheKey (#6805)
+  `PR #6805 <https://github.com/pantsbuild/pants/pull/6805>`_
+
+* Fix documentation example for using scalac_plugins (#6807)
+  `PR #6807 <https://github.com/pantsbuild/pants/pull/6807>`_
+
+* Remove Params::expect_single compatibility API (#6766)
+  `PR #6766 <https://github.com/pantsbuild/pants/pull/6766>`_
+
+* add integration test for invalidation of ctypes c++ sources (#6801)
+  `PR #6801 <https://github.com/pantsbuild/pants/pull/6801>`_

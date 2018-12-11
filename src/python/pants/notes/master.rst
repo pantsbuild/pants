@@ -4,6 +4,30 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.13.0rc0 (12/11/2018)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* add a --toolchain-variant option to select the compiler for C/C++ (#6800)
+  `PR #6800 <https://github.com/pantsbuild/pants/pull/6800>`_
+
+* A contrib package for building AWS Lambdas from python code. (#6881)
+  `PR #6881 <https://github.com/pantsbuild/pants/pull/6881>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix flaky `test_process_request_*`. (#6895)
+  `PR #6895 <https://github.com/pantsbuild/pants/pull/6895>`_
+
+* Convert some of release.sh to python, batch pants invocations (#6843)
+  `PR #6843 <https://github.com/pantsbuild/pants/pull/6843>`_
+
+* [Bug fix] Fix test_interpreter_selection_integration unicode issues for Python 3 (#6887)
+  `PR #6887 <https://github.com/pantsbuild/pants/pull/6887>`_
+
 1.13.0.dev2 (12/07/2018)
 ------------------------
 
