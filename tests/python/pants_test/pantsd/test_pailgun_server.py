@@ -50,17 +50,17 @@ class TestPailgunServer(unittest.TestCase):
     self.assertIs(mock_tcpserver_bind.called, True)
 
   @mock.patch.object(PailgunServer, 'close_request', **PATCH_OPTS)
-  def test_process_request(self, mock_close_request):
+  def test_process_request_thread(self, mock_close_request):
     mock_request = mock.Mock()
-    self.server.process_request(mock_request, ('1.2.3.4', 31338))
+    self.server.process_request_thread(mock_request, ('1.2.3.4', 31338))
     self.assertIs(self.mock_handler_inst.handle_request.called, True)
     mock_close_request.assert_called_once_with(self.server, mock_request)
 
   @mock.patch.object(PailgunServer, 'shutdown_request', **PATCH_OPTS)
-  def test_process_request_error(self, mock_shutdown_request):
+  def test_process_request_thread_error(self, mock_shutdown_request):
     mock_request = mock.Mock()
     self.mock_handler_inst.handle_request.side_effect = AttributeError('oops')
-    self.server.process_request(mock_request, ('1.2.3.4', 31338))
+    self.server.process_request_thread(mock_request, ('1.2.3.4', 31338))
     self.assertIs(self.mock_handler_inst.handle_request.called, True)
     self.assertIs(self.mock_handler_inst.handle_error.called, True)
     mock_shutdown_request.assert_called_once_with(self.server, mock_request)
