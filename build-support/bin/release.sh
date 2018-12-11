@@ -129,24 +129,6 @@ function execute_packaged_pants_with_internal_backends() {
     "$@"
 }
 
-function pkg_name() {
-  PACKAGE=$1
-  eval NAME=\${$PACKAGE[0]}
-  echo ${NAME}
-}
-
-function pkg_build_target() {
-  PACKAGE=$1
-  eval TARGET=\${$PACKAGE[1]}
-  echo ${TARGET}
-}
-
-function bdist_wheel_flags() {
-  PACKAGE=$1
-  eval BDIST_WHEEL_FLAGS=\${$PACKAGE[3]}
-    echo ${BDIST_WHEEL_FLAGS}
-}
-
 function pants_version_reset() {
   pushd ${ROOT} > /dev/null
     git checkout -- ${VERSION_FILE}
@@ -468,8 +450,7 @@ function fetch_and_check_prebuilt_wheels() {
   RELEASE_PACKAGES=($(run_packages_script list | grep '.' | awk '{print $1}'))
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
-    NAME=$(pkg_name $PACKAGE)
-    packages=($(find_pkg "${NAME}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
+    packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
     if [ ${#packages[@]} -eq 0 ]; then
       missing+=("${NAME}")
       continue
