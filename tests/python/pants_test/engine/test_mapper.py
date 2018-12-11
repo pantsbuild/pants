@@ -141,7 +141,7 @@ UnhydratedStructs = Collection.of(UnhydratedStruct)
 
 @rule(UnhydratedStructs, [Select(BuildFileAddresses)])
 def unhydrated_structs(build_file_addresses):
-  uhs = yield [Get(UnhydratedStruct, Address, a) for a in build_file_addresses.addresses]
+  uhs = yield tuple(Get(UnhydratedStruct, Address, a) for a in build_file_addresses.addresses)
   yield UnhydratedStructs(uhs)
 
 

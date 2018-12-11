@@ -481,14 +481,14 @@ def transitive_hydrated_targets(build_file_addresses):
 
 @rule(TransitiveHydratedTarget, [Select(HydratedTarget)])
 def transitive_hydrated_target(root):
-  dependencies = yield [Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies]
+  dependencies = yield tuple(Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies)
   yield TransitiveHydratedTarget(root, dependencies)
 
 
 @rule(HydratedTargets, [Select(BuildFileAddresses)])
 def hydrated_targets(build_file_addresses):
   """Requests HydratedTarget instances for BuildFileAddresses."""
-  targets = yield [Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses]
+  targets = yield tuple(Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses)
   yield HydratedTargets(targets)
 
 
