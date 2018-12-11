@@ -106,6 +106,14 @@ class FakeSubsystem(Subsystem):
     register('--fake-option', type=bool)
 
 
+class SubsystemWithDependencies(Subsystem):
+  options_scope = 'subsystem-with-deps'
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(SubsystemWithDependencies, cls).subsystem_dependencies() + (FakeSubsystem,)
+
+
 class AnotherFakeTask(Task):
   options_scope = 'another-fake-task'
 
@@ -126,6 +134,19 @@ class YetAnotherFakeTask(AnotherFakeTask):
   @classmethod
   def supports_passthru_args(cls):
     return False
+
+
+class TaskWithTransitiveSubsystemDependencies(Task):
+  options_scope = 'task-with-transitive-subsystem-deps'
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(TaskWithTransitiveSubsystemDependencies, cls).subsystem_dependencies() + (
+      SubsystemWithDependencies,
+    )
+
+  def execute(self):
+    pass
 
 
 class TaskTest(TaskTestBase):
@@ -612,3 +633,20 @@ files(
       passthru_args=['asdf'],
     )
     self.assertEqual(different_task_with_passthru_fp, different_task_with_same_opts_fp)
+
+  def test_fingerprint_transitive(self):
+    fp1 = self._synth_fp(cls=TaskWithTransitiveSubsystemDependencies)
+
+    # A transitive but non-fingerprintable option
+    self.set_options_for_scope(FakeSubsystem.options_scope, **{'fake-option': True})
+    fp2 = self._synth_fp(cls=TaskWithTransitiveSubsystemDependencies)
+    self.assertEqual(fp1, fp2)
+
+    # A transitive fingerprintable option
+    option_spec = {
+      FakeSubsystem.options_scope: {'fake-option': bool},
+    }
+    self.set_options_for_scope(FakeSubsystem.options_scope, **{'fake-option': True})
+    fp3 = self._synth_fp(cls=TaskWithTransitiveSubsystemDependencies,
+                         options_fingerprintable=option_spec)
+    self.assertNotEqual(fp1, fp3)

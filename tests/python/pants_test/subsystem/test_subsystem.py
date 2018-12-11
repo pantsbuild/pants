@@ -224,3 +224,49 @@ class SubsystemTest(unittest.TestCase):
 
     dep_scopes = {dep.options_scope() for dep in SubsystemA.subsystem_dependencies_iter()}
     self.assertEqual({'b', 'dummy.a'}, dep_scopes)
+
+  def test_subsystem_closure_iter(self):
+    class SubsystemA(Subsystem):
+      options_scope = 'a'
+
+    class SubsystemB(Subsystem):
+      options_scope = 'b'
+
+      @classmethod
+      def subsystem_dependencies(cls):
+        return (SubsystemA,)
+
+    class SubsystemC(Subsystem):
+      options_scope = 'c'
+
+      @classmethod
+      def subsystem_dependencies(cls):
+        return (SubsystemA, SubsystemB.scoped(cls))
+
+    class SubsystemD(Subsystem):
+      options_scope = 'd'
+
+      @classmethod
+      def subsystem_dependencies(cls):
+        return (SubsystemC, SubsystemB)
+
+    dep_scopes = {dep.options_scope() for dep in SubsystemD.subsystem_closure_iter()}
+    self.assertEqual({'c', 'a', 'b.c', 'b'}, dep_scopes)
+
+  def test_subsystem_closure_iter_cycle(self):
+    class SubsystemA(Subsystem):
+      options_scope = 'a'
+
+      @classmethod
+      def subsystem_dependencies(cls):
+        return (SubsystemB,)
+
+    class SubsystemB(Subsystem):
+      options_scope = 'b'
+
+      @classmethod
+      def subsystem_dependencies(cls):
+        return (SubsystemA,)
+
+    with self.assertRaises(SubsystemClientMixin.CycleException):
+      list(SubsystemB.subsystem_closure_iter())
