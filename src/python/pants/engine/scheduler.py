@@ -420,7 +420,6 @@ class SchedulerSession(object):
     :param subjects: A list of Spec and/or PathGlobs objects.
     :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
       :class:`pants.engine.fs.PathGlobs` objects.
-    :param bool v2_ui: whether to render the v2 engine UI
     :returns: An ExecutionRequest for the given products and subjects.
     """
     roots = (tuple((s, p) for s in subjects for p in products))
@@ -498,7 +497,7 @@ class SchedulerSession(object):
     :param subject: subject for the request.
     :param v2_ui: whether to render the v2 engine UI
     """
-    request = self.execution_request([product], [subject], v2_ui)
+    request = self.execution_request([product], [subject])
     returns, throws = self.execute(request)
 
     if throws:

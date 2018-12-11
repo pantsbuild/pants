@@ -143,7 +143,7 @@ class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table', 'console', 'go
 
   def new_session(self, v2_ui):
     session = self.scheduler.new_session(v2_ui)
-    return LegacyGraphSession(session, self.symbol_table, self.goal_map)
+    return LegacyGraphSession(session, self.symbol_table, self.console, self.goal_map)
 
 
 class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'console', 'goal_map'])):
@@ -208,7 +208,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'symbol_table', 'console
         logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
         self.scheduler_session.run_console_rule(goal_product, subjects[0])
       finally:
-        console.flush()
+        self.console.flush()
 
   def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.

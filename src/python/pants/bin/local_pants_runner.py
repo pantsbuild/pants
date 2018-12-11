@@ -40,7 +40,7 @@ class LocalPantsRunner(object):
     return options, build_config, options_bootstrapper
 
   @staticmethod
-  def _maybe_init_graph_session(graph_session, options_bootstrapper, build_config):
+  def _maybe_init_graph_session(graph_session, options_bootstrapper,build_config, global_options):
     if graph_session:
       return graph_session
 
@@ -51,6 +51,7 @@ class LocalPantsRunner(object):
       options_bootstrapper,
       build_config
     )
+
     return graph_scheduler_helper.new_session(global_options.v2_ui)
 
   @staticmethod
@@ -104,7 +105,8 @@ class LocalPantsRunner(object):
     graph_session = cls._maybe_init_graph_session(
       daemon_graph_session,
       options_bootstrapper,
-      build_config
+      build_config,
+      global_options
     )
 
     target_roots = cls._maybe_init_target_roots(

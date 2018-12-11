@@ -32,7 +32,7 @@ pub struct Session {
   // The set of roots that have been requested within this session.
   roots: Mutex<HashSet<Root>>,
   // If enabled, the display that will render the progress of the V2 engine.
-  display: Mutex<Option<EngineDisplay>>,
+  display: Option<Mutex<EngineDisplay>>,
 }
 
 impl Session {
@@ -40,7 +40,7 @@ impl Session {
     Session {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
-      display: Mutex::new(EngineDisplay::create(ui_worker_count, should_render_ui)),
+      display: EngineDisplay::create(ui_worker_count, should_render_ui).map(Mutex::new),
     }
   }
 
@@ -263,25 +263,27 @@ impl Scheduler {
       .collect();
 
     // Lock the display for the remainder of the execution, and grab a reference to it.
-    let display_arc = &session.display;
-    let mut maybe_display = display_arc.lock();
+    let mut maybe_display = match &session.display {
+      &Some(ref d) => Some(d.lock()),
+      &None => None,
+    };
 
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks_to_display = IndexMap::new();
 
-    if let Some(ref mut display) = *maybe_display {
+    if let Some(ref mut display) = maybe_display {
       display.start();
-    }
+    };
 
     let results = loop {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
-      } else if let Some(ref mut display) = *maybe_display {
+      } else if let Some(ref mut display) = maybe_display {
         Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, &mut tasks_to_display);
       }
     };
-    if let Some(ref mut display) = *maybe_display {
+    if let Some(ref mut display) = maybe_display {
       display.finish();
     };
 
