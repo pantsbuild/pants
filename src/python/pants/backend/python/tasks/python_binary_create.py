@@ -10,14 +10,13 @@ from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
+from pants.backend.python.subsystems.pex_build_util import (PexBuilderWrapper,
+                                                            has_python_requirements,
+                                                            has_python_sources, has_resources,
+                                                            is_python_target)
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
-from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import (PexBuilderWrapper, has_python_requirements,
-                                                       has_python_sources, has_resources,
-                                                       is_python_target)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -34,9 +33,8 @@ class PythonBinaryCreate(Task):
   @classmethod
   def subsystem_dependencies(cls):
     return super(PythonBinaryCreate, cls).subsystem_dependencies() + (
+      PexBuilderWrapper.Factory,
       PythonNativeCode.scoped(cls),
-      PythonRepos,
-      PythonSetup,
     )
 
   @memoized_property
@@ -119,11 +117,9 @@ class PythonBinaryCreate(Task):
       pex_info = binary_tgt.pexinfo.copy()
       pex_info.build_properties = build_properties
 
-      pex_builder = PexBuilderWrapper(
-        PEXBuilder(path=tmpdir, interpreter=interpreter, pex_info=pex_info, copy=True),
-        PythonRepos.global_instance(),
-        PythonSetup.global_instance(),
-        self.context.log)
+      pex_builder = PexBuilderWrapper.Factory.create(
+        builder=PEXBuilder(path=tmpdir, interpreter=interpreter, pex_info=pex_info, copy=True),
+        log=self.context.log)
 
       if binary_tgt.shebang:
         self.context.log.info('Found Python binary target {} with customized shebang, using it: {}'

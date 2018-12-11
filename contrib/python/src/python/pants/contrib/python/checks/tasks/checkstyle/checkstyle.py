@@ -10,11 +10,10 @@ import sys
 from packaging import version
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_repos import PythonRepos
+from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.pex_build_util import PexBuilderWrapper
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
@@ -58,7 +57,9 @@ class Checkstyle(LintTaskMixin, Task):
   @classmethod
   def subsystem_dependencies(cls):
     return super(Task, cls).subsystem_dependencies() + cls.plugin_subsystems + (
-      PythonSetup, PythonRepos, PythonInterpreterCache
+      PexBuilderWrapper.Factory,
+      PythonInterpreterCache,
+      PythonSetup,
     )
 
   @classmethod
@@ -123,10 +124,9 @@ class Checkstyle(LintTaskMixin, Task):
     if not os.path.exists(pex_path):
       with self.context.new_workunit(name='build-checker'):
         with safe_concurrent_creation(pex_path) as chroot:
-          pex_builder = PexBuilderWrapper(
-            PEXBuilder(path=chroot, interpreter=interpreter),
-            PythonRepos.global_instance(),
-            PythonSetup.global_instance(), self.context.log)
+          pex_builder = PexBuilderWrapper.Factory.create(
+            builder=PEXBuilder(path=chroot, interpreter=interpreter),
+            log=self.context.log)
 
           # Constraining is required to guard against the case where the user
           # has a pexrc file set.
