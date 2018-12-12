@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir
+from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.py2_compat import assertRegex
 
@@ -82,22 +82,30 @@ Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
       # GoalRunner#is_valid_workdir().
       workdir = os.path.join(tmpdir, '.pants.d')
       safe_mkdir(workdir)
-      file_to_make = os.path.join(tmpdir, 'some_file')
+      arrive_file = os.path.join(tmpdir, 'arrived')
+      await_file = os.path.join(tmpdir, 'await')
       waiter_handle = self.run_pants_with_workdir_without_waiting([
         '--no-enable-pantsd',
-        'run', 'testprojects/src/python/coordinated_runs:waiter',
-        '--', file_to_make,
+        'run', 'testprojects/src/python/coordinated_runs:phaser',
+        '--', arrive_file, await_file
       ], workdir)
-      yield (workdir, waiter_handle)
+
+      # Wait for testprojects/src/python/coordinated_runs:phaser to be running.
+      while not os.path.exists(arrive_file):
+        time.sleep(0.1)
+
+      def join():
+        touch(await_file)
+        return waiter_handle.join()
+
+      yield (workdir, waiter_handle.process.pid, join)
 
   @contextmanager
   def _send_signal_to_waiter_handle(self, signum):
     # This needs to be a contextmanager as well, because workdir may be temporary.
-    with self._make_waiter_handle() as (workdir, waiter_handle):
-      # Wait for the python run to be running.
-      time.sleep(5)
-      os.kill(waiter_handle.process.pid, signum)
-      waiter_run = waiter_handle.join()
+    with self._make_waiter_handle() as (workdir, pid, join):
+      os.kill(pid, signum)
+      waiter_run = join()
       self.assert_failure(waiter_run)
       # Return the (failed) pants execution result.
       yield (workdir, waiter_run)
@@ -132,15 +140,13 @@ Thread [^\n]+ \\(most recent call first\\):
       self.assertEqual('', read_file(shared_log_file, binary_mode=False))
 
   def test_prints_traceback_on_sigusr2(self):
-    with self._make_waiter_handle() as (workdir, waiter_handle):
-      time.sleep(5)
+    with self._make_waiter_handle() as (workdir, pid, join):
       # Send SIGUSR2, then sleep so the signal handler from faulthandler.register() can run.
-      os.kill(waiter_handle.process.pid, signal.SIGUSR2)
+      os.kill(pid, signal.SIGUSR2)
       time.sleep(1)
-      # This target will wait forever, so kill the process and ensure its output is correct.
-      os.kill(waiter_handle.process.pid, signal.SIGKILL)
-      waiter_run = waiter_handle.join()
-      self.assert_failure(waiter_run)
+
+      waiter_run = join()
+      self.assert_success(waiter_run)
       assertRegex(self, waiter_run.stderr_data, """\
 Current thread [^\n]+ \\(most recent call first\\):
 """)
