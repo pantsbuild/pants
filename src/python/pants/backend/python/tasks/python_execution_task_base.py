@@ -11,12 +11,12 @@ from future.utils import binary_type, text_type
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 
+from pants.backend.python.subsystems.pex_build_util import is_python_target
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.gather_sources import GatherSources
-from pants.backend.python.tasks.pex_build_util import is_python_target
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.build_graph.files import Files

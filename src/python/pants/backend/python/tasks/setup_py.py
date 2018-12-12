@@ -23,10 +23,10 @@ from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
+from pants.backend.python.subsystems.pex_build_util import is_local_python_dist
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.specs import SiblingAddresses

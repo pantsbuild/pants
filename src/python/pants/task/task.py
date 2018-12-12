@@ -291,8 +291,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     hasher.update(self.stable_name().encode('utf-8'))
     hasher.update(self._options_fingerprint(self.options_scope).encode('utf-8'))
     hasher.update(self.implementation_version_str().encode('utf-8'))
-    # TODO: this is not recursive, but should be: see #2739
-    for dep in self.subsystem_dependencies_iter():
+    for dep in self.subsystem_closure_iter():
       hasher.update(self._options_fingerprint(dep.options_scope()).encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 

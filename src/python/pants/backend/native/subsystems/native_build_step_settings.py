@@ -13,6 +13,7 @@ from pants.util.meta import classproperty
 
 
 class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsystem):
+  """Settings which are specific to a target and do not need to be the same for compile and link."""
 
   options_scope = 'native-build-step'
 

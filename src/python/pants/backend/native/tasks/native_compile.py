@@ -173,7 +173,7 @@ class NativeCompile(NativeTask, AbstractClass):
     compiler_option_sets = (self._compile_settings.native_build_step_settings
                                 .get_compiler_option_sets_for_target(target))
 
-    return NativeCompileRequest(
+    compile_request = NativeCompileRequest(
       compiler=self._compiler,
       include_dirs=include_dirs,
       sources=sources_and_headers,
@@ -182,6 +182,10 @@ class NativeCompile(NativeTask, AbstractClass):
                             .get_merged_args_for_compiler_option_sets(compiler_option_sets)),
       output_dir=versioned_target.results_dir,
       header_file_extensions=self._compile_settings.header_file_extensions)
+
+    self.context.log.debug(repr(compile_request))
+
+    return compile_request
 
   def _iter_sources_minus_headers(self, compile_request):
     for s in compile_request.sources:
@@ -201,6 +205,7 @@ class NativeCompile(NativeTask, AbstractClass):
     compiler_options = compile_request.compiler_options
     # We are going to execute in the target output, so get absolute paths for everything.
     buildroot = get_buildroot()
+    # TODO: add -v to every compiler and linker invocation!
     argv = (
       [compiler.exe_filename] +
       compiler.extra_args +
@@ -213,6 +218,7 @@ class NativeCompile(NativeTask, AbstractClass):
       ] +
       [os.path.join(buildroot, src) for src in sources_minus_headers])
 
+    self.context.log.info("selected compiler exe name: '{}'".format(compiler.exe_filename))
     self.context.log.debug("compile argv: {}".format(argv))
 
     return argv

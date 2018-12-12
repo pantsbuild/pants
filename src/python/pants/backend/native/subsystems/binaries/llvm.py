@@ -92,7 +92,9 @@ class LLVM(NativeTool):
         self._PLATFORM_SPECIFIC_LINKER_NAME),
       library_dirs=[],
       linking_library_dirs=[],
-      extra_args=[])
+      extra_args=[],
+      extra_object_files=[],
+    )
 
   @memoized_property
   def _common_include_dirs(self):

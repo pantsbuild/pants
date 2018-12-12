@@ -1,0 +1,25 @@
+header = '''
+#ifndef __PANTS_SCHEDULER_CBINDGEN_H__
+#define __PANTS_SCHEDULER_CBINDGEN_H__
+/*
+ * Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+ * Licensed under the Apache License, Version 2.0 (see LICENSE).
+ */
+
+// Handle is declared as a typedef rather than a wrapper struct because it avoids needing to wrap
+// the inner handle/`void*` in a tuple or datatype at the ffi boundary. For most types that
+// overhead would not be worth worrying about, but Handle is used often enough that it gives a 6%
+// speedup to avoid the wrapping.
+
+typedef void* Handle;
+'''
+trailer = '''
+#endif // __PANTS_SCHEDULER_CBINDGEN_H__
+'''
+include_version = true
+line_length = 100
+language = "C"
+
+[export]
+# TODO: wrapped_PyInit_native_engine is declared twice if not excluded here, figure out why.
+exclude = ["Handle", "wrapped_PyInit_native_engine"]

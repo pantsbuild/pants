@@ -8,7 +8,6 @@ import sys
 
 
 class Console(object):
-
   @property
   def stdout(self):
     return sys.stdout
@@ -28,3 +27,7 @@ class Console(object):
 
   def print_stderr(self, payload):
     print(payload, file=self.stderr)
+
+  def flush(self):
+    self.stdout.flush()
+    self.stderr.flush()

@@ -66,6 +66,34 @@ class SubsystemClientMixin(object):
       else:
         yield SubsystemDependency(dep, GLOBAL_SCOPE)
 
+  @classmethod
+  def subsystem_closure_iter(cls):
+    """Iterate over the transitive closure of subsystem dependencies of this Optionable.
+
+    :rtype: :class:`collections.Iterator` of :class:`SubsystemDependency`
+    :raises: :class:`pants.subsystem.subsystem_client_mixin.SubsystemClientMixin.CycleException`
+             if a dependency cycle is detected.
+    """
+    seen = set()
+    dep_path = OrderedSet()
+
+    def iter_subsystem_closure(subsystem_cls):
+      if subsystem_cls in dep_path:
+        raise cls.CycleException(list(dep_path) + [subsystem_cls])
+      dep_path.add(subsystem_cls)
+
+      for dep in subsystem_cls.subsystem_dependencies_iter():
+        if dep not in seen:
+          seen.add(dep)
+          yield dep
+          for d in iter_subsystem_closure(dep.subsystem_cls):
+            yield d
+
+      dep_path.remove(subsystem_cls)
+
+    for dep in iter_subsystem_closure(cls):
+      yield dep
+
   class CycleException(Exception):
     """Thrown when a circular subsystem dependency is detected."""
 
@@ -77,8 +105,9 @@ class SubsystemClientMixin(object):
 
   @classmethod
   def known_scope_infos(cls):
-    """Yields ScopeInfo for all known scopes for this optionable, in no particular order.
+    """Yield ScopeInfo for all known scopes for this optionable, in no particular order.
 
+    :rtype: set of :class:`pants.option.scope.ScopeInfo`
     :raises: :class:`pants.subsystem.subsystem_client_mixin.SubsystemClientMixin.CycleException`
              if a dependency cycle is detected.
     """

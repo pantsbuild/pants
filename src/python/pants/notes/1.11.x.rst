@@ -3,6 +3,11 @@
 
 This document describes releases leading up to the ``1.11.x`` ``stable`` series.
 
+1.11.0 (12/11/2018)
+-------------------
+
+The first stable release for ``1.11.x``, with no additional changes since ``1.11.0rc3``.
+
 1.11.0rc3 (12/06/2018)
 ----------------------
 
