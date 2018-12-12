@@ -11,6 +11,7 @@ import threading
 from builtins import object
 from contextlib import contextmanager
 
+from future.utils import PY3
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
@@ -62,6 +63,11 @@ class _LoggerStream(object):
   def write(self, msg):
     msg = ensure_text(msg)
     for line in msg.rstrip().splitlines():
+      # The log only accepts text, and will raise a decoding error if the default encoding is ascii
+      # if provided a bytes input for unicode text.
+      if PY3:
+        if isinstance(line, bytes):
+          line = line.decode('utf-8')
       self._logger.log(self._log_level, line.rstrip())
 
   def flush(self):

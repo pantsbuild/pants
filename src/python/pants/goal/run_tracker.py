@@ -170,6 +170,8 @@ class RunTracker(Subsystem):
     # }
     self._target_to_data = {}
 
+    self._end_memoized_result = None
+
   def set_sorted_goal_infos(self, sorted_goal_infos):
     self._sorted_goal_infos = sorted_goal_infos
 
@@ -448,6 +450,9 @@ class RunTracker(Subsystem):
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
+  def has_ended(self):
+    return self._end_memoized_result is not None
+
   def end(self):
     """This pants run is over, so stop tracking it.
 
@@ -455,6 +460,8 @@ class RunTracker(Subsystem):
 
     :return: 0 for success, 1 for failure.
     """
+    if self._end_memoized_result is not None:
+      return self._end_memoized_result
     if self._background_worker_pool:
       if self._aborted:
         self.log(Report.INFO, "Aborting background workers.")
@@ -489,7 +496,9 @@ class RunTracker(Subsystem):
     self.report.close()
     self.store_stats()
 
-    return 1 if outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED] else 0
+    result = 1 if outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED] else 0
+    self._end_memoized_result = result
+    return self._end_memoized_result
 
   def end_workunit(self, workunit):
     path, duration, self_time, is_tool = workunit.end()

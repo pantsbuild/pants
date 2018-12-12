@@ -444,7 +444,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Ensure that we saw the pantsd-runner process's failure in the client's stderr.
       self.assert_failure(waiter_run)
       assertRegex(self, waiter_run.stderr_data, """\
-Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
+Signal {signum} (SIGTERM) was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
 """.format(signum=signal.SIGTERM))
       # NB: testing stderr is an "end-to-end" test, as it requires pants knowing the correct remote
       # pid and reading those files to print their content to stderr, so we don't necessarily need
@@ -485,11 +485,9 @@ Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
         # The pantsd-runner processes should be dead, and they should have exited with 1.
         self.assertFalse(proc.is_running())
 
-  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
   def test_pantsd_control_c(self):
     self._assert_pantsd_keyboardinterrupt_signal(signal.SIGINT)
 
-  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
   def test_pantsd_sigquit(self):
     # We convert a local SIGQUIT in the thin client process -> SIGINT on the remote end in
     # RemotePantsRunner.

@@ -70,8 +70,8 @@ timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
-Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
-""".format(pid=pid, signum=signum))
+Signal {signum} ({signame}) was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
+""".format(pid=pid, signum=signum, signame=ExceptionSink._SIGNAL_NAMES[signum]))
 
   @contextmanager
   def _make_waiter_handle(self):
@@ -114,7 +114,7 @@ Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
     with self._send_signal_to_waiter_handle(signal.SIGTERM) as (workdir, waiter_run):
       assertRegex(self, waiter_run.stderr_data, """\
 timestamp: ([^\n]+)
-Signal {signum} was raised. Exiting with failure. \\(backtrace omitted\\)
+Signal {signum} (SIGTERM) was raised. Exiting with failure. \\(backtrace omitted\\)
 """.format(signum=signal.SIGTERM))
       # Check that the logs show a graceful exit by SIGTERM.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
@@ -153,7 +153,7 @@ Current thread [^\n]+ \\(most recent call first\\):
   def test_keyboardinterrupt_signals(self):
     for interrupt_signal in [signal.SIGINT, signal.SIGQUIT]:
       with self._send_signal_to_waiter_handle(interrupt_signal) as (workdir, waiter_run):
-        self.assertIn('Interrupted by user.\n', waiter_run.stderr_data)
+        self.assertIn('Interrupted by user.', waiter_run.stderr_data)
 
   def _lifecycle_stub_cmdline(self):
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.

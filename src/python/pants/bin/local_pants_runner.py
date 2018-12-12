@@ -8,6 +8,9 @@ import logging
 from builtins import object
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exception_sink import ExceptionSink
+from pants.base.exiter import Exiter
+from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
@@ -23,6 +26,37 @@ from pants.util.contextutil import maybe_profiled
 
 
 logger = logging.getLogger(__name__)
+
+
+class LocalExiter(Exiter):
+
+  def __init__(self, run_tracker, repro, *args, **kwargs):
+    self._run_tracker = run_tracker
+    self._repro = repro
+    super(LocalExiter, self).__init__(*args, **kwargs)
+
+  def exit(self, result=0, *args, **kwargs):
+    try:
+      if not self._run_tracker.has_ended():
+        if result == 0:
+          self._run_tracker.set_root_outcome(WorkUnit.SUCCESS)
+        else:
+          self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
+        run_tracker_result = self._run_tracker.end()
+        assert(result == run_tracker_result)
+    except ValueError as e:
+      # If we have been interrupted by a signal, calling .end() sometimes writes to a closed file,
+      # so we just log that fact here and keep going.
+      logger.exception(e)
+    finally:
+      if self._repro:
+        # TODO: Have Repro capture the 'after' state (as a diff) as well? (in reference to the below
+        # 'before' state comment)
+        # NB: this writes to the logger, which is expected to still be alive if we are exiting from
+        # a signal.
+        self._repro.log_location_of_repro_file()
+
+    super(LocalExiter, self).exit(result=result, *args, **kwargs)
 
 
 class LocalPantsRunner(object):
@@ -156,16 +190,37 @@ class LocalPantsRunner(object):
     self._profile_path = profile_path
 
     self._run_start_time = None
+    self._run_tracker = None
+    self._reporting = None
+    self._repro = None
     self._global_options = options.for_global_scope()
 
   def set_start_time(self, start_time):
+    # Launch RunTracker as early as possible (before .run() is called).
+    run_tracker = RunTracker.global_instance()
+    reporting = Reporting.global_instance()
+    reporting.initialize(run_tracker, self._run_start_time)
+
+    # Capture a repro of the 'before' state for this build, if needed.
+    repro = Reproducer.global_instance().create_repro()
+    if repro:
+      repro.capture(run_tracker.run_info.get_as_dict())
+
+    # The __call__ method of the Exiter allows for the prototype pattern.
+    new_exiter = LocalExiter(run_tracker, repro, exiter=self._exiter)
+    ExceptionSink.reset_exiter(new_exiter)
+    self._exiter = new_exiter
+
     self._run_start_time = start_time
+    self._run_tracker = run_tracker
+    self._reporting = reporting
+    self._repro = repro
 
   def run(self):
     with maybe_profiled(self._profile_path):
       self._run()
 
-  def _maybe_run_v1(self, run_tracker, reporting):
+  def _maybe_run_v1(self):
     if not self._global_options.v1:
       return 0
 
@@ -174,8 +229,8 @@ class LocalPantsRunner(object):
       self._build_root,
       self._options,
       self._build_config,
-      run_tracker,
-      reporting,
+      self._run_tracker,
+      self._reporting,
       self._graph_session,
       self._target_roots,
       self._exiter
@@ -219,25 +274,16 @@ class LocalPantsRunner(object):
     return max_code
 
   def _run(self):
-    # Launch RunTracker as early as possible (just after Subsystem options are initialized).
-    run_tracker = RunTracker.global_instance()
-    reporting = Reporting.global_instance()
-    reporting.initialize(run_tracker, self._options, self._run_start_time)
-
     try:
-      # Capture a repro of the 'before' state for this build, if needed.
-      repro = Reproducer.global_instance().create_repro()
-      if repro:
-        repro.capture(run_tracker.run_info.get_as_dict())
-
       engine_result = self._maybe_run_v2()
-      goal_runner_result = self._maybe_run_v1(run_tracker, reporting)
-
-      if repro:
-        # TODO: Have Repro capture the 'after' state (as a diff) as well?
-        repro.log_location_of_repro_file()
+      goal_runner_result = self._maybe_run_v1()
     finally:
-      run_tracker_result = run_tracker.end()
+      try:
+        run_tracker_result = self._run_tracker.end()
+      except ValueError as e:
+        # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
+        logger.exception(e)
+        run_tracker_result = 0
 
     final_exit_code = self._compute_final_exit_code(
       engine_result,

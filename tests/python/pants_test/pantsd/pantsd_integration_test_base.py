@@ -83,9 +83,6 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
           recursively_update(pantsd_config, extra_config)
         print('>>> config: \n{}\n'.format(pantsd_config))
         checker = PantsDaemonMonitor(runner_process_context, pid_dir)
-        # TODO(#6574): this should be 1, but when we kill pantsd with a signal it doesn't make sure
-        # to close the run tracker -- we can easily address this by moving that cleanup into the
-        # Exiter.
         self.assert_runner(workdir, pantsd_config, ['kill-pantsd'], expected_runs=1)
         try:
           yield workdir, pantsd_config, checker
@@ -98,7 +95,6 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
             workdir,
             pantsd_config,
             ['kill-pantsd'],
-            # TODO(#6574): this should be 1, see above.
             expected_runs=1,
           )
           checker.assert_stopped()

@@ -17,15 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class Exiter(object):
-  """A class that provides standard runtime exit and global exception handling behavior.
+  """A class that provides standard runtime exit behavior.
 
-  The expected method call order of this class is as follows:
-
-   1) Call Exiter.set_except_hook() to set sys.excepthook to the internal exception hook. This
-      should happen as early as possible to ensure any/all exceptions are handled by the hook.
-   2) Call Exiter.apply_options() to set traceback printing behavior via an Options object.
-   3) Perform other operations as normal.
-   4) Call Exiter.exit(), Exiter.exit_and_fail() or exiter_inst() when you wish to exit the runtime.
+  `pants.base.exception_sink.ExceptionSink` handles exceptions and fatal signals, delegating to an
+  Exiter instance. Call Exiter.exit() or Exiter.exit_and_fail() when you wish to exit the runtime.
   """
 
   def __init__(self, exiter=sys.exit):
@@ -71,9 +66,11 @@ class Exiter(object):
         logger.exception(e)
     self._exit(result)
 
-  def exit_and_fail(self, msg=None):
+  def exit_and_fail(self, msg=None, out=None):
     """Exits the runtime with an exit code of 1, indicating failure.
 
-    :param str msg: A string message to print to stderr before exiting. (Optional)
+    :param msg: A string message to print to stderr or another custom file desciptor before exiting.
+                (Optional)
+    :param out: The file descriptor to emit `msg` to. (Optional)
     """
-    self.exit(result=1, msg=msg)
+    self.exit(result=1, msg=msg, out=out)
