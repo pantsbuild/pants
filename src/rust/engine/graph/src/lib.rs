@@ -34,6 +34,7 @@ extern crate boxfuture;
 extern crate fnv;
 extern crate futures;
 extern crate hashing;
+extern crate indexmap;
 extern crate parking_lot;
 extern crate petgraph;
 
@@ -54,6 +55,7 @@ use std::time::{Duration, Instant};
 use fnv::FnvHasher;
 
 use futures::future::{self, Future};
+use indexmap::IndexSet;
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -270,7 +272,7 @@ impl<N: Node> InnerGraph<N> {
   }
 
   fn trace<T: NodeTracer<N>>(&self, roots: &[N], file_path: &Path) -> Result<(), String> {
-    let root_ids: HashSet<EntryId, FNV> = roots
+    let root_ids: IndexSet<EntryId, FNV> = roots
       .into_iter()
       .filter_map(|nk| self.entry_id(&EntryKey::Valid(nk.clone())))
       .cloned()
