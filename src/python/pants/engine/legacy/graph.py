@@ -382,7 +382,8 @@ class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
     return hash(self.address)
 
 
-class TransitiveHydratedTarget(datatype(['root', 'dependencies'])):
+# TODO: are there performance concerns to adding type checks here?
+class TransitiveHydratedTarget(datatype([('root', HydratedTarget), 'dependencies'])):
   """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
 
 

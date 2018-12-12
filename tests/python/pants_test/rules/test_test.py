@@ -65,7 +65,7 @@ some/target                                                                     
 """
     )
 
-  def test_output_training_newline(self):
+  def test_output_trailing_newline(self):
     self.single_target_test(
       TestResult(status=Status.SUCCESS, stdout=str('Here is some output from a test\n')),
       """Here is some output from a test

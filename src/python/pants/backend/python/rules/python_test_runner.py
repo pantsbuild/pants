@@ -10,7 +10,7 @@ from builtins import str
 
 from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.graph import HydratedTarget
+from pants.engine.legacy.graph import TransitiveHydratedTarget
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, Select
 from pants.rules.core.core_test_model import Status, TestResult
@@ -25,8 +25,9 @@ class PyTestResult(TestResult):
 
 # TODO: Support deps
 # TODO: Support resources
-@rule(PyTestResult, [Select(HydratedTarget)])
-def run_python_test(target):
+@rule(PyTestResult, [Select(TransitiveHydratedTarget)])
+def run_python_test(transitive_hydrated_target):
+  target_root = transitive_hydrated_target.root
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
   pex_snapshot = yield Get(Snapshot, UrlToFetch("https://github.com/pantsbuild/pex/releases/download/v1.5.2/pex27",
@@ -44,16 +45,20 @@ def run_python_test(target):
     'pytest',
   ]
 
+  all_targets = [target_root] + [dep.root for dep in transitive_hydrated_target.dependencies]
+  all_digests = [target.adaptor.sources.snapshot.directory_digest for target in all_targets] + [
+    pex_snapshot.directory_digest
+  ]
   merged_input_files = yield Get(
     Digest,
     MergedDirectories,
-    MergedDirectories(directories=(target.adaptor.sources.snapshot.directory_digest, pex_snapshot.directory_digest)),
+    MergedDirectories(directories=tuple(all_digests)),
   )
 
   request = ExecuteProcessRequest(
     argv=tuple(argv),
     input_files=merged_input_files,
-    description='Run pytest for {}'.format(target.address.reference()),
+    description='Run pytest for {}'.format(target_root.address.reference()),
     # TODO: This should not be necessary
     env={'PATH': os.path.dirname(python_binary)}
   )
