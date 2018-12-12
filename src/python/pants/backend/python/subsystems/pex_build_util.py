@@ -4,14 +4,18 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 import os
 from builtins import str
 
 from future.utils import PY2
 from pex.fetcher import Fetcher
+from pex.pex_builder import PEXBuilder
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
+from pants.backend.python.subsystems.python_repos import PythonRepos
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -20,6 +24,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
+from pants.subsystem.subsystem import Subsystem
 
 
 def is_python_target(tgt):
@@ -87,7 +92,30 @@ def dump_sources(builder, tgt, log):
 class PexBuilderWrapper(object):
   """Wraps PEXBuilder to provide an API that consumes targets and other BUILD file entities."""
 
-  def __init__(self, builder, python_repos_subsystem, python_setup_subsystem, log=None):
+  class Factory(Subsystem):
+    options_scope = 'pex-builder-wrapper'
+
+    @classmethod
+    def subsystem_dependencies(cls):
+      return super(PexBuilderWrapper.Factory, cls).subsystem_dependencies() + (
+        PythonRepos,
+        PythonSetup,
+      )
+
+    @classmethod
+    def create(cls, builder, log=None):
+      log = log or logging.getLogger(__name__)
+      return PexBuilderWrapper(builder=builder,
+                               python_repos_subsystem=PythonRepos.global_instance(),
+                               python_setup_subsystem=PythonSetup.global_instance(),
+                               log=log)
+
+  def __init__(self, builder, python_repos_subsystem, python_setup_subsystem, log):
+    assert isinstance(builder, PEXBuilder)
+    assert isinstance(python_repos_subsystem, PythonRepos)
+    assert isinstance(python_setup_subsystem, PythonSetup)
+    assert log is not None
+
     self._builder = builder
     self._python_repos_subsystem = python_repos_subsystem
     self._python_setup_subsystem = python_setup_subsystem

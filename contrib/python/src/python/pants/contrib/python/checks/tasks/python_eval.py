@@ -10,13 +10,12 @@ import pkgutil
 from builtins import open, str
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems.pex_build_util import (PexBuilderWrapper,
+                                                            has_python_requirements,
+                                                            has_python_sources)
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.pex_build_util import (PexBuilderWrapper, has_python_requirements,
-                                                       has_python_sources)
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
@@ -46,7 +45,8 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
   @classmethod
   def subsystem_dependencies(cls):
     return super(PythonEval, cls).subsystem_dependencies() + (
-      PythonRepos, PythonSetup, PythonInterpreterCache
+      PexBuilderWrapper.Factory,
+      PythonInterpreterCache
     )
 
   @classmethod
@@ -217,11 +217,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     if not os.path.isdir(reqs_pex_path):
       req_libs = [t for t in vt.target.closure() if has_python_requirements(t)]
       with safe_concurrent_creation(reqs_pex_path) as safe_path:
-        pex_builder = PexBuilderWrapper(
-          PEXBuilder(safe_path, interpreter=interpreter, copy=True),
-          PythonRepos.global_instance(),
-          PythonSetup.global_instance(),
-          self.context.log)
+        pex_builder = PexBuilderWrapper.Factory.create(
+          builder=PEXBuilder(safe_path, interpreter=interpreter, copy=True),
+          log=self.context.log)
         pex_builder.add_requirement_libs_from(req_libs)
         pex_builder.freeze()
     return PEX(reqs_pex_path, interpreter=interpreter)
@@ -234,11 +232,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     return PEX(source_pex_path, interpreter=interpreter)
 
   def _build_source_pex(self, interpreter, path, targets):
-    pex_builder = PexBuilderWrapper(
-      PEXBuilder(path=path, interpreter=interpreter, copy=True),
-      PythonRepos.global_instance(),
-      PythonSetup.global_instance(),
-      self.context.log)
+    pex_builder = PexBuilderWrapper.Factory.create(
+      builder=PEXBuilder(path=path, interpreter=interpreter, copy=True),
+      log=self.context.log)
     for target in targets:
       if has_python_sources(target):
         pex_builder.add_sources_from(target)

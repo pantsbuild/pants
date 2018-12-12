@@ -142,6 +142,14 @@ class PythonNativeCode(Subsystem):
 class BuildSetupRequiresPex(ExecutablePexTool):
   options_scope = 'build-setup-requires-pex'
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(BuildSetupRequiresPex, cls).subsystem_dependencies() + (PythonSetup,)
+
+  @memoized_property
+  def python_setup(self):
+    return PythonSetup.global_instance()
+
   @property
   def base_requirements(self):
     # TODO: would we ever want to configure these requirement versions separately from the global

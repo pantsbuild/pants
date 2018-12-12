@@ -11,10 +11,8 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import PexBuilderWrapper
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -55,8 +53,7 @@ class PythonToolPrepBase(Task):
   def subsystem_dependencies(cls):
     return super(PythonToolPrepBase, cls).subsystem_dependencies() + (
       cls.tool_subsystem_cls.scoped(cls),
-      PythonSetup,
-      PythonRepos,
+      PexBuilderWrapper.Factory,
     )
 
   @classmethod
@@ -83,11 +80,9 @@ class PythonToolPrepBase(Task):
 
   def _build_tool_pex(self, context, interpreter, pex_path, requirements_lib):
     with safe_concurrent_creation(pex_path) as chroot:
-      pex_builder = PexBuilderWrapper(
-        PEXBuilder(path=chroot, interpreter=interpreter),
-        PythonRepos.global_instance(),
-        PythonSetup.global_instance(),
-        context.log)
+      pex_builder = PexBuilderWrapper.Factory.create(
+        builder=PEXBuilder(path=chroot, interpreter=interpreter),
+        log=context.log)
       pex_builder.add_requirement_libs_from(req_libs=[requirements_lib])
       pex_builder.set_entry_point(self._tool_subsystem().get_entry_point())
       pex_builder.freeze()

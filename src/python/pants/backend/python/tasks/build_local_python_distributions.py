@@ -18,12 +18,12 @@ from pants.backend.native.subsystems.native_toolchain import ToolchainVariantReq
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.subsystems.pex_build_util import is_local_python_dist
 from pants.backend.python.subsystems.python_native_code import (BuildSetupRequiresPex,
                                                                 PythonNativeCode,
                                                                 SetupPyExecutionEnvironment,
                                                                 SetupPyNativeTools)
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
