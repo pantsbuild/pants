@@ -17,7 +17,7 @@ glob = "0.2.11"
 grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec"] }
 hashing = { path = "../hashing" }
 ignore = "0.4.4"
-indexmap = "1"
+indexmap = "1.0.2"
 itertools = "0.7.2"
 lazy_static = "1"
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
