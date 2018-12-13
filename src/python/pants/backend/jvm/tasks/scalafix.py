@@ -38,6 +38,7 @@ class ScalaFix(RewriteBase):
                           classpath=[
                             JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.11', rev='0.5.2'),
                           ])
+    cls.register_jvm_tool(register, 'scalafix-tool-classpath', classpath=[])
 
   @classmethod
   def target_types(cls):
@@ -60,8 +61,9 @@ class ScalaFix(RewriteBase):
 
   def invoke_tool(self, absolute_root, target_sources):
     args = []
-    if self.get_options().tool_classpath:
-      args.append('--tool-classpath={}'.format(self.get_options().tool_classpath))
+    tool_classpath = self.tool_classpath('scalafix-tool-classpath')
+    if tool_classpath:
+      args.append('--tool-classpath={}'.format(':'.join(tool_classpath)))
     if self.get_options().semantic:
       # If semantic checks are enabled, pass the relevant classpath entries for these
       # targets.
