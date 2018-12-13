@@ -14,7 +14,7 @@ use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use pool::ResettablePool;
@@ -33,10 +33,12 @@ pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
 // uploaded_file_{count, bytes}: Number and combined size of files uploaded to the remote
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct UploadSummary {
-  ingested_file_count: usize,
-  ingested_file_bytes: usize,
-  uploaded_file_count: usize,
-  uploaded_file_bytes: usize,
+  pub ingested_file_count: usize,
+  pub ingested_file_bytes: usize,
+  pub uploaded_file_count: usize,
+  pub uploaded_file_bytes: usize,
+  #[serde(skip)]
+  pub upload_wall_time: Duration,
 }
 
 ///
@@ -282,6 +284,8 @@ impl Store {
     &self,
     digests: Vec<Digest>,
   ) -> BoxFuture<UploadSummary, String> {
+    let start_time = Instant::now();
+
     let remote = match self.remote {
       Some(ref remote) => remote,
       None => {
@@ -343,7 +347,7 @@ impl Store {
             }).collect::<Vec<_>>(),
         ).and_then(future::join_all)
         .map(|uploaded_digests| (uploaded_digests, ingested_digests))
-      }).map(|(uploaded_digests, ingested_digests)| {
+      }).map(move |(uploaded_digests, ingested_digests)| {
         let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.1);
         let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.1);
 
@@ -352,6 +356,7 @@ impl Store {
           ingested_file_bytes: ingested_file_sizes.sum(),
           uploaded_file_count: uploaded_file_sizes.len(),
           uploaded_file_bytes: uploaded_file_sizes.sum(),
+          upload_wall_time: start_time.elapsed(),
         }
       }).to_boxed()
   }
@@ -3407,7 +3412,7 @@ mod tests {
       .store_file_bytes(testcatnip.bytes(), false)
       .wait()
       .expect("Error storing file locally");
-    let summary = new_store(dir.path(), cas.address())
+    let mut summary = new_store(dir.path(), cas.address())
       .ensure_remote_has_recursive(vec![testdir.digest()])
       .wait()
       .expect("Error uploading file");
@@ -3419,13 +3424,15 @@ mod tests {
       testcatnip.digest().1,
     ];
     let test_bytes = test_data.iter().sum();
+    summary.upload_wall_time = Duration::default();
     assert_eq!(
       summary,
       UploadSummary {
         ingested_file_count: test_data.len(),
         ingested_file_bytes: test_bytes,
         uploaded_file_count: test_data.len(),
-        uploaded_file_bytes: test_bytes
+        uploaded_file_bytes: test_bytes,
+        upload_wall_time: Duration::default(),
       }
     );
   }
@@ -3455,10 +3462,11 @@ mod tests {
       .expect("Error storing file locally");
 
     // Store testroland first, which should return a summary of one file
-    let data_summary = new_store(dir.path(), cas.address())
+    let mut data_summary = new_store(dir.path(), cas.address())
       .ensure_remote_has_recursive(vec![testroland.digest()])
       .wait()
       .expect("Error uploading file");
+    data_summary.upload_wall_time = Duration::default();
 
     assert_eq!(
       data_summary,
@@ -3466,17 +3474,20 @@ mod tests {
         ingested_file_count: 1,
         ingested_file_bytes: testroland.digest().1,
         uploaded_file_count: 1,
-        uploaded_file_bytes: testroland.digest().1
+        uploaded_file_bytes: testroland.digest().1,
+        upload_wall_time: Duration::default(),
       }
     );
 
     // Store the directory and catnip.
     // It should see the digest of testroland already in cas,
     // and not report it in uploads.
-    let dir_summary = new_store(dir.path(), cas.address())
+    let mut dir_summary = new_store(dir.path(), cas.address())
       .ensure_remote_has_recursive(vec![testdir.digest()])
       .wait()
       .expect("Error uploading directory");
+
+    dir_summary.upload_wall_time = Duration::default();
 
     assert_eq!(
       dir_summary,
@@ -3484,7 +3495,8 @@ mod tests {
         ingested_file_count: 3,
         ingested_file_bytes: testdir.digest().1 + testroland.digest().1 + testcatnip.digest().1,
         uploaded_file_count: 2,
-        uploaded_file_bytes: testdir.digest().1 + testcatnip.digest().1
+        uploaded_file_bytes: testdir.digest().1 + testcatnip.digest().1,
+        upload_wall_time: Duration::default(),
       }
     );
   }

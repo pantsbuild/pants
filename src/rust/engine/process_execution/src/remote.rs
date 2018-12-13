@@ -13,11 +13,13 @@ use futures::{future, Future, Stream};
 use futures_timer::Delay;
 use grpcio;
 use hashing::{Digest, Fingerprint};
-use log::debug;
+use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
+use time;
 
-use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
+use super::{ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult};
+use std;
 use std::cmp::min;
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -51,6 +53,12 @@ enum ExecutionError {
   MissingDigests(Vec<Digest>),
   // String is the operation name which can be used to poll the GetOperation gRPC API.
   NotFinished(String),
+}
+
+#[derive(Default)]
+struct ExecutionHistory {
+  attempts: Vec<ExecutionStats>,
+  current_attempt: ExecutionStats,
 }
 
 impl CommandRunner {
@@ -128,6 +136,8 @@ impl super::CommandRunner for CommandRunner {
       ..
     } = req;
 
+    let description2 = description.clone();
+
     match execute_request_result {
       Ok((action, command, execute_request)) => {
         let command_runner = self.clone();
@@ -135,46 +145,69 @@ impl super::CommandRunner for CommandRunner {
         let command_runner3 = self.clone();
         let execute_request = Arc::new(execute_request);
         let execute_request2 = execute_request.clone();
+
+        let mut history = ExecutionHistory::default();
+
         self
-          .upload_proto(&command)
-          .join(self.upload_proto(&action))
-          .and_then(move |_| {
-            debug!(
+          .upload_protos(&command, &action)
+          .and_then(move |summary| {
+            history.current_attempt += summary;
+            trace!(
               "Executing remotely request: {:?} (command: {:?})",
-              execute_request, command
+              execute_request,
+              command
             );
-            command_runner.oneshot_execute(&execute_request)
-          })
-          .and_then(move |operation| {
+            command_runner
+              .oneshot_execute(&execute_request)
+              .join(future::ok(history))
+          }).and_then(move |(operation, history)| {
             let start_time = Instant::now();
 
-            future::loop_fn((operation, 0), move |(operation, iter_num)| {
-              let description = description.clone();
+            future::loop_fn(
+              (history, operation, 0),
+              move |(mut history, operation, iter_num)| {
+                let description = description.clone();
 
-              let execute_request2 = execute_request2.clone();
-              let store = store.clone();
-              let operations_client = operations_client.clone();
-              let command_runner2 = command_runner2.clone();
-              let command_runner3 = command_runner3.clone();
-              command_runner2
-                .extract_execute_response(operation)
-                .map(future::Loop::Break)
-                .or_else(move |value| {
+                let execute_request2 = execute_request2.clone();
+                let store = store.clone();
+                let operations_client = operations_client.clone();
+                let command_runner2 = command_runner2.clone();
+                let command_runner3 = command_runner3.clone();
+                let f = command_runner2.extract_execute_response(operation, &mut history);
+                f.map(future::Loop::Break).or_else(move |value| {
                   match value {
                     ExecutionError::Fatal(err) => future::err(err).to_boxed(),
                     ExecutionError::MissingDigests(missing_digests) => {
-                      debug!(
-                        "Server reported missing digests; trying to upload: {:?}",
-                        missing_digests
+                      let ExecutionHistory {
+                        mut attempts,
+                        current_attempt,
+                      } = history;
+
+                      trace!(
+                        "Server reported missing digests ({:?}); trying to upload: {:?}",
+                        current_attempt,
+                        missing_digests,
                       );
+
+                      attempts.push(current_attempt);
+                      let history = ExecutionHistory {
+                        attempts,
+                        current_attempt: ExecutionStats::default(),
+                      };
+
                       let execute_request = execute_request2.clone();
-                      store.ensure_remote_has_recursive(missing_digests)
-                              .and_then(move |_| {
-                                command_runner2.oneshot_execute(&execute_request)
-                              })
-                              // Reset `iter_num` on `MissingDigests`
-                              .map(|operation| future::Loop::Continue((operation, 0)))
-                              .to_boxed()
+                      store
+                        .ensure_remote_has_recursive(missing_digests)
+                        .and_then(move |summary| {
+                          let mut history = history;
+                          history.current_attempt += summary;
+                          command_runner2
+                            .oneshot_execute(&execute_request)
+                            .join(future::ok(history))
+                        })
+                        // Reset `iter_num` on `MissingDigests`
+                        .map(|(operation, history)| future::Loop::Continue((history, operation, 0)))
+                        .to_boxed()
                     }
                     ExecutionError::NotFinished(operation_name) => {
                       let mut operation_request =
@@ -202,29 +235,39 @@ impl super::CommandRunner for CommandRunner {
                               "Future-Delay errored at operation result polling for {}, {}: {}",
                               operation_name, description, e
                             )
-                          })
-                          .and_then(move |_| {
+                          }).and_then(move |_| {
                             future::done(
                               operations_client
-                                .get_operation_opt(&operation_request, command_runner3.call_option())
-                                .or_else(move |err| {
+                                .get_operation_opt(
+                                  &operation_request,
+                                  command_runner3.call_option(),
+                                ).or_else(move |err| {
                                   rpcerror_recover_cancelled(operation_request.take_name(), err)
-                                })
-                                .map(OperationOrStatus::Operation)
+                                }).map(OperationOrStatus::Operation)
                                 .map_err(rpcerror_to_string),
                             ).map(move |operation| {
-                              future::Loop::Continue((operation, iter_num + 1))
-                            })
-                              .to_boxed()
-                          })
-                          .to_boxed()
+                              future::Loop::Continue((history, operation, iter_num + 1))
+                            }).to_boxed()
+                          }).to_boxed()
                       }
                     }
                   }
                 })
-            })
-          })
-          .to_boxed()
+              },
+            )
+          }).map(move |resp| {
+            let mut attempts = String::new();
+            for (i, attempt) in resp.execution_attempts.iter().enumerate() {
+              attempts += &format!("\nAttempt {}: {:?}", i, attempt);
+            }
+            debug!(
+              "Finished remote exceution of {} after {} attempts: Stats: {}",
+              description2,
+              resp.execution_attempts.len(),
+              attempts
+            );
+            resp
+          }).to_boxed()
       }
       Err(err) => future::err(err).to_boxed(),
     }
@@ -290,30 +333,42 @@ impl CommandRunner {
     call_option
   }
 
-  fn upload_proto<P: protobuf::Message>(&self, proto: &P) -> BoxFuture<(), String> {
+  fn store_proto_locally<P: protobuf::Message>(
+    &self,
+    proto: &P,
+  ) -> impl Future<Item = Digest, Error = String> {
     let store = self.store.clone();
-    let store2 = store.clone();
     future::done(
       proto
         .write_to_bytes()
         .map_err(|e| format!("Error serializing proto {:?}", e)),
     ).and_then(move |command_bytes| store.store_file_bytes(Bytes::from(command_bytes), true))
-    .map_err(|e| format!("Error saving digest to local store: {:?}", e))
-    .and_then(move |digest| {
-      // TODO: Tune when we upload the proto.
-      store2
-        .ensure_remote_has_recursive(vec![digest])
-        .map_err(|e| format!("Error uploading proto {:?}", e))
-        .map(|_| ())
-    }).to_boxed()
+    .map_err(|e| format!("Error saving proto to local store: {:?}", e))
+  }
+
+  fn upload_protos<P1: protobuf::Message, P2: protobuf::Message>(
+    &self,
+    p1: &P1,
+    p2: &P2,
+  ) -> BoxFuture<fs::UploadSummary, String> {
+    let store = self.store.clone();
+    self
+      .store_proto_locally(p1)
+      .join(self.store_proto_locally(p2))
+      .and_then(move |(digest1, digest2)| {
+        // TODO: Tune when we upload the protos.
+        store
+          .ensure_remote_has_recursive(vec![digest1, digest2])
+          .map_err(|e| format!("Error uploading protos {:?}", e))
+      }).to_boxed()
   }
 
   fn extract_execute_response(
     &self,
     operation_or_status: OperationOrStatus,
+    attempts: &mut ExecutionHistory,
   ) -> BoxFuture<FallibleExecuteProcessResult, ExecutionError> {
-    // TODO: Log less verbosely
-    debug!("Got operation response: {:?}", operation_or_status);
+    trace!("Got operation response: {:?}", operation_or_status);
 
     let status = match operation_or_status {
       OperationOrStatus::Operation(mut operation) => {
@@ -336,8 +391,41 @@ impl CommandRunner {
             .merge_from_bytes(operation.get_response().get_value())
             .map_err(|e| ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e)))
         );
-        // TODO: Log less verbosely
-        debug!("Got (nested) execute response: {:?}", execute_response);
+        trace!("Got (nested) execute response: {:?}", execute_response);
+
+        if execute_response.get_result().has_execution_metadata() {
+          let metadata = execute_response.get_result().get_execution_metadata();
+          let enqueued = timespec_from(metadata.get_queued_timestamp());
+          let worker_start = timespec_from(metadata.get_worker_start_timestamp());
+          let input_fetch_start = timespec_from(metadata.get_input_fetch_start_timestamp());
+          let input_fetch_completed = timespec_from(metadata.get_input_fetch_completed_timestamp());
+          let execution_start = timespec_from(metadata.get_execution_start_timestamp());
+          let execution_completed = timespec_from(metadata.get_execution_completed_timestamp());
+          let output_upload_start = timespec_from(metadata.get_output_upload_start_timestamp());
+          let output_upload_completed =
+            timespec_from(metadata.get_output_upload_completed_timestamp());
+
+          match (worker_start - enqueued).to_std() {
+            Ok(duration) => attempts.current_attempt.remote_queue = Some(duration),
+            Err(err) => warn!("Got negative remote queue time: {}", err),
+          }
+          match (input_fetch_completed - input_fetch_start).to_std() {
+            Ok(duration) => attempts.current_attempt.remote_input_fetch = Some(duration),
+            Err(err) => warn!("Got negative remote input fetch time: {}", err),
+          }
+          match (execution_completed - execution_start).to_std() {
+            Ok(duration) => attempts.current_attempt.remote_execution = Some(duration),
+            Err(err) => warn!("Got negative remote execution time: {}", err),
+          }
+          match (output_upload_completed - output_upload_start).to_std() {
+            Ok(duration) => attempts.current_attempt.remote_output_store = Some(duration),
+            Err(err) => warn!("Got negative remote output store time: {}", err),
+          }
+          attempts.current_attempt.was_cache_hit = execute_response.cached_result;
+        }
+
+        let mut execution_attempts = std::mem::replace(&mut attempts.attempts, vec![]);
+        execution_attempts.push(attempts.current_attempt);
 
         let status = execute_response.take_status();
         if grpcio::RpcStatusCode::from(status.get_code()) == grpcio::RpcStatusCode::Ok {
@@ -351,6 +439,7 @@ impl CommandRunner {
                 stderr: stderr,
                 exit_code: execute_response.get_result().get_exit_code(),
                 output_directory: output_directory,
+                execution_attempts: execution_attempts,
               })
             }).to_boxed();
         }
@@ -783,6 +872,10 @@ fn digest(message: &Message) -> Result<bazel_protos::remote_execution::Digest, S
   Ok(digest)
 }
 
+fn timespec_from(timestamp: &protobuf::well_known_types::Timestamp) -> time::Timespec {
+  time::Timespec::new(timestamp.seconds, timestamp.nanos)
+}
+
 #[cfg(test)]
 mod tests {
   use bazel_protos;
@@ -798,7 +891,10 @@ mod tests {
   use testutil::{as_bytes, owned_string_vec};
 
   use super::super::CommandRunner as CommandRunnerTrait;
-  use super::{CommandRunner, ExecuteProcessRequest, ExecutionError, FallibleExecuteProcessResult};
+  use super::{
+    CommandRunner, ExecuteProcessRequest, ExecutionError, ExecutionHistory,
+    FallibleExecuteProcessResult,
+  };
   use mock::execution_server::MockOperation;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
@@ -1152,12 +1248,13 @@ mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
-      result,
+      result.without_execution_attempts(),
       FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     );
   }
@@ -1177,13 +1274,15 @@ mod tests {
         ).op
         .unwrap()
         .unwrap()
-      ),
-      Ok(FallibleExecuteProcessResult {
+      ).unwrap()
+      .without_execution_attempts(),
+      FallibleExecuteProcessResult {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
-      })
+        execution_attempts: vec![],
+      }
     );
   }
 
@@ -1202,13 +1301,15 @@ mod tests {
         ).op
         .unwrap()
         .unwrap()
-      ),
-      Ok(FallibleExecuteProcessResult {
+      ).unwrap()
+      .without_execution_attempts(),
+      FallibleExecuteProcessResult {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
-      })
+        execution_attempts: vec![],
+      }
     );
   }
 
@@ -1251,15 +1352,16 @@ mod tests {
     ).expect("Failed to make store");
 
     let cmd_runner = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store);
-    let result = cmd_runner.run(echo_roland_request()).wait();
+    let result = cmd_runner.run(echo_roland_request()).wait().unwrap();
     assert_eq!(
-      result,
-      Ok(FallibleExecuteProcessResult {
+      result.without_execution_attempts(),
+      FallibleExecuteProcessResult {
         stdout: test_stdout.bytes(),
         stderr: test_stderr.bytes(),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
-      })
+        execution_attempts: vec![],
+      }
     );
 
     let local_store = fs::Store::local_only(
@@ -1312,12 +1414,13 @@ mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
-      result,
+      result.without_execution_attempts(),
       FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     );
   }
@@ -1360,7 +1463,7 @@ mod tests {
   }
 
   #[test]
-  fn retry_for_canceled_channel() {
+  fn retry_for_cancelled_channel() {
     let execute_request = echo_foo_request();
 
     let mock_server = {
@@ -1387,12 +1490,13 @@ mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
-      result,
+      result.without_execution_attempts(),
       FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     );
   }
@@ -1606,15 +1710,17 @@ mod tests {
 
     let result = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store)
       .run(cat_roland_request())
-      .wait();
+      .wait()
+      .unwrap();
     assert_eq!(
-      result,
-      Ok(FallibleExecuteProcessResult {
+      result.without_execution_attempts(),
+      FallibleExecuteProcessResult {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
-      })
+        execution_attempts: vec![],
+      }
     );
     {
       let blobs = cas.blobs.lock();
@@ -1693,6 +1799,7 @@ mod tests {
         stderr: Bytes::from(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       })
     );
     {
@@ -1775,6 +1882,7 @@ mod tests {
       stderr: Bytes::from("simba"),
       exit_code: 17,
       output_directory: TestDirectory::nested().digest(),
+      execution_attempts: vec![],
     };
 
     let mut output_file = bazel_protos::remote_execution::OutputFile::new();
@@ -1800,7 +1908,12 @@ mod tests {
       response
     }));
 
-    assert_eq!(extract_execute_response(operation), Ok(want_result));
+    assert_eq!(
+      extract_execute_response(operation)
+        .unwrap()
+        .without_execution_attempts(),
+      want_result
+    );
   }
 
   #[test]
@@ -2317,8 +2430,10 @@ mod tests {
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
     command_runner
-      .extract_execute_response(super::OperationOrStatus::Operation(operation))
-      .wait()
+      .extract_execute_response(
+        super::OperationOrStatus::Operation(operation),
+        &mut ExecutionHistory::default(),
+      ).wait()
   }
 
   fn extract_output_files_from_response(
