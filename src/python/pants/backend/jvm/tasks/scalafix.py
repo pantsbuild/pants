@@ -31,6 +31,8 @@ class ScalaFix(RewriteBase):
                   'providing the target classpath to scalafix. To enable this option, you '
                   'will need to install the `semanticdb-scalac` compiler plugin. See '
                   'https://www.pantsbuild.org/scalac_plugins.html for more information.')
+    register('--tool-classpath', type=str, default="", fingerprint=True,
+             help="A classpath containing additional rules.")
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
@@ -58,6 +60,8 @@ class ScalaFix(RewriteBase):
 
   def invoke_tool(self, absolute_root, target_sources):
     args = []
+    if self.get_options().tool_classpath:
+      args.append('--tool-classpath={}'.format(self.get_options().tool_classpath))
     if self.get_options().semantic:
       # If semantic checks are enabled, pass the relevant classpath entries for these
       # targets.
