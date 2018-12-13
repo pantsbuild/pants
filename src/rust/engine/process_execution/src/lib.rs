@@ -122,6 +122,14 @@ pub struct FallibleExecuteProcessResult {
   pub execution_attempts: Vec<ExecutionStats>,
 }
 
+#[cfg(test)]
+impl FallibleExecuteProcessResult {
+  pub fn without_execution_attempts(mut self) -> Self {
+    self.execution_attempts = vec![];
+    self
+  }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ExecutionStats {
   uploaded_bytes: usize,

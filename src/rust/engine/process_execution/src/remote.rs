@@ -1248,7 +1248,7 @@ mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
-      result,
+      result.without_execution_attempts(),
       FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
@@ -1274,14 +1274,15 @@ mod tests {
         ).op
         .unwrap()
         .unwrap()
-      ),
-      Ok(FallibleExecuteProcessResult {
+      ).unwrap()
+      .without_execution_attempts(),
+      FallibleExecuteProcessResult {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
         execution_attempts: vec![],
-      })
+      }
     );
   }
 
@@ -1300,14 +1301,15 @@ mod tests {
         ).op
         .unwrap()
         .unwrap()
-      ),
-      Ok(FallibleExecuteProcessResult {
+      ).unwrap()
+      .without_execution_attempts(),
+      FallibleExecuteProcessResult {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
         execution_attempts: vec![],
-      })
+      }
     );
   }
 
@@ -1350,16 +1352,16 @@ mod tests {
     ).expect("Failed to make store");
 
     let cmd_runner = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store);
-    let result = cmd_runner.run(echo_roland_request()).wait();
+    let result = cmd_runner.run(echo_roland_request()).wait().unwrap();
     assert_eq!(
-      result,
-      Ok(FallibleExecuteProcessResult {
+      result.without_execution_attempts(),
+      FallibleExecuteProcessResult {
         stdout: test_stdout.bytes(),
         stderr: test_stderr.bytes(),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
         execution_attempts: vec![],
-      })
+      }
     );
 
     let local_store = fs::Store::local_only(
@@ -1412,7 +1414,7 @@ mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
-      result,
+      result.without_execution_attempts(),
       FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
@@ -1461,7 +1463,7 @@ mod tests {
   }
 
   #[test]
-  fn retry_for_canceled_channel() {
+  fn retry_for_cancelled_channel() {
     let execute_request = echo_foo_request();
 
     let mock_server = {
@@ -1488,7 +1490,7 @@ mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
-      result,
+      result.without_execution_attempts(),
       FallibleExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
@@ -1708,16 +1710,17 @@ mod tests {
 
     let result = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store)
       .run(cat_roland_request())
-      .wait();
+      .wait()
+      .unwrap();
     assert_eq!(
-      result,
-      Ok(FallibleExecuteProcessResult {
+      result.without_execution_attempts(),
+      FallibleExecuteProcessResult {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
         execution_attempts: vec![],
-      })
+      }
     );
     {
       let blobs = cas.blobs.lock();
@@ -1905,7 +1908,12 @@ mod tests {
       response
     }));
 
-    assert_eq!(extract_execute_response(operation), Ok(want_result));
+    assert_eq!(
+      extract_execute_response(operation)
+        .unwrap()
+        .without_execution_attempts(),
+      want_result
+    );
   }
 
   #[test]
