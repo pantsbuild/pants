@@ -31,8 +31,6 @@ class ScalaFix(RewriteBase):
                   'providing the target classpath to scalafix. To enable this option, you '
                   'will need to install the `semanticdb-scalac` compiler plugin. See '
                   'https://www.pantsbuild.org/scalac_plugins.html for more information.')
-    register('--tool-classpath', type=str, default="", fingerprint=True,
-             help="A classpath containing additional rules.")
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
