@@ -20,3 +20,11 @@ python_tests(
     ':example_lib',
   ],
 )
+
+python_tests(
+  name = 'target_with_thirdparty_dep',
+  sources = ['test_with_thirdparty_dep.py'],
+  dependencies = [
+    '3rdparty/python:futures',
+  ],
+)

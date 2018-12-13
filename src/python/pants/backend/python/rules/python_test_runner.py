@@ -33,30 +33,60 @@ def run_python_test(transitive_hydrated_target):
   pex_snapshot = yield Get(Snapshot, UrlToFetch("https://github.com/pantsbuild/pex/releases/download/v1.5.2/pex27",
                                                 Digest('8053a79a5e9c2e6e9ace3999666c9df910d6289555853210c1bbbfa799c3ecda', 1757011)))
 
+  all_targets = [target_root] + [dep.root for dep in transitive_hydrated_target.dependencies]
+
+  # Produce a pex containing pytest and all transitive 3rdparty requirements.
+  all_requirements = []
+  for maybe_python_req_lib in all_targets:
+    # This is a python_requirement().
+    if hasattr(maybe_python_req_lib.adaptor, 'requirement'):
+      all_requirements.append(str(maybe_python_req_lib.requirement))
+    # This is a python_requirement_library(). TODO: see if this is correct?!
+    if hasattr(maybe_python_req_lib.adaptor, 'requirements'):
+      for py_req in maybe_python_req_lib.adaptor.requirements:
+        all_requirements.append(str(py_req.requirement))
+
   # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
   python_binary = sys.executable
 
-  argv = [
+  output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
+  requirements_pex_argv = [
     './{}'.format(pex_snapshot.files[0].path),
-    '-e', 'pytest:main',
     '--python', python_binary,
-    # TODO: This is non-hermetic because pytest will be resolved on the fly by pex27, where it should be hermetically provided in some way.
-    # We should probably also specify a specific version.
+    '-e', 'pytest:main',
+    '-o', output_pytest_requirements_pex_filename,
     'pytest',
-  ]
+  ] + all_requirements
+  requirements_pex_request = ExecuteProcessRequest(
+    argv=tuple(requirements_pex_argv),
+    input_files=pex_snapshot.directory_digest,
+    description='Resolve requirements for {}'.format(target_root.address.reference()),
+    # TODO: This should not be necessary
+    env={'PATH': os.path.dirname(python_binary)},
+    output_files=(output_pytest_requirements_pex_filename,),
+  )
+  requirements_pex_response = yield Get(
+    FallibleExecuteProcessResult, ExecuteProcessRequest, requirements_pex_request)
 
-  all_targets = [target_root] + [dep.root for dep in transitive_hydrated_target.dependencies]
-  all_digests = [target.adaptor.sources.snapshot.directory_digest for target in all_targets] + [
-    pex_snapshot.directory_digest
+  # Gather sources.
+  # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising (?)
+  all_sources_digests = []
+  for maybe_source_target in all_targets:
+    if hasattr(maybe_source_target.adaptor, 'sources'):
+      sources_snapshot = maybe_source_target.adaptor.sources.snapshot
+      all_sources_digests.append(sources_snapshot.directory_digest)
+
+  all_input_digests = all_sources_digests + [
+    requirements_pex_response.output_directory_digest,
   ]
   merged_input_files = yield Get(
     Digest,
     MergedDirectories,
-    MergedDirectories(directories=tuple(all_digests)),
+    MergedDirectories(directories=tuple(all_input_digests)),
   )
 
   request = ExecuteProcessRequest(
-    argv=tuple(argv),
+    argv=('./pytest-with-requirements.pex',),
     input_files=merged_input_files,
     description='Run pytest for {}'.format(target_root.address.reference()),
     # TODO: This should not be necessary

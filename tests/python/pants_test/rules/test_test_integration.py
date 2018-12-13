@@ -125,6 +125,23 @@ testprojects/tests/python/pants/dummies/test_with_source_dep.py .        [100%]
 testprojects/tests/python/pants/dummies:target_with_source_dep                  .....   SUCCESS
 """)
 
+  def test_thirdparty_dep(self):
+    pants_run = self.run_passing_pants_test([
+      'testprojects/tests/python/pants/dummies:target_with_thirdparty_dep',
+    ])
+    self.assert_fuzzy_string_match(pants_run.stdout_data, """\
+============================= test session starts ==============================
+platform SOME_TEXT
+rootdir: SOME_TEXT
+collected 1 item
+
+testprojects/tests/python/pants/dummies/test_with_thirdparty_dep.py .    [100%]
+
+=========================== 1 passed in SOME_TEXT ===========================
+
+testprojects/tests/python/pants/dummies:target_with_thirdparty_dep              .....   SUCCESS
+""")
+
   @unittest.skip('Flaky test: https://github.com/pantsbuild/pants/issues/6782')
   def test_mixed_python_tests(self):
     pants_run = self.run_failing_pants_test([
