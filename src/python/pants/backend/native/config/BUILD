@@ -6,6 +6,7 @@ python_library(
   dependencies=[
     '3rdparty/python:future',
     'src/python/pants/engine:rules',
+    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
     'src/python/pants/util:osutil',
   ],

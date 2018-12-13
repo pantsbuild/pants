@@ -84,6 +84,9 @@ class XCodeCLITools(Subsystem):
   # NB: We use @memoized_method in this file for methods which may raise.
   @memoized_method
   def _get_existing_subdirs(self, subdir_name):
+    # TODO(#6143): We should attempt to use ParseSearchDirs here or find some documentation on which
+    # directories we should be adding to the include path, and why. If we do need to manually
+    # specify paths, use ArchiveFileMapper instead of doing all that logic over again in this file.
     maybe_subdirs = [os.path.join(pfx, subdir_name) for pfx in self._all_existing_install_prefixes]
     existing_dirs = [existing_dir for existing_dir in maybe_subdirs if is_readable_dir(existing_dir)]
 
@@ -123,17 +126,8 @@ class XCodeCLITools(Subsystem):
     return self._get_existing_subdirs('lib')
 
   @memoized_method
-  def include_dirs(self):
-    base_inc_dirs = self._get_existing_subdirs('include')
-
-    all_inc_dirs = base_inc_dirs
-    for d in base_inc_dirs:
-      # TODO: figure out what this directory does and why it's not already found by this compiler.
-      secure_inc_dir = os.path.join(d, 'secure')
-      if is_readable_dir(secure_inc_dir):
-        all_inc_dirs.append(secure_inc_dir)
-
-    return all_inc_dirs
+  def include_dirs(self, include_cpp_inc=False):
+    return self._get_existing_subdirs('include')
 
   @memoized_method
   def assembler(self):
@@ -149,7 +143,9 @@ class XCodeCLITools(Subsystem):
       exe_filename='ld',
       library_dirs=[],
       linking_library_dirs=[],
-      extra_args=[MIN_OSX_VERSION_ARG])
+      extra_args=[MIN_OSX_VERSION_ARG],
+      extra_object_files=[],
+    )
 
   @memoized_method
   def c_compiler(self):
@@ -166,7 +162,7 @@ class XCodeCLITools(Subsystem):
       path_entries=self.path_entries(),
       exe_filename='clang++',
       library_dirs=self.lib_dirs(),
-      include_dirs=self.include_dirs(),
+      include_dirs=self.include_dirs(include_cpp_inc=True),
       extra_args=[MIN_OSX_VERSION_ARG])
 
 

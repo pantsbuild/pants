@@ -19,11 +19,17 @@ class LinkSharedLibrariesTest(NativeTaskTestBase, NativeCompileTestMixin):
     return LinkSharedLibraries
 
   def test_caching(self):
-    cpp = self. create_simple_cpp_library(ctypes_native_library=NativeArtifact(lib_name='test'),)
+    cpp = self.create_simple_cpp_library(ctypes_native_library=NativeArtifact(lib_name='test'),)
 
     cpp_compile_task_type = self.synthesize_task_subtype(CppCompile, 'cpp_compile_scope')
-    context = self.prepare_context_for_compile(target_roots=[cpp],
-                                               for_task_types=[cpp_compile_task_type])
+    context = self.prepare_context_for_compile(
+      target_roots=[cpp],
+      for_task_types=[cpp_compile_task_type],
+      options={
+        'libc': {
+          'enable_libc_search': True,
+        },
+      })
 
     cpp_compile = cpp_compile_task_type(context, os.path.join(self.pants_workdir, 'cpp_compile'))
     cpp_compile.execute()

@@ -7,10 +7,19 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
   MirroredTargetOptionMixin
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_property
+from pants.util.objects import enum
+
+
+class ToolchainVariant(enum('descriptor', ['gnu', 'llvm'])):
+
+  @property
+  def is_gnu(self):
+    return self.descriptor == 'gnu'
 
 
 class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
-  """Any settings relevant to a compiler and/or linker invocation."""
+  """Settings which affect both the compile and link phases."""
   options_scope = 'native-build-settings'
 
   mirrored_option_to_kwarg_map = {
@@ -28,5 +37,15 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
                   "are used when compiling and linking native code. C and C++ targets may override "
                   "this behavior with the strict_deps keyword argument as well.")
 
+    register('--toolchain-variant', type=str, fingerprint=True, advanced=True,
+             choices=ToolchainVariant.allowed_values,
+             default=ToolchainVariant.default_value,
+             help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
+                  "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
+
   def get_strict_deps_value_for_target(self, target):
     return self.get_target_mirrored_option('strict_deps', target)
+
+  @memoized_property
+  def toolchain_variant(self):
+    return ToolchainVariant.create(self.get_options().toolchain_variant)

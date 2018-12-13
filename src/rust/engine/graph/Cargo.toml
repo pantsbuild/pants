@@ -9,6 +9,7 @@ boxfuture = { path = "../boxfuture" }
 fnv = "1.0.5"
 futures = "^0.1.16"
 hashing = { path = "../hashing" }
+indexmap = "1.0.2"
 parking_lot = "0.6"
 petgraph = "0.4.5"
 

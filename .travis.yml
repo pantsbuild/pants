@@ -66,7 +66,7 @@ stages:
 
 default_test_config: &default_test_config
   os: linux
-  dist: trusty
+  dist: xenial
   sudo: required
   addons:
     apt:
@@ -76,18 +76,14 @@ default_test_config: &default_test_config
         - lib32z1-dev
         - gcc-multilib
         - python-dev
-        - python3
         - openssl
         - libssl-dev
   stage: *test
   language: python
   python: &python_version "2.7"
   before_install:
-    # Remove bad openjdk6 from trusty image, so
-    # Pants will pick up oraclejdk6 from `packages` above.
-    - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-    - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-    - jdk_switcher use oraclejdk8
+    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
+    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     # Increase the max number of user watches to ensure that watchman is able to watch all
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
@@ -105,6 +101,8 @@ default_cron_test_config: &default_cron_test_config
 
 linux_with_fuse: &linux_with_fuse
   before_install:
+    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
+    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -301,7 +299,7 @@ matrix:
     - <<: *linux_with_fuse
       name: "Rust Tests Linux"
       os: linux
-      dist: trusty
+      dist: xenial
       sudo: required
       stage: *test
       language: python
@@ -332,7 +330,7 @@ matrix:
     - <<: *linux_with_fuse
       name: "Rust Clippy on Linux"
       os: linux
-      dist: trusty
+      dist: xenial
       sudo: required
       stage: *test
       language: python
@@ -347,7 +345,7 @@ matrix:
     - <<: *linux_with_fuse
       name: "Cargo audit"
       os: linux
-      dist: trusty
+      dist: xenial
       sudo: required
       stage: *cron
       script:

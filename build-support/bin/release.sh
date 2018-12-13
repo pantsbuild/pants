@@ -37,6 +37,35 @@ readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 
 source ${ROOT}/contrib/release_packages.sh
 
+function requirement() {
+  package="$1"
+  grep "^${package}[^A-Za-z0-9]" "${ROOT}/3rdparty/python/requirements.txt" || die "Could not find requirement for ${package}"
+}
+
+function run_pex27() {
+  # TODO: Cache this in case we run pex multiple times
+  (
+    PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
+    PEX_PEX=pex27
+
+    pexdir="$(mktemp -d -t build_pex.XXXXX)"
+    trap "rm -rf ${pexdir}" EXIT
+
+    pex="${pexdir}/${PEX_PEX}"
+
+    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" > "${pex}"
+    chmod +x "${pex}"
+    "${pex}" "$@"
+  )
+}
+
+function run_packages_script() {
+  (
+    cd "${ROOT}"
+    run_pex27 "$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)" -- "${ROOT}/src/python/pants/releases/packages.py" "$@"
+  )
+}
+
 function find_pkg() {
   local -r pkg_name=$1
   local -r version=$2
@@ -44,31 +73,6 @@ function find_pkg() {
   find "${search_dir}" -type f -name "${pkg_name}-${version}-*.whl"
 }
 
-function find_plat_name() {
-  # See: https://www.python.org/dev/peps/pep-0425/#id13
-  "${PY}" << EOF
-from __future__ import print_function
-from distutils.util import get_platform
-
-print(get_platform().replace('-', '_').replace('.', '_'))
-EOF
-}
-
-#
-# List of packages to be released
-#
-# See build-support/README.md for more information on the format of each
-# `PKG_$NAME` definition.
-#
-PKG_PANTS=(
-  "pantsbuild.pants"
-  "//src/python/pants:pants-packaged"
-  "pkg_pants_install_test"
-
-  # Update the --python-tag in lockstep with other changes as described in
-  #   https://github.com/pantsbuild/pants/issues/6450
-  "--python-tag cp27 --plat-name $(find_plat_name)"
-)
 function pkg_pants_install_test() {
   local version=$1
   shift
@@ -81,28 +85,13 @@ function pkg_pants_install_test() {
      == "${version}" ]] || die "Installed version of pants does match requested version!"
 }
 
-PKG_PANTS_TESTINFRA=(
-  "pantsbuild.pants.testinfra"
-  "//tests/python/pants_test:test_infra"
-  "pkg_pants_testinfra_install_test"
-)
-function pkg_pants_testinfra_install_test() {
+function pkg_testinfra_install_test() {
   local version=$1
   shift
   local PIP_ARGS="$@"
   pip install ${PIP_ARGS} "pantsbuild.pants.testinfra==${version}" && \
   python -c "import pants_test"
 }
-
-# Once an individual (new) package is declared above, insert it into the array below)
-CORE_PACKAGES=(
-  PKG_PANTS
-  PKG_PANTS_TESTINFRA
-)
-RELEASE_PACKAGES=(
-  ${CORE_PACKAGES[*]}
-  ${CONTRIB_PACKAGES[*]}
-)
 
 #
 # End of package declarations.
@@ -138,30 +127,6 @@ function execute_packaged_pants_with_internal_backends() {
         'internal_backend.utilities',\
       ]" \
     "$@"
-}
-
-function pkg_name() {
-  PACKAGE=$1
-  eval NAME=\${$PACKAGE[0]}
-  echo ${NAME}
-}
-
-function pkg_build_target() {
-  PACKAGE=$1
-  eval TARGET=\${$PACKAGE[1]}
-  echo ${TARGET}
-}
-
-function pkg_install_test_func() {
-  PACKAGE=$1
-  eval INSTALL_TEST_FUNC=\${$PACKAGE[2]}
-  echo ${INSTALL_TEST_FUNC}
-}
-
-function bdist_wheel_flags() {
-  PACKAGE=$1
-  eval BDIST_WHEEL_FLAGS=\${$PACKAGE[3]}
-    echo ${BDIST_WHEEL_FLAGS}
 }
 
 function pants_version_reset() {
@@ -206,24 +171,17 @@ function build_pants_packages() {
   mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
 
   pants_version_set "${version}"
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    NAME=$(pkg_name $PACKAGE)
-    BUILD_TARGET=$(pkg_build_target $PACKAGE)
-    BDIST_WHEEL_FLAGS=$(bdist_wheel_flags $PACKAGE)
 
-    start_travis_section "${NAME}" "Building package ${NAME}-${version} with target '${BUILD_TARGET}'"
+  start_travis_section "${NAME}" "Building packages"
+  packages=($(run_packages_script build_and_print "${version}"))
+  for package in "${packages[@]}"
+  do
     (
-      # Update the --python-tag default in lockstep with other changes as described in
-      #   https://github.com/pantsbuild/pants/issues/6450
-      run_local_pants setup-py \
-        --run="bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
-          ${BUILD_TARGET} && \
-      wheel=$(find_pkg ${NAME} ${version} "${ROOT}/dist") && \
+      wheel=$(find_pkg ${package} ${version} "${ROOT}/dist") && \
       cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
-    ) || die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
-    end_travis_section
+    ) || die "Failed to find package ${package}-${version}!"
   done
+  end_travis_section
 
   pants_version_reset
 }
@@ -298,17 +256,14 @@ function install_and_test_packages() {
   export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
   trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
-  PACKAGES=("${RELEASE_PACKAGES[@]}")
+  packages=($(run_packages_script list | grep '.' | awk '{print $1}'))
 
   export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
-  for PACKAGE in "${PACKAGES[@]}"
+  for package in "${packages[@]}"
   do
-    NAME=$(pkg_name $PACKAGE)
-    INSTALL_TEST_FUNC=$(pkg_install_test_func $PACKAGE)
-
-    start_travis_section "${NAME}" "Installing and testing package ${NAME}-${VERSION}"
-    eval $INSTALL_TEST_FUNC ${PIP_ARGS[@]} || \
-      die "Failed to install and test package ${NAME}-${VERSION}!"
+    start_travis_section "${package}" "Installing and testing package ${package}-${VERSION}"
+    eval pkg_${package##*\.}_install_test ${PIP_ARGS[@]} || \
+      die "Failed to install and test package ${package}-${VERSION}!"
     end_travis_section
   done
   unset PANTS_PYTHON_REPOS_REPOS
@@ -416,7 +371,7 @@ function publish_docs_if_master() {
 }
 
 function check_owners() {
-  run_local_pants -q run src/python/pants/releases:packages -- check-my-ownership
+  run_packages_script check-my-ownership
 }
 
 function reversion_whls() {
@@ -492,10 +447,10 @@ function fetch_and_check_prebuilt_wheels() {
   fetch_prebuilt_wheels "${check_dir}"
 
   local missing=()
+  RELEASE_PACKAGES=($(run_packages_script list | grep '.' | awk '{print $1}'))
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
-    NAME=$(pkg_name $PACKAGE)
-    packages=($(find_pkg "${NAME}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
+    packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
     if [ ${#packages[@]} -eq 0 ]; then
       missing+=("${NAME}")
       continue
@@ -549,24 +504,13 @@ function activate_twine() {
 }
 
 function execute_pex() {
-  (
-    PEX_VERSION=$(grep "pex==" "${ROOT}/3rdparty/python/requirements.txt" | sed -e "s|pex==||")
-    PEX_PEX=pex27
-
-    cd $(mktemp -d -t build_pex.XXXXX)
-    trap "rm -rf $(pwd -P)" EXIT
-
-    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" -O
-    chmod +x ./${PEX_PEX}
-
-    ./${PEX_PEX} \
+  run_pex27 \
       --no-build \
       --no-pypi \
       --disable-cache \
       -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
       -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
       "$@"
-  )
 }
 
 function build_pex() {
@@ -702,8 +646,8 @@ while getopts "hdntcloepqw" opt; do
     d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
-    l) run_local_pants -q run src/python/pants/releases:packages -- list ; exit $? ;;
-    o) run_local_pants -q run src/python/pants/releases:packages -- list-owners ; exit $? ;;
+    l) run_packages_script list ; exit $? ;;
+    o) run_packages_script list-owners ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;

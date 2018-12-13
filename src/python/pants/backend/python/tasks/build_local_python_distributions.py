@@ -12,16 +12,18 @@ import shutil
 from pex import pep425tags
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.native.config.environment import LLVMCppToolchain, LLVMCToolchain, Platform
+from pants.backend.native.config.environment import CppToolchain, CToolchain, Platform
+from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
+from pants.backend.native.subsystems.native_toolchain import ToolchainVariantRequest
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.subsystems.pex_build_util import is_local_python_dist
 from pants.backend.python.subsystems.python_native_code import (BuildSetupRequiresPex,
                                                                 PythonNativeCode,
                                                                 SetupPyExecutionEnvironment,
                                                                 SetupPyNativeTools)
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -71,6 +73,7 @@ class BuildLocalPythonDistributions(Task):
   def subsystem_dependencies(cls):
     return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (
       BuildSetupRequiresPex.scoped(cls),
+      NativeBuildSettings,
       PythonNativeCode.scoped(cls),
     )
 
@@ -85,6 +88,20 @@ class BuildLocalPythonDistributions(Task):
     return PythonNativeCode.scoped_instance(self)
 
   @memoized_property
+  def _native_toolchain(self):
+    return self._python_native_code_settings.native_toolchain
+
+  @memoized_property
+  def _toolchain_variant_request(self):
+    return ToolchainVariantRequest(
+      toolchain=self._native_toolchain,
+      variant=self._native_build_settings.toolchain_variant)
+
+  @memoized_property
+  def _native_build_settings(self):
+    return NativeBuildSettings.global_instance()
+
+  @memoized_property
   def _build_setup_requires_pex_settings(self):
     return BuildSetupRequiresPex.scoped_instance(self)
 
@@ -96,15 +113,11 @@ class BuildLocalPythonDistributions(Task):
 
   @memoized_property
   def _c_toolchain(self):
-    llvm_c_toolchain = self._request_single(
-      LLVMCToolchain, self._python_native_code_settings.native_toolchain)
-    return llvm_c_toolchain.c_toolchain
+    return self._request_single(CToolchain, self._toolchain_variant_request)
 
   @memoized_property
   def _cpp_toolchain(self):
-    llvm_cpp_toolchain = self._request_single(
-      LLVMCppToolchain, self._python_native_code_settings.native_toolchain)
-    return llvm_cpp_toolchain.cpp_toolchain
+    return self._request_single(CppToolchain, self._toolchain_variant_request)
 
   # TODO: This should probably be made into an @classproperty (see PR #5901).
   @property

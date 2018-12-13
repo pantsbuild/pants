@@ -3,7 +3,7 @@
 PYTHON_FILES="$(find src tests pants-plugins examples contrib -name '*.py')"
 RUST_FILES="$(find src/rust/engine -name '*.rs')"
 
-bad_files="$(echo ${PYTHON_FILES} | xargs grep -l "^import subprocess")"
+bad_files="$(echo ${PYTHON_FILES} | xargs grep -l "^import subprocess$")"
 if [ -n "${bad_files}" ]; then
     echo >&2 "Found forbidden imports. Instead of \`import subprocess\` you should use \`from pants.util.process_handler import subprocess\`. Bad files:"
     echo >&2 "${bad_files}"
