@@ -144,7 +144,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
         unmodified_pants_binary_create = run_target('binary')
         self.assert_success(unmodified_pants_binary_create)
-        binary_run_output = invoke_pex_for_output(output_pex)
+        binary_run_output = invoke_pex_for_output(output_pex).decode('utf-8')
         self.assertIn(initial_result_message, binary_run_output)
 
         # Modify one of the source files for this target so that the output is different.
@@ -163,7 +163,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
         modified_pants_binary_create = run_target('binary')
         self.assert_success(modified_pants_binary_create)
-        binary_run_output = invoke_pex_for_output(output_pex)
+        binary_run_output = invoke_pex_for_output(output_pex).decode('utf-8')
         self.assertIn(modified_result_message, binary_run_output)
 
   def test_ctypes_native_language_interop(self):
@@ -183,10 +183,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # Replace strict_deps=False with nothing so we can override it (because target values for this
       # option take precedence over subsystem options).
-      orig_wrapped_math_build = read_file(self._wrapped_math_build_file)
+      orig_wrapped_math_build = read_file(self._wrapped_math_build_file, binary_mode=False)
       without_strict_deps_wrapped_math_build = re.sub(
         'strict_deps=False,', '', orig_wrapped_math_build)
-      safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build)
+      safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build, mode='w')
 
       # This should fail because it does not turn on strict_deps for a target which requires it.
       pants_binary_strict_deps_failure = self.run_pants_with_workdir(

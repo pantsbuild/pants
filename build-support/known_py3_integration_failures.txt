@@ -1,6 +1,4 @@
 tests/python/pants_test/backend/codegen/antlr/python:integration
 tests/python/pants_test/backend/python/tasks:integration
-tests/python/pants_test/backend/python/tasks:python_native_code_testing_1
 tests/python/pants_test/backend/python/tasks:python_native_code_testing_2
-tests/python/pants_test/backend/python/tasks:python_native_code_testing_3
 tests/python/pants_test/projects:testprojects_integration
