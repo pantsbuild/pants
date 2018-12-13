@@ -38,10 +38,10 @@ def run_python_test(transitive_hydrated_target):
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
   all_requirements = []
   for maybe_python_req_lib in all_targets:
-    # This is a python_requirement().
+    # This is a python_requirement()-like target.
     if hasattr(maybe_python_req_lib.adaptor, 'requirement'):
       all_requirements.append(str(maybe_python_req_lib.requirement))
-    # This is a python_requirement_library(). TODO: see if this is correct?!
+    # This is a python_requirement_library()-like target.
     if hasattr(maybe_python_req_lib.adaptor, 'requirements'):
       for py_req in maybe_python_req_lib.adaptor.requirements:
         all_requirements.append(str(py_req.requirement))
@@ -55,6 +55,8 @@ def run_python_test(transitive_hydrated_target):
     '--python', python_binary,
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
+    # TODO: This is non-hermetic because pytest will be resolved on the fly by pex27, where it should be hermetically provided in some way.
+    # We should probably also specify a specific version.
     'pytest',
   ] + all_requirements
   requirements_pex_request = ExecuteProcessRequest(
@@ -69,7 +71,8 @@ def run_python_test(transitive_hydrated_target):
     FallibleExecuteProcessResult, ExecuteProcessRequest, requirements_pex_request)
 
   # Gather sources.
-  # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising (?)
+  # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
+  # simplify the hasattr() checks here!
   all_sources_digests = []
   for maybe_source_target in all_targets:
     if hasattr(maybe_source_target.adaptor, 'sources'):

@@ -25,6 +25,6 @@ python_tests(
   name = 'target_with_thirdparty_dep',
   sources = ['test_with_thirdparty_dep.py'],
   dependencies = [
-    '3rdparty/python:futures',
+    '3rdparty/python:future',
   ],
 )
