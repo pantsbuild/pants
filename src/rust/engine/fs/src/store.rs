@@ -1662,8 +1662,6 @@ mod remote {
 
   #[derive(Clone)]
   pub struct ByteStore {
-    byte_stream_client: Arc<bazel_protos::bytestream_grpc::ByteStreamClient>,
-    cas_client: Arc<bazel_protos::remote_execution_grpc::ContentAddressableStorageClient>,
     instance_name: Option<String>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
@@ -1697,16 +1695,8 @@ mod remote {
           builder.connect(cas_address)
         }
       };
-      let byte_stream_client = Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
-        channel.clone(),
-      ));
-      let cas_client = Arc::new(
-        bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(channel.clone()),
-      );
 
       ByteStore {
-        byte_stream_client,
-        cas_client,
         instance_name,
         chunk_size_bytes,
         upload_timeout,
@@ -1714,6 +1704,16 @@ mod remote {
         channel,
         authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
       }
+    }
+
+    fn byte_stream_client(&self) -> bazel_protos::bytestream_grpc::ByteStreamClient {
+      bazel_protos::bytestream_grpc::ByteStreamClient::new(self.channel.clone())
+    }
+
+    fn cas_client(&self) -> bazel_protos::remote_execution_grpc::ContentAddressableStorageClient {
+      bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(
+        self.channel.clone(),
+      )
     }
 
     fn call_option(&self) -> grpcio::CallOption {
@@ -1741,15 +1741,16 @@ mod remote {
         digest.0,
         digest.1,
       );
-      match self
-        .byte_stream_client
+      let client = self.byte_stream_client();
+      match client
         .write_opt(self.call_option().timeout(self.upload_timeout))
+        .map(|v| (v, client))
       {
         Err(err) => future::err(format!(
           "Error attempting to connect to upload digest {:?}: {:?}",
           digest, err
         )).to_boxed(),
-        Ok((sender, receiver)) => {
+        Ok(((sender, receiver), client)) => {
           let chunk_size_bytes = self.chunk_size_bytes;
           let stream =
             futures::stream::unfold::<_, _, futures::future::FutureResult<_, grpcio::Error>, _>(
@@ -1772,7 +1773,7 @@ mod remote {
               },
             );
 
-          future::ok(self.byte_stream_client.clone())
+          future::ok(client)
             .join(
               sender.send_all(stream).map_err(move |e| {
                 format!("Error attempting to upload digest {:?}: {:?}", digest, e)
@@ -1806,26 +1807,29 @@ mod remote {
       digest: Digest,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
-      match self.byte_stream_client.read_opt(
-        &{
-          let mut req = bazel_protos::bytestream::ReadRequest::new();
-          req.set_resource_name(format!(
-            "{}/blobs/{}/{}",
-            self.instance_name.clone().unwrap_or_default(),
-            digest.0,
-            digest.1
-          ));
-          req.set_read_offset(0);
-          // 0 means no limit.
-          req.set_read_limit(0);
-          req
-        },
-        self.call_option(),
-      ) {
-        Ok(stream) => {
+      let client = self.byte_stream_client();
+      match client
+        .read_opt(
+          &{
+            let mut req = bazel_protos::bytestream::ReadRequest::new();
+            req.set_resource_name(format!(
+              "{}/blobs/{}/{}",
+              self.instance_name.clone().unwrap_or_default(),
+              digest.0,
+              digest.1
+            ));
+            req.set_read_offset(0);
+            // 0 means no limit.
+            req.set_read_limit(0);
+            req
+          },
+          self.call_option(),
+        ).map(|stream| (stream, client))
+      {
+        Ok((stream, client)) => {
           // We shouldn't have to pass around the client here, it's a workaround for
           // https://github.com/pingcap/grpc-rs/issues/123
-          future::ok(self.byte_stream_client.clone())
+          future::ok(client)
             .join(
               stream.fold(BytesMut::with_capacity(digest.1), move |mut bytes, r| {
                 bytes.extend_from_slice(&r.data);
@@ -1867,7 +1871,7 @@ mod remote {
         request.mut_blob_digests().push(digest.into());
       }
       self
-        .cas_client
+        .cas_client()
         .find_missing_blobs_opt(&request, self.call_option())
         .map_err(|err| {
           format!(
