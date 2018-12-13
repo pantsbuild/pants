@@ -31,11 +31,9 @@ Refactoring, Improvements, and Tooling
 
 * Unblacklist JVM check_style Python 3 integration test thanks to using Python 3.5+ (#6882)
   `PR #6882 <https://github.com/pantsbuild/pants/pull/6882>`_
-  `PR #6885 <https://github.com/pantsbuild/pants/pull/6885>`_
 
 * Upgrade Travis to Xenial (Ubuntu 16.04) (#6885)
   `PR #6885 <https://github.com/pantsbuild/pants/pull/6885>`_
->`_ttps://github.com/pantsbuild/pants/pull/6882.
 
 * Make PexBuilderWrapper a Subsystem. (#6897)
   `PR #6897 <https://github.com/pantsbuild/pants/pull/6897>`_
@@ -57,7 +55,6 @@ Refactoring, Improvements, and Tooling
 
 * Convert some of release.sh to python, batch pants invocations (#6843)
   `PR #6843 <https://github.com/pantsbuild/pants/pull/6843>`_
-
 
 1.13.0.dev2 (12/07/2018)
 ------------------------

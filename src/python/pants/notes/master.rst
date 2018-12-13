@@ -4,8 +4,8 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.13.0rc0 (12/11/2018)
-----------------------
+1.13.0rc0 (12/13/2018)
+------------------------
 
 New Features
 ~~~~~~~~~~~~
@@ -16,8 +16,41 @@ New Features
 * A contrib package for building AWS Lambdas from python code. (#6881)
   `PR #6881 <https://github.com/pantsbuild/pants/pull/6881>`_
 
+Bugfixes
+~~~~~~~~
+
+* Fix Task fingerprinting. (#6894)
+  `PR #6894 <https://github.com/pantsbuild/pants/pull/6894>`_
+
+* [Bug fix] Fix test_interpreter_selection_integration unicode issues for Python 3 (#6887)
+  `PR #6887 <https://github.com/pantsbuild/pants/pull/6887>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Ensure pants is running in exception sink tests. (#6912)
+  `PR #6912 <https://github.com/pantsbuild/pants/pull/6912>`_
+
+* Unblacklist JVM check_style Python 3 integration test thanks to using Python 3.5+ (#6882)
+  `PR #6882 <https://github.com/pantsbuild/pants/pull/6882>`_
+
+* Upgrade Travis to Xenial (Ubuntu 16.04) (#6885)
+  `PR #6885 <https://github.com/pantsbuild/pants/pull/6885>`_
+
+* Make PexBuilderWrapper a Subsystem. (#6897)
+  `PR #6897 <https://github.com/pantsbuild/pants/pull/6897>`_
+
+* Make graph traces stable. (#6909)
+  `PR #6909 <https://github.com/pantsbuild/pants/pull/6909>`_
+
+* Fix `build-support/bin/release.sh -p`. (#6908)
+  `PR #6908 <https://github.com/pantsbuild/pants/pull/6908>`_
+
+* Re-skip flaky test_mixed_python_tests. (#6904)
+  `PR #6904 <https://github.com/pantsbuild/pants/pull/6904>`_
+
+* Skip EngineTest#test_trace_multi. (#6899)
+  `PR #6899 <https://github.com/pantsbuild/pants/pull/6899>`_
 
 * Fix flaky `test_process_request_*`. (#6895)
   `PR #6895 <https://github.com/pantsbuild/pants/pull/6895>`_
