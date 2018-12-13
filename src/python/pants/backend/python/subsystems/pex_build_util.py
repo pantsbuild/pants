@@ -12,8 +12,10 @@ from future.utils import PY2
 from pex.fetcher import Fetcher
 from pex.pex_builder import PEXBuilder
 from pex.resolver import resolve
+from pex.util import DistributionHelper
 from twitter.common.collections import OrderedSet
 
+from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -25,6 +27,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 from pants.subsystem.subsystem import Subsystem
+from pants.util.contextutil import temporary_file
 
 
 def is_python_target(tgt):
@@ -96,6 +99,13 @@ class PexBuilderWrapper(object):
     options_scope = 'pex-builder-wrapper'
 
     @classmethod
+    def register_options(cls, register):
+      super(PexBuilderWrapper.Factory, cls).register_options(register)
+      register('--setuptools-version', advanced=True, default='40.6.3',
+               help='The setuptools version to include in the pex if namespace packages need to be '
+                    'injected.')
+
+    @classmethod
     def subsystem_dependencies(cls):
       return super(PexBuilderWrapper.Factory, cls).subsystem_dependencies() + (
         PythonRepos,
@@ -104,22 +114,37 @@ class PexBuilderWrapper(object):
 
     @classmethod
     def create(cls, builder, log=None):
+      options = cls.global_instance().get_options()
+      setuptools_requirement = 'setuptools=={}'.format(options.setuptools_version)
+
       log = log or logging.getLogger(__name__)
+
       return PexBuilderWrapper(builder=builder,
                                python_repos_subsystem=PythonRepos.global_instance(),
                                python_setup_subsystem=PythonSetup.global_instance(),
+                               setuptools_requirement=PythonRequirement(setuptools_requirement),
                                log=log)
 
-  def __init__(self, builder, python_repos_subsystem, python_setup_subsystem, log):
+  def __init__(self,
+               builder,
+               python_repos_subsystem,
+               python_setup_subsystem,
+               setuptools_requirement,
+               log):
     assert isinstance(builder, PEXBuilder)
     assert isinstance(python_repos_subsystem, PythonRepos)
     assert isinstance(python_setup_subsystem, PythonSetup)
+    assert isinstance(setuptools_requirement, PythonRequirement)
     assert log is not None
 
     self._builder = builder
     self._python_repos_subsystem = python_repos_subsystem
     self._python_setup_subsystem = python_setup_subsystem
+    self._setuptools_requirement = setuptools_requirement
     self._log = log
+
+    self._distributions = {}
+    self._frozen = False
 
   def add_requirement_libs_from(self, req_libs, platforms=None):
     """Multi-platform dependency resolution for PEX files.
@@ -148,7 +173,7 @@ class PexBuilderWrapper(object):
     find_links = OrderedSet()
     for req in deduped_reqs:
       self._log.debug('  Dumping requirement: {}'.format(req))
-      self._builder.add_requirement(req.requirement)
+      self._builder.add_requirement(str(req.requirement))
       if req.repository:
         find_links.add(req.repository)
 
@@ -160,7 +185,7 @@ class PexBuilderWrapper(object):
       for dist in dists:
         if dist.location not in locations:
           self._log.debug('  Dumping distribution: .../{}'.format(os.path.basename(dist.location)))
-          self._builder.add_distribution(dist)
+          self.add_distribution(dist)
         locations.add(dist.location)
 
   def _resolve_multi(self, interpreter, requirements, platforms, find_links):
@@ -188,7 +213,7 @@ class PexBuilderWrapper(object):
       requirements_cache_dir = os.path.join(python_setup.resolver_cache_dir,
         str(interpreter.identity))
       resolved_dists = resolve(
-        requirements=[req.requirement for req in requirements],
+        requirements=[str(req.requirement) for req in requirements],
         interpreter=interpreter,
         fetchers=fetchers,
         platform=platform,
@@ -222,13 +247,49 @@ class PexBuilderWrapper(object):
       raise TaskError('Old-style resources not supported for target {}.  '
                       'Depend on resources() targets instead.'.format(tgt.address.spec))
 
+  def _prepare_inits(self):
+    chroot = self._builder.chroot()
+    sources = chroot.get('source') | chroot.get('resource')
+
+    packages = set()
+    for source in sources:
+      if source.endswith('.py'):
+        pkg_dir = os.path.dirname(source)
+        if pkg_dir and pkg_dir not in packages:
+          package = ''
+          for component in pkg_dir.split(os.sep):
+            package = os.path.join(package, component)
+            packages.add(package)
+
+    missing_pkg_files = []
+    for package in packages:
+      pkg_file = os.path.join(package, '__init__.py')
+      if pkg_file not in sources:
+        missing_pkg_files.append(pkg_file)
+
+    if missing_pkg_files:
+      with temporary_file() as ns_package:
+        ns_package.write(b'__import__("pkg_resources").declare_namespace(__name__)')
+        ns_package.flush()
+        for missing_pkg_file in missing_pkg_files:
+          self._builder.add_source(ns_package.name, missing_pkg_file)
+
+    return missing_pkg_files
+
   def freeze(self):
-    self._builder.freeze()
+    if not self._frozen:
+      if self._prepare_inits():
+        dist = self._distributions.get('setuptools')
+        if not dist:
+          self.add_resolved_requirements([self._setuptools_requirement])
+      self._builder.freeze()
+      self._frozen = True
 
   def set_entry_point(self, entry_point):
     self._builder.set_entry_point(entry_point)
 
   def build(self, safe_path):
+    self.freeze()
     self._builder.build(safe_path)
 
   def set_shebang(self, shebang):
@@ -247,13 +308,19 @@ class PexBuilderWrapper(object):
 
   def add_direct_requirements(self, reqs):
     for req in reqs:
-      self._builder.add_requirement(req)
+      self._builder.add_requirement(str(req))
 
   def add_distribution(self, dist):
     self._builder.add_distribution(dist)
+    self._register_distribution(dist)
 
   def add_dist_location(self, location):
     self._builder.add_dist_location(location)
+    dist = DistributionHelper.distribution_from_path(location)
+    self._register_distribution(dist)
+
+  def _register_distribution(self, dist):
+    self._distributions[dist.key] = dist
 
   def set_script(self, script):
     self._builder.set_script(script)

@@ -261,7 +261,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     ]
     pants_run = self.run_pants(command=command, config={
       'python-setup': {
-        'platforms': ['current', 'this-platform-does_not-exist']
+        'platforms': ['current', 'this_platform_does_not_exist']
       },
     })
     self.assert_success(pants_run)

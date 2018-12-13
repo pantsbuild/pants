@@ -6,10 +6,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
+import pex
+from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.base.workunit import WorkUnitLabel
@@ -50,7 +51,6 @@ class PythonToolPrepBase(Task):
     return super(PythonToolPrepBase, cls).subsystem_dependencies() + (
       cls.tool_subsystem_cls.scoped(cls),
       PexBuilderWrapper.Factory,
-      PythonInterpreterCache,
     )
 
   @classmethod
@@ -72,8 +72,9 @@ class PythonToolPrepBase(Task):
     pex_name = tool_subsystem.options_scope
     pex_path = os.path.join(self.workdir, self.fingerprint, '{}.pex'.format(pex_name))
 
-    interpreter_cache = PythonInterpreterCache.global_instance()
-    interpreter = interpreter_cache.select_interpreter_for_targets([])
+    # TODO(John Sirois): Eliminate setup_interpreter call once pex API is fixed:
+    #   https://github.com/pantsbuild/pex/issues/632
+    interpreter = pex.vendor.setup_interpreter(PythonInterpreter.get())
 
     if not os.path.exists(pex_path):
       with self.context.new_workunit(name='create-{}-pex'.format(pex_name),

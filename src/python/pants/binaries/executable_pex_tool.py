@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import pex
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
@@ -25,6 +26,11 @@ class ExecutablePexTool(Subsystem):
 
   def bootstrap(self, interpreter, pex_file_path, extra_reqs=None):
     # Caching is done just by checking if the file at the specified path is already executable.
+
+    # TODO(John Sirois): Eliminate setup_interpreter call once pex API is fixed:
+    #   https://github.com/pantsbuild/pex/issues/632
+    interpreter = pex.vendor.setup_interpreter(interpreter)
+
     if not is_executable(pex_file_path):
       pex_info = PexInfo.default(interpreter=interpreter)
       if self.entry_point is not None:

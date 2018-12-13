@@ -8,11 +8,11 @@ import hashlib
 import os
 from builtins import open
 
+import pex
 from future.utils import PY3
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
@@ -44,12 +44,11 @@ class SelectInterpreter(Task):
   def implementation_version(cls):
     # TODO(John Sirois): Fixup this task to use VTS results_dirs. Right now version bumps aren't
     # effective in dealing with workdir data format changes.
-    return super(SelectInterpreter, cls).implementation_version() + [('SelectInterpreter', 2)]
+    return super(SelectInterpreter, cls).implementation_version() + [('SelectInterpreter', 3)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(SelectInterpreter, cls).subsystem_dependencies() + (
-      PythonSetup, PythonInterpreterCache)
+    return super(SelectInterpreter, cls).subsystem_dependencies() + (PythonInterpreterCache,)
 
   @classmethod
   def product_types(cls):
@@ -88,20 +87,21 @@ class SelectInterpreter(Task):
     safe_mkdir_for(interpreter_path_file)
     with open(interpreter_path_file, 'w') as outfile:
       outfile.write('{}\n'.format(interpreter.binary))
-      for dist, location in interpreter.extras.items():
-        dist_name, dist_version = dist
-        outfile.write('{}\t{}\t{}\n'.format(dist_name, dist_version, location))
 
   def _interpreter_path_file(self, target_set_id):
-    return os.path.join(self.workdir, target_set_id, 'interpreter.info')
+    # NB: The file name must be changed when its format changes. See the TODO in
+    #  `implementation_version` above for more.
+    #
+    # The historical names to avoid:
+    # - interpreter.path
+    # - interpreter.info
+    return os.path.join(self.workdir, target_set_id, 'interpreter.binary')
 
   @staticmethod
   def _get_interpreter(interpreter_path_file):
     with open(interpreter_path_file, 'r') as infile:
-      lines = infile.readlines()
-      binary = lines[0].strip()
-      interpreter = PythonInterpreter.from_binary(binary, include_site_extras=False)
-      for line in lines[1:]:
-        dist_name, dist_version, location = line.strip().split('\t')
-        interpreter = interpreter.with_extra(dist_name, dist_version, location)
-      return interpreter
+      binary = infile.read().strip()
+
+      # TODO(John Sirois): Eliminate setup_interpreter call once pex API is fixed:
+      #   https://github.com/pantsbuild/pex/issues/632
+      return pex.vendor.setup_interpreter(PythonInterpreter.from_binary(binary))

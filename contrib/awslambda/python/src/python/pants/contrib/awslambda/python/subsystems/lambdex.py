@@ -9,5 +9,11 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 
 class Lambdex(PythonToolBase):
   options_scope = 'lambdex'
-  default_requirements = ['lambdex==0.1.2']
+  default_requirements = [
+    'lambdex==0.1.2',
+
+    # TODO(John Sirois): Remove when we upgrade lambdex to a version the declares its install
+    #  requirement of setuptools: https://github.com/wickman/lambdex/issues/3
+    'setuptools==40.6.3',
+  ]
   default_entry_point = 'lambdex.bin.lambdex'

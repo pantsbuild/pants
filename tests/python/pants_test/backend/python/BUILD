@@ -30,19 +30,13 @@ python_tests(
   sources = ['test_interpreter_cache.py'],
   dependencies = [
     '3rdparty/python:future',
-    '3rdparty/python:mock',
-    '3rdparty/python:pex',
     ':interpreter_selection_utils',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/testutils:git_util',
     'tests/python/pants_test/testutils:pexrc_util',
-    'tests/python/pants_test/testutils:py2_compat',
-    'tests/python/pants_test:int-test',
     'tests/python/pants_test:test_base',
   ],
-  timeout=1200
 )
 
 python_tests(

@@ -156,7 +156,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
         'python-setup': {
           # If no targets exist declaring the nonexistent platform, this should be reduced to just
           # ['current'] in PythonNativeCode#check_build_for_current_platform_only().
-          'platforms': ['current', 'this-platform-does_not-exist'],
+          'platforms': ['current', 'this_platform_does_not_exist'],
         },
       }
       command=[
