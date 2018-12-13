@@ -109,7 +109,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
       command=['binary', '{}:main_with_no_conflict'.format(self.fasthello_install_requires_dir)]
       pants_run = self.run_pants(command=command)
       self.assert_success(pants_run)
-      output = subprocess.check_output(pex)
+      output = subprocess.check_output(pex).decode('utf-8')
       self.assertIn('United States', output)
 
   def test_with_conflicting_transitive_deps(self):

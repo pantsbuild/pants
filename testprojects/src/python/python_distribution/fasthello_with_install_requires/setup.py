@@ -5,12 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import sys
+
 from setuptools import setup, find_packages
 from distutils.core import Extension
 
 
-c_module = Extension(str('c_greet'), sources=[str('c_greet.c')])
-cpp_module = Extension(str('cpp_greet'), sources=[str('cpp_greet.cpp')])
+PY3 = sys.version_info[0] == 3
+
+if PY3:
+  c_module = Extension('c_greet', sources=['c_greet.c'])
+  cpp_module = Extension('cpp_greet', sources=['cpp_greet.cpp'])
+else:
+  c_module = Extension(b'c_greet', sources=[b'c_greet.c'])
+  cpp_module = Extension(b'cpp_greet', sources=[b'cpp_greet.cpp'])
 
 setup(
   name='fasthello_test',
