@@ -4,8 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from future.utils import text_type
+from builtins import str
 
 
 def test_f():
-  assert isinstance(text_type("foo"), text_type)
+  assert isinstance("foo", str)
