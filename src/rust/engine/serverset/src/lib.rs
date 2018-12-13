@@ -161,6 +161,8 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   /// would require this type to be Resettable because of our fork model, which would be very
   /// complex.
   ///
+  /// TODO: Switch to use tokio_retry when we don't need to worry about forking without execing.
+  ///
   pub fn next(&self) -> (T, Box<Fn(Health) + Send + Sync>) {
     let (i, server) = loop {
       let i = self.inner.next.fetch_add(1, Ordering::Relaxed) % self.inner.servers.len();
@@ -181,6 +183,10 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
     (server.server.clone(), callback)
   }
 
+  fn multiply(duration: Duration, fraction: num_rational::Ratio<u32>) -> Duration {
+    (duration * *fraction.numer()) / *fraction.denom()
+  }
+
   fn callback(&self, server_index: usize, health: Health) {
     let mut unhealthy_info = self.inner.servers[server_index].unhealthy_info.lock();
     match health {
@@ -189,13 +195,13 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
           if let Some(ref mut unhealthy_info) = *unhealthy_info {
             unhealthy_info.unhealthy_since = Instant::now();
             // failure_backoff_ratio's numer and denom both fit in u8s, so hopefully this won't
-            // overflow of lose too much precision...
-            unhealthy_info.next_attempt_after *= *self.inner.failure_backoff_ratio.numer();
-            unhealthy_info.next_attempt_after /= *self.inner.failure_backoff_ratio.denom();
-            unhealthy_info.next_attempt_after = std::cmp::min(
+            // overflow or lose too much precision...
+            let next_exponential_duration = Self::multiply(
               unhealthy_info.next_attempt_after,
-              self.inner.failure_max_lame,
+              self.inner.failure_backoff_ratio,
             );
+            unhealthy_info.next_attempt_after =
+              std::cmp::min(next_exponential_duration, self.inner.failure_max_lame);
           }
         } else {
           *unhealthy_info = Some(UnhealthyInfo {
@@ -213,9 +219,11 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
             if !reset {
               unhealthy_info.unhealthy_since = Instant::now();
               // failure_backoff_ratio's numer and denom both fit in u8s, so hopefully this won't
-              // overflow of lose too much precision...
-              unhealthy_info.next_attempt_after *= *self.inner.failure_backoff_ratio.denom();
-              unhealthy_info.next_attempt_after /= *self.inner.failure_backoff_ratio.numer();
+              // overflow or lose too much precision...
+              unhealthy_info.next_attempt_after = Self::multiply(
+                unhealthy_info.next_attempt_after,
+                self.inner.failure_backoff_ratio.recip(),
+              );
             }
           }
           if reset {
