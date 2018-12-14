@@ -79,11 +79,7 @@ struct Inner<T> {
   // Only visible for testing
   pub(crate) next: AtomicUsize,
 
-  failure_initial_lame: Duration,
-
-  failure_backoff_ratio: num_rational::Ratio<u32>,
-
-  failure_max_lame: Duration,
+  backoff_config: BackoffConfig,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -110,12 +106,13 @@ pub struct BackoffConfig {
   /// The time a backend will be skipped after it is first reported unhealthy.
   ///
   pub initial_lame: Duration,
+
   ///
   /// Ratio by which to multiply the most recent lame duration if a backend continues to be
   /// unhealthy.
   ///
   /// The inverse is used when easing back in after health recovery.
-  pub backoff_ratio: f64,
+  pub ratio: num_rational::Ratio<u32>,
 
   ///
   /// Maximum duration to wait between attempts.
@@ -123,18 +120,12 @@ pub struct BackoffConfig {
   pub max_lame: Duration,
 }
 
-impl<T: Clone + Send + Sync + 'static> Serverset<T> {
-  pub fn new(servers: Vec<T>, backoff_config: BackoffConfig) -> Result<Self, String> {
-    if servers.is_empty() {
-      return Err("Must supply some servers".to_owned());
-    }
-
-    let BackoffConfig {
-      initial_lame,
-      backoff_ratio,
-      max_lame,
-    } = backoff_config;
-
+impl BackoffConfig {
+  pub fn new(
+    initial_lame: Duration,
+    backoff_ratio: f64,
+    max_lame: Duration,
+  ) -> Result<BackoffConfig, String> {
     if backoff_ratio < 1.0 {
       return Err(format!(
         "Failure backoff ratio must be at least 1, got: {}",
@@ -148,8 +139,23 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
           backoff_ratio
         )
       })?;
-    let backoff_ratio =
+    let ratio =
       num_rational::Ratio::new(*backoff_ratio.numer() as u32, *backoff_ratio.denom() as u32);
+
+    Ok(BackoffConfig {
+      initial_lame,
+      ratio,
+      max_lame,
+    })
+  }
+}
+
+impl<T: Clone + Send + Sync + 'static> Serverset<T> {
+  pub fn new(servers: Vec<T>, backoff_config: BackoffConfig) -> Result<Self, String> {
+    if servers.is_empty() {
+      return Err("Must supply some servers".to_owned());
+    }
+
     Ok(Serverset {
       inner: Arc::new(Inner {
         servers: servers
@@ -159,9 +165,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
             unhealthy_info: Arc::new(Mutex::new(None)),
           }).collect(),
         next: AtomicUsize::new(0),
-        failure_initial_lame: initial_lame,
-        failure_backoff_ratio: backoff_ratio,
-        failure_max_lame: max_lame,
+        backoff_config,
       }),
     })
   }
@@ -239,15 +243,17 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
             // overflow or lose too much precision...
             let next_exponential_duration = Self::multiply(
               unhealthy_info.next_attempt_after,
-              self.inner.failure_backoff_ratio,
+              self.inner.backoff_config.ratio,
             );
-            unhealthy_info.next_attempt_after =
-              std::cmp::min(next_exponential_duration, self.inner.failure_max_lame);
+            unhealthy_info.next_attempt_after = std::cmp::min(
+              next_exponential_duration,
+              self.inner.backoff_config.max_lame,
+            );
           }
         } else {
           *unhealthy_info = Some(UnhealthyInfo {
             unhealthy_since: Instant::now(),
-            next_attempt_after: self.inner.failure_initial_lame,
+            next_attempt_after: self.inner.backoff_config.initial_lame,
           });
         }
       }
@@ -255,7 +261,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
         if unhealthy_info.is_some() {
           let mut reset = false;
           if let Some(ref mut unhealthy_info) = *unhealthy_info {
-            reset = unhealthy_info.next_attempt_after <= self.inner.failure_initial_lame;
+            reset = unhealthy_info.next_attempt_after <= self.inner.backoff_config.initial_lame;
 
             if !reset {
               unhealthy_info.unhealthy_since = Instant::now();
@@ -263,7 +269,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
               // overflow or lose too much precision...
               unhealthy_info.next_attempt_after = Self::multiply(
                 unhealthy_info.next_attempt_after,
-                self.inner.failure_backoff_ratio.recip(),
+                self.inner.backoff_config.ratio.recip(),
               );
             }
           }
@@ -295,11 +301,7 @@ mod tests {
   use std::time::Duration;
 
   fn backoff_config() -> BackoffConfig {
-    BackoffConfig {
-      initial_lame: Duration::from_millis(10),
-      backoff_ratio: 2.0,
-      max_lame: Duration::from_millis(100),
-    }
+    BackoffConfig::new(Duration::from_millis(10), 2.0, Duration::from_millis(100)).unwrap()
   }
 
   #[test]
