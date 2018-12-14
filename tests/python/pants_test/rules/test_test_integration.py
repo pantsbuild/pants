@@ -108,6 +108,7 @@ testprojects/tests/python/pants/dummies:failing_target                          
 """,
     )
 
+  @unittest.skip('Flaky test: https://github.com/pantsbuild/pants/issues/6782')
   def test_source_dep(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:target_with_source_dep',
@@ -125,6 +126,7 @@ testprojects/tests/python/pants/dummies/test_with_source_dep.py .        [100%]
 testprojects/tests/python/pants/dummies:target_with_source_dep                  .....   SUCCESS
 """)
 
+  @unittest.skip('Flaky test: https://github.com/pantsbuild/pants/issues/6782')
   def test_thirdparty_dep(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:target_with_thirdparty_dep',
