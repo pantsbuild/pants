@@ -19,6 +19,7 @@ protobuf = { version = "2.0.4", features = ["with-bytes"] }
 sha2 = "0.8"
 tempfile = "3"
 futures-timer = "0.1"
+time = "0.1.40"
 tokio-codec = "0.1"
 tokio-process = "0.2.1"
 

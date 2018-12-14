@@ -59,6 +59,10 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     return self._deps()
 
+  @property
+  def _copy_target_attributes(self):
+    return super(AntlrPyGen, self)._copy_target_attributes + ['compatibility']
+
   @memoized_method
   def _deps(self):
     deps = self.get_options().antlr3_deps

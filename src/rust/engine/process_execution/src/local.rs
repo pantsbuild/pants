@@ -279,6 +279,7 @@ impl super::CommandRunner for CommandRunner {
             stderr: child_results.stderr,
             exit_code: child_results.exit_code,
             output_directory: snapshot.digest,
+            execution_attempts: vec![],
           }).to_boxed()
       }).then(move |result| {
         // Force workdir not to get dropped until after we've ingested the outputs
@@ -337,6 +338,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     )
   }
@@ -362,6 +364,7 @@ mod tests {
         stderr: as_bytes("bar"),
         exit_code: 1,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     )
   }
@@ -388,6 +391,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: -15,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     )
   }
@@ -489,6 +493,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       }
     )
   }
@@ -517,6 +522,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::containing_roland().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -550,6 +556,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::recursive().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -584,6 +591,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::recursive().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -616,6 +624,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 1,
         output_directory: TestDirectory::containing_roland().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -646,6 +655,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::containing_roland().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -677,6 +687,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::nested().digest(),
+        execution_attempts: vec![],
       }
     )
   }
@@ -705,6 +716,7 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
+        execution_attempts: vec![],
       })
     )
   }
