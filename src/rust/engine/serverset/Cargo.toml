@@ -5,5 +5,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+boxfuture = { path = "../boxfuture" }
+futures = "^0.1.16"
 num-rational = "0.2.1"
 parking_lot = "0.6"
