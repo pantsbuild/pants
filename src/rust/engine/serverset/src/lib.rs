@@ -94,6 +94,42 @@ struct UnhealthyInfo {
   next_attempt_after: Duration,
 }
 
+impl UnhealthyInfo {
+  fn new(backoff_config: BackoffConfig) -> UnhealthyInfo {
+    UnhealthyInfo {
+      unhealthy_since: Instant::now(),
+      next_attempt_after: backoff_config.initial_lame,
+    }
+  }
+
+  fn healthy_at(&self) -> Instant {
+    self.unhealthy_since + self.next_attempt_after
+  }
+
+  fn increase_backoff(&mut self, backoff_config: BackoffConfig) {
+    self.unhealthy_since = Instant::now();
+    self.next_attempt_after = std::cmp::min(
+      backoff_config.max_lame,
+      Self::multiply(self.next_attempt_after, backoff_config.ratio),
+    )
+  }
+
+  fn decrease_backoff(mut self, backoff_config: BackoffConfig) -> Option<UnhealthyInfo> {
+    self.unhealthy_since = Instant::now();
+    let next_value = Self::multiply(self.next_attempt_after, backoff_config.ratio.recip());
+    if next_value < backoff_config.initial_lame {
+      None
+    } else {
+      self.next_attempt_after = next_value;
+      Some(self)
+    }
+  }
+
+  fn multiply(duration: Duration, fraction: num_rational::Ratio<u32>) -> Duration {
+    (duration * *fraction.numer()) / *fraction.denom()
+  }
+}
+
 #[derive(Debug)]
 struct Backend<T> {
   server: T,
@@ -197,7 +233,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
       if let Some(ref unhealthy_info) = *unhealthy_info {
         // Server is unhealthy. Note when it will become healthy.
 
-        let healthy_at = unhealthy_info.unhealthy_since + unhealthy_info.next_attempt_after;
+        let healthy_at = unhealthy_info.healthy_at();
 
         if healthy_at > now {
           let healthy_sooner_than_previous = if let Some((_, previous_healthy_at)) = earliest_future
@@ -226,10 +262,6 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
       .to_boxed()
   }
 
-  fn multiply(duration: Duration, fraction: num_rational::Ratio<u32>) -> Duration {
-    (duration * *fraction.numer()) / *fraction.denom()
-  }
-
   pub fn callback(&self, callback_token: CallbackToken, health: Health) {
     let mut unhealthy_info = self.inner.servers[callback_token.index]
       .unhealthy_info
@@ -238,44 +270,18 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
       Health::Unhealthy => {
         if unhealthy_info.is_some() {
           if let Some(ref mut unhealthy_info) = *unhealthy_info {
-            unhealthy_info.unhealthy_since = Instant::now();
-            // failure_backoff_ratio's numer and denom both fit in u8s, so hopefully this won't
-            // overflow or lose too much precision...
-            let next_exponential_duration = Self::multiply(
-              unhealthy_info.next_attempt_after,
-              self.inner.backoff_config.ratio,
-            );
-            unhealthy_info.next_attempt_after = std::cmp::min(
-              next_exponential_duration,
-              self.inner.backoff_config.max_lame,
-            );
+            unhealthy_info.increase_backoff(self.inner.backoff_config);
           }
         } else {
-          *unhealthy_info = Some(UnhealthyInfo {
-            unhealthy_since: Instant::now(),
-            next_attempt_after: self.inner.backoff_config.initial_lame,
-          });
+          *unhealthy_info = Some(UnhealthyInfo::new(self.inner.backoff_config));
         }
       }
       Health::Healthy => {
         if unhealthy_info.is_some() {
-          let mut reset = false;
-          if let Some(ref mut unhealthy_info) = *unhealthy_info {
-            reset = unhealthy_info.next_attempt_after <= self.inner.backoff_config.initial_lame;
-
-            if !reset {
-              unhealthy_info.unhealthy_since = Instant::now();
-              // failure_backoff_ratio's numer and denom both fit in u8s, so hopefully this won't
-              // overflow or lose too much precision...
-              unhealthy_info.next_attempt_after = Self::multiply(
-                unhealthy_info.next_attempt_after,
-                self.inner.backoff_config.ratio.recip(),
-              );
-            }
-          }
-          if reset {
-            *unhealthy_info = None;
-          }
+          *unhealthy_info = unhealthy_info
+            .take()
+            .unwrap()
+            .decrease_backoff(self.inner.backoff_config);
         }
       }
     }
