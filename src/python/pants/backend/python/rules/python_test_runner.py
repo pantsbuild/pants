@@ -58,7 +58,8 @@ def run_python_test(transitive_hydrated_target):
     # TODO: This is non-hermetic because pytest will be resolved on the fly by pex27, where it should be hermetically provided in some way.
     # We should probably also specify a specific version.
     'pytest',
-  ] + all_requirements
+    # Sort all the requirement strings to increase the chance of cache hits across invocations.
+  ] + sorted(all_requirements)
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
     input_files=pex_snapshot.directory_digest,

@@ -382,7 +382,8 @@ class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
     return hash(self.address)
 
 
-# TODO: are there performance concerns to adding type checks here?
+# TODO: add type-checking to datatype fields in this file! Tuple fields such as 'dependencies' need
+# some groundwork to be more ergonomic -- see #6936 for one possible implementation.
 class TransitiveHydratedTarget(datatype([('root', HydratedTarget), 'dependencies'])):
   """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
 
