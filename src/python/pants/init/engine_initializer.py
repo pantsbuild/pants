@@ -154,14 +154,6 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
       )
       self.invalid_goals = invalid_goals
 
-  @staticmethod
-  def _determine_subjects(target_roots):
-    """A utility to determines the subjects for the request.
-
-    :param TargetRoots target_roots: The targets root of the request.
-    """
-    return target_roots.specs or []
-
   def warm_product_graph(self, target_roots):
     """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
 
@@ -171,7 +163,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    subjects = self._determine_subjects(target_roots)
+    subjects = [target_roots.specs]
     request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
     self.scheduler_session.execute(request)
 
@@ -183,14 +175,11 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
     :param list goals: The list of requested goal names as passed on the commandline.
     :param TargetRoots target_roots: The targets root of the request.
     """
-    subjects = self._determine_subjects(target_roots)
+    subject = target_roots.specs
     console = Console()
-    # Console rule can only have one subject.
-    # TODO: What about console_rules with no subjects (i.e., no target specs)?
-    assert len(subjects) == 1
     for goal in goals:
       goal_product = self.goal_map[goal]
-      params = Params(subjects[0], options_bootstrapper, console)
+      params = Params(subject, options_bootstrapper, console)
       logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
       try:
         self.scheduler_session.run_console_rule(goal_product, params)
