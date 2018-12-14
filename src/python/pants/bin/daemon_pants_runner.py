@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import datetime
+import logging
 import os
 import sys
 import termios
@@ -283,7 +284,13 @@ class DaemonPantsRunner(ProcessManager):
     # terminal window.
     # TODO: test the above!
     ExceptionSink.reset_exiter(self._exiter)
-    ExceptionSink.reset_interactive_output_stream(sys.stderr)
+
+    try:
+      ExceptionSink.reset_interactive_output_stream(sys.stderr)
+    except ValueError:
+      # Warn about "ValueError: IO on closed file" when stderr is closed.
+      logger = logging.getLogger(__name__)
+      logger.warn("Cannot reset output stream - sys.stderr is closed")
 
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
