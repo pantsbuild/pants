@@ -31,7 +31,6 @@
 extern crate boxfuture;
 extern crate futures;
 extern crate futures_timer;
-extern crate num_rational;
 extern crate parking_lot;
 
 use boxfuture::{BoxFuture, Boxable};
@@ -88,45 +87,42 @@ pub enum Health {
   Unhealthy,
 }
 
+// Ideally this would use Durations when https://github.com/rust-lang/rust/issues/54361 stabilises.
 #[derive(Debug)]
 struct UnhealthyInfo {
   unhealthy_since: Instant,
-  next_attempt_after: Duration,
+  next_attempt_after_millis: f64,
 }
 
 impl UnhealthyInfo {
   fn new(backoff_config: BackoffConfig) -> UnhealthyInfo {
     UnhealthyInfo {
       unhealthy_since: Instant::now(),
-      next_attempt_after: backoff_config.initial_lame,
+      next_attempt_after_millis: backoff_config.initial_lame_millis as f64,
     }
   }
 
   fn healthy_at(&self) -> Instant {
-    self.unhealthy_since + self.next_attempt_after
+    self.unhealthy_since + Duration::from_millis(self.next_attempt_after_millis as u64)
   }
 
   fn increase_backoff(&mut self, backoff_config: BackoffConfig) {
     self.unhealthy_since = Instant::now();
-    self.next_attempt_after = std::cmp::min(
-      backoff_config.max_lame,
-      Self::multiply(self.next_attempt_after, backoff_config.ratio),
-    )
+    self.next_attempt_after_millis = f64::min(
+      backoff_config.max_lame_millis,
+      self.next_attempt_after_millis * backoff_config.ratio,
+    );
   }
 
   fn decrease_backoff(mut self, backoff_config: BackoffConfig) -> Option<UnhealthyInfo> {
     self.unhealthy_since = Instant::now();
-    let next_value = Self::multiply(self.next_attempt_after, backoff_config.ratio.recip());
-    if next_value < backoff_config.initial_lame {
+    let next_value = self.next_attempt_after_millis / backoff_config.ratio;
+    if next_value < backoff_config.initial_lame_millis {
       None
     } else {
-      self.next_attempt_after = next_value;
+      self.next_attempt_after_millis = next_value;
       Some(self)
     }
-  }
-
-  fn multiply(duration: Duration, fraction: num_rational::Ratio<u32>) -> Duration {
-    (duration * *fraction.numer()) / *fraction.denom()
   }
 }
 
@@ -136,52 +132,49 @@ struct Backend<T> {
   unhealthy_info: Arc<Mutex<Option<UnhealthyInfo>>>,
 }
 
+// Ideally this would use Durations when https://github.com/rust-lang/rust/issues/54361 stabilises.
 #[derive(Clone, Copy, Debug)]
 pub struct BackoffConfig {
   ///
   /// The time a backend will be skipped after it is first reported unhealthy.
   ///
-  pub initial_lame: Duration,
+  initial_lame_millis: f64,
 
   ///
   /// Ratio by which to multiply the most recent lame duration if a backend continues to be
   /// unhealthy.
   ///
   /// The inverse is used when easing back in after health recovery.
-  pub ratio: num_rational::Ratio<u32>,
+  ratio: f64,
 
   ///
   /// Maximum duration to wait between attempts.
   ///
-  pub max_lame: Duration,
+  max_lame_millis: f64,
 }
 
 impl BackoffConfig {
   pub fn new(
     initial_lame: Duration,
-    backoff_ratio: f64,
+    ratio: f64,
     max_lame: Duration,
   ) -> Result<BackoffConfig, String> {
-    if backoff_ratio < 1.0 {
+    if ratio < 1.0 {
       return Err(format!(
         "Failure backoff ratio must be at least 1, got: {}",
-        backoff_ratio
+        ratio
       ));
     }
-    let backoff_ratio =
-      num_rational::Ratio::<i8>::approximate_float(backoff_ratio).ok_or_else(|| {
-        format!(
-          "Couldn't find reasonable backoff ratio for {}",
-          backoff_ratio
-        )
-      })?;
-    let ratio =
-      num_rational::Ratio::new(*backoff_ratio.numer() as u32, *backoff_ratio.denom() as u32);
+
+    let initial_lame_millis =
+      initial_lame.as_secs() as f64 * 1000_f64 + f64::from(initial_lame.subsec_millis());
+    let max_lame_millis =
+      max_lame.as_secs() as f64 * 1000_f64 + f64::from(max_lame.subsec_millis());
 
     Ok(BackoffConfig {
-      initial_lame,
+      initial_lame_millis,
       ratio,
-      max_lame,
+      max_lame_millis,
     })
   }
 }
@@ -404,7 +397,7 @@ mod tests {
 
     s.next().wait().unwrap();
 
-    assert!(start.elapsed() > backoff_config.initial_lame)
+    assert!(start.elapsed() > Duration::from_millis(10))
   }
 
   fn expect_both(s: &Serverset<&'static str>, repetitions: usize) {
