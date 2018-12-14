@@ -1714,6 +1714,8 @@ dependencies = [
 name = "serverset"
 version = "0.0.1"
 dependencies = [
+ "boxfuture 0.0.1",
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-rational 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

@@ -28,9 +28,12 @@
   allow(new_without_default, new_without_default_derive)
 )]
 
+extern crate boxfuture;
+extern crate futures;
 extern crate num_rational;
 extern crate parking_lot;
 
+use boxfuture::{BoxFuture, Boxable};
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -38,8 +41,8 @@ use std::time::{Duration, Instant};
 
 ///
 /// A collection of resources which are observed to be healthy or unhealthy.
-/// Getting the next resource skips any which are marked unhealthy, and will re-try unhealthy
-/// resources at an exponentially backed off interval. Unhealthy resources marked healthy will ease
+/// Getting the next resource skips any which are mark_bad_as_baded unhealthy, and will re-try unhealthy
+/// resources at an exponentially backed off interval. Unhealthy resources mark_bad_as_baded healthy will ease
 /// back into rotation with exponential ease-in.
 ///
 pub struct Serverset<T> {
@@ -54,7 +57,15 @@ impl<T> Clone for Serverset<T> {
   }
 }
 
-#[derive(Clone, Copy)]
+///
+/// An opaque value which can be passed to Serverset::callback to indicate for which server the
+/// callback is being made.
+///
+/// Do not rely on any implementation details of this type, including its Debug representation.
+/// It is liable to change at any time (though will continue to implement the traits which it
+/// implements in some way which may not be stable).
+///
+#[derive(Clone, Copy, Debug)]
 pub struct CallbackToken {
   index: usize,
 }
@@ -168,7 +179,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   ///
   /// TODO: Switch to use tokio_retry when we don't need to worry about forking without execing.
   ///
-  pub fn next(&self) -> (T, CallbackToken) {
+  pub fn next(&self) -> BoxFuture<(T, CallbackToken), String> {
     let (i, server) = loop {
       let i = self.inner.next.fetch_add(1, Ordering::Relaxed) % self.inner.servers.len();
       let server = &self.inner.servers[i];
@@ -183,7 +194,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
 
     let callback_token = CallbackToken { index: i };
 
-    (server.server.clone(), callback_token)
+    futures::future::ok((server.server.clone(), callback_token)).to_boxed()
   }
 
   fn multiply(duration: Duration, fraction: num_rational::Ratio<u32>) -> Duration {
@@ -250,9 +261,12 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Serverset<T> {
 #[cfg(test)]
 mod tests {
   use super::{BackoffConfig, Health, Serverset};
+  use futures::{self, Future};
+  use parking_lot::Mutex;
   use std;
   use std::collections::HashSet;
   use std::sync::atomic::Ordering;
+  use std::sync::Arc;
   use std::time::Duration;
 
   fn backoff_config() -> BackoffConfig {
@@ -273,7 +287,7 @@ mod tests {
   fn round_robins() {
     let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
 
-    expect_both(&s);
+    expect_both(&s, 2);
   }
 
   #[test]
@@ -281,26 +295,22 @@ mod tests {
     let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
     s.inner.next.store(std::usize::MAX, Ordering::SeqCst);
 
-    let mut visited = HashSet::new();
-
     // 3 because we may skip some values if the number of servers isn't a factor of
     // std::usize::MAX, so we make sure to go around them all again after overflowing.
-    for _ in 0..3 {
-      let (server, token) = s.next();
-      visited.insert(server);
-      s.callback(token, Health::Healthy);
-    }
+    expect_both(&s, 3)
+  }
 
-    let both: HashSet<_> = vec!["good", "bad"].into_iter().collect();
-
-    assert_eq!(visited, both);
+  fn unwrap<T: std::fmt::Debug>(wrapped: Arc<Mutex<T>>) -> T {
+    Arc::try_unwrap(wrapped)
+      .expect("Couldn't unwrap")
+      .into_inner()
   }
 
   #[test]
   fn skips_unhealthy() {
     let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
 
-    mark(&s, Health::Unhealthy);
+    mark_bad_as_bad(&s, Health::Unhealthy);
 
     expect_only_good(&s, Duration::from_millis(10));
   }
@@ -309,66 +319,78 @@ mod tests {
   fn reattempts_unhealthy() {
     let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
 
-    mark(&s, Health::Unhealthy);
+    mark_bad_as_bad(&s, Health::Unhealthy);
 
     expect_only_good(&s, Duration::from_millis(10));
 
-    expect_both(&s);
+    expect_both(&s, 2);
   }
 
   #[test]
   fn backoff_when_unhealthy() {
     let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
 
-    mark(&s, Health::Unhealthy);
+    mark_bad_as_bad(&s, Health::Unhealthy);
 
     expect_only_good(&s, Duration::from_millis(10));
 
-    mark(&s, Health::Unhealthy);
+    mark_bad_as_bad(&s, Health::Unhealthy);
 
     expect_only_good(&s, Duration::from_millis(20));
 
-    mark(&s, Health::Unhealthy);
+    mark_bad_as_bad(&s, Health::Unhealthy);
 
     expect_only_good(&s, Duration::from_millis(40));
 
-    mark(&s, Health::Healthy);
+    mark_bad_as_bad(&s, Health::Healthy);
 
     expect_only_good(&s, Duration::from_millis(20));
 
-    mark(&s, Health::Healthy);
+    mark_bad_as_bad(&s, Health::Healthy);
 
     expect_only_good(&s, Duration::from_millis(10));
 
-    mark(&s, Health::Healthy);
+    mark_bad_as_bad(&s, Health::Healthy);
 
-    expect_both(&s);
+    expect_both(&s, 2);
   }
 
-  fn expect_both(s: &Serverset<&'static str>) {
-    let mut saw = HashSet::new();
+  fn expect_both(s: &Serverset<&'static str>, repetitions: usize) {
+    let visited = Arc::new(Mutex::new(HashSet::new()));
 
-    for _ in 0..2 {
-      let (server, token) = s.next();
-      saw.insert(server);
-      s.callback(token, Health::Healthy);
-    }
+    futures::future::join_all(
+      (0..repetitions)
+        .into_iter()
+        .map(|_| {
+          let saw = visited.clone();
+          let s = s.clone();
+          s.next().map(move |(server, token)| {
+            saw.lock().insert(server);
+            s.callback(token, Health::Healthy)
+          })
+        }).collect::<Vec<_>>(),
+    ).wait()
+    .unwrap();
+
     let expect: HashSet<_> = vec!["good", "bad"].into_iter().collect();
-    assert_eq!(expect, saw);
+    assert_eq!(unwrap(visited), expect);
   }
 
-  fn mark(s: &Serverset<&'static str>, health: Health) {
-    let mut saw_bad = false;
+  fn mark_bad_as_bad(s: &Serverset<&'static str>, health: Health) {
+    let mut mark_bad_as_baded_bad = false;
     for _ in 0..2 {
-      let (server, token) = s.next();
-      if server == "bad" {
-        saw_bad = true;
-        s.callback(token, health);
-      } else {
-        s.callback(token, Health::Healthy);
-      }
+      s.next()
+        .map(|(server, token)| {
+          if server == "bad" {
+            mark_bad_as_baded_bad = true;
+            s.callback(token, health);
+          } else {
+            s.callback(token, Health::Healthy);
+          }
+        }).wait()
+        .unwrap();
     }
-    assert!(saw_bad);
+    assert!(mark_bad_as_baded_bad);
   }
 
   fn expect_only_good(s: &Serverset<&'static str>, duration: Duration) {
@@ -376,9 +398,12 @@ mod tests {
 
     let start = std::time::Instant::now();
     while start.elapsed() < duration - buffer {
-      let (server, token) = s.next();
-      assert_eq!("good", server);
-      s.callback(token, Health::Healthy);
+      s.next()
+        .map(|(server, token)| {
+          assert_eq!("good", server);
+          s.callback(token, Health::Healthy);
+        }).wait()
+        .unwrap();
     }
 
     std::thread::sleep(buffer * 2);
