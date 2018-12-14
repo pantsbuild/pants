@@ -87,7 +87,7 @@ class OptionsInitializer(object):
     top_level_optionables = (
       {GlobalOptionsRegistrar} |
       GlobalSubsystems.get() |
-      build_configuration.subsystems() |
+      build_configuration.optionables() |
       set(Goal.get_optionables())
     )
 

@@ -8,10 +8,12 @@ import logging
 from builtins import object, str
 from collections import Iterable, namedtuple
 
+from pants.base.deprecated import deprecated
 from pants.base.parse_context import ParseContext
 from pants.build_graph.addressable import AddressableCallProxy
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target_addressable import TargetAddressable
+from pants.option.optionable import Optionable
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -32,7 +34,7 @@ class BuildConfiguration(object):
     self._target_macro_factory_by_alias = {}
     self._exposed_object_by_alias = {}
     self._exposed_context_aware_object_factory_by_alias = {}
-    self._subsystems = set()
+    self._optionables = set()
     self._rules = []
 
   def registered_aliases(self):
@@ -82,7 +84,7 @@ class BuildConfiguration(object):
       logger.debug('Target alias {} has already been registered. Overwriting!'.format(alias))
 
     self._target_by_alias[alias] = target_type
-    self._subsystems.update(target_type.subsystems())
+    self.register_optionables(target_type.subsystems())
 
   def _register_target_macro_factory_alias(self, alias, target_macro_factory):
     if alias in self._target_macro_factory_by_alias:
@@ -90,7 +92,7 @@ class BuildConfiguration(object):
 
     self._target_macro_factory_by_alias[alias] = target_macro_factory
     for target_type in target_macro_factory.target_types:
-      self._subsystems.update(target_type.subsystems())
+      self.register_optionables(target_type.subsystems())
 
   def _register_exposed_object(self, alias, obj):
     if alias in self._exposed_object_by_alias:
@@ -99,7 +101,7 @@ class BuildConfiguration(object):
     self._exposed_object_by_alias[alias] = obj
     # obj doesn't implement any common base class, so we have to test for this attr.
     if hasattr(obj, 'subsystems'):
-      self.register_subsystems(obj.subsystems())
+      self.register_optionables(obj.subsystems())
 
   def _register_exposed_context_aware_object_factory(self, alias, context_aware_object_factory):
     if alias in self._exposed_context_aware_object_factory_by_alias:
@@ -108,28 +110,46 @@ class BuildConfiguration(object):
 
     self._exposed_context_aware_object_factory_by_alias[alias] = context_aware_object_factory
 
+  @deprecated('1.15.0.dev1', hint_message='Use self.register_optionables().')
   def register_subsystems(self, subsystems):
+    return self.register_optionables(subsystems)
+
+  def register_optionables(self, optionables):
     """Registers the given subsystem types.
 
-    :param subsystems: The subsystem types to register.
-    :type subsystems: :class:`collections.Iterable` containing
-                      :class:`pants.subsystem.subsystem.Subsystem` subclasses.
+    :param optionables: The Optionable types to register.
+    :type optionables: :class:`collections.Iterable` containing
+                       :class:`pants.option.optionable.Optionable` subclasses.
     """
-    if not isinstance(subsystems, Iterable):
-      raise TypeError('The subsystems must be an iterable, given {}'.format(subsystems))
-    invalid_subsystems = [s for s in subsystems if not Subsystem.is_subsystem_type(s)]
-    if invalid_subsystems:
-      raise TypeError('The following items from the given subsystems are not Subsystem '
-                      'subclasses:\n\t{}'.format('\n\t'.join(str(i) for i in invalid_subsystems)))
+    if not isinstance(optionables, Iterable):
+      raise TypeError('The optionables must be an iterable, given {}'.format(optionables))
+    optionables = tuple(optionables)
+    if not optionables:
+      return
 
-    self._subsystems.update(subsystems)
+    invalid_optionables = [s
+                           for s in optionables
+                           if not isinstance(s, type) or not issubclass(s, Optionable)]
+    if invalid_optionables:
+      raise TypeError('The following items from the given optionables are not Optionable '
+                      'subclasses:\n\t{}'.format('\n\t'.join(str(i) for i in invalid_optionables)))
 
+    self._optionables.update(optionables)
+
+  def optionables(self):
+    """Returns the registered Optionable types.
+
+    :rtype set
+    """
+    return self._optionables
+
+  @deprecated('1.15.0.dev1', hint_message='Use self.optionables().')
   def subsystems(self):
     """Returns the registered Subsystem types.
 
     :rtype set
     """
-    return self._subsystems
+    return {o for o in self._optionables if issubclass(o, Subsystem)}
 
   def register_rules(self, rules):
     """Registers the given rules.

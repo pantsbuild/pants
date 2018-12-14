@@ -155,7 +155,7 @@ class LoaderTest(unittest.TestCase):
     self.assertEqual(0, len(registered_aliases.target_macro_factories))
     self.assertEqual(0, len(registered_aliases.objects))
     self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
-    self.assertEqual(self.build_configuration.subsystems(), set())
+    self.assertEqual(self.build_configuration.optionables(), set())
     self.assertEqual(0, len(self.build_configuration.rules()))
 
   def test_load_valid_empty(self):
@@ -173,7 +173,7 @@ class LoaderTest(unittest.TestCase):
       self.assertEqual(DummyTarget, registered_aliases.target_types['bob'])
       self.assertEqual(DummyObject1, registered_aliases.objects['obj1'])
       self.assertEqual(DummyObject2, registered_aliases.objects['obj2'])
-      self.assertEqual(self.build_configuration.subsystems(), {DummySubsystem1, DummySubsystem2})
+      self.assertEqual(self.build_configuration.optionables(), {DummySubsystem1, DummySubsystem2})
 
   def test_load_valid_partial_goals(self):
     def register_goals():
@@ -323,14 +323,14 @@ class LoaderTest(unittest.TestCase):
     self.assertEqual(DummyTarget, registered_aliases.target_types['pluginalias'])
     self.assertEqual(DummyObject1, registered_aliases.objects['FROMPLUGIN1'])
     self.assertEqual(DummyObject2, registered_aliases.objects['FROMPLUGIN2'])
-    self.assertEqual(self.build_configuration.subsystems(), {DummySubsystem1, DummySubsystem2})
+    self.assertEqual(self.build_configuration.optionables(), {DummySubsystem1, DummySubsystem2})
 
   def test_subsystems(self):
     def global_subsystems():
       return {DummySubsystem1, DummySubsystem2}
     with self.create_register(global_subsystems=global_subsystems) as backend_package:
       load_backend(self.build_configuration, backend_package)
-      self.assertEqual(self.build_configuration.subsystems(),
+      self.assertEqual(self.build_configuration.optionables(),
                        {DummySubsystem1, DummySubsystem2})
 
   def test_rules(self):
