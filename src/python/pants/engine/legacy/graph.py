@@ -466,7 +466,7 @@ def transitive_hydrated_targets(build_file_addresses):
   transitive_hydrated_targets = yield [Get(TransitiveHydratedTarget, Address, a)
                                        for a in build_file_addresses.addresses]
 
-  closure = set()
+  closure = OrderedSet()
   to_visit = deque(transitive_hydrated_targets)
 
   while to_visit:
