@@ -1662,7 +1662,7 @@ mod remote {
   use futures::{self, future, Future, Sink, Stream};
   use grpcio;
   use hashing::{Digest, Fingerprint};
-  use serverset::{CallbackToken, Serverset};
+  use serverset::{self, CallbackToken, Serverset};
   use sha2::Sha256;
   use std::cmp::min;
   use std::collections::HashSet;
@@ -1736,6 +1736,47 @@ mod remote {
           token,
         )
       })
+    }
+
+    fn with_byte_stream_client<
+      Value: Send + 'static,
+      F: Fn(bazel_protos::bytestream_grpc::ByteStreamClient) -> BoxFuture<Value, String>
+        + Send
+        + Sync
+        + Clone
+        + 'static,
+    >(
+      &self,
+      f: F,
+    ) -> BoxFuture<Value, String> {
+      let store = self.clone();
+
+      future::loop_fn(0_usize, move |i| {
+        let ss = store.serverset.clone();
+        let f = f.clone();
+        store
+          .byte_stream_client()
+          .and_then(move |(client, callback_token)| {
+            future::ok(client)
+              .and_then(f)
+              .then(move |result| {
+                let health = match &result {
+                  &Ok(_) => serverset::Health::Healthy,
+                  &Err(_) => serverset::Health::Unhealthy,
+                };
+                ss.callback(callback_token, health);
+                result
+              }).to_boxed()
+          }).to_boxed()
+          .map(futures::future::Loop::Break)
+          .or_else(move |_| {
+            if i > 5 {
+              futures::future::err(format!("Too many loops {}", i))
+            } else {
+              futures::future::ok(futures::future::Loop::Continue(i + 1))
+            }
+          })
+      }).to_boxed()
     }
 
     fn cas_client(
@@ -1844,17 +1885,16 @@ mod remote {
         }).to_boxed()
     }
 
-    pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
+    pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + Clone + 'static>(
       &self,
       _entry_type: EntryType,
       digest: Digest,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
       let store = self.clone();
-      self
-        .byte_stream_client()
-        // TODO: Use callback_token
-        .and_then(move |(client, _callback_token)| {
+      self.with_byte_stream_client(
+        move |client: bazel_protos::bytestream_grpc::ByteStreamClient| {
+          let f = f.clone();
           match client
             .read_opt(
               &{
@@ -1900,7 +1940,8 @@ mod remote {
               digest, err
             )).to_boxed(),
           }
-        }).to_boxed()
+        },
+      )
     }
 
     ///
@@ -2273,6 +2314,49 @@ mod remote {
       );
 
       assert_eq!(cas1.read_request_count(), 1);
+      assert_eq!(cas2.read_request_count(), 1);
+    }
+
+    #[test]
+    fn ignores_bad_cas_servers() {
+      let roland = TestData::roland();
+      let catnip = TestData::catnip();
+      let robin = TestData::robin();
+
+      let cas1 = StubCAS::builder()
+        .file(&roland)
+        .file(&catnip)
+        .file(&robin)
+        .build();
+      let cas2 = StubCAS::always_errors();
+
+      let store = ByteStore::new(
+        &[cas1.address(), cas2.address()],
+        None,
+        &None,
+        None,
+        1,
+        10 * 1024 * 1024,
+        Duration::from_secs(1),
+        BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      ).unwrap();
+
+      assert_eq!(
+        load_file_bytes(&store, roland.digest()),
+        Ok(Some(roland.bytes()))
+      );
+
+      assert_eq!(
+        load_file_bytes(&store, catnip.digest()),
+        Ok(Some(catnip.bytes()))
+      );
+
+      assert_eq!(
+        load_file_bytes(&store, robin.digest()),
+        Ok(Some(robin.bytes()))
+      );
+
+      assert_eq!(cas1.read_request_count(), 3);
       assert_eq!(cas2.read_request_count(), 1);
     }
 
