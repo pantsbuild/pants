@@ -54,6 +54,11 @@ impl<T> Clone for Serverset<T> {
   }
 }
 
+#[derive(Clone, Copy)]
+pub struct CallbackToken {
+  index: usize,
+}
+
 struct Inner<T> {
   servers: Vec<Backend<T>>,
 
@@ -150,8 +155,8 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   ///
   /// Get the next (probably) healthy backend to use.
   ///
-  /// The caller will be given a backend to use, and should call the supplied callback with the
-  /// observed health of that backend.
+  /// The caller will be given a backend to use, and should call ServerSet::callback with the
+  /// supplied token, and the observed health of that backend.
   ///
   /// If the callback is not called, the health status of the server will not be changed from its
   /// last known status.
@@ -163,7 +168,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   ///
   /// TODO: Switch to use tokio_retry when we don't need to worry about forking without execing.
   ///
-  pub fn next(&self) -> (T, Box<Fn(Health) + Send + Sync>) {
+  pub fn next(&self) -> (T, CallbackToken) {
     let (i, server) = loop {
       let i = self.inner.next.fetch_add(1, Ordering::Relaxed) % self.inner.servers.len();
       let server = &self.inner.servers[i];
@@ -176,19 +181,19 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
       break (i, server);
     };
 
-    let serverset: Serverset<T> = (*self).clone();
+    let callback_token = CallbackToken { index: i };
 
-    let callback = Box::new(move |health: Health| serverset.callback(i, health));
-
-    (server.server.clone(), callback)
+    (server.server.clone(), callback_token)
   }
 
   fn multiply(duration: Duration, fraction: num_rational::Ratio<u32>) -> Duration {
     (duration * *fraction.numer()) / *fraction.denom()
   }
 
-  fn callback(&self, server_index: usize, health: Health) {
-    let mut unhealthy_info = self.inner.servers[server_index].unhealthy_info.lock();
+  pub fn callback(&self, callback_token: CallbackToken, health: Health) {
+    let mut unhealthy_info = self.inner.servers[callback_token.index]
+      .unhealthy_info
+      .lock();
     match health {
       Health::Unhealthy => {
         if unhealthy_info.is_some() {
@@ -281,9 +286,9 @@ mod tests {
     // 3 because we may skip some values if the number of servers isn't a factor of
     // std::usize::MAX, so we make sure to go around them all again after overflowing.
     for _ in 0..3 {
-      let (server, callback) = s.next();
+      let (server, token) = s.next();
       visited.insert(server);
-      callback(Health::Healthy);
+      s.callback(token, Health::Healthy);
     }
 
     let both: HashSet<_> = vec!["good", "bad"].into_iter().collect();
@@ -344,9 +349,9 @@ mod tests {
     let mut saw = HashSet::new();
 
     for _ in 0..2 {
-      let (server, callback) = s.next();
+      let (server, token) = s.next();
       saw.insert(server);
-      callback(Health::Healthy);
+      s.callback(token, Health::Healthy);
     }
     let expect: HashSet<_> = vec!["good", "bad"].into_iter().collect();
     assert_eq!(expect, saw);
@@ -355,12 +360,12 @@ mod tests {
   fn mark(s: &Serverset<&'static str>, health: Health) {
     let mut saw_bad = false;
     for _ in 0..2 {
-      let (server, callback) = s.next();
+      let (server, token) = s.next();
       if server == "bad" {
         saw_bad = true;
-        callback(health);
+        s.callback(token, health);
       } else {
-        callback(Health::Healthy);
+        s.callback(token, Health::Healthy);
       }
     }
     assert!(saw_bad);
@@ -371,9 +376,9 @@ mod tests {
 
     let start = std::time::Instant::now();
     while start.elapsed() < duration - buffer {
-      let (server, callback) = s.next();
+      let (server, token) = s.next();
       assert_eq!("good", server);
-      callback(Health::Healthy);
+      s.callback(token, Health::Healthy);
     }
 
     std::thread::sleep(buffer * 2);
