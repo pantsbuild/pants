@@ -1,2 +1,1 @@
 tests/python/pants_test/backend/python/tasks:python_native_code_testing_2
-tests/python/pants_test/projects:testprojects_integration
