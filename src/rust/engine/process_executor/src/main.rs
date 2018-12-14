@@ -205,13 +205,15 @@ fn main() {
       fs::Store::with_remote(
         local_store_path,
         pool.clone(),
-        cas_server,
+        &[cas_server.to_owned()],
         remote_instance_arg.clone(),
-        root_ca_certs,
+        &root_ca_certs,
         oauth_bearer_token,
         1,
         chunk_size,
         Duration::from_secs(30),
+        // TODO: Take a command line arg.
+        fs::BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
       )
     }
     (None, None) => fs::Store::local_only(local_store_path, pool.clone()),

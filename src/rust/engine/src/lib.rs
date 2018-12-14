@@ -219,7 +219,7 @@ pub extern "C" fn scheduler_create(
   local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
-  remote_store_server: Buffer,
+  remote_store_servers_buf: BufferBuffer,
   remote_execution_server: Buffer,
   remote_execution_process_cache_namespace: Buffer,
   remote_instance_name: Buffer,
@@ -264,9 +264,9 @@ pub extern "C" fn scheduler_create(
   let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
   tasks.intrinsics_set(&types);
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
-  let remote_store_server_string = remote_store_server
-    .to_string()
-    .expect("remote_store_server was not valid UTF8");
+  let remote_store_servers_vec = remote_store_servers_buf
+    .to_strings()
+    .expect("Failed to decode remote_store_servers");
   let remote_execution_server_string = remote_execution_server
     .to_string()
     .expect("remote_execution_server was not valid UTF8");
@@ -303,11 +303,7 @@ pub extern "C" fn scheduler_create(
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
     PathBuf::from(local_store_dir_buf.to_os_string()),
-    if remote_store_server_string.is_empty() {
-      None
-    } else {
-      Some(remote_store_server_string)
-    },
+    remote_store_servers_vec,
     if remote_execution_server_string.is_empty() {
       None
     } else {

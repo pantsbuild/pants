@@ -66,7 +66,7 @@ class ExecutionOptions(datatype([
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
-    remote_store_server=None,
+    remote_store_server=[],
     remote_store_thread_count=1,
     remote_execution_server=None,
     remote_store_chunk_bytes=1024*1024,
@@ -285,7 +285,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              # This default is also hard-coded into the engine's rust code in
              # fs::Store::default_path
              default=os.path.expanduser('~/.cache/pants/lmdb_store'))
-    register('--remote-store-server', advanced=True,
+    register('--remote-store-server', advanced=True, type=list, default=[],
              help='host:port of grpc server to use as remote execution file store.')
     register('--remote-store-thread-count', type=int, advanced=True,
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_thread_count,

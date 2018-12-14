@@ -40,6 +40,7 @@ extern crate libc;
 extern crate log;
 extern crate parking_lot;
 extern crate protobuf;
+extern crate serverset;
 #[cfg(test)]
 extern crate tempfile;
 #[cfg(test)]
@@ -679,13 +680,19 @@ fn main() {
     Some(address) => fs::Store::with_remote(
       &store_path,
       pool,
-      address,
+      &[address.to_owned()],
       args.value_of("remote-instance-name").map(str::to_owned),
-      root_ca_certs,
+      &root_ca_certs,
       oauth_bearer_token,
       1,
       4 * 1024 * 1024,
       std::time::Duration::from_secs(5 * 60),
+      // TODO: Take a command line arg.
+      serverset::BackoffConfig::new(
+        std::time::Duration::from_secs(1),
+        1.2,
+        std::time::Duration::from_secs(20),
+      ).expect("Error making BackoffConfig"),
     ),
     None => fs::Store::local_only(&store_path, pool),
   }.expect("Error making store");
