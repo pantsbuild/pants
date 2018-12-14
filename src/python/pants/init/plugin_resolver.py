@@ -10,9 +10,11 @@ import os
 import site
 from builtins import object, open
 
+import pex
 from future.utils import PY3
 from pex import resolver
 from pex.base import requirement_is_exact
+from pex.interpreter import PythonInterpreter
 from pkg_resources import Requirement
 from pkg_resources import working_set as global_working_set
 from wheel.install import WheelFile
@@ -108,8 +110,14 @@ class PluginResolver(object):
 
   def _resolve_plugins(self):
     logger.info('Resolving new plugins...:\n  {}'.format('\n  '.join(self._plugin_requirements)))
+
+    # TODO(John Sirois): Eliminate setup_interpreter call once pex API is fixed:
+    #   https://github.com/pantsbuild/pex/issues/632
+    interpreter = pex.vendor.setup_interpreter(PythonInterpreter.get())
+
     resolved_dists = resolver.resolve(self._plugin_requirements,
                                       fetchers=self._python_repos.get_fetchers(),
+                                      interpreter=interpreter,
                                       context=self._python_repos.get_network_context(),
                                       cache=self.plugin_cache_dir,
                                       # Effectively never expire.
