@@ -24,6 +24,7 @@ lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f
 log = "0.4"
 parking_lot = "0.6"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
+serverset = { path = "../serverset" }
 sha2 = "0.8"
 serde = "1.0"
 serde_derive = "1.0"

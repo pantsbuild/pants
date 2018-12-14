@@ -1348,13 +1348,14 @@ mod tests {
     let store = fs::Store::with_remote(
       &store_dir_path,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      &[cas.address()],
       None,
-      None,
+      &None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
+      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     ).expect("Failed to make store");
 
     let cmd_runner = CommandRunner::new(
@@ -1710,13 +1711,14 @@ mod tests {
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      &[cas.address()],
       None,
-      None,
+      &None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
+      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     ).expect("Failed to make store");
     store
       .store_file_bytes(roland.bytes(), false)
@@ -1799,13 +1801,14 @@ mod tests {
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      &[cas.address()],
       None,
-      None,
+      &None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
+      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     ).expect("Failed to make store");
     store
       .store_file_bytes(roland.bytes(), false)
@@ -1868,13 +1871,14 @@ mod tests {
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      &[cas.address()],
       None,
-      None,
+      &None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
+      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     ).expect("Failed to make store");
 
     let error = CommandRunner::new(
@@ -2448,13 +2452,14 @@ mod tests {
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      &[cas.address()],
       None,
-      None,
+      &None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
+      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     ).expect("Failed to make store");
 
     CommandRunner::new(&address, None, None, None, None, 1, store, timer_thread())
