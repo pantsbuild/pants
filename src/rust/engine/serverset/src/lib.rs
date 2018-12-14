@@ -30,10 +30,13 @@
 
 extern crate boxfuture;
 extern crate futures;
+extern crate futures_timer;
 extern crate num_rational;
 extern crate parking_lot;
 
 use boxfuture::{BoxFuture, Boxable};
+use futures::Future;
+use futures_timer::Delay;
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -172,29 +175,51 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   /// If the callback is not called, the health status of the server will not be changed from its
   /// last known status.
   ///
-  /// If all resources are unhealthy, this function will block the calling thread until the backoff
-  /// period has completed. We'd probably prefer to use some Future-based scheduling, but that
-  /// would require this type to be Resettable because of our fork model, which would be very
-  /// complex.
+  /// If all resources are unhealthy, the returned Future will delay until a resource becomes
+  /// healthy.
   ///
-  /// TODO: Switch to use tokio_retry when we don't need to worry about forking without execing.
+  /// No efforts are currently made to avoid a thundering heard at few healthy servers (or the the
+  /// first server to become healthy after all are unhealthy).
   ///
   pub fn next(&self) -> BoxFuture<(T, CallbackToken), String> {
-    let (i, server) = loop {
-      let i = self.inner.next.fetch_add(1, Ordering::Relaxed) % self.inner.servers.len();
+    let now = Instant::now();
+    let server_count = self.inner.servers.len();
+
+    let mut earliest_future = None;
+    for _ in 0..server_count {
+      let i = self.inner.next.fetch_add(1, Ordering::Relaxed) % server_count;
       let server = &self.inner.servers[i];
       let unhealthy_info = server.unhealthy_info.lock();
       if let Some(ref unhealthy_info) = *unhealthy_info {
-        if unhealthy_info.unhealthy_since.elapsed() < unhealthy_info.next_attempt_after {
+        // Server is unhealthy. Note when it will become healthy.
+
+        let healthy_at = unhealthy_info.unhealthy_since + unhealthy_info.next_attempt_after;
+
+        if healthy_at > now {
+          let healthy_sooner_than_previous = if let Some((_, previous_healthy_at)) = earliest_future
+          {
+            previous_healthy_at > healthy_at
+          } else {
+            true
+          };
+
+          if healthy_sooner_than_previous {
+            earliest_future = Some((i, healthy_at));
+          }
           continue;
         }
       }
-      break (i, server);
-    };
-
-    let callback_token = CallbackToken { index: i };
-
-    futures::future::ok((server.server.clone(), callback_token)).to_boxed()
+      // A healthy server! Use it!
+      return futures::future::ok((server.server.clone(), CallbackToken { index: i })).to_boxed();
+    }
+    // Unwrap is safe because if we hadn't populated earliest_future, we would already have returned.
+    let (index, instant) = earliest_future.unwrap();
+    let server = self.inner.servers[index].server.clone();
+    // Note that Delay::new_at(time in the past) gets immediately scheduled.
+    Delay::new_at(instant)
+      .map_err(|err| format!("Error delaying for serverset: {}", err))
+      .map(move |()| (server, CallbackToken { index }))
+      .to_boxed()
   }
 
   fn multiply(duration: Duration, fraction: num_rational::Ratio<u32>) -> Duration {
@@ -353,6 +378,25 @@ mod tests {
     mark_bad_as_bad(&s, Health::Healthy);
 
     expect_both(&s, 2);
+  }
+
+  #[test]
+  fn waits_if_all_unhealthy() {
+    let backoff_config = backoff_config();
+    let s = Serverset::new(vec!["good", "bad"], backoff_config).unwrap();
+
+    for _ in 0..2 {
+      s.next()
+        .map(|(_server, token)| s.callback(token, Health::Unhealthy))
+        .wait()
+        .unwrap();
+    }
+
+    let start = std::time::Instant::now();
+
+    s.next().wait().unwrap();
+
+    assert!(start.elapsed() > backoff_config.initial_lame)
   }
 
   fn expect_both(s: &Serverset<&'static str>, repetitions: usize) {
