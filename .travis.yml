@@ -251,9 +251,14 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c3 -i 5/6
 
     - <<: *default_test_config
-      name: "Py2 integration tests for pants"
+      name: "Py2 integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/travis-ci.sh -cw
+        - ./build-support/bin/travis-ci.sh -cw -i 0/2
+
+    - <<: *default_test_config
+      name: "Py2 integration tests for pants - shard 2"
+      script:
+        - ./build-support/bin/travis-ci.sh -cw -i 1/2
 
     - <<: *default_cron_test_config
       name: "Py2 integration tests for pants (cron) - shard 1"
