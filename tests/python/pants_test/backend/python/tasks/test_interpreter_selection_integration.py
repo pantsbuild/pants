@@ -14,7 +14,16 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
+
   testproject = 'testprojects/src/python/interpreter_selection'
+
+  @classmethod
+  def hermetic(cls):
+    # We must set as true to ignore `PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS`
+    # preconfiguring the interpreter_constraint. For example, in `ci.sh` we set
+    # this environment variable to Python 3, which overrides any config defined
+    # in the below tests.
+    return True
 
   def test_cli_option_wins_compatibility_conflict(self):
     # Tests that targets with compatibility conflicts collide.

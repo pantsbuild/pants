@@ -135,9 +135,8 @@ fi
 
 # NB: Ordering matters here. We (currently) always bootstrap a Python 2 pex.
 if [[ "${python_three:-false}" == "true" ]]; then
-  # The 3.4 end of this constraint is necessary to jive with the travis ubuntu trusty image.
   banner "Setting interpreter constraints for 3!"
-  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.4,<4"]'
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.5,<4"]'
   # TODO: Clear interpreters, otherwise this constraint does not end up applying due to a cache
   # bug between the `./pants binary` and further runs.
   ./pants.pex clean-all
