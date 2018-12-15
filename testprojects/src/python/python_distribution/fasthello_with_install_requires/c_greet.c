@@ -24,12 +24,10 @@ static PyMethodDef Methods[] = {
 #endif
 
 #if PY_MAJOR_VERSION >= 3
-  fprintf(stderr, "%s", "Python 3!\n");
   PyMODINIT_FUNC PyInit_c_greet(void) {
     return PyModule_Create(&moduledef);
   }
 #else
-  fprintf(stderr, "%s", "Python 2!\n");
   PyMODINIT_FUNC initc_greet(void) {
     (void) Py_InitModule("c_greet", Methods);
   }
