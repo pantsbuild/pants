@@ -13,12 +13,13 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import dir_option
 from pants.process.xargs import Xargs
+from pants.task.target_restriction_mixins import HasSkipByTargetTagMixin
 from pants.util.dirutil import fast_relpath, safe_mkdir_for_all
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
-class RewriteBase(NailgunTask, AbstractClass):
+class RewriteBase(NailgunTask, AbstractClass, HasSkipByTargetTagMixin):
   """Abstract base class for JVM-based tools that check/rewrite sources."""
 
   @classmethod
@@ -57,6 +58,7 @@ class RewriteBase(NailgunTask, AbstractClass):
 
   def execute(self):
     """Runs the tool on all source files that are located."""
+    self.filter_by_tag()
     relevant_targets = self._get_non_synthetic_targets(self.get_targets())
 
     if self.sideeffecting:

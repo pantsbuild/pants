@@ -41,6 +41,13 @@ class TransitiveOptionRegistrar(object):
                   "If true, act on the transitive dependency closure of those targets.")
 
 
+class HasSkipByTargetTagMixin(HasTransitiveOptionMixin):
+
+  def filter_by_tag(self):
+
+    print(self.get_targets())
+
+
 class HasSkipOptionMixin(object):
   """A mixin for tasks that have a --skip option.
 
