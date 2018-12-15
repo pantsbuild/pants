@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 from abc import abstractproperty
 
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
@@ -34,7 +35,7 @@ class ScalaFix(RewriteBase):
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
-                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.11', rev='0.5.2'),
+                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.12', rev='0.6.0-M16'),
                           ])
     cls.register_jvm_tool(register, 'scalafix-tool-classpath', classpath=[])
 
@@ -61,13 +62,13 @@ class ScalaFix(RewriteBase):
     args = []
     tool_classpath = self.tool_classpath('scalafix-tool-classpath')
     if tool_classpath:
-      args.append('--tool-classpath={}'.format(':'.join(tool_classpath)))
+      args.append('--tool-classpath={}'.format(os.pathsep.join(tool_classpath)))
     if self.get_options().semantic:
       # If semantic checks are enabled, pass the relevant classpath entries for these
       # targets.
       classpath = self._compute_classpath({target for target, _ in target_sources})
       args.append('--sourceroot={}'.format(absolute_root))
-      args.append('--classpath={}'.format(':'.join(classpath)))
+      args.append('--classpath={}'.format(os.pathsep.join(classpath)))
     if self.get_options().configuration:
       args.append('--config={}'.format(self.get_options().configuration))
     if self.get_options().rules:
