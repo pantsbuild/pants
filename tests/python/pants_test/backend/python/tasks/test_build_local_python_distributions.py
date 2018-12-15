@@ -67,9 +67,29 @@ class TestBuildLocalDistsNativeSources(BuildLocalPythonDistributionsTestBase):
           {NULL, NULL, 0, NULL}
         };
 
-        PyMODINIT_FUNC initnative_source(void) {
-          (void) Py_InitModule("native_source", Methods);
-        }
+        #if PY_MAJOR_VERSION >= 3
+          static struct PyModuleDef moduledef = {
+              PyModuleDef_HEAD_INIT,
+              "native_source", /* m_name */
+              NULL,      /* m_doc */
+              -1,        /* m_size */
+              Methods,   /* m_methods */
+              NULL,      /* m_slots */
+              NULL,      /* m_traverse */
+              NULL,      /* m_clear */
+              NULL       /* m_free */
+          };
+        #endif
+
+        #if PY_MAJOR_VERSION >= 3
+          PyMODINIT_FUNC PyInit_native_source(void) {
+            return PyModule_Create(&moduledef);
+          }
+        #else
+          PyMODINIT_FUNC initnative_source(void) {
+            (void) Py_InitModule("native_source", Methods);
+          }
+        #endif
       """),
       }
     }),
