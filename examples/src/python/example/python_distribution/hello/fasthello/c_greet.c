@@ -9,10 +9,6 @@ static PyMethodDef Methods[] = {
   {NULL, NULL, 0, NULL}
 };
 
-PyMODINIT_FUNC initc_greet(void) {
-  (void) Py_InitModule("c_greet", Methods);
-}
-
 #if PY_MAJOR_VERSION >= 3
   static struct PyModuleDef moduledef = {
       PyModuleDef_HEAD_INIT,
