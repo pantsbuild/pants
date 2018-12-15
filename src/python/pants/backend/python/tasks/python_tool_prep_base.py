@@ -6,19 +6,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
+from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.build_graph.address import Address
 from pants.task.task import Task
-from pants.util.dirutil import fast_relpath, safe_concurrent_creation
+from pants.util.dirutil import safe_concurrent_creation
 
 
 class PythonToolInstance(object):
@@ -54,58 +50,37 @@ class PythonToolPrepBase(Task):
     return super(PythonToolPrepBase, cls).subsystem_dependencies() + (
       cls.tool_subsystem_cls.scoped(cls),
       PexBuilderWrapper.Factory,
+      PythonInterpreterCache,
     )
 
   @classmethod
   def product_types(cls):
     return [cls.tool_instance_cls]
 
-  @property
-  def create_target_dirs(self):
-    return True
-
-  def _tool_subsystem(self):
-    return self.tool_subsystem_cls.scoped_instance(self)
-
-  def _create_requirements(self, context, workdir):
-    tool_subsystem = self._tool_subsystem()
-    address = Address(spec_path=fast_relpath(workdir, get_buildroot()),
-                      target_name=tool_subsystem.options_scope)
-    context.build_graph.inject_synthetic_target(
-      address=address,
-      target_type=PythonRequirementLibrary,
-      requirements=[PythonRequirement(r) for r in tool_subsystem.get_requirement_specs()]
-    )
-    return context.build_graph.get_target(address=address)
-
-  def _build_tool_pex(self, context, interpreter, pex_path, requirements_lib):
+  def _build_tool_pex(self, tool_subsystem, interpreter, pex_path):
     with safe_concurrent_creation(pex_path) as chroot:
       pex_builder = PexBuilderWrapper.Factory.create(
         builder=PEXBuilder(path=chroot, interpreter=interpreter),
-        log=context.log)
-      pex_builder.add_requirement_libs_from(req_libs=[requirements_lib])
-      pex_builder.set_entry_point(self._tool_subsystem().get_entry_point())
+        log=self.context.log)
+      reqs = [PythonRequirement(r) for r in tool_subsystem.get_requirement_specs()]
+      pex_builder.add_resolved_requirements(reqs=reqs)
+      pex_builder.set_entry_point(tool_subsystem.get_entry_point())
       pex_builder.freeze()
 
   def execute(self):
-    tool_req_lib = self._create_requirements(self.context, self.workdir)
+    tool_subsystem = self.tool_subsystem_cls.scoped_instance(self)
+    pex_name = tool_subsystem.options_scope
+    pex_path = os.path.join(self.workdir, self.fingerprint, '{}.pex'.format(pex_name))
 
-    with self.invalidated(targets=[tool_req_lib]) as invalidation_check:
-      pex_name = self._tool_subsystem().options_scope
-      interpreter = PythonInterpreter.get()
-      if len(invalidation_check.all_vts) != 1:
-        raise TaskError('Expected exactly one versioned target found {}: {}'.format(
-          len(invalidation_check.all_vts), invalidation_check.all_vts))
-      vt = invalidation_check.all_vts[0]
-      pex_path = os.path.join(vt.results_dir, '{}.pex'.format(pex_name))
+    interpreter_cache = PythonInterpreterCache.global_instance()
+    interpreter = interpreter_cache.select_interpreter_for_targets([])
 
-      if invalidation_check.invalid_vts:
-        with self.context.new_workunit(name='create-{}-pex'.format(pex_name),
-                                       labels=[WorkUnitLabel.PREP]):
-          self._build_tool_pex(context=self.context,
-                               interpreter=interpreter,
-                               pex_path=pex_path,
-                               requirements_lib=tool_req_lib)
+    if not os.path.exists(pex_path):
+      with self.context.new_workunit(name='create-{}-pex'.format(pex_name),
+                                     labels=[WorkUnitLabel.PREP]):
+        self._build_tool_pex(tool_subsystem=tool_subsystem,
+                             interpreter=interpreter,
+                             pex_path=pex_path)
 
-      tool_instance = self.tool_instance_cls(pex_path, interpreter)
-      self.context.products.register_data(self.tool_instance_cls, tool_instance)
+    tool_instance = self.tool_instance_cls(pex_path, interpreter)
+    self.context.products.register_data(self.tool_instance_cls, tool_instance)

@@ -4,12 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from setuptools import setup, find_packages
+from builtins import str
 
 
-setup(
-  name='ctypes_test',
-  version='0.0.1',
-  packages=find_packages(),
-  data_files=[('', ['libasdf-cpp.so'])],
-)
+def test_f():
+  assert isinstance("foo", str)
