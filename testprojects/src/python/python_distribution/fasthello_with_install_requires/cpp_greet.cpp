@@ -13,13 +13,13 @@ static PyMethodDef Methods[] = {
   static struct PyModuleDef moduledef = {
       PyModuleDef_HEAD_INIT,
       "cpp_greet", /* m_name */
-      NULL,      /* m_doc */
-      -1,        /* m_size */
-      Methods,   /* m_methods */
-      NULL,      /* m_slots */
-      NULL,      /* m_traverse */
-      NULL,      /* m_clear */
-      NULL       /* m_free */
+      NULL,        /* m_doc */
+      -1,          /* m_size */
+      Methods,     /* m_methods */
+      NULL,        /* m_slots */
+      NULL,        /* m_traverse */
+      NULL,        /* m_clear */
+      NULL         /* m_free */
   };
 #endif
 
