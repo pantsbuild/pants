@@ -11,5 +11,5 @@ setup(
   name='ctypes_test',
   version='0.0.1',
   packages=find_packages(),
-  data_files=[('', ['libasdf-cpp.so'])],
+  data_files=[('', ['libasdf-cpp_ctypes-with-extra-compiler-flags.so'])],
 )

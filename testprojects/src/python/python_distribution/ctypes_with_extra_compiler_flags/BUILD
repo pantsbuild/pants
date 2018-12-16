@@ -4,7 +4,7 @@
 ctypes_compatible_cpp_library(
   name='cpp_library',
   sources=['some_more_math.hpp', 'some_more_math.cpp'],
-  ctypes_native_library=native_artifact(lib_name='asdf-cpp'),
+  ctypes_native_library=native_artifact(lib_name='asdf-cpp_ctypes-with-extra-compiler-flags'),
   compiler_option_sets={'asdf'},
 )
 
