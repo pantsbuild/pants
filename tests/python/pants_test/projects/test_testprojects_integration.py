@@ -80,6 +80,12 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'examples/src/java/org/pantsbuild/example/plugin',
     ]
 
+    # Interpreter will not resolve correctly when Pants is constrained to Python 3
+    python2_only = [
+      # tested in test_antlr_py_gen_integration.py
+      'testprojects/src/python/antlr'
+    ]
+
     # Targets for testing timeouts. These should only be run during specific integration tests,
     # because they take a long time to run.
     timeout_targets = [
@@ -104,7 +110,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin',
     ]
 
-    targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 +
+    targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 + python2_only +
                           timeout_targets + deliberately_conflicting_targets + simply_skip)
     exclude_opts = ['--exclude-target-regexp={}'.format(target) for target in targets_to_exclude]
 
