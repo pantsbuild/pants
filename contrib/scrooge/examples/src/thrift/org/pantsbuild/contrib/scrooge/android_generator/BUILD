@@ -4,7 +4,7 @@ java_thrift_library(
   language='android',
   compiler_args=['--finagle'],
   dependencies=[
-  '3rdparty:thrift-0.6.1',
+  '3rdparty:thrift',
   'contrib/scrooge/examples/src/thrift/org/pantsbuild/contrib/scrooge/dummy_generator:dummy_generator'
   ],
 )
