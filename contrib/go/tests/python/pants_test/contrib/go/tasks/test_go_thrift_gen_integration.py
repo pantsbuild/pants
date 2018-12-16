@@ -70,7 +70,7 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
             """.format(srcdir=os.path.relpath(srcdir, get_buildroot()))).strip())
 
       with safe_open(os.path.join(srcdir, '3rdparty/go/github.com/apache/thrift/BUILD'), 'w') as fp:
-        fp.write("go_remote_library(rev='0.9.3', pkg='lib/go/thrift')")
+        fp.write("go_remote_library(rev='0.10.0', pkg='lib/go/thrift')")
 
       config = {
         'gen.go-thrift': {
@@ -108,9 +108,9 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
         root = os.path.join(workdir, 'gen', 'go-thrift', hash_dir,
                             target_dir.replace(os.path.sep, '.'), 'current')
 
-        self.assertEqual(sorted(['src/go/thrifttest/duck/constants.go',
-                                  'src/go/thrifttest/duck/ttypes.go',
-                                  'src/go/thrifttest/duck/feeder.go',
+        self.assertEqual(sorted(['src/go/thrifttest/duck/duck-consts.go',
+                                  'src/go/thrifttest/duck/duck.go',
+                                  'src/go/thrifttest/duck/GoUnusedProtection__.go',
                                   'src/go/thrifttest/duck/feeder-remote/feeder-remote.go']),
                           sorted(exact_files(root)))
 
@@ -128,8 +128,6 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       with self._create_thrift_project(thrift_files) as (srcdir, config):
         args = [
-            # Necessary to use a newer thrift version.
-            '--thrift-version=0.10.0',
             'compile',
             os.path.join(srcdir, 'src/go/usethrift')
           ]
