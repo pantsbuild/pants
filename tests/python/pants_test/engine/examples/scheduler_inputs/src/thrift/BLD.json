@@ -20,13 +20,13 @@
     {
       "type_alias": "apache_thrift_java_configuration",
       "name": "apache_java",
-      "rev": "0.9.2",
+      "rev": "0.10.0",
       "strict": true,
       "dependencies": [
         {
           "type_alias": "jar",
           "extends": ":libthrift",
-          "rev": "0.9.2"
+          "rev": "0.10.0"
         },
         {
           "type_alias": "jar",
@@ -49,7 +49,7 @@
     {
       "type_alias": "jar",
       "extends": ":libthrift",
-      "rev": "0.9.2"
+      "rev": "0.10.0"
     },
     {
       "type_alias": "jar",
@@ -92,7 +92,7 @@
         {
           "type_alias": "jar",
           "extends": ":libthrift",
-          "rev": "0.9.2"
+          "rev": "0.10.0"
         }
       ]
     },

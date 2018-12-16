@@ -228,7 +228,7 @@ class InlinedGraphTest(GraphTestBase):
 
     nonstrict = ApacheThriftConfiguration(type_alias='ApacheThriftConfig',
                                           address=address('nonstrict'),
-                                          version='0.9.2',
+                                          version='0.10.0',
                                           strict=False,
                                           lang='java')
     public = Struct(type_alias='Struct',
@@ -249,7 +249,7 @@ class InlinedGraphTest(GraphTestBase):
                               ),
                               nonstrict,
                               ApacheThriftConfiguration(type_alias='ApacheThriftConfig',
-                                                        version='0.9.2',
+                                                        version='0.10.0',
                                                         strict=True,
                                                         dependencies=[address('thrift2')],
                                                         lang='java'),

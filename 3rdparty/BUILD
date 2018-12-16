@@ -126,7 +126,7 @@ jar_library(name='slf4j-api',
 
 jar_library(name='libthrift',
             jars = [
-              jar(org='org.apache.thrift', name='libthrift', rev='0.9.2')
+              jar(org='org.apache.thrift', name='libthrift', rev='0.10.0')
             ],
             # javac uses undeclared types to build the MessageBuilder API.
             scope='forced',)
