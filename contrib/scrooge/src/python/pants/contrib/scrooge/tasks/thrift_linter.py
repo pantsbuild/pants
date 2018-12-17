@@ -79,9 +79,12 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
     config_args = []
 
     config_args.extend(self.get_options().linter_args)
-    if self._is_strict(target):
-      config_args.append('--fatal-warnings')
-    else:
+
+    # N.B. We always set --fatal-warnings to make sure errors like missing-namespace are at least printed.
+    # If --no-strict is turned on, the return code will be 0 instead of 1, but the errors/warnings
+    # need to always be printed.
+    config_args.append('--fatal-warnings')
+    if not self._is_strict(target):
       config_args.append('--ignore-errors')
 
     include_paths , paths = calculate_compile_sources([target], self._is_thrift)
