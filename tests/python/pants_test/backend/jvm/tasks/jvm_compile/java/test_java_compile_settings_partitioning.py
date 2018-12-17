@@ -62,7 +62,8 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
     self._task_setup(targets, **options)
     partition = defaultdict(set)
     for target in targets:
-      partition[target.platform.target_level].add(target)
+      if target.platform is not None:
+        partition[target.platform.target_level].add(target)
     return partition
 
   def _format_partition(self, partition):
@@ -129,7 +130,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
                                 platforms=self._platforms('1.6', '1.7'),
                                 default_platform='1.6')
     self.assert_partitions_equal({
-      self._version('1.6'): {java, java6},
+      self._version('1.6'): {java6},
       self._version('1.7'): {java7},
     }, partition)
 
