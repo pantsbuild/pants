@@ -13,13 +13,12 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import dir_option
 from pants.process.xargs import Xargs
-from pants.task.target_restriction_mixins import HasSkipByTargetTagMixin
 from pants.util.dirutil import fast_relpath, safe_mkdir_for_all
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
-class RewriteBase(NailgunTask, AbstractClass, HasSkipByTargetTagMixin):
+class RewriteBase(NailgunTask, AbstractClass):
   """Abstract base class for JVM-based tools that check/rewrite sources."""
 
   @classmethod
@@ -58,8 +57,17 @@ class RewriteBase(NailgunTask, AbstractClass, HasSkipByTargetTagMixin):
 
   def execute(self):
     """Runs the tool on all source files that are located."""
-    self.filter_by_tag()
     relevant_targets = self._get_non_synthetic_targets(self.get_targets())
+
+    # force_run_tag = 'no-{}.skip'.format(self.options_scope)
+    # force_run_targets = set(t for t in relevant_targets if force_run_tag in t.tags)
+    # force_skip_tag = '{}.skip'.format(self.options_scope)
+    # force_skip_targets = set(t for t in relevant_targets if force_skip_tag in t.tags)
+    #
+    # final_targets = set(relevant_targets).union(force_run_targets).difference(force_skip_targets)
+    #
+    # self.context.log.debug("Force skipping targets by tag: {}\n{}".format(force_skip_tag, force_skip_targets))
+    # self.context.log.debug("Force running targets by tag: {}\n{}".format(force_run_tag, force_run_targets))
 
     if self.sideeffecting:
       # Always execute sideeffecting tasks without invalidation.

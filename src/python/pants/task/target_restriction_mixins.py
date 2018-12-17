@@ -41,13 +41,6 @@ class TransitiveOptionRegistrar(object):
                   "If true, act on the transitive dependency closure of those targets.")
 
 
-class HasSkipByTargetTagMixin(HasTransitiveOptionMixin):
-
-  def filter_by_tag(self):
-
-    print(self.get_targets())
-
-
 class HasSkipOptionMixin(object):
   """A mixin for tasks that have a --skip option.
 
@@ -61,6 +54,11 @@ class HasSkipOptionMixin(object):
   @property
   def skip_execution(self):
     return self.get_options().skip
+
+  @property
+  def supports_skipping_target_by_tag(self):
+    return True
+
 
 
 class SkipOptionRegistrar(object):

@@ -222,6 +222,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return True
 
+  @property
+  def supports_skipping_target_by_tag(self):
+    return False
+
   def get_targets(self, predicate=None):
     """Returns the candidate targets this task should act on.
 
@@ -237,8 +241,25 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
     """
-    return (self.context.targets(predicate) if self.act_transitively
-            else list(filter(predicate, self.context.target_roots)))
+    relevant_targets = self.context.targets(predicate) if self.act_transitively else list(
+      filter(predicate, self.context.target_roots))
+    if not self.supports_skipping_target_by_tag:
+      return relevant_targets
+
+    force_run_tag = 'no-{}.skip'.format(self.options_scope)
+    force_run_targets = set(t for t in relevant_targets if force_run_tag in t.tags)
+
+    force_skip_tag = '{}.skip'.format(self.options_scope)
+    force_skip_targets = set(t for t in relevant_targets if force_skip_tag in t.tags)
+
+    if force_run_targets:
+      self.context.log.debug("Force skipping targets by tag: {}\n{}".format(force_skip_tag, force_skip_targets))
+    if force_skip_targets:
+      self.context.log.debug("Force running targets by tag: {}\n{}".format(force_run_tag, force_run_targets))
+
+    final_targets = set(relevant_targets).union(force_run_targets).difference(force_skip_targets)
+
+    return final_targets
 
   @memoized_property
   def workdir(self):
