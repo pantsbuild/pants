@@ -8,24 +8,10 @@ target(name = 'scala-js-compiler', dependencies=[
 ])
 target(name = 'scala-js-library', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:library'])
 
-
 # TODO: Attempting to use these targets fails because BootstrapJvmTools.get_alternate_target_roots()
 # doesn't descend into dependent target directories and uses the same build_graph it starts with.
-# target(name='scrooge-gen', dependencies=['3rdparty/jvm/com/twitter:scrooge-gen'])
-# target(name='scrooge-linter', dependencies=['3rdparty/jvm/com/twitter:scrooge-linter'])
-
-SCROOGE_REV = '18.12.0'
-# NB: The scrooge tools do not mix their classpaths with the sources they interact with, and
-# therefore they do not need to use the `scala-platform` via scala_jar.
-jar_library(name = 'scrooge-gen',
-            jars = [
-              jar(org='com.twitter', name='scrooge-generator_2.11', rev=SCROOGE_REV)
-            ])
-
-jar_library(name = 'scrooge-linter',
-            jars = [
-              jar(org='com.twitter', name='scrooge-linter_2.11', rev=SCROOGE_REV)
-            ])
+target(name='scrooge-gen', dependencies=['3rdparty/jvm/com/twitter:scrooge-gen'])
+target(name='scrooge-linter', dependencies=['3rdparty/jvm/com/twitter:scrooge-linter'])
 
 # Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
 # (https://github.com/benjyw/binhost) for now.  See build-support/ivy/ivysettings.xml
