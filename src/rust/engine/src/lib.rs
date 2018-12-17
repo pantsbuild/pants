@@ -62,6 +62,7 @@ extern crate log;
 extern crate num_enum;
 extern crate parking_lot;
 extern crate process_execution;
+extern crate rand;
 extern crate reqwest;
 extern crate resettable;
 extern crate smallvec;

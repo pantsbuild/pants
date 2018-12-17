@@ -19,6 +19,7 @@ use handles::maybe_drop_handles;
 use log::debug;
 use nodes::{NodeKey, TryInto, WrappedNode};
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
+use rand::seq::SliceRandom;
 use reqwest;
 use resettable::Resettable;
 use rule_graph::RuleGraph;
@@ -68,6 +69,10 @@ impl Core {
     process_execution_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
   ) -> Core {
+    // Randomize CAS address order to avoid thundering herds from common config.
+    let mut remote_store_servers = remote_store_servers;
+    remote_store_servers.shuffle(&mut rand::thread_rng());
+
     let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
     let runtime = Resettable::new(|| {
       Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))

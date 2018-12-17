@@ -14,4 +14,4 @@ parking_lot = "0.6"
 petgraph = "0.4.5"
 
 [dev-dependencies]
-rand = "0.5.3"
+rand = "0.6"

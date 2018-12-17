@@ -37,6 +37,7 @@ extern crate futures_timer;
 extern crate hashing;
 extern crate parking_lot;
 extern crate protobuf;
+extern crate rand;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
@@ -49,6 +50,7 @@ use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use protobuf::Message;
+use rand::seq::SliceRandom;
 use serde_derive::Serialize;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -271,11 +273,15 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             None
           };
 
+        // Randomize CAS address order to avoid thundering herds from common config.
+        let mut cas_addresses = cas_address.map(str::to_owned).collect::<Vec<_>>();
+        cas_addresses.shuffle(&mut rand::thread_rng());
+
         (
           Store::with_remote(
             &store_dir,
             pool.clone(),
-            &cas_address.map(str::to_owned).collect::<Vec<_>>(),
+            &cas_addresses,
             top_match
               .value_of("remote-instance-name")
               .map(str::to_owned),
