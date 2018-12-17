@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from future.utils import PY2
+from future.utils import PY2, text_type
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -25,7 +25,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
-from pants.engine.fs import PathGlobs
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.engine.legacy.graph import HydratedField
 from pants.engine.legacy.structs import SourcesField
 from pants.engine.rules import RootRule
@@ -35,8 +35,9 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_mkdir, safe_mkdtemp,
-                                safe_open, safe_rmtree)
+  safe_open, safe_rmtree, safe_file_dump)
 from pants.util.memo import memoized_method
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
@@ -616,6 +617,19 @@ class TestBase(unittest.TestCase):
     # Can't parse any options without a pants.ini.
     self.create_file('pants.ini')
     return OptionsBootstrapper(args=cli_options).get_bootstrap_options().for_global_scope()
+
+  def make_snapshot(self, files):
+    """Makes a snapshot from a collection of files.
+
+    :param files: a dictionary, where key=filename, value=file_content where both are of type String.
+    :return: a Snapshot.
+    """
+    with temporary_dir() as temp_dir:
+      for file_name, content in files.items():
+        safe_file_dump(os.path.join(temp_dir, file_name), content)
+      return self.scheduler.capture_snapshots((
+        PathGlobsAndRoot(PathGlobs(('**',)), text_type(temp_dir)),
+      ))[0]
 
   class LoggingRecorder(object):
     """Simple logging handler to record warnings."""

@@ -6,11 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from pex.orderedset import OrderedSet
 
-from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import console_rule
-from pants.engine.selectors import Select, Get
+from pants.engine.selectors import Select
 
 
 @console_rule('filedeps', [Select(Console), Select(TransitiveHydratedTargets)])
