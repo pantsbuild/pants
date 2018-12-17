@@ -6,9 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import object
 
-from pants.backend.native.config.environment import (Assembler, CCompiler, CompilerMixin,
-                                                     CppCompiler, CppToolchain, CToolchain, Linker,
-                                                     Platform)
+from pants.backend.native.config.environment import (Assembler, CCompiler, CppCompiler,
+                                                     CppToolchain, CToolchain, Linker, Platform)
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
@@ -74,7 +73,6 @@ class LinkerWrapperMixin(object):
 
   def for_compiler(self, compiler, platform):
     """Return a Linker object which is intended to be compatible with the given `compiler`."""
-    assert(isinstance(compiler, CompilerMixin))
     return (self.linker
             .sequence(compiler, exclude_list_fields=['extra_args'])
             .copy(exe_filename=compiler.exe_filename))
