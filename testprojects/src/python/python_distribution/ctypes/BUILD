@@ -4,13 +4,13 @@
 ctypes_compatible_c_library(
   name='c_library',
   sources=['some_math.h', 'some_math.c', 'src-subdir/add_three.h', 'src-subdir/add_three.c'],
-  ctypes_native_library=native_artifact(lib_name='asdf-c'),
+  ctypes_native_library=native_artifact(lib_name='asdf-c_ctypes'),
 )
 
 ctypes_compatible_cpp_library(
   name='cpp_library',
   sources=['some_more_math.hpp', 'some_more_math.cpp'],
-  ctypes_native_library=native_artifact(lib_name='asdf-cpp'),
+  ctypes_native_library=native_artifact(lib_name='asdf-cpp_ctypes'),
 )
 
 python_dist(
