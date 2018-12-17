@@ -19,6 +19,7 @@ from pants.build_graph.build_graph import CycleException, sort_targets
 from pants.task.console_task import ConsoleTask
 from pants.task.task import Task
 from pants.util.memo import memoized_property
+from pants.util.objects import SubclassesOf, datatype
 
 
 class JvmPlatformAnalysisMixin(object):
@@ -184,12 +185,43 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     """
     conflicts = []
 
+    jvm_platform_map = {}
+
+    class JvmPlatformAssignment(datatype([
+        ('from_upstream', bool),
+        ('source', SubclassesOf(JvmTarget)),
+        'version',
+    ])):
+
+      @property
+      def transitive_assignment_description(self):
+        if self.from_upstream:
+          # Version was assigned from a target which depends on the current one.
+          return '{} from <- {} (upstream)'.format(self.version, self.source.address.spec)
+        else:
+          # Version was assigned from a target which the current one depends on.
+          return '{} from -> {} (downstream)'.format(self.version, self.source.address.spec)
+
+    def maybe_get_assigned_platform_version(target):
+      cur_version = self.jvm_version(target)
+      if not cur_version:
+        mapped_assignment = jvm_platform_map.get(target, None)
+        if mapped_assignment:
+          return mapped_assignment.version
+      return cur_version
+
     def is_conflicting(target, dependency):
-      this_version = self.jvm_version(target)
-      dep_version = self.jvm_version(dependency)
+      this_version = maybe_get_assigned_platform_version(target)
+      dep_version = maybe_get_assigned_platform_version(dependency)
 
       if this_version and dep_version:
-        return self.jvm_version(dependency) > self.jvm_version(target)
+        return dep_version > this_version
+      elif this_version and not dep_version:
+        jvm_platform_map[dependency] = JvmPlatformAssignment(True, target, this_version)
+        return False
+      elif dep_version and not this_version:
+        jvm_platform_map[target] = JvmPlatformAssignment(False, dependency, dep_version)
+        return False
       else:
         return False
 
@@ -215,7 +247,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
           # NB(gmalmquist): It's important to unconditionally raise an exception, then decide later
           # whether to continue raising it or just print a warning, to make sure the targets aren't
           # marked as valid if there are invalid platform dependencies.
-          error_message = self._create_full_error_message(conflicts)
+          error_message = self._create_full_error_message(conflicts, jvm_platform_map)
           raise self.IllegalJavaTargetLevelDependency(error_message)
     except self.IllegalJavaTargetLevelDependency as e:
       if self.check == 'fatal':
@@ -225,18 +257,25 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
         self.context.log.warn(error_message)
         return error_message
 
-  def _create_individual_error_message(self, target, invalid_dependencies):
-    # NB: we only expect to see platform incompatibility errors when targets have platforms
-    # explicitly specified, so we don't check whether the plaform is None in this method.
+  @classmethod
+  def _get_platform_error_description(cls, target, jvm_platform_map):
+    if target.platform:
+      return '{} (explicitly specified)'.format(target.platform.name)
+    else:
+      return jvm_platform_map[target].transitive_assignment_description
+
+  def _create_individual_error_message(self, target, invalid_dependencies, jvm_platform_map):
     return '\n  {target} targeting "{platform_name}"\n  {relationship}: {dependencies}'.format(
       target=target.address.spec,
-      platform_name=target.platform.name,
-      dependencies=''.join('\n    {} targeting "{}"'.format(d.address.spec, d.platform.name)
-                           for d in sorted(invalid_dependencies)),
+      platform_name=self._get_platform_error_description(target, jvm_platform_map),
+      dependencies=''.join(
+        '\n    {} targeting "{}"'
+        .format(d.address.spec, self._get_platform_error_description(d, jvm_platform_map))
+        for d in sorted(invalid_dependencies)),
       relationship='is depended on by' if self.parents_before_children else 'depends on',
     )
 
-  def _create_full_error_message(self, invalids):
+  def _create_full_error_message(self, invalids, jvm_platform_map):
     if self.parents_before_children:
       dependency_to_dependees = defaultdict(set)
       for target, deps in invalids:
@@ -245,8 +284,9 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
       invalids = list(dependency_to_dependees.items())
 
     invalids = sorted(invalids)
-    individual_errors = '\n'.join(self._create_individual_error_message(target, deps)
-                                  for target, deps in invalids)
+    individual_errors = '\n'.join(
+      self._create_individual_error_message(target, deps, jvm_platform_map)
+      for target, deps in invalids)
     return ('Dependencies cannot have a higher java target level than dependees!\n{errors}\n\n'
             'Consider running ./pants jvm-platform-explain with the same targets for more details.'
             .format(errors=individual_errors))

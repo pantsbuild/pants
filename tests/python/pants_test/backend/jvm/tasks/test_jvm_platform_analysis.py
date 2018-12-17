@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
 from builtins import filter, object
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -58,6 +59,12 @@ class JvmPlatformAnalysisTestMixin(object):
     two = self._java('two', '6', deps=[middle])
     return [one, two, middle]
 
+  def bad_transitive_java_targets(self):
+    one = self._java('one', '7')
+    middle = self._java('middle', deps=[one])
+    two = self._java('two', '6', deps=[middle])
+    return [one, middle, two]
+
   def good_transitive_targets(self):
     one = self._java('one', '6')
     middle = self._plain('middle', deps=[one])
@@ -94,6 +101,17 @@ class JvmPlatformValidateTest(JvmPlatformAnalysisTestMixin, TaskTestBase):
   def test_bad_fails(self):
     with self.assertRaises(JvmPlatformValidate.IllegalJavaTargetLevelDependency):
       self.simple_task(self.bad_targets(), check='fatal').execute()
+
+  def test_downstream_bad_java_fails(self):
+    """Verify that platform checking propagates through transitive java_library() dependencies which
+    don't specify a platform.
+
+    Note that due to the way targets are ordered when this task is executed, the corresponding
+    'upstream' error message will never arise in practice.
+    """
+    expected_rx = re.escape('java:middle targeting "1.7 from -> java:one (downstream)"')
+    with self.assertRaisesRegexp(JvmPlatformValidate.IllegalJavaTargetLevelDependency, expected_rx):
+      self.simple_task(self.bad_transitive_java_targets(), check='fatal').execute()
 
   def test_transitive_bad_fails(self):
     with self.assertRaises(JvmPlatformValidate.IllegalJavaTargetLevelDependency):
