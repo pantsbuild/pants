@@ -41,10 +41,19 @@ use parking_lot::RwLock;
 /// to reset any references which hide background threads, so that forked processes don't inherit
 /// pointers to threads from the parent process which will not exist in the forked process.
 ///
-#[derive(Clone)]
 pub struct Resettable<T> {
   val: Arc<RwLock<Option<T>>>,
   make: Arc<Fn() -> T>,
+}
+
+// Sadly we need to manualy implement Clone because of https://github.com/rust-lang/rust/issues/26925
+impl<T> Clone for Resettable<T> {
+  fn clone(&self) -> Self {
+    Resettable {
+      val: self.val.clone(),
+      make: self.make.clone(),
+    }
+  }
 }
 
 unsafe impl<T> Send for Resettable<T> {}
@@ -52,7 +61,7 @@ unsafe impl<T> Sync for Resettable<T> {}
 
 impl<T> Resettable<T>
 where
-  T: Clone + Send + Sync,
+  T: Send + Sync,
 {
   pub fn new<F: Fn() -> T + 'static>(make: F) -> Resettable<T> {
     let val = (make)();
@@ -62,18 +71,12 @@ where
     }
   }
 
-  ///
-  /// TODO: This probably needs to switch to a "with"/context-manager style pattern.
-  /// Having an externalized `get` and using Clone like this is problematic: if there
-  /// might be references/Clones of the field outside of the lock on the resource, then we can't
-  /// be sure that dropping it will actually deallocate the resource.  
-  ///
-  pub fn get(&self) -> T {
+  pub fn with<O, F: FnOnce(&T) -> O>(&self, f: F) -> O {
     let val_opt = self.val.read();
     let val = val_opt
       .as_ref()
       .unwrap_or_else(|| panic!("A Resettable value cannot be used while it is shutdown."));
-    val.clone()
+    f(val)
   }
 
   ///
@@ -88,5 +91,24 @@ where
     let t = f();
     *val = Some((self.make)());
     t
+  }
+}
+
+impl<T> Resettable<T>
+where
+  T: Clone + Send + Sync,
+{
+  ///
+  /// Callers should probably use `with` rather than `get`.
+  /// Having an externalized `get` and using Clone like this is problematic: if there
+  /// might be references/Clones of the field outside of the lock on the resource, then we can't
+  /// be sure that dropping it will actually deallocate the resource.
+  ///
+  pub fn get(&self) -> T {
+    let val_opt = self.val.read();
+    let val = val_opt
+      .as_ref()
+      .unwrap_or_else(|| panic!("A Resettable value cannot be used while it is shutdown."));
+    val.clone()
   }
 }

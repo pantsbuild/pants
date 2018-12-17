@@ -52,6 +52,7 @@ extern crate bytes;
 extern crate fnv;
 extern crate fs;
 extern crate futures;
+extern crate futures_timer;
 extern crate graph;
 extern crate hashing;
 extern crate indexmap;

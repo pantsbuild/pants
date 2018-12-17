@@ -40,6 +40,7 @@ pub struct Core {
   pub types: Types,
   pub fs_pool: Arc<ResettablePool>,
   pub runtime: Resettable<Arc<Runtime>>,
+  pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
   store_and_command_runner_and_http_client:
     Resettable<(Store, BoundedCommandRunner, reqwest::async::Client)>,
   pub vfs: PosixFS,
@@ -92,6 +93,8 @@ impl Core {
     };
 
     let fs_pool2 = fs_pool.clone();
+    let futures_timer_thread = Resettable::new(|| futures_timer::HelperThread::new().unwrap());
+    let futures_timer_thread2 = futures_timer_thread.clone();
     let store_and_command_runner_and_http_client = Resettable::new(move || {
       let local_store_dir = local_store_dir.clone();
       let store = safe_create_dir_all_ioerror(&local_store_dir)
@@ -121,6 +124,7 @@ impl Core {
           // Allow for some overhead for bookkeeping threads (if any).
           process_execution_parallelism + 2,
           store.clone(),
+          futures_timer_thread2.clone(),
         )),
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
@@ -147,6 +151,7 @@ impl Core {
       types: types,
       fs_pool: fs_pool.clone(),
       runtime: runtime,
+      futures_timer_thread: futures_timer_thread,
       store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
@@ -173,11 +178,13 @@ impl Core {
       debug!("Waiting to enter fork_context...");
       thread::sleep(Duration::from_millis(10));
     }
-    let t = self.runtime.with_reset(|| {
-      self.graph.with_exclusive(|| {
-        self
-          .fs_pool
-          .with_shutdown(|| self.store_and_command_runner_and_http_client.with_reset(f))
+    let t = self.futures_timer_thread.with_reset(|| {
+      self.runtime.with_reset(|| {
+        self.graph.with_exclusive(|| {
+          self
+            .fs_pool
+            .with_shutdown(|| self.store_and_command_runner_and_http_client.with_reset(f))
+        })
       })
     });
     self
