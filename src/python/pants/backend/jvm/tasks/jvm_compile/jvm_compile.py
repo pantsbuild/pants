@@ -851,13 +851,15 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       tgt, = vts.targets
       compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
       zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
+      # TODO: consider making jvm platform part of the DependencyContext!
+      jvm_platform = tgt.platform or JvmPlatform.global_instance().default_platform
       with Timer() as timer:
         directory_digest = self._compile_vts(vts,
                           ctx,
                           upstream_analysis,
                           dependency_cp_entries,
                           progress_message,
-                          tgt.platform,
+                          jvm_platform,
                           compiler_option_sets,
                           zinc_file_manager,
                           counter)

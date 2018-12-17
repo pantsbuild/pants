@@ -189,7 +189,11 @@ class FindBugs(NailgunTask):
 
     # Try to run spotbugs with the same java version as the target
     # The minimum JDK for spotbugs is JDK 1.8
-    min_jdk_version = max(target.platform.target_level, Revision.lenient('1.8'))
+    spotbugs_min_jdk = Revision.lenient('1.8')
+    if target.platform:
+      min_jdk_version = max(target.platform.target_level, spotbugs_min_jdk)
+    else:
+      min_jdk_version = spotbugs_min_jdk
     if min_jdk_version.components[0] == 1:
       max_jdk_version = Revision(min_jdk_version.components[0], min_jdk_version.components[1], '9999')
     else:

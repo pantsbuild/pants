@@ -132,7 +132,7 @@ class JvmPlatform(Subsystem):
     :rtype: JvmPlatformSettings
     """
     if not name:
-      return self.default_platform
+      return None
     if name not in self.platforms_by_name:
       raise self.UndefinedJvmPlatform(for_target, name, self.platforms_by_name)
     return self.platforms_by_name[name]

@@ -298,9 +298,11 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                                            **kwargs)
 
   def preferred_jvm_distribution_for_targets(self, targets):
-    return JvmPlatform.preferred_jvm_distribution([target.platform for target in targets
-                                                  if isinstance(target, JvmTarget)],
-                                                  self._strict_jvm_version)
+    all_specified_platforms = [
+      target.platform for target in targets
+      if isinstance(target, JvmTarget) and target.platform is not None
+    ]
+    return JvmPlatform.preferred_jvm_distribution(all_specified_platforms, self._strict_jvm_version)
 
   def _spawn(self, distribution, executor=None, *args, **kwargs):
     """Returns a processhandler to a process executing java.

@@ -72,7 +72,8 @@ class RunJvmPrepCommandBase(Task):
 
     with self.context.new_workunit(name='jvm_prep_command', labels=[WorkUnitLabel.PREP]) as workunit:
       for target in targets:
-        distribution = JvmPlatform.preferred_jvm_distribution([target.platform])
+        jvm_platform = target.platform or JvmPlatform.global_instance().default_platform
+        distribution = JvmPlatform.preferred_jvm_distribution([jvm_platform])
         executor = SubprocessExecutor(distribution)
 
         mainclass = target.payload.get_field_value('mainclass')

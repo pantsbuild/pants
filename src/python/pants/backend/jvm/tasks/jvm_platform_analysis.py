@@ -30,7 +30,10 @@ class JvmPlatformAnalysisMixin(object):
 
   @classmethod
   def jvm_version(cls, target):
-    return target.platform.target_level
+    if target.platform:
+      return target.platform.target_level
+    else:
+      return None
 
   @memoized_property
   def jvm_targets(self):
@@ -133,11 +136,11 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     """
 
   class PlatformFingerprintStrategy(FingerprintStrategy):
-    """Fingerprint strategy which only cares a target's platform and dependency ids."""
+    """Fingerprint strategy which only cares about a target's platform."""
 
     def compute_fingerprint(self, target):
       hasher = sha1()
-      if hasattr(target, 'platform'):
+      if hasattr(target, 'platform') and target.platform is not None:
         hasher.update(str(tuple(target.platform)).encode('utf-8'))
       return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
@@ -182,7 +185,13 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     conflicts = []
 
     def is_conflicting(target, dependency):
-      return self.jvm_version(dependency) > self.jvm_version(target)
+      this_version = self.jvm_version(target)
+      dep_version = self.jvm_version(dependency)
+
+      if this_version and dep_version:
+        return self.jvm_version(dependency) > self.jvm_version(target)
+      else:
+        return False
 
     try:
       sort_targets(self.jvm_targets)
@@ -217,6 +226,8 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
         return error_message
 
   def _create_individual_error_message(self, target, invalid_dependencies):
+    # NB: we only expect to see platform incompatibility errors when targets have platforms
+    # explicitly specified, so we don't check whether the plaform is None in this method.
     return '\n  {target} targeting "{platform_name}"\n  {relationship}: {dependencies}'.format(
       target=target.address.spec,
       platform_name=target.platform.name,

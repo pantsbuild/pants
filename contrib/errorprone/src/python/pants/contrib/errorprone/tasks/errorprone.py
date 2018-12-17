@@ -135,7 +135,11 @@ class ErrorProne(NailgunTask):
 
     # Try to run errorprone with the same java version as the target
     # The minimum JDK for errorprone is JDK 1.8
-    min_jdk_version = max(target.platform.target_level, Revision.lenient('1.8'))
+    errorprone_min_jdk = Revision.lenient('1.8')
+    if target.platform:
+      min_jdk_version = max(target.platform.target_level, errorprone_min_jdk)
+    else:
+      min_jdk_version = errorprone_min_jdk
     if min_jdk_version.components[0] == 1:
       max_jdk_version = Revision(min_jdk_version.components[0], min_jdk_version.components[1], '9999')
     else:
@@ -154,10 +158,10 @@ class ErrorProne(NailgunTask):
     ]
 
     # Errorprone does not recognize source or target 10 yet
-    if target.platform.source_level < Revision.lenient('10'):
+    if (target.platform is not None) and (target.platform.source_level < Revision.lenient('10')):
       args.extend(['-source', str(target.platform.source_level)])
 
-    if target.platform.target_level < Revision.lenient('10'):
+    if (target.platform is not None) and (target.platform.target_level < Revision.lenient('10')):
       args.extend(['-target', str(target.platform.target_level)])
 
     errorprone_classpath_file = os.path.join(self.workdir, '{}.classpath'.format(os.path.basename(output_dir)))
