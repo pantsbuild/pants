@@ -108,6 +108,7 @@ impl Store {
     chunk_size_bytes: usize,
     upload_timeout: Duration,
     backoff_config: BackoffConfig,
+    futures_timer_thread: futures_timer::TimerHandle,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new(path, pool)?,
@@ -120,6 +121,7 @@ impl Store {
         chunk_size_bytes,
         upload_timeout,
         backoff_config,
+        futures_timer_thread,
       )?),
     })
   }
@@ -1659,10 +1661,10 @@ mod remote {
   use boxfuture::{BoxFuture, Boxable};
   use bytes::{Bytes, BytesMut};
   use digest::{Digest as DigestTrait, FixedOutput};
-  use futures::{self, future, Future, Sink, Stream};
+  use futures::{self, future, Future, IntoFuture, Sink, Stream};
   use grpcio;
   use hashing::{Digest, Fingerprint};
-  use serverset::{CallbackToken, Serverset};
+  use serverset::{Retry, Serverset};
   use sha2::Sha256;
   use std::cmp::min;
   use std::collections::HashSet;
@@ -1675,6 +1677,7 @@ mod remote {
     instance_name: Option<String>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
+    rpc_attempts: usize,
     env: Arc<grpcio::Environment>,
     serverset: Serverset<grpcio::Channel>,
     authorization_header: Option<String>,
@@ -1691,6 +1694,7 @@ mod remote {
       chunk_size_bytes: usize,
       upload_timeout: Duration,
       backoff_config: BackoffConfig,
+      futures_timer_thread: futures_timer::TimerHandle,
     ) -> Result<ByteStore, String> {
       let env = Arc::new(grpcio::Environment::new(thread_count));
 
@@ -1709,50 +1713,62 @@ mod remote {
         }
       }).collect();
 
-      let serverset = Serverset::new(channels, backoff_config)?;
+      let serverset = Serverset::new(channels, backoff_config, futures_timer_thread)?;
 
       Ok(ByteStore {
         instance_name,
         chunk_size_bytes,
         upload_timeout,
+        // TODO: Parameterise this
+        rpc_attempts: 3,
         env,
         serverset,
         authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
       })
     }
 
-    fn byte_stream_client(
+    fn with_byte_stream_client<
+      Value: Send + 'static,
+      Fut: Future<Item = Value, Error = String>,
+      IntoFut: IntoFuture<Future = Fut, Item = Value, Error = String>,
+      F: Fn(bazel_protos::bytestream_grpc::ByteStreamClient) -> IntoFut
+        + Send
+        + Sync
+        + Clone
+        + 'static,
+    >(
       &self,
-    ) -> impl Future<
-      Item = (
-        bazel_protos::bytestream_grpc::ByteStreamClient,
-        CallbackToken,
-      ),
-      Error = String,
-    > {
-      self.serverset.next().map(|(channel, token)| {
-        (
-          bazel_protos::bytestream_grpc::ByteStreamClient::new(channel),
-          token,
-        )
-      })
+      f: F,
+    ) -> impl Future<Item = Value, Error = String> {
+      Retry(self.serverset.clone()).all_errors_immediately(
+        move |channel| {
+          f(bazel_protos::bytestream_grpc::ByteStreamClient::new(
+            channel,
+          ))
+        },
+        self.rpc_attempts,
+      )
     }
 
-    fn cas_client(
+    fn with_cas_client<
+      Value: Send + 'static,
+      Fut: Future<Item = Value, Error = String>,
+      IntoFut: IntoFuture<Future = Fut, Item = Value, Error = String>,
+      F: Fn(bazel_protos::remote_execution_grpc::ContentAddressableStorageClient) -> IntoFut
+        + Send
+        + Sync
+        + Clone
+        + 'static,
+    >(
       &self,
-    ) -> impl Future<
-      Item = (
-        bazel_protos::remote_execution_grpc::ContentAddressableStorageClient,
-        CallbackToken,
-      ),
-      Error = String,
-    > {
-      self.serverset.next().map(|(channel, token)| {
-        (
-          bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(channel),
-          token,
-        )
-      })
+      f: F,
+    ) -> impl Future<Item = Value, Error = String> {
+      Retry(self.serverset.clone()).all_errors_immediately(
+        move |channel| {
+          f(bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(channel))
+        },
+        self.rpc_attempts,
+      )
     }
 
     fn call_option(&self) -> grpcio::CallOption {
@@ -1782,9 +1798,7 @@ mod remote {
       );
       let store = self.clone();
       self
-        .byte_stream_client()
-        // TODO: Use callback_token
-        .and_then(move |(client, _callback_token)| {
+        .with_byte_stream_client(move |client| {
           match client
             .write_opt(store.call_option().timeout(store.upload_timeout))
             .map(|v| (v, client))
@@ -1795,6 +1809,8 @@ mod remote {
             )).to_boxed(),
             Ok(((sender, receiver), client)) => {
               let chunk_size_bytes = store.chunk_size_bytes;
+              let resource_name = resource_name.clone();
+              let bytes = bytes.clone();
               let stream = futures::stream::unfold::<
                 _,
                 _,
@@ -1844,7 +1860,7 @@ mod remote {
         }).to_boxed()
     }
 
-    pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
+    pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + Clone + 'static>(
       &self,
       _entry_type: EntryType,
       digest: Digest,
@@ -1852,9 +1868,7 @@ mod remote {
     ) -> BoxFuture<Option<T>, String> {
       let store = self.clone();
       self
-        .byte_stream_client()
-        // TODO: Use callback_token
-        .and_then(move |(client, _callback_token)| {
+        .with_byte_stream_client(move |client| {
           match client
             .read_opt(
               &{
@@ -1874,6 +1888,7 @@ mod remote {
             ).map(|stream| (stream, client))
           {
             Ok((stream, client)) => {
+              let f = f.clone();
               // We shouldn't have to pass around the client here, it's a workaround for
               // https://github.com/pingcap/grpc-rs/issues/123
               future::ok(client)
@@ -1912,25 +1927,22 @@ mod remote {
       request: bazel_protos::remote_execution::FindMissingBlobsRequest,
     ) -> impl Future<Item = HashSet<Digest>, Error = String> {
       let store = self.clone();
-      // TODO: Use callback_token
-      self
-        .cas_client()
-        .and_then(move |(client, _callback_token)| {
-          client
-            .find_missing_blobs_opt(&request, store.call_option())
-            .map_err(|err| {
-              format!(
-                "Error from server in response to find_missing_blobs_request: {:?}",
-                err
-              )
-            }).and_then(|response| {
-              response
-                .get_missing_blob_digests()
-                .iter()
-                .map(|digest| digest.into())
-                .collect()
-            })
-        })
+      self.with_cas_client(move |client| {
+        client
+          .find_missing_blobs_opt(&request, store.call_option())
+          .map_err(|err| {
+            format!(
+              "Error from server in response to find_missing_blobs_request: {:?}",
+              err
+            )
+          }).and_then(|response| {
+            response
+              .get_missing_blob_digests()
+              .iter()
+              .map(|digest| digest.into())
+              .collect()
+          })
+      })
     }
 
     pub(super) fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(
@@ -1954,6 +1966,7 @@ mod remote {
     use super::ByteStore;
     use bytes::Bytes;
     use futures::Future;
+    use futures_timer::TimerHandle;
     use hashing::Digest;
     use mock::StubCAS;
     use serverset::BackoffConfig;
@@ -2106,6 +2119,7 @@ mod remote {
         10 * 1024,
         Duration::from_secs(5),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        TimerHandle::default(),
       ).unwrap();
 
       let all_the_henries = big_file_bytes();
@@ -2182,6 +2196,7 @@ mod remote {
         10 * 1024 * 1024,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        TimerHandle::default(),
       ).unwrap();
       let error = store
         .store_bytes(TestData::roland().bytes())
@@ -2260,6 +2275,7 @@ mod remote {
         10 * 1024 * 1024,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        TimerHandle::default(),
       ).unwrap();
 
       assert_eq!(
@@ -2286,6 +2302,7 @@ mod remote {
         10 * 1024 * 1024,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        TimerHandle::default(),
       ).unwrap()
     }
 
@@ -2318,6 +2335,7 @@ mod tests {
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::Future;
+  use futures_timer::TimerHandle;
   use hashing::{Digest, Fingerprint};
   use mock::StubCAS;
   use pool::ResettablePool;
@@ -2409,6 +2427,7 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      TimerHandle::default(),
     ).unwrap()
   }
 
@@ -2581,7 +2600,11 @@ mod tests {
       &new_store(dir.path(), cas.address()),
       TestData::roland().digest(),
     ).expect_err("Want error");
-    assert_eq!(1, cas.read_request_count());
+    assert!(
+      cas.read_request_count() > 0,
+      "Want read_request_count > 0 but got {}",
+      cas.read_request_count()
+    );
     assert!(
       error.contains("StubCAS is configured to always fail"),
       "Bad error message"
@@ -2597,7 +2620,11 @@ mod tests {
       .load_directory(TestData::roland().digest())
       .wait()
       .expect_err("Want error");
-    assert_eq!(1, cas.read_request_count());
+    assert!(
+      cas.read_request_count() > 0,
+      "Want read_request_count > 0 but got {}",
+      cas.read_request_count()
+    );
     assert!(
       error.contains("StubCAS is configured to always fail"),
       "Bad error message"
@@ -3113,6 +3140,7 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      TimerHandle::default(),
     ).unwrap();
 
     store_with_remote
@@ -3140,6 +3168,7 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      TimerHandle::default(),
     ).unwrap();
 
     assert_eq!(
@@ -3184,6 +3213,7 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      TimerHandle::default(),
     ).unwrap();
 
     store_with_remote
@@ -3211,6 +3241,7 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      TimerHandle::default(),
     ).unwrap();
 
     assert_eq!(

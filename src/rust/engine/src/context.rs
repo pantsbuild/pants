@@ -116,6 +116,7 @@ impl Core {
               // TODO: Take a parameter
               fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
                 .unwrap(),
+              futures_timer_thread2.with(|t| t.handle()),
             )
           }
         }).unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));

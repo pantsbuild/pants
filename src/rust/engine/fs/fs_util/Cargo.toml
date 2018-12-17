@@ -11,6 +11,8 @@ clap = "2"
 env_logger = "0.5.4"
 fs = { path = ".." }
 futures = "^0.1.16"
+# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
+futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
 hashing = { path = "../../hashing" }
 parking_lot = "0.6"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }

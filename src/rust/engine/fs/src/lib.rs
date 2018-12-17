@@ -49,6 +49,7 @@ extern crate digest;
 extern crate dirs;
 extern crate futures;
 extern crate futures_cpupool;
+extern crate futures_timer;
 extern crate glob;
 extern crate grpcio;
 extern crate hashing;

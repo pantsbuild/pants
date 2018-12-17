@@ -35,6 +35,7 @@ extern crate errno;
 extern crate fs;
 extern crate fuse;
 extern crate futures;
+extern crate futures_timer;
 extern crate hashing;
 extern crate libc;
 extern crate log;
@@ -693,6 +694,7 @@ fn main() {
         1.2,
         std::time::Duration::from_secs(20),
       ).expect("Error making BackoffConfig"),
+      futures_timer::TimerHandle::default(),
     ),
     None => fs::Store::local_only(&store_path, pool),
   }.expect("Error making store");

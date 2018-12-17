@@ -33,6 +33,7 @@ extern crate clap;
 extern crate env_logger;
 extern crate fs;
 extern crate futures;
+extern crate futures_timer;
 extern crate hashing;
 extern crate parking_lot;
 extern crate protobuf;
@@ -297,6 +298,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               1.2,
               std::time::Duration::from_secs(20),
             )?,
+            futures_timer::TimerHandle::default(),
           ),
           true,
         )
