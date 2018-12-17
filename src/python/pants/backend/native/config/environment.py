@@ -6,11 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from abc import abstractmethod, abstractproperty
-from builtins import object
 
 from pants.engine.rules import SingletonRule
-from pants.util.meta import AbstractClass, classproperty
 from pants.util.memo import memoized_classproperty
+from pants.util.meta import AbstractClass
 from pants.util.objects import datatype, enum
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var
@@ -32,8 +31,7 @@ def _list_field(func):
 
 
 def _algebraic_data(metaclass):
-  """A class decorator to pull out `_list_fields` from a mixin class for use with a `datatype`.
-  """
+  """A class decorator to pull out `_list_fields` from a mixin class for use with a `datatype`."""
   def wrapper(cls):
     cls.__bases__ += (metaclass,)
     cls._list_fields = metaclass._list_fields
@@ -41,10 +39,9 @@ def _algebraic_data(metaclass):
   return wrapper
 
 
+# NB: prototypal inheritance seems *deeply* linked with the idea here!
 class _ExtensibleAlgebraic(AbstractClass):
   """A mixin to make it more concise to coalesce datatypes with related collection fields."""
-
-  # NB: prototypal inheritance seems *deeply* linked with the idea here!
 
   @memoized_classproperty
   def _list_fields(cls):
@@ -124,16 +121,15 @@ class _Executable(_ExtensibleAlgebraic):
     """
     raise NotImplementedError('exe_filename is a scalar field of _Executable!')
 
-  # TODO: rename this to 'runtime_library_dirs'!
   @_list_field
-  def library_dirs(self):
+  def runtime_library_dirs(self):
     """Directories containing shared libraries that must be on the runtime library search path.
 
     Note: this is for libraries needed for the current _Executable to run -- see _LinkerMixin below
     for libraries that are needed at link time.
     :rtype: list of str
     """
-    raise NotImplementedError('library_dirs is a list field of _Executable!')
+    raise NotImplementedError('runtime_library_dirs is a list field of _Executable!')
 
   @_list_field
   def extra_args(self):
@@ -159,7 +155,7 @@ class _Executable(_ExtensibleAlgebraic):
     })
     return {
       'PATH': create_path_env_var(self.path_entries),
-      lib_env_var: create_path_env_var(self.library_dirs),
+      lib_env_var: create_path_env_var(self.runtime_library_dirs),
     }
 
 
@@ -167,7 +163,7 @@ class _Executable(_ExtensibleAlgebraic):
 class Assembler(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
     'extra_args',
 ])): pass
 
@@ -212,7 +208,7 @@ class _LinkerMixin(_Executable):
 class Linker(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
     'linking_library_dirs',
     'extra_args',
     'extra_object_files',
@@ -243,7 +239,7 @@ class _CompilerMixin(_Executable):
 class CCompiler(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
     'include_dirs',
     'extra_args',
 ])):
@@ -261,7 +257,7 @@ class CCompiler(datatype([
 class CppCompiler(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
     'include_dirs',
     'extra_args',
 ])):

@@ -180,7 +180,7 @@ def select_llvm_c_toolchain(platform, native_toolchain):
                          .sequence(provided_gcc)
                          .append_field('extra_args', gcc_install.as_clang_argv)
                          # We need g++'s version of the GLIBCXX library to be able to run.
-                         .prepend_field('library_dirs', provided_gcc.library_dirs))
+                         .prepend_field('runtime_library_dirs', provided_gcc.runtime_library_dirs))
 
   working_c_compiler = joined_c_compiler.prepend_field('extra_args', [
     '-x', 'c', '-std=c11',
@@ -213,8 +213,8 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
                            .copy(include_dirs=provided_gpp.include_dirs)
                            .append_field('extra_args', gcc_install.as_clang_argv)
                            # We need g++'s version of the GLIBCXX library to be able to run.
-                           .prepend_field('library_dirs', provided_gpp.library_dirs))
-    extra_llvm_linking_library_dirs = provided_gpp.library_dirs + provided_clangpp.library_dirs
+                           .prepend_field('runtime_library_dirs', provided_gpp.runtime_library_dirs))
+    extra_llvm_linking_library_dirs = provided_gpp.runtime_library_dirs + provided_clangpp.runtime_library_dirs
     # Ensure we use libstdc++, provided by g++, during the linking stage.
     linker_extra_args=['-stdlib=libstdc++']
 
