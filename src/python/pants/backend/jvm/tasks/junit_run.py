@@ -512,7 +512,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def _iter_batches(self, test_registry):
     tests_by_properties = test_registry.index(
       lambda tgt: tgt.cwd if tgt.cwd is not None else self._working_dir,
-      lambda tgt: tgt.test_platform,
+      lambda tgt: tgt.test_platform or JvmPlatform.global_instance().default_platform,
       lambda tgt: tgt.payload.extra_jvm_options,
       lambda tgt: tgt.payload.extra_env_vars,
       lambda tgt: tgt.concurrency,
