@@ -14,6 +14,7 @@ from future.utils import PY3
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.build_graph.build_graph import CycleException, sort_targets
 from pants.task.console_task import ConsoleTask
@@ -33,8 +34,7 @@ class JvmPlatformAnalysisMixin(object):
   def jvm_version(cls, target):
     if target.platform:
       return target.platform.target_level
-    else:
-      return None
+    return None
 
   @memoized_property
   def jvm_targets(self):
@@ -190,7 +190,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     class JvmPlatformAssignment(datatype([
         ('from_upstream', bool),
         ('source', SubclassesOf(JvmTarget)),
-        'version',
+        ('version', Revision),
     ])):
 
       @property
@@ -198,9 +198,8 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
         if self.from_upstream:
           # Version was assigned from a target which depends on the current one.
           return '{} from <- {} (upstream)'.format(self.version, self.source.address.spec)
-        else:
-          # Version was assigned from a target which the current one depends on.
-          return '{} from -> {} (downstream)'.format(self.version, self.source.address.spec)
+        # Version was assigned from a target which the current one depends on.
+        return '{} from -> {} (downstream)'.format(self.version, self.source.address.spec)
 
     def maybe_get_assigned_platform_version(target):
       cur_version = self.jvm_version(target)
@@ -217,13 +216,16 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
       if this_version and dep_version:
         return dep_version > this_version
       elif this_version and not dep_version:
-        jvm_platform_map[dependency] = JvmPlatformAssignment(True, target, this_version)
+        jvm_platform_map[dependency] = JvmPlatformAssignment(from_upstream=True,
+                                                             source=target,
+                                                             version=this_version)
         return False
       elif dep_version and not this_version:
-        jvm_platform_map[target] = JvmPlatformAssignment(False, dependency, dep_version)
+        jvm_platform_map[target] = JvmPlatformAssignment(from_upstream=False,
+                                                         source=dependency,
+                                                         version=dep_version)
         return False
-      else:
-        return False
+      return False
 
     try:
       sort_targets(self.jvm_targets)
@@ -261,8 +263,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
   def _get_platform_error_description(cls, target, jvm_platform_map):
     if target.platform:
       return '{} (explicitly specified)'.format(target.platform.name)
-    else:
-      return jvm_platform_map[target].transitive_assignment_description
+    return jvm_platform_map[target].transitive_assignment_description
 
   def _create_individual_error_message(self, target, invalid_dependencies, jvm_platform_map):
     return '\n  {target} targeting "{platform_name}"\n  {relationship}: {dependencies}'.format(
