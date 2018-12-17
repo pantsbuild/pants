@@ -162,6 +162,10 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
     return compile_classpath
 
+  @memoized_property
+  def _default_jvm_platform_name(self):
+    return JvmPlatform.global_instance().default_platform.name
+
   def generate_targets_map(self, targets, classpath_products=None):
     """Generates a dictionary containing all pertinent information about the target graph.
 
@@ -271,12 +275,15 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
       if isinstance(current_target, JvmTarget):
         info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
-        # TODO: this is a breaking change! should return the default jvm platform if this breaks
-        # anything
         if current_target.platform:
           info['platform'] = current_target.platform.name
+        else:
+          info['platform'] = self._default_jvm_platform_name
         if hasattr(current_target, 'test_platform'):
-          info['test_platform'] = current_target.test_platform.name
+          if current_target.test_platform:
+            info['test_platform'] = current_target.test_platform.name
+          else:
+            info['test_platform'] = self._default_jvm_platform_name
 
       info['roots'] = [{
         'source_root': source_root_package_prefix[0],
@@ -291,7 +298,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
       process_target(target)
 
     jvm_platforms_map = {
-      'default_platform' : JvmPlatform.global_instance().default_platform.name,
+      'default_platform' : self._default_jvm_platform_name,
       'platforms': {
         str(platform_name): {
           'target_level' : str(platform.target_level),
