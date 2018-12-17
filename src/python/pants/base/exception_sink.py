@@ -152,16 +152,20 @@ class ExceptionSink(object):
 
     This is where the the error message on exit will be printed to as well.
     """
-    # NB: mutate process-global state!
-    if faulthandler.unregister(signal.SIGUSR2):
-      logger.debug('re-registering a SIGUSR2 handler')
-    # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
-    faulthandler.register(signal.SIGUSR2, interactive_output_stream,
-                          all_threads=True, chain=False)
+    try:
+      # NB: mutate process-global state!
+      if faulthandler.unregister(signal.SIGUSR2):
+        logger.debug('re-registering a SIGUSR2 handler')
+      # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
+      faulthandler.register(signal.SIGUSR2, interactive_output_stream,
+                            all_threads=True, chain=False)
 
-    # NB: mutate the class variables!
-    # We don't *necessarily* need to keep a reference to this, but we do here for clarity.
-    cls._interactive_output_stream = interactive_output_stream
+      # NB: mutate the class variables!
+      # We don't *necessarily* need to keep a reference to this, but we do here for clarity.
+      cls._interactive_output_stream = interactive_output_stream
+    except ValueError:
+      # Warn about "ValueError: IO on closed file" when stderr is closed.
+      ExceptionSink.log_exception("Cannot reset output stream - sys.stderr is closed")
 
   @classmethod
   def exceptions_log_path(cls, for_pid=None, in_dir=None):
