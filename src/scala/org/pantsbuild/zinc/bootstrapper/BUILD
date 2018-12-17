@@ -13,7 +13,7 @@ scala_library(
     '3rdparty/jvm/org/scala-sbt:util-logging',
     '3rdparty/jvm/org/scala-sbt:io',
     '3rdparty/jvm/com/github/scopt',
-    '3rdparty/jvm/com/facebook/buck/util/zip',
+    '3rdparty/jvm/org/pantsbuild/buck/util/zip',
     'src/scala/org/pantsbuild/zinc/options',
     'src/scala/org/pantsbuild/zinc/scalautil',
   ],
