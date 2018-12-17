@@ -60,7 +60,6 @@ class HasSkipOptionMixin(object):
     return True
 
 
-
 class SkipOptionRegistrar(object):
   """Registrar of --skip."""
 

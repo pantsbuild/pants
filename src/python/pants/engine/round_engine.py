@@ -43,8 +43,6 @@ class GoalExecutor(object):
         with self._context.new_workunit(name=name, labels=[WorkUnitLabel.TASK], log_config=log_config):
           if explain:
             self._context.log.debug('Skipping execution of {} in explain mode'.format(name))
-          # elif task.skip_execution:
-          #   self._context.log.info('Skipping {}'.format(name))
           else:
             task.execute()
 

@@ -59,16 +59,6 @@ class RewriteBase(NailgunTask, AbstractClass):
     """Runs the tool on all source files that are located."""
     relevant_targets = self._get_non_synthetic_targets(self.get_targets())
 
-    # force_run_tag = 'no-{}.skip'.format(self.options_scope)
-    # force_run_targets = set(t for t in relevant_targets if force_run_tag in t.tags)
-    # force_skip_tag = '{}.skip'.format(self.options_scope)
-    # force_skip_targets = set(t for t in relevant_targets if force_skip_tag in t.tags)
-    #
-    # final_targets = set(relevant_targets).union(force_run_targets).difference(force_skip_targets)
-    #
-    # self.context.log.debug("Force skipping targets by tag: {}\n{}".format(force_skip_tag, force_skip_targets))
-    # self.context.log.debug("Force running targets by tag: {}\n{}".format(force_run_tag, force_run_targets))
-
     if self.sideeffecting:
       # Always execute sideeffecting tasks without invalidation.
       self._execute_for(relevant_targets)
