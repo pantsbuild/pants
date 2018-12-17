@@ -199,7 +199,7 @@ function build_fs_util() {
   (
     set -e
     RUST_BACKTRACE=1 "${ROOT}/build-support/bin/native/cargo" build --release \
-      --manifest-path="${ROOT}/src/rust/engine/fs/fs_util/Cargo.toml"
+      --manifest-path="${ROOT}/src/rust/engine/Cargo.toml" -p fs_util
     dst_dir="${DEPLOY_DIR}/bin/fs_util/$("${ROOT}/build-support/bin/get_os.sh")/${version}"
     mkdir -p "${dst_dir}"
     cp "${ROOT}/src/rust/engine/target/release/fs_util" "${dst_dir}/"
