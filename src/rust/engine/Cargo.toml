@@ -78,6 +78,8 @@ bytes = "0.4.5"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "^0.1.16"
+# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
+futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"

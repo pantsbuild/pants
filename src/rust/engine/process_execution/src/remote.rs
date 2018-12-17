@@ -43,6 +43,7 @@ pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
+  futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -145,6 +146,7 @@ impl super::CommandRunner for CommandRunner {
         let command_runner3 = self.clone();
         let execute_request = Arc::new(execute_request);
         let execute_request2 = execute_request.clone();
+        let futures_timer_thread = self.futures_timer_thread.clone();
 
         let mut history = ExecutionHistory::default();
 
@@ -173,6 +175,7 @@ impl super::CommandRunner for CommandRunner {
                 let operations_client = operations_client.clone();
                 let command_runner2 = command_runner2.clone();
                 let command_runner3 = command_runner3.clone();
+                let futures_timer_thread = futures_timer_thread.clone();
                 let f = command_runner2.extract_execute_response(operation, &mut history);
                 f.map(future::Loop::Break).or_else(move |value| {
                   match value {
@@ -229,26 +232,26 @@ impl super::CommandRunner for CommandRunner {
                         )).to_boxed()
                       } else {
                         // maybe the delay here should be the min of remaining time and the backoff period
-                        Delay::new(Duration::from_millis(backoff_period))
-                          .map_err(move |e| {
-                            format!(
-                              "Future-Delay errored at operation result polling for {}, {}: {}",
-                              operation_name, description, e
-                            )
-                          }).and_then(move |_| {
-                            future::done(
-                              operations_client
-                                .get_operation_opt(
-                                  &operation_request,
-                                  command_runner3.call_option(),
-                                ).or_else(move |err| {
-                                  rpcerror_recover_cancelled(operation_request.take_name(), err)
-                                }).map(OperationOrStatus::Operation)
-                                .map_err(rpcerror_to_string),
-                            ).map(move |operation| {
-                              future::Loop::Continue((history, operation, iter_num + 1))
-                            }).to_boxed()
+                        Delay::new_handle(
+                          Instant::now() + Duration::from_millis(backoff_period),
+                          futures_timer_thread.with(|thread| thread.handle()),
+                        ).map_err(move |e| {
+                          format!(
+                            "Future-Delay errored at operation result polling for {}, {}: {}",
+                            operation_name, description, e
+                          )
+                        }).and_then(move |_| {
+                          future::done(
+                            operations_client
+                              .get_operation_opt(&operation_request, command_runner3.call_option())
+                              .or_else(move |err| {
+                                rpcerror_recover_cancelled(operation_request.take_name(), err)
+                              }).map(OperationOrStatus::Operation)
+                              .map_err(rpcerror_to_string),
+                          ).map(move |operation| {
+                            future::Loop::Continue((history, operation, iter_num + 1))
                           }).to_boxed()
+                        }).to_boxed()
                       }
                     }
                   }
@@ -278,6 +281,7 @@ impl CommandRunner {
   const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
   const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
 
+  #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
   pub fn new(
     address: &str,
     cache_key_gen_version: Option<String>,
@@ -286,6 +290,7 @@ impl CommandRunner {
     oauth_bearer_token: Option<String>,
     thread_count: usize,
     store: Store,
+    futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
   ) -> CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = {
@@ -318,6 +323,7 @@ impl CommandRunner {
       execution_client,
       operations_client,
       store,
+      futures_timer_thread,
     }
   }
 
@@ -1351,7 +1357,16 @@ mod tests {
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let cmd_runner = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store);
+    let cmd_runner = CommandRunner::new(
+      &mock_server.address(),
+      None,
+      None,
+      None,
+      None,
+      1,
+      store,
+      timer_thread(),
+    );
     let result = cmd_runner.run(echo_roland_request()).wait().unwrap();
     assert_eq!(
       result.without_execution_attempts(),
@@ -1708,10 +1723,18 @@ mod tests {
       .wait()
       .expect("Saving file bytes to store");
 
-    let result = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store)
-      .run(cat_roland_request())
-      .wait()
-      .unwrap();
+    let result = CommandRunner::new(
+      &mock_server.address(),
+      None,
+      None,
+      None,
+      None,
+      1,
+      store,
+      timer_thread(),
+    ).run(cat_roland_request())
+    .wait()
+    .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
@@ -1789,9 +1812,17 @@ mod tests {
       .wait()
       .expect("Saving file bytes to store");
 
-    let result = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store)
-      .run(cat_roland_request())
-      .wait();
+    let result = CommandRunner::new(
+      &mock_server.address(),
+      None,
+      None,
+      None,
+      None,
+      1,
+      store,
+      timer_thread(),
+    ).run(cat_roland_request())
+    .wait();
     assert_eq!(
       result,
       Ok(FallibleExecuteProcessResult {
@@ -1846,10 +1877,18 @@ mod tests {
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    let error = CommandRunner::new(&mock_server.address(), None, None, None, None, 1, store)
-      .run(cat_roland_request())
-      .wait()
-      .expect_err("Want error");
+    let error = CommandRunner::new(
+      &mock_server.address(),
+      None,
+      None,
+      None,
+      None,
+      1,
+      store,
+      timer_thread(),
+    ).run(cat_roland_request())
+    .wait()
+    .expect_err("Want error");
     assert_contains(&error, &format!("{}", missing_digest.0));
   }
 
@@ -2418,7 +2457,11 @@ mod tests {
       Duration::from_secs(1),
     ).expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, None, 1, store)
+    CommandRunner::new(&address, None, None, None, None, 1, store, timer_thread())
+  }
+
+  fn timer_thread() -> resettable::Resettable<futures_timer::HelperThread> {
+    resettable::Resettable::new(|| futures_timer::HelperThread::new().unwrap())
   }
 
   fn extract_execute_response(

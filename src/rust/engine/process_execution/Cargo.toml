@@ -16,9 +16,11 @@ grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355d
 hashing = { path = "../hashing" }
 log = "0.4"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
+resettable = { path = "../resettable" }
 sha2 = "0.8"
 tempfile = "3"
-futures-timer = "0.1"
+# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
+futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
 time = "0.1.40"
 tokio-codec = "0.1"
 tokio-process = "0.2.1"
