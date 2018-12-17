@@ -98,7 +98,7 @@ class Executable(ExtensibleAlgebraic):
 
     :rtype: str
     """
-    raise NotImplementedError('path_entries is a list field of Executable!')
+    raise NotImplementedError('exe_filename is a scalar field of Executable!')
 
   # TODO: rename this to 'runtime_library_dirs'!
   @abstractproperty
@@ -110,11 +110,6 @@ class Executable(ExtensibleAlgebraic):
     :rtype: list of str
     """
     raise NotImplementedError('library_dirs is a list field of Executable!')
-
-  @abstractproperty
-  def exe_filename(self):
-    """The "entry point" -- which file to invoke when PATH is set to `path_entries()`."""
-    raise NotImplementedError('exe_filename is a scalar field of Executable!')
 
   @abstractproperty
   def extra_args(self):

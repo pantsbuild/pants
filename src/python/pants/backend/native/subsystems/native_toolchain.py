@@ -4,8 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.config.environment import (Assembler, CCompiler, CppCompiler,
-                                                     CppToolchain, CToolchain, Linker, Platform)
+from builtins import object
+
+from pants.backend.native.config.environment import (Assembler, CCompiler, CompilerMixin,
+                                                     CppCompiler, CppToolchain, CToolchain, Linker,
+                                                     Platform)
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
@@ -67,10 +70,20 @@ class NativeToolchain(Subsystem):
 class LibcObjects(datatype(['crti_object_paths'])): pass
 
 
-class GCCLinker(datatype([('linker', Linker)])): pass
+class LinkerWrapperMixin(object):
+
+  def for_compiler(self, compiler, platform):
+    """Return a Linker object which is intended to be compatible with the given `compiler`."""
+    assert(isinstance(compiler, CompilerMixin))
+    return (self.linker
+            .sequence(compiler, exclude_list_fields=['extra_args'])
+            .copy(exe_filename=compiler.exe_filename))
 
 
-class LLVMLinker(datatype([('linker', Linker)])): pass
+class GCCLinker(datatype([('linker', Linker)]), LinkerWrapperMixin): pass
+
+
+class LLVMLinker(datatype([('linker', Linker)]), LinkerWrapperMixin): pass
 
 
 class GCCCToolchain(datatype([('c_toolchain', CToolchain)])): pass
@@ -110,14 +123,6 @@ class BaseLinker(datatype([('linker', Linker)])):
   This represents Linker objects provided by subsystems, but may need additional information to be
   usable by a specific compiler."""
 
-  def for_compiler(self, compiler, libc_dev, platform):
-    """Return a Linker object which is intended to be compatible with the given `compiler`."""
-    assert(isinstance(compiler, CompilerMixin))
-    return (self.linker
-            .sequence(compiler, exclude_list_fields=['extra_args'])
-            .copy(exe_filename=compiler.exe_filename)
-            .append_field('linking_library_dirs', libc_dev.get_libc_dirs(platform)))
-
 
 # TODO: select the appropriate `Platform` in the `@rule` decl using variants!
 @rule(BaseLinker, [Select(Platform), Select(NativeToolchain)])
@@ -136,8 +141,7 @@ def select_gcc_linker(native_toolchain):
   base_linker = yield Get(BaseLinker, NativeToolchain, native_toolchain)
   linker = base_linker.linker
   libc_objects = yield Get(LibcObjects, NativeToolchain, native_toolchain)
-  linker_with_libc = linker.copy(
-    extra_object_files=(linker.extra_object_files + libc_objects.crti_object_paths))
+  linker_with_libc = linker.append_field('extra_object_files', libc_objects.crti_object_paths)
   yield GCCLinker(linker_with_libc)
 
 
@@ -184,9 +188,8 @@ def select_llvm_c_toolchain(platform, native_toolchain):
     '-x', 'c', '-std=c11',
   ])
 
-  base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
-  libc_dev = yield Get(LibcDev, NativeToolchain, native_toolchain)
-  working_linker = base_linker_wrapper.for_compiler(working_c_compiler, libc_dev, platform)
+  llvm_linker_wrapper = yield Get(LLVMLinker, NativeToolchain, native_toolchain)
+  working_linker = llvm_linker_wrapper.for_compiler(working_c_compiler, platform)
 
   yield LLVMCToolchain(CToolchain(working_c_compiler, working_linker))
 
@@ -226,10 +229,9 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     '-nostdinc++',
   ])
 
-  libc_dev = yield Get(LibcDev, NativeToolchain, native_toolchain)
-  base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
-  working_linker = (base_linker_wrapper
-                    .for_compiler(working_cpp_compiler, libc_dev, platform)
+  llvm_linker_wrapper = yield Get(LLVMLinker, NativeToolchain, native_toolchain)
+  working_linker = (llvm_linker_wrapper
+                    .for_compiler(working_cpp_compiler, platform)
                     .append_field('linking_library_dirs', extra_llvm_linking_library_dirs)
                     .prepend_field('extra_args', linker_extra_args))
 
@@ -255,9 +257,8 @@ def select_gcc_c_toolchain(platform, native_toolchain):
     '-x', 'c', '-std=c11',
   ])
 
-  base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
-  libc_dev = yield Get(LibcDev, NativeToolchain, native_toolchain)
-  working_linker = base_linker_wrapper.for_compiler(working_c_compiler, libc_dev, platform)
+  gcc_linker_wrapper = yield Get(GCCLinker, NativeToolchain, native_toolchain)
+  working_linker = gcc_linker_wrapper.for_compiler(working_c_compiler, platform)
 
   yield GCCCToolchain(CToolchain(working_c_compiler, working_linker))
 
@@ -284,9 +285,8 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
     '-nostdinc++',
   ])
 
-  base_linker_wrapper = yield Get(BaseLinker, NativeToolchain, native_toolchain)
-  libc_dev = yield Get(LibcDev, NativeToolchain, native_toolchain)
-  working_linker = base_linker_wrapper.for_compiler(working_cpp_compiler, libc_dev, platform)
+  gcc_linker_wrapper = yield Get(GCCLinker, NativeToolchain, native_toolchain)
+  working_linker = gcc_linker_wrapper.for_compiler(working_cpp_compiler, platform)
 
   yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
 
