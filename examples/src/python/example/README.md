@@ -69,7 +69,7 @@ For example, to use python3 for the whole repo, update `pants.ini` as follows:
 
 ```ini
 [python-setup]
-interpreter_constraints: ["CPython>=3.6"]
+interpreter_constraints: ["CPython>=3.5"]
 ```
 
 If you require more granularity, the `compatibility` parameter may be specified on
