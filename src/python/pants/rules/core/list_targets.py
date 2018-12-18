@@ -32,9 +32,7 @@ class List(Goal):
 
 
 @console_rule(List, [Console, List, Specs])
-def fast_list(console, list_goal, specs):
-  """A fast variant of `./pants list` with a reduced feature set."""
-
+def list_targets(console, list_goal, specs):
   provides = list_goal.options.provides
   provides_columns = list_goal.options.provides_columns
   documented = list_goal.options.documented
@@ -84,5 +82,5 @@ def fast_list(console, list_goal, specs):
 
 def rules():
   return [
-      fast_list,
+      list_targets,
     ]

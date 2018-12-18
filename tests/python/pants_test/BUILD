@@ -80,6 +80,17 @@ python_library(
 )
 
 python_library(
+  name = 'console_rule_test_base',
+  sources = ['console_rule_test_base.py'],
+  dependencies = [
+    ':test_base',
+    'src/python/pants/bin',
+    'src/python/pants/init',
+  ]
+)
+
+
+python_library(
   name = 'task_test_base',
   sources = ['task_test_base.py'],
   dependencies = [

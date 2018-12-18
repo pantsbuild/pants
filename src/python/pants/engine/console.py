@@ -8,13 +8,17 @@ import sys
 
 
 class Console(object):
+  def __init__(self, stdout=None, stderr=None):
+    self._stdout = stdout or sys.stdout
+    self._stderr = stderr or sys.stderr
+
   @property
   def stdout(self):
-    return sys.stdout
+    return self._stdout
 
   @property
   def stderr(self):
-    return sys.stderr
+    return self._stderr
 
   def write_stdout(self, payload):
     self.stdout.write(payload)

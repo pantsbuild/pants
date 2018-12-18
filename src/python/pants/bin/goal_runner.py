@@ -50,7 +50,7 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-  def _determine_goals(self, address_mapper, options):
+  def _determine_v1_goals(self, address_mapper, options):
     """Check and populate the requested goals for a given run."""
     v1_goals, ambiguous_goals, _ = options.goals_by_version
     requested_goals = v1_goals + ambiguous_goals
@@ -90,7 +90,7 @@ class GoalRunnerFactory(object):
         self._root_dir
       )
 
-      goals = self._determine_goals(address_mapper, self._options)
+      goals = self._determine_v1_goals(address_mapper, self._options)
       is_quiet = self._should_be_quiet(goals)
 
       target_root_instances = self._roots_to_targets(build_graph, self._target_roots)
@@ -125,7 +125,11 @@ class GoalRunnerFactory(object):
 
 
 class GoalRunner(object):
-  """Lists installed goals or else executes a named goal."""
+  """Lists installed goals or else executes a named goal.
+
+  NB: GoalRunner represents a v1-only codepath. v2 goals are registered via `@console_rule` and
+  the `pants.engine.goal.Goal` class.
+  """
 
   Factory = GoalRunnerFactory
 
