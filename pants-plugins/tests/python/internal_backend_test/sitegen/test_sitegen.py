@@ -5,11 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
-import sys
 import unittest
 
 import bs4
-import pytest
 from future.utils import PY3
 
 from internal_backend.sitegen.tasks import sitegen
@@ -193,7 +191,6 @@ class AllTheThingsTestCase(unittest.TestCase):
     self.assertIn('DEPTH=1 LINK=one TEXT=Section One', rendered)
     self.assertIn('DEPTH=1 LINK=two TEXT=Section Two', rendered)
 
-  @pytest.mark.skipif(sys.version_info >= (3,0), reason="TODO: See #6062.")
   def test_site_toc(self):
     # Our "site" has a simple outline.
     # Do we get the correct info from that to generate
