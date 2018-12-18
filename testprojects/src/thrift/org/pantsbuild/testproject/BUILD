@@ -3,4 +3,5 @@ java_thrift_library(
   sources=rglobs('*.thrift'),
   compiler='scrooge',
   language='java',
+  platform='java8',
 )
