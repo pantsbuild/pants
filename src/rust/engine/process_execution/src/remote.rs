@@ -1345,16 +1345,19 @@ mod tests {
     let store_dir_path = store_dir.path();
 
     let cas = mock::StubCAS::empty();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       &store_dir_path,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      &[cas.address()],
       None,
-      None,
+      &None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
+      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      timer_thread.with(|t| t.handle()),
     ).expect("Failed to make store");
 
     let cmd_runner = CommandRunner::new(
@@ -1365,7 +1368,7 @@ mod tests {
       None,
       1,
       store,
-      timer_thread(),
+      timer_thread,
     );
     let result = cmd_runner.run(echo_roland_request()).wait().unwrap();
     assert_eq!(
@@ -1707,16 +1710,19 @@ mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      &[cas.address()],
       None,
-      None,
+      &None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
+      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      timer_thread.with(|t| t.handle()),
     ).expect("Failed to make store");
     store
       .store_file_bytes(roland.bytes(), false)
@@ -1731,7 +1737,7 @@ mod tests {
       None,
       1,
       store,
-      timer_thread(),
+      timer_thread,
     ).run(cat_roland_request())
     .wait()
     .unwrap();
@@ -1796,16 +1802,19 @@ mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      &[cas.address()],
       None,
-      None,
+      &None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
+      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      timer_thread.with(|t| t.handle()),
     ).expect("Failed to make store");
     store
       .store_file_bytes(roland.bytes(), false)
@@ -1820,7 +1829,7 @@ mod tests {
       None,
       1,
       store,
-      timer_thread(),
+      timer_thread,
     ).run(cat_roland_request())
     .wait();
     assert_eq!(
@@ -1865,16 +1874,19 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      &[cas.address()],
       None,
-      None,
+      &None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
+      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      timer_thread.with(|t| t.handle()),
     ).expect("Failed to make store");
 
     let error = CommandRunner::new(
@@ -1885,7 +1897,7 @@ mod tests {
       None,
       1,
       store,
-      timer_thread(),
+      timer_thread,
     ).run(cat_roland_request())
     .wait()
     .expect_err("Want error");
@@ -2445,19 +2457,22 @@ mod tests {
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
     let store_dir = TempDir::new().unwrap();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
-      &cas.address(),
+      &[cas.address()],
       None,
-      None,
+      &None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
+      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      timer_thread.with(|t| t.handle()),
     ).expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, None, 1, store, timer_thread())
+    CommandRunner::new(&address, None, None, None, None, 1, store, timer_thread)
   }
 
   fn timer_thread() -> resettable::Resettable<futures_timer::HelperThread> {

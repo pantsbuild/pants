@@ -33,9 +33,11 @@ extern crate clap;
 extern crate env_logger;
 extern crate fs;
 extern crate futures;
+extern crate futures_timer;
 extern crate hashing;
 extern crate parking_lot;
 extern crate protobuf;
+extern crate rand;
 extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
@@ -48,6 +50,7 @@ use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use protobuf::Message;
+use rand::seq::SliceRandom;
 use serde_derive::Serialize;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -201,6 +204,8 @@ to this directory.",
               .takes_value(true)
               .long("server-address")
               .required(false)
+              .multiple(true)
+              .number_of_values(1)
         )
         .arg(
           Arg::with_name("root-ca-cert-file")
@@ -245,7 +250,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
     .unwrap_or_else(Store::default_path);
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
   let (store, store_has_remote) = {
-    let (store_result, store_has_remote) = match top_match.value_of("server-address") {
+    let (store_result, store_has_remote) = match top_match.values_of("server-address") {
       Some(cas_address) => {
         let chunk_size =
           value_t!(top_match.value_of("chunk-bytes"), usize).expect("Bad chunk-bytes flag");
@@ -268,15 +273,19 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             None
           };
 
+        // Randomize CAS address order to avoid thundering herds from common config.
+        let mut cas_addresses = cas_address.map(str::to_owned).collect::<Vec<_>>();
+        cas_addresses.shuffle(&mut rand::thread_rng());
+
         (
           Store::with_remote(
             &store_dir,
             pool.clone(),
-            cas_address,
+            &cas_addresses,
             top_match
               .value_of("remote-instance-name")
               .map(str::to_owned),
-            root_ca_certs,
+            &root_ca_certs,
             oauth_bearer_token,
             1,
             chunk_size,
@@ -289,6 +298,13 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             //
             // See https://github.com/pantsbuild/pants/pull/6433 for more context.
             Duration::from_secs(30 * 60),
+            // TODO: Take a command line arg.
+            fs::BackoffConfig::new(
+              std::time::Duration::from_secs(1),
+              1.2,
+              std::time::Duration::from_secs(20),
+            )?,
+            futures_timer::TimerHandle::default(),
           ),
           true,
         )

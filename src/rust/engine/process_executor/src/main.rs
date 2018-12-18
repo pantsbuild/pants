@@ -183,6 +183,7 @@ fn main() {
     .map(PathBuf::from)
     .unwrap_or_else(fs::Store::default_path);
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
+  let timer_thread = resettable::Resettable::new(|| futures_timer::HelperThread::new().unwrap());
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let store = match (server_arg, args.value_of("cas-server")) {
@@ -205,13 +206,16 @@ fn main() {
       fs::Store::with_remote(
         local_store_path,
         pool.clone(),
-        cas_server,
+        &[cas_server.to_owned()],
         remote_instance_arg.clone(),
-        root_ca_certs,
+        &root_ca_certs,
         oauth_bearer_token,
         1,
         chunk_size,
         Duration::from_secs(30),
+        // TODO: Take a command line arg.
+        fs::BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
+        timer_thread.with(|t| t.handle()),
       )
     }
     (None, None) => fs::Store::local_only(local_store_path, pool.clone()),
@@ -263,7 +267,7 @@ fn main() {
         oauth_bearer_token,
         1,
         store,
-        resettable::Resettable::new(|| futures_timer::HelperThread::new().unwrap()),
+        timer_thread,
       ))
     }
     None => Box::new(process_execution::local::CommandRunner::new(

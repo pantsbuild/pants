@@ -10,7 +10,7 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
   /// Will retry any time `f` produces an error. The underlying serverset may lead to backoff
   /// between attempts, but the Retry implementation itself will not.
   ///
-  fn all_errors_immediately<
+  pub fn all_errors_immediately<
     Value: Send + 'static,
     Fut: Future<Item = Value, Error = String>,
     IntoFut: IntoFuture<Future = Fut, Item = Value, Error = String>,
