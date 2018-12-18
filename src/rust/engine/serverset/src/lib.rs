@@ -41,6 +41,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+mod retry;
+pub use retry::Retry;
+
 ///
 /// A collection of resources which are observed to be healthy or unhealthy.
 /// Getting the next resource skips any which are mark_bad_as_baded unhealthy, and will re-try unhealthy
@@ -51,7 +54,7 @@ pub struct Serverset<T> {
   inner: Arc<Inner<T>>,
 }
 
-impl<T> Clone for Serverset<T> {
+impl<T: Clone + Send + Sync + 'static> Clone for Serverset<T> {
   fn clone(&self) -> Self {
     Serverset {
       inner: self.inner.clone(),
