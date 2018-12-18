@@ -15,7 +15,7 @@ from pants.build_graph.register import build_file_aliases as register_core
 from pants_test.task_test_base import ConsoleTaskTestBase
 
 
-class FileDepsTest(ConsoleTaskTestBase):
+class FileDepsTestBase(ConsoleTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
@@ -26,7 +26,7 @@ class FileDepsTest(ConsoleTaskTestBase):
     return FileDeps
 
   def setUp(self):
-    super(FileDepsTest, self).setUp()
+    super(FileDepsTestBase, self).setUp()
     self.context(options={
       'scala': {
         'runtime': ['tools:scala-library']
@@ -233,6 +233,24 @@ class FileDepsTest(ConsoleTaskTestBase):
       targets=[self.target('project:app')]
     )
 
+
+class FileDepsAbsoluteTest(FileDepsTestBase):
+
   def assert_console_output(self, *paths, **kwargs):
+    if 'options' not in kwargs:
+      kwargs['options'] = {}
+    kwargs['options'].update({'abs': True})
+
     abs_paths = [os.path.join(self.build_root, path) for path in paths]
-    super(FileDepsTest, self).assert_console_output(*abs_paths, **kwargs)
+
+    super(FileDepsTestBase, self).assert_console_output(*abs_paths, **kwargs)
+
+
+class FileDepsRelativeTest(FileDepsTestBase):
+
+  def assert_console_output(self, *paths, **kwargs):
+    if 'options' not in kwargs:
+      kwargs['options'] = {}
+    kwargs['options'].update({'abs': False})
+
+    super(FileDepsTestBase, self).assert_console_output(*paths, **kwargs)

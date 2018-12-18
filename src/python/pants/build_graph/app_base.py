@@ -81,6 +81,21 @@ class BundleProps(namedtuple('_BundleProps', ['rel_path', 'mapper', 'fileset']))
         filemap[abspath] = self.mapper(abspath)
     return filemap
 
+  @memoized_property
+  def relative_filemap(self):
+    filemap = OrderedDict()
+    if self.fileset is not None:
+      paths = self.fileset() if isinstance(self.fileset, Fileset) \
+        else self.fileset if hasattr(self.fileset, '__iter__') \
+        else [self.fileset]
+      for path in paths:
+        if os.path.isabs(path):
+          relpath = fast_relpath(path, get_buildroot())
+        else:
+          relpath = os.path.join(self.rel_path, path)
+        filemap[relpath] = self.mapper(relpath)
+    return filemap
+
   def __hash__(self):
     # Leave out fileset from hash calculation since it may not be hashable.
     return hash((self.rel_path, self.mapper))

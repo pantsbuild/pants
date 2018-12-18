@@ -16,8 +16,8 @@ from pants.task.console_task import ConsoleTask
 class FileDeps(ConsoleTask):
   """List all source and BUILD files a target transitively depends on.
 
-  Files are listed with absolute paths and any BUILD files implied in the transitive closure of
-  targets are also included.
+  Files may be listed with absolute or relative paths and any BUILD files implied in the transitive
+  closure of targets are also included.
   """
 
   @classmethod
@@ -25,9 +25,14 @@ class FileDeps(ConsoleTask):
     super(FileDeps, cls).register_options(register)
     register('--globs', type=bool,
              help='Instead of outputting filenames, output globs (ignoring excludes)')
+    register('--abs', type=bool, default=True,
+             help='If True output with absolute path, else output with relative path')
 
-  def _full_path(self, path):
-    return os.path.join(get_buildroot(), path)
+  def _files_path(self, path):
+    abs_path = self.get_options().abs
+    if abs_path:
+      return os.path.join(get_buildroot(), path)
+    return path
 
   def console_output(self, targets):
     concrete_targets = set()
@@ -48,16 +53,20 @@ class FileDeps(ConsoleTask):
     # Filter out any synthetic targets, which will not have a build_file attr.
     concrete_targets = {target for target in concrete_targets if not target.is_synthetic}
     for target in concrete_targets:
-      files.add(self._full_path(target.address.rel_path))
+      files.add(self._files_path(target.address.rel_path))
       if output_globs or target.has_sources():
         if output_globs:
           globs_obj = target.globs_relative_to_buildroot()
           if globs_obj:
-            files.update(self._full_path(src) for src in globs_obj['globs'])
+            files.update(self._files_path(src) for src in globs_obj['globs'])
         else:
-          files.update(self._full_path(src) for src in target.sources_relative_to_buildroot())
+          files.update(self._files_path(src) for src in target.sources_relative_to_buildroot())
       # TODO(John Sirois): BundlePayload should expose its sources in a way uniform to
       # SourcesPayload to allow this special-casing to go away.
       if isinstance(target, JvmApp) and not output_globs:
-        files.update(itertools.chain(*[list(bundle.filemap.keys()) for bundle in target.bundles]))
+        abs_path = self.get_options().abs
+        if abs_path:
+          files.update(itertools.chain(*[list(bundle.filemap.keys()) for bundle in target.bundles]))
+        else:
+          files.update(itertools.chain(*[list(bundle.relative_filemap.keys()) for bundle in target.bundles]))
     return files
