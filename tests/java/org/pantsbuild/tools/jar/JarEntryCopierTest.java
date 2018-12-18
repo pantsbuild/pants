@@ -18,8 +18,6 @@ import java.util.zip.CRC32;
 import java.util.zip.CheckedInputStream;
 import java.util.zip.ZipEntry;
 
-import com.facebook.buck.util.zip.ZipConstants;
-import com.facebook.buck.util.zip.ZipScrubber;
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
 import com.google.common.io.ByteStreams;
@@ -27,6 +25,8 @@ import com.google.common.io.Closer;
 import com.google.common.io.Files;
 
 import org.junit.Test;
+import org.pantsbuild.buck.util.zip.ZipConstants;
+import org.pantsbuild.buck.util.zip.ZipScrubber;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
