@@ -20,6 +20,9 @@ from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThrif
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.wire.java.wire_gen import WireGen
+from pants.backend.codegen.grpcio.grpcio_prep import GrpcioPrep
+from pants.backend.codegen.grpcio.grpcio_run import GrpcioRun
+from pants.backend.codegen.grpcio.python_grpcio_library import PythonGrpcioLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -34,6 +37,7 @@ def build_file_aliases():
       'java_wire_library': JavaWireLibrary,
       'python_antlr_library': PythonAntlrLibrary,
       'python_thrift_library': PythonThriftLibrary,
+      'python_grpcio_library': PythonGrpcioLibrary,
       'jaxb_library': JaxbLibrary,
       }
     )
@@ -42,6 +46,8 @@ def build_file_aliases():
 def register_goals():
   task(name='thrift-java', action=ApacheThriftJavaGen).install('gen')
   task(name='thrift-py', action=ApacheThriftPyGen).install('gen')
+  task(name='grpcio-prep', action=GrpcioPrep).install('gen')
+  task(name='grpcio-run', action=GrpcioRun).install('gen')
   task(name='protoc', action=ProtobufGen).install('gen')
   task(name='antlr-java', action=AntlrJavaGen).install('gen')
   task(name='antlr-py', action=AntlrPyGen).install('gen')
