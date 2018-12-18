@@ -1,0 +1,11 @@
+[package]
+name = "serverset"
+version = "0.0.1"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+boxfuture = { path = "../boxfuture" }
+futures = "^0.1.16"
+futures-timer = "0.1.1"
+parking_lot = "0.6"

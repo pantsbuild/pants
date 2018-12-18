@@ -263,6 +263,7 @@ fn main() {
         oauth_bearer_token,
         1,
         store,
+        resettable::Resettable::new(|| futures_timer::HelperThread::new().unwrap()),
       ))
     }
     None => Box::new(process_execution::local::CommandRunner::new(

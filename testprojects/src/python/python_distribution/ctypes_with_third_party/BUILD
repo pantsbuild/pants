@@ -6,7 +6,7 @@
 ctypes_compatible_cpp_library(
   name='cpp_library_with_third_party',
   sources=['some_more_math.hpp', 'some_more_math_with_third_party.cpp'],
-  ctypes_native_library=native_artifact(lib_name='asdf-cpp-tp'),
+  ctypes_native_library=native_artifact(lib_name='asdf-cpp_ctypes-with-third-party'),
   dependencies=[':rang', ':cereal'],
   fatal_warnings=False
 )

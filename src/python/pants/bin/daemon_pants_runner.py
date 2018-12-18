@@ -283,6 +283,7 @@ class DaemonPantsRunner(ProcessManager):
     # terminal window.
     # TODO: test the above!
     ExceptionSink.reset_exiter(self._exiter)
+
     ExceptionSink.reset_interactive_output_stream(sys.stderr)
 
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.

@@ -108,7 +108,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       wheel_files = ZipFile(wheel_dist_with_path).namelist()
 
       dist_versioned_name = '{}-{}.data'.format(dist_name, dist_version)
-      for shared_lib_filename in ['libasdf-c.so', 'libasdf-cpp.so']:
+      for shared_lib_filename in ['libasdf-c_ctypes.so', 'libasdf-cpp_ctypes.so']:
         full_path_in_wheel = os.path.join(dist_versioned_name, 'data', shared_lib_filename)
         self.assertIn(full_path_in_wheel, wheel_files)
 

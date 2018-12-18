@@ -16,8 +16,8 @@ def get_generated_shared_lib(lib_name):
   return os.path.normpath(rel_path)
 
 
-asdf_c_lib_path = get_generated_shared_lib('asdf-c')
-asdf_cpp_lib_path = get_generated_shared_lib('asdf-cpp')
+asdf_c_lib_path = get_generated_shared_lib('asdf-c_ctypes')
+asdf_cpp_lib_path = get_generated_shared_lib('asdf-cpp_ctypes')
 
 asdf_c_lib = ctypes.CDLL(asdf_c_lib_path)
 asdf_cpp_lib = ctypes.CDLL(asdf_cpp_lib_path)

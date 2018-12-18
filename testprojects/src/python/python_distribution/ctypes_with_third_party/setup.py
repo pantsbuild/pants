@@ -12,5 +12,5 @@ setup(
   version='0.0.1',
   packages=find_packages(),
   # Declare one shared lib at the top-level directory (denoted by '').
-  data_files=[('', ['libasdf-cpp-tp.so'])],
+  data_files=[('', ['libasdf-cpp_ctypes-with-third-party.so'])],
 )

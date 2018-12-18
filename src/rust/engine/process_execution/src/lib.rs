@@ -41,6 +41,7 @@ extern crate log;
 #[cfg(test)]
 extern crate mock;
 extern crate protobuf;
+extern crate resettable;
 extern crate sha2;
 #[cfg(test)]
 extern crate tempfile;
