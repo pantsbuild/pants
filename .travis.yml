@@ -203,92 +203,92 @@ matrix:
     - <<: *default_test_config
       name: "Py2 - Unit tests for pants and pants-plugins"
       script:
-        - ./build-support/bin/travis-ci.sh -lp
+        - ./build-support/bin/travis-ci.sh -2lp
 
     - <<: *default_test_config
       name: "Py3 - Unit tests for pants and pants-plugins"
       script:
-        - ./build-support/bin/travis-ci.sh -3lp
+        - ./build-support/bin/travis-ci.sh -lp
 
     - <<: *default_test_config
       name: "Py2 - Python contrib tests"
       script:
-        - ./build-support/bin/travis-ci.sh -n
+        - ./build-support/bin/travis-ci.sh -2n
 
     - <<: *default_test_config
       name: "Py3 - Python contrib tests"
       script:
-        - ./build-support/bin/travis-ci.sh -3n
+        - ./build-support/bin/travis-ci.sh -n
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 0/7
+        - ./build-support/bin/travis-ci.sh -c -i 0/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 2"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 1/7
+        - ./build-support/bin/travis-ci.sh -c -i 1/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 3"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 2/7
+        - ./build-support/bin/travis-ci.sh -c -i 2/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 4"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 3/7
+        - ./build-support/bin/travis-ci.sh -c -i 3/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 5"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 4/7
+        - ./build-support/bin/travis-ci.sh -c -i 4/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 6"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 5/7
+        - ./build-support/bin/travis-ci.sh -c -i 5/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 7"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 6/7
+        - ./build-support/bin/travis-ci.sh -c -i 6/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 1"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 0/7
+        - ./build-support/bin/travis-ci.sh -c2 -i 0/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 2"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 1/7
+        - ./build-support/bin/travis-ci.sh -c2 -i 1/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 3"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 2/7
+        - ./build-support/bin/travis-ci.sh -c2 -i 2/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 4"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 3/7
+        - ./build-support/bin/travis-ci.sh -c2 -i 3/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 5"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 4/7
+        - ./build-support/bin/travis-ci.sh -c2 -i 4/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 6"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 5/7
+        - ./build-support/bin/travis-ci.sh -c2 -i 5/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 7"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 6/7
+        - ./build-support/bin/travis-ci.sh -c2 -i 6/7
 
     # Rust on linux
     - <<: *linux_with_fuse
