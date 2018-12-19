@@ -239,7 +239,7 @@ class FileDepsAbsoluteTest(FileDepsTestBase):
   def assert_console_output(self, *paths, **kwargs):
     if 'options' not in kwargs:
       kwargs['options'] = {}
-    kwargs['options'].update({'abs': True})
+    kwargs['options'].update({'absolute': True})
 
     abs_paths = [os.path.join(self.build_root, path) for path in paths]
 
@@ -251,6 +251,6 @@ class FileDepsRelativeTest(FileDepsTestBase):
   def assert_console_output(self, *paths, **kwargs):
     if 'options' not in kwargs:
       kwargs['options'] = {}
-    kwargs['options'].update({'abs': False})
+    kwargs['options'].update({'absolute': False})
 
     super(FileDepsTestBase, self).assert_console_output(*paths, **kwargs)
