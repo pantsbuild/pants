@@ -19,12 +19,12 @@ SCROOGE_REV = '18.12.0'
 # therefore they do not need to use the `scala-platform` via scala_jar.
 jar_library(name = 'scrooge-gen',
             jars = [
-              scala_jar(org='com.twitter', name='scrooge-generator', rev=SCROOGE_REV)
+              jar(org='com.twitter', name='scrooge-generator_2.11', rev=SCROOGE_REV)
             ])
 
 jar_library(name = 'scrooge-linter',
             jars = [
-              scala_jar(org='com.twitter', name='scrooge-linter', rev=SCROOGE_REV)
+              jar(org='com.twitter', name='scrooge-linter_2.11', rev=SCROOGE_REV)
             ])
 
 # Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
