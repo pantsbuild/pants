@@ -20,13 +20,13 @@
     {
       "type_alias": "apache_thrift_java_configuration",
       "name": "apache_java",
-      "rev": "0.9.2",
+      "rev": "0.10.0",
       "strict": true,
       "dependencies": [
         {
           "type_alias": "jar",
           "extends": ":libthrift",
-          "rev": "0.9.2"
+          "rev": "0.10.0"
         },
         {
           "type_alias": "jar",
@@ -43,25 +43,25 @@
 {
   "type_alias": "scrooge_scala_configuration",
   "name": "scrooge_scala_config",
-  "rev": "3.20.0",
+  "rev": "18.12.0",
   "strict": true,
   "dependencies": [
     {
       "type_alias": "jar",
       "extends": ":libthrift",
-      "rev": "0.6.1"
+      "rev": "0.10.0"
     },
     {
       "type_alias": "jar",
       "org": "com.twitter",
-      "name": "scrooge-core_2.10",
-      "rev": "3.20.0"
+      "name": "scrooge-core_2.11",
+      "rev": "18.12.0"
     },
     {
       "type_alias": "jar",
       "org": "com.twitter",
-      "name": "finagle-thrift_2.10",
-      "rev": "6.28.0"
+      "name": "finagle-thrift_2.11",
+      "rev": "18.12.0"
     },
     "3rdparty/jvm:scala-library"
   ]
@@ -85,14 +85,14 @@
     {
       "type_alias": "scrooge_java_configuration",
       "name": "scrooge_java_config",
-      "rev": "3.20.0",
+      "rev": "18.12.0",
       "strict": true,
       "dependencies": [
         ":slf4j-api",
         {
           "type_alias": "jar",
           "extends": ":libthrift",
-          "rev": "0.6.1"
+          "rev": "0.10.0"
         }
       ]
     },
