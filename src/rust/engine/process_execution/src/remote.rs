@@ -134,6 +134,7 @@ impl super::CommandRunner for CommandRunner {
     let ExecuteProcessRequest {
       description,
       timeout,
+      input_files,
       ..
     } = req;
 
@@ -148,11 +149,15 @@ impl super::CommandRunner for CommandRunner {
         let execute_request2 = execute_request.clone();
         let futures_timer_thread = self.futures_timer_thread.clone();
 
+        let store2 = store.clone();
         let mut history = ExecutionHistory::default();
 
         self
-          .upload_protos(&command, &action)
-          .and_then(move |summary| {
+          .store_proto_locally(&command)
+          .join(self.store_proto_locally(&action))
+          .and_then(move |(command_digest, action_digest)| {
+            store2.ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
+          }).and_then(move |summary| {
             history.current_attempt += summary;
             trace!(
               "Executing remotely request: {:?} (command: {:?})",
@@ -350,23 +355,6 @@ impl CommandRunner {
         .map_err(|e| format!("Error serializing proto {:?}", e)),
     ).and_then(move |command_bytes| store.store_file_bytes(Bytes::from(command_bytes), true))
     .map_err(|e| format!("Error saving proto to local store: {:?}", e))
-  }
-
-  fn upload_protos<P1: protobuf::Message, P2: protobuf::Message>(
-    &self,
-    p1: &P1,
-    p2: &P2,
-  ) -> BoxFuture<fs::UploadSummary, String> {
-    let store = self.store.clone();
-    self
-      .store_proto_locally(p1)
-      .join(self.store_proto_locally(p2))
-      .and_then(move |(digest1, digest2)| {
-        // TODO: Tune when we upload the protos.
-        store
-          .ensure_remote_has_recursive(vec![digest1, digest2])
-          .map_err(|e| format!("Error uploading protos {:?}", e))
-      }).to_boxed()
   }
 
   fn extract_execute_response(
