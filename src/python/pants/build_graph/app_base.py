@@ -67,19 +67,31 @@ class DirectoryReMapper(object):
 
 
 class BundleProps(namedtuple('_BundleProps', ['rel_path', 'mapper', 'fileset'])):
-  @memoized_property
-  def filemap(self):
+  def _filemap(self, abs_path):
     filemap = OrderedDict()
     if self.fileset is not None:
       paths = self.fileset() if isinstance(self.fileset, Fileset) \
         else self.fileset if hasattr(self.fileset, '__iter__') \
         else [self.fileset]
       for path in paths:
-        abspath = path
-        if not os.path.isabs(abspath):
-          abspath = os.path.join(get_buildroot(), self.rel_path, path)
-        filemap[abspath] = self.mapper(abspath)
+        if abs_path:
+          if not os.path.isabs(path):
+            path = os.path.join(get_buildroot(), self.rel_path, path)
+        else:
+          if os.path.isabs(path):
+            path = fast_relpath(path, get_buildroot())
+          else:
+            path = os.path.join(self.rel_path, path)
+        filemap[path] = self.mapper(path)
     return filemap
+
+  @memoized_property
+  def filemap(self):
+    return self._filemap(abs_path=True)
+
+  @memoized_property
+  def relative_filemap(self):
+    return self._filemap(abs_path=False)
 
   def __hash__(self):
     # Leave out fileset from hash calculation since it may not be hashable.
