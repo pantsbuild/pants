@@ -13,9 +13,10 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.project_info.tasks.filedeps import FileDeps
 from pants.build_graph.register import build_file_aliases as register_core
 from pants_test.task_test_base import ConsoleTaskTestBase
+from pants_test.test_base import TestGenerator
 
 
-class FileDepsTestBase(ConsoleTaskTestBase):
+class FileDepsTestBase(ConsoleTaskTestBase, TestGenerator):
 
   @classmethod
   def alias_groups(cls):
@@ -24,6 +25,12 @@ class FileDepsTestBase(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
     return FileDeps
+
+  def assert_console_output(self, *paths, **kwargs):
+    if kwargs['options']['absolute']:
+      paths = [os.path.join(self.build_root, path) for path in paths]
+
+    super(FileDepsTestBase, self).assert_console_output(*paths, **kwargs)
 
   def setUp(self):
     super(FileDepsTestBase, self).setUp()
@@ -140,117 +147,115 @@ class FileDepsTestBase(ConsoleTaskTestBase):
                   """),
                   sources=['config/app.yaml'])
 
-  def test_resources(self):
-    self.assert_console_output(
-      'src/resources/lib/BUILD',
-      'src/resources/lib/data.json',
-      targets=[self.target('src/resources/lib')]
-    )
+  @classmethod
+  def generate_tests(cls):
 
-  def test_globs(self):
-    self.assert_console_output(
-      'src/scala/core/BUILD',
-      'src/scala/core/core1.scala',
-      'src/java/core/BUILD',
-      'src/java/core/core*.java',
-      targets=[self.target('src/scala/core')],
-      options=dict(globs=True),
-    )
+    for is_absolute in [True, False]:
 
-  def test_globs_app(self):
-    self.assert_console_output(
-      'project/config/app.yaml',
-      'project/BUILD',
-      'src/java/bin/BUILD',
-      'src/java/core/BUILD',
-      'src/java/bin/main.java',
-      'src/java/core/core*.java',
-      'src/java/lib/BUILD',
-      'src/java/lib/lib1.java',
-      'src/resources/lib/*.json',
-      'src/resources/lib/BUILD',
-      'src/scala/core/BUILD',
-      'src/scala/core/core1.scala',
-      'src/thrift/storage/BUILD',
-      'src/thrift/storage/data_types.thrift',
-      targets=[self.target('project:app')],
-      options=dict(globs=True),
-    )
+      def test_resources(self, is_absolute=is_absolute):
+        self.assert_console_output(
+          'src/resources/lib/BUILD',
+          'src/resources/lib/data.json',
+          targets=[self.target('src/resources/lib')],
+          options=dict(absolute=is_absolute),
+        )
 
-  def test_scala_java_cycle_scala_end(self):
-    self.assert_console_output(
-      'src/scala/core/BUILD',
-      'src/scala/core/core1.scala',
-      'src/java/core/BUILD',
-      'src/java/core/core1.java',
-      'src/java/core/core2.java',
-      targets=[self.target('src/scala/core')]
-    )
+      def test_globs(self, is_absolute=is_absolute):
+        self.assert_console_output(
+          'src/scala/core/BUILD',
+          'src/scala/core/core1.scala',
+          'src/java/core/BUILD',
+          'src/java/core/core*.java',
+          targets=[self.target('src/scala/core')],
+          options=dict(globs=True, absolute=is_absolute),
+        )
 
-  def test_scala_java_cycle_java_end(self):
-    self.assert_console_output(
-      'src/scala/core/BUILD',
-      'src/scala/core/core1.scala',
-      'src/java/core/BUILD',
-      'src/java/core/core1.java',
-      'src/java/core/core2.java',
-      targets=[self.target('src/java/core')]
-    )
+      def test_globs_app(self, is_absolute=is_absolute):
+        self.assert_console_output(
+          'project/config/app.yaml',
+          'project/BUILD',
+          'src/java/bin/BUILD',
+          'src/java/core/BUILD',
+          'src/java/bin/main.java',
+          'src/java/core/core*.java',
+          'src/java/lib/BUILD',
+          'src/java/lib/lib1.java',
+          'src/resources/lib/*.json',
+          'src/resources/lib/BUILD',
+          'src/scala/core/BUILD',
+          'src/scala/core/core1.scala',
+          'src/thrift/storage/BUILD',
+          'src/thrift/storage/data_types.thrift',
+          targets=[self.target('project:app')],
+          options=dict(globs=True, absolute=is_absolute),
+        )
 
-  def test_concrete_only(self):
-    self.assert_console_output(
-      'src/java/lib/BUILD',
-      'src/java/lib/lib1.java',
-      'src/thrift/storage/BUILD',
-      'src/thrift/storage/data_types.thrift',
-      'src/resources/lib/BUILD',
-      'src/resources/lib/data.json',
-      'src/scala/core/BUILD',
-      'src/scala/core/core1.scala',
-      'src/java/core/BUILD',
-      'src/java/core/core1.java',
-      'src/java/core/core2.java',
-      targets=[self.target('src/java/lib')]
-    )
+      def test_scala_java_cycle_scala_end(self, is_absolute=is_absolute):
+        self.assert_console_output(
+          'src/scala/core/BUILD',
+          'src/scala/core/core1.scala',
+          'src/java/core/BUILD',
+          'src/java/core/core1.java',
+          'src/java/core/core2.java',
+          targets=[self.target('src/scala/core')],
+          options=dict(absolute=is_absolute),
+        )
 
-  def test_jvm_app(self):
-    self.assert_console_output(
-      'project/BUILD',
-      'project/config/app.yaml',
-      'src/java/bin/BUILD',
-      'src/java/bin/main.java',
-      'src/java/lib/BUILD',
-      'src/java/lib/lib1.java',
-      'src/thrift/storage/BUILD',
-      'src/thrift/storage/data_types.thrift',
-      'src/resources/lib/BUILD',
-      'src/resources/lib/data.json',
-      'src/scala/core/BUILD',
-      'src/scala/core/core1.scala',
-      'src/java/core/BUILD',
-      'src/java/core/core1.java',
-      'src/java/core/core2.java',
-      targets=[self.target('project:app')]
-    )
+      def test_scala_java_cycle_java_end(self, is_absolute=is_absolute):
+        self.assert_console_output(
+          'src/scala/core/BUILD',
+          'src/scala/core/core1.scala',
+          'src/java/core/BUILD',
+          'src/java/core/core1.java',
+          'src/java/core/core2.java',
+          targets=[self.target('src/java/core')],
+          options=dict(absolute=is_absolute),
+        )
+
+      def test_concrete_only(self, is_absolute=is_absolute):
+        self.assert_console_output(
+          'src/java/lib/BUILD',
+          'src/java/lib/lib1.java',
+          'src/thrift/storage/BUILD',
+          'src/thrift/storage/data_types.thrift',
+          'src/resources/lib/BUILD',
+          'src/resources/lib/data.json',
+          'src/scala/core/BUILD',
+          'src/scala/core/core1.scala',
+          'src/java/core/BUILD',
+          'src/java/core/core1.java',
+          'src/java/core/core2.java',
+          targets=[self.target('src/java/lib')],
+          options=dict(absolute=is_absolute),
+        )
+
+      def test_jvm_app(self, is_absolute=is_absolute):
+        self.assert_console_output(
+          'project/BUILD',
+          'project/config/app.yaml',
+          'src/java/bin/BUILD',
+          'src/java/bin/main.java',
+          'src/java/lib/BUILD',
+          'src/java/lib/lib1.java',
+          'src/thrift/storage/BUILD',
+          'src/thrift/storage/data_types.thrift',
+          'src/resources/lib/BUILD',
+          'src/resources/lib/data.json',
+          'src/scala/core/BUILD',
+          'src/scala/core/core1.scala',
+          'src/java/core/BUILD',
+          'src/java/core/core1.java',
+          'src/java/core/core2.java',
+          targets=[self.target('project:app')],
+          options=dict(absolute=is_absolute),
+        )
+
+      for test in [test_resources, test_globs, test_globs_app, test_scala_java_cycle_scala_end,\
+        test_scala_java_cycle_java_end, test_concrete_only, test_jvm_app]:
+        cls.add_test(
+          '{}_{}'.format(test.__name__, "abs_path" if is_absolute else "rel_path"),
+          test
+        )
 
 
-class FileDepsAbsoluteTest(FileDepsTestBase):
-
-  def assert_console_output(self, *paths, **kwargs):
-    if 'options' not in kwargs:
-      kwargs['options'] = {}
-    kwargs['options'].update({'absolute': True})
-
-    abs_paths = [os.path.join(self.build_root, path) for path in paths]
-
-    super(FileDepsTestBase, self).assert_console_output(*abs_paths, **kwargs)
-
-
-class FileDepsRelativeTest(FileDepsTestBase):
-
-  def assert_console_output(self, *paths, **kwargs):
-    if 'options' not in kwargs:
-      kwargs['options'] = {}
-    kwargs['options'].update({'absolute': False})
-
-    super(FileDepsTestBase, self).assert_console_output(*paths, **kwargs)
+FileDepsTestBase.generate_tests()
