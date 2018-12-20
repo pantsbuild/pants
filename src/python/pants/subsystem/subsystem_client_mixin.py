@@ -5,18 +5,23 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import object
-from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.scope import ScopeInfo
+from pants.util.objects import datatype
 
 
 class SubsystemClientError(Exception): pass
 
 
-class SubsystemDependency(namedtuple('_SubsystemDependency', ('subsystem_cls', 'scope'))):
+class SubsystemDependency(datatype([
+  'subsystem_cls',
+  'scope',
+  'removal_version',
+  'removal_hint',
+])):
   """Indicates intent to use an instance of `subsystem_cls` scoped to `scope`."""
 
   def is_global(self):
@@ -64,7 +69,7 @@ class SubsystemClientMixin(object):
       if isinstance(dep, SubsystemDependency):
         yield dep
       else:
-        yield SubsystemDependency(dep, GLOBAL_SCOPE)
+        yield SubsystemDependency(dep, GLOBAL_SCOPE, removal_version=None, removal_hint=None)
 
   @classmethod
   def subsystem_closure_iter(cls):
@@ -114,14 +119,20 @@ class SubsystemClientMixin(object):
     known_scope_infos = set()
     optionables_path = OrderedSet()  #  To check for cycles at the Optionable level, ignoring scope.
 
-    def collect_scope_infos(optionable_cls, scoped_to):
+    def collect_scope_infos(optionable_cls, scoped_to, removal_version=None, removal_hint=None):
       if optionable_cls in optionables_path:
         raise cls.CycleException(list(optionables_path) + [optionable_cls])
       optionables_path.add(optionable_cls)
 
       scope = (optionable_cls.options_scope if scoped_to == GLOBAL_SCOPE
                else optionable_cls.subscope(scoped_to))
-      scope_info = ScopeInfo(scope, optionable_cls.options_scope_category, optionable_cls)
+      scope_info = ScopeInfo(
+          scope,
+          optionable_cls.options_scope_category,
+          optionable_cls,
+          removal_version=removal_version,
+          removal_hint=removal_hint
+        )
 
       if scope_info not in known_scope_infos:
         known_scope_infos.add(scope_info)
@@ -129,9 +140,16 @@ class SubsystemClientMixin(object):
           # A subsystem always exists at its global scope (for the purpose of options
           # registration and specification), even if in practice we only use it scoped to
           # some other scope.
-          collect_scope_infos(dep.subsystem_cls, GLOBAL_SCOPE)
+          #
+          # NB: We do not apply deprecations to this implicit global copy of the scope, because if
+          # the intention was to deprecate the entire scope, that could be accomplished by
+          # deprecating all options in the scope.
           if not dep.is_global():
-            collect_scope_infos(dep.subsystem_cls, scope)
+            collect_scope_infos(dep.subsystem_cls, GLOBAL_SCOPE)
+          collect_scope_infos(dep.subsystem_cls,
+                              scope,
+                              removal_version=dep.removal_version,
+                              removal_hint=dep.removal_hint)
 
       optionables_path.remove(scope_info.optionable_cls)
 

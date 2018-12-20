@@ -19,7 +19,7 @@ from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import ScopeInfo
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method
 
 
 def make_flag_regex(long_name, short_name=None):
@@ -137,15 +137,14 @@ class Options(object):
     help_request = splitter.help_request
 
     parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos, option_tracker)
-    values_by_scope = {}  # Arg values, parsed per-scope on demand.
     bootstrap_option_values = bootstrap_option_values
     known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
     return cls(goals, scope_to_flags, target_specs, passthru, passthru_owner, help_request,
-               parser_hierarchy, values_by_scope, bootstrap_option_values, known_scope_to_info,
+               parser_hierarchy, bootstrap_option_values, known_scope_to_info,
                option_tracker, unknown_scopes)
 
   def __init__(self, goals, scope_to_flags, target_specs, passthru, passthru_owner, help_request,
-               parser_hierarchy, values_by_scope, bootstrap_option_values, known_scope_to_info,
+               parser_hierarchy, bootstrap_option_values, known_scope_to_info,
                option_tracker, unknown_scopes):
     """The low-level constructor for an Options instance.
 
@@ -158,7 +157,6 @@ class Options(object):
     self._passthru_owner = passthru_owner
     self._help_request = help_request
     self._parser_hierarchy = parser_hierarchy
-    self._values_by_scope = values_by_scope
     self._bootstrap_option_values = bootstrap_option_values
     self._known_scope_to_info = known_scope_to_info
     self._option_tracker = option_tracker
@@ -234,7 +232,6 @@ class Options(object):
     # An empty scope_to_flags to force all values to come via the config -> env hierarchy alone
     # and empty values in case we already cached some from flags.
     no_flags = {}
-    no_values = {}
     return Options(self._goals,
                    no_flags,
                    self._target_specs,
@@ -242,7 +239,6 @@ class Options(object):
                    self._passthru_owner,
                    self._help_request,
                    self._parser_hierarchy,
-                   no_values,
                    self._bootstrap_option_values,
                    self._known_scope_to_info,
                    self._option_tracker,
@@ -311,12 +307,35 @@ class Options(object):
     self._assert_not_frozen()
     self._parser_hierarchy.walk(callback)
 
-  def _check_deprecated_scope(self, scope, values):
-    # If we're the new name of a deprecated scope, also get values from that scope.
-    deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
+  def _check_and_apply_deprecations(self, scope, values):
+    """Checks whether a ScopeInfo has options specified in a deprecated scope.
+
+    There are two related cases here. Either:
+      1) The ScopeInfo has an associated deprecated_scope that was replaced with a non-deprecated
+         scope, meaning that the options temporarily live in two locations.
+      2) The entire ScopeInfo is deprecated (as in the case of deprecated SubsystemDependencies),
+         meaning that the options live in one location.
+
+    In the first case, this method has the sideeffect of merging options values from deprecated
+    scopes into the given values.
+    """
+    si = self.known_scope_to_info[scope]
+
+    # If this Scope is itself deprecated, report that.
+    if si.removal_version:
+      explicit_keys = self.for_scope(scope, inherit_from_enclosing_scope=False).get_explicit_keys()
+      if explicit_keys:
+        warn_or_error(
+            removal_version=si.removal_version,
+            deprecated_entity_description='scope {}'.format(scope),
+            hint=si.removal_hint,
+          )
+
+    # Check if we're the new name of a deprecated scope, and clone values from that scope.
     # Note that deprecated_scope and scope share the same Optionable class, so deprecated_scope's
     # Optionable has a deprecated_options_scope equal to deprecated_scope. Therefore we must
     # check that scope != deprecated_scope to prevent infinite recursion.
+    deprecated_scope = si.deprecated_scope
     if deprecated_scope is not None and scope != deprecated_scope:
       # Do the deprecation check only on keys that were explicitly set on the deprecated scope
       # (and not on its enclosing scopes).
@@ -329,28 +348,14 @@ class Options(object):
         # This makes the code a bit neater.
         values.update(self.for_scope(deprecated_scope))
 
-        return dict(
-          removal_version=self.known_scope_to_info[scope].deprecated_scope_removal_version,
-          deprecated_entity_description='scope {}'.format(deprecated_scope),
-          hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys)))
-
-  @memoized_property
-  def flag_matchers(self):
-    return [
-      lambda scope, _, values: self._check_deprecated_scope(scope, values),
-    ]
-
-  def _check_deprecations(self, scope, flags, values):
-    for flag_matcher in self.flag_matchers:
-      maybe_deprecation_warning_kwargs = flag_matcher(scope, flags, values)
-
-      if maybe_deprecation_warning_kwargs is not None:
-        if not isinstance(maybe_deprecation_warning_kwargs, dict):
-          raise TypeError("scope_flags_fun must return a dict, or None (was: {!r})"
-                          .format(maybe_deprecation_warning_kwargs))
-        warn_or_error(**maybe_deprecation_warning_kwargs)
+        warn_or_error(
+            removal_version=self.known_scope_to_info[scope].deprecated_scope_removal_version,
+            deprecated_entity_description='scope {}'.format(deprecated_scope),
+            hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys))
+          )
 
   # TODO: Eagerly precompute backing data for this?
+  @memoized_method
   def for_scope(self, scope, inherit_from_enclosing_scope=True):
     """Return the option values for the given scope.
 
@@ -359,9 +364,6 @@ class Options(object):
 
     :API: public
     """
-    # Short-circuit, if already computed.
-    if scope in self._values_by_scope:
-      return self._values_by_scope[scope]
 
     # First get enclosing scope's option values, if any.
     if scope == GLOBAL_SCOPE or not inherit_from_enclosing_scope:
@@ -374,10 +376,8 @@ class Options(object):
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
 
     # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
-    self._check_deprecations(scope, flags_in_scope, values)
-
-    # Cache the values.
-    self._values_by_scope[scope] = values
+    if inherit_from_enclosing_scope:
+      self._check_and_apply_deprecations(scope, values)
 
     return values
 
