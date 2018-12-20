@@ -24,43 +24,43 @@ class ScroogeGenTest(PantsRunIntegrationTest):
         'service_deps': {
             'java': [
               '3rdparty:slf4j-api',
-              '3rdparty:thrift-0.6.1',
+              '3rdparty:thrift',
               '3rdparty/jvm/com/twitter:finagle-thrift',
               '3rdparty/jvm/com/twitter:scrooge-core',
             ],
             'scala': [
-              '3rdparty:thrift-0.6.1',
+              '3rdparty:thrift',
               '3rdparty/jvm/com/twitter:finagle-thrift',
               '3rdparty/jvm/com/twitter:scrooge-core',
             ],
           },
         'service_exports': {
             'java': [
-              '3rdparty:thrift-0.6.1',
+              '3rdparty:thrift',
             ],
             'scala': [
-              '3rdparty:thrift-0.6.1',
+              '3rdparty:thrift',
               '3rdparty/jvm/com/twitter:finagle-thrift',
               '3rdparty/jvm/com/twitter:scrooge-core',
             ]
           },
         'structs_deps': {
             'java': [
-              '3rdparty:thrift-0.6.1',
+              '3rdparty:thrift',
               '3rdparty/jvm/com/twitter:scrooge-core',
             ],
             'scala': [
-              '3rdparty:thrift-0.6.1',
+              '3rdparty:thrift',
               '3rdparty/jvm/com/twitter:scrooge-core',
             ],
           },
         'structs_exports': {
             'java': [
-              '3rdparty:thrift-0.6.1',
+              '3rdparty:thrift',
               '3rdparty/jvm/com/twitter:scrooge-core',
             ],
             'scala': [
-              '3rdparty:thrift-0.6.1',
+              '3rdparty:thrift',
               '3rdparty/jvm/com/twitter:scrooge-core',
             ],
           }

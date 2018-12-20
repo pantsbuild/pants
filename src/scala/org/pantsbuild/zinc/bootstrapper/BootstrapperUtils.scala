@@ -5,7 +5,7 @@
 
 package org.pantsbuild.zinc.bootstrapper
 
-import com.facebook.buck.util.zip.ZipScrubber
+import org.pantsbuild.buck.util.zip.ZipScrubber
 import java.io.File
 import xsbti.compile.{
   ClasspathOptionsUtil,

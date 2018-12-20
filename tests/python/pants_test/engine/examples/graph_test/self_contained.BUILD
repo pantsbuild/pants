@@ -60,7 +60,7 @@ Struct(
 ApacheThriftConfig(
   name='production_thrift_config',
   abstract=True,  # ApacheThriftConfig validates, so we avoid validation for this abstract template.
-  version='0.9.2',
+  version='0.10.0',
   strict=True
 
   # NB: This abstract template has no `lang` - which is required (validated).
@@ -75,7 +75,7 @@ Target(
     # off / prove the capabilities of the new BUILD graph parser.
     ':nonstrict',
     ApacheThriftConfig(
-      version='0.9.2',
+      version='0.10.0',
       strict=True,
       lang='java',
       dependencies=[

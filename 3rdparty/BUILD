@@ -108,12 +108,6 @@ jar_library(name='protobuf-test-import',
               jar(org='com.squareup.testing.protolib', name='protolib-test', rev='1.0.1'),
             ])
 
-jar_library(name='scrooge-core',
-            jars = [
-              # used by scrooge-generator in BUILD.tools:scrooge-gen
-              scala_jar(org='com.twitter', name='scrooge-core', rev='3.20.0'),
-            ])
-
 jar_library(name='shapeless',
             jars=[
               scala_jar(org='com.chuusai', name='shapeless', rev='2.2.5'),
@@ -124,28 +118,12 @@ jar_library(name='slf4j-api',
               jar(org='org.slf4j', name='slf4j-api', rev='1.6.1'),
             ])
 
-# NB: we have two versions of thrift here due to scrooge requiring one version while apache
-# thrift requires another. This is not usually recommended.
-jar_library(name='libthrift-0.9.2',
+jar_library(name='thrift',
             jars = [
-              jar(org='org.apache.thrift', name='libthrift', rev='0.9.2')
+              jar(org='org.apache.thrift', name='libthrift', rev='0.10.0')
             ],
             # javac uses undeclared types to build the MessageBuilder API.
             scope='forced',)
-
-target(name='thrift-0.9.2', dependencies = [':libthrift-0.9.2'])
-
-jar_library(name='libthrift-0.6.1',
-            jars = [
-              jar(org='org.apache.thrift', name='libthrift', rev='0.6.1')
-            ])
-
-target(name='thrift-0.6.1',
-       dependencies = [
-         ':commons-lang',
-         ':libthrift-0.6.1',
-         ':slf4j-api',
-       ])
 
 
 ###############

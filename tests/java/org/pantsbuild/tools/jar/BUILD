@@ -8,7 +8,7 @@ junit_tests(
     '3rdparty:guava',
     '3rdparty:guava-testlib',
     '3rdparty:junit',
-    '3rdparty/jvm/com/facebook/buck/util/zip',
+    '3rdparty/jvm/org/pantsbuild/buck/util/zip',
     'src/java/org/pantsbuild/args4j',
     'src/java/org/pantsbuild/testing',
     'src/java/org/pantsbuild/tools/jar',

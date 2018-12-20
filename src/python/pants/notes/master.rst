@@ -4,6 +4,21 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.13.0rc1 (12/18/2018)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add tool classpath for ./pants scalafix (#6926)
+  `PR #6926 <https://github.com/pantsbuild/pants/pull/6926>`_
+
+Bugfixes
+~~~~~~~~
+
+* Bump scalafix version and use os.pathsep (#6938)
+  `PR #6938 <https://github.com/pantsbuild/pants/pull/6938>`_
+
 1.13.0rc0 (12/13/2018)
 ------------------------
 

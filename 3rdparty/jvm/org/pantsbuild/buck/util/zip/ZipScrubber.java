@@ -14,7 +14,7 @@
  * under the License.
  */
 
-package com.facebook.buck.util.zip;
+package org.pantsbuild.buck.util.zip;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
