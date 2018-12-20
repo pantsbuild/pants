@@ -40,6 +40,8 @@ def _algebraic_data(metaclass):
 
 
 # NB: prototypal inheritance seems *deeply* linked with the idea here!
+# TODO: since we are calling these methods from other files, we should remove the leading underscore
+# and add testing!
 class _ExtensibleAlgebraic(AbstractClass):
   """A mixin to make it more concise to coalesce datatypes with related collection fields."""
 
@@ -56,8 +58,13 @@ class _ExtensibleAlgebraic(AbstractClass):
   def copy(self, **kwargs):
     """Implementations should have the same behavior as a `datatype()`'s `copy()` method."""
 
+  class AlgebraicDataError(Exception): pass
+
   def _single_list_field_operation(self, field_name, list_value, prepend=True):
-    assert(field_name in self._list_fields)
+    if field_name not in self._list_fields:
+      raise self.AlgebraicDataError(
+        "Field '{}' is not in this object's set of declared list fields: {} (this object is : {})."
+        .format(field_name, self._list_fields, self))
     cur_value = getattr(self, field_name)
 
     if prepend:
@@ -81,20 +88,29 @@ class _ExtensibleAlgebraic(AbstractClass):
 
     List fields will be concatenated.
 
-    The return type of this method is the type of `self`, but the `other` can be any
-    `_ExtensibleAlgebraic` instance.
+    The return type of this method is the type of `self` (or whatever `.copy()` returns), but the
+    `other` argument can be any `_ExtensibleAlgebraic` instance.
     """
     exclude_list_fields = frozenset(exclude_list_fields or [])
     overwrite_kwargs = {}
 
-    nonexistent_excluded_fields = (exclude_list_fields
-                                   - (self._list_fields
-                                      | other._list_fields))
-    assert(not nonexistent_excluded_fields)
+    nonexistent_excluded_fields = exclude_list_fields - self._list_fields
+    if nonexistent_excluded_fields:
+      raise self.AlgebraicDataError(
+        "Fields {} to exclude from a sequence() were not found in this object's list fields: {}. "
+        "This object is {}, the other object is {}."
+        .format(nonexistent_excluded_fields, self._list_fields, self, other))
 
     shared_list_fields = (self._list_fields
                           & other._list_fields
                           - exclude_list_fields)
+    if not shared_list_fields:
+      raise self.AlgebraicDataError(
+        "Objects to sequence have no shared fields after excluding {}. "
+        "This object is {}, with list fields: {}. "
+        "The other object is {}, with list fields: {}."
+        .format(exclude_list_fields, self, self._list_fields, other, other._list_fields))
+
     for list_field_name in shared_list_fields:
       lhs_value = getattr(self, list_field_name)
       rhs_value = getattr(other, list_field_name)
