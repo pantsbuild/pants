@@ -10,6 +10,7 @@ from builtins import filter, object
 from collections import defaultdict
 from contextlib import contextmanager
 
+from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
@@ -55,7 +56,7 @@ class Context(object):
     self._lock = OwnerPrintingInterProcessFileLock(os.path.join(self._buildroot, '.pants.workdir.file_lock'))
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
-    self._console_outstream = console_outstream or sys.stdout
+    self._console_outstream = console_outstream or (sys.stdout.buffer if PY3 else sys.stdout)
     self._scm = scm or get_scm()
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._replace_targets(target_roots)
