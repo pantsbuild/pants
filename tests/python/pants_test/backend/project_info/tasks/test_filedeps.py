@@ -16,7 +16,7 @@ from pants_test.task_test_base import ConsoleTaskTestBase
 from pants_test.test_base import TestGenerator
 
 
-class FileDepsTestBase(ConsoleTaskTestBase, TestGenerator):
+class FileDepsTest(ConsoleTaskTestBase, TestGenerator):
 
   @classmethod
   def alias_groups(cls):
@@ -30,10 +30,10 @@ class FileDepsTestBase(ConsoleTaskTestBase, TestGenerator):
     if kwargs['options']['absolute']:
       paths = [os.path.join(self.build_root, path) for path in paths]
 
-    super(FileDepsTestBase, self).assert_console_output(*paths, **kwargs)
+    super(FileDepsTest, self).assert_console_output(*paths, **kwargs)
 
   def setUp(self):
-    super(FileDepsTestBase, self).setUp()
+    super(FileDepsTest, self).setUp()
     self.context(options={
       'scala': {
         'runtime': ['tools:scala-library']
@@ -250,12 +250,12 @@ class FileDepsTestBase(ConsoleTaskTestBase, TestGenerator):
           options=dict(absolute=is_absolute),
         )
 
-      for test in [test_resources, test_globs, test_globs_app, test_scala_java_cycle_scala_end,\
-        test_scala_java_cycle_java_end, test_concrete_only, test_jvm_app]:
-        cls.add_test(
-          '{}_{}'.format(test.__name__, "abs_path" if is_absolute else "rel_path"),
-          test
-        )
+      for test_name, test in sorted(locals().items()):
+        if test_name.startswith('test_'):
+          cls.add_test(
+            '{}_{}'.format(test_name, "abs_path" if is_absolute else "rel_path"),
+            test
+          )
 
 
-FileDepsTestBase.generate_tests()
+FileDepsTest.generate_tests()
