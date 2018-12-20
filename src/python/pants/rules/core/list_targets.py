@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -7,16 +7,18 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.base.specs import Specs
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, LineOriented
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import console_rule
 from pants.engine.selectors import Get
 
 
-class List(Goal):
+class List(LineOriented, Goal):
   """Lists all targets matching the target specs."""
 
   name = 'list'
+
+  deprecated_cache_setup_removal_version = '1.18.0.dev2'
 
   @classmethod
   def register_options(cls, register):
@@ -71,13 +73,14 @@ def list_targets(console, list_goal, specs):
     collection = yield Get(BuildFileAddresses, Specs, specs)
     print_fn = lambda address: address.spec
 
-  if not collection.dependencies:
-    console.print_stderr('WARNING: No targets were matched in goal `{}`.'.format('list'))
+  with list_goal.line_oriented(console) as (print_stdout, print_stderr):
+    if not collection.dependencies:
+      print_stderr('WARNING: No targets were matched in goal `{}`.'.format('list'))
 
-  for item in collection:
-    result = print_fn(item)
-    if result:
-      console.print_stdout(result)
+    for item in collection:
+      result = print_fn(item)
+      if result:
+        print_stdout(result)
 
 
 def rules():
