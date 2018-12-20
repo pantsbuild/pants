@@ -1716,6 +1716,10 @@ mod tests {
       .store_file_bytes(roland.bytes(), false)
       .wait()
       .expect("Saving file bytes to store");
+    store
+      .record_directory(&TestDirectory::containing_roland().directory(), false)
+      .wait()
+      .expect("Saving directory bytes to store");
 
     let result = CommandRunner::new(
       &mock_server.address(),
@@ -1838,7 +1842,7 @@ mod tests {
 
   #[test]
   fn execute_missing_file_errors_if_unknown() {
-    let missing_digest = TestData::roland().digest();
+    let missing_digest = TestDirectory::containing_roland().digest();
 
     let mock_server = {
       let op_name = "cat".to_owned();
@@ -1848,12 +1852,9 @@ mod tests {
         super::make_execute_request(&cat_roland_request(), &None, &None)
           .unwrap()
           .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
-            &missing_digest,
-          )]),
-        ],
+        // We won't get as far as trying to run the operation, so don't expect any requests whose
+        // responses we would need to stub.
+        vec![],
       ))
     };
 
