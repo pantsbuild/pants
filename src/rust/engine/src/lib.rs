@@ -345,10 +345,7 @@ pub extern "C" fn scheduler_metrics(
         .metrics(session)
         .into_iter()
         .map(|(metric, value)| {
-          externs::store_tuple(&[
-            externs::store_bytes(metric.as_bytes()),
-            externs::store_i64(value),
-          ])
+          externs::store_tuple(&[externs::store_utf8(metric), externs::store_i64(value)])
         }).collect::<Vec<_>>();
       externs::store_tuple(&values).into()
     })

@@ -400,8 +400,8 @@ class RunTracker(Subsystem):
     # TODO(benjy): Do we really need these, once the statsdb is mature?
     stats_file = os.path.join(get_pants_cachedir(), 'stats',
                               '{}.json'.format(self.run_info.get_info('id')))
-    binary_mode = False if PY3 else True
-    safe_file_dump(stats_file, json.dumps(stats), binary_mode=binary_mode)
+    mode = 'w' if PY3 else 'wb'
+    safe_file_dump(stats_file, json.dumps(stats), mode=mode)
 
     # Add to local stats db.
     StatsDBFactory.global_instance().get_db().insert_stats(stats)
