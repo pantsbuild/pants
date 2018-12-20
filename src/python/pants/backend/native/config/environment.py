@@ -54,8 +54,7 @@ class _ExtensibleAlgebraic(AbstractClass):
 
   @abstractmethod
   def copy(self, **kwargs):
-    """Analogous to a `datatype()`'s `copy()` method."""
-    raise NotImplementedError('copy() must be implemented by subclasses of _ExtensibleAlgebraic!')
+    """Implementations should have the same behavior as a `datatype()`'s `copy()` method."""
 
   def _single_list_field_operation(self, field_name, list_value, prepend=True):
     assert(field_name in self._list_fields)
@@ -85,18 +84,20 @@ class _ExtensibleAlgebraic(AbstractClass):
     The return type of this method is the type of `self`, but the `other` can be any
     `_ExtensibleAlgebraic` instance.
     """
-    exclude_list_fields = exclude_list_fields or []
+    exclude_list_fields = frozenset(exclude_list_fields or [])
     overwrite_kwargs = {}
+
+    nonexistent_excluded_fields = (exclude_list_fields
+                                   - (self._list_fields
+                                      | other._list_fields))
+    assert(not nonexistent_excluded_fields)
 
     shared_list_fields = (self._list_fields
                           & other._list_fields
-                          - frozenset(exclude_list_fields))
+                          - exclude_list_fields)
     for list_field_name in shared_list_fields:
       lhs_value = getattr(self, list_field_name)
       rhs_value = getattr(other, list_field_name)
-      if rhs_value is None:
-        raise Exception('self: {}, other: {}, shared_list_fields: {}, lhs_value: {}, rhs_value: {}'
-                        .format(self, other, shared_list_fields, lhs_value, rhs_value))
       overwrite_kwargs[list_field_name] = lhs_value + rhs_value
 
     return self.copy(**overwrite_kwargs)
@@ -119,7 +120,6 @@ class _Executable(_ExtensibleAlgebraic):
 
     :rtype: str
     """
-    raise NotImplementedError('exe_filename is a scalar field of _Executable!')
 
   @_list_field
   def runtime_library_dirs(self):
@@ -129,7 +129,6 @@ class _Executable(_ExtensibleAlgebraic):
     for libraries that are needed at link time.
     :rtype: list of str
     """
-    raise NotImplementedError('runtime_library_dirs is a list field of _Executable!')
 
   @_list_field
   def extra_args(self):
@@ -139,13 +138,16 @@ class _Executable(_ExtensibleAlgebraic):
 
     :rtype: list of str
     """
-    raise NotImplementedError('extra_args is a list field of _Executable!')
 
   _platform = Platform.create()
 
   @property
-  def as_invocation_environment_dict(self):
+  def invocation_environment_dict(self):
     """A dict to use as this _Executable's execution environment.
+
+    This isn't made into an "algebraic" field because its contents (the keys of the dict) are
+    generally known to the specific class which is overriding this property. Implementations of this
+    property can then make use of the data in the algebraic fields to populate this dict.
 
     :rtype: dict of string -> string
     """
@@ -176,7 +178,6 @@ class _LinkerMixin(_Executable):
 
     :rtype: list of str
     """
-    raise NotImplementedError('linking_library_dirs is a list field of _LinkerMixin!')
 
   @_list_field
   def extra_object_files(self):
@@ -186,11 +187,10 @@ class _LinkerMixin(_Executable):
 
     :rtype: list of str
     """
-    raise NotImplementedError('extra_object_files is a list field of _LinkerMixin!')
 
   @property
-  def as_invocation_environment_dict(self):
-    ret = super(_LinkerMixin, self).as_invocation_environment_dict.copy()
+  def invocation_environment_dict(self):
+    ret = super(_LinkerMixin, self).invocation_environment_dict.copy()
 
     full_library_path_dirs = self.linking_library_dirs + [
       os.path.dirname(f) for f in self.extra_object_files
@@ -223,11 +223,10 @@ class _CompilerMixin(_Executable):
 
     :rtype: list of str
     """
-    raise NotImplementedError('include_dirs is a list field of _CompilerMixin!')
 
   @property
-  def as_invocation_environment_dict(self):
-    ret = super(_CompilerMixin, self).as_invocation_environment_dict.copy()
+  def invocation_environment_dict(self):
+    ret = super(_CompilerMixin, self).invocation_environment_dict.copy()
 
     if self.include_dirs:
       ret['CPATH'] = create_path_env_var(self.include_dirs)
@@ -245,8 +244,8 @@ class CCompiler(datatype([
 ])):
 
   @property
-  def as_invocation_environment_dict(self):
-    ret = super(CCompiler, self).as_invocation_environment_dict.copy()
+  def invocation_environment_dict(self):
+    ret = super(CCompiler, self).invocation_environment_dict.copy()
 
     ret['CC'] = self.exe_filename
 
@@ -263,8 +262,8 @@ class CppCompiler(datatype([
 ])):
 
   @property
-  def as_invocation_environment_dict(self):
-    ret = super(CppCompiler, self).as_invocation_environment_dict.copy()
+  def invocation_environment_dict(self):
+    ret = super(CppCompiler, self).invocation_environment_dict.copy()
 
     ret['CXX'] = self.exe_filename
 

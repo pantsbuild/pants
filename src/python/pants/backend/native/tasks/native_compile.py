@@ -228,7 +228,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
     compiler = compile_request.compiler
     output_dir = compile_request.output_dir
-    env = compiler.as_invocation_environment_dict
+    env = compiler.invocation_environment_dict
 
     with self.context.new_workunit(
         name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]) as workunit:

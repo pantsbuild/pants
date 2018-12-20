@@ -280,6 +280,10 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
   assembler = yield Get(Assembler, NativeToolchain, native_toolchain)
   working_cpp_compiler = joined_cpp_compiler.sequence(assembler).prepend_field('extra_args', [
     '-x', 'c++', '-std=c++11',
+    # This flag is intended to avoid using any of the headers from our LLVM distribution's C++
+    # stdlib implementation, or any from the host system, and instead, use include dirs from the
+    # XCodeCLITools or GCC.
+    # TODO(#6143): Determine precisely what this flag does and why it's necessary.
     '-nostdinc++',
   ])
 
