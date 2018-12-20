@@ -6,8 +6,8 @@ import os
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks.pex_build_util import PexBuilderWrapper
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
