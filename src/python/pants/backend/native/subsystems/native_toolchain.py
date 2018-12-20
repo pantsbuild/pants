@@ -74,7 +74,9 @@ class LinkerWrapperMixin(object):
   def for_compiler(self, compiler, platform):
     """Return a Linker object which is intended to be compatible with the given `compiler`."""
     return (self.linker
-            .sequence(compiler, exclude_list_fields=['extra_args'])
+            # TODO(#6143): describe why the compiler needs to be first on the PATH!
+            .sequence(compiler, exclude_list_fields=['extra_args', 'path_entries'])
+            .prepend_field('path_entries', compiler.path_entries)
             .copy(exe_filename=compiler.exe_filename))
 
 
