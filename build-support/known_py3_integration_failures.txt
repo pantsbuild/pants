@@ -1,2 +1,0 @@
-tests/python/pants_test/backend/python/tasks:integration
-tests/python/pants_test/projects:testprojects_integration
