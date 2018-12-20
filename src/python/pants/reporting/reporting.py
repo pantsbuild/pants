@@ -9,6 +9,8 @@ import sys
 from builtins import open
 from io import BytesIO
 
+from future.utils import PY3
+
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.invalidation_report import InvalidationReport
@@ -120,7 +122,9 @@ class Reporting(Subsystem):
                                                               timing=timing, cache_stats=cache_stats))
     else:
       # Set up the new console reporter.
-      settings = PlainTextReporter.Settings(log_level=log_level, outfile=sys.stdout, errfile=sys.stderr,
+      stdout = sys.stdout.buffer if PY3 else sys.stdout
+      stderr = sys.stderr.buffer if PY3 else sys.stderr
+      settings = PlainTextReporter.Settings(log_level=log_level, outfile=stdout, errfile=stderr,
                                             color=color, indent=True, timing=timing, cache_stats=cache_stats,
                                             label_format=self.get_options().console_label_format,
                                             tool_output_format=self.get_options().console_tool_output_format)
@@ -134,8 +138,8 @@ class Reporting(Subsystem):
       # Also write plaintext logs to a file. This is completely separate from the html reports.
       safe_mkdir(global_options.logdir)
       run_id = run_tracker.run_info.get_info('id')
-      outfile = open(os.path.join(global_options.logdir, '{}.log'.format(run_id)), 'w')
-      errfile = open(os.path.join(global_options.logdir, '{}.err.log'.format(run_id)), 'w')
+      outfile = open(os.path.join(global_options.logdir, '{}.log'.format(run_id)), 'wb')
+      errfile = open(os.path.join(global_options.logdir, '{}.err.log'.format(run_id)), 'wb')
       settings = PlainTextReporter.Settings(log_level=log_level, outfile=outfile, errfile=errfile,
                                             color=False, indent=True, timing=True, cache_stats=True,
                                             label_format=self.get_options().console_label_format,
