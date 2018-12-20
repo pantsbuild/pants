@@ -1666,7 +1666,7 @@ mod remote {
   use hashing::{Digest, Fingerprint};
   use serverset::{Retry, Serverset};
   use sha2::Sha256;
-  use std::cmp::min;
+  use std::cmp::{max, min};
   use std::collections::HashSet;
   use std::sync::Arc;
   use std::time::Duration;
@@ -1698,7 +1698,7 @@ mod remote {
     ) -> Result<ByteStore, String> {
       let env = Arc::new(grpcio::Environment::new(thread_count));
 
-      let channels = cas_addresses.iter().map(|cas_address| {
+      let channels: Vec<_> = cas_addresses.iter().map(|cas_address| {
         let builder = grpcio::ChannelBuilder::new(env.clone());
         if let Some(ref _root_ca_certs) = root_ca_certs {
           panic!("Sorry, we dropped secure grpc support until we can either make openssl link properly, or switch to tower");
@@ -1713,6 +1713,8 @@ mod remote {
         }
       }).collect();
 
+      // Try each server at least once.
+      let rpc_attempts = max(channels.len() + 1, 3);
       let serverset = Serverset::new(channels, backoff_config, futures_timer_thread)?;
 
       Ok(ByteStore {
@@ -1720,7 +1722,7 @@ mod remote {
         chunk_size_bytes,
         upload_timeout,
         // TODO: Parameterise this
-        rpc_attempts: 3,
+        rpc_attempts,
         env,
         serverset,
         authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
