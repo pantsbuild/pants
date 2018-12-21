@@ -1,3 +1,7 @@
+# coding=utf-8
+# Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import grpc
 from org.pantsbuild.example.service import service_pb2
 from org.pantsbuild.example.service import service_pb2_grpc
