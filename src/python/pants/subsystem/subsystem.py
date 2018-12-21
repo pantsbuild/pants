@@ -50,12 +50,15 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return inspect.isclass(obj) and issubclass(obj, cls)
 
   @classmethod
-  def scoped(cls, optionable):
+  def scoped(cls, optionable, removal_version=None, removal_hint=None):
     """Returns a dependency on this subsystem, scoped to `optionable`.
+
+    :param removal_version: An optional deprecation version for this scoped Subsystem dependency.
+    :param removal_hint: An optional hint to accompany a deprecation removal_version.
 
     Return value is suitable for use in SubsystemClientMixin.subsystem_dependencies().
     """
-    return SubsystemDependency(cls, optionable.options_scope)
+    return SubsystemDependency(cls, optionable.options_scope, removal_version, removal_hint)
 
   @classmethod
   def get_scope_info(cls, subscope=None):
@@ -64,11 +67,6 @@ class Subsystem(SubsystemClientMixin, Optionable):
       return super(Subsystem, cls).get_scope_info()
     else:
       return ScopeInfo(cls.subscope(subscope), ScopeInfo.SUBSYSTEM, cls)
-
-  @classmethod
-  def subscope(cls, scope):
-    """Create a subscope under this Subsystem's scope."""
-    return '{0}.{1}'.format(cls.options_scope, scope)
 
   # The full Options object for this pants run.  Will be set after options are parsed.
   # TODO: A less clunky way to make option values available?
