@@ -108,6 +108,7 @@ impl Store {
     chunk_size_bytes: usize,
     upload_timeout: Duration,
     backoff_config: BackoffConfig,
+    rpc_attempts: usize,
     futures_timer_thread: futures_timer::TimerHandle,
   ) -> Result<Store, String> {
     Ok(Store {
@@ -121,6 +122,7 @@ impl Store {
         chunk_size_bytes,
         upload_timeout,
         backoff_config,
+        rpc_attempts,
         futures_timer_thread,
       )?),
     })
@@ -1699,8 +1701,12 @@ mod remote {
       chunk_size_bytes: usize,
       upload_timeout: Duration,
       backoff_config: BackoffConfig,
+      rpc_attempts: usize,
       futures_timer_thread: futures_timer::TimerHandle,
     ) -> Result<ByteStore, String> {
+      if rpc_attempts == 0 {
+        return Err("rpc_attempts must be greater than 0".to_owned());
+      }
       let env = Arc::new(grpcio::Environment::new(thread_count));
 
       let channels = cas_addresses.iter().map(|cas_address| {
@@ -1725,7 +1731,7 @@ mod remote {
         chunk_size_bytes,
         upload_timeout,
         // TODO: Parameterise this
-        rpc_attempts: 3,
+        rpc_attempts,
         env,
         serverset,
         authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
@@ -2124,6 +2130,7 @@ mod remote {
         10 * 1024,
         Duration::from_secs(5),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        1,
         TimerHandle::default(),
       ).unwrap();
 
@@ -2201,6 +2208,7 @@ mod remote {
         10 * 1024 * 1024,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        1,
         TimerHandle::default(),
       ).unwrap();
       let error = store
@@ -2280,6 +2288,7 @@ mod remote {
         10 * 1024 * 1024,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        1,
         TimerHandle::default(),
       ).unwrap();
 
@@ -2307,6 +2316,7 @@ mod remote {
         10 * 1024 * 1024,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        1,
         TimerHandle::default(),
       ).unwrap()
     }
@@ -2432,6 +2442,7 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       TimerHandle::default(),
     ).unwrap()
   }
@@ -3145,6 +3156,7 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       TimerHandle::default(),
     ).unwrap();
 
@@ -3173,6 +3185,7 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       TimerHandle::default(),
     ).unwrap();
 
@@ -3218,6 +3231,7 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       TimerHandle::default(),
     ).unwrap();
 
@@ -3246,6 +3260,7 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       TimerHandle::default(),
     ).unwrap();
 

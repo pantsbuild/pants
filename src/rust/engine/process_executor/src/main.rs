@@ -215,6 +215,7 @@ fn main() {
         Duration::from_secs(30),
         // TODO: Take a command line arg.
         fs::BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
+        3,
         timer_thread.with(|t| t.handle()),
       )
     }

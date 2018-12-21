@@ -230,6 +230,7 @@ pub extern "C" fn scheduler_create(
   remote_store_thread_count: u64,
   remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
+  remote_store_rpc_attempts: u64,
   process_execution_parallelism: u64,
   process_execution_cleanup_local_dirs: bool,
 ) -> *const Scheduler {
@@ -326,6 +327,7 @@ pub extern "C" fn scheduler_create(
     remote_store_thread_count as usize,
     remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
+    remote_store_rpc_attempts as usize,
     process_execution_parallelism as usize,
     process_execution_cleanup_local_dirs as bool,
   ))))

@@ -694,6 +694,7 @@ fn main() {
         1.2,
         std::time::Duration::from_secs(20),
       ).expect("Error making BackoffConfig"),
+      1,
       futures_timer::TimerHandle::default(),
     ),
     None => fs::Store::local_only(&store_path, pool),
