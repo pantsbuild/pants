@@ -58,7 +58,7 @@ def known_os_names():
 if PY3:
   IntegerForPid = (int,)
 else:
-  IntegerForPid = (int, long)
+  IntegerForPid = (int, long)  # noqa  # pycodestyle complains about `long` when using Py3
 
 
 # From kill(2) on OSX 10.13:
