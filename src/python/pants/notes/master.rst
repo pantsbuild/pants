@@ -13,7 +13,7 @@ New Features
 * Add support for deprecating scoped SubsystemDependencies (#6961)
   `PR #6961 <https://github.com/pantsbuild/pants/pull/6961>`_
 
-*  Add a flag to filedeps v1 to output abs or rel paths (#6960)
+* Add a flag to filedeps v1 to output abs or rel paths (#6960)
   `PR #6960 <https://github.com/pantsbuild/pants/pull/6960>`_
 
 * Add serverset (#6921)
@@ -26,7 +26,6 @@ New Features
   `PR #6930 <https://github.com/pantsbuild/pants/pull/6930>`_
 
 * Support source and 3rdparty dependencies in v2 python test running (#6915)
-  `Issue #6782#issuecomment-447147972) <https://github.com/pantsbuild/pants/issues/6782#issuecomment-447147972)>`_
   `PR #6915 <https://github.com/pantsbuild/pants/pull/6915>`_
 
 * Add tool classpath for ./pants scalafix (#6926)
@@ -40,8 +39,6 @@ Version updates
 
 * Upgrade Scrooge, Finagle, and Thrift for unified Thrift library and Py3 support (#6945)
   `PR #6945 <https://github.com/pantsbuild/pants/pull/6945>`_
-  `PR #6913 <https://github.com/pantsbuild/pants/pull/6913>`_
-  `PR #6883 <https://github.com/pantsbuild/pants/pull/6883>`_
 
 * Bump zinc bootstrapper to 0.0.4 (#6967)
   `PR #6967 <https://github.com/pantsbuild/pants/pull/6967>`_
@@ -78,7 +75,6 @@ Refactoring, Improvements, and Tooling
 
 * Fix plaintext_recorder sometimes being passed TextIO (#6963)
   `PR #6963 <https://github.com/pantsbuild/pants/pull/6963>`_
-  `PR #6505 <https://github.com/pantsbuild/pants/pull/6505>`_
 
 * Switch daytime CI to Python 3 only (#6952)
   `PR #6952 <https://github.com/pantsbuild/pants/pull/6952>`_
@@ -103,7 +99,6 @@ Refactoring, Improvements, and Tooling
 
 * Fix relative import for testprojects dummy test on Python 3 (#6942)
   `PR #6942 <https://github.com/pantsbuild/pants/pull/6942>`_
-  `PR #6941, <https://github.com/pantsbuild/pants/pull/6941,>`_
 
 * Fix relative import for conftest test on Python 3 (#6941)
   `PR #6941 <https://github.com/pantsbuild/pants/pull/6941>`_
