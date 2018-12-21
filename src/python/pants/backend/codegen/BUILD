@@ -13,6 +13,7 @@ python_library(
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/codegen/thrift/python',
     'src/python/pants/backend/codegen/wire/java',
+    'src/python/pants/backend/codegen/grpcio',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ]
