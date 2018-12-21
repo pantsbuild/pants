@@ -24,6 +24,9 @@ class SubsystemDependency(datatype([
 ])):
   """Indicates intent to use an instance of `subsystem_cls` scoped to `scope`."""
 
+  def __new__(cls, subsystem_cls, scope, removal_version=None, removal_hint=None):
+    return super(SubsystemDependency, cls).__new__(cls, subsystem_cls, scope, removal_version, removal_hint)
+
   def is_global(self):
     return self.scope == GLOBAL_SCOPE
 
@@ -144,12 +147,12 @@ class SubsystemClientMixin(object):
           # NB: We do not apply deprecations to this implicit global copy of the scope, because if
           # the intention was to deprecate the entire scope, that could be accomplished by
           # deprecating all options in the scope.
+          collect_scope_infos(dep.subsystem_cls, GLOBAL_SCOPE)
           if not dep.is_global():
-            collect_scope_infos(dep.subsystem_cls, GLOBAL_SCOPE)
-          collect_scope_infos(dep.subsystem_cls,
-                              scope,
-                              removal_version=dep.removal_version,
-                              removal_hint=dep.removal_hint)
+            collect_scope_infos(dep.subsystem_cls,
+                                scope,
+                                removal_version=dep.removal_version,
+                                removal_hint=dep.removal_hint)
 
       optionables_path.remove(scope_info.optionable_cls)
 
