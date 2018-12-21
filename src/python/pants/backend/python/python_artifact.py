@@ -71,10 +71,11 @@ class PythonArtifact(PayloadField):
     return self.name
 
   def _compute_fingerprint(self):
-    fingerprint = sha1(json.dumps((self._kw, self._binaries),
+    json_representation = json.dumps((self._kw, self._binaries),
                                   ensure_ascii=True,
                                   allow_nan=False,
-                                  sort_keys=True)).hexdigest()
+                                  sort_keys=True)
+    fingerprint = sha1(json_representation.encode('utf-8')).hexdigest()
     return fingerprint if PY3 else fingerprint.decode('utf-8')
 
   def with_binaries(self, *args, **kw):
