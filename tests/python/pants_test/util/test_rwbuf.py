@@ -17,7 +17,7 @@ class StringWriterTest(unittest.TestCase):
       fb = FileBackedRWBuf(p)
       try:
         sw = StringWriter(fb)
-        sw.write(u"\u2764 Curious Zelda")
+        sw.write("\u2764 Curious Zelda")
       finally:
         fb.close()
       with open(p, 'rb') as f:
@@ -39,9 +39,9 @@ class StringWriterTest(unittest.TestCase):
       fb = FileBackedRWBuf(p)
       try:
         sw = StringWriter(fb)
-        sw.write(u"\u2764")
+        sw.write("\u2764")
         sw.buffer.write(b" Curious")
-        sw.write(u" Zelda")
+        sw.write(" Zelda")
       finally:
         fb.close()
       with open(p, 'rb') as f:
