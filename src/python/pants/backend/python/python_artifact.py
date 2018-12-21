@@ -7,8 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 from hashlib import sha1
 
-from future.utils import PY3
-
 from pants.base.hash_utils import stable_json_hash
 from pants.base.payload_field import PayloadField
 
