@@ -21,7 +21,7 @@ from future.utils import PY2, binary_type, text_type
 from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
-from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.objects import datatype
 
 
@@ -531,23 +531,12 @@ class ExternContext(object):
 class Native(object):
   """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
-  @staticmethod
-  def create(bootstrap_options):
-    """:param options: Any object that provides access to bootstrap option values."""
-    return Native(bootstrap_options.native_engine_visualize_to)
-
-  def __init__(self, visualize_to_dir):
-    """
-    :param visualize_to_dir: An existing directory (or None) to visualize executions to.
-    """
-    # TODO: This should likely be a per-session property... ie, not a bootstrap option.
-    self._visualize_to_dir = visualize_to_dir
-
-  @property
-  def visualize_to_dir(self):
-    return self._visualize_to_dir
-
   class BinaryLocationError(Exception): pass
+
+  @classmethod
+  @memoized_method
+  def instance(cls):
+    return Native()
 
   @memoized_property
   def binary(self):

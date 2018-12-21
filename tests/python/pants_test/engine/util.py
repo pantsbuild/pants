@@ -11,7 +11,6 @@ from io import StringIO
 from types import GeneratorType
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.binaries.binary_util import BinaryUtil
 from pants.engine.addressable import addressable_list
 from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
@@ -20,10 +19,7 @@ from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.dirutil import safe_mkdtemp
-from pants.util.memo import memoized
 from pants.util.objects import SubclassesOf
-from pants_test.option.util.fakes import create_options_for_optionables
-from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 def run_rule(rule, *args):
@@ -86,12 +82,9 @@ def run_rule(rule, *args):
       return res
 
 
-@memoized
 def init_native():
-  """Initialize and return a `Native` instance."""
-  init_subsystem(BinaryUtil.Factory)
-  opts = create_options_for_optionables([])
-  return Native.create(opts.for_global_scope())
+  """Return the `Native` instance."""
+  return Native.instance()
 
 
 def create_scheduler(rules, validate=True, native=None):

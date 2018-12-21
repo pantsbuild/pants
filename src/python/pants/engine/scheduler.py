@@ -58,6 +58,7 @@ class Scheduler(object):
     execution_options,
     include_trace_on_error=True,
     validate=True,
+    visualize_to_dir=None,
   ):
     """
     :param native: An instance of engine.native.Native.
@@ -76,6 +77,7 @@ class Scheduler(object):
 
     self._native = native
     self.include_trace_on_error = include_trace_on_error
+    self._visualize_to_dir = visualize_to_dir
     # Validate and register all provided and intrinsic tasks.
     rule_index = RuleIndex.create(list(rules))
     self._root_subject_types = sorted(rule_index.roots, key=repr)
@@ -120,9 +122,9 @@ class Scheduler(object):
 
 
     # If configured, visualize the rule graph before asserting that it is valid.
-    if self.visualize_to_dir() is not None:
+    if self._visualize_to_dir is not None:
       rule_graph_name = 'rule_graph.dot'
-      self.visualize_rule_graph_to_file(os.path.join(self.visualize_to_dir(), rule_graph_name))
+      self.visualize_rule_graph_to_file(os.path.join(self._visualize_to_dir, rule_graph_name))
 
     if validate:
       self._assert_ruleset_valid()
@@ -277,7 +279,7 @@ class Scheduler(object):
     self._raise_or_return(res)
 
   def visualize_to_dir(self):
-    return self._native.visualize_to_dir
+    return self._visualize_to_dir
 
   def _metrics(self, session):
     metrics_val = self._native.lib.scheduler_metrics(self._scheduler, session)

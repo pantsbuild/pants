@@ -137,7 +137,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
       if full_init:
         build_root = get_buildroot()
-        native = Native.create(bootstrap_options_values)
+        native = Native.instance()
         build_config = BuildConfigInitializer.get(options_bootstrapper)
         legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(native,
                                                                       options_bootstrapper,
