@@ -4,6 +4,120 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.14.0.dev0 (12/21/2018)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for deprecating scoped SubsystemDependencies (#6961)
+  `PR #6961 <https://github.com/pantsbuild/pants/pull/6961>`_
+
+* Add a flag to filedeps v1 to output abs or rel paths (#6960)
+  `PR #6960 <https://github.com/pantsbuild/pants/pull/6960>`_
+
+* Add serverset (#6921)
+  `PR #6921 <https://github.com/pantsbuild/pants/pull/6921>`_
+
+* Use serverset for Store (#6931)
+  `PR #6931 <https://github.com/pantsbuild/pants/pull/6931>`_
+
+* Add Python 3 support to C and C++ module initialization (#6930)
+  `PR #6930 <https://github.com/pantsbuild/pants/pull/6930>`_
+
+* Support source and 3rdparty dependencies in v2 python test running (#6915)
+  `PR #6915 <https://github.com/pantsbuild/pants/pull/6915>`_
+
+* Add tool classpath for ./pants scalafix (#6926)
+  `PR #6926 <https://github.com/pantsbuild/pants/pull/6926>`_
+
+* Log aggregate statistics for remote executions (#6812)
+  `PR #6812 <https://github.com/pantsbuild/pants/pull/6812>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+
+* Upgrade Scrooge, Finagle, and Thrift for unified Thrift library and Py3 support (#6945)
+  `PR #6945 <https://github.com/pantsbuild/pants/pull/6945>`_
+
+* Bump zinc bootstrapper to 0.0.4 (#6967)
+  `PR #6967 <https://github.com/pantsbuild/pants/pull/6967>`_
+
+* Set CI's minimum Python 3 version to 3.6 (#6954)
+  `PR #6954 <https://github.com/pantsbuild/pants/pull/6954>`_
+
+* Bump scalafix version and use os.pathsep (#6938)
+  `PR #6938 <https://github.com/pantsbuild/pants/pull/6938>`_
+
+Bugfixes
+~~~~~~~~
+
+* Handle ValueError when child wants to reset stderr but it is closed. (#6932)
+  `PR #6932 <https://github.com/pantsbuild/pants/pull/6932>`_
+
+* Manually manage Delay's timer thread (#6950)
+  `PR #6950 <https://github.com/pantsbuild/pants/pull/6950>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Ensure digests are uploaded before attempting execution (#6965)
+  `PR #6965 <https://github.com/pantsbuild/pants/pull/6965>`_
+
+* Fix tokenize encoding issue engine parser on Python 3 (#6962)
+  `PR #6962 <https://github.com/pantsbuild/pants/pull/6962>`_
+
+* Fix scheduler.metrics() returning bytes instead of unicode (#6969)
+  `PR #6969 <https://github.com/pantsbuild/pants/pull/6969>`_
+
+* Use stdout with bytes for task context (#6968)
+  `PR #6968 <https://github.com/pantsbuild/pants/pull/6968>`_
+
+* Fix plaintext_recorder sometimes being passed TextIO (#6963)
+  `PR #6963 <https://github.com/pantsbuild/pants/pull/6963>`_
+
+* Switch daytime CI to Python 3 only (#6952)
+  `PR #6952 <https://github.com/pantsbuild/pants/pull/6952>`_
+
+* Renamespace and publish the buck zip utils (#6955)
+  `PR #6955 <https://github.com/pantsbuild/pants/pull/6955>`_
+
+* Add filedeps goal and tests for v2 (#6933)
+  `PR #6933 <https://github.com/pantsbuild/pants/pull/6933>`_
+
+* serverset: Add ability to retry a function (#6953)
+  `PR #6953 <https://github.com/pantsbuild/pants/pull/6953>`_
+
+* Only build fs_util when releasing (#6951)
+  `PR #6951 <https://github.com/pantsbuild/pants/pull/6951>`_
+
+* Exclude Antlr test from testprojects to avoid interpreter conflict (#6944)
+  `PR #6944 <https://github.com/pantsbuild/pants/pull/6944>`_
+
+* Fix failing lint with TEST_BUILD pattern (#6943)
+  `PR #6943 <https://github.com/pantsbuild/pants/pull/6943>`_
+
+* Fix relative import for testprojects dummy test on Python 3 (#6942)
+  `PR #6942 <https://github.com/pantsbuild/pants/pull/6942>`_
+
+* Fix relative import for conftest test on Python 3 (#6941)
+  `PR #6941 <https://github.com/pantsbuild/pants/pull/6941>`_
+
+* Fix Travis environment variable overriding interpreter_selection test's config (#6939)
+  `PR #6939 <https://github.com/pantsbuild/pants/pull/6939>`_
+
+* PythonToolPrepBase now sets up its interpreter. (#6928)
+  `PR #6928 <https://github.com/pantsbuild/pants/pull/6928>`_
+
+* Remove remaining unnecessary __future__ imports (#6925)
+  `PR #6925 <https://github.com/pantsbuild/pants/pull/6925>`_
+
+* Construct clients on demand (#6920)
+  `PR #6920 <https://github.com/pantsbuild/pants/pull/6920>`_
+
+* Enforce interpreter constraints for antlr3 python code. (#6924)
+  `PR #6924 <https://github.com/pantsbuild/pants/pull/6924>`_
+
 1.13.0rc1 (12/18/2018)
 ------------------------
 
