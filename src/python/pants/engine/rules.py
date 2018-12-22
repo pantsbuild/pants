@@ -18,6 +18,7 @@ import asttokens
 from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
+from pants.engine.goal import Goal
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
 from pants.util.collections_abc_backport import Iterable, OrderedDict
@@ -230,13 +231,13 @@ def _get_starting_indent(source):
   return 0
 
 
-def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
+def _make_rule(output_type, input_selectors, goal_cls=None, cacheable=True):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
   :param type output_type: The return/output type for the Rule. This must be a concrete Python type.
   :param list input_selectors: A list of Selector instances that matches the number of arguments
     to the @decorated function.
-  :param str for_goal: If this is a @console_rule, which goal string it's called for.
+  :param Goal goal_cls: If this is a `@console_rule`, a Goal class to provide options, help, and a scope.
   """
 
   def wrapper(func):
@@ -283,7 +284,7 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       for p, s in rule_visitor.gets)
 
     # For @console_rule, redefine the function to avoid needing a literal return of the output type.
-    if for_goal:
+    if goal_cls:
       def goal_and_return(*args, **kwargs):
         res = func(*args, **kwargs)
         if isinstance(res, GeneratorType):
@@ -294,15 +295,18 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
         return output_type()
       functools.update_wrapper(goal_and_return, func)
       wrapped_func = goal_and_return
+      dependency_rules = (optionable_rule(goal_cls),)
     else:
       wrapped_func = func
+      dependency_rules = None
 
     wrapped_func.rule = TaskRule(
         output_type,
         tuple(input_selectors),
         wrapped_func,
         input_gets=tuple(gets),
-        goal=for_goal,
+        goal_cls=goal_cls,
+        dependency_rules=dependency_rules,
         cacheable=cacheable,
       )
 
@@ -314,9 +318,12 @@ def rule(output_type, input_selectors):
   return _make_rule(output_type, input_selectors)
 
 
-def console_rule(goal_name, input_selectors):
-  output_type = _GoalProduct.for_name(goal_name)
-  return _make_rule(output_type, input_selectors, goal_name, False)
+def console_rule(goal_cls, input_selectors):
+  if not isinstance(goal_cls, type) or not issubclass(goal_cls, Goal):
+    raise TypeError('The first argument for a @console_rule must be an associated `Goal` to '
+                    'declare its help, options, and scope. Got: `{}`.'.format(goal_cls))
+  output_type = _GoalProduct.for_name(goal_cls.options_scope)
+  return _make_rule(output_type, input_selectors, goal_cls, False)
 
 
 def union(cls):
@@ -374,7 +381,15 @@ class Rule(AbstractClass):
   def output_type(self):
     """An output `type` for the rule."""
 
-  @property
+  @abstractproperty
+  def dependency_rules(self):
+    """A tuple of @rules that are known to be necessary to run this rule.
+
+    Note that installing @rules as flat lists is generally preferable, as Rules already implicitly
+    form a loosely coupled RuleGraph: this facility exists only to assist with boilerplate removal.
+    """
+
+  @abstractproperty
   def dependency_optionables(self):
     """A tuple of Optionable classes that are known to be necessary to run this rule."""
     return ()
@@ -385,7 +400,8 @@ class TaskRule(datatype([
   ('input_selectors', TypedCollection(SubclassesOf(type))),
   ('input_gets', tuple),
   'func',
-  'goal',
+  'goal_cls',
+  ('dependency_rules', tuple),
   ('dependency_optionables', tuple),
   ('cacheable', bool),
 ]), Rule):
@@ -401,17 +417,25 @@ class TaskRule(datatype([
               input_selectors,
               func,
               input_gets,
-              goal=None,
               dependency_optionables=None,
+              dependency_rules=None,
+              goal_cls=None,
               cacheable=True):
 
+    # Validate associated Goal (if any).
+    if goal_cls and not issubclass(goal_cls, Goal):
+      raise TypeError("Expected a Goal instance for `{}`, got: {}".format(
+        func.__name__, type(goal_cls)))
+
+    # Create.
     return super(TaskRule, cls).__new__(
         cls,
         output_type,
         input_selectors,
         input_gets,
         func,
-        goal,
+        goal_cls,
+        dependency_rules or tuple(),
         dependency_optionables or tuple(),
         cacheable,
       )
@@ -432,6 +456,14 @@ class RootRule(datatype([('output_type', _type_field)]), Rule):
   particular type might be when a value is provided as a root subject at the beginning
   of an execution.
   """
+
+  @property
+  def dependency_rules(self):
+    return tuple()
+
+  @property
+  def dependency_optionables(self):
+    return tuple()
 
 
 # TODO: add typechecking here -- would need to have a TypedCollection for dicts for `union_rules`.
@@ -459,6 +491,8 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
         add_root_rule(rule)
       else:
         add_task(rule.output_type, rule)
+      for dep_rule in rule.dependency_rules:
+        add_rule(dep_rule)
 
     def add_type_transition_rule(union_rule):
       # NB: This does not require that union bases be supplied to `def rules():`, as the union type

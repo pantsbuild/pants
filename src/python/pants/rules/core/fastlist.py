@@ -7,25 +7,20 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.base.specs import Specs
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
+from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.rules import console_rule, optionable_rule
+from pants.engine.rules import console_rule
 from pants.engine.selectors import Get
-from pants.subsystem.subsystem import Subsystem
 
 
-class ListOptions(Subsystem):
-  """Lists all targets matching the target specs.
+class List(Goal):
+  """Lists all targets matching the target specs."""
 
-  If no targets are specified, lists all targets in the workspace.
-  """
-
-  # NB: This option scope is temporary: a followup to #6880 will replace the v1 list goal and rename
-  # this scope.
-  options_scope = 'fastlist'
+  name = 'list'
 
   @classmethod
   def register_options(cls, register):
-    super(ListOptions, cls).register_options(register)
+    super(List, cls).register_options(register)
     register('--provides', type=bool,
              help='List only targets that provide an artifact, displaying the columns specified by '
                   '--provides-columns.')
@@ -36,13 +31,13 @@ class ListOptions(Subsystem):
              help='Print only targets that are documented with a description.')
 
 
-@console_rule('list', [Console, ListOptions, Specs])
-def fast_list(console, options, specs):
+@console_rule(List, [Console, List, Specs])
+def fast_list(console, list_goal, specs):
   """A fast variant of `./pants list` with a reduced feature set."""
 
-  provides = options.get_options().provides
-  provides_columns = options.get_options().provides_columns
-  documented = options.get_options().documented
+  provides = list_goal.options.provides
+  provides_columns = list_goal.options.provides_columns
+  documented = list_goal.options.documented
   if provides or documented:
     # To get provides clauses or documentation, we need hydrated targets.
     collection = yield Get(HydratedTargets, Specs, specs)
@@ -89,6 +84,5 @@ def fast_list(console, options, specs):
 
 def rules():
   return [
-      optionable_rule(ListOptions),
-      fast_list
+      fast_list,
     ]

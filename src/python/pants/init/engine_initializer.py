@@ -192,18 +192,16 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
     :param list goals: The list of requested goal names as passed on the commandline.
     :param TargetRoots target_roots: The targets root of the request.
     """
-    # Reduce to only applicable goals - with validation happening by way of `validate_goals()`.
-    goals = [goal for goal in goals if goal in self.goal_map]
     subjects = self._determine_subjects(target_roots)
     console = Console()
     # Console rule can only have one subject.
     # TODO: What about console_rules with no subjects (i.e., no target specs)?
     assert len(subjects) == 1
     for goal in goals:
+      goal_product = self.goal_map[goal]
+      params = Params(subjects[0], options_bootstrapper, console)
+      logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
       try:
-        goal_product = self.goal_map[goal]
-        params = Params(subjects[0], options_bootstrapper, console)
-        logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
         self.scheduler_session.run_console_rule(goal_product, params)
       finally:
         console.flush()
@@ -236,8 +234,10 @@ class EngineInitializer(object):
   @staticmethod
   def _make_goal_map_from_rules(rules):
     goal_map = {}
-    goal_to_rule = [(rule.goal, rule) for rule in rules if getattr(rule, 'goal', None) is not None]
-    for goal, r in goal_to_rule:
+    for r in rules:
+      if getattr(r, 'goal_cls', None) is None:
+        continue
+      goal = r.goal_cls.options_scope
       if goal in goal_map:
         raise EngineInitializer.GoalMappingError(
           'could not map goal `{}` to rule `{}`: already claimed by product `{}`'

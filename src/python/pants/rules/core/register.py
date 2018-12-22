@@ -4,12 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.rules.core import fastlist, filedeps
-from pants.rules.core.test import coordinator_of_tests, fast_test
+from pants.rules.core import fastlist, filedeps, test
 
 
 def rules():
-  return fastlist.rules() + filedeps.rules() + [
-    fast_test,
-    coordinator_of_tests,
-  ]
+  return fastlist.rules() + filedeps.rules() + test.rules()

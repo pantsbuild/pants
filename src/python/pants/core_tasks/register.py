@@ -37,7 +37,6 @@ def register_goals():
   Goal.register('binary', 'Create a runnable binary.')
   Goal.register('resources', 'Prepare resources.')
   Goal.register('bundle', 'Create a deployable application bundle.')
-  Goal.register('test', 'Run tests.')
   Goal.register('bench', 'Run benchmarks.')
   Goal.register('repl', 'Run a REPL.')
   Goal.register('repl-dirty', 'Run a REPL, skipping compilation.')

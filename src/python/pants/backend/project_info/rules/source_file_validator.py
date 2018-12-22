@@ -11,6 +11,7 @@ from future.utils import text_type
 
 from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent
+from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.objects import Collection
 from pants.engine.rules import console_rule, optionable_rule, rule
@@ -32,8 +33,18 @@ class DetailLevel(enum(['none', 'summary', 'nonmatching', 'all'])):
   pass
 
 
+class Validate(Goal):
+  name = 'validate'
+
+  @classmethod
+  def register_options(cls, register):
+    super(Validate, cls).register_options(register)
+    register('--detail-level', type=DetailLevel, default=DetailLevel.nonmatching,
+             help='How much detail to emit to the console.')
+
+
 class SourceFileValidation(Subsystem):
-  options_scope = 'sourcefile_validation'
+  options_scope = 'sourcefile-validation'
 
   @classmethod
   def register_options(cls, register):
@@ -68,8 +79,6 @@ class SourceFileValidation(Subsystem):
     register('--config', type=dict, fromfile=True,
              # TODO: Replace "See documentation" with actual URL, once we have some.
              help='Source file regex matching config.  See documentation for config schema.')
-    register('--detail-level', type=DetailLevel, default=DetailLevel.nonmatching,
-             help='How much detail to emit to the console.')
 
   @memoized_method
   def get_multi_matcher(self):
@@ -201,12 +210,12 @@ class MultiMatcher(object):
 
 # TODO: Switch this to `lint` once we figure out a good way for v1 tasks and v2 rules
 # to share goal names.
-@console_rule('validate', [Console, HydratedTargets, SourceFileValidation])
-def validate(console, hydrated_targets, source_file_validation):
+@console_rule(Validate, [Console, HydratedTargets, Validate])
+def validate(console, hydrated_targets, validate_goal):
   per_tgt_rmrs = yield [Get(RegexMatchResults, HydratedTarget, ht) for ht in hydrated_targets]
   regex_match_results = list(itertools.chain(*per_tgt_rmrs))
 
-  detail_level = source_file_validation.get_options().detail_level
+  detail_level = validate_goal.options.detail_level
   regex_match_results = sorted(regex_match_results, key=lambda x: x.path)
   num_matched_all = 0
   num_nonmatched_some = 0

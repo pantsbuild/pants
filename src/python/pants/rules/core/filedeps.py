@@ -7,17 +7,23 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pex.orderedset import OrderedSet
 
 from pants.engine.console import Console
+from pants.engine.goal import Goal
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import console_rule
 
 
-@console_rule('filedeps', [Console, TransitiveHydratedTargets])
-def file_deps(console, transitive_hydrated_targets):
+class Filedeps(Goal):
   """List all source and BUILD files a target transitively depends on.
 
   Files are listed with relative paths and any BUILD files implied in the transitive closure of
   targets are also included.
   """
+
+  name = 'filedeps'
+
+
+@console_rule(Filedeps, [Console, TransitiveHydratedTargets])
+def file_deps(console, transitive_hydrated_targets):
 
   uniq_set = OrderedSet()
 
