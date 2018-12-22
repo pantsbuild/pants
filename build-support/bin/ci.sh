@@ -133,15 +133,12 @@ fi
 
 # NB: Ordering matters here. We (currently) always bootstrap a Python 2 pex.
 if [[ "${python_three:-false}" == "true" ]]; then
-  banner "Setting interpreter constraints to Python 3!"
+  banner "Setting interpreter constraints for 3!"
   export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
-else
-  banner "Setting interpreter constraints to Python 2!"
-  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=2.7,<3"]'
+  # TODO: Clear interpreters, otherwise this constraint does not end up applying due to a cache
+  # bug between the `./pants binary` and further runs.
+  ./pants.pex clean-all
 fi
-# TODO: Clear interpreters, otherwise this constraint does not end up applying due to a cache
-# bug between the `./pants binary` and further runs.
-./pants.pex clean-all
 
 if [[ "${run_sanity_checks:-false}" == "true" ]]; then
   start_travis_section "SanityCheck" "Sanity checking bootstrapped pants and repo BUILD files"
