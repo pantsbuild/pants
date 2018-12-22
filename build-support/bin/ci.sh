@@ -122,21 +122,13 @@ if [[ "${run_bootstrap:-true}" == "true" ]]; then
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    ./pants ${bootstrap_compile_args[@]} binary \
+    pants_script="./pants"; [[ "${python_two:-false}" == "false" ]] && pants_script="./pants3"
+    ${pants_script} ${bootstrap_compile_args[@]} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
     ./pants.pex -V
   ) || die "Failed to bootstrap pants."
   end_travis_section
-fi
-
-# NB: Ordering matters here. We (currently) always bootstrap a Python 2 pex.
-if [[ "${python_two:-false}" == "false" ]]; then
-  banner "Setting interpreter constraints to Python 3!"
-  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
-  # TODO: Clear interpreters, otherwise this constraint does not end up applying due to a cache
-  # bug between the `./pants binary` and further runs.
-  ./pants.pex clean-all
 fi
 
 if [[ "${run_sanity_checks:-false}" == "true" ]]; then
