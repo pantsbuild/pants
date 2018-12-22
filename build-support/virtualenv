@@ -14,10 +14,11 @@ fi
 source ${REPO_ROOT}/build-support/common.sh
 
 if [[ -z "${PY}" ]]; then
-  if which python2.7 >/dev/null; then
-    PY=`which python2.7`
+  python_bin_name="python2.7"; [ "$PANTS_USE_PYTHON3" = true ] && python_bin_name="python3"
+  if which "${python_bin_name}" >/dev/null; then
+    PY=`which ${python_bin_name}`
   else
-    die 'No python2.7 interpreter found on the path.  Python will not work!'
+    die "No ${python_bin_name} interpreter found on the path. Python will not work!"
   fi
 fi
 
