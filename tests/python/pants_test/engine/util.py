@@ -84,7 +84,7 @@ def run_rule(rule, *args):
 
 def init_native():
   """Return the `Native` instance."""
-  return Native.instance()
+  return Native()
 
 
 def create_scheduler(rules, validate=True, native=None):

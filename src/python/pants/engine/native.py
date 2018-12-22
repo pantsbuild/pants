@@ -21,7 +21,8 @@ from future.utils import PY2, binary_type, text_type
 from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
-from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.meta import Singleton
 from pants.util.objects import datatype
 
 
@@ -528,15 +529,10 @@ class ExternContext(object):
     return self._lib.val_for(key)
 
 
-class Native(object):
+class Native(Singleton):
   """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
   class BinaryLocationError(Exception): pass
-
-  @classmethod
-  @memoized_method
-  def instance(cls):
-    return Native()
 
   @memoized_property
   def binary(self):
