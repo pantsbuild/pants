@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -26,100 +26,100 @@ logger = logging.getLogger(__name__)
 
 
 class GrpcioPrep(Task):
-    class Grpcio(object):
-        class Factory(Subsystem):
-            options_scope = 'grpcio'
+  class Grpcio(object):
+    class Factory(Subsystem):
+      options_scope = 'grpcio'
 
-            @classmethod
-            def register_options(cls, register):
-                super(GrpcioPrep.Grpcio.Factory, cls).register_options(register)
+      @classmethod
+      def register_options(cls, register):
+        super(GrpcioPrep.Grpcio.Factory, cls).register_options(register)
 
-            @classmethod
-            def create_requirements(cls, context, workdir, grpcio_version):
-                address = Address(spec_path=fast_relpath(workdir, get_buildroot()), target_name='grpcio')
-                requirements = [
-                    'grpcio-tools=={}'.format(grpcio_version),
-                    'grpcio=={}'.format(grpcio_version),
-                ]
-                context.build_graph.inject_synthetic_target(
-                    address=address,
-                    target_type=PythonRequirementLibrary,
-                    requirements=[PythonRequirement(r) for r in requirements]
-                )
-                return context.build_graph.get_target(address=address)
-
-            @classmethod
-            def build_grpcio_pex(cls, context, interpreter, pex_path, requirements_lib):
-                with safe_concurrent_creation(pex_path) as chroot:
-                    pex_builder = PexBuilderWrapper(
-                        PEXBuilder(path=chroot, interpreter=interpreter),
-                        PythonRepos.global_instance(),
-                        PythonSetup.global_instance(),
-                        context.log)
-                    pex_builder.add_requirement_libs_from(req_libs=[requirements_lib])
-                    pex_builder.set_entry_point('grpc_tools.protoc')
-                    pex_builder.freeze()
-
-        def __init__(self, pex_path, interpreter=None):
-            self._pex = PEX(pex_path, interpreter=interpreter)
-
-        def run(self, workunit_factory, args, **kwargs):
-            cmdline = ' '.join(self._pex.cmdline(args))
-            with workunit_factory(cmd=cmdline) as workunit:
-                logger.info(args)
-                exit_code = self._pex.run(args,
-                                                 stdout=workunit.output('stdout'),
-                                                 stderr=workunit.output('stderr'),
-                                                 with_chroot=False,
-                                                 blocking=True,
-                                                 **kwargs)
-                logging.info('exit_code: [{}]'.format(exit_code))
-                return cmdline, exit_code
-
-    @classmethod
-    def register_options(cls, register):
-        register(
-            '--grpcio-version',
-            default='1.14.1',
-            help='The version of grpcio to use.')
-
-    @classmethod
-    def subsystem_dependencies(cls):
-        return super(GrpcioPrep, cls).subsystem_dependencies() + (
-            cls.Grpcio.Factory,
-            # PythonSetup, PythonRepos are required by dump_requirement_libs.
-            PythonSetup,
-            PythonRepos
+      @classmethod
+      def create_requirements(cls, context, workdir, grpcio_version):
+        address = Address(spec_path=fast_relpath(workdir, get_buildroot()), target_name='grpcio')
+        requirements = [
+          'grpcio-tools=={}'.format(grpcio_version),
+          'grpcio=={}'.format(grpcio_version),
+        ]
+        context.build_graph.inject_synthetic_target(
+          address=address,
+          target_type=PythonRequirementLibrary,
+          requirements=[PythonRequirement(r) for r in requirements]
         )
+        return context.build_graph.get_target(address=address)
 
-    @classmethod
-    def product_types(cls):
-        return [cls.Grpcio]
+      @classmethod
+      def build_grpcio_pex(cls, context, interpreter, pex_path, requirements_lib):
+        with safe_concurrent_creation(pex_path) as chroot:
+          pex_builder = PexBuilderWrapper(
+            PEXBuilder(path=chroot, interpreter=interpreter),
+            PythonRepos.global_instance(),
+            PythonSetup.global_instance(),
+            context.log)
+          pex_builder.add_requirement_libs_from(req_libs=[requirements_lib])
+          pex_builder.set_entry_point('grpc_tools.protoc')
+          pex_builder.freeze()
 
-    @property
-    def create_target_dirs(self):
-        return True
+    def __init__(self, pex_path, interpreter=None):
+      self._pex = PEX(pex_path, interpreter=interpreter)
 
-    def execute(self):
-        grpcio_version = self.get_options().grpcio_version
-        grpcio_requirement_lib = self.Grpcio.Factory.create_requirements(self.context, self.workdir, grpcio_version)
+    def run(self, workunit_factory, args, **kwargs):
+      cmdline = ' '.join(self._pex.cmdline(args))
+      with workunit_factory(cmd=cmdline) as workunit:
+        logger.info(args)
+        exit_code = self._pex.run(args,
+                                  stdout=workunit.output('stdout'),
+                                  stderr=workunit.output('stderr'),
+                                  with_chroot=False,
+                                  blocking=True,
+                                  **kwargs)
+        logging.info('exit_code: [{}]'.format(exit_code))
+        return cmdline, exit_code
 
-        with self.invalidated(targets=[grpcio_requirement_lib]) as invalidation_check:
-            interpreter = PythonInterpreter.get()
+  @classmethod
+  def register_options(cls, register):
+    register(
+      '--grpcio-version',
+      default='1.14.1',
+      help='The version of grpcio to use.')
 
-            assert len(invalidation_check.all_vts) == 1, (
-                'Expected exactly one versioned target found {}: {}'
-                    .format(len(invalidation_check.all_vts), invalidation_check.all_vts)
-            )
-            vt = invalidation_check.all_vts[0]
-            pex_path = os.path.join(vt.results_dir, 'grpcio.pex')
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(GrpcioPrep, cls).subsystem_dependencies() + (
+      cls.Grpcio.Factory,
+      # PythonSetup, PythonRepos are required by dump_requirement_libs.
+      PythonSetup,
+      PythonRepos
+    )
 
-            if invalidation_check.invalid_vts:
-                with self.context.new_workunit(name='create-grpcio-pex', labels=[WorkUnitLabel.PREP]):
-                    self.Grpcio.Factory.build_grpcio_pex(context=self.context,
-                                                         interpreter=interpreter,
-                                                         pex_path=pex_path,
-                                                         requirements_lib=grpcio_requirement_lib)
+  @classmethod
+  def product_types(cls):
+    return [cls.Grpcio]
 
-            grpcio = self.Grpcio(pex_path, interpreter=interpreter)
-            self.context.products.register_data(self.Grpcio, grpcio)
+  @property
+  def create_target_dirs(self):
+    return True
+
+  def execute(self):
+    grpcio_version = self.get_options().grpcio_version
+    grpcio_requirement_lib = self.Grpcio.Factory.create_requirements(self.context, self.workdir, grpcio_version)
+
+    with self.invalidated(targets=[grpcio_requirement_lib]) as invalidation_check:
+      interpreter = PythonInterpreter.get()
+
+      assert len(invalidation_check.all_vts) == 1, (
+        'Expected exactly one versioned target found {}: {}'
+          .format(len(invalidation_check.all_vts), invalidation_check.all_vts)
+      )
+      vt = invalidation_check.all_vts[0]
+      pex_path = os.path.join(vt.results_dir, 'grpcio.pex')
+
+      if invalidation_check.invalid_vts:
+        with self.context.new_workunit(name='create-grpcio-pex', labels=[WorkUnitLabel.PREP]):
+          self.Grpcio.Factory.build_grpcio_pex(context=self.context,
+                                               interpreter=interpreter,
+                                               pex_path=pex_path,
+                                               requirements_lib=grpcio_requirement_lib)
+
+      grpcio = self.Grpcio(pex_path, interpreter=interpreter)
+      self.context.products.register_data(self.Grpcio, grpcio)
