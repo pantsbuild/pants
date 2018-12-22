@@ -13,9 +13,10 @@ function usage() {
   cat <<EOF
 Runs commons tests for local or hosted CI.
 
-Usage: $0 (-h|-2fxbkmrjlpuneycitzs)
+Usage: $0 (-h|-3fxbkmrjlpuneycitzs)
  -h           print out this help message
- -2           Run using Python 2 (defaults to using Python 3).
+ -3           After pants is bootstrapped, set --python-setup-interpreter-constraints such that any
+              python tests run with Python 3.
  -f           run python code formatting checks
  -x           run bootstrap clean-all (assume bootstrapping from a
               fresh clone)
@@ -63,12 +64,12 @@ bootstrap_compile_args=(
 python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
-python_two="false"
+python_three="false"
 
-while getopts "h2fxbkmrjlpeasu:ny:ci:tz" opt; do
+while getopts "h3fxbkmrjlpeasu:ny:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
-    2) python_two="true" ;;
+    3) python_three="true" ;;
     f) run_pre_commit_checks="true" ;;
     x) run_bootstrap_clean="true" ;;
     b) run_bootstrap="false" ;;
@@ -131,7 +132,7 @@ if [[ "${run_bootstrap:-true}" == "true" ]]; then
 fi
 
 # NB: Ordering matters here. We (currently) always bootstrap a Python 2 pex.
-if [[ "${python_two:-false}" == "false" ]]; then
+if [[ "${python_three:-false}" == "true" ]]; then
   banner "Setting interpreter constraints to Python 3!"
   export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
 else
