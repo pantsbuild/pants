@@ -223,7 +223,7 @@ class RuleGraphMakerTest(unittest.TestCase):
   def test_full_graph_for_planner_example(self):
     symbol_table = TargetTable()
     address_mapper = AddressMapper(JsonParser(symbol_table), '*.BUILD.json')
-    rules = create_graph_rules(address_mapper, symbol_table) + create_fs_rules()
+    rules = create_graph_rules(address_mapper) + create_fs_rules()
 
     fullgraph_str = self.create_full_graph(rules)
 

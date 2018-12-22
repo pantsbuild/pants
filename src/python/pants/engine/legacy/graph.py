@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import functools
 import logging
 from builtins import str, zip
 from collections import defaultdict, deque
@@ -27,7 +26,8 @@ from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import RootRule, TaskRule, rule
+from pants.engine.parser import SymbolTable, TargetAdaptorContainer
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.filespec import any_matches_filespec
@@ -407,6 +407,7 @@ class OwnersRequest(datatype([
   """
 
 
+@rule(BuildFileAddresses, [Select(SymbolTable), Select(AddressMapper), Select(OwnersRequest)])
 def find_owners(symbol_table, address_mapper, owners_request):
   sources_set = OrderedSet(owners_request.sources)
   dirs_set = OrderedSet(dirname(source) for source in sources_set)
@@ -443,7 +444,8 @@ def find_owners(symbol_table, address_mapper, owners_request):
   else:
     # Otherwise: find dependees.
     all_addresses = yield Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
-    all_structs = yield [Get(symbol_table.constraint(), Address, a.to_address()) for a in all_addresses]
+    all_structs = yield [Get(TargetAdaptorContainer, Address, a.to_address()) for a in all_addresses]
+    all_structs = [s.value for s in all_structs]
 
     graph = _DependentGraph.from_iterable(target_types_from_symbol_table(symbol_table),
                                           address_mapper,
@@ -498,7 +500,9 @@ class HydratedField(datatype(['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 
 
-def hydrate_target(target_adaptor):
+@rule(HydratedTarget, [Select(TargetAdaptorContainer)])
+def hydrate_target(target_adaptor_container):
+  target_adaptor = target_adaptor_container.value
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
   hydrated_fields = yield [(Get(HydratedField, BundlesField, fa)
@@ -572,36 +576,14 @@ def hydrate_bundles(bundles_field, glob_match_error_behavior):
   yield HydratedField('bundles', bundles)
 
 
-def create_legacy_graph_tasks(symbol_table):
+def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
-  symbol_table_constraint = symbol_table.constraint()
-
-  partial_find_owners = functools.partial(find_owners, symbol_table)
-  functools.update_wrapper(partial_find_owners, find_owners)
-
   return [
     transitive_hydrated_targets,
     transitive_hydrated_target,
     hydrated_targets,
-    TaskRule(
-      HydratedTarget,
-      [Select(symbol_table_constraint)],
-      hydrate_target,
-      input_gets=[
-        Get(HydratedField, SourcesField),
-        Get(HydratedField, BundlesField),
-      ]
-    ),
-    TaskRule(
-      BuildFileAddresses,
-      [Select(AddressMapper), Select(OwnersRequest)],
-      partial_find_owners,
-      input_gets=[
-        Get(HydratedTargets, Specs),
-        Get(BuildFileAddresses, Specs),
-        Get(symbol_table_constraint, Address),
-      ]
-    ),
+    hydrate_target,
+    find_owners,
     hydrate_sources,
     hydrate_bundles,
     RootRule(OwnersRequest),
