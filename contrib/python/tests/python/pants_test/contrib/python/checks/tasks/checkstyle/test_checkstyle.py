@@ -32,7 +32,7 @@ CHECKER_RESOLVE_METHOD = [('sys.path', True), ('resolve', False)]
 class CheckstyleTest(PythonTaskTestBase):
 
   py2_constraint = 'CPython>=2.7,<3'
-  py3_constraint = 'CPython>=3.6,<4'
+  py3_constraint = 'CPython>=3.4,<3.5'
 
   @staticmethod
   def build_checker_wheel(root_dir):
@@ -195,7 +195,7 @@ class CheckstyleTest(PythonTaskTestBase):
     self.assertIn('4 Python Style issues found', str(task_error.exception))
 
   def test_lint_ignores_unwhitelisted_constraints(self):
-    target_py3 = self.create_py3_failing_target() 
+    target_py3 = self.create_py3_failing_target()
     self.assertEqual(0, self.execute_task(target_roots=[target_py3]))
 
   def test_lint_runs_for_single_whitelisted_constraints(self):
