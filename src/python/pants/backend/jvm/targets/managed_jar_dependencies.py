@@ -22,7 +22,7 @@ class ManagedJarDependencies(Target):
 
   def __init__(self, payload=None, artifacts=None, **kwargs):
     """
-    :param artifacts: List of `jar <#jar>`_\s or specs to jar_library targets with pinned versions.
+    :param artifacts: List of `jar <#jar>`_\\s or specs to jar_library targets with pinned versions.
       Versions are pinned per (org, name, classifier, ext) artifact coordinate (excludes, etc are
       ignored for the purposes of pinning).
     """
@@ -127,7 +127,7 @@ class ManagedJarLibraries(object):
   def __call__(self, name=None, artifacts=None, **kwargs):
     """
     :param string name: The optional name of the generated managed_jar_dependencies() target.
-    :param artifacts: List of `jar <#jar>`_\s or specs to jar_library targets with pinned versions.
+    :param artifacts: List of `jar <#jar>`_\\s or specs to jar_library targets with pinned versions.
       Versions are pinned per (org, name, classifier, ext) artifact coordinate (excludes, etc are
       ignored for the purposes of pinning).
     """

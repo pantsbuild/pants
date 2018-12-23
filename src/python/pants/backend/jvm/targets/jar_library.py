@@ -31,7 +31,7 @@ class JarLibrary(Target):
 
   def __init__(self, payload=None, jars=None, managed_dependencies=None, **kwargs):
     """
-    :param jars: List of `jar <#jar>`_\s to depend upon.
+    :param jars: List of `jar <#jar>`_\\s to depend upon.
     :param managed_dependencies: Address of a managed_jar_dependencies() target to use. If omitted, uses
       the default managed_jar_dependencies() target set by --jar-dependency-management-default-target.
     """

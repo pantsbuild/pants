@@ -322,7 +322,7 @@ class JvmBinary(JvmTarget):
     :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.
     :type dependencies: list of target specs
-    :param deploy_excludes: List of `exclude <#exclude>`_\s to apply
+    :param deploy_excludes: List of `exclude <#exclude>`_\\s to apply
       at deploy time.
       If you, for example, deploy a java servlet that has one version of
       ``servlet.jar`` onto a Tomcat environment that provides another version,
