@@ -50,7 +50,8 @@ cache:
     # using its own isolated cache:
     #   https://github.com/pantsbuild/pants/issues/2485
     - ${HOME}/.npm
-    - build-support/pants_dev_deps.venv
+    - build-support/pants_dev_deps.py2.venv
+    - build-support/pants_dev_deps.py3.venv
     - src/rust/engine/target
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
