@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import ast
 import functools
 import inspect
+import itertools
 import logging
 from abc import abstractproperty
 from builtins import bytes, str
@@ -86,7 +87,11 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       raise ValueError('The @rule decorator must be applied innermost of all decorators.')
 
     caller_frame = inspect.stack()[1][0]
-    module_ast = ast.parse(inspect.getsource(func))
+    source = inspect.getsource(func)
+    if source.startswith(" "):
+      to_trim = sum(1 for _ in itertools.takewhile(lambda c: c in {' ', b' '}, source))
+      source = "\n".join(line[to_trim:] for line in source.split("\n"))
+    module_ast = ast.parse(source)
 
     def resolve_type(name):
       resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
