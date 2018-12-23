@@ -12,7 +12,7 @@ REQUIREMENTS=(
 )
 
 function venv_dir() {
-  py_version="py2"; [ "$PANTS_USE_PYTHON3" = true ] && py_version="py3"
+  py_version="py2"; [ "${PANTS_USE_PYTHON3}" = true ] && py_version="py3"
   echo ${REPO_ROOT}/build-support/pants_dev_deps.${py_version}.venv
 }
 

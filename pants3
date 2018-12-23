@@ -6,4 +6,3 @@
 
 export PANTS_USE_PYTHON3=true
 ./pants $@
-unset PANTS_USE_PYTHON3
