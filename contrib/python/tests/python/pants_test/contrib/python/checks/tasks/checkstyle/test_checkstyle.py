@@ -32,7 +32,7 @@ CHECKER_RESOLVE_METHOD = [('sys.path', True), ('resolve', False)]
 class CheckstyleTest(PythonTaskTestBase):
 
   py2_constraint = 'CPython>=2.7,<3'
-  py3_constraint = 'CPython>=3.4,<=3.5'
+  py3_constraint = 'CPython>=3.4,<3.6'
 
   @staticmethod
   def build_checker_wheel(root_dir):
