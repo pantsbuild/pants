@@ -94,7 +94,8 @@ osx_test_config: &osx_test_config
   stage: *test
   language: generic
   before_install:
-    - brew update && brew install python3
+    # install Python 3
+    - brew install python
   script:
     - MODE=debug ./build-support/bin/travis-ci.sh -m
 
