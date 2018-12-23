@@ -22,6 +22,7 @@ from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
 from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.meta import Singleton
 from pants.util.objects import datatype
 
 
@@ -142,7 +143,8 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     env_script = '{}.cflags'.format(real_output_prefix)
 
     # Preprocessor directives won't parse in the .cdef calls, so we have to hide them for now.
-    scheduler_bindings = _hackily_rewrite_scheduler_bindings(read_file(scheduler_bindings_path))
+    scheduler_bindings_content = read_file(scheduler_bindings_path, binary_mode=False)
+    scheduler_bindings = _hackily_rewrite_scheduler_bindings(scheduler_bindings_content)
 
     ffibuilder = cffi.FFI()
     ffibuilder.cdef(scheduler_bindings)
@@ -163,7 +165,7 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     # to define a module that is loadable by either 2 or 3.
     # TODO: Because PyPy uses the same `init` function name regardless of the python version, this
     # trick does not work there: we leave its conditional in place.
-    file_content = read_file(temp_c_file).decode('utf-8')
+    file_content = read_file(temp_c_file, binary_mode=False)
     if CFFI_C_PATCH_BEFORE not in file_content:
       raise Exception('The patch for the CFFI generated code will not apply cleanly.')
     file_content = file_content.replace(CFFI_C_PATCH_BEFORE, CFFI_C_PATCH_AFTER)
@@ -528,24 +530,8 @@ class ExternContext(object):
     return self._lib.val_for(key)
 
 
-class Native(object):
+class Native(Singleton):
   """Encapsulates fetching a platform specific version of the native portion of the engine."""
-
-  @staticmethod
-  def create(bootstrap_options):
-    """:param options: Any object that provides access to bootstrap option values."""
-    return Native(bootstrap_options.native_engine_visualize_to)
-
-  def __init__(self, visualize_to_dir):
-    """
-    :param visualize_to_dir: An existing directory (or None) to visualize executions to.
-    """
-    # TODO: This should likely be a per-session property... ie, not a bootstrap option.
-    self._visualize_to_dir = visualize_to_dir
-
-  @property
-  def visualize_to_dir(self):
-    return self._visualize_to_dir
 
   class BinaryLocationError(Exception): pass
 
