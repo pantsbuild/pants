@@ -143,7 +143,8 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     env_script = '{}.cflags'.format(real_output_prefix)
 
     # Preprocessor directives won't parse in the .cdef calls, so we have to hide them for now.
-    scheduler_bindings = _hackily_rewrite_scheduler_bindings(read_file(scheduler_bindings_path))
+    scheduler_bindings_content = read_file(scheduler_bindings_path, binary_mode=False)
+    scheduler_bindings = _hackily_rewrite_scheduler_bindings(scheduler_bindings_content)
 
     ffibuilder = cffi.FFI()
     ffibuilder.cdef(scheduler_bindings)
@@ -164,7 +165,7 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     # to define a module that is loadable by either 2 or 3.
     # TODO: Because PyPy uses the same `init` function name regardless of the python version, this
     # trick does not work there: we leave its conditional in place.
-    file_content = read_file(temp_c_file).decode('utf-8')
+    file_content = read_file(temp_c_file, binary_mode=False)
     if CFFI_C_PATCH_BEFORE not in file_content:
       raise Exception('The patch for the CFFI generated code will not apply cleanly.')
     file_content = file_content.replace(CFFI_C_PATCH_BEFORE, CFFI_C_PATCH_AFTER)
