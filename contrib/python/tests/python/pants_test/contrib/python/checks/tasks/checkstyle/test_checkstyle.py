@@ -173,7 +173,7 @@ class CheckstyleTest(PythonTaskTestBase):
                          print(x+7)
                        """))
     target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
-      compatibility=['CPython>=3.6'])
+      compatibility=['CPython>=3.8'])
     self.set_options(interpreter_constraints_whitelist=[])
     with self.assertRaises(TaskError) as task_error:
       self.execute_task(target_roots=[target_py2, target_py3])
@@ -191,7 +191,7 @@ class CheckstyleTest(PythonTaskTestBase):
                          print(x+7)
                        """))
     target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
-      compatibility=['CPython>=3.6'])
+      compatibility=['CPython>=3.8'])
     with self.assertRaises(TaskError) as task_error:
       self.execute_task(target_roots=[target_py2, target_py3])
     self.assertIn('4 Python Style issues found', str(task_error.exception))
@@ -202,7 +202,7 @@ class CheckstyleTest(PythonTaskTestBase):
                          print(x+7)
                        """))
     target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
-      compatibility=['CPython>=3.6'])
+      compatibility=['CPython>=3.8'])
     self.assertEqual(0, self.execute_task(target_roots=[target_py3]))
 
   def test_lint_runs_for_single_whitelisted_constraints(self):
@@ -211,8 +211,8 @@ class CheckstyleTest(PythonTaskTestBase):
                          print(x+7)
                        """))
     target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
-      compatibility=['CPython>=3.6'])
-    self.set_options(interpreter_constraints_whitelist=["CPython>=3.6"])
+      compatibility=['CPython>=3.8'])
+    self.set_options(interpreter_constraints_whitelist=["CPython>=3.8"])
     with self.assertRaises(TaskError) as task_error:
       self.execute_task(target_roots=[target_py3])
     self.assertIn('3 Python Style issues found', str(task_error.exception))
@@ -229,8 +229,8 @@ class CheckstyleTest(PythonTaskTestBase):
                          print(x+7)
                        """))
     target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
-      compatibility=['CPython>=3.6'])
-    self.set_options(interpreter_constraints_whitelist=["CPython>=2.6", "CPython>=3.6"])
+      compatibility=['CPython>=3.8'])
+    self.set_options(interpreter_constraints_whitelist=["CPython>=2.6", "CPython>=3.8"])
     with self.assertRaises(TaskError) as task_error:
       self.execute_task(target_roots=[target_py2, target_py3])
     self.assertIn('7 Python Style issues found', str(task_error.exception))
@@ -247,8 +247,8 @@ class CheckstyleTest(PythonTaskTestBase):
                          print(x+7)
                        """))
     target_py3 = self.make_target('a/python:fail3', PythonLibrary, sources=['fail_py3.py'],
-      compatibility=['CPython>=3.6'])
-    self.set_options(interpreter_constraints_whitelist=["CPython>=3.6"])
+      compatibility=['CPython>=3.8'])
+    self.set_options(interpreter_constraints_whitelist=["CPython>=3.8"])
     with self.assertRaises(TaskError) as task_error:
       self.execute_task(target_roots=[target_py2, target_py3])
     self.assertIn('7 Python Style issues found', str(task_error.exception))
