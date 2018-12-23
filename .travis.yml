@@ -317,6 +317,8 @@ matrix:
       language: generic
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
+        # Install Python 3
+        - brew install python
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
