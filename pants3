@@ -5,4 +5,4 @@
 # This bootstrap script invokes Pants using a Python 3 interpreter.
 
 export PANTS_USE_PYTHON3=true
-./pants $@
+./pants "$@"
