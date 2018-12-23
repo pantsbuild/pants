@@ -22,6 +22,9 @@ function activate_venv() {
 
 function create_venv() {
   rm -rf "$(venv_dir)"
+  # Also delete `pants_dev_deps.venv` to remove legacy folder now that 
+  # we use `pants_dev_deps.py2.venv` and `pants_dev_deps.py3.venv` folders
+  rm -rf "${REPO_ROOT}/build-support/pants_dev_deps.venv"
   "${REPO_ROOT}/build-support/virtualenv" "$(venv_dir)"
 }
 
