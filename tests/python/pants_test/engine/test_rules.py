@@ -230,7 +230,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
     @rule(D, [Select(A), Select(SubA)])
     def d_from_a_and_suba(a, suba):
-      _ = yield Get(A, C, C())
+      _ = yield Get(A, C, C())  # noqa: F841
 
     @rule(A, [Select(C)])
     def a_from_c(c):
@@ -551,7 +551,7 @@ class RuleGraphMakerTest(unittest.TestCase):
   def test_get_with_matching_singleton(self):
     @rule(Exactly(A), [Select(SubA)])
     def a_from_suba(suba):
-      _ = yield Get(B, C, C())
+      _ = yield Get(B, C, C())  # noqa: F841
 
     rules = [
       a_from_suba,
@@ -645,7 +645,7 @@ class RuleGraphMakerTest(unittest.TestCase):
   def test_get_simple(self):
     @rule(Exactly(A), [])
     def a():
-      _ = yield Get(B, D, D())
+      _ = yield Get(B, D, D())  # noqa: F841
 
     @rule(B, [Select(D)])
     def b_from_d(d):
