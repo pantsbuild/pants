@@ -80,7 +80,7 @@ default_test_config: &default_test_config
         - libssl-dev
   stage: *test
   language: python
-  python: &python_version "2.7"
+  python: &python_version "3.6"
   before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
