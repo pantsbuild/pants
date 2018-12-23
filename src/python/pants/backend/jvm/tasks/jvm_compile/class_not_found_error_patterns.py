@@ -25,7 +25,7 @@ CLASS_NOT_FOUND_ERROR_PATTERNS = [
 
   # scalac errors. More work undergoing to improve scalac error messages.
   (r'\s*\[error\] missing or invalid dependency detected while loading class file '
-   r'\'(?P<dependee_classname>\S+)\.class\'\.\n'
+   r"'(?P<dependee_classname>\S+)\.class'\.\n"
    r'\s*\[error\] Could not access type (?P<classnameonly>\S+) in (value|package) '
    r'(?P<packagename>\S+),'),
   (r'\s*\[error\] (?P<filename>\S+):(?P<lineno>\d+):(\d+): exception during macro expansion:\s*\n'
