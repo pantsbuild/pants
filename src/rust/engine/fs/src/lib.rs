@@ -53,7 +53,7 @@ extern crate futures_timer;
 extern crate glob;
 extern crate grpcio;
 extern crate hashing;
-extern crate ignore;
+use ::ignore;
 extern crate indexmap;
 extern crate itertools;
 extern crate lazy_static;
