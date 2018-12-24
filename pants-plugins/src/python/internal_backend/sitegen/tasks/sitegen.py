@@ -353,9 +353,7 @@ def generate_generated(config, here):
 
 def render_html(dst, config, soups, precomputed, template):
   soup = soups[dst]
-  renderer = Renderer(escape=cgi.escape)  # TODO(python3port): cgi.escape is deprecated in favor html.escape
-                                          # (the default used by Pystache on Python3). html.escape() escapes single
-                                          # quotes, whereas cgi.escape() does not. This will need to be addressed.
+  renderer = Renderer()
   title = precomputed.page[dst].title
   topdots = ('../' * dst.count('/'))
   if soup.body:
