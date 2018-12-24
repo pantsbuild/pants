@@ -23,7 +23,6 @@ from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
 from pants.util.dirutil import fast_relpath, safe_concurrent_creation
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -38,7 +37,7 @@ class GrpcioPrep(Task):
 
       @classmethod
       def create_requirements(cls, context, workdir, grpcio_version):
-        address = Address(spec_path=fast_relpath(workdir, get_buildroot()), target_name='grpcio')
+        address = Address(spec_path=cls._relative_path(workdir), target_name='grpcio')
         requirements = [
           'grpcio-tools=={}'.format(grpcio_version),
           'grpcio=={}'.format(grpcio_version),
@@ -49,6 +48,12 @@ class GrpcioPrep(Task):
           requirements=[PythonRequirement(r) for r in requirements]
         )
         return context.build_graph.get_target(address=address)
+
+      @classmethod
+      def _relative_path(cls, workdir):
+        if get_buildroot() in workdir:
+          return fast_relpath(workdir, get_buildroot())
+        return workdir
 
       @classmethod
       def build_grpcio_pex(cls, context, interpreter, pex_path, requirements_lib):
