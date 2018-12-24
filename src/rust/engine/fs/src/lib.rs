@@ -49,7 +49,8 @@ use futures_cpupool;
 
 use grpcio;
 
-use ignore;
+// Needs a :: prefix because of https://github.com/rust-lang/rust/issues/56326
+use ::ignore;
 use indexmap;
 
 use lmdb;
