@@ -18,7 +18,7 @@ class PublicationMetadata(PayloadField):
 class Artifact(PayloadField):
   """Represents a publishable jvm artifact ala maven or ivy.
 
-  Used in the ``provides`` parameter to *jvm*\_library targets.
+  Used in the ``provides`` parameter to *jvm*\\_library targets.
 
   :API: public
   """

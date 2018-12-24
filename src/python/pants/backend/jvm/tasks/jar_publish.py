@@ -254,7 +254,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
   `annotation_processor <build_dictionary.html#annotation_processor>`_.
   Targets to publish and their dependencies must be publishable target
   types and specify the ``provides`` argument. One exception is
-  `jar <build_dictionary.html#jar>`_\s - pants will generate a pom file that
+  `jar <build_dictionary.html#jar>`_\\s - pants will generate a pom file that
   depends on the already-published jar.
 
   Example usage: ::

@@ -900,8 +900,8 @@ class RscCompile(ZincCompile):
         os.path.join(relative_workdir, 'resolve', 'coursier', '[^/]*', 'cache', '.*'),
         os.path.join(relative_workdir, 'resolve', 'ivy', '[^/]*', 'ivy', 'jars', '.*'),
         os.path.join(relative_workdir, 'compile', 'rsc', '.*'),
-        os.path.join(relative_workdir, '\.jdk', '.*'),
-        os.path.join('\.jdk', '.*'),
+        os.path.join(relative_workdir, r'\.jdk', '.*'),
+        os.path.join(r'\.jdk', '.*'),
       ]
       )
 

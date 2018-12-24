@@ -62,7 +62,7 @@ class RemotePantsRunner(object):
 
   @contextmanager
   def _trapped_signals(self, client):
-    """A contextmanager that overrides the SIGINT (control-c) and SIGQUIT (control-\) handlers
+    """A contextmanager that overrides the SIGINT (control-c) and SIGQUIT (control-\\) handlers
     and handles them remotely."""
     def handle_control_c(signum, frame):
       client.maybe_send_signal(signum, include_pgrp=True)
