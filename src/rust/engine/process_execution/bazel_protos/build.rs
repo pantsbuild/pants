@@ -6,6 +6,10 @@ use std::path::PathBuf;
 
 use build_utils::BuildRoot;
 
+const EXTRA_HEADER: &'static str = r#"import "rustproto.proto";
+option (rustproto.carllerche_bytes_for_bytes_all) = true;
+"#;
+
 fn main() {
   let build_root = BuildRoot::find().unwrap();
   let thirdpartyprotobuf = build_root.join("3rdparty/protobuf");
@@ -13,6 +17,34 @@ fn main() {
     "cargo:rerun-if-changed={}",
     thirdpartyprotobuf.to_str().unwrap()
   );
+
+  let amended_proto_root = tempfile::TempDir::new().unwrap();
+  for f in &["bazelbuild_remote-apis", "googleapis"] {
+    let src_root = thirdpartyprotobuf.join(f);
+    for entry in walkdir::WalkDir::new(&src_root)
+      .into_iter()
+      .filter_map(|entry| entry.ok())
+    {
+      if entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".proto") {
+        let dst = amended_proto_root
+          .path()
+          .join(entry.path().strip_prefix(&src_root).unwrap());
+        std::fs::create_dir_all(dst.parent().unwrap())
+          .expect("Error making dir in temp proto root");
+        let original = std::fs::read_to_string(entry.path())
+          .expect(&format!("Error reading {}", entry.path().display()));
+        let mut copy = String::with_capacity(original.len() + EXTRA_HEADER.len());
+        for line in original.lines() {
+          copy += line;
+          copy += "\n";
+          if line.starts_with("package ") {
+            copy += EXTRA_HEADER
+          }
+        }
+        std::fs::write(&dst, copy.as_bytes()).expect(&format!("Error writing {}", dst.display()));
+      }
+    }
+  }
 
   let gen_dir = PathBuf::from("src/gen");
 
@@ -31,8 +63,7 @@ fn main() {
       "google/protobuf/empty.proto",
     ],
     &[
-      thirdpartyprotobuf.join("bazelbuild_remote-apis"),
-      thirdpartyprotobuf.join("googleapis"),
+      amended_proto_root.path().to_owned(),
       thirdpartyprotobuf.join("standard"),
       thirdpartyprotobuf.join("rust-protobuf"),
     ],
