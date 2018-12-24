@@ -27,8 +27,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-extern crate parking_lot;
-
 use std::sync::Arc;
 
 use parking_lot::RwLock;
@@ -43,7 +41,7 @@ use parking_lot::RwLock;
 ///
 pub struct Resettable<T> {
   val: Arc<RwLock<Option<T>>>,
-  make: Arc<Fn() -> T>,
+  make: Arc<dyn Fn() -> T>,
 }
 
 // Sadly we need to manualy implement Clone because of https://github.com/rust-lang/rust/issues/26925

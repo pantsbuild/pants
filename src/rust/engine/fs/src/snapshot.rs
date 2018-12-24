@@ -341,7 +341,7 @@ impl Snapshot {
 }
 
 impl fmt::Debug for Snapshot {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(
       f,
       "Snapshot(digest={:?}, entries={})",
@@ -415,9 +415,9 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
 
 #[cfg(test)]
 mod tests {
-  extern crate tempfile;
   use futures::future::Future;
   use hashing::{Digest, Fingerprint};
+  use tempfile;
   use testutil::data::TestDirectory;
   use testutil::make_file;
 

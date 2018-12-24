@@ -22,12 +22,11 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-extern crate clap;
-extern crate env_logger;
-extern crate fs;
-extern crate futures;
-extern crate hashing;
-extern crate process_execution;
+use clap;
+use env_logger;
+use fs;
+
+use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use futures::future::Future;
@@ -247,7 +246,7 @@ fn main() {
     jdk_home: args.value_of("jdk").map(PathBuf::from),
   };
 
-  let runner: Box<process_execution::CommandRunner> = match server_arg {
+  let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
     Some(address) => {
       let root_ca_certs = if let Some(path) = args.value_of("execution-root-ca-cert-file") {
         Some(std::fs::read(path).expect("Error reading root CA certs file"))

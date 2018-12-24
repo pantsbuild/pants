@@ -60,7 +60,7 @@ where
   Ok(())
 }
 
-fn verify_no_unknown_fields(message: &protobuf::Message) -> Result<(), String> {
+fn verify_no_unknown_fields(message: &dyn protobuf::Message) -> Result<(), String> {
   if message.get_unknown_fields().fields.is_some() {
     return Err(format!(
       "Found unknown fields: {:?}",

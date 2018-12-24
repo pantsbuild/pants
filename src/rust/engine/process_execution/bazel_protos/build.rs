@@ -1,5 +1,4 @@
-extern crate build_utils;
-extern crate protoc_grpcio;
+use protoc_grpcio;
 
 use std::fs::File;
 use std::io::Write;

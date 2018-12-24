@@ -27,9 +27,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-extern crate futures;
-extern crate parking_lot;
-
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -61,7 +58,7 @@ impl AsyncSemaphore {
   ///
   /// Runs the given Future-creating function (and the Future it returns) under the semaphore.
   ///
-  pub fn with_acquired<F, B, T, E>(&self, f: F) -> Box<Future<Item = T, Error = E> + Send>
+  pub fn with_acquired<F, B, T, E>(&self, f: F) -> Box<dyn Future<Item = T, Error = E> + Send>
   where
     F: FnOnce() -> B + Send + 'static,
     B: Future<Item = T, Error = E> + Send + 'static,

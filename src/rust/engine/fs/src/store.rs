@@ -786,7 +786,7 @@ mod local {
       database: Database,
       fingerprint: &Fingerprint,
       until_secs_since_epoch: u64,
-      txn: &mut RwTransaction,
+      txn: &mut RwTransaction<'_>,
     ) -> Result<(), lmdb::Error> {
       let mut buf = [0; 8];
       LittleEndian::write_u64(&mut buf, until_secs_since_epoch);

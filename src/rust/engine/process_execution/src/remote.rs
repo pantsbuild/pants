@@ -880,7 +880,7 @@ fn rpcerror_to_string(error: grpcio::Error) -> String {
   }
 }
 
-fn digest(message: &Message) -> Result<bazel_protos::remote_execution::Digest, String> {
+fn digest(message: &dyn Message) -> Result<bazel_protos::remote_execution::Digest, String> {
   let bytes = message.write_to_bytes().map_err(|e| format!("{:?}", e))?;
 
   let mut hasher = Sha256::default();
@@ -2553,7 +2553,7 @@ mod tests {
       .wait()
   }
 
-  fn make_any_proto(message: &Message) -> protobuf::well_known_types::Any {
+  fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
     let mut any = protobuf::well_known_types::Any::new();
     any.set_type_url(format!(
       "type.googleapis.com/{}",

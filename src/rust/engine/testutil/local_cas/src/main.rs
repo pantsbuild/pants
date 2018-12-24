@@ -1,6 +1,4 @@
-extern crate clap;
-extern crate env_logger;
-extern crate mock;
+use env_logger;
 
 use clap::{App, Arg};
 use mock::StubCAS;

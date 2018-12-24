@@ -27,29 +27,21 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-extern crate async_semaphore;
-extern crate bazel_protos;
-extern crate boxfuture;
-extern crate bytes;
-extern crate digest;
-extern crate fs;
-extern crate futures;
-extern crate futures_timer;
-extern crate grpcio;
-extern crate hashing;
-extern crate log;
+use bazel_protos;
+
+use fs;
+
+use grpcio;
+use hashing;
+
 #[cfg(test)]
 extern crate mock;
-extern crate protobuf;
-extern crate resettable;
-extern crate sha2;
+use protobuf;
+
 #[cfg(test)]
 extern crate tempfile;
-#[cfg(test)]
-extern crate testutil;
-extern crate time;
-extern crate tokio_codec;
-extern crate tokio_process;
+
+use time;
 
 use boxfuture::BoxFuture;
 use bytes::Bytes;
@@ -160,11 +152,11 @@ pub trait CommandRunner: Send + Sync {
 ///
 #[derive(Clone)]
 pub struct BoundedCommandRunner {
-  inner: Arc<(Box<CommandRunner>, AsyncSemaphore)>,
+  inner: Arc<(Box<dyn CommandRunner>, AsyncSemaphore)>,
 }
 
 impl BoundedCommandRunner {
-  pub fn new(inner: Box<CommandRunner>, bound: usize) -> BoundedCommandRunner {
+  pub fn new(inner: Box<dyn CommandRunner>, bound: usize) -> BoundedCommandRunner {
     BoundedCommandRunner {
       inner: Arc::new((inner, AsyncSemaphore::new(bound))),
     }

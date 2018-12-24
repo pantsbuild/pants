@@ -285,7 +285,7 @@ impl StubCASResponder {
   ///
   fn send<Item, S>(
     &self,
-    ctx: &grpcio::RpcContext,
+    ctx: &grpcio::RpcContext<'_>,
     sink: grpcio::ServerStreamingSink<Item>,
     stream: S,
   ) where
@@ -299,7 +299,7 @@ impl StubCASResponder {
 impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
   fn read(
     &self,
-    ctx: grpcio::RpcContext,
+    ctx: grpcio::RpcContext<'_>,
     req: bazel_protos::bytestream::ReadRequest,
     sink: grpcio::ServerStreamingSink<bazel_protos::bytestream::ReadResponse>,
   ) {
@@ -327,7 +327,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
 
   fn write(
     &self,
-    ctx: grpcio::RpcContext,
+    ctx: grpcio::RpcContext<'_>,
     stream: grpcio::RequestStream<bazel_protos::bytestream::WriteRequest>,
     sink: grpcio::ClientStreamingSink<bazel_protos::bytestream::WriteResponse>,
   ) {
@@ -459,7 +459,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
 
   fn query_write_status(
     &self,
-    _ctx: grpcio::RpcContext,
+    _ctx: grpcio::RpcContext<'_>,
     _req: bazel_protos::bytestream::QueryWriteStatusRequest,
     sink: grpcio::UnarySink<bazel_protos::bytestream::QueryWriteStatusResponse>,
   ) {
@@ -473,7 +473,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
 impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASResponder {
   fn find_missing_blobs(
     &self,
-    ctx: grpcio::RpcContext,
+    ctx: grpcio::RpcContext<'_>,
     req: bazel_protos::remote_execution::FindMissingBlobsRequest,
     sink: grpcio::UnarySink<bazel_protos::remote_execution::FindMissingBlobsResponse>,
   ) {
@@ -511,7 +511,7 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
 
   fn batch_update_blobs(
     &self,
-    _ctx: grpcio::RpcContext,
+    _ctx: grpcio::RpcContext<'_>,
     _req: bazel_protos::remote_execution::BatchUpdateBlobsRequest,
     sink: grpcio::UnarySink<bazel_protos::remote_execution::BatchUpdateBlobsResponse>,
   ) {
@@ -522,7 +522,7 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
   }
   fn get_tree(
     &self,
-    _ctx: grpcio::RpcContext,
+    _ctx: grpcio::RpcContext<'_>,
     _req: bazel_protos::remote_execution::GetTreeRequest,
     _sink: grpcio::ServerStreamingSink<bazel_protos::remote_execution::GetTreeResponse>,
   ) {

@@ -41,38 +41,22 @@ pub use crate::store::{ShrinkBehavior, Store, UploadSummary, DEFAULT_LOCAL_STORE
 mod pool;
 pub use crate::pool::ResettablePool;
 
-extern crate bazel_protos;
-extern crate boxfuture;
-extern crate byteorder;
-extern crate bytes;
-extern crate digest;
-extern crate dirs;
-extern crate futures;
-extern crate futures_cpupool;
-extern crate futures_timer;
-extern crate glob;
-extern crate grpcio;
-extern crate hashing;
-use ::ignore;
-extern crate indexmap;
-extern crate itertools;
-extern crate lazy_static;
-extern crate lmdb;
-extern crate log;
-#[cfg(test)]
-extern crate mock;
-extern crate parking_lot;
-extern crate protobuf;
-extern crate serde;
-extern crate serde_derive;
-extern crate serverset;
-extern crate sha2;
-extern crate tempfile;
-#[cfg(test)]
-extern crate testutil;
-extern crate uuid;
-#[cfg(test)]
-extern crate walkdir;
+use bazel_protos;
+
+use dirs;
+use futures;
+use futures_cpupool;
+
+use grpcio;
+
+use ignore;
+use indexmap;
+
+use lmdb;
+
+use protobuf;
+
+use uuid;
 
 pub use serverset::BackoffConfig;
 
@@ -811,7 +795,7 @@ pub struct FileContent {
 }
 
 impl fmt::Debug for FileContent {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let len = min(self.content.len(), 5);
     let describer = if len < self.content.len() {
       "starting "
@@ -856,8 +840,8 @@ fn safe_create_dir_all(path: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod posixfs_test {
-  extern crate tempfile;
-  extern crate testutil;
+  use tempfile;
+  use testutil;
 
   use super::{
     Dir, DirectoryListing, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat,

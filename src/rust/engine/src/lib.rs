@@ -47,30 +47,20 @@ mod selectors;
 mod tasks;
 mod types;
 
-extern crate boxfuture;
-extern crate bytes;
-extern crate fnv;
-extern crate fs;
-extern crate futures;
-extern crate futures_timer;
-extern crate graph;
-extern crate hashing;
-extern crate indexmap;
-extern crate itertools;
-extern crate lazy_static;
-extern crate log;
-extern crate num_enum;
-extern crate parking_lot;
-extern crate process_execution;
-extern crate rand;
-extern crate reqwest;
-extern crate resettable;
-extern crate smallvec;
-extern crate tar_api;
-extern crate tempfile;
-extern crate tokio;
-extern crate ui;
-extern crate url;
+use bytes;
+
+use fs;
+use futures;
+
+use hashing;
+
+use log;
+
+use process_execution;
+
+use reqwest;
+
+use tar_api;
 
 use std::ffi::CStr;
 use std::fs::File;

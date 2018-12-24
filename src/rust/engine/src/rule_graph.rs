@@ -399,7 +399,7 @@ impl<'t> GraphMaker<'t> {
 
       // Collect fulfillable candidates, used parameters, and cyclic deps.
       let mut cycled = false;
-      let mut fulfillable_candidates = fulfillable_candidates_by_key
+      let fulfillable_candidates = fulfillable_candidates_by_key
         .entry(select_key.clone())
         .or_insert_with(Vec::new);
       for candidate in rhs(&self.tasks, &params, &product) {
@@ -1056,7 +1056,7 @@ impl RuleGraph {
     Err(format!("Rules with errors: {}\n  {}", msgs.len(), msgs.join("\n  ")).to_string())
   }
 
-  pub fn visualize(&self, f: &mut io::Write) -> io::Result<()> {
+  pub fn visualize(&self, f: &mut dyn io::Write) -> io::Result<()> {
     let mut root_subject_type_strs = self
       .root_param_types
       .iter()

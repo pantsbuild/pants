@@ -30,10 +30,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-extern crate digest;
-extern crate hex;
-extern crate serde;
-extern crate sha2;
+use hex;
 
 use digest::{Digest as DigestTrait, FixedOutput};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
@@ -81,13 +78,13 @@ impl Fingerprint {
 }
 
 impl fmt::Display for Fingerprint {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.to_hex())
   }
 }
 
 impl fmt::Debug for Fingerprint {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "Fingerprint<{}>", self.to_hex())
   }
 }
@@ -177,9 +174,9 @@ impl<W: Write> Write for WriterHasher<W> {
 
 #[cfg(test)]
 mod fingerprint_tests {
-  use super::Fingerprint;
-  extern crate serde_test;
   use self::serde_test::{assert_ser_tokens, Token};
+  use super::Fingerprint;
+  use serde_test;
 
   #[test]
   fn from_bytes_unsafe() {
@@ -270,10 +267,10 @@ mod fingerprint_tests {
 
 #[cfg(test)]
 mod digest_tests {
+  use self::serde_test::{assert_ser_tokens, Token};
   use super::Digest;
   use super::Fingerprint;
-  extern crate serde_test;
-  use self::serde_test::{assert_ser_tokens, Token};
+  use serde_test;
 
   #[test]
   fn serialize_to_str() {

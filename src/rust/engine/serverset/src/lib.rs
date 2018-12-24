@@ -28,10 +28,8 @@
   allow(new_without_default, new_without_default_derive)
 )]
 
-extern crate boxfuture;
-extern crate futures;
-extern crate futures_timer;
-extern crate parking_lot;
+use futures;
+use futures_timer;
 
 use boxfuture::{BoxFuture, Boxable};
 use futures::Future;
@@ -293,7 +291,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
 }
 
 impl<T: std::fmt::Debug> std::fmt::Debug for Serverset<T> {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
     write!(f, "Serverset {{ {:?} }}", self.inner.servers);
     Ok(())
   }

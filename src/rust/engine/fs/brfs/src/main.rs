@@ -27,26 +27,21 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-extern crate bazel_protos;
-extern crate clap;
-extern crate dirs;
-extern crate env_logger;
-extern crate errno;
-extern crate fs;
-extern crate fuse;
-extern crate futures;
-extern crate futures_timer;
-extern crate hashing;
-extern crate libc;
-extern crate log;
-extern crate parking_lot;
-extern crate protobuf;
-extern crate serverset;
-#[cfg(test)]
-extern crate tempfile;
-#[cfg(test)]
-extern crate testutil;
-extern crate time;
+use bazel_protos;
+use clap;
+use dirs;
+
+use errno;
+use fs;
+use fuse;
+
+use futures_timer;
+
+use libc;
+
+use serverset;
+
+use time;
 
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
@@ -396,7 +391,13 @@ impl BuildResultFS {
 //  ... created on demand and cached for the lifetime of the program.
 impl fuse::Filesystem for BuildResultFS {
   // Used to answer stat calls
-  fn lookup(&mut self, _req: &fuse::Request, parent: Inode, name: &OsStr, reply: fuse::ReplyEntry) {
+  fn lookup(
+    &mut self,
+    _req: &fuse::Request<'_>,
+    parent: Inode,
+    name: &OsStr,
+    reply: fuse::ReplyEntry,
+  ) {
     let r = match (parent, name.to_str()) {
       (ROOT, Some("digest")) => Ok(dir_attr_for(DIGEST_ROOT)),
       (ROOT, Some("directory")) => Ok(dir_attr_for(DIRECTORY_ROOT)),
@@ -481,7 +482,7 @@ impl fuse::Filesystem for BuildResultFS {
     }
   }
 
-  fn getattr(&mut self, _req: &fuse::Request, inode: Inode, reply: fuse::ReplyAttr) {
+  fn getattr(&mut self, _req: &fuse::Request<'_>, inode: Inode, reply: fuse::ReplyAttr) {
     match inode {
       ROOT => reply.attr(&TTL, &dir_attr_for(ROOT)),
       DIGEST_ROOT => reply.attr(&TTL, &dir_attr_for(DIGEST_ROOT)),
@@ -506,7 +507,7 @@ impl fuse::Filesystem for BuildResultFS {
   // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
   fn read(
     &mut self,
-    _req: &fuse::Request,
+    _req: &fuse::Request<'_>,
     inode: Inode,
     _fh: u64,
     offset: i64,
@@ -556,7 +557,7 @@ impl fuse::Filesystem for BuildResultFS {
 
   fn readdir(
     &mut self,
-    _req: &fuse::Request,
+    _req: &fuse::Request<'_>,
     inode: Inode,
     // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
     _fh: u64,
@@ -585,7 +586,7 @@ impl fuse::Filesystem for BuildResultFS {
   // If this isn't implemented, OSX will try to manipulate ._ files to manage xattrs out of band, which adds both overhead and logspam.
   fn listxattr(
     &mut self,
-    _req: &fuse::Request,
+    _req: &fuse::Request<'_>,
     _inode: Inode,
     _size: u32,
     reply: fuse::ReplyXattr,
@@ -733,8 +734,8 @@ fn unmount(mount_path: &str) -> i32 {
 
 #[cfg(test)]
 mod test {
-  extern crate tempfile;
-  extern crate testutil;
+  use tempfile;
+  use testutil;
 
   use super::mount;
   use fs;

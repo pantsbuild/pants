@@ -31,11 +31,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-extern crate futures;
-
 use futures::future::Future;
 
-pub type BoxFuture<T, E> = Box<Future<Item = T, Error = E> + Send>;
+pub type BoxFuture<T, E> = Box<dyn Future<Item = T, Error = E> + Send>;
 
 pub trait Boxable<T, E> {
   fn to_boxed(self) -> BoxFuture<T, E>;

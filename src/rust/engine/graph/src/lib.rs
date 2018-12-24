@@ -30,13 +30,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
 
-extern crate boxfuture;
-extern crate fnv;
-extern crate futures;
-extern crate hashing;
-extern crate indexmap;
-extern crate parking_lot;
-extern crate petgraph;
+use hashing;
+
+use petgraph;
 
 mod entry;
 mod node;
@@ -150,7 +146,7 @@ impl<N: Node> InnerGraph<N> {
   ///
   /// Begins a topological Walk from the given roots.
   ///
-  fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk<N> {
+  fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk<'_, N> {
     Walk {
       graph: self,
       direction: direction,
@@ -651,7 +647,7 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     let (entry, entry_id, dep_generations) = {
-      let mut inner = self.inner.lock();
+      let inner = self.inner.lock();
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
@@ -758,7 +754,7 @@ impl<N: Node> Graph<N> {
 /// Represents the state of a particular topological walk through a Graph. Implements Iterator and
 /// has the same lifetime as the Graph itself.
 ///
-struct Walk<'a, N: Node + 'a> {
+struct Walk<'a, N: Node> {
   graph: &'a InnerGraph<N>,
   direction: Direction,
   deque: VecDeque<EntryId>,
@@ -787,8 +783,8 @@ impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
 
 #[cfg(test)]
 mod tests {
-  extern crate parking_lot;
-  extern crate rand;
+  use parking_lot;
+  use rand;
 
   use std::cmp;
   use std::collections::{HashMap, HashSet};

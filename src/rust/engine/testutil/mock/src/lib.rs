@@ -29,14 +29,12 @@
 // We use a bunch of complex compound tuples for storing call arguments.
 #![cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
 
-extern crate bazel_protos;
-extern crate bytes;
-extern crate futures;
-extern crate grpcio;
-extern crate hashing;
-extern crate parking_lot;
-extern crate protobuf;
-extern crate testutil;
+use bazel_protos;
+
+use futures;
+use grpcio;
+
+use protobuf;
 
 mod cas;
 pub use crate::cas::StubCAS;
