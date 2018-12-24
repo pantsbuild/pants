@@ -49,6 +49,11 @@ class Optionable(AbstractClass):
     return ScopeInfo(cls.options_scope, cls.options_scope_category, cls)
 
   @classmethod
+  def subscope(cls, scope):
+    """Create a subscope under this Optionable's scope."""
+    return '{0}.{1}'.format(cls.options_scope, scope)
+
+  @classmethod
   def known_scope_infos(cls):
     """Yields ScopeInfo for all known scopes for this optionable, in no particular order.
 

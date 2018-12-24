@@ -690,6 +690,11 @@ mod local {
 
     // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
     pub fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
+      if *fingerprint == EMPTY_DIGEST.0 {
+        // Technically this is valid as both; choose Directory in case a caller is checking whether
+        // it _can_ be a Directory.
+        return Ok(Some(EntryType::Directory));
+      }
       {
         let (env, directory_database, _) = self.inner.directory_dbs.clone()?.get(fingerprint);
         let txn = env

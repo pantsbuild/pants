@@ -48,6 +48,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Dumitru Daniliuc
 + Ebube Chuba
 + Eitan Adler
++ Ekaterina Tyurina
 + Emily Caveness
 + Eric Arellano
 + Eric Ayers
@@ -143,6 +144,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Oliver Gould
 + Oliver Seemann
 + Omer Zach
++ Owen Parry
 + Pankaj Gupta
 + Patrick Lawson
 + Paul Groudas

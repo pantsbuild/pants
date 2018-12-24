@@ -818,20 +818,6 @@ class OptionsTest(unittest.TestCase):
     self.assertIn("will be removed in version", text_type(warning_message))
     self.assertIn(option_string, text_type(warning_message))
 
-  def test_arbitrary_deprecation_matcher(self):
-    def _matcher(_scope, flags, _values):
-      if any(f.startswith('--int-choices') for f in flags):
-        return dict(removal_version='9999.9.9.dev0',
-                    deprecated_entity_description='int choices test option')
-
-    class OptionsWithDeprecation(Options):
-      flag_matchers = [_matcher]
-
-    with self.warnings_catcher() as w:
-      options = self._parse('./pants --int-choices=42', options_cls=OptionsWithDeprecation)
-      self.assertEqual(options.for_global_scope().int_choices, [42])
-      self.assertWarning(w, 'int choices')
-
   def test_deprecated_options_flag(self):
     with self.warnings_catcher() as w:
       options = self._parse('./pants --global-crufty=crufty1')
@@ -1349,6 +1335,38 @@ class OptionsTest(unittest.TestCase):
     # Check that we got no warnings and that the actual scope took precedence.
     self.assertEqual(0, len(w))
     self.assertEqual('xx', vals1.foo)
+
+  def test_scope_dependency_deprecation(self):
+    # Test that a dependency scope can be deprecated.
+    class DummyOptionable1(Optionable):
+      options_scope = 'scope'
+      options_scope_category = ScopeInfo.SUBSYSTEM
+
+    options = Options.create(env={},
+                             config=self._create_config({}),
+                             known_scope_infos=[
+                               DummyOptionable1.get_scope_info(),
+                               # A deprecated, scoped dependency on `DummyOptionable1`. This
+                               # imitates the construction of SubsystemClientMixin.known_scope_infos.
+                               ScopeInfo(
+                                 DummyOptionable1.subscope('sub'),
+                                 ScopeInfo.SUBSYSTEM,
+                                 DummyOptionable1,
+                                 removal_version='9999.9.9.dev0',
+                                 removal_hint='Sayonara!',
+                               )
+                             ],
+                             args=shlex.split('./pants --scope-sub-foo=vv'))
+
+    options.register(DummyOptionable1.options_scope, '--foo')
+
+    with self.warnings_catcher() as w:
+      vals1 = options.for_scope(DummyOptionable1.subscope('sub'))
+
+    # Check that we got a warning, but also the correct value.
+    single_warning_dummy1 = assert_single_element(w)
+    self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
+    self.assertEqual('vv', vals1.foo)
 
 
 class OptionsTestStringPayloads(OptionsTest):

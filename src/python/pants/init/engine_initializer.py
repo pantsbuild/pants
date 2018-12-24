@@ -32,7 +32,6 @@ from pants.engine.legacy.structs import (AppAdaptor, JvmBinaryAdaptor, PageAdapt
                                          PythonTargetAdaptor, PythonTestsAdaptor,
                                          RemoteSourcesAdaptor, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
-from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule
 from pants.engine.scheduler import Scheduler
@@ -319,6 +318,8 @@ class EngineInitializer(object):
 
     build_root = build_root or get_buildroot()
     build_configuration = build_configuration or BuildConfigInitializer.get(options_bootstrapper)
+    bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+
     build_file_aliases = build_configuration.registered_aliases()
     rules = build_configuration.rules()
     console = Console()
@@ -339,9 +340,6 @@ class EngineInitializer(object):
                                    build_ignore_patterns=build_ignore_patterns,
                                    exclude_target_regexps=exclude_target_regexps,
                                    subproject_roots=subproject_roots)
-
-    # Load the native backend.
-    native = native or Native.create()
 
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
@@ -372,6 +370,7 @@ class EngineInitializer(object):
       rules,
       execution_options,
       include_trace_on_error=include_trace_on_error,
+      visualize_to_dir=bootstrap_options.native_engine_visualize_to,
     )
 
     return LegacyGraphScheduler(scheduler, symbol_table, console, goal_map)

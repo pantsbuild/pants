@@ -17,7 +17,17 @@ class Scope(datatype([('scope', str)])):
   """An options scope."""
 
 
-class ScopeInfo(datatype(['scope', 'category', 'optionable_cls'])):
+class ScopeInfo(datatype([
+  'scope',
+  'category',
+  'optionable_cls',
+  # A ScopeInfo may have a deprecated_scope (from its associated optionable_cls), which represents a
+  # previous/deprecated name for a current/non-deprecated ScopeInfo. It may also be directly
+  # deprecated via this `removal_version`, which allows for the deprecation of an entire scope,
+  # including that of a SubsystemDependency (ie, deprecation of a dependency on a scoped Subsystem).
+  'removal_version',
+  'removal_hint',
+])):
   """Information about a scope."""
 
   # Symbolic constants for different categories of scope.
@@ -27,8 +37,8 @@ class ScopeInfo(datatype(['scope', 'category', 'optionable_cls'])):
   SUBSYSTEM = 'SUBSYSTEM'
   INTERMEDIATE = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.
 
-  def __new__(cls, scope, category, optionable_cls=None):
-    return super(ScopeInfo, cls).__new__(cls, scope, category, optionable_cls)
+  def __new__(cls, scope, category, optionable_cls=None, removal_version=None, removal_hint=None):
+    return super(ScopeInfo, cls).__new__(cls, scope, category, optionable_cls, removal_version, removal_hint)
 
   @property
   def description(self):

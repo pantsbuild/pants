@@ -44,7 +44,7 @@ class LocalPantsRunner(object):
     if graph_session:
       return graph_session
 
-    native = Native.create(options_bootstrapper.bootstrap_options.for_global_scope())
+    native = Native()
     native.set_panic_handler()
     graph_scheduler_helper = EngineInitializer.setup_legacy_graph(
       native,
