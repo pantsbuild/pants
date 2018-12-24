@@ -66,7 +66,7 @@ impl Core {
     remote_store_thread_count: usize,
     remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
-    remote_store_rpc_attempts: usize,
+    remote_store_rpc_retries: usize,
     process_execution_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
   ) -> Core {
@@ -122,7 +122,7 @@ impl Core {
               // TODO: Take a parameter
               fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
                 .unwrap(),
-              remote_store_rpc_attempts,
+              remote_store_rpc_retries,
               futures_timer_thread2.with(|t| t.handle()),
             )
           }

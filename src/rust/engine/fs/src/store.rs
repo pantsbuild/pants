@@ -108,7 +108,7 @@ impl Store {
     chunk_size_bytes: usize,
     upload_timeout: Duration,
     backoff_config: BackoffConfig,
-    rpc_attempts: usize,
+    rpc_retries: usize,
     futures_timer_thread: futures_timer::TimerHandle,
   ) -> Result<Store, String> {
     Ok(Store {
@@ -122,7 +122,7 @@ impl Store {
         chunk_size_bytes,
         upload_timeout,
         backoff_config,
-        rpc_attempts,
+        rpc_retries,
         futures_timer_thread,
       )?),
     })
@@ -1701,12 +1701,9 @@ mod remote {
       chunk_size_bytes: usize,
       upload_timeout: Duration,
       backoff_config: BackoffConfig,
-      rpc_attempts: usize,
+      rpc_retries: usize,
       futures_timer_thread: futures_timer::TimerHandle,
     ) -> Result<ByteStore, String> {
-      if rpc_attempts == 0 {
-        return Err("rpc_attempts must be greater than 0".to_owned());
-      }
       let env = Arc::new(grpcio::Environment::new(thread_count));
 
       let channels = cas_addresses.iter().map(|cas_address| {
@@ -1730,7 +1727,7 @@ mod remote {
         instance_name,
         chunk_size_bytes,
         upload_timeout,
-        rpc_attempts,
+        rpc_attempts: rpc_retries + 1,
         env,
         serverset,
         authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
