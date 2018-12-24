@@ -1,5 +1,6 @@
 [package]
 version = "0.0.1"
+edition = "2018"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 build = "src/cffi_build.rs"
@@ -35,7 +36,6 @@ members = [
   "graph",
   "hashing",
   "process_execution",
-  "process_execution/bazel_protos",
   "process_executor",
   "resettable",
   "serverset",
@@ -63,7 +63,6 @@ default-members = [
   "graph",
   "hashing",
   "process_execution",
-  "process_execution/bazel_protos",
   "process_executor",
   "resettable",
   "serverset",

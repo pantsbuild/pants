@@ -11,20 +11,20 @@ use tokio::runtime::Runtime;
 
 use futures::Future;
 
+use crate::core::{Failure, TypeId};
+use crate::handles::maybe_drop_handles;
+use crate::nodes::{NodeKey, TryInto, WrappedNode};
+use crate::rule_graph::RuleGraph;
+use crate::tasks::Tasks;
+use crate::types::Types;
 use boxfuture::{BoxFuture, Boxable};
-use core::{Failure, TypeId};
 use fs::{self, safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
-use handles::maybe_drop_handles;
 use log::debug;
-use nodes::{NodeKey, TryInto, WrappedNode};
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;
 use resettable::Resettable;
-use rule_graph::RuleGraph;
-use tasks::Tasks;
-use types::Types;
 
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -43,7 +43,7 @@ pub struct Core {
   pub runtime: Resettable<Arc<Runtime>>,
   pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
   store_and_command_runner_and_http_client:
-    Resettable<(Store, BoundedCommandRunner, reqwest::async::Client)>,
+    Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
   pub vfs: PosixFS,
 }
 
@@ -126,9 +126,10 @@ impl Core {
               futures_timer_thread2.with(|t| t.handle()),
             )
           }
-        }).unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
+        })
+        .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
-      let underlying_command_runner: Box<CommandRunner> = match &remote_execution_server {
+      let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
         Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
           address,
           remote_execution_process_cache_namespace.clone(),
@@ -151,7 +152,7 @@ impl Core {
       let command_runner =
         BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
 
-      let http_client = reqwest::async::Client::new();
+      let http_client = reqwest::r#async::Client::new();
 
       (store, command_runner, http_client)
     });
@@ -216,7 +217,7 @@ impl Core {
     self.store_and_command_runner_and_http_client.get().1
   }
 
-  pub fn http_client(&self) -> reqwest::async::Client {
+  pub fn http_client(&self) -> reqwest::r#async::Client {
     self.store_and_command_runner_and_http_client.get().2
   }
 }
@@ -249,7 +250,8 @@ impl Context {
         node_result
           .try_into()
           .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 }
 

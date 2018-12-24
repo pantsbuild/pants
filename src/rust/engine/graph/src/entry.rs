@@ -2,7 +2,7 @@ use std::mem;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use node::{EntryId, Node, NodeContext, NodeError};
+use crate::node::{EntryId, Node, NodeContext, NodeError};
 
 use futures::future::{self, Future};
 use futures::sync::oneshot;
@@ -158,11 +158,7 @@ impl<N: Node> Entry<N> {
     match *state {
       EntryState::Completed {
         ref result, dirty, ..
-      }
-        if !dirty =>
-      {
-        Some(result.clone())
-      }
+      } if !dirty => Some(result.clone()),
       _ => None,
     }
   }
@@ -210,7 +206,8 @@ impl<N: Node> Entry<N> {
                   context2.graph().clear_deps(entry_id, run_token);
                   Ok(false)
                 }
-              }).to_boxed()
+              })
+              .to_boxed()
           } else {
             future::ok(false).to_boxed()
           };
@@ -234,7 +231,8 @@ impl<N: Node> Entry<N> {
                     .graph()
                     .complete(&context2, entry_id, run_token, Some(res));
                   Ok(())
-                }).to_boxed()
+                })
+                .to_boxed()
             }
           })
         }));
@@ -295,9 +293,7 @@ impl<N: Node> Entry<N> {
           generation,
           dirty,
           ..
-        }
-          if !dirty && self.node.content().cacheable() =>
-        {
+        } if !dirty && self.node.content().cacheable() => {
           return future::result(result.clone())
             .map(move |res| (res, generation))
             .to_boxed();

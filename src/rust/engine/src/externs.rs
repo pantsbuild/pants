@@ -8,9 +8,9 @@ use std::os::raw;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::string::FromUtf8Error;
 
-use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
-use handles::{DroppingHandle, Handle};
-use interning::Interns;
+use crate::core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
+use crate::handles::{DroppingHandle, Handle};
+use crate::interning::Interns;
 use lazy_static::lazy_static;
 use log;
 use num_enum::CustomTryInto;
@@ -107,7 +107,8 @@ pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
       value as &Handle,
       field.as_ptr(),
       field.len() as u64,
-    ).into()
+    )
+    .into()
   })
 }
 
@@ -118,7 +119,8 @@ pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
       value as &Handle,
       field.as_ptr(),
       field.len() as u64,
-    ).to_vec()
+    )
+    .to_vec()
   })
 }
 
@@ -136,7 +138,8 @@ pub fn project_str(value: &Value, field: &str) -> String {
       value as &Handle,
       field.as_ptr(),
       field.len() as u64,
-    ).into()
+    )
+    .into()
   });
   val_to_str(&name_val)
 }
@@ -178,7 +181,8 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
       arg_handles.as_ptr(),
       args.len() as u64,
     )
-  }).into()
+  })
+  .into()
 }
 
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
@@ -676,11 +680,11 @@ impl FfiLogger {
 }
 
 impl log::Log for FfiLogger {
-  fn enabled(&self, metadata: &log::Metadata) -> bool {
+  fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
     metadata.level() <= self.level_filter
   }
 
-  fn log(&self, record: &log::Record) {
+  fn log(&self, record: &log::Record<'_>) {
     if !self.enabled(record.metadata()) {
       return;
     }

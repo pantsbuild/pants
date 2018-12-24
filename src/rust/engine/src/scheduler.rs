@@ -9,14 +9,14 @@ use std::time::Duration;
 
 use futures::future::{self, Future};
 
-use context::{Context, Core};
-use core::{Failure, Params, TypeConstraint, Value};
+use crate::context::{Context, Core};
+use crate::core::{Failure, Params, TypeConstraint, Value};
+use crate::nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
+use crate::selectors;
 use graph::{EntryId, Graph, InvalidationResult, Node, NodeContext};
 use indexmap::IndexMap;
 use log::{debug, info, warn};
-use nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use parking_lot::Mutex;
-use selectors;
 use ui::EngineDisplay;
 
 ///
@@ -226,7 +226,8 @@ impl Scheduler {
                 }
               }
             })
-        }).collect::<Vec<_>>(),
+        })
+        .collect::<Vec<_>>(),
     );
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry

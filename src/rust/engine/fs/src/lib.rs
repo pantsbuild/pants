@@ -2,77 +2,55 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  deny(
-    clippy,
-    default_trait_access,
-    expl_impl_clone_on_copy,
-    if_not_else,
-    needless_continue,
-    single_match_else,
-    unseparated_literal_suffix,
-    used_underscore_binding
-  )
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
-#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+#![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(len_without_is_empty, redundant_field_names)
-)]
+#![allow(clippy::len_without_is_empty, clippy::redundant_field_names)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(new_without_default, new_without_default_derive)
+#![allow(
+  clippy::new_without_default,
+  clippy::new_without_default_derive,
+  clippy::new_ret_no_self
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
-#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+#![allow(clippy::mutex_atomic)]
 
 mod glob_matching;
-pub use glob_matching::GlobMatching;
+pub use crate::glob_matching::GlobMatching;
 mod snapshot;
-pub use snapshot::{
+pub use crate::snapshot::{
   OneOffStoreFileByDigest, Snapshot, StoreFileByDigest, EMPTY_DIGEST, EMPTY_FINGERPRINT,
 };
 mod store;
-pub use store::{ShrinkBehavior, Store, UploadSummary, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
+pub use crate::store::{ShrinkBehavior, Store, UploadSummary, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
 mod pool;
-pub use pool::ResettablePool;
+pub use crate::pool::ResettablePool;
 
-extern crate bazel_protos;
-extern crate boxfuture;
-extern crate byteorder;
-extern crate bytes;
-extern crate digest;
-extern crate dirs;
-extern crate futures;
-extern crate futures_cpupool;
-extern crate futures_timer;
-extern crate glob;
-extern crate grpcio;
-extern crate hashing;
-extern crate ignore;
-extern crate indexmap;
-extern crate itertools;
-extern crate lazy_static;
-extern crate lmdb;
-extern crate log;
-#[cfg(test)]
-extern crate mock;
-extern crate parking_lot;
-extern crate protobuf;
-extern crate serde;
-extern crate serde_derive;
-extern crate serverset;
-extern crate sha2;
-extern crate tempfile;
-#[cfg(test)]
-extern crate testutil;
-extern crate uuid;
-#[cfg(test)]
-extern crate walkdir;
+use bazel_protos;
+
+use dirs;
+use futures;
+use futures_cpupool;
+
+use grpcio;
+
+use indexmap;
+
+use lmdb;
+
+use protobuf;
+
+use uuid;
 
 pub use serverset::BackoffConfig;
 
@@ -83,11 +61,11 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
 
+use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::future::{self, Future};
 use glob::Pattern;
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use lazy_static::lazy_static;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -182,7 +160,7 @@ impl GitignoreStyleExcludes {
     }))
   }
 
-  fn create_gitignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
+  fn create_gitignore(patterns: &[String]) -> Result<Gitignore, ::ignore::Error> {
     let mut ignore_builder = GitignoreBuilder::new("");
     for pattern in patterns {
       ignore_builder.add_line(None, pattern.as_str())?;
@@ -200,8 +178,8 @@ impl GitignoreStyleExcludes {
       _ => false,
     };
     match self.gitignore.matched(stat.path(), is_dir) {
-      ignore::Match::None | ignore::Match::Whitelist(_) => false,
-      ignore::Match::Ignore(_) => true,
+      ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
+      ::ignore::Match::Ignore(_) => true,
     }
   }
 }
@@ -251,7 +229,8 @@ impl PathGlobIncludeEntry {
       .map(|path_glob| GlobWithSource {
         path_glob,
         source: GlobSource::ParsedInput(self.input.clone()),
-      }).collect()
+      })
+      .collect()
   }
 }
 
@@ -515,7 +494,8 @@ impl PathGlobs {
       .map(|glob| PathGlobIncludeEntry {
         input: MISSING_GLOB_SOURCE.clone(),
         globs: vec![glob],
-      }).collect();
+      })
+      .collect();
     // An empty exclude becomes EMPTY_IGNORE.
     PathGlobs::create_with_globs_and_match_behavior(
       include,
@@ -568,7 +548,8 @@ impl PosixFS {
             ))
           }
         })
-      }).map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
+      })
+      .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
 
     let ignore = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
       format!(
@@ -596,7 +577,8 @@ impl PosixFS {
           &dir_abs,
           get_metadata,
         )
-      }).filter(|s| match s {
+      })
+      .filter(|s| match s {
         Ok(ref s) =>
         // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
         // git-style ignore patterns, we need to know whether a path represents a directory.
@@ -604,7 +586,8 @@ impl PosixFS {
           !self.ignore.is_ignored(s)
         }
         Err(_) => true,
-      }).collect::<Result<Vec<_>, io::Error>>()?;
+      })
+      .collect::<Result<Vec<_>, io::Error>>()?;
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(stats)
   }
@@ -627,7 +610,8 @@ impl PosixFS {
             content: Bytes::from(content),
           })
         })
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
@@ -653,7 +637,8 @@ impl PosixFS {
               })
           }
         })
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 
   ///
@@ -767,7 +752,8 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
                 io::ErrorKind::NotFound => Ok(None),
                 _ => Err(err),
               },
-            }).and_then(move |maybe_stat| {
+            })
+            .and_then(move |maybe_stat| {
               match maybe_stat {
                 // Note: This will drop PathStats for symlinks which don't point anywhere.
                 Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), &link),
@@ -780,8 +766,10 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
                 None => future::ok(None).to_boxed(),
               }
             })
-        }).collect::<Vec<_>>(),
-    ).to_boxed()
+        })
+        .collect::<Vec<_>>(),
+    )
+    .to_boxed()
   }
 }
 
@@ -801,7 +789,7 @@ pub struct FileContent {
 }
 
 impl fmt::Debug for FileContent {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let len = min(self.content.len(), 5);
     let describer = if len < self.content.len() {
       "starting "
@@ -846,8 +834,8 @@ fn safe_create_dir_all(path: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod posixfs_test {
-  extern crate tempfile;
-  extern crate testutil;
+  use tempfile;
+  use testutil;
 
   use super::{
     Dir, DirectoryListing, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat,
@@ -887,7 +875,8 @@ mod posixfs_test {
       .read_file(&File {
         path: path.clone(),
         is_executable: false,
-      }).wait()
+      })
+      .wait()
       .unwrap();
     assert_eq!(file_content.path, path);
     assert_eq!(file_content.content, content);
@@ -900,7 +889,8 @@ mod posixfs_test {
       .read_file(&File {
         path: PathBuf::from("marmosets"),
         is_executable: false,
-      }).wait()
+      })
+      .wait()
       .expect_err("Expected error");
   }
 
@@ -1010,7 +1000,8 @@ mod posixfs_test {
       dir
         .path()
         .join(&dir.path().join(&remarkably_similar_marmoset)),
-    ).unwrap();
+    )
+    .unwrap();
     std::fs::create_dir(dir.path().join(&hammock)).unwrap();
     make_file(
       &dir.path().join(&hammock).join("napping_marmoset"),
@@ -1070,7 +1061,8 @@ mod posixfs_test {
     std::os::unix::fs::symlink(
       "../symlink",
       &root_path.join("dir").join("recursive_symlink"),
-    ).unwrap();
+    )
+    .unwrap();
     std::os::unix::fs::symlink("dir", &root_path.join("dir_symlink")).unwrap();
     std::os::unix::fs::symlink("doesnotexist", &root_path.join("symlink_to_nothing")).unwrap();
 
@@ -1085,7 +1077,8 @@ mod posixfs_test {
         PathBuf::from("dir_symlink"),
         PathBuf::from("symlink_to_nothing"),
         PathBuf::from("doesnotexist"),
-      ]).wait()
+      ])
+      .wait()
       .unwrap();
     let v: Vec<Option<PathStat>> = vec![
       Some(PathStat::file(
@@ -1147,6 +1140,7 @@ mod posixfs_test {
       dir.as_ref(),
       Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[],
-    ).unwrap()
+    )
+    .unwrap()
   }
 }

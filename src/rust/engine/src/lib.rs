@@ -2,37 +2,32 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  deny(
-    clippy,
-    default_trait_access,
-    expl_impl_clone_on_copy,
-    if_not_else,
-    needless_continue,
-    single_match_else,
-    unseparated_literal_suffix,
-    used_underscore_binding
-  )
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
-#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+#![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(len_without_is_empty, redundant_field_names)
-)]
+#![allow(clippy::len_without_is_empty, clippy::redundant_field_names)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(new_without_default, new_without_default_derive)
+#![allow(
+  clippy::new_without_default,
+  clippy::new_without_default_derive,
+  clippy::new_ret_no_self
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
-#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+#![allow(clippy::mutex_atomic)]
 // We only use unsafe pointer derefrences in our no_mangle exposed API, but it is nicer to list
 // just the one minor call as unsafe, than to mark the whole function as unsafe which may hide
 // other unsafeness.
-#![cfg_attr(feature = "cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 pub mod cffi_externs;
 mod context;
@@ -47,30 +42,20 @@ mod selectors;
 mod tasks;
 mod types;
 
-extern crate boxfuture;
-extern crate bytes;
-extern crate fnv;
-extern crate fs;
-extern crate futures;
-extern crate futures_timer;
-extern crate graph;
-extern crate hashing;
-extern crate indexmap;
-extern crate itertools;
-extern crate lazy_static;
-extern crate log;
-extern crate num_enum;
-extern crate parking_lot;
-extern crate process_execution;
-extern crate rand;
-extern crate reqwest;
-extern crate resettable;
-extern crate smallvec;
-extern crate tar_api;
-extern crate tempfile;
-extern crate tokio;
-extern crate ui;
-extern crate url;
+use bytes;
+
+use fs;
+use futures;
+
+use hashing;
+
+use log;
+
+use process_execution;
+
+use reqwest;
+
+use tar_api;
 
 use std::ffi::CStr;
 use std::fs::File;
@@ -81,23 +66,23 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use context::Core;
-use core::{Function, Key, Params, TypeConstraint, TypeId, Value};
-use externs::{
+use crate::context::Core;
+use crate::core::{Function, Key, Params, TypeConstraint, TypeId, Value};
+use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, HandleBuffer,
   IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
   SatisfiedByExtern, SatisfiedByTypeExtern, StoreBytesExtern, StoreI64Extern, StoreTupleExtern,
   StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
+use crate::handles::Handle;
+use crate::rule_graph::{GraphMaker, RuleGraph};
+use crate::scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
+use crate::tasks::Tasks;
+use crate::types::Types;
 use futures::Future;
-use handles::Handle;
 use hashing::Digest;
 use log::error;
-use rule_graph::{GraphMaker, RuleGraph};
-use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
-use tasks::Tasks;
-use types::Types;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -348,7 +333,8 @@ pub extern "C" fn scheduler_metrics(
         .into_iter()
         .map(|(metric, value)| {
           externs::store_tuple(&[externs::store_utf8(metric), externs::store_i64(value)])
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
       externs::store_tuple(&values).into()
     })
   })
@@ -516,7 +502,8 @@ pub extern "C" fn decompress_tarball(
         output_dir_str.as_path(),
         e
       )
-    }).into()
+    })
+    .into()
 }
 
 #[no_mangle]
@@ -688,7 +675,8 @@ pub extern "C" fn capture_snapshots(
       let path_globs =
         nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
       path_globs.map(|path_globs| (path_globs, root))
-    }).collect();
+    })
+    .collect();
 
   let path_globs_and_roots = match path_globs_and_roots_result {
     Ok(v) => v,
@@ -710,10 +698,13 @@ pub extern "C" fn capture_snapshots(
             core.fs_pool.clone(),
             root,
             path_globs,
-          ).map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-        }).collect::<Vec<_>>(),
+          )
+          .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+        })
+        .collect::<Vec<_>>(),
     )
-  }).map(|values| externs::store_tuple(&values))
+  })
+  .map(|values| externs::store_tuple(&values))
   .wait()
   .into()
 }
@@ -757,7 +748,8 @@ pub extern "C" fn materialize_directories(
       let dir_digest =
         nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
       dir_digest.map(|dir_digest| (dir, dir_digest))
-    }).collect();
+    })
+    .collect();
 
   let dir_and_digests = match directories_paths_and_digests_results {
     Ok(d) => d,
@@ -774,7 +766,8 @@ pub extern "C" fn materialize_directories(
         .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
         .collect::<Vec<_>>(),
     )
-  }).map(|_| ())
+  })
+  .map(|_| ())
   .wait()
   .into()
 }

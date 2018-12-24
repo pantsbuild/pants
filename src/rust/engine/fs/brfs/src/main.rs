@@ -1,52 +1,42 @@
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  deny(
-    clippy,
-    default_trait_access,
-    expl_impl_clone_on_copy,
-    if_not_else,
-    needless_continue,
-    single_match_else,
-    unseparated_literal_suffix,
-    used_underscore_binding
-  )
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
-#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+#![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(len_without_is_empty, redundant_field_names)
-)]
+#![allow(clippy::len_without_is_empty, clippy::redundant_field_names)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(new_without_default, new_without_default_derive)
+#![allow(
+  clippy::new_without_default,
+  clippy::new_without_default_derive,
+  clippy::new_ret_no_self
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
-#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+#![allow(clippy::mutex_atomic)]
 
-extern crate bazel_protos;
-extern crate clap;
-extern crate dirs;
-extern crate env_logger;
-extern crate errno;
-extern crate fs;
-extern crate fuse;
-extern crate futures;
-extern crate futures_timer;
-extern crate hashing;
-extern crate libc;
-extern crate log;
-extern crate parking_lot;
-extern crate protobuf;
-extern crate serverset;
-#[cfg(test)]
-extern crate tempfile;
-#[cfg(test)]
-extern crate testutil;
-extern crate time;
+use bazel_protos;
+use clap;
+use dirs;
+
+use errno;
+use fs;
+use fuse;
+
+use futures_timer;
+
+use libc;
+
+use serverset;
+
+use time;
 
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
@@ -396,7 +386,13 @@ impl BuildResultFS {
 //  ... created on demand and cached for the lifetime of the program.
 impl fuse::Filesystem for BuildResultFS {
   // Used to answer stat calls
-  fn lookup(&mut self, _req: &fuse::Request, parent: Inode, name: &OsStr, reply: fuse::ReplyEntry) {
+  fn lookup(
+    &mut self,
+    _req: &fuse::Request<'_>,
+    parent: Inode,
+    name: &OsStr,
+    reply: fuse::ReplyEntry,
+  ) {
     let r = match (parent, name.to_str()) {
       (ROOT, Some("digest")) => Ok(dir_attr_for(DIGEST_ROOT)),
       (ROOT, Some("directory")) => Ok(dir_attr_for(DIRECTORY_ROOT)),
@@ -406,7 +402,8 @@ impl fuse::Filesystem for BuildResultFS {
           .map_err(|err| {
             error!("Error loading file by digest {}: {}", digest_str, err);
             libc::EINVAL
-          }).and_then(|maybe_inode| {
+          })
+          .and_then(|maybe_inode| {
             maybe_inode
               .and_then(|inode| self.file_attr_for(inode))
               .ok_or(libc::ENOENT)
@@ -439,9 +436,11 @@ impl fuse::Filesystem for BuildResultFS {
               .map_err(|err| {
                 error!("Error reading directory {:?}: {}", parent_digest, err);
                 libc::EINVAL
-              })?.and_then(|directory| self.node_for_digest(&directory, filename))
+              })?
+              .and_then(|directory| self.node_for_digest(&directory, filename))
               .ok_or(libc::ENOENT)
-          }).and_then(|node| match node {
+          })
+          .and_then(|node| match node {
             Node::Directory(directory_node) => {
               let digest_result: Result<Digest, String> = directory_node.get_digest().into();
               let digest = digest_result.map_err(|err| {
@@ -461,7 +460,8 @@ impl fuse::Filesystem for BuildResultFS {
                 .map_err(|err| {
                   error!("Error loading file by digest {}: {}", filename, err);
                   libc::EINVAL
-                }).and_then(|maybe_inode| {
+                })
+                .and_then(|maybe_inode| {
                   maybe_inode
                     .and_then(|inode| self.file_attr_for(inode))
                     .ok_or(libc::ENOENT)
@@ -477,7 +477,7 @@ impl fuse::Filesystem for BuildResultFS {
     }
   }
 
-  fn getattr(&mut self, _req: &fuse::Request, inode: Inode, reply: fuse::ReplyAttr) {
+  fn getattr(&mut self, _req: &fuse::Request<'_>, inode: Inode, reply: fuse::ReplyAttr) {
     match inode {
       ROOT => reply.attr(&TTL, &dir_attr_for(ROOT)),
       DIGEST_ROOT => reply.attr(&TTL, &dir_attr_for(DIGEST_ROOT)),
@@ -502,7 +502,7 @@ impl fuse::Filesystem for BuildResultFS {
   // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
   fn read(
     &mut self,
-    _req: &fuse::Request,
+    _req: &fuse::Request<'_>,
     inode: Inode,
     _fh: u64,
     offset: i64,
@@ -526,21 +526,24 @@ impl fuse::Filesystem for BuildResultFS {
             let end = std::cmp::min(offset as usize + size as usize, bytes.len());
             let mut reply = reply.lock();
             reply.take().unwrap().data(&bytes.slice(begin, end));
-          }).map(|v| {
+          })
+          .map(|v| {
             if v.is_none() {
               let maybe_reply = reply2.lock().take();
               if let Some(reply) = maybe_reply {
                 reply.error(libc::ENOENT);
               }
             }
-          }).or_else(|err| {
+          })
+          .or_else(|err| {
             error!("Error loading bytes for {:?}: {}", digest, err);
             let maybe_reply = reply2.lock().take();
             if let Some(reply) = maybe_reply {
               reply.error(libc::EINVAL);
             }
             Ok(())
-          }).wait();
+          })
+          .wait();
         result.expect("Error from read future which should have been handled in the future ");
       }
       _ => reply.error(libc::ENOENT),
@@ -549,7 +552,7 @@ impl fuse::Filesystem for BuildResultFS {
 
   fn readdir(
     &mut self,
-    _req: &fuse::Request,
+    _req: &fuse::Request<'_>,
     inode: Inode,
     // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
     _fh: u64,
@@ -578,7 +581,7 @@ impl fuse::Filesystem for BuildResultFS {
   // If this isn't implemented, OSX will try to manipulate ._ files to manage xattrs out of band, which adds both overhead and logspam.
   fn listxattr(
     &mut self,
-    _req: &fuse::Request,
+    _req: &fuse::Request<'_>,
     _inode: Inode,
     _size: u32,
     reply: fuse::ReplyXattr,
@@ -693,12 +696,14 @@ fn main() {
         std::time::Duration::from_secs(1),
         1.2,
         std::time::Duration::from_secs(20),
-      ).expect("Error making BackoffConfig"),
+      )
+      .expect("Error making BackoffConfig"),
       1,
       futures_timer::TimerHandle::default(),
     ),
     None => fs::Store::local_only(&store_path, pool),
-  }.expect("Error making store");
+  }
+  .expect("Error making store");
 
   let _fs = mount(mount_path, store).expect("Error mounting");
   loop {
@@ -724,8 +729,8 @@ fn unmount(mount_path: &str) -> i32 {
 
 #[cfg(test)]
 mod test {
-  extern crate tempfile;
-  extern crate testutil;
+  use tempfile;
+  use testutil;
 
   use super::mount;
   use fs;
@@ -744,16 +749,15 @@ mod test {
     let store = fs::Store::local_only(
       store_dir.path(),
       Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    ).expect("Error creating local store");
+    )
+    .expect("Error creating local store");
 
     let _fs = mount(mount_dir.path(), store).expect("Mounting");
-    assert!(
-      !&mount_dir
-        .path()
-        .join("digest")
-        .join(digest_to_filepath(&TestData::roland().digest()))
-        .exists()
-    );
+    assert!(!&mount_dir
+      .path()
+      .join("digest")
+      .join(digest_to_filepath(&TestData::roland().digest()))
+      .exists());
   }
 
   #[test]
@@ -763,7 +767,8 @@ mod test {
     let store = fs::Store::local_only(
       store_dir.path(),
       Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    ).expect("Error creating local store");
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
 
@@ -788,7 +793,8 @@ mod test {
     let store = fs::Store::local_only(
       store_dir.path(),
       Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    ).expect("Error creating local store");
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let test_directory = TestDirectory::containing_roland();
@@ -817,7 +823,8 @@ mod test {
     let store = fs::Store::local_only(
       store_dir.path(),
       Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    ).expect("Error creating local store");
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let test_directory = TestDirectory::containing_roland();
@@ -848,7 +855,8 @@ mod test {
     let store = fs::Store::local_only(
       store_dir.path(),
       Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    ).expect("Error creating local store");
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let treat_bytes = TestData::catnip();
@@ -888,7 +896,8 @@ mod test {
     let store = fs::Store::local_only(
       store_dir.path(),
       Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    ).expect("Error creating local store");
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let treat_bytes = TestData::catnip();
@@ -933,7 +942,8 @@ mod test {
     let store = fs::Store::local_only(
       store_dir.path(),
       Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    ).expect("Error creating local store");
+    )
+    .expect("Error creating local store");
 
     let treat_bytes = TestData::catnip();
     let directory = TestDirectory::with_mixed_executable_files();
@@ -974,13 +984,13 @@ mod test {
 mod syscall_tests {
   use super::mount;
   use super::test::digest_to_filepath;
+  use crate::test::make_dirs;
   use fs;
   use futures::Future;
   use libc;
   use std::ffi::CString;
   use std::path::Path;
   use std::sync::Arc;
-  use test::make_dirs;
   use testutil::data::TestData;
 
   #[test]
@@ -990,7 +1000,8 @@ mod syscall_tests {
     let store = fs::Store::local_only(
       store_dir.path(),
       Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    ).expect("Error creating local store");
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
 

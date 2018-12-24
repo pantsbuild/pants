@@ -1,4 +1,4 @@
-use core::{Function, TypeConstraint, TypeId};
+use crate::core::{Function, TypeConstraint, TypeId};
 
 pub struct Types {
   pub construct_directory_digest: Function,
