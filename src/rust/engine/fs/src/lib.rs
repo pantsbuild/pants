@@ -44,8 +44,6 @@ use futures_cpupool;
 
 use grpcio;
 
-// Needs a :: prefix because of https://github.com/rust-lang/rust/issues/56326
-use ignore;
 use indexmap;
 
 use lmdb;
@@ -63,11 +61,11 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
 
+use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::future::{self, Future};
 use glob::Pattern;
-use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use lazy_static::lazy_static;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -162,7 +160,7 @@ impl GitignoreStyleExcludes {
     }))
   }
 
-  fn create_gitignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
+  fn create_gitignore(patterns: &[String]) -> Result<Gitignore, ::ignore::Error> {
     let mut ignore_builder = GitignoreBuilder::new("");
     for pattern in patterns {
       ignore_builder.add_line(None, pattern.as_str())?;
@@ -180,8 +178,8 @@ impl GitignoreStyleExcludes {
       _ => false,
     };
     match self.gitignore.matched(stat.path(), is_dir) {
-      ignore::Match::None | ignore::Match::Whitelist(_) => false,
-      ignore::Match::Ignore(_) => true,
+      ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
+      ::ignore::Match::Ignore(_) => true,
     }
   }
 }
