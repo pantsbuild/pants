@@ -1730,7 +1730,6 @@ mod remote {
         instance_name,
         chunk_size_bytes,
         upload_timeout,
-        // TODO: Parameterise this
         rpc_attempts,
         env,
         serverset,
