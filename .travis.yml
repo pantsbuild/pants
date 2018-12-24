@@ -94,8 +94,8 @@ osx_test_config: &osx_test_config
   stage: *test
   language: generic
   before_install:
-    # install Python 3
-    - brew install python
+    # Upgrade to Python 3
+    - brew upgrade python
   script:
     - MODE=debug ./build-support/bin/travis-ci.sh -m
 
@@ -317,8 +317,8 @@ matrix:
       language: generic
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
-        # Install Python 3
-        - brew install python
+        # Upgrade to Python 3
+        - brew upgrade python
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
