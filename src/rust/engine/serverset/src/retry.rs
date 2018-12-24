@@ -1,5 +1,5 @@
+use crate::{Health, Serverset};
 use futures::{self, Future, IntoFuture};
-use {Health, Serverset};
 
 pub struct Retry<T>(pub Serverset<T>);
 
@@ -50,10 +50,10 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
 
 #[cfg(test)]
 mod tests {
+  use crate::{BackoffConfig, Retry, Serverset};
   use futures::Future;
   use futures_timer::TimerHandle;
   use std::time::Duration;
-  use {BackoffConfig, Retry, Serverset};
 
   #[test]
   fn retries() {

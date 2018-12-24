@@ -6,10 +6,10 @@ use std::io;
 
 use itertools::Itertools;
 
-use core::{Function, Key, Params, TypeConstraint, TypeId, Value};
-use externs;
-use selectors::{Get, Select};
-use tasks::{Intrinsic, Task, Tasks};
+use crate::core::{Function, Key, Params, TypeConstraint, TypeId, Value};
+use crate::externs;
+use crate::selectors::{Get, Select};
+use crate::tasks::{Intrinsic, Task, Tasks};
 
 type ParamTypes = BTreeSet<TypeId>;
 

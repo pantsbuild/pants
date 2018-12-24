@@ -2,7 +2,7 @@ use std::mem;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use node::{EntryId, Node, NodeContext, NodeError};
+use crate::node::{EntryId, Node, NodeContext, NodeError};
 
 use futures::future::{self, Future};
 use futures::sync::oneshot;

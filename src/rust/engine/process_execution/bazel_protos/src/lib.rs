@@ -5,8 +5,8 @@ extern crate hashing;
 extern crate protobuf;
 
 mod gen;
-pub use gen::*;
+pub use crate::gen::*;
 
 mod conversions;
 mod verification;
-pub use verification::verify_directory_canonical;
+pub use crate::verification::verify_directory_canonical;

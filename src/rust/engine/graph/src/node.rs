@@ -10,8 +10,8 @@ use hashing::Digest;
 use futures::future::Future;
 use petgraph::stable_graph;
 
-use entry::Entry;
-use Graph;
+use crate::entry::Entry;
+use crate::Graph;
 
 // 2^32 Nodes ought to be more than enough for anyone!
 pub type EntryId = stable_graph::NodeIndex<u32>;

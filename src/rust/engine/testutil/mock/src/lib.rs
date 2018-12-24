@@ -39,5 +39,5 @@ extern crate protobuf;
 extern crate testutil;
 
 mod cas;
-pub use cas::StubCAS;
+pub use crate::cas::StubCAS;
 pub mod execution_server;

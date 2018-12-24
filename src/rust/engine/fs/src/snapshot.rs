@@ -1,22 +1,22 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use crate::glob_matching::GlobMatching;
+use crate::pool::ResettablePool;
+use crate::{File, PathGlobs, PathStat, PosixFS, Store};
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use futures::future::{self, join_all};
 use futures::Future;
-use glob_matching::GlobMatching;
 use hashing::{Digest, Fingerprint};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
-use pool::ResettablePool;
 use protobuf;
 use std::ffi::OsString;
 use std::fmt;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use {File, PathGlobs, PathStat, PosixFS, Store};
 
 pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,

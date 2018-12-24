@@ -12,20 +12,20 @@ use futures::future::{self, Future};
 use futures::Stream;
 use url::Url;
 
+use crate::context::{Context, Core};
+use crate::core::{throw, Failure, Key, Params, TypeConstraint, Value};
+use crate::externs;
+use crate::rule_graph;
+use crate::selectors;
+use crate::tasks::{self, Intrinsic};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
-use context::{Context, Core};
-use core::{throw, Failure, Key, Params, TypeConstraint, Value};
-use externs;
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, StoreFileByDigest, StrictGlobMatching, VFS,
 };
 use hashing;
 use process_execution::{self, CommandRunner};
-use rule_graph;
-use selectors;
-use tasks::{self, Intrinsic};
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 

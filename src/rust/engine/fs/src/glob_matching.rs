@@ -12,7 +12,7 @@ use glob::Pattern;
 use indexmap::{map::Entry::Occupied, IndexMap, IndexSet};
 use log::warn;
 
-use {
+use crate::{
   Dir, GitignoreStyleExcludes, GlobExpansionConjunction, GlobParsedSource, GlobSource,
   GlobWithSource, Link, PathGlob, PathGlobs, PathStat, Stat, VFS,
 };

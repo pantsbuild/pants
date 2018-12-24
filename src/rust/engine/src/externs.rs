@@ -8,9 +8,9 @@ use std::os::raw;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::string::FromUtf8Error;
 
-use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
-use handles::{DroppingHandle, Handle};
-use interning::Interns;
+use crate::core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
+use crate::handles::{DroppingHandle, Handle};
+use crate::interning::Interns;
 use lazy_static::lazy_static;
 use log;
 use num_enum::CustomTryInto;
