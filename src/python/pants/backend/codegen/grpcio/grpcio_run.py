@@ -8,15 +8,14 @@ import functools
 import logging
 from collections import OrderedDict
 
+from pants.backend.codegen.grpcio.grpcio_prep import GrpcioPrep
+from pants.backend.codegen.grpcio.python_grpcio_library import PythonGrpcioLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.contextutil import pushd
-
-from pants.backend.codegen.grpcio.grpcio_prep import GrpcioPrep
-from pants.backend.codegen.grpcio.python_grpcio_library import PythonGrpcioLibrary
 
 
 class GrpcioRun(SimpleCodegenTask):

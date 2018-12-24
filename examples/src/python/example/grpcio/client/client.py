@@ -5,8 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import grpc
-from org.pantsbuild.example.service import service_pb2
-from org.pantsbuild.example.service import service_pb2_grpc
+from org.pantsbuild.example.service import service_pb2, service_pb2_grpc
 
 
 if __name__ == '__main__':

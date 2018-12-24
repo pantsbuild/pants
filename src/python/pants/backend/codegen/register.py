@@ -8,6 +8,9 @@ from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.antlr.python.antlr_py_gen import AntlrPyGen
 from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
+from pants.backend.codegen.grpcio.grpcio_prep import GrpcioPrep
+from pants.backend.codegen.grpcio.grpcio_run import GrpcioRun
+from pants.backend.codegen.grpcio.python_grpcio_library import PythonGrpcioLibrary
 from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
 from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
@@ -20,9 +23,6 @@ from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThrif
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.wire.java.wire_gen import WireGen
-from pants.backend.codegen.grpcio.grpcio_prep import GrpcioPrep
-from pants.backend.codegen.grpcio.grpcio_run import GrpcioRun
-from pants.backend.codegen.grpcio.python_grpcio_library import PythonGrpcioLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 

@@ -5,11 +5,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import time
-import grpc
-
 from concurrent import futures
-from org.pantsbuild.example.service import service_pb2
-from org.pantsbuild.example.service import service_pb2_grpc
+
+import grpc
+from org.pantsbuild.example.service import service_pb2, service_pb2_grpc
 
 
 class ExampleHelloServer(service_pb2_grpc.ExampleServiceServicer):

@@ -7,10 +7,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 
+from pex.interpreter import PythonInterpreter
+from pex.pex import PEX
+from pex.pex_builder import PEXBuilder
+
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
@@ -18,9 +22,7 @@ from pants.build_graph.address import Address
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
 from pants.util.dirutil import fast_relpath, safe_concurrent_creation
-from pex.interpreter import PythonInterpreter
-from pex.pex import PEX
-from pex.pex_builder import PEXBuilder
+
 
 logger = logging.getLogger(__name__)
 
