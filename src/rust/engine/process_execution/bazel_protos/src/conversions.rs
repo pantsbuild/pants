@@ -26,7 +26,8 @@ mod tests {
     let our_digest = &hashing::Digest(
       hashing::Fingerprint::from_hex_string(
         "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
-      ).unwrap(),
+      )
+      .unwrap(),
       10,
     );
     let converted: super::super::remote_execution::Digest = our_digest.into();
@@ -46,7 +47,8 @@ mod tests {
     let want = hashing::Digest(
       hashing::Fingerprint::from_hex_string(
         "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
-      ).unwrap(),
+      )
+      .unwrap(),
       10,
     );
     assert_eq!(converted, Ok(want));

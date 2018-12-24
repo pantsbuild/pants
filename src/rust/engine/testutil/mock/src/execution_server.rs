@@ -91,9 +91,11 @@ impl TestServer {
     let mut server_transport = grpcio::ServerBuilder::new(env)
       .register_service(bazel_protos::remote_execution_grpc::create_execution(
         mock_responder.clone(),
-      )).register_service(bazel_protos::operations_grpc::create_operations(
+      ))
+      .register_service(bazel_protos::operations_grpc::create_operations(
         mock_responder.clone(),
-      )).bind("localhost", 0)
+      ))
+      .bind("localhost", 0)
       .build()
       .unwrap();
     server_transport.start();
@@ -226,7 +228,8 @@ impl MockResponder {
           .fail(grpcio::RpcStatus::new(
             grpcio::RpcStatusCode::InvalidArgument,
             Some("Did not expect further requests from client.".to_string()),
-          )).map(|_| ())
+          ))
+          .map(|_| ())
           .map_err(|_| ()),
       ),
     }
@@ -250,7 +253,8 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
           .fail(grpcio::RpcStatus::new(
             grpcio::RpcStatusCode::InvalidArgument,
             Some("Did not expect this request".to_string()),
-          )).map_err(|_| ()),
+          ))
+          .map_err(|_| ()),
       );
       return;
     }

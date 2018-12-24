@@ -158,7 +158,8 @@ impl EngineDisplay {
         "{goto_origin}{clear}",
         goto_origin = cursor::Goto(cursor_start.0, cursor_start.1),
         clear = clear::AfterCursor,
-      )).expect("could not write to terminal");
+      ))
+      .expect("could not write to terminal");
   }
 
   // Flush terminal output.
@@ -194,7 +195,8 @@ impl EngineDisplay {
         blue = color::Fg(color::Blue),
         divider = divider,
         reset = color::Fg(color::Reset)
-      )).expect("could not write to terminal");
+      ))
+      .expect("could not write to terminal");
   }
 
   // Renders one frame of the log portion of the screen.
@@ -209,7 +211,8 @@ impl EngineDisplay {
         "{padding}{log_entry}",
         padding = self.padding,
         log_entry = log_entry
-      ).graphemes(true)
+      )
+      .graphemes(true)
       .take(self.terminal_size.0 as usize)
       .collect();
 
@@ -219,7 +222,8 @@ impl EngineDisplay {
           pos = cursor::Goto(1, cursor_start.1 + n as u16),
           clear_line = clear::CurrentLine,
           entry = line_shortened_log_entry
-        )).expect("could not write to terminal");
+        ))
+        .expect("could not write to terminal");
     }
 
     if counter > 0 {
@@ -244,7 +248,8 @@ impl EngineDisplay {
         sigil = self.sigil,
         reset = color::Fg(color::Reset),
         action = action
-      ).graphemes(true)
+      )
+      .graphemes(true)
       // Account for control characters.
       .take(self.terminal_size.0 as usize + 14)
       .collect();
@@ -254,7 +259,8 @@ impl EngineDisplay {
           "{pos}{entry}",
           pos = cursor::Goto(1, cursor_start.1 + start_row as u16 + n as u16),
           entry = line_shortened_output
-        )).expect("could not write to terminal");
+        ))
+        .expect("could not write to terminal");
     }
   }
 
@@ -289,7 +295,8 @@ impl EngineDisplay {
         hide_cursor = termion::cursor::Hide,
         cursor_init = cursor::Goto(cursor_start.0, cursor_start.1),
         clear_after_cursor = clear::AfterCursor
-      )).expect("could not write to terminal");
+      ))
+      .expect("could not write to terminal");
   }
 
   // Adds a worker/thread to the visual representation.
@@ -328,6 +335,7 @@ impl EngineDisplay {
         park_cursor = cursor::Goto(1, current_pos.1 - action_count),
         clear_after_cursor = clear::AfterCursor,
         reveal_cursor = termion::cursor::Show
-      )).expect("could not write to terminal");
+      ))
+      .expect("could not write to terminal");
   }
 }

@@ -166,7 +166,8 @@ mod tests {
           tx_thread1.send(()).unwrap();
           rx_thread1.recv().unwrap();
           future::ok::<_, ()>(())
-        }).wait()
+        })
+        .wait()
         .unwrap();
     });
 
@@ -180,7 +181,8 @@ mod tests {
         .with_acquired(move || {
           tx_thread2.send(()).unwrap();
           future::ok::<_, ()>(())
-        }).wait()
+        })
+        .wait()
         .unwrap();
     });
 

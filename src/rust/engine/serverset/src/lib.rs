@@ -202,7 +202,8 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
           .map(|s| Backend {
             server: s,
             unhealthy_info: Arc::new(Mutex::new(None)),
-          }).collect(),
+          })
+          .collect(),
         next: AtomicUsize::new(0),
         backoff_config,
         timer_handle,
@@ -327,7 +328,8 @@ mod tests {
       vec!["good", "bad"],
       backoff_config(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
 
     expect_both(&s, 2);
   }
@@ -338,7 +340,8 @@ mod tests {
       vec!["good", "bad"],
       backoff_config(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
     s.inner.next.store(std::usize::MAX, Ordering::SeqCst);
 
     // 3 because we may skip some values if the number of servers isn't a factor of
@@ -358,7 +361,8 @@ mod tests {
       vec!["good", "bad"],
       backoff_config(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
 
     mark_bad_as_bad(&s, Health::Unhealthy);
 
@@ -371,7 +375,8 @@ mod tests {
       vec!["good", "bad"],
       backoff_config(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
 
     mark_bad_as_bad(&s, Health::Unhealthy);
 
@@ -386,7 +391,8 @@ mod tests {
       vec!["good", "bad"],
       backoff_config(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
 
     mark_bad_as_bad(&s, Health::Unhealthy);
 
@@ -445,8 +451,10 @@ mod tests {
             saw.lock().insert(server);
             s.report_health(token, Health::Healthy)
           })
-        }).collect::<Vec<_>>(),
-    ).wait()
+        })
+        .collect::<Vec<_>>(),
+    )
+    .wait()
     .unwrap();
 
     let expect: HashSet<_> = vec!["good", "bad"].into_iter().collect();
@@ -464,7 +472,8 @@ mod tests {
           } else {
             s.report_health(token, Health::Healthy);
           }
-        }).wait()
+        })
+        .wait()
         .unwrap();
     }
     assert!(mark_bad_as_baded_bad);
@@ -479,7 +488,8 @@ mod tests {
         .map(|(server, token)| {
           assert_eq!("good", server);
           s.report_health(token, Health::Healthy);
-        }).wait()
+        })
+        .wait()
         .unwrap();
     }
 

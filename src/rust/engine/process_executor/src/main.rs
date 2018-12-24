@@ -171,7 +171,8 @@ fn main() {
           parts.next().unwrap().to_string(),
           parts.next().unwrap_or_default().to_string(),
         )
-      }).collect(),
+      })
+      .collect(),
     None => BTreeMap::new(),
   };
   let work_dir = args
@@ -221,7 +222,8 @@ fn main() {
     }
     (None, None) => fs::Store::local_only(local_store_path, pool.clone()),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
-  }.expect("Error making store");
+  }
+  .expect("Error making store");
 
   let input_files = {
     let fingerprint = Fingerprint::from_hex_string(args.value_of("input-digest").unwrap())

@@ -149,9 +149,11 @@ impl StubCAS {
     let mut server_transport = grpcio::ServerBuilder::new(env)
       .register_service(bazel_protos::bytestream_grpc::create_byte_stream(
         responder.clone(),
-      )).register_service(
+      ))
+      .register_service(
         bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder.clone()),
-      ).bind("localhost", port)
+      )
+      .bind("localhost", port)
       .build()
       .unwrap();
     server_transport.start();
@@ -268,7 +270,8 @@ impl StubCASResponder {
             let mut resp = bazel_protos::bytestream::ReadResponse::new();
             resp.set_data(Bytes::from(b));
             resp
-          }).collect(),
+          })
+          .collect(),
       ),
       None => Err(grpcio::RpcStatus::new(
         grpcio::RpcStatusCode::NotFound,
@@ -373,10 +376,12 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
             bytes.extend(req.get_data());
           }
           Ok((maybe_resource_name, bytes))
-        }).map_err(move |err: grpcio::Error| match err {
+        })
+        .map_err(move |err: grpcio::Error| match err {
           grpcio::Error::RpcFailure(status) => status,
           e => grpcio::RpcStatus::new(grpcio::RpcStatusCode::Unknown, Some(format!("{:?}", e))),
-        }).and_then(
+        })
+        .and_then(
           move |(maybe_resource_name, bytes)| match maybe_resource_name {
             None => Err(grpcio::RpcStatus::new(
               grpcio::RpcStatusCode::InvalidArgument,
@@ -443,10 +448,12 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               Ok(response)
             }
           },
-        ).then(move |result| match result {
+        )
+        .then(move |result| match result {
           Ok(resp) => sink.success(resp),
           Err(err) => sink.fail(err),
-        }).then(move |_| Ok(())),
+        })
+        .then(move |_| Ok(())),
     );
   }
 

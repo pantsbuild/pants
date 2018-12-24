@@ -279,7 +279,8 @@ impl<'t> GraphMaker<'t> {
           ..
         }) => Some(task_rule.clone()),
         _ => None,
-      }).collect();
+      })
+      .collect();
     let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules
       .keys()
       .filter_map(|f| f.task_rule())
@@ -626,7 +627,8 @@ impl<'t> GraphMaker<'t> {
           Self::used_params(key, input_entry)
             .iter()
             .all(|p| available_params.contains(p))
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
       let chosen_entries = Self::choose_dependency(satisfiable_entries);
       match chosen_entries.len() {
@@ -680,7 +682,8 @@ impl<'t> GraphMaker<'t> {
               if e.0 > wd.params().len() {
                 *e = (wd.params().len(), satisfiable_entry);
               }
-            }).or_insert((wd.params().len(), satisfiable_entry));
+            })
+            .or_insert((wd.params().len(), satisfiable_entry));
         }
       }
 
@@ -902,7 +905,8 @@ fn task_display(task: &Task) -> String {
   format!(
     "({}, {}, {}{})",
     product, clause_portion, get_portion, function_name
-  ).to_string()
+  )
+  .to_string()
 }
 
 impl RuleGraph {
@@ -940,7 +944,8 @@ impl RuleGraph {
           Some((entry, edges))
         }
         _ => None,
-      }).collect::<Vec<_>>();
+      })
+      .collect::<Vec<_>>();
 
     match subset_matches.len() {
       1 => Ok(subset_matches[0].1.clone()),
@@ -988,7 +993,8 @@ impl RuleGraph {
           ..
         }) => Some(task_rule),
         _ => None,
-      }).collect();
+      })
+      .collect();
 
     let rule_diagnostics = self
       .unfulfillable_rules
@@ -1002,7 +1008,8 @@ impl RuleGraph {
           // We're only checking rule usage not entry usage generally, so we ignore intrinsics.
           None
         }
-      }).chain(
+      })
+      .chain(
         self
           .unreachable_rules
           .iter()
@@ -1038,10 +1045,12 @@ impl RuleGraph {
               d.details.sort();
               format!("{}:\n      {}", d.reason, d.details.join("\n      "))
             }
-          }).collect::<Vec<_>>()
+          })
+          .collect::<Vec<_>>()
           .join("\n    ");
         format!("{}:\n    {}", task_display(&rule), errors)
-      }).collect();
+      })
+      .collect();
     msgs.sort();
 
     Err(format!("Rules with errors: {}\n  {}", msgs.len(), msgs.join("\n  ")).to_string())
@@ -1079,7 +1088,8 @@ impl RuleGraph {
           ))
         }
         _ => None,
-      }).collect::<Vec<String>>();
+      })
+      .collect::<Vec<String>>();
     root_rule_strs.sort();
     writeln!(f, "{}", root_rule_strs.join("\n"))?;
 
@@ -1101,7 +1111,8 @@ impl RuleGraph {
           ))
         }
         _ => None,
-      }).collect::<Vec<String>>();
+      })
+      .collect::<Vec<String>>();
     internal_rule_strs.sort();
     writeln!(f, "{}", internal_rule_strs.join("\n"))?;
     writeln!(f, "}}")

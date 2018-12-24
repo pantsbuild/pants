@@ -202,7 +202,8 @@ impl WrappedNode for Select {
                 .map_err(|err| throw(&err))
                 .map(move |digest| Snapshot::store_directory(&core, &digest))
                 .to_boxed()
-            }).to_boxed()
+            })
+            .to_boxed()
         }
         &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.files_content
@@ -213,7 +214,8 @@ impl WrappedNode for Select {
             .select_product(&context, context.core.types.directory_digest, "intrinsic")
             .and_then(|directory_digest_val| {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
-            }).and_then(move |digest| {
+            })
+            .and_then(move |digest| {
               let store = context.core.store();
               context
                 .core
@@ -224,12 +226,15 @@ impl WrappedNode for Select {
                   maybe_directory
                     .ok_or_else(|| format!("Could not find directory with digest {:?}", digest))
                     .map_err(|str| throw(&str))
-                }).and_then(move |directory| {
+                })
+                .and_then(move |directory| {
                   store
                     .contents_for_directory(&directory)
                     .map_err(|str| throw(&str))
-                }).map(move |files_content| Snapshot::store_files_content(&context, &files_content))
-            }).to_boxed()
+                })
+                .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
+            })
+            .to_boxed()
         }
         &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.process_result
@@ -242,7 +247,8 @@ impl WrappedNode for Select {
             .and_then(|request| {
               ExecuteProcess::lift(&request)
                 .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
-            }).and_then(move |process_request| context.get(process_request))
+            })
+            .and_then(move |process_request| context.get(process_request))
             .map(move |result| {
               externs::unsafe_call(
                 &core.types.construct_process_result,
@@ -253,7 +259,8 @@ impl WrappedNode for Select {
                   Snapshot::store_directory(&core, &result.0.output_directory),
                 ],
               )
-            }).to_boxed()
+            })
+            .to_boxed()
         }
         &rule_graph::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
       },
@@ -438,7 +445,8 @@ impl WrappedNode for DigestFile {
           .store()
           .store_file_bytes(c.content, true)
           .map_err(|e| throw(&e))
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 }
 
@@ -467,7 +475,8 @@ impl WrappedNode for Scandir {
       .then(move |listing_res| match listing_res {
         Ok(listing) => Ok(Arc::new(listing)),
         Err(e) => Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 }
 
@@ -494,7 +503,8 @@ impl Snapshot {
       .and_then(move |path_stats| {
         fs::Snapshot::from_path_stats(context.core.store(), &context, path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
-      }).map_err(|e| throw(&e))
+      })
+      .map_err(|e| throw(&e))
       .to_boxed()
   }
 
@@ -621,13 +631,11 @@ impl DownloadedFile {
     url: Url,
     digest: hashing::Digest,
   ) -> BoxFuture<fs::Snapshot, String> {
-    let file_name = try_future!(
-      url
-        .path_segments()
-        .and_then(|ps| ps.last())
-        .map(|f| f.to_owned())
-        .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url))
-    );
+    let file_name = try_future!(url
+      .path_segments()
+      .and_then(|ps| ps.last())
+      .map(|f| f.to_owned())
+      .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url)));
 
     core
       .store()
@@ -639,7 +647,8 @@ impl DownloadedFile {
           .and_then(move |()| {
             DownloadedFile::snapshot_of_one_file(core.store(), PathBuf::from(file_name), digest)
           })
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 
   fn snapshot_of_one_file(
@@ -702,7 +711,8 @@ impl DownloadedFile {
         } else {
           Ok(response)
         }
-      }).and_then(move |response| {
+      })
+      .and_then(move |response| {
         struct SizeLimiter<W: std::io::Write> {
           writer: W,
           written: usize,
@@ -743,16 +753,19 @@ impl DownloadedFile {
               .write_all(&chunk)
               .map(|_| hasher)
               .map_err(|err| format!("Error hashing/writing URL fetch response: {}", err))
-          }).map(|hasher| {
+          })
+          .map(|hasher| {
             let (digest, bytewriter) = hasher.finish();
             (digest, bytewriter.writer.into_inner().freeze())
           })
-      }).and_then(move |(actual_digest, buf)| {
+      })
+      .and_then(move |(actual_digest, buf)| {
         if expected_digest != actual_digest {
           return future::err(format!(
             "Wrong digest for downloaded file: want {:?} got {:?}",
             expected_digest, actual_digest
-          )).to_boxed();
+          ))
+          .to_boxed();
         }
 
         core
@@ -760,7 +773,8 @@ impl DownloadedFile {
           .store_file_bytes(buf, true)
           .map(|_| ())
           .to_boxed()
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 }
 
@@ -771,14 +785,13 @@ impl WrappedNode for DownloadedFile {
     let value = externs::val_for(&self.0);
     let url_to_fetch = externs::project_str(&value, "url");
 
-    let url = try_future!(
-      Url::parse(&url_to_fetch)
-        .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_to_fetch, err)))
-    );
+    let url = try_future!(Url::parse(&url_to_fetch)
+      .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_to_fetch, err))));
 
-    let expected_digest = try_future!(
-      lift_digest(&externs::project_ignoring_type(&value, "digest")).map_err(|str| throw(&str))
-    );
+    let expected_digest = try_future!(lift_digest(&externs::project_ignoring_type(
+      &value, "digest"
+    ))
+    .map_err(|str| throw(&str)));
 
     self
       .load_or_download(context.core.clone(), url, expected_digest)
@@ -827,13 +840,15 @@ impl Task {
               "{:?} did not declare a dependency on {:?}",
               entry, select_key
             )
-          }).clone();
+          })
+          .clone();
         // The subject of the get is a new parameter that replaces an existing param of the same
         // type.
         let mut params = params.clone();
         params.put(subject);
         Select::new(params, product, entry).run(context.clone())
-      }).collect::<Vec<_>>();
+      })
+      .collect::<Vec<_>>();
     future::join_all(get_futures).to_boxed()
   }
 
@@ -866,7 +881,8 @@ impl Task {
           externs::GeneratorResponse::Break(val) => future::ok(future::Loop::Break(val)).to_boxed(),
         }
       })
-    }).to_boxed()
+    })
+    .to_boxed()
   }
 }
 
@@ -911,7 +927,8 @@ impl WrappedNode for Task {
       .then(move |deps_result| match deps_result {
         Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
         Err(failure) => Err(failure),
-      }).then(move |task_result| match task_result {
+      })
+      .then(move |task_result| match task_result {
         Ok(val) => {
           if externs::satisfied_by(&context.core.types.generator, &val) {
             Self::generate(context, params, entry, val)
@@ -925,7 +942,8 @@ impl WrappedNode for Task {
           }
         }
         Err(failure) => err(failure),
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 }
 

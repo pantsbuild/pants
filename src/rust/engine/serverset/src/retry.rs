@@ -35,7 +35,8 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
             serverset.report_health(token, health);
             result
           })
-        }).map(futures::future::Loop::Break)
+        })
+        .map(futures::future::Loop::Break)
         .or_else(move |err| {
           if i >= times {
             Err(format!("Failed after {} retries; last failure: {}", i, err))
@@ -60,7 +61,8 @@ mod tests {
       vec![Ok("good"), Err("bad".to_owned()), Ok("enough")],
       BackoffConfig::new(Duration::from_millis(10), 2.0, Duration::from_millis(100)).unwrap(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
     let mut v = vec![];
     for _ in 0..3 {
       v.push(
@@ -79,7 +81,8 @@ mod tests {
       vec![Err("bad".to_owned())],
       BackoffConfig::new(Duration::from_millis(1), 1.0, Duration::from_millis(1)).unwrap(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(
       Err(format!("Failed after 5 retries; last failure: bad")),
       Retry(s)

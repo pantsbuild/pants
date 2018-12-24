@@ -226,7 +226,8 @@ impl Scheduler {
                 }
               }
             })
-        }).collect::<Vec<_>>(),
+        })
+        .collect::<Vec<_>>(),
     );
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry

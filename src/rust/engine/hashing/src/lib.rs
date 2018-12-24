@@ -198,7 +198,8 @@ mod fingerprint_tests {
     assert_eq!(
       Fingerprint::from_hex_string(
         "0123456789abcdefFEDCBA98765432100000000000000000ffFFfFfFFfFfFFff",
-      ).unwrap(),
+      )
+      .unwrap(),
       Fingerprint([
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
         0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -216,14 +217,16 @@ mod fingerprint_tests {
   fn from_hex_string_too_long() {
     Fingerprint::from_hex_string(
       "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0",
-    ).expect_err("Want err");
+    )
+    .expect_err("Want err");
   }
 
   #[test]
   fn from_hex_string_invalid_chars() {
     Fingerprint::from_hex_string(
       "Q123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
-    ).expect_err("Want err");
+    )
+    .expect_err("Want err");
   }
 
   #[test]
@@ -233,7 +236,8 @@ mod fingerprint_tests {
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
         0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0xff,
-      ],).to_hex(),
+      ],)
+      .to_hex(),
       "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_lowercase()
     )
   }
@@ -276,7 +280,8 @@ mod digest_tests {
     let digest = Digest(
       Fingerprint::from_hex_string(
         "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
-      ).unwrap(),
+      )
+      .unwrap(),
       1,
     );
     assert_ser_tokens(
@@ -311,7 +316,8 @@ mod hasher_tests {
       super::Digest(
         super::Fingerprint::from_hex_string(
           "23e92dfba8fb0c93cfba31ad2962b4e35a47054296d1d375d7f7e13e0185de7a",
-        ).unwrap(),
+        )
+        .unwrap(),
         4,
       ),
       "meep".as_bytes().to_vec(),

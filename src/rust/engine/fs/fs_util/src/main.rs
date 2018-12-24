@@ -387,7 +387,8 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               format!(
                 "Tried to save file {:?} but it was not a file, was a {:?}",
                 path, o
-              ).into(),
+              )
+              .into(),
             ),
           }
         }
@@ -430,14 +431,16 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             // something here, or we don't care. Is that a valid assumption?
             fs::StrictGlobMatching::Ignore,
             fs::GlobExpansionConjunction::AllMatch,
-          )?).map_err(|e| format!("Error expanding globs: {:?}", e))
+          )?)
+          .map_err(|e| format!("Error expanding globs: {:?}", e))
           .and_then(move |paths| {
             Snapshot::from_path_stats(
               store_copy.clone(),
               &fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
               paths,
             )
-          }).map(|snapshot| snapshot.digest)
+          })
+          .map(|snapshot| snapshot.digest)
           .wait()?;
 
         let report = ensure_uploaded_to_remote(&store, store_has_remote, digest);
@@ -469,7 +472,8 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                   .map(|(name, _digest)| format!("{}\n", name))
                   .collect::<Vec<String>>()
                   .join("")
-              }).map(|s| s.into_bytes())
+              })
+              .map(|s| s.into_bytes())
           }),
           "recursive-file-list-with-digests" => expand_files(store, digest).map(|maybe_v| {
             maybe_v
@@ -478,7 +482,8 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                   .map(|(name, digest)| format!("{} {} {}\n", name, digest.0, digest.1))
                   .collect::<Vec<String>>()
                   .join("")
-              }).map(|s| s.into_bytes())
+              })
+              .map(|s| s.into_bytes())
           }),
           format => Err(format!(
             "Unexpected value of --output-format arg: {}",
@@ -517,7 +522,8 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                   .expect("Error serializing Directory proto"),
               )
             })
-          }).wait()?,
+          })
+          .wait()?,
         some => some,
       };
       match v {
@@ -584,12 +590,15 @@ fn expand_files_helper(
                 format!("{}{}/", prefix, dir.name),
                 files.clone(),
               )
-            }).collect::<Vec<_>>(),
-        ).map(|_| Some(()))
+            })
+            .collect::<Vec<_>>(),
+        )
+        .map(|_| Some(()))
         .to_boxed()
       }
       None => futures::future::ok(None).to_boxed(),
-    }).to_boxed()
+    })
+    .to_boxed()
 }
 
 fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {

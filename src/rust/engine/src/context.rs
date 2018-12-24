@@ -126,7 +126,8 @@ impl Core {
               futures_timer_thread2.with(|t| t.handle()),
             )
           }
-        }).unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
+        })
+        .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
       let underlying_command_runner: Box<CommandRunner> = match &remote_execution_server {
         Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
@@ -249,7 +250,8 @@ impl Context {
         node_result
           .try_into()
           .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 }
 

@@ -184,7 +184,8 @@ impl<N: Node> InnerGraph<N> {
         } else {
           None
         }
-      }).collect();
+      })
+      .collect();
     // And their transitive dependencies, which will be dirtied.
     let transitive_ids: Vec<_> = self
       .walk(root_ids.iter().cloned().collect(), Direction::Incoming)
@@ -596,8 +597,10 @@ impl<N: Node> Graph<N> {
             .get(context, dep_id)
             .map(|(_, generation)| generation)
             .to_boxed()
-        }).collect::<Vec<_>>(),
-    ).to_boxed()
+        })
+        .collect::<Vec<_>>(),
+    )
+    .to_boxed()
   }
 
   ///
@@ -1049,7 +1052,8 @@ mod tests {
           .map(move |mut v| {
             v.push(token);
             v
-          }).to_boxed()
+          })
+          .to_boxed()
       } else {
         future::ok(vec![token]).to_boxed()
       }
@@ -1089,7 +1093,8 @@ mod tests {
         .map(|&T(node_id, context_id)| {
           // We cast to isize to allow comparison to -1.
           (node_id as isize, context_id)
-        }).unzip();
+        })
+        .unzip();
       // Confirm monotonically ordered.
       let mut previous: isize = -1;
       for node_id in node_ids {

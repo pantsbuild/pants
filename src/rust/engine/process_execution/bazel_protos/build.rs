@@ -38,7 +38,8 @@ fn main() {
       thirdpartyprotobuf.join("rust-protobuf"),
     ],
     &gen_dir,
-  ).expect("Failed to compile protos!");
+  )
+  .expect("Failed to compile protos!");
 
   let listing = gen_dir.read_dir().unwrap();
   let mut pub_mod_stmts = listing
@@ -49,7 +50,8 @@ fn main() {
         "mod" | ".gitignore" => None,
         module_name => Some(format!("pub mod {};", module_name)),
       }
-    }).collect::<Vec<_>>();
+    })
+    .collect::<Vec<_>>();
   pub_mod_stmts.sort();
   let contents = format!(
     "\
