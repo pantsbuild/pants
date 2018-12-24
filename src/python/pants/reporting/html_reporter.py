@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import cgi
+import html
 import os
 import re
 import time
@@ -454,7 +454,7 @@ class HtmlReporter(Reporter):
 
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""
-    colored = self._handle_ansi_color_codes(cgi.escape(s))
+    colored = self._handle_ansi_color_codes(html.escape(s))
     return linkify(self._buildroot, colored, self._linkify_memo).replace('\n', '</br>')
 
   _ANSI_COLOR_CODE_RE = re.compile(r'\033\[((?:\d|;)*)m')
