@@ -730,6 +730,7 @@ class Native(Singleton):
         execution_options.remote_store_thread_count,
         execution_options.remote_store_chunk_bytes,
         execution_options.remote_store_chunk_upload_timeout_seconds,
+        execution_options.remote_store_rpc_retries,
         execution_options.process_execution_parallelism,
         execution_options.process_execution_cleanup_local_dirs,
       )

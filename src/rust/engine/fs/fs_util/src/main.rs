@@ -239,7 +239,15 @@ to this directory.",
               .long("thread-count")
               .required(false)
               .default_value("1")
-    )
+        )
+        .arg(
+          Arg::with_name("rpc-attempts")
+              .help("Number of times to attempt any RPC before giving up.")
+              .takes_value(true)
+              .long("rpc-attempts")
+              .required(false)
+              .default_value("3")
+        )
       .get_matches(),
   ) {
     Ok(_) => {}
@@ -311,6 +319,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               1.2,
               std::time::Duration::from_secs(20),
             )?,
+            value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
             futures_timer::TimerHandle::default(),
           ),
           true,
