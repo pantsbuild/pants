@@ -232,7 +232,14 @@ to this directory.",
               .long("chunk-bytes")
               .required(false)
               .default_value(&format!("{}", 3 * 1024 * 1024))
-        )
+        ).arg(
+          Arg::with_name("thread-count")
+              .help("Number of threads to use for uploads and downloads")
+              .takes_value(true)
+              .long("thread-count")
+              .required(false)
+              .default_value("1")
+    )
       .get_matches(),
   ) {
     Ok(_) => {}
@@ -287,7 +294,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               .map(str::to_owned),
             &root_ca_certs,
             oauth_bearer_token,
-            1,
+            value_t!(top_match.value_of("thread-count"), usize).expect("Invalid thread count"),
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures
             // leave this hanging forever.
