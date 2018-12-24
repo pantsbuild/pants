@@ -382,10 +382,10 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(ctx.sources)
 
     self.log_zinc_file(ctx.analysis_file)
-    with open(ctx.zinc_args_file, 'wb') as fp:
+    with open(ctx.zinc_args_file, 'w') as fp:
       for arg in zinc_args:
         fp.write(arg)
-        fp.write(b'\n')
+        fp.write('\n')
 
     if self.execution_strategy == self.HERMETIC:
       zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
