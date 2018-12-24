@@ -37,6 +37,7 @@ from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
+from pants.util.strutil import ensure_text
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -384,7 +385,10 @@ class BaseZincCompile(JvmCompile):
     self.log_zinc_file(ctx.analysis_file)
     with open(ctx.zinc_args_file, 'w') as fp:
       for arg in zinc_args:
-        fp.write(arg)
+        # TODO: `zinc_args` include mixed bytes and strings. The values
+        # from this file's get_args_defaults(), like '-S-encoding', in particular are bytes, even though 
+        # they're defined as unicode in the source code.
+        fp.write(ensure_text(arg))
         fp.write('\n')
 
     if self.execution_strategy == self.HERMETIC:
