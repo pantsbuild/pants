@@ -8,5 +8,4 @@ junit_tests(
     'examples/src/java/org/pantsbuild/example/hello/greet',
     'examples/src/resources/org/pantsbuild/example/hello',
   ],
-  tags = {'no-lint.google-java-format.skip'}
 )
