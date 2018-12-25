@@ -19,8 +19,10 @@ class EchoTaskBase(HasSkipAndTransitiveGoalOptionsMixin, Task):
   prefix = None
 
   def execute(self):
-    with open(os.path.join(self.workdir, 'output'), 'w') as fp:
-      fp.write('\n'.join(t.address.spec for t in self.get_targets()))
+    relevant_targets = self.get_targets()
+    if relevant_targets:
+      with open(os.path.join(self.workdir, 'output'), 'w') as fp:
+        fp.write('\n'.join(t.address.spec for t in relevant_targets))
 
 
 class EchoOne(EchoTaskBase):
