@@ -18,15 +18,15 @@ class TestGoalOptionsMixinIntegration(PantsRunIntegrationTest):
   def hermetic(cls):
     return True
 
-  def _do_test_goal_options(self, flags, expected_one, expected_two):
+  def _do_test_goal_options(self, flags, expected_one, expected_two, a_tag='{}', b_tag='{}'):
     with temporary_dir(root_dir=get_buildroot()) as src_dir:
       foo_dir = os.path.join(src_dir, 'foo')
       os.mkdir(foo_dir)
       with open(os.path.join(foo_dir, 'BUILD'), 'w') as fp:
         fp.write(textwrap.dedent("""
-        target(name='a', dependencies=[':b'])
-        target(name='b')
-        """))
+        target(name='a', dependencies=[':b'], tags={})
+        target(name='b', tags={})
+        """).format(a_tag, b_tag))
 
       config = {
         'GLOBAL': {
@@ -44,8 +44,11 @@ class TestGoalOptionsMixinIntegration(PantsRunIntegrationTest):
           else:
             with open(path, 'r') as fp:
               return {os.path.basename(x.strip()) for x in fp.readlines()}
-        self.assertEqual(expected_one, get_echo('one'))
-        self.assertEqual(expected_two, get_echo('two'))
+
+        self.assertEqual(expected_one, get_echo('one'),
+                         'one expected {}, but got {}'.format(expected_one, get_echo('one')))
+        self.assertEqual(expected_two, get_echo('two'),
+                         'two expected {}, but got {}'.format(expected_two, get_echo('two')))
 
   def test_defaults(self):
     self._do_test_goal_options([], {'foo:a', 'foo:b'}, {'foo:a', 'foo:b'})
@@ -61,3 +64,15 @@ class TestGoalOptionsMixinIntegration(PantsRunIntegrationTest):
     self._do_test_goal_options(['--skip', '--no-echo-one-skip'], {'foo:a', 'foo:b'}, None)
     self._do_test_goal_options(['--no-transitive', '--echo-two-transitive'],
                                {'foo:a'}, {'foo:a', 'foo:b'})
+
+  def test_task_skip_but_target_tag_no_skip(self):
+    self._do_test_goal_options(['--echo-one-skip', '--echo-two-skip'],
+                               expected_one={'foo:a'},
+                               expected_two={'foo:a'},
+                               a_tag='{"no-echo.one.skip", "no-echo.two.skip"}')
+
+  def test_task_no_skip_but_target_tag_skip(self):
+    self._do_test_goal_options(['--no-echo-one-skip', '--no-echo-two-skip'],
+                               expected_one={'foo:b'},
+                               expected_two={'foo:b'},
+                               a_tag='{"echo.one.skip", "echo.two.skip"}')

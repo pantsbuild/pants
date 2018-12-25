@@ -213,7 +213,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   @property
   def supports_skipping_target_by_tag(self):
     """
-    Whether this task supports forced skip/non-skip on targets based on tags.
+    Whether this task supports forced skip/no-skip on targets based on tags.
 
     :API: public
     """
@@ -254,10 +254,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     force_run_tag = 'no-{}.skip'.format(self.options_scope)
     force_run_targets = set(t for t in relevant_targets if force_run_tag in t.tags)
 
-    if not force_run_targets and self.skip_execution:
-      self.context.log.info('Skipping by returning empty targets '
-                            'because task level is skipped and there is no forced run targets')
-      return []
+    if self.skip_execution:
+      if not force_run_targets:
+        self.context.log.info('Skipping by returning empty targets '
+                              'because task level is skipped and there is no forced run targets')
+        return []
+      else:
+        return force_run_targets
 
     force_skip_tag = '{}.skip'.format(self.options_scope)
     force_skip_targets = set(t for t in relevant_targets if force_skip_tag in t.tags)
