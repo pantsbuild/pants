@@ -256,11 +256,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     if self.skip_execution:
       if not force_run_targets:
-        self.context.log.info('Skipping by returning empty targets '
-                              'because task level is skipped and there is no forced run targets')
-        return []
-      else:
-        return force_run_targets
+        self.context.log.debug('Skipping by returning empty targets '
+                               'because task level is skipped and there is no forced run targets')
+
+      return force_run_targets
 
     force_skip_tag = '{}.skip'.format(self.options_scope)
     force_skip_targets = set(t for t in relevant_targets if force_skip_tag in t.tags)
