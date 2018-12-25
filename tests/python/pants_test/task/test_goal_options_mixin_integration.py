@@ -18,7 +18,7 @@ class TestGoalOptionsMixinIntegration(PantsRunIntegrationTest):
   def hermetic(cls):
     return True
 
-  def _do_test_goal_options(self, flags, expected_one, expected_two, a_tag='{}', b_tag='{}'):
+  def _do_test_goal_options(self, flags, expected_one, expected_two, a_tag=set(), b_tag=set()):
     with temporary_dir(root_dir=get_buildroot()) as src_dir:
       foo_dir = os.path.join(src_dir, 'foo')
       os.mkdir(foo_dir)
@@ -69,16 +69,16 @@ class TestGoalOptionsMixinIntegration(PantsRunIntegrationTest):
     self._do_test_goal_options(['--echo-one-skip', '--echo-two-skip'],
                                expected_one={'foo:a'},
                                expected_two={'foo:a'},
-                               a_tag='{"no-echo.one.skip", "no-echo.two.skip"}')
+                               a_tag={"no-echo.one.skip", "no-echo.two.skip"})
 
   def test_task_no_skip_but_target_tag_skip_a(self):
     self._do_test_goal_options(['--no-echo-one-skip', '--no-echo-two-skip'],
                                expected_one={'foo:b'},
                                expected_two={'foo:b'},
-                               a_tag='{"echo.one.skip", "echo.two.skip"}')
+                               a_tag={"echo.one.skip", "echo.two.skip"})
 
   def test_task_no_skip_but_target_tag_skip_b(self):
     self._do_test_goal_options(['--no-echo-one-skip', '--no-echo-two-skip'],
                                expected_one={'foo:a'},
                                expected_two={'foo:a'},
-                               b_tag='{"echo.one.skip", "echo.two.skip"}')
+                               b_tag={"echo.one.skip", "echo.two.skip"})
