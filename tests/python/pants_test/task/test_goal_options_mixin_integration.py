@@ -71,8 +71,14 @@ class TestGoalOptionsMixinIntegration(PantsRunIntegrationTest):
                                expected_two={'foo:a'},
                                a_tag='{"no-echo.one.skip", "no-echo.two.skip"}')
 
-  def test_task_no_skip_but_target_tag_skip(self):
+  def test_task_no_skip_but_target_tag_skip_a(self):
     self._do_test_goal_options(['--no-echo-one-skip', '--no-echo-two-skip'],
                                expected_one={'foo:b'},
                                expected_two={'foo:b'},
                                a_tag='{"echo.one.skip", "echo.two.skip"}')
+
+  def test_task_no_skip_but_target_tag_skip_b(self):
+    self._do_test_goal_options(['--no-echo-one-skip', '--no-echo-two-skip'],
+                               expected_one={'foo:a'},
+                               expected_two={'foo:a'},
+                               b_tag='{"echo.one.skip", "echo.two.skip"}')
