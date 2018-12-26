@@ -21,12 +21,12 @@ class PythonArtifact(PayloadField):
     'packages',
   })
 
-  def __init__(self, **kwargs):
+  def __init__(self, binaries=None, **kwargs):
     """
     :param kwargs: Passed to `setuptools.setup
        <https://pythonhosted.org/setuptools/setuptools.html>`_."""
     self._kw = kwargs
-    self._binaries = {}
+    self._binaries = binaries or {}
 
     def has(name):
       value = self._kw.get(name)

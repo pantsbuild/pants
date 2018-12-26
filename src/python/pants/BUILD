@@ -18,9 +18,8 @@ python_library(
     name='pantsbuild.pants',
     description='A scalable build tool for large, complex, heterogeneous repos.',
     namespace_packages=['pants', 'pants.backend'],
-  ).with_binaries(
-    pants='src/python/pants/bin:pants',
-  )
+    binaries={"pants": "src/python/pants/bin:pants"},
+  ),
 )
 
 page(name='readme',
