@@ -141,7 +141,7 @@ def _tuplify(v):
 class LegacyGraphScheduler(datatype(['scheduler', 'symbol_table', 'console', 'goal_map'])):
   """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
 
-  def new_session(self, v2_ui):
+  def new_session(self, v2_ui=False):
     session = self.scheduler.new_session(v2_ui)
     return LegacyGraphSession(session, self.symbol_table, self.console, self.goal_map)
 
