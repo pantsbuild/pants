@@ -251,7 +251,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   def test_pants_native_source_detection_for_local_ctypes_dists_for_current_platform_only(self):
     """Test that `./pants run` respects platforms when the closure contains native sources.
 
-    To do this, we need to setup a pants.ini that contains two platform defauts: (1) "current" and
+    To do this, we need to setup a pants.ini that contains two platform defaults: (1) "current" and
     (2) a different platform than the one we are currently running on. The python_binary() target
     below is declared with `platforms="current"`.
     """
