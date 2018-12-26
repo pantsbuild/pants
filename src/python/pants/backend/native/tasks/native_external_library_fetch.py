@@ -11,8 +11,8 @@ from distutils.dir_util import copy_tree
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.native.config.environment import Platform
-from pants.backend.native.subsystems.conan import Conan
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
+from pants.backend.native.tasks.conan_prep import ConanPrep
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.exceptions import TaskError
 from pants.goal.products import UnionProducts
@@ -96,15 +96,17 @@ class NativeExternalLibraryFetch(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(NativeExternalLibraryFetch, cls).implementation_version() + [('NativeExternalLibraryFetch', 0)]
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(NativeExternalLibraryFetch, cls).subsystem_dependencies() + (Conan.scoped(cls),)
+    return (super(NativeExternalLibraryFetch, cls).implementation_version() +
+            [('NativeExternalLibraryFetch', 0)])
 
   @classmethod
   def product_types(cls):
     return [NativeExternalLibraryFiles]
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(NativeExternalLibraryFetch, cls).prepare(options, round_manager)
+    round_manager.require_data(ConanPrep.tool_instance_cls)
 
   @property
   def create_target_dirs(self):
@@ -125,9 +127,10 @@ class NativeExternalLibraryFetch(Task):
 
   @memoized_property
   def _conan_binary(self):
-    return Conan.scoped_instance(self).bootstrap(
-      self._conan_python_interpreter,
-      self._conan_pex_path)
+    # Note: For historical reasons, this file manipulates and executes pex commandlines directly,
+    # instead of calling pex.run() (ideally in a workunit, via PythonToolInstance.run()).
+    # TODO: Switch to calling conan in a workunit.
+    return self.context.products.get_data(ConanPrep.tool_instance_cls).pex
 
   def execute(self):
     native_lib_tgts = self.context.targets(self.native_library_constraint.satisfied_by)
@@ -173,12 +176,14 @@ class NativeExternalLibraryFetch(Task):
                         'package',
                         pkg_sha)
 
-  def _remove_conan_center_remote_cmdline(self, conan_binary):
+  @staticmethod
+  def _remove_conan_center_remote_cmdline(conan_binary):
     return conan_binary.cmdline(['remote',
                                  'remove',
                                  'conan-center'])
 
-  def _add_pants_conan_remote_cmdline(self, conan_binary, remote_index_num, remote_url):
+  @staticmethod
+  def _add_pants_conan_remote_cmdline(conan_binary, remote_index_num, remote_url):
     return conan_binary.cmdline(['remote',
                                  'add',
                                  'pants-conan-remote-' + str(remote_index_num),

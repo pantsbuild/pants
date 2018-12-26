@@ -21,6 +21,10 @@ class PythonToolInstance(object):
   def __init__(self, pex_path, interpreter):
     self._pex = PEX(pex_path, interpreter=interpreter)
 
+  @property
+  def pex(self):
+    return self._pex
+
   def run(self, workunit_factory, args, **kwargs):
     cmdline = ' '.join(self._pex.cmdline(args))
     with workunit_factory(cmd=cmdline) as workunit:
