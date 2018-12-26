@@ -70,20 +70,18 @@ impl EngineDisplay {
   }
 
   fn initialize(&mut self, display_worker_count: usize) {
-    self.start();
     let worker_ids: Vec<String> = (0..display_worker_count)
       .map(|s| format!("{}", s))
       .collect();
     for worker_id in worker_ids {
       self.add_worker(worker_id);
     }
-    self.render();
   }
 
   pub fn for_stdout(indent_level: u16) -> EngineDisplay {
     let write_handle = stdout();
 
-    EngineDisplay {
+    let mut display = EngineDisplay {
       sigil: '⚡',
       divider: "▵".to_string(),
       poll_interval_ms: Duration::from_millis(55),
@@ -109,6 +107,24 @@ impl EngineDisplay {
       // as we've done here is the safest way to avoid terminal oddness.
       cursor_start: (1, 1),
       terminal_size: EngineDisplay::get_size(),
+    };
+
+    display.stop_raw_mode().unwrap();
+    display
+  }
+
+  fn stop_raw_mode(&mut self) -> Result<()> {
+    match self.terminal {
+      Console::Terminal(ref mut t) => t.suspend_raw_mode(),
+      _ => Ok(()),
+    }
+  }
+
+  fn start_raw_mode(&mut self) -> Result<()> {
+    eprintln!("BL: Start raw mode");
+    match self.terminal {
+      Console::Terminal(ref mut t) => t.activate_raw_mode(),
+      _ => Ok(()),
     }
   }
 
@@ -281,6 +297,7 @@ impl EngineDisplay {
   // Starts the EngineDisplay at the current cursor position.
   pub fn start(&mut self) {
     self.running = true;
+    self.start_raw_mode().unwrap();
     let cursor_start = self.cursor_start;
     self
       .write(&format!(
@@ -330,5 +347,6 @@ impl EngineDisplay {
         reveal_cursor = termion::cursor::Show
       ))
       .expect("could not write to terminal");
+    self.stop_raw_mode().unwrap();
   }
 }

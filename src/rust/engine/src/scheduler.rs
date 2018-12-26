@@ -31,13 +31,16 @@ pub struct Session {
   preceding_graph_size: usize,
   // The set of roots that have been requested within this session.
   roots: Mutex<HashSet<Root>>,
+  // If enabled, the display that will render the progress of the V2 engine.
+  display: Option<Mutex<EngineDisplay>>,
 }
 
 impl Session {
-  pub fn new(scheduler: &Scheduler) -> Session {
+  pub fn new(scheduler: &Scheduler, should_render_ui: bool, ui_worker_count: usize) -> Session {
     Session {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
+      display: EngineDisplay::create(ui_worker_count, should_render_ui).map(Mutex::new),
     }
   }
 
@@ -55,18 +58,11 @@ impl Session {
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,
-  // Flag used to determine whether to show engine execution progress.
-  pub should_render_ui: bool,
-  pub ui_worker_count: u64,
 }
 
 impl ExecutionRequest {
-  pub fn new(should_render_ui: bool, ui_worker_count: u64) -> ExecutionRequest {
-    ExecutionRequest {
-      roots: Vec::new(),
-      should_render_ui,
-      ui_worker_count,
-    }
+  pub fn new() -> ExecutionRequest {
+    ExecutionRequest { roots: Vec::new() }
   }
 
   ///
@@ -258,10 +254,6 @@ impl Scheduler {
     };
     let (sender, receiver) = mpsc::channel();
 
-    // Setting up display
-    let mut optional_display: Option<EngineDisplay> =
-      EngineDisplay::create(request.ui_worker_count as usize, request.should_render_ui);
-
     Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
     let roots: Vec<NodeKey> = request
       .roots
@@ -270,19 +262,28 @@ impl Scheduler {
       .map(|s| s.into())
       .collect();
 
+    // Lock the display for the remainder of the execution, and grab a reference to it.
+    let mut maybe_display = match &session.display {
+      &Some(ref d) => Some(d.lock()),
+      &None => None,
+    };
+
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks_to_display = IndexMap::new();
 
+    if let Some(ref mut display) = maybe_display {
+      display.start();
+    };
+
     let results = loop {
       if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
         break res;
-      } else if let Some(display) = optional_display.as_mut() {
+      } else if let Some(ref mut display) = maybe_display {
         Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, &mut tasks_to_display);
       }
     };
-    if let Some(display) = optional_display.as_mut() {
-      // Ran after printing the result of a console_rule.
+    if let Some(ref mut display) = maybe_display {
       display.finish();
     };
 

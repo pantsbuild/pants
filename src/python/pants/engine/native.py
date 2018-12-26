@@ -639,13 +639,13 @@ class Native(Singleton):
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 
-  def new_execution_request(self, v2_ui, ui_worker_count):
+  def new_execution_request(self):
     return self.gc(
-      self.lib.execution_request_create(v2_ui, ui_worker_count),
+      self.lib.execution_request_create(),
       self.lib.execution_request_destroy)
 
-  def new_session(self, scheduler):
-    return self.gc(self.lib.session_create(scheduler), self.lib.session_destroy)
+  def new_session(self, scheduler, should_render_ui, ui_worker_count):
+    return self.gc(self.lib.session_create(scheduler, should_render_ui, ui_worker_count), self.lib.session_destroy)
 
   def new_scheduler(self,
                     tasks,
