@@ -347,11 +347,12 @@ class EngineInitializer(object):
         SingletonRule.from_instance(console),
         SingletonRule.from_instance(GlobMatchErrorBehavior.create(glob_match_error_behavior)),
         SingletonRule.from_instance(build_configuration),
+        SingletonRule(SymbolTable, symbol_table),
       ] +
-      create_legacy_graph_tasks(symbol_table) +
+      create_legacy_graph_tasks() +
       create_fs_rules() +
       create_process_rules() +
-      create_graph_rules(address_mapper, symbol_table) +
+      create_graph_rules(address_mapper) +
       create_options_parsing_rules() +
       create_core_rules() +
       # TODO: This should happen automatically, but most tests (e.g. tests/python/pants_test/auth) fail if it's not here:

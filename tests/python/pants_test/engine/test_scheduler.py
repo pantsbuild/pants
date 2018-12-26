@@ -8,7 +8,7 @@ import unittest
 from builtins import object, str
 from textwrap import dedent
 
-from pants.engine.rules import RootRule, TaskRule, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Params, Select
 from pants_test.engine.util import (assert_equal_with_printing, create_scheduler,
                                     remove_locations_from_traceback)
@@ -27,6 +27,7 @@ def fn_raises(x):
   raise Exception('An exception for {}'.format(type(x).__name__))
 
 
+@rule(A, [Select(B)])
 def nested_raise(x):
   fn_raises(x)
 
@@ -67,7 +68,7 @@ class SchedulerTraceTest(unittest.TestCase):
   def test_trace_includes_rule_exception_traceback(self):
     rules = [
       RootRule(B),
-      TaskRule(A, [Select(B)], nested_raise)
+      nested_raise,
     ]
 
     scheduler = create_scheduler(rules)
