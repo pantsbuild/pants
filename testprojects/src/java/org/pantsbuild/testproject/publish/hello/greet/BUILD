@@ -11,7 +11,7 @@ java_library(
     repo=testing,
     publication_metadata=ossrh(
       description='A simple greeter.',
-      url='https://github.com/pantsbuild/pants/tree/master/'
+      url='https://github.com/pantsbuild/pants/tree/master/' +
           'testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
       licenses=[
         license(
