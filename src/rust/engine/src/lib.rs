@@ -287,7 +287,7 @@ pub extern "C" fn scheduler_create(
     root_type_ids.clone(),
     tasks,
     types,
-    build_root_buf.to_os_string().as_ref(),
+    PathBuf::from(build_root_buf.to_os_string()),
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
     PathBuf::from(local_store_dir_buf.to_os_string()),
