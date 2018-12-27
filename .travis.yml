@@ -6,6 +6,9 @@ env:
     - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
     - LC_ALL="en_US.UTF-8"
+    - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
+    - BOOTSTRAPPED_PEX_KEY=/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
+    - BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}${BOOTSTRAPPED_PEX_KEY}
 
 
 before_cache:
@@ -55,6 +58,7 @@ cache:
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
+  - &bootstrap Bootstrap Pants
   - name: &test Test Pants
     if: type != cron
   - name: &cron Cron
@@ -87,6 +91,10 @@ default_test_config: &default_test_config
     # Increase the max number of user watches to ensure that watchman is able to watch all
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
+    - pip install awscli
+    - sudo apt-get install -y jq
+  before_script:
+    - aws s3 cp ${BOOTSTRAPPED_PEX_URL} ./pants.pex
 
 osx_test_config: &osx_test_config
   os: osx
@@ -110,6 +118,14 @@ linux_with_fuse: &linux_with_fuse
 
 matrix:
   include:
+    - <<: *default_test_config
+      name: "Bootstrap Pants"
+      stage: *bootstrap
+      before_script:
+      script:
+        - ./build-support/bin/travis-ci.sh  # With no args, just bootstraps.
+      after_success:
+        - aws s3 cp ./pants.pex ${BOOTSTRAPPED_PEX_URL}
 
     # Build macOS engine
     - name: "OSX Native Engine Binary Builder"
@@ -198,97 +214,97 @@ matrix:
       <<: *linux_with_fuse
       name: "Self checks, lint, and JVM tests"
       script:
-        - ./build-support/bin/travis-ci.sh -fkmrjt
+        - ./build-support/bin/travis-ci.sh -bfkmrjt
 
     - <<: *default_test_config
       name: "Py2 - Unit tests for pants and pants-plugins"
       script:
-        - ./build-support/bin/travis-ci.sh -lp
+        - ./build-support/bin/travis-ci.sh -blp
 
     - <<: *default_test_config
       name: "Py3 - Unit tests for pants and pants-plugins"
       script:
-        - ./build-support/bin/travis-ci.sh -3lp
+        - ./build-support/bin/travis-ci.sh -3blp
 
     - <<: *default_test_config
       name: "Py2 - Python contrib tests"
       script:
-        - ./build-support/bin/travis-ci.sh -n
+        - ./build-support/bin/travis-ci.sh -bn
 
     - <<: *default_test_config
       name: "Py3 - Python contrib tests"
       script:
-        - ./build-support/bin/travis-ci.sh -3n
+        - ./build-support/bin/travis-ci.sh -3bn
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 0/7
+        - ./build-support/bin/travis-ci.sh -bc3 -i 0/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 2"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 1/7
+        - ./build-support/bin/travis-ci.sh -bc3 -i 1/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 3"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 2/7
+        - ./build-support/bin/travis-ci.sh -bc3 -i 2/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 4"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 3/7
+        - ./build-support/bin/travis-ci.sh -bc3 -i 3/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 5"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 4/7
+        - ./build-support/bin/travis-ci.sh -bc3 -i 4/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 6"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 5/7
+        - ./build-support/bin/travis-ci.sh -bc3 -i 5/7
 
     - <<: *default_test_config
       name: "Integration tests for pants - shard 7"
       script:
-        - ./build-support/bin/travis-ci.sh -c3 -i 6/7
+        - ./build-support/bin/travis-ci.sh -bc3 -i 6/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 1"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 0/7
+        - ./build-support/bin/travis-ci.sh -bc -i 0/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 2"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 1/7
+        - ./build-support/bin/travis-ci.sh -bc -i 1/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 3"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 2/7
+        - ./build-support/bin/travis-ci.sh -bc -i 2/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 4"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 3/7
+        - ./build-support/bin/travis-ci.sh -bc -i 3/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 5"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 4/7
+        - ./build-support/bin/travis-ci.sh -bc -i 4/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 6"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 5/7
+        - ./build-support/bin/travis-ci.sh -bc -i 5/7
 
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard 7"
       script:
-        - ./build-support/bin/travis-ci.sh -c -i 6/7
+        - ./build-support/bin/travis-ci.sh -bc -i 6/7
 
     # Rust on linux
     - <<: *linux_with_fuse
