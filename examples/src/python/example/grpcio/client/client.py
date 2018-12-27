@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import grpc
 from org.pantsbuild.example.service import service_pb2, service_pb2_grpc
 
+
 if __name__ == '__main__':
   print('hello world from grpcio client!')
   with grpc.insecure_channel('localhost:50051') as channel:
