@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -45,6 +45,7 @@ pub struct Core {
   store_and_command_runner_and_http_client:
     Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
   pub vfs: PosixFS,
+  pub build_root: PathBuf,
 }
 
 impl Core {
@@ -53,7 +54,7 @@ impl Core {
     root_subject_types: Vec<TypeId>,
     tasks: Tasks,
     types: Types,
-    build_root: &Path,
+    build_root: PathBuf,
     ignore_patterns: &[String],
     work_dir: PathBuf,
     local_store_dir: PathBuf,
@@ -170,9 +171,10 @@ impl Core {
       store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
+      vfs: PosixFS::new(&build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
+      build_root: build_root,
     }
   }
 
