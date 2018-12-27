@@ -23,6 +23,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
 from pants.util.dirutil import fast_relpath, safe_concurrent_creation
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -53,7 +54,7 @@ class GrpcioPrep(Task):
       def _relative_path(cls, workdir):
         if get_buildroot() in workdir:
           return fast_relpath(workdir, get_buildroot())
-        return workdir
+        return ''
 
       @classmethod
       def build_grpcio_pex(cls, context, interpreter, pex_path, requirements_lib):
