@@ -290,8 +290,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
 
 impl<T: std::fmt::Debug> std::fmt::Debug for Serverset<T> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-    write!(f, "Serverset {{ {:?} }}", self.inner.servers);
-    Ok(())
+    write!(f, "Serverset {{ {:?} }}", self.inner.servers)
   }
 }
 
