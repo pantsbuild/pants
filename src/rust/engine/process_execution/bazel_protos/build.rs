@@ -42,6 +42,32 @@ fn main() {
   )
   .expect("Failed to compile protos!");
 
+  // Ignore clippy for generated code.
+  // protoc_grpcio generates its own clippy config, but it's for an out of date version of clippy,
+  // so strip that out.
+  for file in walkdir::WalkDir::new(&gen_dir)
+    .into_iter()
+    .filter_map(|entry| entry.ok())
+    .filter(|entry| {
+      entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".rs")
+    })
+  {
+    let lines: Vec<_> = std::fs::read_to_string(file.path())
+      .expect(&format!(
+        "Error reading generated protobuf at {}",
+        file.path().display()
+      ))
+      .lines()
+      .filter(|line| !line.contains("clippy"))
+      .map(str::to_owned)
+      .collect();
+    let content = String::from("#![allow(clippy::all)]\n") + &lines.join("\n");
+    std::fs::write(file.path(), content).expect(&format!(
+      "Error re-writing generated protobuf at {}",
+      file.path().display()
+    ));
+  }
+
   let listing = gen_dir.read_dir().unwrap();
   let mut pub_mod_stmts = listing
     .filter_map(|d| {
