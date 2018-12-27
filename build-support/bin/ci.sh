@@ -263,7 +263,7 @@ fi
 
 if [[ "${run_integration:-false}" == "true" ]]; then
   if [[ "0/1" != "${python_intg_shard}" ]]; then
-    shard_desc=" [shard ${python_intg_shard}]"
+    shard_desc=" [shards ${python_intg_shard}]"
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
