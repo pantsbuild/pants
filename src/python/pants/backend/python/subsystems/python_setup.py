@@ -228,6 +228,8 @@ class PythonSetup(Subsystem):
     if pyenv_root is None:
       return []
     versions_dir = os.path.join(pyenv_root, 'versions')
+    if not os.path.exists(versions_dir):
+      return []
     paths = []
     for version in sorted(os.listdir(versions_dir)):
       path = os.path.join(versions_dir, version, 'bin')

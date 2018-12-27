@@ -22,6 +22,7 @@
 .pants.run
 .pants.workdir.file_lock
 .pants.stats
+.pexrc
 .pids
 .project
 .settings
