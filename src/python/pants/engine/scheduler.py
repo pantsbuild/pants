@@ -17,6 +17,7 @@ from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesC
                              MergedDirectories, Path, PathGlobs, PathGlobsAndRoot, Snapshot,
                              UrlToFetch)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.engine.legacy.starlark_parser import Call, CallIndex, ParseOutput, ParseFunction, ParseInput
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
@@ -105,6 +106,10 @@ class Scheduler(object):
       construct_file=File,
       construct_link=Link,
       construct_process_result=FallibleExecuteProcessResult,
+      construct_parse_call=Call,
+      construct_parse_call_index=CallIndex,
+      construct_parse_output=ParseOutput,
+      construct_parse_function=ParseFunction,
       constraint_address=constraint_for(Address),
       constraint_path_globs=constraint_for(PathGlobs),
       constraint_directory_digest=constraint_for(Digest),
@@ -118,6 +123,8 @@ class Scheduler(object):
       constraint_process_result=constraint_for(FallibleExecuteProcessResult),
       constraint_generator=constraint_for(GeneratorType),
       constraint_url_to_fetch=constraint_for(UrlToFetch),
+      constraint_parse_input=constraint_for(ParseInput),
+      constraint_parse_output=constraint_for(ParseOutput),
     )
 
 

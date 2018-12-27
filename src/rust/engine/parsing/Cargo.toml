@@ -1,0 +1,12 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "parsing"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[dependencies]
+codemap = "0.1.1"
+linked-hash-map = "0.5.1"
+linked_hash_set = "*"
+parking_lot = "0.6"
+starlark = { git = "https://github.com/google/starlark-rust.git", rev = "9128c17467a2cde7223267e1efc10577420c1163", features = ["linked_hash_set"] }

@@ -158,5 +158,6 @@ def create_fs_rules():
     RootRule(Digest),
     RootRule(MergedDirectories),
     RootRule(PathGlobs),
+    RootRule(FileContent),
     RootRule(UrlToFetch),
   ]

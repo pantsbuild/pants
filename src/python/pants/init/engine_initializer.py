@@ -26,7 +26,7 @@ from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
                                        create_legacy_graph_tasks)
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
-from pants.engine.legacy.parser import LegacyPythonCallbacksParser
+from pants.engine.legacy.starlark_parser import StarlarkParser
 from pants.engine.legacy.structs import (AppAdaptor, JvmBinaryAdaptor, PageAdaptor,
                                          PantsPluginAdaptor, PythonBinaryAdaptor,
                                          PythonTargetAdaptor, PythonTestsAdaptor,
@@ -331,7 +331,7 @@ class EngineInitializer(object):
     execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
     # Register "literal" subjects required for these rules.
-    parser = LegacyPythonCallbacksParser(
+    parser = StarlarkParser(
       symbol_table,
       build_file_aliases,
       build_file_imports_behavior

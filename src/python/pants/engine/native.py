@@ -695,6 +695,10 @@ class Native(Singleton):
                     construct_file,
                     construct_link,
                     construct_process_result,
+                    construct_parse_call,
+                    construct_parse_call_index,
+                    construct_parse_output,
+                    construct_parse_function,
                     constraint_address,
                     constraint_path_globs,
                     constraint_directory_digest,
@@ -707,7 +711,9 @@ class Native(Singleton):
                     constraint_process_request,
                     constraint_process_result,
                     constraint_generator,
-                    constraint_url_to_fetch):
+                    constraint_url_to_fetch,
+                    constraint_parse_input,
+                    constraint_parse_output):
     """Create and return an ExternContext and native Scheduler."""
 
     def func(constraint):
@@ -727,6 +733,10 @@ class Native(Singleton):
         func(construct_file),
         func(construct_link),
         func(construct_process_result),
+        func(construct_parse_call),
+        func(construct_parse_call_index),
+        func(construct_parse_output),
+        func(construct_parse_function),
         # TypeConstraints.
         tc(constraint_address),
         tc(constraint_path_globs),
@@ -741,6 +751,8 @@ class Native(Singleton):
         tc(constraint_process_result),
         tc(constraint_generator),
         tc(constraint_url_to_fetch),
+        tc(constraint_parse_input),
+        tc(constraint_parse_output),
         # Types.
         TypeId(self.context.to_id(text_type)),
         TypeId(self.context.to_id(binary_type)),

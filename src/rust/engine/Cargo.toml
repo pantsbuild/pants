@@ -35,6 +35,7 @@ members = [
   "fs/fs_util",
   "graph",
   "hashing",
+  "parsing",
   "process_execution",
   "process_executor",
   "resettable",
@@ -62,6 +63,7 @@ default-members = [
   "fs/fs_util",
   "graph",
   "hashing",
+  "parsing",
   "process_execution",
   "process_executor",
   "resettable",
@@ -89,6 +91,7 @@ lazy_static = "1"
 log = "0.4"
 num_enum = "0.1.1"
 parking_lot = "0.6"
+parsing = { path = "parsing" }
 process_execution = { path = "process_execution" }
 rand = "0.6"
 reqwest = { version = "0.9.6", default_features = false, features = ["rustls-tls"] }

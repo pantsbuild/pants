@@ -109,6 +109,10 @@ impl Tasks {
         product: types.process_result,
         input: types.process_request,
       },
+      Intrinsic {
+        product: types.parse_output,
+        input: types.parse_input,
+      },
     ];
 
     self.intrinsics = vec![].into_iter().collect();

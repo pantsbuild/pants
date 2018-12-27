@@ -18,6 +18,7 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
+from pants.engine.legacy.starlark_parser import ParseOutput, ParseInput
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.parser import TargetAdaptorContainer
@@ -56,9 +57,11 @@ def parse_address_family(address_mapper, directory):
     raise ResolveError('Directory "{}" does not contain any BUILD files.'.format(directory.path))
   address_maps = []
   for filecontent_product in files_content:
+    parsed_objects = yield Get(ParseOutput, ParseInput, ParseInput(filecontent_product, tuple(sorted(address_mapper.parser._symbols.keys()))))
     address_maps.append(AddressMap.parse(filecontent_product.path,
                                          filecontent_product.content,
-                                         address_mapper.parser))
+                                         address_mapper.parser,
+                                         parsed_objects=parsed_objects))
   yield AddressFamily.create(directory.path, address_maps)
 
 

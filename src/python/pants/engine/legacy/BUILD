@@ -20,7 +20,7 @@ python_library(
 
 python_library(
   name='parser',
-  sources=['parser.py'],
+  sources=['parser.py', 'starlark_parser.py'],
   dependencies=[
     '3rdparty/python:future',
     ':structs',

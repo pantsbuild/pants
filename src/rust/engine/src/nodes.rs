@@ -262,6 +262,93 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
+        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.parse_output
+            && input == context.core.types.parse_input =>
+        {
+          let build_root = context.core.build_root.clone();
+          self
+            .select_product(&context, context.core.types.parse_input, "intrinsic")
+            .and_then(move |parse_input| {
+              let file_content = externs::project_ignoring_type(&parse_input, "file_content");
+              let path = externs::project_str(&file_content, "path");
+              let content = externs::project_str(&file_content, "content");
+              let function_names = externs::project_multi_strs(&parse_input, "function_names");
+
+              // TODO: Get function list from SymbolTable
+              parsing::parse(&function_names, &content, &PathBuf::from(path), &build_root)
+                .map_err(|str| throw(&format!("Error parsing BUILD file: {}", str)))
+            })
+            .map(move |calls| {
+              fn store_parsing_value(context: &Context, value: &parsing::Value) -> Value {
+                match value {
+                  parsing::Value::Bool(ref b) => externs::store_bool(*b),
+                  parsing::Value::Dict(ref d) => externs::store_dict(
+                    &d.iter()
+                      .flat_map(|(k, v)| {
+                        vec![
+                          store_parsing_value(context, k),
+                          store_parsing_value(context, v),
+                        ]
+                      })
+                      .collect::<Vec<_>>(),
+                  ),
+                  parsing::Value::String(ref s) => externs::store_utf8(s),
+                  parsing::Value::List(ref l) => externs::store_tuple(
+                    &l.iter()
+                      .map(|v| store_parsing_value(context, v))
+                      .collect::<Vec<_>>(),
+                  ),
+                  parsing::Value::Set(ref s) => {
+                    externs::store_set(s.iter().map(|v| store_parsing_value(context, v)))
+                  }
+                  parsing::Value::Number(ref n) => externs::store_i64(*n),
+                  parsing::Value::Function(ref f) => externs::unsafe_call(
+                    &context.core.types.construct_parse_function,
+                    &[externs::store_utf8(&f)],
+                  ),
+                  parsing::Value::CallIndex(ref n) => externs::unsafe_call(
+                    &context.core.types.construct_parse_call_index,
+                    &[externs::store_i64(*n as i64)],
+                  ),
+                }
+              }
+
+              let calls_values: Vec<_> = calls
+                .into_iter()
+                .map(|call| {
+                  let args: Vec<_> = call
+                    .args
+                    .iter()
+                    .map(|v| store_parsing_value(&context, v))
+                    .collect();
+                  let kwargs: Vec<_> = call
+                    .kwargs
+                    .iter()
+                    .map(|(name, value)| {
+                      externs::store_tuple(&[
+                        externs::store_utf8(name),
+                        store_parsing_value(&context, value),
+                      ])
+                    })
+                    .collect();
+                  externs::unsafe_call(
+                    &context.core.types.construct_parse_call,
+                    &[
+                      externs::store_utf8(&call.function_name),
+                      externs::store_tuple(&args),
+                      externs::store_tuple(&kwargs),
+                    ],
+                  )
+                })
+                .collect();
+              externs::unsafe_call(
+                &context.core.types.construct_parse_output,
+                &[externs::store_tuple(&calls_values)],
+              )
+            })
+            .to_boxed()
+        }
         &rule_graph::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
       },
       &rule_graph::Entry::Param(type_id) => {
