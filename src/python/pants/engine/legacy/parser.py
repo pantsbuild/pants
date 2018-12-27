@@ -25,30 +25,18 @@ from pants.util.memo import memoized_property
 logger = logging.getLogger(__name__)
 
 
-class LegacyPythonCallbacksParser(Parser):
-  """A parser that parses the given python code into a list of top-level objects.
-
-  Only Serializable objects with `name`s will be collected and returned.  These objects will be
-  addressable via their name in the parsed namespace.
-
-  This parser attempts to be compatible with existing legacy BUILD files and concepts including
-  macros and target factories.
-  """
-
-  def __init__(self, symbol_table, aliases, build_file_imports_behavior):
+class AbstractLegacyPythonCallbacksParser(Parser):
+  def __init__(self, symbol_table, aliases):
     """
     :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
       additional aliases.
     :type symbol_table: :class:`pants.engine.parser.SymbolTable`
     :param aliases: Additional BuildFileAliases to register.
     :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
-    :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
-      import statements. Valid values: "allow", "warn", "error".
-    :type build_file_imports_behavior: string
     """
-    super(LegacyPythonCallbacksParser, self).__init__()
+    super(AbstractLegacyPythonCallbacksParser, self).__init__()
     self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
-    self._build_file_imports_behavior = build_file_imports_behavior
+
 
   @staticmethod
   def _generate_symbols(symbol_table, aliases):
@@ -127,7 +115,33 @@ class LegacyPythonCallbacksParser(Parser):
 
     return symbols, parse_context
 
-  def parse(self, filepath, filecontent):
+
+class LegacyPythonCallbacksParser(AbstractLegacyPythonCallbacksParser):
+  """A parser that parses the given python code into a list of top-level objects.
+
+  Only Serializable objects with `name`s will be collected and returned.  These objects will be
+  addressable via their name in the parsed namespace.
+
+  This parser attempts to be compatible with existing legacy BUILD files and concepts including
+  macros and target factories.
+  """
+
+  def __init__(self, symbol_table, aliases, build_file_imports_behavior):
+    """
+    :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
+      additional aliases.
+    :type symbol_table: :class:`pants.engine.parser.SymbolTable`
+    :param aliases: Additional BuildFileAliases to register.
+    :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+    :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
+      import statements. Valid values: "allow", "warn", "error".
+    :type build_file_imports_behavior: string
+    """
+    super(LegacyPythonCallbacksParser, self).__init__(symbol_table, aliases, build_file_imports_behavior)
+    self._build_file_imports_behavior = build_file_imports_behavior
+
+
+  def parse(self, filepath, filecontent, **kwargs):
     python = filecontent.decode('utf-8') if PY3 else filecontent
 
     # Mutate the parse context for the new path, then exec, and copy the resulting objects.

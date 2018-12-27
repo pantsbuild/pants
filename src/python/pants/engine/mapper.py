@@ -35,7 +35,7 @@ class AddressMap(datatype(['path', 'objects_by_name'])):
   """
 
   @classmethod
-  def parse(cls, filepath, filecontent, parser):
+  def parse(cls, filepath, filecontent, parser, **kwargs):
     """Parses a source for addressable Serializable objects.
 
     No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
@@ -50,7 +50,7 @@ class AddressMap(datatype(['path', 'objects_by_name'])):
     :type parser: A :class:`pants.engine.parser.Parser`.
     """
     try:
-      objects = parser.parse(filepath, filecontent)
+      objects = parser.parse(filepath, filecontent, **kwargs)
     except Exception as e:
       raise MappingError('Failed to parse {}:\n{}'.format(filepath, e))
     objects_by_name = {}

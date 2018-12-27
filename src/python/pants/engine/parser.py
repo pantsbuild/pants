@@ -44,7 +44,7 @@ class EmptyTable(SymbolTable):
 class Parser(AbstractClass):
 
   @abstractmethod
-  def parse(self, filepath, filecontent):
+  def parse(self, filepath, filecontent, **kwargs):
     """
     :param string filepath: The name of the file being parsed. The parser should not assume
                             that the path is accessible, and should consume the filecontent.
