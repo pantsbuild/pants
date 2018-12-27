@@ -354,6 +354,12 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     return c.to_value(i64)
 
+  @_extern_decl('Handle', ['ExternContext*', '_Bool'])
+  def extern_store_bool(self, context_handle, b):
+    """Given a context and _Bool, return a new Handle to represent the _Bool."""
+    c = self._ffi.from_handle(context_handle)
+    return c.to_value(b)
+
   @_extern_decl('Handle', ['ExternContext*', 'Handle*', 'uint8_t*', 'uint64_t'])
   def extern_project_ignoring_type(self, context_handle, val, field_str_ptr, field_str_len):
     """Given a Handle for `obj`, and a field name, project the field as a new Handle."""
@@ -604,6 +610,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_store_bytes,
                            self.ffi_lib.extern_store_utf8,
                            self.ffi_lib.extern_store_i64,
+                           self.ffi_lib.extern_store_bool,
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,
                            self.ffi_lib.extern_create_exception,
