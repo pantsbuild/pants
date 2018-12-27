@@ -7,19 +7,12 @@ use build_utils::BuildRoot;
 fn main() {
   let build_root = BuildRoot::find().unwrap();
   let thirdpartyprotobuf = build_root.join("3rdparty/protobuf");
-  println!(
-    "cargo:rerun-if-changed={}",
-    thirdpartyprotobuf.to_str().unwrap()
-  );
+  mark_dir_as_rerun_trigger(&thirdpartyprotobuf);
 
   let amended_proto_root =
     add_rustproto_header(&thirdpartyprotobuf).expect("Error adding proto bytes header");
 
   let gen_dir = PathBuf::from("src/gen");
-
-  // Re-gen if, say, someone does a git clean on the gen dir but not the target dir. This ensures
-  // generated sources are available for reading by programmers and tools like rustfmt alike.
-  println!("cargo:rerun-if-changed={}", gen_dir.to_str().unwrap());
 
   protoc_grpcio::compile_grpc_protos(
     &[
@@ -43,6 +36,16 @@ fn main() {
   disable_clippy_in_generated_code(&gen_dir).expect("Failed to strip clippy from generated code");
 
   generate_mod_rs(&gen_dir).expect("Failed to generate mod.rs");
+
+  // Re-gen if, say, someone does a git clean on the gen dir but not the target dir. This ensures
+  // generated sources are available for reading by programmers and tools like rustfmt alike.
+  mark_dir_as_rerun_trigger(&gen_dir);
+}
+
+fn mark_dir_as_rerun_trigger(dir: &Path) {
+  for file in walkdir::WalkDir::new(dir) {
+    println!("cargo:rerun-if-changed={}", file.unwrap().path().display());
+  }
 }
 
 const EXTRA_HEADER: &'static str = r#"import "rustproto.proto";
