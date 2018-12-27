@@ -98,7 +98,7 @@ class ImportOracle(object):
   # This simple regex mirrors the behavior of the relevant go code in practice (see
   # repoRootForImportDynamic and surrounding code in
   # https://github.com/golang/go/blob/7bc40ffb05d8813bf9b41a331b45d37216f9e747/src/cmd/go/vcs.go).
-  _remote_import_re = re.compile('[^.]+(?:\.[^.]+)+\/')
+  _remote_import_re = re.compile(r'[^.]+(?:\.[^.]+)+\/')
 
   def is_remote_import(self, import_path):
     """Whether the specified import_path denotes a remote import."""

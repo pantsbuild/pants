@@ -91,9 +91,11 @@ impl TestServer {
     let mut server_transport = grpcio::ServerBuilder::new(env)
       .register_service(bazel_protos::remote_execution_grpc::create_execution(
         mock_responder.clone(),
-      )).register_service(bazel_protos::operations_grpc::create_operations(
+      ))
+      .register_service(bazel_protos::operations_grpc::create_operations(
         mock_responder.clone(),
-      )).bind("localhost", 0)
+      ))
+      .bind("localhost", 0)
       .build()
       .unwrap();
     server_transport.start();
@@ -142,7 +144,7 @@ impl Drop for TestServer {
 #[derive(Clone, Debug)]
 pub struct MockResponder {
   mock_execution: MockExecution,
-  pub received_messages: Arc<Mutex<Vec<(String, Box<protobuf::Message>, Instant)>>>,
+  pub received_messages: Arc<Mutex<Vec<(String, Box<dyn protobuf::Message>, Instant)>>>,
 }
 
 impl MockResponder {
@@ -198,7 +200,7 @@ impl MockResponder {
 
   fn send_next_operation_stream(
     &self,
-    ctx: &grpcio::RpcContext,
+    ctx: &grpcio::RpcContext<'_>,
     sink: grpcio::ServerStreamingSink<super::bazel_protos::operations::Operation>,
   ) {
     match self.mock_execution.operation_responses.lock().pop_front() {
@@ -226,7 +228,8 @@ impl MockResponder {
           .fail(grpcio::RpcStatus::new(
             grpcio::RpcStatusCode::InvalidArgument,
             Some("Did not expect further requests from client.".to_string()),
-          )).map(|_| ())
+          ))
+          .map(|_| ())
           .map_err(|_| ()),
       ),
     }
@@ -238,7 +241,7 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
   // If we start supporting the "stream updates" variant, we will need to do so here.
   fn execute(
     &self,
-    ctx: grpcio::RpcContext,
+    ctx: grpcio::RpcContext<'_>,
     req: bazel_protos::remote_execution::ExecuteRequest,
     sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
   ) {
@@ -250,7 +253,8 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
           .fail(grpcio::RpcStatus::new(
             grpcio::RpcStatusCode::InvalidArgument,
             Some("Did not expect this request".to_string()),
-          )).map_err(|_| ()),
+          ))
+          .map_err(|_| ()),
       );
       return;
     }
@@ -260,7 +264,7 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
 
   fn wait_execution(
     &self,
-    _ctx: grpcio::RpcContext,
+    _ctx: grpcio::RpcContext<'_>,
     _req: bazel_protos::remote_execution::WaitExecutionRequest,
     _sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
   ) {
@@ -271,7 +275,7 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
 impl bazel_protos::operations_grpc::Operations for MockResponder {
   fn get_operation(
     &self,
-    _: grpcio::RpcContext,
+    _: grpcio::RpcContext<'_>,
     req: bazel_protos::operations::GetOperationRequest,
     sink: grpcio::UnarySink<bazel_protos::operations::Operation>,
   ) {
@@ -282,7 +286,7 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
 
   fn list_operations(
     &self,
-    _: grpcio::RpcContext,
+    _: grpcio::RpcContext<'_>,
     _: bazel_protos::operations::ListOperationsRequest,
     sink: grpcio::UnarySink<bazel_protos::operations::ListOperationsResponse>,
   ) {
@@ -294,7 +298,7 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
 
   fn delete_operation(
     &self,
-    _: grpcio::RpcContext,
+    _: grpcio::RpcContext<'_>,
     _: bazel_protos::operations::DeleteOperationRequest,
     sink: grpcio::UnarySink<bazel_protos::empty::Empty>,
   ) {
@@ -306,7 +310,7 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
 
   fn cancel_operation(
     &self,
-    _: grpcio::RpcContext,
+    _: grpcio::RpcContext<'_>,
     _: bazel_protos::operations::CancelOperationRequest,
     sink: grpcio::UnarySink<bazel_protos::empty::Empty>,
   ) {

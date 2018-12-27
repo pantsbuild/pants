@@ -155,7 +155,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     # We add the `unhydrated_structs` rule because it is otherwise not used in the core engine.
     rules = [
         unhydrated_structs
-      ] + create_fs_rules() + create_graph_rules(address_mapper, symbol_table)
+      ] + create_fs_rules() + create_graph_rules(address_mapper)
 
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'))
     self.build_root = project_tree.build_root

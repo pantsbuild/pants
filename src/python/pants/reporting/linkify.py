@@ -29,7 +29,7 @@ _IGNORE_LONG_DOT_CHAINS = r'(?!\.{5})'
 # ellipsis after file names (I'm looking at you, zinc). None of our files end in a dot in practice,
 # so this is fine.
 _PATH = _IGNORE_LONG_DOT_CHAINS + _PREFIX + _REL_PATH_COMPONENT + _OPTIONAL_PORT + \
-        _ABS_PATH_COMPONENTS + _OPTIONAL_TARGET_SUFFIX + '\w'
+        _ABS_PATH_COMPONENTS + _OPTIONAL_TARGET_SUFFIX + r'\w'
 _PATH_RE = re.compile(_PATH)
 
 _NO_URL = "no url"  # Sentinel value for non-existent files in linkify's memo

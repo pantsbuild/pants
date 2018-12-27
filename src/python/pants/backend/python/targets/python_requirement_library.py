@@ -19,7 +19,7 @@ class PythonRequirementLibrary(Target):
 
   def __init__(self, payload=None, requirements=None, **kwargs):
     """
-    :param requirements: pip requirements as `python_requirement <#python_requirement>`_\s.
+    :param requirements: pip requirements as `python_requirement <#python_requirement>`_\\s.
     :type requirements: List of python_requirement calls
     """
     payload = payload or Payload()

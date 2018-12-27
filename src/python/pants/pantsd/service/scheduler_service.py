@@ -174,7 +174,7 @@ class SchedulerService(PantsService):
       self._logger.debug('graph len was {}, waiting for initial watchman event'.format(graph_len))
       self._watchman_is_running.wait()
 
-    session = self._graph_helper.new_session()
+    session = self._graph_helper.new_session(options.for_global_scope().v2_ui)
     if options.for_global_scope().loop:
       return session, self._prefork_loop(session, options)
     else:
@@ -214,7 +214,7 @@ class SchedulerService(PantsService):
         session.validate_goals(options.goals_and_possible_v2_goals)
 
       # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
-      session.run_console_rules(options.goals_and_possible_v2_goals, target_roots, v2_ui=global_options.v2_ui)
+      session.run_console_rules(options.goals_and_possible_v2_goals, target_roots)
 
     return target_roots
 

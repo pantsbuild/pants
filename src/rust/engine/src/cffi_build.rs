@@ -1,6 +1,5 @@
-extern crate build_utils;
-extern crate cbindgen;
-extern crate cc;
+use cbindgen;
+use cc;
 
 /*
 

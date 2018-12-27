@@ -8,7 +8,7 @@ import unittest
 from builtins import object, str
 from textwrap import dedent
 
-from pants.engine.rules import RootRule, TaskRule, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Select
 from pants.util.objects import datatype
@@ -36,6 +36,7 @@ def fn_raises(x):
   raise Exception('An exception for {}'.format(type(x).__name__))
 
 
+@rule(A, [Select(B)])
 def nested_raise(x):
   fn_raises(x)
 
@@ -83,7 +84,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
   def test_no_include_trace_error_raises_boring_error(self):
     rules = [
       RootRule(B),
-      TaskRule(A, [Select(B)], nested_raise)
+      nested_raise,
     ]
 
     scheduler = self.scheduler(rules, include_trace_on_error=False)
@@ -96,7 +97,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
   def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
     rules = [
       RootRule(B),
-      TaskRule(A, [Select(B)], nested_raise),
+      nested_raise,
     ]
 
     scheduler = self.scheduler(rules, include_trace_on_error=False)
@@ -113,7 +114,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
   def test_include_trace_error_raises_error_with_trace(self):
     rules = [
       RootRule(B),
-      TaskRule(A, [Select(B)], nested_raise)
+      nested_raise,
     ]
 
     scheduler = self.scheduler(rules, include_trace_on_error=True)
@@ -148,11 +149,24 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
   @unittest.skip('Inherently flaky as described in https://github.com/pantsbuild/pants/issues/6829')
   def test_trace_multi(self):
     # Tests that when multiple distinct failures occur, they are each rendered.
+
+    @rule(D, [Select(B)])
+    def d_from_b_nested_raise(b):
+      fn_raises(b)
+
+    @rule(C, [Select(B)])
+    def c_from_b_nested_raise(b):
+      fn_raises(b)
+
+    @rule(A, [Select(C), Select(D)])
+    def a_from_c_and_d(c, d):
+      return A()
+
     rules = [
       RootRule(B),
-      TaskRule(D, [Select(B)], nested_raise),
-      TaskRule(C, [Select(B)], nested_raise),
-      TaskRule(A, [Select(C), Select(D)], A),
+      d_from_b_nested_raise,
+      c_from_b_nested_raise,
+      a_from_c_and_d,
     ]
 
     scheduler = self.scheduler(rules, include_trace_on_error=True)
@@ -162,28 +176,28 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
     self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
-        Computing Task(A, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A, true)
-          Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
+        Computing Task(a_from_c_and_d, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A, true)
+          Computing Task(d_from_b_nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
                   val = func(*args)
-                File LOCATION-INFO, in nested_raise
-                  fn_raises(x)
+                File LOCATION-INFO, in d_from_b_nested_raise
+                  fn_raises(b)
                 File LOCATION-INFO, in fn_raises
                   raise Exception('An exception for {}'.format(type(x).__name__))
               Exception: An exception for B
 
 
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
-        Computing Task(A, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A, true)
-          Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
+        Computing Task(a_from_c_and_d, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A, true)
+          Computing Task(c_from_b_nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
                   val = func(*args)
-                File LOCATION-INFO, in nested_raise
-                  fn_raises(x)
+                File LOCATION-INFO, in c_from_b_nested_raise
+                  fn_raises(b)
                 File LOCATION-INFO, in fn_raises
                   raise Exception('An exception for {}'.format(type(x).__name__))
               Exception: An exception for B

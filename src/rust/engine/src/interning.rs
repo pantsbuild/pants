@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 use std::hash;
 
-use core::{Key, Value, FNV};
-use externs;
+use crate::core::{Key, Value, FNV};
+use crate::externs;
 
 ///
 /// A struct that encapsulates interning of python `Value`s as comparable `Key`s.

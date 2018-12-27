@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
-from pants.util.objects import Exactly
+from pants.util.objects import Exactly, datatype
 
 
 class ParseError(Exception):
@@ -26,6 +26,14 @@ class SymbolTable(AbstractClass):
     # NB Sort types so that multiple calls get the same tuples.
     symbol_table_types = sorted(set(self.table().values()), key=repr)
     return Exactly(*symbol_table_types, description='symbol table types')
+
+
+class TargetAdaptorContainer(datatype(["value"])):
+  """A wrapper around a concrete TargetAdaptor subclass.
+
+  This exists so that the rule graph can statically provide a TargetAdaptor for a target, and rules can depend on this
+  without needing to depend on having a concrete instance of SymbolTable to register their input selectors.
+  """
 
 
 class EmptyTable(SymbolTable):

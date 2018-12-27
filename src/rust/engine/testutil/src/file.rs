@@ -13,7 +13,8 @@ pub fn list_dir(path: &Path) -> Vec<String> {
         .file_name()
         .to_string_lossy()
         .to_string()
-    }).collect();
+    })
+    .collect();
   v.sort();
   v
 }

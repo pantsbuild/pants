@@ -33,12 +33,12 @@ class FetcherFactory(Subsystem):
     # TODO: Add launchpad.net?
     r'bitbucket\.org/(?P<user>[^/]+)/(?P<repo>[^/]+)':
       ArchiveFetcher.UrlInfo(
-          url_format='https://bitbucket.org/\g<user>/\g<repo>/get/{rev}.tar.gz',
+          url_format=r'https://bitbucket.org/\g<user>/\g<repo>/get/{rev}.tar.gz',
           default_rev='tip',
           strip_level=1),
     r'github\.com/(?P<user>[^/]+)/(?P<repo>[^/]+)':
       ArchiveFetcher.UrlInfo(
-          url_format='https://github.com/\g<user>/\g<repo>/archive/{rev}.tar.gz',
+          url_format=r'https://github.com/\g<user>/\g<repo>/archive/{rev}.tar.gz',
           default_rev='master',
           strip_level=1),
   }

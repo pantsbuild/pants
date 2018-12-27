@@ -1,6 +1,7 @@
 [package]
 name = "fs_util"
 version = "0.0.1"
+edition = "2018"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
