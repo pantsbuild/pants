@@ -336,6 +336,21 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     return c.to_value(tuple(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len)))
 
+  @_extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
+  def extern_store_dict(self, context_handle, vals_ptr, vals_len):
+    """Given storage and an array of Handles, return a new Handle to represent the dict.
+
+    Array of handles alternates keys and values (i.e. key0, value0, key1, value1, ...).
+
+    It is assumed that an even number of values were passed.
+    """
+    c = self._ffi.from_handle(context_handle)
+    tup = tuple(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len))
+    d = dict()
+    for i in xrange(len(tup) // 2):
+      d[tup[2 * i]] = tup[2 * i + 1]
+    return c.to_value(d)
+
   @_extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
   def extern_store_bytes(self, context_handle, bytes_ptr, bytes_len):
     """Given a context and raw bytes, return a new Handle to represent the content."""
@@ -601,6 +616,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_satisfied_by,
                            self.ffi_lib.extern_satisfied_by_type,
                            self.ffi_lib.extern_store_tuple,
+                           self.ffi_lib.extern_store_dict,
                            self.ffi_lib.extern_store_bytes,
                            self.ffi_lib.extern_store_utf8,
                            self.ffi_lib.extern_store_i64,
