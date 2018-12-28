@@ -94,7 +94,8 @@ default_test_config: &default_test_config
     - pip install awscli
     - sudo apt-get install -y jq
   before_script:
-    - aws s3 cp ${BOOTSTRAPPED_PEX_URL} ./pants.pex
+    # --no-sign-request allows access without credentials, as long as we specify the region.
+    - aws --no-sign-request --region us-east-1 s3 cp ${BOOTSTRAPPED_PEX_URL} ./pants.pex
 
 osx_test_config: &osx_test_config
   os: osx
@@ -125,7 +126,7 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh  # With no args, just bootstraps.
       after_success:
-        - aws s3 cp ./pants.pex ${BOOTSTRAPPED_PEX_URL}
+        - aws --no-sign-request --region us-east-1 s3 cp ./pants.pex ${BOOTSTRAPPED_PEX_URL}
 
     # Build macOS engine
     - name: "OSX Native Engine Binary Builder"
