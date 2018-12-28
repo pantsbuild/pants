@@ -297,7 +297,6 @@ impl CommandRunner {
   const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
   const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
 
-  #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
   pub fn new(
     address: &str,
     cache_key_gen_version: Option<String>,
