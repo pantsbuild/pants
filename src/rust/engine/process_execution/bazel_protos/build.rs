@@ -1,7 +1,5 @@
 use protoc_grpcio;
 
-use std::fs::File;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use build_utils::BuildRoot;
@@ -42,55 +40,9 @@ fn main() {
   )
   .expect("Failed to compile protos!");
 
-  // Ignore clippy for generated code.
-  // protoc_grpcio generates its own clippy config, but it's for an out of date version of clippy,
-  // so strip that out.
-  for file in walkdir::WalkDir::new(&gen_dir)
-    .into_iter()
-    .filter_map(|entry| entry.ok())
-    .filter(|entry| {
-      entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".rs")
-    })
-  {
-    let lines: Vec<_> = std::fs::read_to_string(file.path())
-      .expect(&format!(
-        "Error reading generated protobuf at {}",
-        file.path().display()
-      ))
-      .lines()
-      .filter(|line| !line.contains("clippy"))
-      .map(str::to_owned)
-      .collect();
-    let content = String::from("#![allow(clippy::all)]\n") + &lines.join("\n");
-    std::fs::write(file.path(), content).expect(&format!(
-      "Error re-writing generated protobuf at {}",
-      file.path().display()
-    ));
-  }
+  disable_clippy_in_generated_code(&gen_dir).expect("Failed to strip clippy from generated code");
 
-  let listing = gen_dir.read_dir().unwrap();
-  let mut pub_mod_stmts = listing
-    .filter_map(|d| {
-      let dirent = d.unwrap();
-      let file_name = dirent.file_name().into_string().unwrap();
-      match file_name.trim_right_matches(".rs") {
-        "mod" | ".gitignore" => None,
-        module_name => Some(format!("pub mod {};", module_name)),
-      }
-    })
-    .collect::<Vec<_>>();
-  pub_mod_stmts.sort();
-  let contents = format!(
-    "\
-// This file is generated. Do not edit.
-{}
-",
-    pub_mod_stmts.join("\n")
-  );
-
-  File::create(gen_dir.join("mod.rs"))
-    .and_then(|mut f| f.write_all(contents.as_bytes()))
-    .expect("Failed to write mod.rs")
+  generate_mod_rs(&gen_dir).expect("Failed to generate mod.rs");
 }
 
 const EXTRA_HEADER: &'static str = r#"import "rustproto.proto";
@@ -131,4 +83,64 @@ fn add_rustproto_header(thirdpartyprotobuf: &Path) -> Result<tempfile::TempDir, 
     }
   }
   Ok(amended_proto_root)
+}
+
+///
+/// protoc_grpcio generates its own clippy config, but it's for an out of date version of clippy,
+/// so strip that out so we don't get warnings about it.
+///
+/// Add our own #![allow(clippy::all)] heading to each generated file so that we don't get any
+/// warnings/errors from generated code not meeting our standards.
+///
+fn disable_clippy_in_generated_code(dir: &Path) -> Result<(), String> {
+  for file in walkdir::WalkDir::new(&dir)
+    .into_iter()
+    .filter_map(|entry| entry.ok())
+    .filter(|entry| {
+      entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".rs")
+    })
+  {
+    let lines: Vec<_> = std::fs::read_to_string(file.path())
+      .map_err(|err| {
+        format!(
+          "Error reading generated protobuf at {}: {}",
+          file.path().display(),
+          err
+        )
+      })?
+      .lines()
+      .filter(|line| !line.contains("clippy"))
+      .map(str::to_owned)
+      .collect();
+    let content = String::from("#![allow(clippy::all)]\n") + &lines.join("\n");
+    std::fs::write(file.path(), content).map_err(|err| {
+      format!(
+        "Error re-writing generated protobuf at {}: {}",
+        file.path().display(),
+        err
+      )
+    })?;
+  }
+  Ok(())
+}
+
+fn generate_mod_rs(dir: &Path) -> Result<(), String> {
+  let listing = dir.read_dir().unwrap();
+  let mut pub_mod_stmts = listing
+    .filter_map(|d| d.ok())
+    .map(|d| d.file_name().to_string_lossy().into_owned())
+    .filter(|name| &name != &"mod.rs" && &name != &".gitignore")
+    .map(|name| format!("pub mod {};", name.trim_end_matches(".rs")))
+    .collect::<Vec<_>>();
+  pub_mod_stmts.sort();
+  let contents = format!(
+    "\
+// This file is generated. Do not edit.
+{}
+",
+    pub_mod_stmts.join("\n")
+  );
+
+  std::fs::write(dir.join("mod.rs"), contents)
+    .map_err(|err| format!("Failed to write mod.rs: {}", err))
 }
