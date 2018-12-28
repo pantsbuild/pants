@@ -347,7 +347,7 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     tup = tuple(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len))
     d = dict()
-    for i in xrange(0, len(tup), 2):
+    for i in range(0, len(tup), 2):
       d[tup[i]] = tup[i + 1]
     return c.to_value(d)
 
