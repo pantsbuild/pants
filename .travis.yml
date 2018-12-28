@@ -98,13 +98,13 @@ default_test_config: &default_test_config
     - sudo apt-get install -y jq
   before_script:
     # --no-sign-request allows access without credentials, as long as we specify the region.
-    - NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versions
-          --bucket ${BOOTSTRAPPED_PEX_BUCKET} --key ${BOOTSTRAPPED_PEX_KEY}
-      | jq '.Versions | length')
-    - if [ "${NUM_VERSIONS}" != "1" ]; then
-        echo "Error: Found ${NUM_VERSIONS} versions for ${BOOTSTRAPPED_PEX_URL}"
-        exit 1
-      fi
+    #    - NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versions
+    #          --bucket ${BOOTSTRAPPED_PEX_BUCKET} --key ${BOOTSTRAPPED_PEX_KEY}
+    #      | jq '.Versions | length')
+    #    - if [ "${NUM_VERSIONS}" != "1" ]; then
+    #        echo "Error: Found ${NUM_VERSIONS} versions for ${BOOTSTRAPPED_PEX_URL}"
+    #        exit 1
+    #      fi
     - aws --no-sign-request --region us-east-1 s3 cp ${BOOTSTRAPPED_PEX_URL} ./pants.pex
 
 osx_test_config: &osx_test_config
