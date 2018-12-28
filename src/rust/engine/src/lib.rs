@@ -1,6 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
 #![deny(
   clippy::all,
@@ -287,7 +288,7 @@ pub extern "C" fn scheduler_create(
     root_type_ids.clone(),
     tasks,
     types,
-    build_root_buf.to_os_string().as_ref(),
+    PathBuf::from(build_root_buf.to_os_string()),
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
     PathBuf::from(local_store_dir_buf.to_os_string()),
