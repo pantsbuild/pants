@@ -16,9 +16,6 @@ syntax = "proto3";
 
 package google.rpc;
 
-import "rustproto.proto";
-option (rustproto.carllerche_bytes_for_bytes_all) = true;
-
 import "google/protobuf/any.proto";
 
 option go_package = "google.golang.org/genproto/googleapis/rpc/status;status";
