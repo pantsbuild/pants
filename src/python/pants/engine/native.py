@@ -347,8 +347,8 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     tup = tuple(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len))
     d = dict()
-    for i in xrange(len(tup) // 2):
-      d[tup[2 * i]] = tup[2 * i + 1]
+    for i in xrange(0, len(tup), 2):
+      d[tup[i]] = tup[i + 1]
     return c.to_value(d)
 
   @_extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
