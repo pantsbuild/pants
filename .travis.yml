@@ -127,6 +127,11 @@ linux_with_fuse: &linux_with_fuse
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
+    - pip install awscli
+    # Multipart operations aren't supported for anonymous users, so we set the
+    # threshold high to avoid them being used automatically by the aws cli.
+    - aws configure set default.s3.multipart_threshold 1024MB
+    - sudo apt-get install -y jq
 
 matrix:
   include:
@@ -225,7 +230,7 @@ matrix:
       <<: *linux_with_fuse
       name: "Self checks, lint, and JVM tests"
       script:
-        - ./build-support/bin/travis-ci.sh -bfkmrjt
+        - ./build-support/bin/travis-ci.sh -fbkmrjt
 
     - <<: *default_test_config
       name: "Py2 - Unit tests for pants and pants-plugins"
