@@ -2,13 +2,9 @@ use protoc_grpcio;
 
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use build_utils::BuildRoot;
-
-const EXTRA_HEADER: &'static str = r#"import "rustproto.proto";
-option (rustproto.carllerche_bytes_for_bytes_all) = true;
-"#;
 
 fn main() {
   let build_root = BuildRoot::find().unwrap();
@@ -18,33 +14,8 @@ fn main() {
     thirdpartyprotobuf.to_str().unwrap()
   );
 
-  let amended_proto_root = tempfile::TempDir::new().unwrap();
-  for f in &["bazelbuild_remote-apis", "googleapis"] {
-    let src_root = thirdpartyprotobuf.join(f);
-    for entry in walkdir::WalkDir::new(&src_root)
-      .into_iter()
-      .filter_map(|entry| entry.ok())
-    {
-      if entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".proto") {
-        let dst = amended_proto_root
-          .path()
-          .join(entry.path().strip_prefix(&src_root).unwrap());
-        std::fs::create_dir_all(dst.parent().unwrap())
-          .expect("Error making dir in temp proto root");
-        let original = std::fs::read_to_string(entry.path())
-          .expect(&format!("Error reading {}", entry.path().display()));
-        let mut copy = String::with_capacity(original.len() + EXTRA_HEADER.len());
-        for line in original.lines() {
-          copy += line;
-          copy += "\n";
-          if line.starts_with("package ") {
-            copy += EXTRA_HEADER
-          }
-        }
-        std::fs::write(&dst, copy.as_bytes()).expect(&format!("Error writing {}", dst.display()));
-      }
-    }
-  }
+  let amended_proto_root =
+    add_rustproto_header(&thirdpartyprotobuf).expect("Error adding proto bytes header");
 
   let gen_dir = PathBuf::from("src/gen");
 
@@ -94,4 +65,44 @@ fn main() {
   File::create(gen_dir.join("mod.rs"))
     .and_then(|mut f| f.write_all(contents.as_bytes()))
     .expect("Failed to write mod.rs")
+}
+
+const EXTRA_HEADER: &'static str = r#"import "rustproto.proto";
+option (rustproto.carllerche_bytes_for_bytes_all) = true;
+"#;
+
+///
+/// Copies protos from thirdpartyprotobuf, adds a header to make protoc_grpcio uses Bytes instead
+/// of Vec<u8>s, and rewrites them into a temporary directory
+///
+fn add_rustproto_header(thirdpartyprotobuf: &Path) -> Result<tempfile::TempDir, String> {
+  let amended_proto_root = tempfile::TempDir::new().unwrap();
+  for f in &["bazelbuild_remote-apis", "googleapis"] {
+    let src_root = thirdpartyprotobuf.join(f);
+    for entry in walkdir::WalkDir::new(&src_root)
+      .into_iter()
+      .filter_map(|entry| entry.ok())
+      .filter(|entry| entry.file_type().is_file())
+      .filter(|entry| entry.file_name().to_string_lossy().ends_with(".proto"))
+    {
+      let dst = amended_proto_root
+        .path()
+        .join(entry.path().strip_prefix(&src_root).unwrap());
+      std::fs::create_dir_all(dst.parent().unwrap())
+        .map_err(|err| format!("Error making dir in temp proto root: {}", err))?;
+      let original = std::fs::read_to_string(entry.path())
+        .map_err(|err| format!("Error reading proto {}: {}", entry.path().display(), err))?;
+      let mut copy = String::with_capacity(original.len() + EXTRA_HEADER.len());
+      for line in original.lines() {
+        copy += line;
+        copy += "\n";
+        if line.starts_with("package ") {
+          copy += EXTRA_HEADER
+        }
+      }
+      std::fs::write(&dst, copy.as_bytes())
+        .map_err(|err| format!("Error writing {}: {}", dst.display(), err))?;
+    }
+  }
+  Ok(amended_proto_root)
 }
