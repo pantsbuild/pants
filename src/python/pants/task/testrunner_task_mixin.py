@@ -13,7 +13,7 @@ from builtins import filter, next, object, str
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
-from pants.task.target_restriction_mixins import HasSkipOptionMixin, SkipOptionGoalRegistrar
+from pants.task.target_restriction_mixins import HasSkipGoalOptionMixin, SkipOptionGoalRegistrar
 from pants.task.task import Task
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.process_handler import subprocess
@@ -88,7 +88,7 @@ class TestResult(object):
     return self
 
 
-class TestRunnerTaskMixin(HasSkipOptionMixin):
+class TestRunnerTaskMixin(HasSkipGoalOptionMixin):
   """A mixin to combine with test runner tasks.
 
   The intent is to migrate logic over time out of JUnitRun and PytestRun, so the functionality
