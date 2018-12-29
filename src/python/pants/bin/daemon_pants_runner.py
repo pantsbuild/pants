@@ -234,15 +234,14 @@ class DaemonPantsRunner(ProcessManager):
   def _raise_deferred_exc(self):
     """Raises deferred exceptions from the daemon's synchronous path in the post-fork client."""
     if self._deferred_exception:
-      exc_type, exc_value, exc_traceback = self._deferred_exception
-      if exc_type == GracefulTerminationException:
-        self._exiter.exit(exc_value.exit_code)
       try:
-        # Expect `_deferred_exception` to be a 3-item tuple of the values returned by sys.exc_info().
-        # This permits use the 3-arg form of the `raise` statement to preserve the original traceback.
-        raise_with_traceback(exc_type(exc_value), exc_traceback)
-      except ValueError:
-        # If `_deferred_exception` isn't a 3-item tuple, treat it like a bare exception.
+        exc_type, exc_value, exc_traceback = self._deferred_exception
+        if exc_type == GracefulTerminationException:
+          self._exiter.exit(exc_value.exit_code)
+        raise_with_traceback(exc_value, exc_traceback)
+      except TypeError:
+        # If `_deferred_exception` isn't a 3-item tuple (raising a TypeError on the above
+        # destructuring), treat it like a bare exception.
         raise self._deferred_exception
 
   def _maybe_get_client_start_time_from_env(self, env):
