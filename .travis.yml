@@ -95,7 +95,7 @@ default_test_config: &default_test_config
     # Multipart operations aren't supported for anonymous users, so we set the
     # threshold high to avoid them being used automatically by the aws cli.
     - aws configure set default.s3.multipart_threshold 1024MB
-    - sudo apt-get install -y jq
+    - sudo apt-get install -y jq unzip
   before_script:
     # --no-sign-request allows access without credentials, as long as we specify the region.
     #    - NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versions
@@ -107,6 +107,7 @@ default_test_config: &default_test_config
     #      fi
     - aws --no-sign-request --region us-east-1 s3 cp ${BOOTSTRAPPED_PEX_URL} ./pants.pex
     - chmod 755 ./pants.pex
+    - unzip -j pants.pex pants/engine/native_engine.so -d src/python/pants/engine/
 
 osx_test_config: &osx_test_config
   os: osx
@@ -131,7 +132,7 @@ linux_with_fuse: &linux_with_fuse
     # Multipart operations aren't supported for anonymous users, so we set the
     # threshold high to avoid them being used automatically by the aws cli.
     - aws configure set default.s3.multipart_threshold 1024MB
-    - sudo apt-get install -y jq
+    - sudo apt-get install -y jq unzip
 
 matrix:
   include:
