@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+function pythondir {
+  python_bin=$(which $1)
+  if [ -n "${python_bin}" ]; then
+    echo $(dirname ${python_bin})
+  fi
+}
+
+path=$(pythondir python2):$(pythondir python3)
+
+PATH=${path} LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 ./pants.pex "$@"
