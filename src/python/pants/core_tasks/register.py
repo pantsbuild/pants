@@ -23,6 +23,7 @@ from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
+from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 
 
 def register_goals():
@@ -37,7 +38,8 @@ def register_goals():
   Goal.register('binary', 'Create a runnable binary.')
   Goal.register('resources', 'Prepare resources.')
   Goal.register('bundle', 'Create a deployable application bundle.')
-  Goal.register('test', 'Run tests.')
+  Goal.register('test', 'Run tests.',
+                TestRunnerTaskMixin.goal_options_registrar_cls)
   Goal.register('bench', 'Run benchmarks.')
   Goal.register('repl', 'Run a REPL.')
   Goal.register('repl-dirty', 'Run a REPL, skipping compilation.')
