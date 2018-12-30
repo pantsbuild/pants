@@ -272,45 +272,22 @@ matrix:
 
 {{#integration_shards}}
     - <<: *default_test_config
-      name: "Integration tests for pants - shard {{_}}"
+      name: "Integration tests for pants - shard {{.}}"
+      env:
+        - CACHE_NAME=integrationshard{{.}}  # Ensure distinct caches.
       script:
-        - ./build-support/bin/travis-ci.sh -bc3 -i {{_}}/7
+        - ./build-support/bin/travis-ci.sh -bc3 -i {{.}}/{{integration_shards_length}}
+
 {{/integration_shards}}
-
+{{#integration_shards}}
     - <<: *default_cron_test_config
-      name: "Integration tests for pants (Python 2) - shard 1"
+      name: "Integration tests for pants (Python 2) - shard {{.}}"
+      env:
+        - CACHE_NAME=cronshard{{.}}  # Ensure distinct caches.
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 0/7
+        - ./build-support/bin/travis-ci.sh -bc -i {{.}}/{{integration_shards_length}}
 
-    - <<: *default_cron_test_config
-      name: "Integration tests for pants (Python 2) - shard 2"
-      script:
-        - ./build-support/bin/travis-ci.sh -bc -i 1/7
-
-    - <<: *default_cron_test_config
-      name: "Integration tests for pants (Python 2) - shard 3"
-      script:
-        - ./build-support/bin/travis-ci.sh -bc -i 2/7
-
-    - <<: *default_cron_test_config
-      name: "Integration tests for pants (Python 2) - shard 4"
-      script:
-        - ./build-support/bin/travis-ci.sh -bc -i 3/7
-
-    - <<: *default_cron_test_config
-      name: "Integration tests for pants (Python 2) - shard 5"
-      script:
-        - ./build-support/bin/travis-ci.sh -bc -i 4/7
-
-    - <<: *default_cron_test_config
-      name: "Integration tests for pants (Python 2) - shard 6"
-      script:
-        - ./build-support/bin/travis-ci.sh -bc -i 5/7
-
-    - <<: *default_cron_test_config
-      name: "Integration tests for pants (Python 2) - shard 7"
-      script:
-        - ./build-support/bin/travis-ci.sh -bc -i 6/7
+{{/integration_shards}}
 
     # Rust on linux
     - <<: *linux_with_fuse
