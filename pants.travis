@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 
-set -e
+#set -e
 
-function pythondir {
-  python_bin=$(pyenv which $1 2>/dev/null)
-  if [ -n "${python_bin}" ]; then
-    echo $(dirname ${python_bin})
-  else
-    (>&2 echo "pyenv couldn't find a $1, aborting travis pants run.")
-    exit 1
-  fi
-}
+#function pythondir {
+#  python_bin=$(pyenv which $1 2>/dev/null)
+#  if [ -n "${python_bin}" ]; then
+#    echo $(dirname ${python_bin})
+#  else
+#    (>&2 echo "pyenv couldn't find a $1, aborting travis pants run.")
+#    exit 1
+#  fi
+#}
 
-python2=$(pythondir python2)
-python3=$(pythondir python3)
-path=${PATH}:${python2}:${python3}
+#python2=$(pythondir python2)
+#python3=$(pythondir python3)
+#path=${PATH}:${python2}:${python3}
 
-PATH=${path} LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 $(dirname "$0")/pants.pex "$@"
+#PATH=${path} LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 $(dirname "$0")/pants.pex "$@"
+
+$(dirname "$0")/pants.pex "$@"
