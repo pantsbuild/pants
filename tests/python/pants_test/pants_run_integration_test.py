@@ -506,6 +506,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     files_to_link = ('.pants.d',
                      'build-support',
                      'pants',
+                     'pants.pex',
                      'pants-plugins',
                      'pants.ini',
                      'pants.travis-ci.ini',
@@ -521,7 +522,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
         shutil.copytree(os.path.join(get_buildroot(), dirname), os.path.join(tmp_dir, dirname))
 
       for filename in files_to_link:
-        os.symlink(os.path.join(get_buildroot(), filename), os.path.join(tmp_dir, filename))
+        link_target = os.path.join(get_buildroot(), filename)
+        if os.path.exists(link_target):
+          os.symlink(link_target, os.path.join(tmp_dir, filename))
 
       def write_file(file_path, contents):
         full_file_path = os.path.join(tmp_dir, *file_path.split(os.pathsep))
