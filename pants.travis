@@ -19,4 +19,4 @@ set -e
 
 #PATH=${path} LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 $(dirname "$0")/pants.pex "$@"
 
-$(dirname "$0")/pants.pex "$@"
+exec $(dirname "$0")/pants.pex "$@"
