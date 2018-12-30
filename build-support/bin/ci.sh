@@ -120,6 +120,7 @@ fi
 if [[ "${run_bootstrap:-true}" == "true" ]]; then
   start_travis_section "Bootstrap" "Bootstrapping pants"
   (
+    set -x
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
@@ -162,6 +163,7 @@ fi
 if [[ "${run_lint:-false}" == "true" ]]; then
   start_travis_section "Lint" "Running lint checks"
   (
+    set -x
     ./pants.pex --tag=-nolint lint contrib:: examples:: src:: tests:: zinc::
   ) || die "Lint check failure"
   end_travis_section
@@ -169,6 +171,7 @@ fi
 
 if [[ "${run_docs:-false}" == "true" ]]; then
   start_travis_section "DocGen" "Running site doc generation test"
+  set -x
   ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
   end_travis_section
 fi
@@ -176,6 +179,7 @@ fi
 if [[ "${run_jvm:-false}" == "true" ]]; then
   start_travis_section "CoreJVM" "Running core jvm tests"
   (
+    set -x
     ./pants.pex doc test {src,tests}/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
   end_travis_section
@@ -184,6 +188,7 @@ fi
 if [[ "${run_internal_backends:-false}" == "true" ]]; then
   start_travis_section "BackendTests" "Running internal backend python tests"
   (
+    set -x
     ./pants.pex test.pytest \
     pants-plugins/tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Internal backend python test failure"
@@ -196,6 +201,7 @@ if [[ "${run_python:-false}" == "true" ]]; then
   fi
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
+    set -x
     ./pants.pex --tag='-integration' test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
       tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
@@ -209,6 +215,7 @@ if [[ "${run_contrib:-false}" == "true" ]]; then
   fi
   start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
   (
+    set -x
     ./pants.pex --exclude-target-regexp='.*/testprojects/.*' test.pytest \
     --test-pytest-test-shard=${python_contrib_shard} \
     contrib:: -- ${PYTEST_PASSTHRU_ARGS}
@@ -219,6 +226,7 @@ fi
 if [[ "${run_rust_tests:-false}" == "true" ]]; then
   start_travis_section "RustTests" "Running Pants rust tests"
   (
+    set -x
     test_threads_flag=""
     if [[ "$(uname)" == "Darwin" ]]; then
       # The osx travis environment has a low file descriptors ulimit, so we avoid running too many
@@ -235,6 +243,7 @@ fi
 if [[ "${run_cargo_audit:-false}" == "true" ]]; then
   start_travis_section "CargoAudit" "Running cargo audit on rust code"
   (
+    set -x
     "${REPO_ROOT}/build-support/bin/native/cargo" ensure-installed --package=cargo-audit --version=0.5.2
     "${REPO_ROOT}/build-support/bin/native/cargo" audit -f "${REPO_ROOT}/src/rust/engine/Cargo.lock"
   ) || die "Cargo audit failure"
@@ -244,6 +253,7 @@ fi
 if [[ "${run_rust_clippy:-false}" == "true" ]]; then
   start_travis_section "RustClippy" "Running Clippy on rust code"
   (
+    set -x
     "${REPO_ROOT}/build-support/bin/check_clippy.sh"
   ) || die "Pants clippy failure"
 fi
@@ -254,6 +264,7 @@ if [[ "${test_platform_specific_behavior:-false}" == 'true' ]]; then
   start_travis_section "Platform-specific tests" \
                        "Running platform-specific testing on platform: $(uname)"
   (
+    set -x
     ./pants.pex --tag='+platform_specific_behavior' test \
                 tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants platform-specific test failure"
@@ -267,6 +278,7 @@ if [[ "${run_integration:-false}" == "true" ]]; then
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
+    set -x
     ./pants.pex --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
       tests/python:: -- ${PYTEST_PASSTHRU_ARGS}

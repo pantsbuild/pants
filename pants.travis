@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
-#set -e
+set -e
+
+# Our integration tests invoke "./pants", and our regular runner script will trigger
+# a bootstrapping, which we don't want. So we shim in this alternative runner, which
+# calls the already-bootstrapped pants.pex.
 
 #function pythondir {
 #  python_bin=$(pyenv which $1 2>/dev/null)
 #  if [ -n "${python_bin}" ]; then
 #    echo $(dirname ${python_bin})
-#  else
-#    (>&2 echo "pyenv couldn't find a $1, aborting travis pants run.")
-#    exit 1
 #  fi
 #}
 
