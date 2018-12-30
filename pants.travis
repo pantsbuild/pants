@@ -7,6 +7,6 @@ function pythondir {
   fi
 }
 
-path=$(pythondir python2):$(pythondir python3)
+path=${PATH}:$(pythondir python2):$(pythondir python3)
 
 PATH=${path} LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 ./pants.pex "$@"
