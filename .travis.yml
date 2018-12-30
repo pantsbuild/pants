@@ -43,9 +43,12 @@ before_cache:
   - rm -rf ${HOME}/.cache/pants/lmdb_store
   # Render a summary of what is left in the home directory, to assist with further pruning of
   # the cache.
-  - du -d2 ${HOME} | sort -r -n
+  - du -m -d2 ${HOME} | sort -r -n
 
 cache:
+  # The default timeout is 180 seconds, and our larger cache uploads exceed this.
+  # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
+  timeout: 500
   directories:
     - ${HOME}/.cache/pants
     - ${HOME}/.ivy2/pants
