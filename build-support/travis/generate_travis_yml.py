@@ -8,10 +8,11 @@ import pkg_resources
 import pystache
 
 
-num_integration_shards = 7
+num_integration_shards = 20
 
 
 def generate_travis_yml():
+  """Generates content for a .travis.yml file from templates."""
   template = pkg_resources.resource_string(__name__,
                                            'travis.yml.mustache').decode('utf-8')
   before_install = pkg_resources.resource_string(__name__,
