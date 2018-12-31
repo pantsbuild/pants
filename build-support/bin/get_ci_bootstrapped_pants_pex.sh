@@ -4,7 +4,7 @@ set -euo pipefail
 
 BOOTSTRAPPED_PEX_BUCKET=$1
 BOOTSTRAPPED_PEX_KEY=$2
-BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}${BOOTSTRAPPED_PEX_KEY}
+BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
 
 # Note that in the aws cli --no-sign-request allows access to public S3 buckets without
 # credentials, as long as we specify the region.

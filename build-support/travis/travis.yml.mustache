@@ -11,8 +11,8 @@ env:
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
     - LC_ALL="en_US.UTF-8"
     - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
-    - BOOTSTRAPPED_PEX_KEY=/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
-    - BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}${BOOTSTRAPPED_PEX_KEY}
+    - BOOTSTRAPPED_PEX_KEY=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
+    - BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
 
 
 before_cache:
@@ -95,7 +95,7 @@ default_test_config: &default_test_config
   before_install:
 {{>before_install}}
   before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY}
 
 
 osx_test_config: &osx_test_config
