@@ -6,12 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
-from pkg_resources import DistributionNotFound, Environment, Requirement, WorkingSet
-
 from builtins import str
-from pex.pex import PEX
-from pex.pex_builder import PEXBuilder
-from pex.platforms import Platform
 
 from packaging import requirements, version
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -21,7 +16,6 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, pants_version
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_all
 from pants.base.workunit import WorkUnitLabel
@@ -34,6 +28,10 @@ from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation
 from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.strutil import safe_shlex_join
+from pex.pex import PEX
+from pex.pex_builder import PEXBuilder
+from pex.platforms import Platform
+from pkg_resources import DistributionNotFound, Environment, Requirement, WorkingSet
 
 from pants.contrib.python.checks.checker import checker
 from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import \
@@ -276,11 +274,13 @@ class Checkstyle(LintTaskMixin, Task):
         if sources_for_targets:
           failure_count += self.checkstyle(interpreter, sources_for_targets)
 
-      if failure_count > 0 and self.get_options().fail:
-        raise self.CheckstyleRunError(
-          failure_count,
-          '{} Python Style issues found. You may try `./pants fmt <targets>`.'
-          .format(failure_count))
+      if failure_count > 0:
+        err_msg = ('{} Python Style issues found. You may try `./pants fmt <targets>`.'
+                   .format(failure_count))
+        if self.get_options().fail:
+          raise self.CheckstyleRunError(failure_count, err_msg)
+        else:
+          self.context.log.warn(err_msg)
 
   def calculate_sources(self, targets):
     """Generate a set of source files from the given targets."""
