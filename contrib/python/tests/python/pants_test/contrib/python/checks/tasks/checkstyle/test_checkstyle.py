@@ -157,6 +157,21 @@ class CheckstyleTest(PythonTaskTestBase):
                                  re.escape('7 Python Style issues found')):
       self.execute_task(target_roots=[target_py2, target_py3])
 
+  def test_failure_same_interpreter_different_constraints(self):
+    target_py2 = self.create_py2_failing_target()
+    self.create_file('a/python/fail.py', contents=dedent("""
+                        class lower_case(object):
+                          pass
+                       """))
+    target_py2_different = self.make_target(
+      'a/python:fail', PythonLibrary, sources=['fail.py'],
+      # This will also choose a python 2.7 interpreter, but technically has different filters than
+      # self.py2_constraint. Both of these targets should have lint run.
+      compatibility=['CPython>=2.7,<2.8'])
+    with self.assertRaisesRegexp(Checkstyle.CheckstyleRunError,
+                                 re.escape('5 Python Style issues found')):
+      self.execute_task(target_roots=[target_py2, target_py2_different])
+
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_suppressed_file_passes(self, unused_test_name, resolve_local):
     self.create_file('a/python/fail.py', contents=dedent("""

@@ -239,7 +239,6 @@ class Checkstyle(LintTaskMixin, Task):
       # create and invoke, which reduces the runtime of this task -- unfortunately, this is an
       # instance of general SAT and is a bit too much effort to implement right now, so we greedily
       # take the minimum here.
-      # TODO: test for targets with different compatibility but same interpreter!
       targets_with_min_interpreter = [
         (min(self._interpreter_cache.setup(filters=filters)), targets)
         for filters, targets in targets_by_compatibility.items()
