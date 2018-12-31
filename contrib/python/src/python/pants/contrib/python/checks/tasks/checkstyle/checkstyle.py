@@ -7,8 +7,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 from builtins import str
+from collections import defaultdict
 
-from packaging import requirements, version
+from packaging import version
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
@@ -60,12 +61,11 @@ class Checkstyle(LintTaskMixin, Task):
     return super(Task, cls).subsystem_dependencies() + cls.plugin_subsystems + (
       PexBuilderWrapper.Factory,
       PythonInterpreterCache,
-      PythonSetup,
     )
 
   @classmethod
   def implementation_version(cls):
-    return super(Checkstyle, cls).implementation_version() + [('Checkstyle', 1)]
+    return super(Checkstyle, cls).implementation_version() + [('Checkstyle', 2)]
 
   @classmethod
   def register_options(cls, register):
@@ -77,11 +77,8 @@ class Checkstyle(LintTaskMixin, Task):
     register('--suppress', fingerprint=True, type=file_option, default=None,
              help='Takes a text file where specific rules on specific files will be skipped.')
     register('--fail', fingerprint=True, default=True, type=bool,
-             help='Prevent test failure but still produce output for problems.')
-
-  @memoized_property
-  def _python_setup(self):
-    return PythonSetup.global_instance()
+             help='If disabled, prevent pants from exiting with a failure, but still produce '
+                  'output for style problems.')
 
   @memoized_property
   def _interpreter_cache(self):
@@ -219,26 +216,6 @@ class Checkstyle(LintTaskMixin, Task):
     return all(version.parse(constraint) in self._acceptable_interpreter_constraints
            for constraint in constraint_tuple)
 
-  class CheckstyleSetupError(Exception): pass
-
-  # TODO: this should be an option!
-  _DEFAULT_INTERPRETER_TYPE = 'CPython'
-
-  def _parse_requirement(self, constraint_string):
-    # This does a lot of the same job as pex.interpreter.PythonIdentity.parse_requirement, but more
-    # easily handles checking for compatibility with python 2 or 3 using .specifier
-    try:
-      return requirements.Requirement(constraint_string)
-    except requirements.InvalidRequirement as orig_exc:
-      # packaging.requirements.Requirement chokes on e.g. '<4', so we try again.
-      try:
-        return requirements.Requirement(
-          '{}{}'.format(self._DEFAULT_INTERPRETER_TYPE, constraint_string))
-      except requirements.InvalidRequirement:
-        # We don't want to raise an error message with the hacked on interpreter type, just the
-        # original input.
-        raise orig_exc
-
   class CheckstyleRunError(TaskError):
 
     def __init__(self, num_failures, *args, **kwargs):
@@ -251,21 +228,25 @@ class Checkstyle(LintTaskMixin, Task):
       return
 
     if self.act_transitively:
-      targets = self.get_targets(self._is_checked)
+      all_targets = self.get_targets(self._is_checked)
     else:
-      targets = filter(self._is_checked, self.context.target_roots)
+      all_targets = filter(self._is_checked, self.context.target_roots)
 
-    with self.invalidated(targets) as invalidation_check:
+    with self.invalidated(all_targets) as invalidation_check:
       targets_by_compatibility, _ = self._interpreter_cache.partition_targets_by_compatibility(
         vt.target for vt in invalidation_check.invalid_vts)
       # TODO: Minimizing the number of interpreters used reduces the number of pexes we have to
       # create and invoke, which reduces the runtime of this task -- unfortunately, this is an
       # instance of general SAT and is a bit too much effort to implement right now, so we greedily
       # take the minimum here.
-      targets_by_min_interpreter = {
-        min(self._interpreter_cache.setup(filters=filters)):targets
+      # TODO: test for targets with different compatibility but same interpreter!
+      targets_with_min_interpreter = [
+        (min(self._interpreter_cache.setup(filters=filters)), targets)
         for filters, targets in targets_by_compatibility.items()
-      }
+      ]
+      targets_by_min_interpreter = defaultdict(list)
+      for (interpreter, targets) in targets_with_min_interpreter:
+        targets_by_min_interpreter[interpreter].extend(targets)
 
       failure_count = 0
 
