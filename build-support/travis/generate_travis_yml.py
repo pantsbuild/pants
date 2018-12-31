@@ -12,9 +12,13 @@ num_integration_shards = 7
 
 
 def generate_travis_yml():
-  template = pkg_resources.resource_string(__name__, 'travis.yml.mustache').decode('utf-8')
+  template = pkg_resources.resource_string(__name__,
+                                           'travis.yml.mustache').decode('utf-8')
+  before_install = pkg_resources.resource_string(__name__,
+                                                 'before_install.mustache').decode('utf-8')
   context = {
     'integration_shards': range(0, num_integration_shards),
     'integration_shards_length': num_integration_shards,
   }
-  print(pystache.render(template, context))
+  renderer = pystache.Renderer(partials={'before_install': before_install})
+  print(renderer.render(template, context))

@@ -141,15 +141,18 @@ linux_with_fuse: &linux_with_fuse
   before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo apt-get install -y pkg-config fuse libfuse-dev
-    - sudo modprobe fuse
-    - sudo chmod 666 /dev/fuse
-    - sudo chown root:$USER /etc/fuse.conf
+    # Increase the max number of user watches to ensure that watchman is able to watch all
+    # files in the working copy.
+    - sudo sysctl fs.inotify.max_user_watches=524288
     - pip install awscli
     # Multipart operations aren't supported for anonymous users, so we set the
     # threshold high to avoid them being used automatically by the aws cli.
     - aws configure set default.s3.multipart_threshold 1024MB
     - sudo apt-get install -y jq unzip
+    - sudo apt-get install -y pkg-config fuse libfuse-dev
+    - sudo modprobe fuse
+    - sudo chmod 666 /dev/fuse
+    - sudo chown root:$USER /etc/fuse.conf
 
 matrix:
   include:

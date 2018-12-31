@@ -3,7 +3,7 @@
 
 python_library(
   dependencies = [
-    ':travis_yml',
+    ':templates',
     '3rdparty/python:pystache',
     '3rdparty/python:setuptools',
   ]
@@ -19,6 +19,6 @@ python_binary(
 )
 
 resources(
-  name='travis_yml',
-  sources=['travis.yml.mustache']
+  name='templates',
+  sources=globs('*.mustache')
 )

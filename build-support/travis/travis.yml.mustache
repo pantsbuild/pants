@@ -93,16 +93,7 @@ default_test_config: &default_test_config
   language: python
   python: &python_version "2.7"
   before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    # Increase the max number of user watches to ensure that watchman is able to watch all
-    # files in the working copy.
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - pip install awscli
-    # Multipart operations aren't supported for anonymous users, so we set the
-    # threshold high to avoid them being used automatically by the aws cli.
-    - aws configure set default.s3.multipart_threshold 1024MB
-    - sudo apt-get install -y jq unzip
+{{>before_install}}
   before_script:
     # --no-sign-request allows access without credentials, as long as we specify the region.
     - NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versions
@@ -139,17 +130,11 @@ default_cron_test_config: &default_cron_test_config
 
 linux_with_fuse: &linux_with_fuse
   before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+{{>before_install}}
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
-    - pip install awscli
-    # Multipart operations aren't supported for anonymous users, so we set the
-    # threshold high to avoid them being used automatically by the aws cli.
-    - aws configure set default.s3.multipart_threshold 1024MB
-    - sudo apt-get install -y jq unzip
 
 matrix:
   include:
