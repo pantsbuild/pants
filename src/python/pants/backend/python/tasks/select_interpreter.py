@@ -56,10 +56,6 @@ class SelectInterpreter(Task):
     return [PythonInterpreter]
 
   def execute(self):
-    # NB: Downstream product consumers may need the selected interpreter for use with
-    # any type of importable Python target, including `PythonRequirementLibrary` targets
-    # (for use with the `repl` goal, for instance). For interpreter selection,
-    # we only care about targets with compatibility constraints.
     python_tgts_and_reqs = self.context.targets(
       lambda tgt: isinstance(tgt, (PythonTarget, PythonRequirementLibrary))
     )

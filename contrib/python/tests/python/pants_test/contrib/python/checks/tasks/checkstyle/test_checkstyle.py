@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import re
 import sys
 from builtins import str
 from contextlib import contextmanager
@@ -14,7 +15,6 @@ from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants.util.process_handler import subprocess
@@ -126,7 +126,7 @@ class CheckstyleTest(PythonTaskTestBase):
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_no_sources(self, unused_test_name, resolve_local):
-    self.assertEqual(0, self.execute_task(resolve_local=resolve_local))
+    self.execute_task(resolve_local=resolve_local)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_pass(self, unused_test_name, resolve_local):
@@ -135,7 +135,7 @@ class CheckstyleTest(PythonTaskTestBase):
                          pass
                      """))
     target = self.make_target('a/python:pass', PythonLibrary, sources=['pass.py'])
-    self.assertEqual(0, self.execute_task(target_roots=[target], resolve_local=resolve_local))
+    self.execute_task(target_roots=[target], resolve_local=resolve_local)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_failure(self, unused_test_name, resolve_local):
@@ -144,9 +144,17 @@ class CheckstyleTest(PythonTaskTestBase):
                           pass
                        """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
-    with self.assertRaises(TaskError) as task_error:
+    with self.assertRaisesRegexp(Checkstyle.CheckstyleRunError,
+                                 re.escape('1 Python Style issues found')):
       self.execute_task(target_roots=[target], resolve_local=resolve_local)
-    self.assertIn('1 Python Style issues found', str(task_error.exception))
+
+  @parameterized.expand(CHECKER_RESOLVE_METHOD)
+  def test_failure_py2_and_py3(self, unused_test_name, resolve_local):
+    target_py2 = self.create_py2_failing_target()
+    target_py3 = self.create_py3_failing_target()
+    with self.assertRaisesRegexp(Checkstyle.CheckstyleRunError,
+                                 re.escape('7 Python Style issues found')):
+      self.execute_task(target_roots=[target_py2, target_py3], resolve_local=resolve_local)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_suppressed_file_passes(self, unused_test_name, resolve_local):
@@ -158,7 +166,7 @@ class CheckstyleTest(PythonTaskTestBase):
     a/python/fail\.py::variable-names"""))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
     self.set_options(suppress=suppression_file)
-    self.assertEqual(0, self.execute_task(target_roots=[target], resolve_local=resolve_local))
+    self.execute_task(target_roots=[target], resolve_local=resolve_local)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_failure_fail_false(self, unused_test_name, resolve_local):
@@ -168,7 +176,8 @@ class CheckstyleTest(PythonTaskTestBase):
                      """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
     self.set_options(fail=False)
-    self.assertEqual(1, self.execute_task(target_roots=[target], resolve_local=resolve_local))
+    with self.assertRaises(Checkstyle.CheckstyleRunError):
+      self.execute_task(target_roots=[target], resolve_local=resolve_local)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_syntax_error(self, unused_test_name, resolve_local):
@@ -177,46 +186,5 @@ class CheckstyleTest(PythonTaskTestBase):
                        """))
     target = self.make_target('a/python:error', PythonLibrary, sources=['error.py'])
     self.set_options(fail=False)
-    self.assertEqual(1, self.execute_task(target_roots=[target], resolve_local=resolve_local))
-
-  def test_lint_runs_for_blanket_whitelist(self):
-    target_py2 = self.create_py2_failing_target()
-    target_py3 = self.create_py3_failing_target()
-    self.set_options(interpreter_constraints_whitelist=[])
-    with self.assertRaises(TaskError) as task_error:
-      self.execute_task(target_roots=[target_py2, target_py3])
-    self.assertIn('7 Python Style issues found', str(task_error.exception))
-
-  def test_lint_runs_for_default_constraints_only(self):
-    target_py2 = self.create_py2_failing_target()
-    target_py3 = self.create_py3_failing_target()
-    with self.assertRaises(TaskError) as task_error:
-      self.execute_task(target_roots=[target_py2, target_py3])
-    self.assertIn('4 Python Style issues found', str(task_error.exception))
-
-  def test_lint_ignores_unwhitelisted_constraints(self):
-    target_py3 = self.create_py3_failing_target()
-    self.assertEqual(0, self.execute_task(target_roots=[target_py3]))
-
-  def test_lint_runs_for_single_whitelisted_constraints(self):
-    target_py3 = self.create_py3_failing_target()
-    self.set_options(interpreter_constraints_whitelist=[self.py3_constraint])
-    with self.assertRaises(TaskError) as task_error:
-      self.execute_task(target_roots=[target_py3])
-    self.assertIn('3 Python Style issues found', str(task_error.exception))
-
-  def test_lint_runs_for_multiple_whitelisted_constraints(self):
-    target_py2 = self.create_py2_failing_target()
-    target_py3 = self.create_py3_failing_target()
-    self.set_options(interpreter_constraints_whitelist=[self.py2_constraint, self.py3_constraint])
-    with self.assertRaises(TaskError) as task_error:
-      self.execute_task(target_roots=[target_py2, target_py3])
-    self.assertIn('7 Python Style issues found', str(task_error.exception))
-
-  def test_lint_runs_for_default_constraints_and_matching_whitelist(self):
-    target_py2 = self.create_py2_failing_target()
-    target_py3 = self.create_py3_failing_target()
-    self.set_options(interpreter_constraints_whitelist=[self.py3_constraint])
-    with self.assertRaises(TaskError) as task_error:
-      self.execute_task(target_roots=[target_py2, target_py3])
-    self.assertIn('7 Python Style issues found', str(task_error.exception))
+    with self.assertRaises(Checkstyle.CheckstyleRunError):
+      self.execute_task(target_roots=[target], resolve_local=resolve_local)
