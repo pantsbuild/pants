@@ -32,3 +32,11 @@ else
   # fails in pants changed.
   echo "* Skipping import/lint checks in partial working copy."
 fi
+
+if git diff master --name-only | grep build-support/travis > /dev/null; then
+  echo "* Checking .travis.yml generation" && \
+  actual_travis_yml=$(<.travis.yml) && \
+  expected_travis_yml=$(./pants --quiet run build-support/travis:generate_travis_yml) && \
+  [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
+  die "Travis config generator changed but .travis.yml file not regenerated. See top of that file for instructions."
+fi
