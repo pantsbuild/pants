@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import pkg_resources
 import pystache
 
+
 num_integration_shards = 7
 
 
@@ -17,4 +18,3 @@ def generate_travis_yml():
     'integration_shards_length': num_integration_shards,
   }
   print(pystache.render(template, context))
-
