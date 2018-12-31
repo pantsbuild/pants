@@ -26,7 +26,7 @@ class BinaryUtilIntegrationTest(unittest.TestCase):
   def test_fetch_cmake_success(self):
     self.assertEqual(
       0,
-      subprocess.check_call([self.script_path, 'cmake', '3.9.5']))
+      subprocess.check_call([self.script_path, 'cmake', '3.9.5', 'cmake.tar.gz']))
 
   def test_fetch_nonexistent_tool_failure(self):
     try:
