@@ -105,11 +105,12 @@ class Checkstyle(LintTaskMixin, Task):
 
     if pants_dev_mode:
       checker_id = self.checker_target.transitive_invalidation_hash()
+      pex_base_dir = self.workdir
     else:
       checker_id = hash_all([self._CHECKER_REQ])
+      pex_base_dir = os.path.join(get_pants_cachedir(), 'python-checkstyle-checker')
 
-    pex_path = os.path.join(
-      get_pants_cachedir(), 'python-checkstyle-checker', checker_id, str(interpreter.identity))
+    pex_path = os.path.join(pex_base_dir, checker_id, str(interpreter.identity))
 
     if not os.path.exists(pex_path):
       with self.context.new_workunit(name='build-checker'):
