@@ -288,6 +288,9 @@ class Checkstyle(LintTaskMixin, Task):
       failure_count = 0
 
       for interpreter, targets in targets_by_min_interpreter.items():
+        if interpreter.identity.version[0] == 3:
+          if not self.get_options().enable_py3_lint:
+            continue
         sources_for_targets = self.calculate_sources(targets)
         if sources_for_targets:
           failure_count += self.checkstyle(interpreter, sources_for_targets)
