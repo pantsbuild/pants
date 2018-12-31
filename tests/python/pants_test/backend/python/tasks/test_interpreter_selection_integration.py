@@ -8,7 +8,9 @@ import os
 
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
-from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27, skip_unless_python3,
+from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27,
+                                                                   python_interpreter_path,
+                                                                   skip_unless_python3,
                                                                    skip_unless_python27)
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -89,4 +91,5 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
           '--python-setup-interpreter-constraints={}'.format(constraint)
         ]
     command = ['binary', binary_target] + args
-    return self.run_pants(command=command, config=config)
+    path = os.path.dirname(python_interpreter_path(version))
+    return self.run_pants(command=command, config=config, extra_env={'PATH': path})

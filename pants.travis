@@ -6,17 +6,4 @@ set -e
 # a bootstrapping, which we don't want. So we shim in this alternative runner, which
 # calls the already-bootstrapped pants.pex.
 
-#function pythondir {
-#  python_bin=$(pyenv which $1 2>/dev/null)
-#  if [ -n "${python_bin}" ]; then
-#    echo $(dirname ${python_bin})
-#  fi
-#}
-
-#python2=$(pythondir python2)
-#python3=$(pythondir python3)
-#path=${PATH}:${python2}:${python3}
-
-#PATH=${path} LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 $(dirname "$0")/pants.pex "$@"
-
 exec $(dirname "$0")/pants.pex "$@"
