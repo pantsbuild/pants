@@ -95,29 +95,8 @@ default_test_config: &default_test_config
   before_install:
 {{>before_install}}
   before_script:
-    # --no-sign-request allows access without credentials, as long as we specify the region.
-    - >
-      NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versions
-          --bucket ${BOOTSTRAPPED_PEX_BUCKET} --prefix ${BOOTSTRAPPED_PEX_KEY} --max-items 2
-      | jq '.Versions | length')
-    - >
-      if [ "${NUM_VERSIONS}" != "1" ]; then
-        echo "Error: Found ${NUM_VERSIONS} versions for ${BOOTSTRAPPED_PEX_URL}"
-        exit 1
-      fi
-    - aws --no-sign-request --region us-east-1 s3 cp ${BOOTSTRAPPED_PEX_URL} ./pants.pex
-    - chmod 755 ./pants.pex
-    # Pants code executing under test expects the native_engine.so to be present as a resource
-    # in the source tree. Normally it'll be there because we created it there during bootstrapping.
-    # So here we have to manually extract it there from the bootstrapped pex.
-    - unzip -j pants.pex pants/engine/native_engine.so -d src/python/pants/engine/
-    # Our integration tests shell out to `./pants`, which will bootstrap the native code
-    # all over again, so it can run from sources. But since the pex was built from the same
-    # sources, we can invoke it directly to the same effect. However we do need to make sure that
-    # its PATH will enable it to find whatever python interpreter is mentioned in its shebang, even
-    # if run from a hermetic integration test. The ./pants.travis script takes care of this.
-    - mv ./pants ./pants.bak
-    - mv ./pants.travis ./pants
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh
+
 
 osx_test_config: &osx_test_config
   os: osx
