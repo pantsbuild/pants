@@ -224,27 +224,8 @@ class Checkstyle(LintTaskMixin, Task):
                                         .format(filt, str(orig_error)),
                                         orig_error)
 
-  def _constraints_probably_include_py3(self, filters):
-    # NB: I've spent too much time trying to figure out if this catches every possible case.
-    parsed_constraints = [self._parse_requirement(f) for f in filters]
-    for pc in parsed_constraints:
-      specifier_set = pc.specifier
-      if '3' in specifier_set:
-        return True
-      if '3.9999' in specifier_set:
-        return True
-      non_py3_version_included = False
-      for spec in specifier_set:
-        if spec.version.startswith('3'):
-          if spec.operator in ['<=', '==', '=>']:
-            return True
-        else:
-          non_py3_version_included = True
-      # If there are only py3 constraints mentioned, and pants can resolve an interpreter for it,
-      # and '3' and '3.9999' aren't included, I'm pretty sure that means this is definitely py3.
-      if not non_py3_version_included:
-        return True
-    return False
+  def _interpreter_is_py3(self, interpreter):
+    return interpreter.identity.version[0] == 3
 
   def _partition_targets_by_min_interpreter(self, tgts):
     targets_by_compatibility, _ = self._interpreter_cache.partition_targets_by_compatibility(tgts)
@@ -255,9 +236,10 @@ class Checkstyle(LintTaskMixin, Task):
     targets_by_min_interpreter = defaultdict(list)
     py3_compatible_target_encountered = False
     for filters, targets in targets_by_compatibility.items():
-      if self._constraints_probably_include_py3(filters):
+      matching_interpreters = self._interpreter_cache.setup(filters=filters)
+      if any(self._interpreter_is_py3(interp) for interp in matching_interpreters):
         py3_compatible_target_encountered = True
-      min_interpreter = min(self._interpreter_cache.setup(filters=filters))
+      min_interpreter = min(matching_interpreters)
       targets_by_min_interpreter[min_interpreter].extend(targets)
     return (targets_by_min_interpreter, py3_compatible_target_encountered)
 
@@ -296,7 +278,7 @@ class Checkstyle(LintTaskMixin, Task):
 
       failures_by_min_interpreter = {}
       for interpreter, targets in targets_by_min_interpreter.items():
-        if interpreter.identity.version[0] == 3:
+        if self._interpreter_is_py3(interpreter):
           if not self.get_options().enable_py3_lint:
             continue
         sources_for_targets = self.calculate_sources(targets)
