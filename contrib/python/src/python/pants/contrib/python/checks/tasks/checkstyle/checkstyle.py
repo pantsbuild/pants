@@ -259,7 +259,12 @@ class Checkstyle(LintTaskMixin, Task):
       targets_by_min_interpreter[min_interpreter].extend(targets)
     return (targets_by_min_interpreter, py3_compatible_target_encountered)
 
-  class CheckstyleRunError(TaskError): pass
+  class CheckstyleRunError(TaskError):
+
+    def __init__(self, py3_was_encountered, failures_by_min_interpreter, *args, **kwargs):
+      self.py3_was_encountered = py3_was_encountered
+      self.failures_by_min_interpreter = failures_by_min_interpreter
+      super(Checkstyle.CheckstyleRunError, self).__init__(*args, **kwargs)
 
   def execute(self):
     """"Run Checkstyle on all found non-synthetic source files."""
@@ -272,12 +277,12 @@ class Checkstyle(LintTaskMixin, Task):
       all_targets = filter(self._is_checked, self.context.target_roots)
 
     with self.invalidated(all_targets) as invalidation_check:
-      targets_by_min_interpreter, py3_encountered = self._partition_targets_by_min_interpreter(
+      targets_by_min_interpreter, py3_was_encountered = self._partition_targets_by_min_interpreter(
         vt.target for vt in invalidation_check.invalid_vts)
 
       # TODO: consider changing the language here to "upcoming" instead of "deprecated".
       deprecated_conditional(
-        predicate=lambda: py3_encountered and not self.get_options().enable_py3_lint,
+        predicate=lambda: py3_was_encountered and not self.get_options().enable_py3_lint,
         removal_version='1.14.0.dev2',
         entity_description="This warning",
         hint_message=(
@@ -287,19 +292,22 @@ class Checkstyle(LintTaskMixin, Task):
 
       failure_count = 0
 
+      failures_by_min_interpreter = {}
       for interpreter, targets in targets_by_min_interpreter.items():
         if interpreter.identity.version[0] == 3:
           if not self.get_options().enable_py3_lint:
             continue
         sources_for_targets = self.calculate_sources(targets)
         if sources_for_targets:
-          failure_count += self.checkstyle(interpreter, sources_for_targets)
+          cur_failure_count = self.checkstyle(interpreter, sources_for_targets)
+          failures_by_min_interpreter[interpreter] = cur_failure_count
+          failure_count += cur_failure_count
 
       if failure_count > 0:
         err_msg = ('{} Python Style issues found. You may try `./pants fmt <targets>`.'
                    .format(failure_count))
         if self.get_options().fail:
-          raise self.CheckstyleRunError(err_msg)
+          raise self.CheckstyleRunError(py3_was_encountered, failures_by_min_interpreter, err_msg)
         else:
           self.context.log.warn(err_msg)
 

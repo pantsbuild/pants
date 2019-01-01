@@ -153,9 +153,22 @@ class CheckstyleTest(PythonTaskTestBase):
   def test_failure_py2_and_py3(self):
     target_py2 = self.create_py2_failing_target()
     target_py3 = self.create_py3_failing_target()
-    with self.assertRaisesRegexp(Checkstyle.CheckstyleRunError,
-                                 re.escape('7 Python Style issues found')):
+    self.set_options(enable_py3_lint=True)
+    with self.assertRaises(Checkstyle.CheckstyleRunError) as cm:
       self.execute_task(target_roots=[target_py2, target_py3])
+    self.assertIn('7 Python Style issues found', str(cm.exception))
+    # Two different interpreters should have been selected.
+    self.assertEqual(2, len(cm.exception.failures_by_min_interpreter))
+    # One of the interpreters should have been python 3.
+    self.assertTrue(cm.exception.py3_was_encountered)
+
+  def test_py3_skipped(self):
+    target_py3 = self.create_py3_failing_target()
+    self.set_options(enable_py3_lint=False)
+    with self.captured_logging(logging.WARNING) as captured:
+      self.execute_task(target_roots=[target_py3])
+      self.assertIn('Python 3 linting is currently experimental.',
+                    str(assert_single_element(captured.warnings())))
 
   def test_failure_same_interpreter_different_constraints(self):
     target_py2 = self.create_py2_failing_target()
@@ -168,9 +181,15 @@ class CheckstyleTest(PythonTaskTestBase):
       # This will also choose a python 2.7 interpreter, but technically has different filters than
       # self.py2_constraint. Both of these targets should have lint run.
       compatibility=['CPython>=2.7,<2.8'])
-    with self.assertRaisesRegexp(Checkstyle.CheckstyleRunError,
-                                 re.escape('5 Python Style issues found')):
+    with self.assertRaises(Checkstyle.CheckstyleRunError) as cm:
       self.execute_task(target_roots=[target_py2, target_py2_different])
+    self.assertIn('5 Python Style issues found', str(cm.exception))
+    # Assert that only a single checker pex was created and invoked, because the same interpreter
+    # should have been resolved for both targets.
+    self.assertEqual(1, len(cm.exception.failures_by_min_interpreter))
+    self.assertEqual(5, cm.exception.failures_by_min_interpreter.values()[0])
+    # Assert that there was no python 3-compatible target linted.
+    self.assertFalse(cm.exception.py3_was_encountered)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_suppressed_file_passes(self, unused_test_name, resolve_local):
