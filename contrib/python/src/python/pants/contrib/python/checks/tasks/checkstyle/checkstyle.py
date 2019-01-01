@@ -198,8 +198,12 @@ class Checkstyle(LintTaskMixin, Task):
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT],
                                      cmd=' '.join(checker.cmdline(args))) as workunit:
         return checker.run(args=args,
-                                    stdout=workunit.output('stdout'),
-                                    stderr=workunit.output('stderr'))
+                           stdout=workunit.output('stdout'),
+                           stderr=workunit.output('stderr'),
+                           # Overriding PEX_PYTHON_PATH is necessary to satisfy the interpreter
+                           # constraint we added when creating the checker pex to guard against a
+                           # pexrc.
+                           env={'PEX_PYTHON_PATH': interpreter.binary})
 
   def _constraints_are_whitelisted(self, constraint_tuple):
     """
