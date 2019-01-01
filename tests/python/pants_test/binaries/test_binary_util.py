@@ -353,7 +353,7 @@ pants_bootstrapdir: {}
 """.format(tmp_dir), binary_mode=False)
       expected_output_glob = os.path.join(
         tmp_dir, 'bin', 'cmake', '*', '*', '3.9.5', 'cmake')
-      with environment_as(PANTS_PANTS_CONFIG_FILES='[{!r}]'.format(config_file_loc)):
+      with environment_as(PANTS_CONFIG_FILES='[{!r}]'.format(config_file_loc)):
         # Ignore the first argument, as per sys.argv.
         output_file = select(['_', 'cmake', '3.9.5', 'cmake.tar.gz'])
       self.assertTrue(is_readable_dir(output_file))
