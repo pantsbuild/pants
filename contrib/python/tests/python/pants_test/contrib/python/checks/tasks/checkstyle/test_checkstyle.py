@@ -102,7 +102,8 @@ class CheckstyleTest(PythonTaskTestBase):
 
   def execute_task(self, target_roots=None, resolve_local=False):
     with self.resolve_configuration(resolve_local=resolve_local):
-      with environment_as(PANTS_DEV=None, PEX_VERBOSE='9'):
+      # We are testing the python checkstyle task, not the checkers themselves.
+      with environment_as(PANTS_USE_DEV_SOURCES='False', PEX_VERBOSE='9'):
         context = self.context(target_roots=target_roots)
         return self.create_task(context).execute()
 
