@@ -80,7 +80,7 @@ class Checkstyle(LintTaskMixin, Task):
              help='If disabled, prevent pants from exiting with a failure, but still produce '
                   'output for style problems.')
     register('--enable-py3-lint', fingerprint=True, default=True, type=bool,
-             removal_version='1.14.0.dev0',
+             removal_version='1.14.0.dev2',
              removal_hint='Python 3 linting will eventually be turned on without a flag',
              help='Enable linting on Python 3-compatible targets.')
 
@@ -267,7 +267,7 @@ class Checkstyle(LintTaskMixin, Task):
       # TODO: consider changing the language here to "upcoming" instead of "deprecated".
       deprecated_conditional(
         predicate=lambda: py3_was_encountered and not self.get_options().enable_py3_lint,
-        removal_version='1.14.0.dev0',
+        removal_version='1.14.0.dev2',
         entity_description="This warning",
         hint_message=(
           "Python 3 linting is currently experimental. Add --{}-enable-py3-lint to the "
