@@ -131,7 +131,7 @@ class TestRunnerTaskMixin(HasSkipGoalOptionMixin):
       self.context.log.error(message)
       raise ErrorWhileTesting(message)
 
-    if not self.get_options().skip:
+    if not self.skip_execution:
       test_targets = self._get_test_targets()
       for target in test_targets:
         self._validate_target(target)

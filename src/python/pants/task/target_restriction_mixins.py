@@ -67,7 +67,7 @@ class SkipOptionRegistrar(object):
 
 
 class HasSkipGoalOptionMixin(GoalOptionsMixin, HasSkipOptionMixin):
-  """A mixin for tasks that have a --skip option."""
+  """A mixin for tasks that have a --skip option at the goal level."""
   pass
 
 
