@@ -165,10 +165,8 @@ class CheckstyleTest(PythonTaskTestBase):
   def test_py3_skipped(self):
     target_py3 = self.create_py3_failing_target()
     self.set_options(enable_py3_lint=False)
-    with self.captured_logging(logging.WARNING) as captured:
-      self.execute_task(target_roots=[target_py3])
-      self.assertIn('Python 3 linting is currently experimental.',
-                    str(assert_single_element(captured.warnings())))
+    # The task will succeed (with a deprecation warning), so no exception is raised.
+    self.execute_task(target_roots=[target_py3])
 
   def test_failure_same_interpreter_different_constraints(self):
     target_py2 = self.create_py2_failing_target()
