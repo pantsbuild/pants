@@ -128,6 +128,7 @@ class CheckstyleTest(PythonTaskTestBase):
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_no_sources(self, unused_test_name, resolve_local):
+    self.set_options(enable_py3_lint=True)
     self.execute_task(resolve_local=resolve_local)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
@@ -137,6 +138,7 @@ class CheckstyleTest(PythonTaskTestBase):
                          pass
                      """))
     target = self.make_target('a/python:pass', PythonLibrary, sources=['pass.py'])
+    self.set_options(enable_py3_lint=True)
     self.execute_task(target_roots=[target], resolve_local=resolve_local)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
@@ -146,6 +148,8 @@ class CheckstyleTest(PythonTaskTestBase):
                           pass
                        """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
+    # Needed for when pants runs in a python 3 interpreter.
+    self.set_options(enable_py3_lint=True)
     with self.assertRaisesRegexp(Checkstyle.CheckstyleRunError,
                                  re.escape('1 Python Style issues found')):
       self.execute_task(target_roots=[target], resolve_local=resolve_local)
@@ -184,8 +188,7 @@ class CheckstyleTest(PythonTaskTestBase):
     self.assertIn('5 Python Style issues found', str(cm.exception))
     # Assert that only a single checker pex was created and invoked, because the same interpreter
     # should have been resolved for both targets.
-    self.assertEqual(1, len(cm.exception.failures_by_min_interpreter))
-    self.assertEqual(5, cm.exception.failures_by_min_interpreter.values()[0])
+    self.assertEqual(5, assert_single_element(cm.exception.failures_by_min_interpreter.values()))
     # Assert that there was no python 3-compatible target linted.
     self.assertFalse(cm.exception.py3_was_encountered)
 
@@ -198,7 +201,7 @@ class CheckstyleTest(PythonTaskTestBase):
     suppression_file = self.create_file('suppress.txt', contents=dedent("""
     a/python/fail\.py::variable-names"""))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
-    self.set_options(suppress=suppression_file)
+    self.set_options(suppress=suppression_file, enable_py3_lint=True)
     self.execute_task(target_roots=[target], resolve_local=resolve_local)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
@@ -208,7 +211,7 @@ class CheckstyleTest(PythonTaskTestBase):
                           pass
                      """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
-    self.set_options(fail=False)
+    self.set_options(fail=False, enable_py3_lint=True)
     with self.captured_logging(logging.WARNING) as captured:
       self.execute_task(target_roots=[target], resolve_local=resolve_local)
       self.assertIn('1 Python Style issues found', str(assert_single_element(captured.warnings())))
@@ -219,7 +222,7 @@ class CheckstyleTest(PythonTaskTestBase):
                          invalid python
                        """))
     target = self.make_target('a/python:error', PythonLibrary, sources=['error.py'])
-    self.set_options(fail=False)
+    self.set_options(fail=False, enable_py3_lint=True)
     with self.captured_logging(logging.WARNING) as captured:
       self.execute_task(target_roots=[target], resolve_local=resolve_local)
       self.assertIn('1 Python Style issues found', str(assert_single_element(captured.warnings())))
