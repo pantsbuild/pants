@@ -691,7 +691,7 @@ keywords=[], starargs=None, kwargs=None))
 """)
     with self.assertRaisesRegexp(_RuleVisitor.YieldVisitError, expected_rx_str):
       @rule(A, [])
-      def f():
+      def g():
         yield Get(B, D, D())
         yield A()
         return
