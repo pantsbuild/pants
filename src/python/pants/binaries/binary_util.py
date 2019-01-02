@@ -487,11 +487,11 @@ See binary_util.py for more information.
   return parser
 
 
-def main():
+def select(argv):
   # Parse positional arguments to the script.
-  args = _create_bootstrap_binary_arg_parser().parse_args()
+  args = _create_bootstrap_binary_arg_parser().parse_args(argv[1:])
   # Resolve bootstrap options with a fake empty command line.
-  options_bootstrapper = OptionsBootstrapper.create(args=[sys.argv[0]])
+  options_bootstrapper = OptionsBootstrapper.create(args=[argv[0]])
   subsystems = (GlobalOptionsRegistrar, BinaryUtil.Factory)
   known_scope_infos = reduce(set.union, (ss.known_scope_infos() for ss in subsystems), set())
   options = options_bootstrapper.get_full_options(known_scope_infos)
@@ -521,10 +521,9 @@ def main():
     platform_dependent=True,
     external_url_generator=None,
     archiver=archiver_for_current_binary)
-  path = binary_util.select(binary_request)
 
-  print(path)
+  return binary_util.select(binary_request)
 
 
 if __name__ == '__main__':
-  main()
+  print(select(sys.argv))
