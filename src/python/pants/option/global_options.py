@@ -383,10 +383,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
 
-    register('--use-dev-sources', advanced=True, type=bool, default=False,
-             help='Signal that pants is running in its own repo, and certain packages such as '
-                  'checkstyle checkers should be loaded from source instead of 3rdparty.')
-
   @classmethod
   def validate_instance(cls, opts):
     """Validates an instance of global options for cases that are not prohibited via registration.
