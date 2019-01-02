@@ -145,6 +145,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':selectors',
     'src/python/pants/base:specs',
+    'src/python/pants/util:collections',
     'src/python/pants/util:objects',
   ]
 )

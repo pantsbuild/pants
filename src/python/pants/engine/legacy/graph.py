@@ -441,6 +441,7 @@ def find_owners(symbol_table, address_mapper, owners_request):
   # If the OwnersRequest does not require dependees, then we're done.
   if owners_request.include_dependees == 'none':
     yield BuildFileAddresses(direct_owners)
+    return
   else:
     # Otherwise: find dependees.
     all_addresses = yield Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
@@ -452,9 +453,11 @@ def find_owners(symbol_table, address_mapper, owners_request):
                                           all_structs)
     if owners_request.include_dependees == 'direct':
       yield BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
+      return
     else:
       assert owners_request.include_dependees == 'transitive'
       yield BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
+      return
 
 
 @rule(TransitiveHydratedTargets, [Select(BuildFileAddresses)])
@@ -481,12 +484,14 @@ def transitive_hydrated_targets(build_file_addresses):
     to_visit.extend(tht.dependencies)
 
   yield TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
+  return
 
 
 @rule(TransitiveHydratedTarget, [Select(HydratedTarget)])
 def transitive_hydrated_target(root):
   dependencies = yield [Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies]
   yield TransitiveHydratedTarget(root, dependencies)
+  return
 
 
 @rule(HydratedTargets, [Select(BuildFileAddresses)])
@@ -494,6 +499,7 @@ def hydrated_targets(build_file_addresses):
   """Requests HydratedTarget instances for BuildFileAddresses."""
   targets = yield [Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses]
   yield HydratedTargets(targets)
+  return
 
 
 class HydratedField(datatype(['name', 'value'])):
@@ -515,6 +521,7 @@ def hydrate_target(target_adaptor_container):
   yield HydratedTarget(target_adaptor.address,
                         TargetAdaptor(**kwargs),
                         tuple(target_adaptor.dependencies))
+  return
 
 
 def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
@@ -545,6 +552,7 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
     snapshot)
   sources_field.validate_fn(fileset_with_spec)
   yield HydratedField(sources_field.arg, fileset_with_spec)
+  return
 
 
 @rule(HydratedField, [Select(BundlesField), Select(GlobMatchErrorBehavior)])
@@ -574,6 +582,7 @@ def hydrate_bundles(bundles_field, glob_match_error_behavior):
                                                  include_dirs=True)
     bundles.append(BundleAdaptor(**kwargs))
   yield HydratedField('bundles', bundles)
+  return
 
 
 def create_legacy_graph_tasks():

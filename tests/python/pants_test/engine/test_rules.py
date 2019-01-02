@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
+import sys
 import unittest
 from builtins import object, str
 from textwrap import dedent
@@ -12,12 +14,14 @@ from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import RootRule, RuleIndex, SingletonRule, _GoalProduct, console_rule, rule
+from pants.engine.rules import (RootRule, RuleIndex, SingletonRule, _GoalProduct, _RuleVisitor,
+                                console_rule, rule)
 from pants.engine.selectors import Get, Select
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.util import (TargetTable, assert_equal_with_printing, create_scheduler,
                                     run_rule)
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class A(object):
@@ -669,6 +673,46 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "(B, [Select(D)], b_from_d) for D" -> {"Param(D)"}
                      }""").strip(),
                                     subgraph)
+
+  def test_validate_yield_statements(self):
+    expected_rx_str = re.escape("""\
+Yield(value=Call(func=Name(id='A', ctx=Load()), args=[], keywords=[], starargs=None, kwargs=None))
+""")
+    with self.assertRaisesRegexp(_RuleVisitor.YieldVisitError, expected_rx_str):
+      @rule(A, [])
+      def f():
+        yield A()
+
+    expected_rx_str = re.escape("""\
+Yield(value=Call(func=Name(id='Get', ctx=Load()), args=[\
+Name(id='B', ctx=Load()), Name(id='D', ctx=Load()), \
+Call(func=Name(id='D', ctx=Load()), args=[], keywords=[], starargs=None, kwargs=None)], \
+keywords=[], starargs=None, kwargs=None))
+""")
+    with self.assertRaisesRegexp(_RuleVisitor.YieldVisitError, expected_rx_str):
+      @rule(A, [])
+      def f():
+        yield Get(B, D, D())
+        yield A()
+        return
+
+  def test_validate_yield_error_location(self):
+    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
+      @rule(A, [])
+      def f():
+        yield A()
+    exc_msg = str(cm.exception)
+    # Correctly matches the function name.
+    self.assertIn('In function f:', exc_msg)
+    # Matches the line number of the @rule decorator.
+    match_regexp = re.compile(r'^.*test_rules.py:{}:'.format(sys._getframe().f_lineno - 7),
+                              flags=re.MULTILINE)
+    assertRegex(self, exc_msg, match_regexp)
+    # Shows sufficient context around the rule definition to locate it.
+    self.assertIn("""\
+      @rule(A, [])
+      def f():
+""", exc_msg)
 
   def create_full_graph(self, rules, validate=True):
     scheduler = create_scheduler(rules, validate=validate)

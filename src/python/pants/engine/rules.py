@@ -18,6 +18,7 @@ from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
 from pants.engine.selectors import Get, type_or_constraint_repr
+from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 from pants.util.objects import Exactly, datatype
@@ -27,14 +28,65 @@ logger = logging.getLogger(__name__)
 
 
 class _RuleVisitor(ast.NodeVisitor):
-  def __init__(self):
+  """Pull `Get` calls out of an @rule body and validate `yield` statements."""
+
+  def __init__(self, func, frame, parents_table, siblings_table):
     super(_RuleVisitor, self).__init__()
     self.gets = []
+    self._func = func
+    self._frame = frame
+    self._parents_table = parents_table
+    self._siblings_table = siblings_table
+    self._yields_in_assignments = set()
 
   def visit_Call(self, node):
-    if not isinstance(node.func, ast.Name) or node.func.id != Get.__name__:
-      return
-    self.gets.append(Get.extract_constraints(node))
+    if isinstance(node.func, ast.Name) and node.func.id == Get.__name__:
+      self.gets.append(Get.extract_constraints(node))
+
+  def visit_Assign(self, node):
+    if isinstance(node.value, ast.Yield):
+      self._yields_in_assignments.add(node.value)
+    self.generic_visit(node)
+
+  class YieldVisitError(Exception):
+    def __init__(self, node, func, frame, msg, *args, **kwargs):
+      filename, line_number, _, context_lines, _ = inspect.getframeinfo(frame, context=4)
+      err_msg = ("""\
+In function {func_name}: {msg}
+{filename}:{line_number}:
+{context_lines}
+
+The invalid `yield` statement (in the body of the above function) was: {node}
+""".format(func_name=func.__name__, msg=msg,
+           filename=filename, line_number=line_number,
+           context_lines=''.join(context_lines).strip(),
+           node=ast.dump(node)))
+      super(_RuleVisitor.YieldVisitError, self).__init__(err_msg, *args, **kwargs)
+
+  def visit_Yield(self, node):
+    # A yield outside of an assignment is only allowed to be immediately preceding a final `return`.
+    if node in self._yields_in_assignments:
+      self.generic_visit(node)
+    else:
+      # Get the position of the current yield (which is part of an Expr stmt).
+      expr_for_yield = self._parents_table[node]
+      parent_stmt = self._parents_table[expr_for_yield]
+      sibling_stmts = self._siblings_table[parent_stmt]
+      yield_stmt_sibling_index = sibling_stmts.index(expr_for_yield)
+
+      found_invalid_yield = False
+      next_sibling = None
+      if yield_stmt_sibling_index == (len(sibling_stmts) - 1):
+        found_invalid_yield = True
+      else:
+        next_sibling = sibling_stmts[yield_stmt_sibling_index + 1]
+        if not (isinstance(next_sibling, ast.Return) and next_sibling.value is None):
+          found_invalid_yield = True
+      if found_invalid_yield:
+        raise self.YieldVisitError(
+          node, self._func, self._frame,
+          'A yield in an @rule without an assignment must have an empty `return` as the final '
+          'statement immediately after.')
 
 
 class _GoalProduct(object):
@@ -116,11 +168,23 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       return resolved
 
     gets = OrderedSet()
-    for node in ast.iter_child_nodes(module_ast):
-      if isinstance(node, ast.FunctionDef) and node.name == func.__name__:
-        rule_visitor = _RuleVisitor()
-        rule_visitor.visit(node)
-        gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
+    rule_func_node = assert_single_element(
+      node for node in ast.iter_child_nodes(module_ast)
+      if isinstance(node, ast.FunctionDef) and node.name == func.__name__
+    )
+
+    siblings_table = {}
+    parents_table = {}
+    for parent in ast.walk(rule_func_node):
+      children_ordered = []
+      for child in ast.iter_child_nodes(parent):
+        parents_table[child] = parent
+        children_ordered.append(child)
+      siblings_table[parent] = children_ordered
+
+    rule_visitor = _RuleVisitor(func, caller_frame, parents_table, siblings_table)
+    rule_visitor.visit(rule_func_node)
+    gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
 
     # For @console_rule, redefine the function to avoid needing a literal return of the output type.
     if for_goal:

@@ -49,5 +49,6 @@ def coordinator_of_tests(target):
   if target.adaptor.type_alias == 'python_tests':
     result = yield Get(PyTestResult, HydratedTarget, target)
     yield TestResult(status=result.status, stdout=result.stdout)
+    return
   else:
     raise Exception("Didn't know how to run tests for type {}".format(target.adaptor.type_alias))

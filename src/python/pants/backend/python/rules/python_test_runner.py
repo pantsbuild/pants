@@ -102,3 +102,4 @@ def run_python_test(transitive_hydrated_target):
   status = Status.SUCCESS if result.exit_code == 0 else Status.FAILURE
 
   yield PyTestResult(status=status, stdout=str(result.stdout))
+  return
