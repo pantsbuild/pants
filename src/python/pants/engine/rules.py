@@ -75,7 +75,6 @@ The invalid `yield` statement (in the body of the above function) was: {node}
       yield_stmt_sibling_index = sibling_stmts.index(expr_for_yield)
 
       found_invalid_yield = False
-      next_sibling = None
       if yield_stmt_sibling_index == (len(sibling_stmts) - 1):
         found_invalid_yield = True
       else:
