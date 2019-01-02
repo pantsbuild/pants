@@ -88,7 +88,7 @@ class GrpcioPrep(Task):
   def register_options(cls, register):
     register(
       '--grpcio-version',
-      default='1.17.1',
+      default='1.17.2',
       help='The version of grpcio to use.')
 
   @classmethod
