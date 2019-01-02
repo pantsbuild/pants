@@ -16,7 +16,11 @@
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![allow(clippy::len_without_is_empty, clippy::redundant_field_names)]
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
+)]
 // Default isn't as big a deal as people seem to think it is.
 #![allow(
   clippy::new_without_default,
@@ -125,6 +129,7 @@ pub extern "C" fn externs_set(
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
   store_tuple: StoreTupleExtern,
+  store_dict: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
   store_utf8: StoreUtf8Extern,
   store_i64: StoreI64Extern,
@@ -150,6 +155,7 @@ pub extern "C" fn externs_set(
     satisfied_by,
     satisfied_by_type,
     store_tuple,
+    store_dict,
     store_bytes,
     store_utf8,
     store_i64,

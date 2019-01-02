@@ -13,7 +13,11 @@
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![allow(clippy::len_without_is_empty, clippy::redundant_field_names)]
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
+)]
 // Default isn't as big a deal as people seem to think it is.
 #![allow(
   clippy::new_without_default,

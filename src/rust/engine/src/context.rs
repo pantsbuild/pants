@@ -49,7 +49,6 @@ pub struct Core {
 }
 
 impl Core {
-  #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
   pub fn new(
     root_subject_types: Vec<TypeId>,
     tasks: Tasks,
