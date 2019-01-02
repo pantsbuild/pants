@@ -1,6 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
 #![deny(
   clippy::all,
@@ -15,7 +16,11 @@
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![allow(clippy::len_without_is_empty, clippy::redundant_field_names)]
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
+)]
 // Default isn't as big a deal as people seem to think it is.
 #![allow(
   clippy::new_without_default,
@@ -72,8 +77,8 @@ use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, HandleBuffer,
   IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
-  SatisfiedByExtern, SatisfiedByTypeExtern, StoreBytesExtern, StoreI64Extern, StoreTupleExtern,
-  StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
+  SatisfiedByExtern, SatisfiedByTypeExtern, StoreBoolExtern, StoreBytesExtern, StoreI64Extern,
+  StoreTupleExtern, StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
 use crate::rule_graph::{GraphMaker, RuleGraph};
@@ -124,9 +129,11 @@ pub extern "C" fn externs_set(
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
   store_tuple: StoreTupleExtern,
+  store_dict: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
   store_utf8: StoreUtf8Extern,
   store_i64: StoreI64Extern,
+  store_bool: StoreBoolExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
@@ -148,9 +155,11 @@ pub extern "C" fn externs_set(
     satisfied_by,
     satisfied_by_type,
     store_tuple,
+    store_dict,
     store_bytes,
     store_utf8,
     store_i64,
+    store_bool,
     project_ignoring_type,
     project_multi,
     create_exception,
@@ -287,7 +296,7 @@ pub extern "C" fn scheduler_create(
     root_type_ids.clone(),
     tasks,
     types,
-    build_root_buf.to_os_string().as_ref(),
+    PathBuf::from(build_root_buf.to_os_string()),
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
     PathBuf::from(local_store_dir_buf.to_os_string()),
@@ -549,9 +558,17 @@ pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 }
 
 #[no_mangle]
-pub extern "C" fn session_create(scheduler_ptr: *mut Scheduler) -> *const Session {
+pub extern "C" fn session_create(
+  scheduler_ptr: *mut Scheduler,
+  should_render_ui: bool,
+  ui_worker_count: u64,
+) -> *const Session {
   with_scheduler(scheduler_ptr, |scheduler| {
-    Box::into_raw(Box::new(Session::new(scheduler)))
+    Box::into_raw(Box::new(Session::new(
+      scheduler,
+      should_render_ui,
+      ui_worker_count as usize,
+    )))
   })
 }
 
@@ -561,14 +578,8 @@ pub extern "C" fn session_destroy(ptr: *mut Session) {
 }
 
 #[no_mangle]
-pub extern "C" fn execution_request_create(
-  should_render_ui: bool,
-  ui_worker_count: u64,
-) -> *const ExecutionRequest {
-  Box::into_raw(Box::new(ExecutionRequest::new(
-    should_render_ui,
-    ui_worker_count,
-  )))
+pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
+  Box::into_raw(Box::new(ExecutionRequest::new()))
 }
 
 #[no_mangle]

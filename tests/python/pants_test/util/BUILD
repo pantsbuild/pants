@@ -142,6 +142,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'rwbuf',
+  sources = ['test_rwbuf.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:rwbuf',
+  ],
+)
+
+python_tests(
   name = 'socket',
   sources = ['test_socket.py'],
   coverage = ['pants.util.socket'],

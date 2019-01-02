@@ -16,3 +16,5 @@ protobuf = { version = "2.0.4", features = ["with-bytes"] }
 build_utils = { path = "../../build_utils" }
 grpcio-compiler = "0.3"
 protoc-grpcio = "0.2"
+tempfile = "3"
+walkdir = "2"

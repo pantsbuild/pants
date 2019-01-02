@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 use bazel_protos;
 
 use futures;

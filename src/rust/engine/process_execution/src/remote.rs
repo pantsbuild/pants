@@ -297,7 +297,6 @@ impl CommandRunner {
   const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
   const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
 
-  #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
   pub fn new(
     address: &str,
     cache_key_gen_version: Option<String>,
@@ -804,14 +803,14 @@ fn make_execute_request(
   }
 
   let mut action = bazel_protos::remote_execution::Action::new();
-  action.set_command_digest(digest(&command)?);
+  action.set_command_digest((&digest(&command)?).into());
   action.set_input_root_digest((&req.input_files).into());
 
   let mut execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
   if let Some(instance_name) = instance_name {
     execute_request.set_instance_name(instance_name.clone());
   }
-  execute_request.set_action_digest(digest(&action)?);
+  execute_request.set_action_digest((&digest(&action)?).into());
 
   Ok((action, command, execute_request))
 }
@@ -880,17 +879,16 @@ fn rpcerror_to_string(error: grpcio::Error) -> String {
   }
 }
 
-fn digest(message: &dyn Message) -> Result<bazel_protos::remote_execution::Digest, String> {
+fn digest(message: &dyn Message) -> Result<Digest, String> {
   let bytes = message.write_to_bytes().map_err(|e| format!("{:?}", e))?;
 
   let mut hasher = Sha256::default();
   hasher.input(&bytes);
 
-  let mut digest = bazel_protos::remote_execution::Digest::new();
-  digest.set_size_bytes(bytes.len() as i64);
-  digest.set_hash(format!("{:x}", hasher.fixed_result()));
-
-  Ok(digest)
+  Ok(Digest(
+    Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
+    bytes.len(),
+  ))
 }
 
 fn timespec_from(timestamp: &protobuf::well_known_types::Timestamp) -> time::Timespec {
@@ -2142,10 +2140,10 @@ mod tests {
     let digest = super::digest(&command).unwrap();
 
     assert_eq!(
-      digest.get_hash(),
+      &digest.0.to_hex(),
       "a32cd427e5df6a998199266681692989f56c19cabd1cc637bdd56ae2e62619b4"
     );
-    assert_eq!(digest.get_size_bytes(), 32)
+    assert_eq!(digest.1, 32)
   }
 
   #[test]

@@ -40,7 +40,7 @@ class LocalPantsRunner(object):
     return options, build_config, options_bootstrapper
 
   @staticmethod
-  def _maybe_init_graph_session(graph_session, options_bootstrapper, build_config):
+  def _maybe_init_graph_session(graph_session, options_bootstrapper,build_config, global_options):
     if graph_session:
       return graph_session
 
@@ -51,7 +51,8 @@ class LocalPantsRunner(object):
       options_bootstrapper,
       build_config
     )
-    return graph_scheduler_helper.new_session()
+
+    return graph_scheduler_helper.new_session(global_options.v2_ui)
 
   @staticmethod
   def _maybe_init_target_roots(target_roots, graph_session, options, build_root):
@@ -104,7 +105,8 @@ class LocalPantsRunner(object):
     graph_session = cls._maybe_init_graph_session(
       daemon_graph_session,
       options_bootstrapper,
-      build_config
+      build_config,
+      global_options
     )
 
     target_roots = cls._maybe_init_target_roots(
@@ -190,7 +192,6 @@ class LocalPantsRunner(object):
       self._graph_session.run_console_rules(
         self._options.goals_and_possible_v2_goals,
         self._target_roots,
-        self._global_options.v2_ui
       )
     except GracefulTerminationException as e:
       logger.debug('Encountered graceful termination exception {}; exiting'.format(e))

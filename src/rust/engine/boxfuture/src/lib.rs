@@ -2,6 +2,7 @@
 // https://github.com/alexcrichton/futures-rs/issues/228 has background for its removal.
 // This avoids needing to call Box::new() around every future that we produce.
 
+#![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
 #![deny(
   clippy::all,
@@ -16,7 +17,11 @@
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![allow(clippy::len_without_is_empty, clippy::redundant_field_names)]
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
+)]
 // Default isn't as big a deal as people seem to think it is.
 #![allow(
   clippy::new_without_default,

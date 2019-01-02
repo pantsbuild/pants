@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import threading
-from builtins import bytes, object, open
+from builtins import bytes, object, open, str
 from io import BytesIO
 
 
@@ -79,3 +79,32 @@ class FileBackedRWBuf(_RWBuf):
 
   def do_write(self, s):
     self._io.write(s)
+
+
+class StringWriter(object):
+  """A write-only buffer which accepts strings and writes to another buffer which accepts bytes.
+
+  Writes strings as utf-8.
+
+  This is write-only because it's unclear whether seeking should seek by code-point or byte, and
+  implementing the former is non-trivial. If you need to read, read from the underlying buffer's
+  bytes.
+  """
+
+  def __init__(self, underlying):
+    """
+    :param underlying: Any file-like object which has a write(binary_string) function.
+    """
+    # Called buffer to mirror how sys.stdout and sys.stderr expose this.
+    self.buffer = underlying
+
+  def write(self, s):
+    if not isinstance(s, str):
+      raise ValueError('Expected unicode str, not {}, for argument {}'.format(type(s), s))
+    self.buffer.write(s.encode('utf-8'))
+
+  def flush(self):
+    self.buffer.flush()
+
+  def close(self):
+    self.buffer.close()

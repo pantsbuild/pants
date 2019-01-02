@@ -71,6 +71,23 @@ pub fn store_tuple(values: &[Value]) -> Value {
 }
 
 ///
+/// Store a dict of values, which are stored in a slice alternating interleaved keys and values,
+/// i.e. stored (key0, value0, key1, value1, ...)
+///
+/// The underlying slice _must_ contain an even number of elements.
+///
+pub fn store_dict(keys_and_values_interleaved: &[(Value)]) -> Value {
+  if keys_and_values_interleaved.len() % 2 != 0 {
+    panic!("store_dict requires an even number of elements");
+  }
+  let handles: Vec<_> = keys_and_values_interleaved
+    .iter()
+    .map(|v| v as &Handle as *const Handle)
+    .collect();
+  with_externs(|e| (e.store_dict)(e.context, handles.as_ptr(), handles.len() as u64).into())
+}
+
+///
 /// Store an opqaue buffer of bytes to pass to Python. This will end up as a Python `bytes`.
 ///
 pub fn store_bytes(bytes: &[u8]) -> Value {
@@ -95,6 +112,10 @@ pub fn store_utf8_osstr(utf8: &OsStr) -> Value {
 
 pub fn store_i64(val: i64) -> Value {
   with_externs(|e| (e.store_i64)(e.context, val).into())
+}
+
+pub fn store_bool(val: bool) -> Value {
+  with_externs(|e| (e.store_bool)(e.context, val).into())
 }
 
 ///
@@ -310,9 +331,11 @@ pub struct Externs {
   pub satisfied_by: SatisfiedByExtern,
   pub satisfied_by_type: SatisfiedByTypeExtern,
   pub store_tuple: StoreTupleExtern,
+  pub store_dict: StoreTupleExtern,
   pub store_bytes: StoreBytesExtern,
   pub store_utf8: StoreUtf8Extern,
   pub store_i64: StoreI64Extern,
+  pub store_bool: StoreBoolExtern,
   pub project_ignoring_type: ProjectIgnoringTypeExtern,
   pub project_multi: ProjectMultiExtern,
   pub type_to_str: TypeToStrExtern,
@@ -350,6 +373,8 @@ pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) 
 pub type StoreUtf8Extern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
 
 pub type StoreI64Extern = extern "C" fn(*const ExternContext, i64) -> Handle;
+
+pub type StoreBoolExtern = extern "C" fn(*const ExternContext, bool) -> Handle;
 
 ///
 /// NB: When a PyResult is handed from Python to Rust, the Rust side destroys the handle. But when

@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import ast
 import functools
 import inspect
+import itertools
 import logging
 from abc import abstractproperty
 from builtins import bytes, str
@@ -86,7 +87,11 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       raise ValueError('The @rule decorator must be applied innermost of all decorators.')
 
     caller_frame = inspect.stack()[1][0]
-    module_ast = ast.parse(inspect.getsource(func))
+    source = inspect.getsource(func)
+    if source.startswith(" "):
+      to_trim = sum(1 for _ in itertools.takewhile(lambda c: c in {' ', b' '}, source))
+      source = "\n".join(line[to_trim:] for line in source.split("\n"))
+    module_ast = ast.parse(source)
 
     def resolve_type(name):
       resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
@@ -118,7 +123,7 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
     else:
       wrapped_func = func
 
-    wrapped_func._rule = TaskRule(output_type, input_selectors, wrapped_func, input_gets=list(gets), cacheable=cacheable)
+    wrapped_func._rule = TaskRule(output_type, tuple(input_selectors), wrapped_func, input_gets=tuple(gets), cacheable=cacheable)
     wrapped_func.output_type = output_type
     wrapped_func.goal = for_goal
 
@@ -147,13 +152,16 @@ class Rule(AbstractClass):
     """An output Constraint type for the rule."""
 
 
-class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', 'func', 'cacheable']), Rule):
-  """A Rule that runs a task function when all of its input selectors are satisfied.
+class TaskRule(datatype([
+  'output_constraint',
+  ('input_selectors', tuple),
+  ('input_gets', tuple),
+  'func',
+  ('cacheable', bool),
+]), Rule):
+  """A Rule that runs a task function when all of its input selectors are satisfied."""
 
-  TODO: Make input_gets non-optional when more/all rules are using them.
-  """
-
-  def __new__(cls, output_type, input_selectors, func, input_gets=None, cacheable=True):
+  def __new__(cls, output_type, input_selectors, func, input_gets, cacheable=True):
     # Validate result type.
     if isinstance(output_type, Exactly):
       constraint = output_type
@@ -163,19 +171,8 @@ class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', '
       raise TypeError("Expected an output_type for rule `{}`, got: {}".format(
         func.__name__, output_type))
 
-    # Validate selectors.
-    if not isinstance(input_selectors, list):
-      raise TypeError("Expected a list of Selectors for rule `{}`, got: {}".format(
-        func.__name__, type(input_selectors)))
-
-    # Validate gets.
-    input_gets = [] if input_gets is None else input_gets
-    if not isinstance(input_gets, list):
-      raise TypeError("Expected a list of Gets for rule `{}`, got: {}".format(
-        func.__name__, type(input_gets)))
-
     # Create.
-    return super(TaskRule, cls).__new__(cls, constraint, tuple(input_selectors), tuple(input_gets), func, cacheable)
+    return super(TaskRule, cls).__new__(cls, constraint, input_selectors, input_gets, func, cacheable)
 
   def __str__(self):
     return '({}, {!r}, {})'.format(type_or_constraint_repr(self.output_constraint),
