@@ -80,8 +80,8 @@ if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
   log "*** Running pants with extra sources ${WRAPPER_SRCPATH} ***"
 fi
 
-if [[ "$PANTS_DEV" -eq 0 ]]; then
-  # Unexport PANTS_DEV if set to 0.
+if [[ ! -z "$PANTS_DEV" && "$PANTS_DEV" -eq 0 ]]; then
+  # Unexport PANTS_DEV if explicitly set to 0.
   export -n PANTS_DEV
 else
   # We're running against a Pants clone.
