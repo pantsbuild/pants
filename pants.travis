@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-set -e
-
-# Our integration tests invoke "./pants", and our regular runner script will trigger
-# a bootstrapping, which we don't want. So we shim in this alternative runner, which
-# calls the already-bootstrapped pants.pex.
-
-exec $(dirname "$0")/pants.pex "$@"

@@ -15,19 +15,12 @@ NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versio
   | jq '.Versions | length')
 [ "${NUM_VERSIONS}" == "1" ] || die "Error: Found ${NUM_VERSIONS} versions for ${BOOTSTRAPPED_PEX_URL}"
 
-# Now fetch the pex.
-aws --no-sign-request --region us-east-1 s3 cp ${BOOTSTRAPPED_PEX_URL} ./pants.pex
-chmod 755 ./pants.pex
+# Now fetch the pex to a known location, so that the ./pants wrapper script will use it,
+# instead of running from sources (and re-bootstrapping).
+aws --no-sign-request --region us-east-1 s3 cp ${BOOTSTRAPPED_PEX_URL} ./bootstrapped.pants.pex
+chmod 755 ./bootstrapped.pants.pex
 
 # Pants code executing under test expects native_engine.so to be present as a resource
 # in the source tree. Normally it'll be there because we created it there during bootstrapping.
 # So here we have to manually extract it there from the bootstrapped pex.
 unzip -j pants.pex pants/engine/native_engine.so -d src/python/pants/engine/
-
-# Our integration tests shell out to `./pants`, which will bootstrap the native code
-# all over again, so it can run from sources. But since the pex was built from the same
-# sources, we can invoke it directly to the same effect. However we do need to make sure that
-# its PATH will enable it to find whatever python interpreter is mentioned in its shebang, even
-# if run from a hermetic integration test. The ./pants.travis script takes care of this.
-mv ./pants ./pants.bak
-mv ./pants.travis ./pants

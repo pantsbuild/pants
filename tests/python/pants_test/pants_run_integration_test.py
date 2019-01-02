@@ -177,7 +177,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return [
         # Used in the wrapper script to locate a rust install.
         'HOME',
-        # Needed to find python interpreters and other binaries. 
+        # Needed to find python interpreters and other binaries.
         'PATH',
         'PANTS_PROFILE',
       ]

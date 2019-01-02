@@ -10,6 +10,11 @@ import pystache
 
 num_integration_shards = 20
 
+HEADER = """
+# GENERATED, DO NOT EDIT!
+# To change, edit build-support/travis/travis.yml.mustache and run
+# ./pants --quiet run build-support/travis:generate_travis_yml > .travis.yml
+"""
 
 def generate_travis_yml():
   """Generates content for a .travis.yml file from templates."""
@@ -18,6 +23,7 @@ def generate_travis_yml():
   before_install = pkg_resources.resource_string(__name__,
                                                  'before_install.mustache').decode('utf-8')
   context = {
+    'header': HEADER,
     'integration_shards': range(0, num_integration_shards),
     'integration_shards_length': num_integration_shards,
   }

@@ -37,6 +37,15 @@ set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
+BOOTSTRAPPED_PEX="${HERE}/bootstrapped.pants.pex"
+
+# We use this in CI to delegate to a pre-bootstrapped pex.
+if [[ -f "${BOOTSTRAPPED_PEX}" ]]; then
+  exec "${BOOTSTRAPPED_PEX}" "$@"
+fi
+
+# Otherwise, run directly from sources, bootstrapping if needed.
+
 # Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
 source ${HERE}/build-support/pants_venv
