@@ -711,7 +711,7 @@ Call(func=Name(id='D', ctx=Load()), args=[], keywords=[], starargs=None, kwargs=
 keywords=[], starargs=None, kwargs=None))
 """, exc_msg)
 
-   def create_full_graph(self, rules, validate=True):
+  def create_full_graph(self, rules, validate=True):
     scheduler = create_scheduler(rules, validate=validate)
     return "\n".join(scheduler.rule_graph_visualization())
 
