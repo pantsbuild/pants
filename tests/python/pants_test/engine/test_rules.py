@@ -10,8 +10,6 @@ import unittest
 from builtins import object, str
 from textwrap import dedent
 
-from future.utils import PY3
-
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
@@ -23,7 +21,6 @@ from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.util import (TargetTable, assert_equal_with_printing, create_scheduler,
                                     run_rule)
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class A(object):
@@ -677,41 +674,52 @@ class RuleGraphMakerTest(unittest.TestCase):
                                     subgraph)
 
   def test_validate_yield_statements(self):
-    expected_rx_str = re.escape("""\
-Yield(value=Call(func=Name(id='A', ctx=Load()), args=[], keywords=[]{}))
-""".format('' if PY3 else ', starargs=None, kwargs=None'))
-    with self.assertRaisesRegexp(_RuleVisitor.YieldVisitError, expected_rx_str):
+    with self.assertRaisesRegexp(_RuleVisitor.YieldVisitError, re.escape('yield A()')):
       @rule(A, [])
       def f():
         yield A()
-        # The yield statement isn't at the end.
+        # The yield statement isn't at the end of this series of statements.
         return
 
     with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
       @rule(A, [])
+      def h():
+        yield A(
+          1 + 2
+        )
+        return
+    # Test that the full indentation of multiple-line yields are represented in the output.
+    self.assertIn("""\
+        yield A(
+          1 + 2
+        )
+""", str(cm.exception))
+
+    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
+      @rule(A, [])
       def g():
-        # This is a yield statement without an assignment.
+        # This is a yield statement without an assignment, and not at the end.
         yield Get(B, D, D())
         yield A()
     exc_msg = str(cm.exception)
     # Correctly matches the function name.
     self.assertIn('In function g:', exc_msg)
-    # Matches the line number of the @rule decorator.
-    match_regexp = re.compile(r'^.*test_rules.py:{}:'.format(sys._getframe().f_lineno - 9),
-                              flags=re.MULTILINE)
-    assertRegex(self, exc_msg, match_regexp)
-    # Shows sufficient context around the rule definition to locate it.
+    # Matches the line, column, and text of the offending yield statement.
     self.assertIn("""\
+test_rules.py:{lineno}:{col}
+        yield Get(B, D, D())
+""".format(lineno=(sys._getframe().f_lineno - 9),
+           col=8),
+                  exc_msg)
+    # Matches the line number of the @rule decorator.
+    self.assertIn('The rule defined by function `g` begins at:', exc_msg)
+    self.assertIn("""\
+test_rules.py:{lineno}:
+    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
       @rule(A, [])
       def g():
-""", exc_msg)
-    # Prints an AST dump of the offending yield statement for debuggability.
-    self.assertIn("""\
-Yield(value=Call(func=Name(id='Get', ctx=Load()), args=[\
-Name(id='B', ctx=Load()), Name(id='D', ctx=Load()), \
-Call(func=Name(id='D', ctx=Load()), args=[], keywords=[]{trailing})], \
-keywords=[]{trailing}))
-""".format(trailing='' if PY3 else ', starargs=None, kwargs=None'), exc_msg)
+""".format(lineno=sys._getframe().f_lineno - 22),
+                  exc_msg)
 
   def create_full_graph(self, rules, validate=True):
     scheduler = create_scheduler(rules, validate=validate)
