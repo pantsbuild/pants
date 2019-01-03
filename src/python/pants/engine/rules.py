@@ -9,9 +9,10 @@ import functools
 import inspect
 import itertools
 import logging
+import sys
 from abc import abstractproperty
 from builtins import bytes, str
-from collections import OrderedDict
+from collections import Iterable, OrderedDict
 from types import GeneratorType
 
 from future.utils import PY2
@@ -63,6 +64,30 @@ The invalid `yield` statement (in the body of the above function) was: {node}
            node=ast.dump(node)))
       super(_RuleVisitor.YieldVisitError, self).__init__(err_msg, *args, **kwargs)
 
+  def _maybe_end_of_stmt_list(self, attr_value):
+    # 'body' is also used in Exec for some reason, but as a single expr, so we check if the value is
+    # iterable.
+    if (attr_value is not None) and isinstance(attr_value, Iterable):
+      result = list(attr_value)
+      if len(result) > 0:
+        return result[-1]
+    return None
+
+  def _stmt_is_at_end_of_parent_list(self, stmt):
+    # See https://docs.python.org/2/library/ast.html#abstract-grammar. 'body', 'orelse', and
+    # 'finalbody' are the only attributes which can contain lists of stmts.
+    parent_stmt = self._parents_table[stmt]
+    last_body_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'body', None))
+    if stmt == last_body_stmt:
+      return True
+    last_orelse_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'orelse', None))
+    if stmt == last_orelse_stmt:
+      return True
+    last_finally_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'finalbody', None))
+    if stmt == last_finally_stmt:
+      return True
+    return False
+
   def visit_Yield(self, node):
     # A yield outside of an assignment is only allowed to be immediately preceding a final `return`.
     if node in self._yields_in_assignments:
@@ -70,22 +95,16 @@ The invalid `yield` statement (in the body of the above function) was: {node}
     else:
       # Get the position of the current yield (which is part of an Expr stmt).
       expr_for_yield = self._parents_table[node]
-      parent_stmt = self._parents_table[expr_for_yield]
-      sibling_stmts = self._siblings_table[parent_stmt]
-      yield_stmt_sibling_index = sibling_stmts.index(expr_for_yield)
 
-      found_invalid_yield = False
-      if yield_stmt_sibling_index == (len(sibling_stmts) - 1):
-        found_invalid_yield = True
-      else:
-        next_sibling = sibling_stmts[yield_stmt_sibling_index + 1]
-        if not (isinstance(next_sibling, ast.Return) and next_sibling.value is None):
-          found_invalid_yield = True
-      if found_invalid_yield:
+      if not self._stmt_is_at_end_of_parent_list(expr_for_yield):
         raise self.YieldVisitError(
           node, self._func, self._frame,
-          'A yield in an @rule without an assignment must have an empty `return` as the final '
-          'statement immediately after.')
+          """\
+A yield in an @rule without an assignment is equivalent to a return, and we
+currently require that it comes at the end of a series of statements.
+Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the result.
+""")
+
 
 
 class _GoalProduct(object):

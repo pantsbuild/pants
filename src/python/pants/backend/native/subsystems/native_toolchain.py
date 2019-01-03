@@ -92,7 +92,6 @@ def select_libc_objects(platform, native_toolchain):
     'linux': lambda: native_toolchain._libc_dev.get_libc_objects(),
   })
   yield LibcObjects(paths)
-  return
 
 
 @rule(Assembler, [Select(Platform), Select(NativeToolchain)])
@@ -102,7 +101,6 @@ def select_assembler(platform, native_toolchain):
   else:
     assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
   yield assembler
-  return
 
 
 class BaseLinker(datatype([('linker', Linker)])):
@@ -122,7 +120,6 @@ def select_base_linker(platform, native_toolchain):
     linker = yield Get(Linker, Binutils, native_toolchain._binutils)
   base_linker = BaseLinker(linker=linker)
   yield base_linker
-  return
 
 
 @rule(GCCLinker, [Select(NativeToolchain)])
@@ -133,7 +130,6 @@ def select_gcc_linker(native_toolchain):
   linker_with_libc = linker.copy(
     extra_object_files=(linker.extra_object_files + libc_objects.crti_object_paths))
   yield GCCLinker(linker_with_libc)
-  return
 
 
 @rule(LLVMLinker, [Select(BaseLinker)])
@@ -195,7 +191,6 @@ def select_llvm_c_toolchain(platform, native_toolchain):
   )
 
   yield LLVMCToolchain(CToolchain(working_c_compiler, working_linker))
-  return
 
 
 @rule(LLVMCppToolchain, [Select(Platform), Select(NativeToolchain)])
@@ -250,7 +245,6 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
   )
 
   yield LLVMCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
-  return
 
 
 @rule(GCCCToolchain, [Select(Platform), Select(NativeToolchain)])
@@ -288,7 +282,6 @@ def select_gcc_c_toolchain(platform, native_toolchain):
   )
 
   yield GCCCToolchain(CToolchain(working_c_compiler, working_linker))
-  return
 
 
 @rule(GCCCppToolchain, [Select(Platform), Select(NativeToolchain)])
@@ -339,7 +332,6 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
   )
 
   yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
-  return
 
 
 class ToolchainVariantRequest(datatype([
@@ -357,7 +349,6 @@ def select_c_toolchain(toolchain_variant_request):
   else:
     toolchain_resolved = yield Get(LLVMCToolchain, NativeToolchain, native_toolchain)
   yield toolchain_resolved.c_toolchain
-  return
 
 
 @rule(CppToolchain, [Select(ToolchainVariantRequest)])
@@ -368,7 +359,6 @@ def select_cpp_toolchain(toolchain_variant_request):
   else:
     toolchain_resolved = yield Get(LLVMCppToolchain, NativeToolchain, native_toolchain)
   yield toolchain_resolved.cpp_toolchain
-  return
 
 
 def create_native_toolchain_rules():

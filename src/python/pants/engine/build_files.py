@@ -60,7 +60,6 @@ def parse_address_family(address_mapper, directory):
                                          filecontent_product.content,
                                          address_mapper.parser))
   yield AddressFamily.create(directory.path, address_maps)
-  return
 
 
 class UnhydratedStruct(datatype(['address', 'struct', 'dependencies'])):
@@ -134,7 +133,6 @@ def resolve_unhydrated_struct(address_mapper, address):
     next(build_address for build_address in addresses if build_address == address),
     struct,
     dependencies)
-  return
 
 
 @rule(TargetAdaptorContainer, [Select(AddressMapper), Select(UnhydratedStruct)])
@@ -187,7 +185,6 @@ def hydrate_struct(address_mapper, unhydrated_struct):
     return _hydrate(type(item), address.spec_path, **hydrated_args)
 
   yield TargetAdaptorContainer(consume_dependencies(struct, args={'address': address}))
-  return
 
 
 def _hydrate(item_type, spec_path, **kwargs):
@@ -250,7 +247,6 @@ def addresses_from_address_families(address_mapper, specs):
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
   yield BuildFileAddresses(tuple(matched_addresses))
-  return
 
 
 def _spec_to_globs(address_mapper, specs):

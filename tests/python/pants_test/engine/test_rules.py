@@ -682,37 +682,35 @@ Yield(value=Call(func=Name(id='A', ctx=Load()), args=[], keywords=[], starargs=N
       @rule(A, [])
       def f():
         yield A()
-
-    expected_rx_str = re.escape("""\
-Yield(value=Call(func=Name(id='Get', ctx=Load()), args=[\
-Name(id='B', ctx=Load()), Name(id='D', ctx=Load()), \
-Call(func=Name(id='D', ctx=Load()), args=[], keywords=[], starargs=None, kwargs=None)], \
-keywords=[], starargs=None, kwargs=None))
-""")
-    with self.assertRaisesRegexp(_RuleVisitor.YieldVisitError, expected_rx_str):
-      @rule(A, [])
-      def g():
-        yield Get(B, D, D())
-        yield A()
+        # The yield statement isn't at the end.
         return
 
-  def test_validate_yield_error_location(self):
     with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
       @rule(A, [])
-      def f():
+      def g():
+        # This is a yield statement without an assignment.
+        yield Get(B, D, D())
         yield A()
     exc_msg = str(cm.exception)
     # Correctly matches the function name.
-    self.assertIn('In function f:', exc_msg)
+    self.assertIn('In function g:', exc_msg)
     # Matches the line number of the @rule decorator.
-    match_regexp = re.compile(r'^.*test_rules.py:{}:'.format(sys._getframe().f_lineno - 7),
+    match_regexp = re.compile(r'^.*test_rules.py:{}:'.format(sys._getframe().f_lineno - 9),
                               flags=re.MULTILINE)
     assertRegex(self, exc_msg, match_regexp)
     # Shows sufficient context around the rule definition to locate it.
     self.assertIn("""\
       @rule(A, [])
-      def f():
+      def g():
 """, exc_msg)
+    # Prints an AST dump of the offending yield statement for debuggability.
+    self.assertIn("""\
+Yield(value=Call(func=Name(id='Get', ctx=Load()), args=[\
+Name(id='B', ctx=Load()), Name(id='D', ctx=Load()), \
+Call(func=Name(id='D', ctx=Load()), args=[], keywords=[], starargs=None, kwargs=None)], \
+keywords=[], starargs=None, kwargs=None))
+""", exc_msg)
+
 
   def create_full_graph(self, rules, validate=True):
     scheduler = create_scheduler(rules, validate=validate)
