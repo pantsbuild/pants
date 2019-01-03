@@ -84,7 +84,7 @@ class Checkstyle(LintTaskMixin, Task):
              removal_hint='Python 3 linting will eventually be turned on without a flag',
              help='Enable linting on Python 3-compatible targets.')
 
-  @memoized_property
+  @property
   def _interpreter_cache(self):
     return PythonInterpreterCache.global_instance()
 
@@ -264,11 +264,10 @@ class Checkstyle(LintTaskMixin, Task):
       targets_by_min_interpreter, py3_was_encountered = self._partition_targets_by_min_interpreter(
         vt.target for vt in invalidation_check.invalid_vts)
 
-      # TODO: consider changing the language here to "upcoming" instead of "deprecated".
       deprecated_conditional(
         predicate=lambda: py3_was_encountered and not self.get_options().enable_py3_lint,
         removal_version='1.14.0.dev2',
-        entity_description="This warning",
+        entity_description="Disabling python 3 linting",
         hint_message=(
           "Python 3 linting is currently experimental. Add --{}-enable-py3-lint to the "
           "front of the pants command line to silence this message."
