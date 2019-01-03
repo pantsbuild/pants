@@ -133,6 +133,12 @@ if [[ "${run_bootstrap:-true}" == "true" ]]; then
   end_travis_section
 fi
 
+# We want all invocations of ./pants (apart from the bootstrapping one above) to delegate
+# to ./pants.pex, and not themselves attempt to bootstrap.
+# In this file we invoke ./pants.pex directly anyway, but some of those invocations will run
+# integration tests that shell out to `./pants`, so we set this env var for those cases.
+export RUN_PANTS_FROM_PEX=1
+
 # NB: Ordering matters here. We (currently) always bootstrap a Python 2 pex.
 if [[ "${python_three:-false}" == "true" ]]; then
   banner "Setting interpreter constraints for 3!"

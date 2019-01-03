@@ -180,6 +180,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
         # Needed to find python interpreters and other binaries.
         #'PATH',
         'PANTS_PROFILE',
+        # Ensure that the underlying ./pants invocation doesn't run from sources
+        # (and therefore bootstrap) if we don't want it to.
+        'RUN_PANTS_FROM_PEX',
       ]
 
   def setUp(self):

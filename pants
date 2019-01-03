@@ -37,11 +37,10 @@ set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
-BOOTSTRAPPED_PEX="${HERE}/bootstrapped.pants.pex"
-
-# We use this in CI to delegate to a pre-bootstrapped pex.
-if [[ -f "${BOOTSTRAPPED_PEX}" ]]; then
-  exec "${BOOTSTRAPPED_PEX}" "$@"
+# Set RUN_PANTS_FROM_PEX to non-empty to cause this wrapper script to delegate directly
+# to ./pants.pex. We use this in CI to avoid bootstrapping in every shard.
+if [[ -n "${RUN_PANTS_FROM_PEX}" ]]; then
+  exec "${HERE}/pants.pex" "$@"
 fi
 
 # Otherwise, run directly from sources, bootstrapping if needed.
