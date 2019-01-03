@@ -17,6 +17,7 @@ HEADER = """
 # ./pants --quiet run build-support/travis:generate_travis_yml > .travis.yml
 """
 
+
 def generate_travis_yml():
   """Generates content for a .travis.yml file from templates."""
   template = pkg_resources.resource_string(__name__,
