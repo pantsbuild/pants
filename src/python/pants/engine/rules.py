@@ -9,7 +9,6 @@ import functools
 import inspect
 import itertools
 import logging
-import sys
 from abc import abstractproperty
 from builtins import bytes, str
 from collections import Iterable, OrderedDict
@@ -102,7 +101,6 @@ A yield in an @rule without an assignment is equivalent to a return, and we
 currently require that it comes at the end of a series of statements.
 Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the result.
 """)
-
 
 
 class _GoalProduct(object):
