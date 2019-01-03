@@ -54,8 +54,7 @@ The invalid `yield` statement (in the body of the above function) was: {node}
       super(_RuleVisitor.YieldVisitError, self).__init__(err_msg, *args, **kwargs)
 
   def _maybe_end_of_stmt_list(self, attr_value):
-    # 'body' is also used in Exec for some reason, but as a single expr, so we check if the value is
-    # iterable.
+    """If `attr_value` is a non-empty iterable, return its final element."""
     if (attr_value is not None) and isinstance(attr_value, Iterable):
       result = list(attr_value)
       if len(result) > 0:
@@ -63,8 +62,35 @@ The invalid `yield` statement (in the body of the above function) was: {node}
     return None
 
   def _stmt_is_at_end_of_parent_list(self, stmt):
-    # See https://docs.python.org/2/library/ast.html#abstract-grammar. 'body', 'orelse', and
-    # 'finalbody' are the only attributes which can contain lists of stmts.
+    """Determine if `stmt` is at the end of a list of statements (i.e. can be an implicit `return`).
+
+    If there are any statements following `stmt` at the same level of nesting, this method returns
+    False, such as the following (if `stmt` is a yield Expr):
+
+    if 2 + 2 == 5:
+      yield 'good'
+      a = 3
+
+    However, if `stmt` is at the end of a list of statements, it can be made more clear that `stmt`
+    is intended to represent a `return`. Another way to view this method is as a dead code
+    elimination check, for a `stmt` which is intended to represent control flow moving out of the
+    current @rule. For example, this method would return True for both of the yield Expr statements
+    in the below snippet.
+
+    if True:
+      yield 3
+    else:
+      a = 3
+      yield a
+
+    This checking is performed by getting the parent of `stmt` with a pre-generated table passed
+    into the constructor.
+
+    See https://docs.python.org/2/library/ast.html#abstract-grammar for the grammar specification.
+    'body', 'orelse', and 'finalbody' are the only attributes on any AST nodes which can contain
+    lists of stmts.  'body' is also an attribute in the Exec statement for some reason, but as a
+    single expr, so we check if it is iterable.
+    """
     parent_stmt = self._parents_table[stmt]
     last_body_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'body', None))
     if stmt == last_body_stmt:
