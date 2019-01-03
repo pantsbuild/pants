@@ -31,23 +31,13 @@ logger = logging.getLogger(__name__)
 class _RuleVisitor(ast.NodeVisitor):
   """Pull `Get` calls out of an @rule body and validate `yield` statements."""
 
-  def __init__(self, func, frame, parents_table, siblings_table):
+  def __init__(self, func, frame, parents_table):
     super(_RuleVisitor, self).__init__()
     self.gets = []
     self._func = func
     self._frame = frame
     self._parents_table = parents_table
-    self._siblings_table = siblings_table
     self._yields_in_assignments = set()
-
-  def visit_Call(self, node):
-    if isinstance(node.func, ast.Name) and node.func.id == Get.__name__:
-      self.gets.append(Get.extract_constraints(node))
-
-  def visit_Assign(self, node):
-    if isinstance(node.value, ast.Yield):
-      self._yields_in_assignments.add(node.value)
-    self.generic_visit(node)
 
   class YieldVisitError(Exception):
     def __init__(self, node, func, frame, msg, *args, **kwargs):
@@ -88,12 +78,20 @@ The invalid `yield` statement (in the body of the above function) was: {node}
       return True
     return False
 
+  def visit_Call(self, node):
+    if isinstance(node.func, ast.Name) and node.func.id == Get.__name__:
+      self.gets.append(Get.extract_constraints(node))
+
+  def visit_Assign(self, node):
+    if isinstance(node.value, ast.Yield):
+      self._yields_in_assignments.add(node.value)
+    self.generic_visit(node)
+
   def visit_Yield(self, node):
-    # A yield outside of an assignment is only allowed to be immediately preceding a final `return`.
     if node in self._yields_in_assignments:
       self.generic_visit(node)
     else:
-      # Get the position of the current yield (which is part of an Expr stmt).
+      # The current yield "expr" is the child of an "Expr" "stmt".
       expr_for_yield = self._parents_table[node]
 
       if not self._stmt_is_at_end_of_parent_list(expr_for_yield):
@@ -191,16 +189,12 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       if isinstance(node, ast.FunctionDef) and node.name == func.__name__
     )
 
-    siblings_table = {}
     parents_table = {}
     for parent in ast.walk(rule_func_node):
-      children_ordered = []
       for child in ast.iter_child_nodes(parent):
         parents_table[child] = parent
-        children_ordered.append(child)
-      siblings_table[parent] = children_ordered
 
-    rule_visitor = _RuleVisitor(func, caller_frame, parents_table, siblings_table)
+    rule_visitor = _RuleVisitor(func, caller_frame, parents_table)
     rule_visitor.visit(rule_func_node)
     gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
 
