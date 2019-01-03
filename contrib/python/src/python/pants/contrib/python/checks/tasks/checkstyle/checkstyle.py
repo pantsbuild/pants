@@ -253,6 +253,10 @@ class Checkstyle(LintTaskMixin, Task):
             if not allowed_interpreters:
               raise TaskError('No valid interpreters found for targets: {}\n(filters: {})'
                               .format(targets, filters))
+            # TODO: Minimizing the number of interpreters used reduces the number of pexes we have
+            # to create and invoke, which reduces the runtime of this task -- unfortunately, this is
+            # an instance of general SAT and is a bit too much effort to implement right now, so we
+            # greedily take the minimum here.
             interpreter = min(allowed_interpreters)
             sources_by_min_interpreter[interpreter].extend(sources_for_target)
 
