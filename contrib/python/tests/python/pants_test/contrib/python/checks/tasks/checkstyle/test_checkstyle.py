@@ -137,6 +137,7 @@ class CheckstyleTest(PythonTaskTestBase):
                          pass
                      """))
     target = self.make_target('a/python:pass', PythonLibrary, sources=['pass.py'])
+    self.set_options(interpreter_constraints_whitelist=[])
     self.execute_task(target_roots=[target], resolve_local=resolve_local)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
@@ -146,6 +147,7 @@ class CheckstyleTest(PythonTaskTestBase):
                           pass
                        """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
+    self.set_options(interpreter_constraints_whitelist=[])
     # Needed for when pants runs in a python 3 interpreter.
     with self.assertRaisesRegexp(Checkstyle.CheckstyleRunError,
                                  re.escape('1 Python Style issues found')):
@@ -154,17 +156,18 @@ class CheckstyleTest(PythonTaskTestBase):
   def test_failure_py2_and_py3(self):
     target_py2 = self.create_py2_failing_target()
     target_py3 = self.create_py3_failing_target()
+    self.set_options(interpreter_constraints_whitelist=[])
     with self.assertRaises(Checkstyle.CheckstyleRunError) as cm:
       self.execute_task(target_roots=[target_py2, target_py3])
     self.assertIn('7 Python Style issues found', str(cm.exception))
     # Two different interpreters should have been selected.
     self.assertEqual(2, len(cm.exception.failures_by_min_interpreter))
     # One of the interpreters should have been python 3.
-    self.assertTrue(cm.exception.py3_was_encountered)
+    self.assertTrue(cm.exception.py3_was_linted)
 
   def test_py3_skipped(self):
     target_py3 = self.create_py3_failing_target()
-    self.set_options(enable_py3_lint=False)
+    self.set_options(interpreter_constraints_whitelist=None)
     # The task will succeed (with a deprecation warning), so no exception is raised.
     self.execute_task(target_roots=[target_py3])
 
@@ -179,6 +182,7 @@ class CheckstyleTest(PythonTaskTestBase):
       # This will also choose a python 2.7 interpreter, but technically has different filters than
       # self.py2_constraint. Both of these targets should have lint run.
       compatibility=['CPython>=2.7,<2.8'])
+    self.set_options(interpreter_constraints_whitelist=[])
     with self.assertRaises(Checkstyle.CheckstyleRunError) as cm:
       self.execute_task(target_roots=[target_py2, target_py2_different])
     self.assertIn('5 Python Style issues found', str(cm.exception))
@@ -186,7 +190,7 @@ class CheckstyleTest(PythonTaskTestBase):
     # should have been resolved for both targets.
     self.assertEqual(5, assert_single_element(cm.exception.failures_by_min_interpreter.values()))
     # Assert that there was no python 3-compatible target linted.
-    self.assertFalse(cm.exception.py3_was_encountered)
+    self.assertFalse(cm.exception.py3_was_linted)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_suppressed_file_passes(self, unused_test_name, resolve_local):
@@ -197,7 +201,7 @@ class CheckstyleTest(PythonTaskTestBase):
     suppression_file = self.create_file('suppress.txt', contents=dedent("""
     a/python/fail\.py::variable-names"""))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
-    self.set_options(suppress=suppression_file)
+    self.set_options(suppress=suppression_file, interpreter_constraints_whitelist=[])
     self.execute_task(target_roots=[target], resolve_local=resolve_local)
 
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
@@ -207,7 +211,7 @@ class CheckstyleTest(PythonTaskTestBase):
                           pass
                      """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
-    self.set_options(fail=False)
+    self.set_options(fail=False, interpreter_constraints_whitelist=[])
     with self.captured_logging(logging.WARNING) as captured:
       self.execute_task(target_roots=[target], resolve_local=resolve_local)
       self.assertIn('1 Python Style issues found', str(assert_single_element(captured.warnings())))
@@ -218,7 +222,41 @@ class CheckstyleTest(PythonTaskTestBase):
                          invalid python
                        """))
     target = self.make_target('a/python:error', PythonLibrary, sources=['error.py'])
-    self.set_options(fail=False)
+    self.set_options(fail=False, interpreter_constraints_whitelist=[])
     with self.captured_logging(logging.WARNING) as captured:
       self.execute_task(target_roots=[target], resolve_local=resolve_local)
       self.assertIn('1 Python Style issues found', str(assert_single_element(captured.warnings())))
+
+  def test_lint_runs_for_default_constraints_only(self):
+    target_py2 = self.create_py2_failing_target()
+    target_py3 = self.create_py3_failing_target()
+    with self.assertRaises(Checkstyle.CheckstyleRunError) as task_error:
+      self.execute_task(target_roots=[target_py2, target_py3])
+    self.assertIn('4 Python Style issues found', str(task_error.exception))
+
+  def test_lint_ignores_unwhitelisted_constraints(self):
+    target_py3 = self.create_py3_failing_target()
+    self.execute_task(target_roots=[target_py3])
+
+  def test_lint_runs_for_single_whitelisted_constraints(self):
+    target_py3 = self.create_py3_failing_target()
+    self.set_options(interpreter_constraints_whitelist=[self.py3_constraint])
+    with self.assertRaises(Checkstyle.CheckstyleRunError) as task_error:
+      self.execute_task(target_roots=[target_py3])
+    self.assertIn('3 Python Style issues found', str(task_error.exception))
+
+  def test_lint_runs_for_multiple_whitelisted_constraints(self):
+    target_py2 = self.create_py2_failing_target()
+    target_py3 = self.create_py3_failing_target()
+    self.set_options(interpreter_constraints_whitelist=[self.py2_constraint, self.py3_constraint])
+    with self.assertRaises(Checkstyle.CheckstyleRunError) as task_error:
+      self.execute_task(target_roots=[target_py2, target_py3])
+    self.assertIn('7 Python Style issues found', str(task_error.exception))
+
+  def test_lint_runs_for_default_constraints_and_matching_whitelist(self):
+    target_py2 = self.create_py2_failing_target()
+    target_py3 = self.create_py3_failing_target()
+    self.set_options(interpreter_constraints_whitelist=[self.py3_constraint])
+    with self.assertRaises(Checkstyle.CheckstyleRunError) as task_error:
+      self.execute_task(target_roots=[target_py2, target_py3])
+    self.assertIn('7 Python Style issues found', str(task_error.exception))

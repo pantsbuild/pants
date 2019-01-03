@@ -9,10 +9,11 @@ import sys
 from builtins import str
 from collections import defaultdict
 
-from packaging import requirements
+from packaging import version
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, pants_version
@@ -61,6 +62,7 @@ class Checkstyle(LintTaskMixin, Task):
     return super(Task, cls).subsystem_dependencies() + cls.plugin_subsystems + (
       PexBuilderWrapper.Factory,
       PythonInterpreterCache,
+      PythonSetup,
     )
 
   @classmethod
@@ -77,12 +79,15 @@ class Checkstyle(LintTaskMixin, Task):
     register('--suppress', fingerprint=True, type=file_option, default=None,
              help='Takes a text file where specific rules on specific files will be skipped.')
     register('--fail', fingerprint=True, default=True, type=bool,
-             help='If disabled, prevent pants from exiting with a failure, but still produce '
-                  'output for style problems.')
-    register('--enable-py3-lint', fingerprint=True, default=True, type=bool,
+             help='Prevent test failure but still produce output for problems.')
+    register('--interpreter-constraints-whitelist', fingerprint=True,
+             default=None,
              removal_version='1.14.0.dev2',
-             removal_hint='Python 3 linting will eventually be turned on without a flag',
-             help='Enable linting on Python 3-compatible targets.')
+             help='A list of interpreter constraints for which matching targets will be linted '
+                  'in addition to targets that match the global interpreter constraints '
+                  '(either from defaults or pants.ini). If the user supplies an empty list, '
+                  'Pants will lint all targets in the target set, irrespective of the working '
+                  'set of compatibility constraints.')
 
   @property
   def _interpreter_cache(self):
@@ -100,6 +105,18 @@ class Checkstyle(LintTaskMixin, Task):
   def checker_target(self):
     self.context.resolve(self._CHECKER_ADDRESS_SPEC)
     return self.context.build_graph.get_target(Address.parse(self._CHECKER_ADDRESS_SPEC))
+
+  @memoized_property
+  def _acceptable_interpreter_constraints(self):
+    default_constraints = PythonSetup.global_instance().interpreter_constraints
+    whitelisted_constraints = self.get_options().interpreter_constraints_whitelist
+    # The user wants to lint everything.
+    if whitelisted_constraints == []:
+      return []
+    # The user did not pass a whitelist option.
+    elif whitelisted_constraints is None:
+      whitelisted_constraints = ()
+    return [version.parse(v) for v in default_constraints + whitelisted_constraints]
 
   def checker_pex(self, interpreter):
     # TODO(John Sirois): Formalize in pants.base?
@@ -211,42 +228,10 @@ class Checkstyle(LintTaskMixin, Task):
 
   class CheckstyleSetupError(TaskError): pass
 
-  def _parse_requirement(self, filt):
-    try:
-      return requirements.Requirement(filt)
-    except requirements.InvalidRequirement as orig_error:
-      # For the case of '>3', add something that looks like a requirement name.
-      new_filt = 'XXX{}'.format(filt)
-      try:
-        return requirements.Requirement(new_filt)
-      except requirements.InvalidRequirement:
-        raise self.CheckstyleSetupError('Could not parse interpreter constraint {}: {}'
-                                        .format(filt, str(orig_error)),
-                                        orig_error)
-
-  def _interpreter_is_py3(self, interpreter):
-    return interpreter.identity.version[0] == 3
-
-  def _partition_targets_by_min_interpreter(self, tgts):
-    targets_by_compatibility, _ = self._interpreter_cache.partition_targets_by_compatibility(tgts)
-    # TODO: Minimizing the number of interpreters used reduces the number of pexes we have to
-    # create and invoke, which reduces the runtime of this task -- unfortunately, this is an
-    # instance of general SAT and is a bit too much effort to implement right now, so we greedily
-    # take the minimum here.
-    targets_by_min_interpreter = defaultdict(list)
-    py3_compatible_target_encountered = False
-    for filters, targets in targets_by_compatibility.items():
-      matching_interpreters = self._interpreter_cache.setup(filters=filters)
-      if any(self._interpreter_is_py3(interp) for interp in matching_interpreters):
-        py3_compatible_target_encountered = True
-      min_interpreter = min(matching_interpreters)
-      targets_by_min_interpreter[min_interpreter].extend(targets)
-    return (targets_by_min_interpreter, py3_compatible_target_encountered)
-
   class CheckstyleRunError(TaskError):
 
-    def __init__(self, py3_was_encountered, failures_by_min_interpreter, *args, **kwargs):
-      self.py3_was_encountered = py3_was_encountered
+    def __init__(self, py3_was_linted, failures_by_min_interpreter, *args, **kwargs):
+      self.py3_was_linted = py3_was_linted
       self.failures_by_min_interpreter = failures_by_min_interpreter
       super(Checkstyle.CheckstyleRunError, self).__init__(*args, **kwargs)
 
@@ -261,36 +246,45 @@ class Checkstyle(LintTaskMixin, Task):
       all_targets = filter(self._is_checked, self.context.target_roots)
 
     with self.invalidated(all_targets) as invalidation_check:
-      targets_by_min_interpreter, py3_was_encountered = self._partition_targets_by_min_interpreter(
-        vt.target for vt in invalidation_check.invalid_vts)
-
-      deprecated_conditional(
-        predicate=lambda: py3_was_encountered and not self.get_options().enable_py3_lint,
-        removal_version='1.14.0.dev2',
-        entity_description="Disabling python 3 linting",
-        hint_message=(
-          "Python 3 linting is currently experimental. Add --{}-enable-py3-lint to the "
-          "front of the pants command line to silence this message."
-          .format(self.get_options_scope_equivalent_flag_component())))
+      tgts_by_compatibility, _ = self._interpreter_cache.partition_targets_by_compatibility(
+        [vt.target for vt in invalidation_check.invalid_vts]
+      )
 
       failure_count = 0
+      failures_by_min_interpreter = defaultdict(int)
+      py3_was_linted = False
 
-      failures_by_min_interpreter = {}
-      for interpreter, targets in targets_by_min_interpreter.items():
-        if self._interpreter_is_py3(interpreter):
-          if not self.get_options().enable_py3_lint:
-            continue
-        sources_for_targets = self.calculate_sources(targets)
-        if sources_for_targets:
-          cur_failure_count = self.checkstyle(interpreter, sources_for_targets)
-          failures_by_min_interpreter[interpreter] = cur_failure_count
-          failure_count += cur_failure_count
+      for filters, targets in tgts_by_compatibility.items():
+        if self.get_options().interpreter_constraints_whitelist is None and not self._constraints_are_whitelisted(filters):
+          deprecated_conditional(
+            lambda: self.get_options().interpreter_constraints_whitelist is None,
+            '1.14.0.dev2',
+            "Python linting is currently restricted to targets that match the global "
+            "interpreter constraints: {}. Pants detected unacceptable filters: {}. "
+            "Use the `--interpreter-constraints-whitelist` lint option to whitelist "
+            "compatibiltiy constraints."
+            .format(PythonSetup.global_instance().interpreter_constraints, filters)
+          )
+        else:
+          sources_for_targets = self.calculate_sources(targets)
+          if sources_for_targets:
+            allowed_interpreters = set(self._interpreter_cache.setup(filters=filters))
+            if not allowed_interpreters:
+              raise self.CheckstyleSetupError(
+                'No valid interpreters found for targets: {}\n(filters: {})'
+                .format(targets, filters))
+            interpreter = min(allowed_interpreters)
+            cur_failure_count = self.checkstyle(interpreter, sources_for_targets)
+            if interpreter.identity.version[0] == 3:
+              py3_was_linted = True
+            failures_by_min_interpreter[interpreter] += cur_failure_count
+            failure_count += cur_failure_count
 
       if failure_count > 0:
         err_msg = ('{} Python Style issues found. You may try `./pants fmt <targets>`.'
                    .format(failure_count))
         if self.get_options().fail:
-          raise self.CheckstyleRunError(py3_was_encountered, failures_by_min_interpreter, err_msg)
+          raise self.CheckstyleRunError(py3_was_linted, failures_by_min_interpreter, err_msg)
         else:
           self.context.log.warn(err_msg)
 
