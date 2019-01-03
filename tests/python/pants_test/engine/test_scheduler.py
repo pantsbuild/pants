@@ -9,8 +9,7 @@ from builtins import object, str
 from textwrap import dedent
 
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, Params, Select
-from pants.util.objects import datatype
+from pants.engine.selectors import Params, Select
 from pants_test.engine.util import (assert_equal_with_printing, create_scheduler,
                                     remove_locations_from_traceback)
 from pants_test.test_base import TestBase
@@ -38,37 +37,14 @@ def consumes_a_and_b(a, b):
   return str('{} and {}'.format(a, b))
 
 
-class C(object):
-  pass
-
-
-@rule(B, [Select(C)])
-def transitive_b_c(c):
-  return B()
-
-
-class D(datatype([('b', B)])):
-  pass
-
-
-@rule(D, [Select(C)])
-def transitive_coroutine_rule(c):
-  b = yield Get(B, C, c)
-  yield D(b)
-
-
 class SchedulerTest(TestBase):
 
   @classmethod
   def rules(cls):
     return super(SchedulerTest, cls).rules() + [
       RootRule(A),
-      # B is both a RootRule and an intermediate product here.
       RootRule(B),
-      RootRule(C),
       consumes_a_and_b,
-      transitive_b_c,
-      transitive_coroutine_rule,
     ]
 
   def test_use_params(self):
@@ -84,21 +60,6 @@ class SchedulerTest(TestBase):
     # But not a subset.
     with self.assertRaises(Exception):
       self.scheduler.product_request(str, [Params(a)])
-
-  def test_transitive_params(self):
-    # Test that C can be provided and implicitly converted into a B with transitive_b_c() to satisfy
-    # the selectors of consumes_a_and_b().
-    a, c = A(), C()
-    result_str, = self.scheduler.product_request(str, [Params(a, c)])
-    self.assertEquals(remove_locations_from_traceback(result_str),
-                      remove_locations_from_traceback(consumes_a_and_b(a, transitive_b_c(c))))
-
-    # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to the
-    # existence of transitive_b_c().
-    result_d, = self.scheduler.product_request(D, [Params(c)])
-    # We don't need the inner B objects to be the same, and we know the arguments are type-checked,
-    # we're just testing transitively resolving products in this file.
-    self.assertTrue(isinstance(result_d, D))
 
 
 class SchedulerTraceTest(unittest.TestCase):
