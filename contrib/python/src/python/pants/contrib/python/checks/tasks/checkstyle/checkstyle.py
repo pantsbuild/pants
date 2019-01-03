@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
+from collections import defaultdict
 
 from packaging import version
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -122,7 +123,8 @@ class Checkstyle(LintTaskMixin, Task):
     pex_path = os.path.join(self.workdir, 'checker', checker_id, str(interpreter.identity))
 
     if not os.path.exists(pex_path):
-      with self.context.new_workunit(name='build-checker'):
+      with self.context.new_workunit(
+          name='build-checker-{}'.format(interpreter.identity.version_str)):
         with safe_concurrent_creation(pex_path) as chroot:
           pex_builder = PexBuilderWrapper.Factory.create(
             builder=PEXBuilder(path=chroot, interpreter=interpreter),
@@ -190,7 +192,7 @@ class Checkstyle(LintTaskMixin, Task):
 
       args.append('@{}'.format(argfile.name))
 
-      with self.context.new_workunit(name='pythonstyle',
+      with self.context.new_workunit(name='pythonstyle-{}'.format(interpreter.identity.version_str),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT],
                                      cmd=' '.join(checker.cmdline(args))) as workunit:
 
@@ -223,13 +225,17 @@ class Checkstyle(LintTaskMixin, Task):
     )
     if not python_tgts:
       return 0
+
     interpreter_cache = PythonInterpreterCache.global_instance()
+
     with self.invalidated(self.get_targets(self._is_checked)) as invalidation_check:
-      failure_count = 0
-      tgts_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility(
-        [vt.target for vt in invalidation_check.invalid_vts]
-      )
-      for filters, targets in tgts_by_compatibility.items():
+      targets_by_compatibility, _ = interpreter_cache.partition_targets_by_compatibility(
+        vt.target for vt in invalidation_check.invalid_vts)
+
+      # Accumulate all the sources by the minimum interpreter assigned to their owning target, and
+      # check them all at once to minimize the number of serial invocations of a checker pex.
+      sources_by_min_interpreter = defaultdict(list)
+      for filters, targets in targets_by_compatibility.items():
         if self.get_options().interpreter_constraints_whitelist is None and not self._constraints_are_whitelisted(filters):
           deprecated_conditional(
             lambda: self.get_options().interpreter_constraints_whitelist is None,
@@ -237,18 +243,24 @@ class Checkstyle(LintTaskMixin, Task):
             "Python linting is currently restricted to targets that match the global "
             "interpreter constraints: {}. Pants detected unacceptable filters: {}. "
             "Use the `--interpreter-constraints-whitelist` lint option to whitelist "
-            "compatibiltiy constraints."
+            "compatibility constraints."
             .format(PythonSetup.global_instance().interpreter_constraints, filters)
           )
         else:
-          sources = self.calculate_sources([tgt for tgt in targets])
-          if sources:
-            allowed_interpreters = set(interpreter_cache.setup(filters=filters))
+          sources_for_target = self.calculate_sources(targets)
+          if sources_for_target:
+            allowed_interpreters = interpreter_cache.setup(filters=filters)
             if not allowed_interpreters:
               raise TaskError('No valid interpreters found for targets: {}\n(filters: {})'
                               .format(targets, filters))
             interpreter = min(allowed_interpreters)
-            failure_count += self.checkstyle(interpreter, sources)
+            sources_by_min_interpreter[interpreter].extend(sources_for_target)
+
+      failures_by_min_interpreter = {}
+      for interpreter, sources in sources_by_min_interpreter.items():
+        failures_by_min_interpreter[interpreter] = self.checkstyle(interpreter, sources)
+
+      failure_count = sum(failures_by_min_interpreter.values())
       if failure_count > 0 and self.get_options().fail:
         raise TaskError('{} Python Style issues found. You may try `./pants fmt <targets>`'
                         .format(failure_count))
