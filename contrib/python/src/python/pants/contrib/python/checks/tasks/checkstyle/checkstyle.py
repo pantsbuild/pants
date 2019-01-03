@@ -234,6 +234,7 @@ class Checkstyle(LintTaskMixin, Task):
 
       # Accumulate all the sources by the minimum interpreter assigned to their owning target, and
       # check them all at once to minimize the number of serial invocations of a checker pex.
+      # TODO: the v2 engine will allow parallelism in this task for free.
       sources_by_min_interpreter = defaultdict(list)
       for filters, targets in targets_by_compatibility.items():
         if self.get_options().interpreter_constraints_whitelist is None and not self._constraints_are_whitelisted(filters):
