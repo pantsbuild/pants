@@ -178,7 +178,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
         # Used in the wrapper script to locate a rust install.
         'HOME',
         # Needed to find python interpreters and other binaries.
-        #'PATH',
+        'PATH',
         'PANTS_PROFILE',
         # Ensure that the underlying ./pants invocation doesn't run from sources
         # (and therefore bootstrap) if we don't want it to.
