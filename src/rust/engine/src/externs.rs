@@ -76,6 +76,7 @@ pub fn store_tuple(values: &[Value]) -> Value {
 ///
 /// The underlying slice _must_ contain an even number of elements.
 ///
+#[allow(dead_code)]
 pub fn store_dict(keys_and_values_interleaved: &[(Value)]) -> Value {
   if keys_and_values_interleaved.len() % 2 != 0 {
     panic!("store_dict requires an even number of elements");
@@ -114,6 +115,7 @@ pub fn store_i64(val: i64) -> Value {
   with_externs(|e| (e.store_i64)(e.context, val).into())
 }
 
+#[allow(dead_code)]
 pub fn store_bool(val: bool) -> Value {
   with_externs(|e| (e.store_bool)(e.context, val).into())
 }
