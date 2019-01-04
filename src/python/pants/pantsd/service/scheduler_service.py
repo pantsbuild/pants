@@ -162,7 +162,7 @@ class SchedulerService(PantsService):
     """
     return self._scheduler.graph_len()
 
-  def prefork(self, options, build_config):
+  def prefork(self, options, options_bootstrapper):
     """Runs all pre-fork logic in the process context of the daemon.
 
     :returns: `(LegacyGraphSession, TargetRoots)`
@@ -176,17 +176,17 @@ class SchedulerService(PantsService):
 
     session = self._graph_helper.new_session(options.for_global_scope().v2_ui)
     if options.for_global_scope().loop:
-      return session, self._prefork_loop(session, options)
+      return session, self._prefork_loop(session, options, options_bootstrapper)
     else:
-      return session, self._prefork_body(session, options)
+      return session, self._prefork_body(session, options, options_bootstrapper)
 
-  def _prefork_loop(self, session, options):
+  def _prefork_loop(self, session, options, options_bootstrapper):
     # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
     iterations = options.for_global_scope().loop_max
     target_roots = None
     while iterations and not self._state.is_terminating:
       try:
-        target_roots = self._prefork_body(session, options)
+        target_roots = self._prefork_body(session, options, options_bootstrapper)
       except session.scheduler_session.execution_error_type as e:
         # Render retryable exceptions raised by the Scheduler.
         print(e, file=sys.stderr)
@@ -196,7 +196,7 @@ class SchedulerService(PantsService):
         continue
     return target_roots
 
-  def _prefork_body(self, session, options):
+  def _prefork_body(self, session, options, options_bootstrapper):
     global_options = options.for_global_scope()
     target_roots = TargetRootsCalculator.create(
       options=options,
@@ -214,7 +214,11 @@ class SchedulerService(PantsService):
         session.validate_goals(options.goals_and_possible_v2_goals)
 
       # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
-      session.run_console_rules(options.goals_and_possible_v2_goals, target_roots)
+      session.run_console_rules(
+          options_bootstrapper,
+          options.goals_and_possible_v2_goals,
+          target_roots,
+        )
 
     return target_roots
 

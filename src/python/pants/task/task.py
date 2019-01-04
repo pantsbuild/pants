@@ -292,7 +292,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     hasher.update(self._options_fingerprint(self.options_scope).encode('utf-8'))
     hasher.update(self.implementation_version_str().encode('utf-8'))
     for dep in self.subsystem_closure_iter():
-      hasher.update(self._options_fingerprint(dep.options_scope()).encode('utf-8'))
+      hasher.update(self._options_fingerprint(dep.options_scope).encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def artifact_cache_reads_enabled(self):
