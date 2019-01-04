@@ -128,10 +128,6 @@ class Checkstyle(LintTaskMixin, Task):
             builder=PEXBuilder(path=chroot, interpreter=interpreter),
             log=self.context.log)
 
-          # Constraining is required to guard against the case where the user
-          # has a pexrc file set.
-          pex_builder.add_interpreter_constraint(str(interpreter.identity.requirement))
-
           if pants_dev_mode:
             pex_builder.add_sources_from(self.checker_target)
             req_libs = [tgt for tgt in self.checker_target.closure()
@@ -197,9 +193,16 @@ class Checkstyle(LintTaskMixin, Task):
       with self.context.new_workunit(name='pythonstyle',
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT],
                                      cmd=' '.join(checker.cmdline(args))) as workunit:
+
+        # We have determined the exact interpreter we want here, so we override any pexrc settings.
+        pex_invocation_env = {
+          'PEX_PYTHON': interpreter.binary,
+          'PEX_IGNORE_RCFILES': 'True',
+        }
         return checker.run(args=args,
-                                    stdout=workunit.output('stdout'),
-                                    stderr=workunit.output('stderr'))
+                           stdout=workunit.output('stdout'),
+                           stderr=workunit.output('stderr'),
+                           env=pex_invocation_env)
 
   def _constraints_are_whitelisted(self, constraint_tuple):
     """

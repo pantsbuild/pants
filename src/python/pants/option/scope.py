@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import str
 
+from pants.option.option_value_container import OptionValueContainer
 from pants.util.objects import datatype
 
 
@@ -54,3 +55,10 @@ class ScopeInfo(datatype([
 
   def _optionable_cls_attr(self, name, default=None):
     return getattr(self.optionable_cls, name) if self.optionable_cls else default
+
+
+class ScopedOptions(datatype([
+  ('scope', Scope),
+  ('options', OptionValueContainer),
+])):
+  """A wrapper around options selected for a particular Scope."""

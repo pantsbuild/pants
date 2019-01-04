@@ -96,7 +96,6 @@ impl Store {
   /// Make a store which uses local storage, and if it is missing a value which it tries to load,
   /// will attempt to back-fill its local storage from a remote CAS.
   ///
-  #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
   pub fn with_remote<P: AsRef<Path>>(
     path: P,
     pool: Arc<ResettablePool>,
@@ -1728,7 +1727,6 @@ mod remote {
   }
 
   impl ByteStore {
-    #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn new(
       cas_addresses: &[String],
       instance_name: Option<String>,
