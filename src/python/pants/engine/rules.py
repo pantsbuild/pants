@@ -74,10 +74,10 @@ The invalid statement was:
 {node_text}
 
 The rule defined by function `{func_name}` begins at:
-{filename}:{line_number}:
+{filename}:{line_number}:{orig_indent}
 {context_lines}
 """.format(func_name=self._func.__name__, msg=msg,
-           filename=filename, line_number=line_number,
+           filename=filename, line_number=line_number, orig_indent=self._orig_indent,
            node_line_number=node_file_line,
            node_col=fully_indented_node_col,
            node_text=indented_node_text,

@@ -714,11 +714,12 @@ test_rules.py:{lineno}:{col}
     # Matches the line number of the @rule decorator.
     self.assertIn('The rule defined by function `g` begins at:', exc_msg)
     self.assertIn("""\
-test_rules.py:{lineno}:
+test_rules.py:{lineno}:{col}
     with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
       @rule(A, [])
       def g():
-""".format(lineno=sys._getframe().f_lineno - 22),
+""".format(lineno=sys._getframe().f_lineno - 22,
+           col=6),
                   exc_msg)
 
   def create_full_graph(self, rules, validate=True):
