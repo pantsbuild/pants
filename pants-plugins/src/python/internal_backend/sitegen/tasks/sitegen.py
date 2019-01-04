@@ -81,7 +81,7 @@ def load_soups(config):
   soups = {}
   for page, path in config['sources'].items():
     with open(path, 'r') as orig_file:
-      soups[page] = beautiful_soup(orig_file.read())
+      soups[page] = beautiful_soup(orig_file.read(), features='html.parser')
   return soups
 
 
