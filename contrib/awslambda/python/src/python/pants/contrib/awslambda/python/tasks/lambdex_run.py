@@ -77,7 +77,7 @@ class LambdexRun(Task):
       lambdex = self.context.products.get_data(LambdexPrep.tool_instance_cls)
       workunit_factory = functools.partial(self.context.new_workunit,
                                            name='run-lambdex',
-                                           labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TOOL])
+                                           labels=[WorkUnitLabel.TOOL])
       cmdline, exit_code = lambdex.run(workunit_factory,
                                        ['build', '-e', target.handler, tmp_lambda_path])
       if exit_code != 0:
