@@ -45,43 +45,133 @@ impl rule_graph::Rule for Rule {
       &Rule::Intrinsic(_) => false,
     }
   }
+
+  fn color(&self) -> Option<rule_graph::Palette> {
+    match self {
+      Rule::Task(_) => None,
+      Rule::Intrinsic(_) => Some(rule_graph::Palette::Gray),
+    }
+  }
+
+  fn fmt_for_graph(&self) -> String {
+    match self {
+      Rule::Task(ref task) => {
+        let FormattedTaskRuleElements {
+          rule_type,
+          task_name,
+          clause_portion,
+          product,
+          get_portion,
+        } = Self::extract_task_elements(
+          task,
+          Some(GraphVisualizationParameters {
+            select_clause_threshold: 2,
+            get_clause_threshold: 1,
+          }),
+        );
+
+        format!(
+          "@{}({}) -> {}{}\n{}",
+          rule_type, clause_portion, product, get_portion, task_name,
+        )
+      }
+      Rule::Intrinsic(ref intrinsic) => format!(
+        "@rule(<intrinsic>({}) -> {})",
+        intrinsic.input, intrinsic.product,
+      ),
+    }
+  }
+}
+
+///
+/// A helper struct to contain stringified versions of various components of the rule.
+///
+struct FormattedTaskRuleElements {
+  rule_type: String,
+  task_name: String,
+  clause_portion: String,
+  product: String,
+  get_portion: String,
+}
+
+#[derive(Clone, Copy)]
+struct GraphVisualizationParameters {
+  select_clause_threshold: usize,
+  get_clause_threshold: usize,
+}
+
+impl Rule {
+  fn extract_task_elements(
+    task: &Task,
+    visualization_params: Option<GraphVisualizationParameters>,
+  ) -> FormattedTaskRuleElements {
+    let product = format!("{}", task.product);
+
+    let select_clauses = task
+      .clause
+      .iter()
+      .map(|c| c.product.to_string())
+      .collect::<Vec<_>>();
+    let select_clause_threshold = visualization_params.map(|p| p.select_clause_threshold);
+
+    let clause_portion = match select_clause_threshold {
+      None => select_clauses.join(", ").to_string(),
+      Some(select_clause_threshold) if select_clauses.len() <= select_clause_threshold => {
+        select_clauses.join(", ").to_string()
+      }
+      Some(_) => format!("\n{},\n", select_clauses.join(",\n")),
+    };
+
+    let get_clauses = task
+      .gets
+      .iter()
+      .map(::std::string::ToString::to_string)
+      .collect::<Vec<_>>();
+    let get_clause_threshold = visualization_params.map(|p| p.get_clause_threshold);
+
+    let get_portion = if get_clauses.is_empty() {
+      "".to_string()
+    } else {
+      match get_clause_threshold {
+        None => format!(", gets=[{}]", get_clauses.join(", ")),
+        Some(get_clause_threshold) if get_clauses.len() <= get_clause_threshold => {
+          format!(",\ngets=[{}]", get_clauses.join(", "))
+        }
+        Some(_) => format!(",\ngets=[\n{},\n]", get_clauses.join("\n")),
+      }
+    };
+
+    let rule_type = if task.cacheable {
+      "rule".to_string()
+    } else {
+      "goal_rule".to_string()
+    };
+
+    FormattedTaskRuleElements {
+      rule_type,
+      task_name: task.func.name(),
+      clause_portion,
+      product,
+      get_portion,
+    }
+  }
 }
 
 impl fmt::Display for Rule {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
     match self {
       &Rule::Task(ref task) => {
-        let product = format!("{}", task.product);
-        let params = task
-          .clause
-          .iter()
-          .map(|c| c.product.to_string())
-          .collect::<Vec<_>>()
-          .join(", ");
-        let get_portion = if task.gets.is_empty() {
-          "".to_string()
-        } else {
-          let get_members = task
-            .gets
-            .iter()
-            .map(::std::string::ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(", ");
-          format!(", gets=[{}]", get_members)
-        };
-        let rule_type = if task.cacheable {
-          "rule".to_string()
-        } else {
-          "goal_rule".to_string()
-        };
+        let FormattedTaskRuleElements {
+          rule_type,
+          task_name,
+          clause_portion,
+          product,
+          get_portion,
+        } = Self::extract_task_elements(task, None);
         write!(
           f,
           "@{}({}({}) -> {}{})",
-          rule_type,
-          task.func.name(),
-          params,
-          product,
-          get_portion,
+          rule_type, task_name, clause_portion, product, get_portion,
         )
       }
       &Rule::Intrinsic(ref intrinsic) => write!(

@@ -4,6 +4,8 @@
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
+use super::Palette;
+
 pub trait TypeId: Clone + Copy + Debug + Display + Hash + Eq + Ord + Sized + 'static {
   ///
   /// Render a string for a collection of TypeIds.
@@ -46,4 +48,15 @@ pub trait Rule: Clone + Debug + Display + Hash + Eq + Sized + 'static {
   /// True if this rule implementation should be required to be reachable in the RuleGraph.
   ///
   fn require_reachable(&self) -> bool;
+
+  ///
+  /// Return any specific color this rule should be drawn with on the visualized graph. Note that
+  /// this coloration setting may be superseded by other factors.
+  ///
+  fn color(&self) -> Option<Palette>;
+
+  ///
+  /// Return a pretty-printed representation of this Rule's graph node, suitable for graphviz.
+  ///
+  fn fmt_for_graph(&self) -> String;
 }

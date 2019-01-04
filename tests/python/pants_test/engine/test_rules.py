@@ -1,8 +1,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import re
 import unittest
+from dataclasses import dataclass
+from enum import Enum
 from textwrap import dedent
+from typing import Callable, List, Optional, Tuple, Type, Union, get_type_hints
 
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
@@ -25,10 +29,163 @@ from pants.testutil.engine.util import (
   assert_equal_with_printing,
   create_scheduler,
   fmt_rule,
+  fmt_rust_function,
   run_rule,
 )
 from pants.testutil.test_base import TestBase
+from pants.util.enums import match
 from pants_test.engine.examples.parsers import JsonParser
+
+
+def fmt_graph_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None) -> str:
+  type_hints = get_type_hints(rule)
+  product = type_hints.pop("return").__name__
+  params = ", ".join(t.__name__ for t in type_hints.values())
+  gets_str = ""
+  if gets:
+    get_members = ',\n'.join(
+      f"Get[{product_subject_pair[0]}]({product_subject_pair[1]})"
+      for product_subject_pair in gets
+    )
+    gets_str = f",\ngets=[{get_members}]"
+  return f"@rule({params}) -> {product}{gets_str}\n{fmt_rust_function(rule)}"
+
+
+@dataclass(frozen=True)
+class RuleFormatRequest:
+  rule: Callable
+  for_param: Optional[Union[Type, Tuple[Type, ...]]] = None
+  gets: Optional[List[Tuple[str, str]]] = None
+
+  def format(self) -> str:
+    msg = fmt_graph_rule(self.rule, gets=self.gets)
+    if self.for_param is not None:
+      if isinstance(self.for_param, type):
+        msg += f'\nfor {self.for_param.__name__}'
+      else:
+        joined = ', '.join(c.__name__ for c in self.for_param)
+        msg += f'\nfor ({joined})'
+    return msg
+
+  @classmethod
+  def format_rule(cls, obj):
+    assert obj is not None
+
+    if isinstance(obj, cls):
+      return obj.format()
+    if isinstance(obj, type):
+      return f'Select({obj.__name__})'
+    return fmt_graph_rule(obj)
+
+
+def fmt_param_edge(
+    param: Type,
+    product: Union[Type, Tuple[Type, ...]],
+    via_func: Union[Type, RuleFormatRequest],
+    return_func: Optional[RuleFormatRequest] = None,
+) -> str:
+  if isinstance(via_func, type):
+    via_func_str = f'Select({via_func.__name__})'
+  else:
+    via_func_str = RuleFormatRequest.format_rule(via_func)
+
+  if isinstance(product, type):
+    product_name = product.__name__
+  else:
+    joined = ', '.join(p.__name__ for p in product)
+    product_name = f'({joined})'
+
+  return_elements = []
+  if return_func is not None:
+    return_func_str = return_func.format()
+    return_elements.append(return_func_str)
+  return_elements.append(f'Param({param.__name__})')
+  return_str = ' '.join(f'"{el}"' for el in return_elements)
+
+  param_color_fmt_str = GraphVertexType.param.graph_vertex_color_fmt_str()
+  return dedent(
+    f"""\
+    "Param({param.__name__})" {param_color_fmt_str}    "{via_func_str}
+    for {product_name}" -> {{{return_str}}}\
+    """)
+
+
+class GraphVertexType(Enum):
+  task = 'task'
+  inner = 'inner'
+  singleton = 'singleton'
+  intrinsic = 'intrinsic'
+  param = 'param'
+
+  def graph_vertex_color_fmt_str(self) -> Optional[str]:
+    olive = "0.2214,0.7179,0.8528"
+    gray = "0.576,0,0.6242"
+    orange = "0.08,0.5,0.976"
+    blue = "0.5,1,0.9"
+
+    color = match(self, {
+      GraphVertexType.task: blue,
+      GraphVertexType.inner: None,
+      GraphVertexType.singleton: olive,
+      GraphVertexType.intrinsic: gray,
+      GraphVertexType.param: orange,
+    })
+    if color is None:
+      return None
+    return f'[color="{color}",style=filled]'
+
+
+def fmt_non_param_edge(
+    subject: Union[Type, Callable, RuleFormatRequest],
+    product: Union[Type, Tuple[Type, ...]],
+    return_func: Optional[RuleFormatRequest] = None,
+    rule_type: GraphVertexType = GraphVertexType.task,
+    append_for_product: bool = True,
+) -> str:
+  if isinstance(product, type):
+    product_name = product.__name__
+  else:
+    joined = ', '.join(p.__name__ for p in product)
+    product_name = f'({joined})'
+
+  if return_func is None:
+    color = rule_type.graph_vertex_color_fmt_str()
+    if color is None:
+      via_return_func = '-> {}'
+    else:
+      via_return_func = color
+  else:
+    return_func_fmt = return_func.format()
+    via_return_func = ('-> {' + f'"{return_func_fmt}\nfor {product_name}"' + '}')
+
+  via_func_subject = RuleFormatRequest.format_rule(subject)
+
+  if rule_type == GraphVertexType.singleton:
+    spacing = ''
+  else:
+    spacing = '    '
+
+  if append_for_product:
+    before_return = f'\nfor {product_name}'
+  else:
+    before_return = ''
+
+  return dedent(
+    f"""\
+    {spacing}"{via_func_subject}{before_return}" {via_return_func}\
+    """)
+
+
+def remove_whitespace_from_graph_output(s: str) -> str:
+  no_trailing_whitespace = re.sub(r'\s*\n\s*', '', s, flags=re.MULTILINE)
+  no_pre_or_post_quotes_whitespace = re.sub(r'"\s+|\s+"', '"', no_trailing_whitespace)
+  return no_pre_or_post_quotes_whitespace.strip()
+
+
+def assert_equal_graph_output(test_case, expected, actual):
+  return assert_equal_with_printing(
+    test_case, expected, actual,
+    uniform_formatter=remove_whitespace_from_graph_output)
 
 
 class A:
@@ -150,7 +307,7 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
     self.assertEqual(some_goal_rule.rule.name, "example but **COOLER**")
 
 
-class RuleTypeAnnotationTest(unittest.TestCase):
+class GraphVertexTypeAnnotationTest(unittest.TestCase):
   def test_nominal(self):
     @rule
     def dry(a: int, b: str, c: float) -> bool:
@@ -203,6 +360,8 @@ class GoalRuleValidation(TestBase):
 
 
 class RuleGraphTest(TestBase):
+  maxDiff = None
+
   def test_ruleset_with_missing_product_type(self):
     @rule
     def a_from_b_noop(b: B) -> A:
@@ -248,20 +407,20 @@ class RuleGraphTest(TestBase):
     with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        Rules with errors: 3
-          {fmt_rule(a_from_b_and_c)}:
-            Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-          {fmt_rule(a_from_c_and_b)}:
-            Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-          {fmt_rule(d_from_a)}:
-            Ambiguous rules to compute A with parameter types (B, C):
-              {fmt_rule(a_from_b_and_c)} for (B, C)
-              {fmt_rule(a_from_c_and_b)} for (B, C)
-       """
-      ).strip(),
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      Rules with errors: 3
+        {fmt_rule(a_from_b_and_c)}:
+          Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+        {fmt_rule(a_from_c_and_b)}:
+          Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+        {fmt_rule(d_from_a)}:
+          Ambiguous rules to compute A with parameter types (B, C):
+            {fmt_graph_rule(a_from_b_and_c)}
+      for (B, C)
+            {fmt_graph_rule(a_from_c_and_b)}
+      for (B, C)
+      """),
       str(cm.exception),
     )
 
@@ -342,7 +501,7 @@ class RuleGraphTest(TestBase):
     with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
-    # This error message could note near matches like the singleton.
+    # TODO: This error message could note near matches like the singleton.
     self.assert_equal_with_printing(
       dedent(
         f"""\
@@ -378,20 +537,17 @@ class RuleGraphTest(TestBase):
     with self.assertRaises(Exception) as cm:
       create_scheduler(rules)
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        Rules with errors: 3
-          {fmt_rule(a_from_c)}:
-            Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-          {fmt_rule(b_from_d)}:
-            No rule was available to compute D with parameter type SubA
-          {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
-            No rule was available to compute A with parameter type SubA
-        """
-      ).strip(),
-      str(cm.exception),
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      Rules with errors: 3
+        {fmt_rule(a_from_c)}:
+          Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+        {fmt_rule(b_from_d)}:
+          No rule was available to compute D with parameter type SubA
+        {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
+          No rule was available to compute A with parameter type SubA
+      """).strip(),
+      str(cm.exception))
 
   def test_unreachable_rule(self):
     """Test that when one rule "shadows" another, we get an error."""
@@ -434,20 +590,17 @@ class RuleGraphTest(TestBase):
     ]
     fullgraph = self.create_full_graph(rules)
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
-          // internal entries
-            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)"}}
-        }}"""
-      ).strip(),
-      fullgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, SubA)}
+      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
+        // internal entries
+      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
+      }}""").strip(),
+      fullgraph)
 
   def test_full_graph_for_planner_example(self):
     address_mapper = AddressMapper(JsonParser(TARGET_TABLE), '*.BUILD.json')
@@ -496,28 +649,25 @@ class RuleGraphTest(TestBase):
       b_from_a,
     ]
     fullgraph = self.create_full_graph(rules)
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: A, SubA
-          // root entries
-            "Select(A) for A" [color=blue]
-            "Select(A) for A" -> {{"Param(A)"}}
-            "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
-            "Select(B) for A" [color=blue]
-            "Select(B) for A" -> {{"{fmt_rule(b_from_a)} for A"}}
-            "Select(B) for SubA" [color=blue]
-            "Select(B) for SubA" -> {{"{fmt_rule(b_from_a)} for SubA"}}
-          // internal entries
-            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)"}}
-            "{fmt_rule(b_from_a)} for A" -> {{"Param(A)"}}
-            "{fmt_rule(b_from_a)} for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
-        }}"""
-      ).strip(),
-      fullgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: A, SubA
+        // root entries
+      {fmt_non_param_edge(A, A)}
+      {fmt_param_edge(A, A, A)}
+      {fmt_non_param_edge(A, SubA)}
+      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
+      {fmt_non_param_edge(B, A)}
+      {fmt_non_param_edge(B, A, RuleFormatRequest(b_from_a))}
+      {fmt_non_param_edge(B, SubA)}
+      {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
+        // internal entries
+      {fmt_non_param_edge(b_from_a, SubA, RuleFormatRequest(a_from_suba))}
+      {fmt_param_edge(A, A, RuleFormatRequest(b_from_a))}
+      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
+      }}""").strip(),
+      fullgraph)
 
   def test_single_rule_depending_on_subject_selection(self):
     @rule
@@ -530,20 +680,17 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
-          // internal entries
-            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)"}}
-        }}"""
-      ).strip(),
-      subgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, SubA)}
+      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
+        // internal entries
+      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
+      }}""").strip(),
+      subgraph)
 
   def test_multiple_selects(self):
     @rule
@@ -561,21 +708,19 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba_and_b)} for SubA"}}
-          // internal entries
-            "{fmt_rule(a_from_suba_and_b)} for SubA" -> {{"{fmt_rule(b)} for ()" "Param(SubA)"}}
-            "{fmt_rule(b)} for ()" -> {{}}
-        }}"""
-      ).strip(),
-      subgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, SubA)}
+      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba_and_b))}
+        // internal entries
+      {fmt_non_param_edge(b, (), rule_type=GraphVertexType.inner)}
+      {fmt_non_param_edge(b, (), rule_type=GraphVertexType.singleton)}
+      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba_and_b), RuleFormatRequest(b, ()))}
+      }}""").strip(),
+      subgraph)
 
   def test_potentially_ambiguous_get(self):
     # In this case, we validate that a Get is satisfied by a rule that actually consumes its
@@ -604,22 +749,21 @@ class RuleGraphTest(TestBase):
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
-    self.assert_equal_with_printing(
-        dedent(f"""\
-            digraph {{
-              // root subject types: SubA
-              // root entries
-                "Select(A) for SubA" [color=blue]
-                "Select(A) for SubA" -> {{"{fmt_rule(a, gets=[("B", "C")])} for SubA"}}
-              // internal entries
-                "{fmt_rule(a, gets=[("B", "C")])} for SubA" -> {{"{fmt_rule(b_from_suba)} for C" "Param(SubA)"}}
-                "{fmt_rule(b_from_suba)} for C" -> {{"{fmt_rule(suba_from_c)} for C"}}
-                "{fmt_rule(b_from_suba)} for SubA" -> {{"Param(SubA)"}}
-                "{fmt_rule(suba_from_c)} for C" -> {{"Param(C)"}}
-            }}
-        """).strip(),
-        subgraph,
-      )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, SubA)}
+      {fmt_non_param_edge(A, SubA, return_func=RuleFormatRequest(a, gets=[("B", "C")]))}
+        // internal entries
+      {fmt_non_param_edge(b_from_suba, C, return_func=RuleFormatRequest(suba_from_c))}
+      {fmt_param_edge(C, C, RuleFormatRequest(suba_from_c))}
+      {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a, gets=[("B", "C")]), return_func=RuleFormatRequest(b_from_suba, C))}
+      {fmt_param_edge(SubA, SubA, RuleFormatRequest(b_from_suba))}
+      }}
+      """).strip(),
+      subgraph)
 
   def test_one_level_of_recursion(self):
     @rule
@@ -637,21 +781,18 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"{fmt_rule(a_from_b)} for SubA"}}
-          // internal entries
-            "{fmt_rule(a_from_b)} for SubA" -> {{"{fmt_rule(b_from_suba)} for SubA"}}
-            "{fmt_rule(b_from_suba)} for SubA" -> {{"Param(SubA)"}}
-        }}"""
-      ).strip(),
-      subgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, SubA)}
+      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_b))}
+        // internal entries
+      {fmt_non_param_edge(a_from_b, SubA, RuleFormatRequest(b_from_suba))}
+      {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(b_from_suba))}
+      }}""").strip(),
+      subgraph)
 
   def test_noop_removal_in_subgraph(self):
     @rule
@@ -674,20 +815,18 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(A) for ()" [color=blue]
-            "Select(A) for ()" -> {{"{fmt_rule(a)} for ()"}}
-          // internal entries
-            "{fmt_rule(a)} for ()" -> {{}}
-        }}"""
-      ).strip(),
-      subgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, ())}
+      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
+      {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
+        // internal entries
+      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
+      }}""").strip(),
+      subgraph)
 
   def test_noop_removal_full_single_subject_type(self):
     @rule
@@ -705,20 +844,18 @@ class RuleGraphTest(TestBase):
 
     fullgraph = self.create_full_graph(rules, validate=False)
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(A) for ()" [color=blue]
-            "Select(A) for ()" -> {{"{fmt_rule(a)} for ()"}}
-          // internal entries
-            "{fmt_rule(a)} for ()" -> {{}}
-        }}"""
-      ).strip(),
-      fullgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, ())}
+      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
+      {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
+        // internal entries
+      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
+      }}""").strip(),
+      fullgraph)
 
   def test_root_tuple_removed_when_no_matches(self):
     @rule
@@ -738,23 +875,20 @@ class RuleGraphTest(TestBase):
 
     fullgraph = self.create_full_graph(rules, validate=False)
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: C, D
-          // root entries
-            "Select(A) for C" [color=blue]
-            "Select(A) for C" -> {{"{fmt_rule(a_from_c)} for C"}}
-            "Select(B) for (C, D)" [color=blue]
-            "Select(B) for (C, D)" -> {{"{fmt_rule(b_from_d_and_a)} for (C, D)"}}
-          // internal entries
-            "{fmt_rule(a_from_c)} for C" -> {{"Param(C)"}}
-            "{fmt_rule(b_from_d_and_a)} for (C, D)" -> {{"{fmt_rule(a_from_c)} for C" "Param(D)"}}
-        }}"""
-      ).strip(),
-      fullgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: C, D
+        // root entries
+      {fmt_non_param_edge(A, C)}
+      {fmt_non_param_edge(A, C, RuleFormatRequest(a_from_c))}
+      {fmt_non_param_edge(B, (C, D))}
+      {fmt_non_param_edge(B, (C, D), RuleFormatRequest(b_from_d_and_a))}
+        // internal entries
+      {fmt_param_edge(C, C, RuleFormatRequest(a_from_c))}
+      {fmt_param_edge(D, (C, D), RuleFormatRequest(b_from_d_and_a), return_func=RuleFormatRequest(a_from_c, C))}
+      }}""").strip(),
+      fullgraph)
 
   def test_noop_removal_transitive(self):
     # If a noop-able rule has rules that depend on it,
@@ -779,20 +913,18 @@ class RuleGraphTest(TestBase):
     ]
     subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(A) for ()" [color=blue]
-            "Select(A) for ()" -> {{"{fmt_rule(a)} for ()"}}
-          // internal entries
-            "{fmt_rule(a)} for ()" -> {{}}
-        }}"""
-      ).strip(),
-      subgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, ())}
+      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
+      {fmt_non_param_edge(A, (), RuleFormatRequest(a))}
+        // internal entries
+      {fmt_non_param_edge(a, (), rule_type=GraphVertexType.inner)}
+      }}""").strip(),
+      subgraph)
 
   def test_matching_singleton(self):
     @rule
@@ -810,21 +942,19 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
-          // internal entries
-            "{fmt_rule(a_from_suba)} for SubA" -> {{"{fmt_rule(b_singleton)} for ()" "Param(SubA)"}}
-            "{fmt_rule(b_singleton)} for ()" -> {{}}
-        }}"""
-      ).strip(),
-      subgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, SubA)}
+      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
+        // internal entries
+      {fmt_non_param_edge(b_singleton, (), rule_type=GraphVertexType.inner)}
+      {fmt_non_param_edge(b_singleton, (), rule_type=GraphVertexType.singleton)}
+      {fmt_param_edge(SubA, SubA, via_func=RuleFormatRequest(a_from_suba), return_func=RuleFormatRequest(b_singleton, ()))}
+      }}""").strip(),
+      subgraph)
 
   def test_depends_on_multiple_one_noop(self):
 
@@ -848,21 +978,18 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(B, rules, SubA(), validate=False)
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(B) for SubA" [color=blue]
-            "Select(B) for SubA" -> {{"{fmt_rule(b_from_a)} for SubA"}}
-          // internal entries
-            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)"}}
-            "{fmt_rule(b_from_a)} for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
-        }}"""
-      ).strip(),
-      subgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(B, SubA)}
+      {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
+        // internal entries
+      {fmt_non_param_edge(RuleFormatRequest(b_from_a), SubA, RuleFormatRequest(a_from_suba))}
+      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
+      }}""").strip(),
+      subgraph)
 
   def test_multiple_depend_on_same_rule(self):
 
@@ -886,26 +1013,23 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_full_graph(rules)
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(A) for SubA" [color=blue]
-            "Select(A) for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
-            "Select(B) for SubA" [color=blue]
-            "Select(B) for SubA" -> {{"{fmt_rule(b_from_a)} for SubA"}}
-            "Select(C) for SubA" [color=blue]
-            "Select(C) for SubA" -> {{"{fmt_rule(c_from_a)} for SubA"}}
-          // internal entries
-            "{fmt_rule(a_from_suba)} for SubA" -> {{"Param(SubA)"}}
-            "{fmt_rule(b_from_a)} for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
-            "{fmt_rule(c_from_a)} for SubA" -> {{"{fmt_rule(a_from_suba)} for SubA"}}
-        }}"""
-      ).strip(),
-      subgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, SubA)}
+      {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
+      {fmt_non_param_edge(B, SubA)}
+      {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
+      {fmt_non_param_edge(C, SubA)}
+      {fmt_non_param_edge(C, SubA, RuleFormatRequest(c_from_a))}
+        // internal entries
+      {fmt_non_param_edge(b_from_a, SubA, RuleFormatRequest(a_from_suba))}
+      {fmt_non_param_edge(c_from_a, SubA, RuleFormatRequest(a_from_suba))}
+      {fmt_param_edge(SubA, SubA, RuleFormatRequest(a_from_suba))}
+      }}""").strip(),
+      subgraph)
 
   def test_get_simple(self):
     @rule
@@ -923,21 +1047,20 @@ class RuleGraphTest(TestBase):
 
     subgraph = self.create_subgraph(A, rules, SubA())
 
-    self.assert_equal_with_printing(
-      dedent(
-        f"""\
-        digraph {{
-          // root subject types: SubA
-          // root entries
-            "Select(A) for ()" [color=blue]
-            "Select(A) for ()" -> {{"{fmt_rule(a, gets=[("B", "D")])} for ()"}}
-          // internal entries
-            "{fmt_rule(a, gets=[("B", "D")])} for ()" -> {{"{fmt_rule(b_from_d)} for D"}}
-            "{fmt_rule(b_from_d)} for D" -> {{"Param(D)"}}
-        }}"""
-      ).strip(),
-      subgraph,
-    )
+    assert_equal_graph_output(self, dedent(
+      f"""\
+      digraph {{
+        // root subject types: SubA
+        // root entries
+      {fmt_non_param_edge(A, ())}
+      {fmt_non_param_edge(RuleFormatRequest(a, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
+      {fmt_non_param_edge(A, (), RuleFormatRequest(a, gets=[("B", "D")]))}
+        // internal entries
+      {fmt_non_param_edge(RuleFormatRequest(a, (), gets=[("B", "D")]), D, RuleFormatRequest(b_from_d),
+                          append_for_product=False)}
+      {fmt_param_edge(D, D, RuleFormatRequest(b_from_d))}
+      }}""").strip(),
+      subgraph)
 
   def test_invalid_get_arguments(self):
     with self.assertRaisesWithMessage(
