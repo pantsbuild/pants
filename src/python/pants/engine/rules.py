@@ -33,7 +33,7 @@ class _RuleVisitor(ast.NodeVisitor):
 
   def __init__(self, func, func_node, func_source, orig_indent, frame, parents_table):
     super(_RuleVisitor, self).__init__()
-    self.gets = []
+    self._gets = []
     self._func = func
     self._func_node = func_node
     self._func_source = func_source
@@ -41,6 +41,10 @@ class _RuleVisitor(ast.NodeVisitor):
     self._frame = frame
     self._parents_table = parents_table
     self._yields_in_assignments = set()
+
+  @property
+  def gets(self):
+    return self._gets
 
   def _generate_ast_error_message(self, node, msg):
     # This is the location info of the start of the decorated @rule.
@@ -86,7 +90,8 @@ The rule defined by function `{func_name}` begins at:
 
   class YieldVisitError(Exception): pass
 
-  def _maybe_end_of_stmt_list(self, attr_value):
+  @staticmethod
+  def _maybe_end_of_stmt_list(attr_value):
     """If `attr_value` is a non-empty iterable, return its final element."""
     if (attr_value is not None) and isinstance(attr_value, Iterable):
       result = list(attr_value)
@@ -98,11 +103,13 @@ The rule defined by function `{func_name}` begins at:
     """Determine if `stmt` is at the end of a list of statements (i.e. can be an implicit `return`).
 
     If there are any statements following `stmt` at the same level of nesting, this method returns
-    False, such as the following (if `stmt` is a yield Expr):
+    False, such as the following (if `stmt` is the Expr for `yield 'good'`):
 
     if 2 + 2 == 5:
       yield 'good'
       a = 3
+
+    Note that this returns False even if the statement following `stmt` is a `return`.
 
     However, if `stmt` is at the end of a list of statements, it can be made more clear that `stmt`
     is intended to represent a `return`. Another way to view this method is as a dead code
@@ -122,7 +129,7 @@ The rule defined by function `{func_name}` begins at:
     See https://docs.python.org/2/library/ast.html#abstract-grammar for the grammar specification.
     'body', 'orelse', and 'finalbody' are the only attributes on any AST nodes which can contain
     lists of stmts.  'body' is also an attribute in the Exec statement for some reason, but as a
-    single expr, so we check if it is iterable.
+    single expr, so we simply check if it is iterable in `_maybe_end_of_stmt_list()`.
     """
     parent_stmt = self._parents_table[stmt]
     last_body_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'body', None))
@@ -138,7 +145,7 @@ The rule defined by function `{func_name}` begins at:
 
   def visit_Call(self, node):
     if isinstance(node.func, ast.Name) and node.func.id == Get.__name__:
-      self.gets.append(Get.extract_constraints(node))
+      self._gets.append(Get.extract_constraints(node))
 
   def visit_Assign(self, node):
     if isinstance(node.value, ast.Yield):
@@ -213,6 +220,7 @@ def optionable_rule(optionable_factory):
 
 
 def _get_starting_indent(source):
+  """Remove leading indentation from `source` so ast.parse() doesn't raise an exception."""
   if source.startswith(" "):
     return sum(1 for _ in itertools.takewhile(lambda c: c in {' ', b' '}, source))
   return 0
