@@ -4,6 +4,118 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.14.0.dev1 (1/4/2019)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Validate yield statements in rule bodies to remove ambiguity about returning (#7019)
+  `PR #7019 <https://github.com/pantsbuild/pants/pull/7019>`_
+
+* Add support for consuming Subsystems from @rules (#6993)
+  `PR #6993 <https://github.com/pantsbuild/pants/pull/6993>`_
+
+* add rules to plugins and add some integration tests, maybe (#6892)
+  `PR #6892 <https://github.com/pantsbuild/pants/pull/6892>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+
+* Update to rust 2018 (#6867)
+  `PR #6867 <https://github.com/pantsbuild/pants/pull/6867>`_
+
+Bugfixes
+~~~~~~~~
+
+* set PEX_PYTHON_PATH when invoking the checkstyle pex for pexrc to work (#7013)
+  `PR #7013 <https://github.com/pantsbuild/pants/pull/7013>`_
+
+* fix binary_util.py main method, add unit test, and kill integration test (#7010)
+  `PR #7010 <https://github.com/pantsbuild/pants/pull/7010>`_
+
+* Markdown writer errors are written properly (#6975)
+  `PR #6975 <https://github.com/pantsbuild/pants/pull/6975>`_
+
+* Fix unused_must_use, error in the futrue (#6999)
+  `PR #6999 <https://github.com/pantsbuild/pants/pull/6999>`_
+
+* Add python version to the native cache key (#6991)
+  `PR #6991 <https://github.com/pantsbuild/pants/pull/6991>`_
+
+* Fix invalid escape sequence & regex expression deprecations (#6984)
+  `PR #6984 <https://github.com/pantsbuild/pants/pull/6984>`_
+
+* Fix test_checkstyle.py interpreter constraint  (#6983)
+  `PR #6983 <https://github.com/pantsbuild/pants/pull/6983>`_
+  `PR #6959 <https://github.com/pantsbuild/pants/pull/6959>`_
+
+* Fix native.py unicode issue leading to compile error with Python 3 (#6982)
+  `PR #6982 <https://github.com/pantsbuild/pants/pull/6982>`_
+
+* Fix python_artifact fingerprint unicode issue for Python 3 (#6971)
+  `PR #6971 <https://github.com/pantsbuild/pants/pull/6971>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Eliminate dead code warnings. (#7018)
+  `PR #7018 <https://github.com/pantsbuild/pants/pull/7018>`_
+
+* Retrofit the Conan tool using PythonToolBase. (#6992)
+  `PR #6992 <https://github.com/pantsbuild/pants/pull/6992>`_
+
+* A preliminary bootstrapping CI stage, to prevent repeated work in each CI shard. (#7012)
+  `PR #7012 <https://github.com/pantsbuild/pants/pull/7012>`_
+
+* add unit testing for requesting transitively available products (#7015)
+  `PR #7015 <https://github.com/pantsbuild/pants/pull/7015>`_
+
+* When compiling with rsc, metacp java libraries in a separate execution graph node. (#6940)
+  `PR #6940 <https://github.com/pantsbuild/pants/pull/6940>`_
+
+* digest returns hashing::Digest (#7006)
+  `PR #7006 <https://github.com/pantsbuild/pants/pull/7006>`_
+
+* Fix all rust clippy warnings (#7001)
+  `PR #7001 <https://github.com/pantsbuild/pants/pull/7001>`_
+
+* Engine can store dict (#6996)
+  `PR #6996 <https://github.com/pantsbuild/pants/pull/6996>`_
+
+* Programatically add rust config to vendored protos (#7000)
+  `PR #7000 <https://github.com/pantsbuild/pants/pull/7000>`_
+
+* Engine can store bools (#6994)
+  `PR #6994 <https://github.com/pantsbuild/pants/pull/6994>`_
+
+* Clarify which files should be edited when releasing from branch (#6988)
+  `PR #6988 <https://github.com/pantsbuild/pants/pull/6988>`_
+
+* Core has a PathBuf for build root (#6995)
+  `PR #6995 <https://github.com/pantsbuild/pants/pull/6995>`_
+
+* Don't explicitly use TaskRule (#6980)
+  `PR #6980 <https://github.com/pantsbuild/pants/pull/6980>`_
+
+* Make UI Per-session instead of per-request (#6827)
+  `PR #6827 <https://github.com/pantsbuild/pants/pull/6827>`_
+
+* Replace deprecated cgi.escape() with html.escape() (#6986)
+  `PR #6986 <https://github.com/pantsbuild/pants/pull/6986>`_
+
+* Allow remote store RPC attempts to be configured (#6978)
+  `PR #6978 <https://github.com/pantsbuild/pants/pull/6978>`_
+
+* Prep for 1.13.0 (#6977)
+  `PR #6977 <https://github.com/pantsbuild/pants/pull/6977>`_
+
+* Allow fs_util thread count to be configured (#6976)
+  `PR #6976 <https://github.com/pantsbuild/pants/pull/6976>`_
+
+* Convert Native into a singleton (#6979)
+  `PR #6979 <https://github.com/pantsbuild/pants/pull/6979>`_
+
 1.14.0.dev0 (12/21/2018)
 ------------------------
 
