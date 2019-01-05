@@ -73,7 +73,7 @@ stages:
   - name: &build_unstable Deploy Pants Pex Unstable
     if: tag IS NOT present AND type NOT IN (pull_request, cron)
 
-default_test_config: &default_test_config
+default_linux_config: &default_linux_config
   os: linux
   dist: xenial
   sudo: required
@@ -87,14 +87,22 @@ default_test_config: &default_test_config
         - python-dev
         - openssl
         - libssl-dev
-  stage: *test
+        - jq
+        - unzip
   language: python
   python: &python_version "2.7"
+  before_install:
+{{>awscli_install}}
+  after_failure:
+    - build-support/bin/ci-failure.sh
+
+default_linux_test_config: &default_linux_test_config
+  <<: *default_linux_config
+  stage: *test
   before_install:
 {{>before_install}}
   before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY}
-
 
 osx_test_config: &osx_test_config
   os: osx
@@ -104,7 +112,7 @@ osx_test_config: &osx_test_config
     - MODE=debug ./build-support/bin/travis-ci.sh -m
 
 default_cron_test_config: &default_cron_test_config
-  <<: *default_test_config
+  <<: *default_linux_test_config
   stage: *cron
 
 linux_with_fuse: &linux_with_fuse
@@ -117,13 +125,38 @@ linux_with_fuse: &linux_with_fuse
 
 matrix:
   include:
-    - <<: *default_test_config
-      name: "Bootstrap Pants"
+    - <<: *default_linux_config
+      name: "Build Linux Native Engine and pants.pex"
       stage: *bootstrap
+      services:
+        - docker
+      env:
+        - CACHE_NAME=linuxpexbuild
       before_script:
+        - ulimit -c unlimited
       script:
-        - ./build-support/bin/travis-ci.sh  # With no args this script just bootstraps.
-        - aws --no-sign-request --region us-east-1 s3 cp ./pants.pex ${BOOTSTRAPPED_PEX_URL}
+        - docker build --rm -t travis_ci
+          --build-arg "TRAVIS_USER=$(id -un)"
+          --build-arg "TRAVIS_UID=$(id -u)"
+          --build-arg "TRAVIS_GROUP=$(id -gn)"
+          --build-arg "TRAVIS_GID=$(id -g)"
+          build-support/docker/travis_ci/
+        # Mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain
+        - docker run --rm -t
+          -v "${HOME}:/travis/home"
+          -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+          travis_ci:latest
+          sh -c "git clean -xfd && ./build-support/bin/ci.sh"  # With no args ci.sh just bootstraps a pants.pex.
+        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL}
+
+    - <<: *default_linux_test_config
+      name: "Build Linux Wheels"
+      stage: *test
+      env:
+        - CACHE_NAME=linuxwheelsbuild
+        - PREPARE_DEPLOY=1
+      script:
+        - ./build-support/bin/release.sh -n
 
     # Build macOS engine
     - name: "OSX Native Engine Binary Builder"
@@ -135,45 +168,25 @@ matrix:
       stage: *test
       language: generic
       env:
+        - CACHE_NAME=macoswheels
         - PREPARE_DEPLOY=1
       script:
         - ./pants --version && ./build-support/bin/release.sh -n
+      after_failure:
+        - build-support/bin/ci-failure.sh
 
     # TODO: Update this to use 10.14 once it is available
     - name: "OSX 10.12 Sanity Check"
       <<: *osx_test_config
       osx_image: xcode9.2
+      env:
+        - CACHE_NAME=macos10.12sanity
 
     - name: "OSX 10.13 Sanity Check"
       <<: *osx_test_config
       osx_image: xcode10.1
-
-    # Build Linux engine
-    - name: "Linux Native Engine Binary Builder"
-      os: linux
-      stage: *test
-      language: generic
-      services:
-        - docker
       env:
-        - PREPARE_DEPLOY=1
-      before_script:
-        - ulimit -c unlimited
-      script:
-        - docker build --rm -t travis_ci
-          --build-arg "TRAVIS_USER=$(id -un)"
-          --build-arg "TRAVIS_UID=$(id -u)"
-          --build-arg "TRAVIS_GROUP=$(id -gn)"
-          --build-arg "TRAVIS_GID=$(id -g)"
-            build-support/docker/travis_ci/
-        # Mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain
-        - docker run --rm -t
-          -v "${HOME}:/travis/home"
-          -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-          travis_ci:latest
-          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
-      after_failure:
-        - build-support/bin/ci-failure.sh
+        - CACHE_NAME=macos10.13sanity
 
     # Deploy Pex Stable
     - name: "Deploy Pants PEX"
@@ -181,6 +194,7 @@ matrix:
       language: python
       stage: *build_stable
       env:
+        - CACHE_NAME=linuxpexdeploystable
         - PANTS_PEX_RELEASE=stable
       script:
         - ./build-support/bin/release.sh -p
@@ -204,41 +218,52 @@ matrix:
       language: python
       stage: *build_unstable
       env:
+        - CACHE_NAME=linuxpexdeployunstable
         - PREPARE_DEPLOY=1
       script:
         - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       <<: *linux_with_fuse
       name: "Self checks, lint, and JVM tests"
+      env:
+        - CACHE_NAME=linuxselfchecks
       script:
         - ./build-support/bin/travis-ci.sh -fbkmrjt
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py2 - Unit tests for pants and pants-plugins"
+      env:
+        - CACHE_NAME=linuxunittests.py2
       script:
         - ./build-support/bin/travis-ci.sh -blp
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py3 - Unit tests for pants and pants-plugins"
+      env:
+        - CACHE_NAME=linuxunittests.py3
       script:
         - ./build-support/bin/travis-ci.sh -3blp
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py2 - Python contrib tests"
+      env:
+        - CACHE_NAME=linuxcontribtests.py2
       script:
         - ./build-support/bin/travis-ci.sh -bn
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py3 - Python contrib tests"
+      env:
+        - CACHE_NAME=linuxcontribtests.py3
       script:
         - ./build-support/bin/travis-ci.sh -3bn
 
 {{#integration_shards}}
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard {{.}}"
       env:
-        - CACHE_NAME=integrationshard{{.}}  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i {{.}}/{{integration_shards_length}}
 
@@ -247,7 +272,7 @@ matrix:
     - <<: *default_cron_test_config
       name: "Integration tests for pants (Python 2) - shard {{.}}"
       env:
-        - CACHE_NAME=cronshard{{.}}  # Ensure distinct caches.
+        - CACHE_NAME=cronshard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -bc -i {{.}}/{{integration_shards_length}}
 
@@ -256,6 +281,8 @@ matrix:
     # Rust on linux
     - <<: *linux_with_fuse
       name: "Rust Tests Linux"
+      env:
+        - CACHE_NAME=linuxrusttests
       os: linux
       dist: xenial
       sudo: required
@@ -267,8 +294,11 @@ matrix:
         - ulimit -n 8192
       script:
         - ./build-support/bin/travis-ci.sh -be
+
     # Rust on macOS
-    - name: "Rust + Platform-specific Tests OSX"
+    - name: "Rust + Platform-specific Tests MacOS"
+      env:
+        - CACHE_NAME=macosrusttests
       os: osx
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
@@ -287,6 +317,8 @@ matrix:
     # Rust Clippy on Linux
     - <<: *linux_with_fuse
       name: "Rust Clippy on Linux"
+      env:
+        - CACHE_NAME=linuxclippy
       os: linux
       dist: xenial
       sudo: required
@@ -302,6 +334,8 @@ matrix:
     # Cargo audit
     - <<: *linux_with_fuse
       name: "Cargo audit"
+      env:
+        - CACHE_NAME=linuxcargoaudit
       os: linux
       dist: xenial
       sudo: required
