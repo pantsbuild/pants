@@ -155,8 +155,10 @@ The rule defined by function `{func_name}` begins at:
       if not self._stmt_is_at_end_of_parent_list(expr_for_yield):
         raise self.YieldVisitError(
           self._generate_ast_error_message(node, """\
+yield in @rule without assignment must come at the end of a series of statements.
+
 A yield in an @rule without an assignment is equivalent to a return, and we
-currently require that it comes at the end of a series of statements.
+currently require that no statements follow such a yield at the same level of nesting.
 Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the result.
 """))
 
