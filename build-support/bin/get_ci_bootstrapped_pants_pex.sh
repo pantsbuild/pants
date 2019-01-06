@@ -23,4 +23,7 @@ chmod 755 ./pants.pex
 # Pants code executing under test expects native_engine.so to be present as a resource
 # in the source tree. Normally it'll be there because we created it there during bootstrapping.
 # So here we have to manually extract it there from the bootstrapped pex.
-unzip -j pants.pex pants/engine/native_engine.so -d src/python/pants/engine/
+# The "|| true" is necessary because unzip returns a non-zero exit code if there were any
+# bytes before the zip magic number (in our case, the pex shebang), even though the unzip
+# operation otherwise succeeds.
+unzip -j pants.pex pants/engine/native_engine.so -d src/python/pants/engine/ || true
