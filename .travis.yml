@@ -120,11 +120,11 @@ default_linux_test_config: &default_linux_test_config
 default_osx_config: &default_osx_config
   os: osx
   language: generic
+  addons:
+    homebrew:
+      packages:
+        - awscli
   before_install:
-    # Upgrade to a new version of pip, so we don't hit the TLS issue described here: https://bit.ly/2VvV0VQ
-    # when installing awscli on older osx images.
-    - sudo sh -c 'curl https://bootstrap.pypa.io/get-pip.py | python'
-    - pip install awscli
     - aws configure set default.s3.multipart_threshold 1024MB
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
@@ -201,6 +201,7 @@ matrix:
       stage: *test
       env:
         - CACHE_NAME=linuxwheelsbuild
+        - RUN_PANTS_FROM_PEX=1
         - PREPARE_DEPLOY=1
       script:
         - ./build-support/bin/release.sh -n
@@ -210,6 +211,7 @@ matrix:
       osx_image: xcode8
       env:
         - CACHE_NAME=osxwheelsbuild
+        - RUN_PANTS_FROM_PEX=1
         - PREPARE_DEPLOY=1
       script:
         - ./build-support/bin/release.sh -n
@@ -238,6 +240,7 @@ matrix:
       stage: *build_stable
       env:
         - CACHE_NAME=linuxpexdeploystable
+        - RUN_PANTS_FROM_PEX=1
         - PANTS_PEX_RELEASE=stable
       script:
         - ./build-support/bin/release.sh -p
@@ -262,6 +265,7 @@ matrix:
       stage: *build_unstable
       env:
         - CACHE_NAME=linuxpexdeployunstable
+        - RUN_PANTS_FROM_PEX=1
         - PREPARE_DEPLOY=1
       script:
         - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
