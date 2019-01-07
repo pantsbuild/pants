@@ -109,9 +109,12 @@ default_linux_test_config: &default_linux_test_config
 default_osx_config: &default_osx_config
   os: osx
   language: generic
+  addons:
+    homebrew:
+      packages:
+        - jq
   before_install:
 {{>awscli_install}}
-    - brew install jq
 
 default_osx_test_config: &default_osx_test_config
   <<: *default_osx_config
