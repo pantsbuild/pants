@@ -55,25 +55,19 @@ EOF
   fi
 }
 
-bootstrap_compile_args=(
-  lint.python-eval
-  --transitive
-)
-
 # No python test sharding (1 shard) by default.
 python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 python_three="false"
 
-while getopts "h3fxbkmrjlpeasu:ny:ci:tz" opt; do
+while getopts "h3fxbmrjlpeasu:ny:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
     3) python_three="true" ;;
     f) run_pre_commit_checks="true" ;;
     x) run_bootstrap_clean="true" ;;
     b) run_bootstrap="false" ;;
-    k) bootstrap_compile_args=() ;;
     m) run_sanity_checks="true" ;;
     r) run_docs="true" ;;
     j) run_jvm="true" ;;
@@ -111,8 +105,6 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
-set -x
-
 if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
   FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
@@ -125,7 +117,7 @@ if [[ "${run_bootstrap:-true}" == "true" ]]; then
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    ./pants ${bootstrap_compile_args[@]} binary \
+    ./pants binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
     ./pants.pex -V
