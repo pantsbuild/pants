@@ -222,6 +222,7 @@ matrix:
       stage: *build_stable
       env:
         - CACHE_NAME=linuxpexdeploystable
+        - RUN_PANTS_FROM_PEX=1
         - PANTS_PEX_RELEASE=stable
       script:
         - ./build-support/bin/release.sh -p
@@ -246,6 +247,7 @@ matrix:
       stage: *build_unstable
       env:
         - CACHE_NAME=linuxpexdeployunstable
+        - RUN_PANTS_FROM_PEX=1
         - PREPARE_DEPLOY=1
       script:
         - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
