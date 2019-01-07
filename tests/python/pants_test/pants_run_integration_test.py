@@ -154,7 +154,7 @@ def read_pantsd_log(workdir):
 def _read_log(filename):
   with open(filename, 'r') as f:
     for line in f:
-      yield line.strip()
+      yield line.rstrip()
 
 
 class PantsRunIntegrationTest(unittest.TestCase):
