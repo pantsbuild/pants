@@ -183,6 +183,7 @@ matrix:
       stage: *test
       env:
         - CACHE_NAME=linuxwheelsbuild
+        - RUN_PANTS_FROM_PEX=1
         - PREPARE_DEPLOY=1
       script:
         - ./build-support/bin/release.sh -n
@@ -192,6 +193,7 @@ matrix:
       osx_image: xcode8
       env:
         - CACHE_NAME=osxwheelsbuild
+        - RUN_PANTS_FROM_PEX=1
         - PREPARE_DEPLOY=1
       script:
         - ./build-support/bin/release.sh -n
