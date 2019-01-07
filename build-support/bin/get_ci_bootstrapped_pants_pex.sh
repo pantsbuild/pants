@@ -5,13 +5,7 @@ set -euo pipefail
 BOOTSTRAPPED_PEX_BUCKET=$1
 BOOTSTRAPPED_PEX_KEY=$2
 
-if [[ "$(uname)" == "Darwin" ]]; then
-  PLATFORM="osx"
-else
-  PLATFORM="linux"
-fi
-
-BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}.${PLATFORM}
+BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
 
 # Note that in the aws cli --no-sign-request allows access to public S3 buckets without
 # credentials, as long as we specify the region.
@@ -20,7 +14,7 @@ BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}.${P
 NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versions \
   --bucket ${BOOTSTRAPPED_PEX_BUCKET} --prefix ${BOOTSTRAPPED_PEX_KEY} --max-items 2 \
   | jq '.Versions | length')
-[ "${NUM_VERSIONS}" == "1" ] || die "Error: Found ${NUM_VERSIONS} versions for ${BOOTSTRAPPED_PEX_URL}"
+[ "${NUM_VERSIONS}" == "1" ] || (echo "Error: Found ${NUM_VERSIONS} versions for ${BOOTSTRAPPED_PEX_URL}" && exit 1)
 
 # Now fetch the pre-bootstrapped pex, so that the ./pants wrapper script can use it
 # instead of running from sources (and re-bootstrapping).
