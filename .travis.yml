@@ -13,8 +13,8 @@ env:
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
     - LC_ALL="en_US.UTF-8"
     - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
-    - BOOTSTRAPPED_PEX_KEY=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
-    - BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}.${TRAVIS_OS_NAME}
+    - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
+    - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
@@ -119,7 +119,7 @@ default_linux_test_config: &default_linux_test_config
     # threshold high to avoid them being used automatically by the aws cli.
     - aws configure set default.s3.multipart_threshold 1024MB
   before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.linux
 
 default_osx_config: &default_osx_config
   os: osx
@@ -129,6 +129,7 @@ default_osx_config: &default_osx_config
     # Multipart operations aren't supported for anonymous users, so we set the
     # threshold high to avoid them being used automatically by the aws cli.
     - aws configure set default.s3.multipart_threshold 1024MB
+    - brew install jq
 
 default_osx_test_config: &default_osx_test_config
   <<: *default_osx_config
@@ -137,7 +138,7 @@ default_osx_test_config: &default_osx_test_config
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.osx
 
 linux_with_fuse: &linux_with_fuse
   before_install:
@@ -180,7 +181,7 @@ matrix:
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
           sh -c "git clean -xfd && ./build-support/bin/ci.sh"  # With no args ci.sh just bootstraps a pants.pex.
-        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL}
+        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.linux
 
     # Build macOS engine
     - <<: *default_osx_config
@@ -195,7 +196,7 @@ matrix:
         - CACHE_NAME=macospexbuild
       script:
         - git clean -xfd && ./build-support/bin/ci.sh
-        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL}
+        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.osx
       after_failure:
         - build-support/bin/ci-failure.sh
 
@@ -631,6 +632,8 @@ matrix:
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
       before_install:
+        - pip install awscli
+        - aws configure set default.s3.multipart_threshold 1024MB
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       script:
         - ./build-support/bin/travis-ci.sh -bez
