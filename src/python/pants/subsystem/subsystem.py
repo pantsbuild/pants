@@ -148,6 +148,14 @@ class Subsystem(SubsystemClientMixin, Optionable):
   def options_scope(self):
     return self._scope
 
+  @property
+  def options(self):
+    """Returns the option values for this subsystem's scope.
+
+    :API: public
+    """
+    return self._scoped_options
+
   def get_options(self):
     """Returns the option values for this subsystem's scope.
 
