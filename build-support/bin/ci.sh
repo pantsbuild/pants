@@ -21,7 +21,6 @@ Usage: $0 (-h|-3fxbkmrjlpuneycitzs)
  -x           run bootstrap clean-all (assume bootstrapping from a
               fresh clone)
  -b           skip bootstrapping pants from local sources
- -k           run bootstrapped pants self compile check
  -m           run sanity checks of bootstrapped pants and repo BUILD
               files
  -r           run doc generation tests

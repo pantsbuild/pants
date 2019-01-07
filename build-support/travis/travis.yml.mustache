@@ -251,7 +251,7 @@ matrix:
       env:
         - CACHE_NAME=linuxselfchecks
       script:
-        - ./build-support/bin/travis-ci.sh -fbkmrjt
+        - ./build-support/bin/travis-ci.sh -fbmrjt
 
     - <<: *default_linux_test_config
       name: "Py2 - Unit tests for pants and pants-plugins"
