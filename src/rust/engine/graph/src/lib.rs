@@ -790,6 +790,7 @@ mod tests {
 
   use std::cmp;
   use std::collections::{HashMap, HashSet};
+  use std::path::Path;
   use std::sync::{mpsc, Arc};
   use std::thread;
   use std::time::Duration;
@@ -801,7 +802,9 @@ mod tests {
 
   use self::rand::Rng;
 
-  use super::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
+  use super::{
+    Entry, EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError, NodeVisualizer,
+  };
 
   #[test]
   fn create() {
@@ -1060,18 +1063,23 @@ mod tests {
     let context_up = TContext::new_with_dependencies(
       1,
       // Reverse the path from bottom to top.
-      vec![
-        (TNode(2), None),
-        (TNode(1), Some(TNode(2))),
-        (TNode(0), Some(TNode(1))),
-      ].into_iter()
-      .collect(),
+      vec![(TNode(1), None), (TNode(0), Some(TNode(1)))]
+        .into_iter()
+        .collect(),
       graph.clone(),
     );
-    assert_eq!(
-      graph.create(initial_bot, &context_up).wait(),
-      Ok(vec![T(2, 1), T(1, 1), T(0, 1)])
-    );
+
+    let res = graph.create(initial_bot, &context_up);
+    thread::sleep(Duration::from_millis(100));
+    graph
+      .visualize(
+        EmptyVisualizer,
+        &[TNode(2), TNode(1), TNode(0)],
+        Path::new("/Users/stuhood/src/pants/dest.dot"),
+      )
+      .unwrap();
+
+    assert_eq!(res.wait(), Ok(vec![T(2, 1), T(1, 1), T(0, 1)]));
   }
 
   ///
@@ -1305,6 +1313,18 @@ mod tests {
 
     fn cyclic() -> Self {
       TError::Cyclic
+    }
+  }
+
+  struct EmptyVisualizer;
+
+  impl NodeVisualizer<TNode> for EmptyVisualizer {
+    fn color_scheme(&self) -> &str {
+      "set312"
+    }
+
+    fn color(&mut self, entry: &Entry<TNode>) -> String {
+      "white".to_owned()
     }
   }
 }
