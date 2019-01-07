@@ -112,7 +112,7 @@ default_osx_config: &default_osx_config
   before_install:
     # Upgrade to a new version of pip, so we don't hit the TLS issue described here: https://bit.ly/2VvV0VQ
     # when installing awscli on older osx images.
-    - curl https://bootstrap.pypa.io/get-pip.py | python
+    - sudo curl https://bootstrap.pypa.io/get-pip.py | python
 {{>awscli_install}}
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
