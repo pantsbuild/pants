@@ -125,6 +125,9 @@ default_osx_config: &default_osx_config
   os: osx
   language: generic
   before_install:
+    # Upgrade to a new version of pip, so we don't hit the TLS issue described here: https://bit.ly/2VvV0VQ
+    # when installing awscli on older osx images.
+    - curl https://bootstrap.pypa.io/get-pip.py | python
     - pip install awscli
     # Multipart operations aren't supported for anonymous users, so we set the
     # threshold high to avoid them being used automatically by the aws cli.
