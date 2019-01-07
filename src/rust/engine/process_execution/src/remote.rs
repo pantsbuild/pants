@@ -2174,7 +2174,12 @@ mod tests {
       let messages = mock_server.mock_responder.received_messages.lock();
       assert!(messages.len() == 2);
       assert!(
-        messages.get(1).unwrap().2.sub(messages.get(0).unwrap().2) >= Duration::from_millis(500)
+        messages
+          .get(1)
+          .unwrap()
+          .received_at
+          .sub(messages.get(0).unwrap().received_at)
+          >= Duration::from_millis(500)
       );
     }
   }
@@ -2209,13 +2214,28 @@ mod tests {
       let messages = mock_server.mock_responder.received_messages.lock();
       assert!(messages.len() == 4);
       assert!(
-        messages.get(1).unwrap().2.sub(messages.get(0).unwrap().2) >= Duration::from_millis(500)
+        messages
+          .get(1)
+          .unwrap()
+          .received_at
+          .sub(messages.get(0).unwrap().received_at)
+          >= Duration::from_millis(500)
       );
       assert!(
-        messages.get(2).unwrap().2.sub(messages.get(1).unwrap().2) >= Duration::from_millis(1000)
+        messages
+          .get(2)
+          .unwrap()
+          .received_at
+          .sub(messages.get(1).unwrap().received_at)
+          >= Duration::from_millis(1000)
       );
       assert!(
-        messages.get(3).unwrap().2.sub(messages.get(2).unwrap().2) >= Duration::from_millis(1500)
+        messages
+          .get(3)
+          .unwrap()
+          .received_at
+          .sub(messages.get(2).unwrap().received_at)
+          >= Duration::from_millis(1500)
       );
     }
   }

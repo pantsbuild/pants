@@ -141,10 +141,17 @@ impl Drop for TestServer {
   }
 }
 
+#[derive(Debug)]
+pub struct ReceivedMessage {
+  pub message_type: String,
+  pub message: Box<dyn protobuf::Message>,
+  pub received_at: Instant,
+}
+
 #[derive(Clone, Debug)]
 pub struct MockResponder {
   mock_execution: MockExecution,
-  pub received_messages: Arc<Mutex<Vec<(String, Box<dyn protobuf::Message>, Instant)>>>,
+  pub received_messages: Arc<Mutex<Vec<ReceivedMessage>>>,
 }
 
 impl MockResponder {
@@ -156,11 +163,11 @@ impl MockResponder {
   }
 
   fn log<T: protobuf::Message + Sized>(&self, message: T) {
-    self.received_messages.lock().push((
-      message.descriptor().name().to_string(),
-      Box::new(message),
-      Instant::now(),
-    ));
+    self.received_messages.lock().push(ReceivedMessage {
+      message_type: message.descriptor().name().to_string(),
+      message: Box::new(message),
+      received_at: Instant::now(),
+    });
   }
 
   fn display_all<D: Debug>(items: &[D]) -> String {
