@@ -1,4 +1,4 @@
-    - pip install awscli
-    # Multipart operations aren't supported for anonymous users, so we set the
-    # threshold high to avoid them being used automatically by the aws cli.
-    - aws configure set default.s3.multipart_threshold 1024MB
+- pip install awscli
+{{! Multipart operations aren't supported for anonymous users, so we set the
+   threshold high to avoid them being used automatically by the aws cli. }}
+- aws configure set default.s3.multipart_threshold 1024MB
