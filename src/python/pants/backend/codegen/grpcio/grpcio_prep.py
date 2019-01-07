@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 class GrpcioPrep(Task):
+  """Task to prepare a grpcio PEX with requirements"""
+
   class Grpcio(object):
     class Factory(Subsystem):
       options_scope = 'grpcio'
@@ -59,12 +61,13 @@ class GrpcioPrep(Task):
       @classmethod
       def build_grpcio_pex(cls, context, interpreter, pex_path, requirements_lib):
         with safe_concurrent_creation(pex_path) as chroot:
+          python_setup = PythonSetup.global_instance()
           pex_builder = PexBuilderWrapper(
             PEXBuilder(path=chroot, interpreter=interpreter),
             PythonRepos.global_instance(),
-            PythonSetup.global_instance(),
+            python_setup,
             context.log)
-          pex_builder.add_requirement_libs_from(req_libs=[requirements_lib])
+          pex_builder.add_requirement_libs_from(req_libs=[requirements_lib], platforms=python_setup.get_options().platforms)
           pex_builder.set_entry_point('grpc_tools.protoc')
           pex_builder.freeze()
 
