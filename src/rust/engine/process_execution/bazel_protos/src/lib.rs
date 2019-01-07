@@ -3,11 +3,17 @@
 
 #![deny(unused_must_use)]
 
+#[macro_use]
+extern crate prost_derive;
+
 use hashing;
 use protobuf;
 
 mod gen;
 pub use crate::gen::*;
+
+mod gen_for_tower;
+pub use crate::gen_for_tower::*;
 
 mod conversions;
 mod verification;
