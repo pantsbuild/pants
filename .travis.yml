@@ -97,7 +97,7 @@ default_linux_config: &default_linux_config
   language: python
   python: &python_version "2.7"
   before_install:
-    - ./build-support/bin/install_aws_for_cli.sh
+    - ./build-support/bin/install_aws_cli_for_ci.sh
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
@@ -111,7 +111,7 @@ default_linux_test_config: &default_linux_test_config
     # Increase the max number of user watches to ensure that watchman is able to watch all
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_for_cli.sh
+    - ./build-support/bin/install_aws_cli_for_ci.sh
   before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.linux
 
@@ -119,7 +119,7 @@ default_osx_config: &default_osx_config
   os: osx
   language: generic
   before_install:
-    - ./build-support/bin/install_aws_for_cli.sh
+    - ./build-support/bin/install_aws_cli_for_ci.sh
     - aws configure set default.s3.multipart_threshold 1024MB
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
@@ -140,7 +140,7 @@ linux_with_fuse: &linux_with_fuse
     # Increase the max number of user watches to ensure that watchman is able to watch all
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_for_cli.sh
+    - ./build-support/bin/install_aws_cli_for_ci.sh
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -626,7 +626,7 @@ matrix:
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
       before_install:
-        - ./build-support/bin/install_aws_for_cli.sh
+        - ./build-support/bin/install_aws_cli_for_ci.sh
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       script:
         - ./build-support/bin/travis-ci.sh -bez
