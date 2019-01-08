@@ -757,11 +757,20 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         return True
       if target in invalid_target_set:
         invalid_dependencies.add(target)
-        return False
+        return self._on_invalid_compile_dependency(target, compile_target)
       return True
 
     compile_target.walk(work, predicate)
     return invalid_dependencies
+
+  def _on_invalid_compile_dependency(self, dep, compile_target):
+    """Decide whether to continue searching for invalid targets to use in the execution graph.
+
+    By default, don't recurse because once we have an invalid dependency, we can rely on its
+    dependencies having been compiled already.
+
+    Override to adjust this behavior."""
+    return False
 
   def _create_context_jar(self, compile_context):
     """Jar up the compile_context to its output jar location.

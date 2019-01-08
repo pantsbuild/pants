@@ -113,4 +113,3 @@ class RscCompileIntegration(BaseCompileIT):
           ],
           workdir, config)
         self.assert_success(pants_run)
-        self.assertIn('Hello, Resource World!', pants_run.stdout_data)

@@ -10,8 +10,6 @@ import logging
 import os
 import re
 
-from twitter.common.collections import OrderedSet
-
 from six import text_type
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
@@ -916,30 +914,17 @@ class RscCompile(ZincCompile):
     else:
       return local_distribution
 
-  def  _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set):
-    # Collects all invalid dependencies that are not dependencies of other invalid dependencies
-    # within the closure of compile_target.
-    invalid_dependencies = OrderedSet()
+  def _on_invalid_compile_dependency(self, dep, compile_target):
+    """Decide whether to continue searching for invalid targets to use in the execution graph.
 
-    def work(target):
-      pass
-    def new_predicate(target):
-      if target is compile_target:
-        return True
+    If a necessary dep is a Scala dep and the root is Java, continue to recurse because
+    otherwise we'll drop the path between Zinc compile of the Java target and a Zinc
+    compile of a transitive Scala dependency.
 
-
-      if target in invalid_target_set:
-        invalid_dependencies.add(target)
-        # if a necessary dep is a scala dep and the root is java, continue to recurse because
-        # otherwise we'll drop the path between zinc compile of the Java target and a zinc
-        # compile of a transitive scala dependency.
-        # This is only an issue for graphs like J -> S1 -> S2,
-        # where J is a Java target, S1/2 are Scala targets and S2 must be on the classpath
-        # to compile J.
-        if target.has_sources('.scala') and compile_target.has_sources('.java'):
-          return True
-        else:
-          return False
+    This is only an issue for graphs like J -> S1 -> S2, where J is a Java target,
+    S1/2 are Scala targets and S2 must be on the classpath to compile J successfully.
+    """
+    if dep.has_sources('.scala') and compile_target.has_sources('.java'):
       return True
-    compile_target.walk(work, new_predicate)
-    return invalid_dependencies
+    else:
+      return False
