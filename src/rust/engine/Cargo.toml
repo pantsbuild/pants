@@ -91,8 +91,7 @@ num_enum = "0.1.1"
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 rand = "0.6"
-# TODO: Includes https://github.com/seanmonstar/reqwest/pull/391.
-reqwest = { git = "https://github.com/pantsbuild/reqwest.git", rev = "983409edb6ba1693f38a6fc230dfcd34f9249649", features = ["native-tls-vendored"] }
+reqwest = { version = "0.9.6", features = ["default-tls-vendored"] }
 resettable = { path = "resettable" }
 smallvec = "0.6"
 tokio = "0.1"
