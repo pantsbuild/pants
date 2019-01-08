@@ -20,8 +20,9 @@ class ExampleHelloServer(service_pb2_grpc.ExampleServiceServicer):
     return reply
 
 
-if __name__ == '__main__':
+def run_server():
   server = grpc.server(futures.ThreadPoolExecutor(max_workers=5))
+
   service_pb2_grpc.add_ExampleServiceServicer_to_server(ExampleHelloServer(), server)
 
   server.add_insecure_port('[::]:50051')
@@ -34,3 +35,7 @@ if __name__ == '__main__':
       time.sleep(10)
   except KeyboardInterrupt:
     server.stop(0)
+
+
+if __name__ == '__main__':
+  run_server()
