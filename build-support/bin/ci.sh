@@ -225,7 +225,8 @@ if [[ "${run_rust_tests:-false}" == "true" ]]; then
       test_threads_flag="--test-threads=1"
     fi
 
-    RUST_BACKTRACE=all "${REPO_ROOT}/build-support/bin/native/cargo" test --all \
+    # We pass --tests to skip doc tests, because our generated protos contain invalid doc tests in their comments.
+    RUST_BACKTRACE=all "${REPO_ROOT}/build-support/bin/native/cargo" test --all --tests \
       --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}" --nocapture
   ) || die "Pants rust test failure"
   end_travis_section

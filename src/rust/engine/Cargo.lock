@@ -99,9 +99,14 @@ dependencies = [
  "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=4dfafe9355dc996d7d0702e7386a6fedcd9734c0)",
  "grpcio-compiler 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
+ "prost 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost-derive 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost-types 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "protoc-grpcio 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-grpc 0.1.0 (git+https://github.com/pantsbuild/tower-grpc.git?rev=ef19f2e1715f415ecb699e8f17f5845ad2b45daf)",
+ "tower-grpc-build 0.1.0 (git+https://github.com/pantsbuild/tower-grpc.git?rev=ef19f2e1715f415ecb699e8f17f5845ad2b45daf)",
  "walkdir 2.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -251,6 +256,14 @@ version = "0.1.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cc 1.0.25 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "codegen"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -716,6 +729,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "heck"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "unicode-segmentation 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "hex"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1072,6 +1093,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "multimap"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "native-tls"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1311,6 +1337,55 @@ dependencies = [
  "hashing 0.0.1",
  "process_execution 0.0.1",
  "resettable 0.0.1",
+]
+
+[[package]]
+name = "prost"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bytes 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "prost-build"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bytes 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "multimap 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost-types 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tempdir 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "which 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "prost-derive"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "failure 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "proc-macro2 0.4.24 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.14.9 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bytes 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost-derive 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1833,6 +1908,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tempdir"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "rand 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "remove_dir_all 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1945,6 +2029,15 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bytes 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-io 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tokio-connect"
+version = "0.1.0"
+source = "git+https://github.com/pantsbuild/tokio-connect?rev=f7ad1ca437973d6e24037ac6f7d5ef1013833c0b#f7ad1ca437973d6e24037ac6f7d5ef1013833c0b"
+dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2112,6 +2205,97 @@ dependencies = [
 ]
 
 [[package]]
+name = "tower-add-origin"
+version = "0.1.0"
+source = "git+https://github.com/pantsbuild/tower-http?rev=56049ee7f31d4f6c549f5d1d5fbbfd7937df3d00#56049ee7f31d4f6c549f5d1d5fbbfd7937df3d00"
+dependencies = [
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "http 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-service 0.2.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)",
+]
+
+[[package]]
+name = "tower-direct-service"
+version = "0.1.0"
+source = "git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c#7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c"
+dependencies = [
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tower-grpc"
+version = "0.1.0"
+source = "git+https://github.com/pantsbuild/tower-grpc.git?rev=ef19f2e1715f415ecb699e8f17f5845ad2b45daf#ef19f2e1715f415ecb699e8f17f5845ad2b45daf"
+dependencies = [
+ "bytes 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "h2 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "http 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "percent-encoding 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-h2 0.1.0 (git+https://github.com/pantsbuild/tower-h2?rev=44b0efb4983b769283efd5b2a3bc3decbf7c33de)",
+ "tower-http 0.1.0 (git+https://github.com/pantsbuild/tower-http?rev=56049ee7f31d4f6c549f5d1d5fbbfd7937df3d00)",
+ "tower-service 0.2.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)",
+ "tower-util 0.1.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)",
+]
+
+[[package]]
+name = "tower-grpc-build"
+version = "0.1.0"
+source = "git+https://github.com/pantsbuild/tower-grpc.git?rev=ef19f2e1715f415ecb699e8f17f5845ad2b45daf#ef19f2e1715f415ecb699e8f17f5845ad2b45daf"
+dependencies = [
+ "codegen 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost-build 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tower-h2"
+version = "0.1.0"
+source = "git+https://github.com/pantsbuild/tower-h2?rev=44b0efb4983b769283efd5b2a3bc3decbf7c33de#44b0efb4983b769283efd5b2a3bc3decbf7c33de"
+dependencies = [
+ "bytes 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "h2 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "http 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-connect 0.1.0 (git+https://github.com/pantsbuild/tokio-connect?rev=f7ad1ca437973d6e24037ac6f7d5ef1013833c0b)",
+ "tokio-io 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-service 0.2.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)",
+ "tower-util 0.1.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.1.0"
+source = "git+https://github.com/pantsbuild/tower-http?rev=56049ee7f31d4f6c549f5d1d5fbbfd7937df3d00#56049ee7f31d4f6c549f5d1d5fbbfd7937df3d00"
+dependencies = [
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "http 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-add-origin 0.1.0 (git+https://github.com/pantsbuild/tower-http?rev=56049ee7f31d4f6c549f5d1d5fbbfd7937df3d00)",
+ "tower-service 0.2.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)",
+]
+
+[[package]]
+name = "tower-service"
+version = "0.2.0"
+source = "git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c#7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c"
+dependencies = [
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tower-util"
+version = "0.1.0"
+source = "git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c#7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c"
+dependencies = [
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tower-direct-service 0.1.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)",
+ "tower-service 0.2.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)",
+]
+
+[[package]]
 name = "try-lock"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2260,6 +2444,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "which"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "failure 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.44 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "winapi"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2347,6 +2540,7 @@ dependencies = [
 "checksum clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b957d88f4b6a63b9d70d5f454ac8011819c6efa7727858f458ab71c756ce2d3e"
 "checksum cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 "checksum cmake 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)" = "6ec65ee4f9c9d16f335091d23693457ed4928657ba4982289d7fafee03bc614a"
+"checksum codegen 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b3f4228e2f06a368bf4f1dc433c3f0671c4d5af99717f23a30eadb0067662057"
 "checksum constant_time_eq 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8ff012e225ce166d4422e0e78419d901719760f62ae2b7969ca6b564d1b54a9e"
 "checksum core-foundation 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "286e0b41c3a20da26536c6000a280585d519fd07b3956b43aed8a79e9edce980"
 "checksum core-foundation-sys 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "716c271e8613ace48344f723b60b900a93150271e5be206212d052bbc0883efa"
@@ -2388,6 +2582,7 @@ dependencies = [
 "checksum grpcio-compiler 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a63ccc27b0099347d2bea2c3d0f1c79c018a13cfd08b814a1992e341b645d5e1"
 "checksum grpcio-sys 0.2.3 (git+https://github.com/pantsbuild/grpc-rs.git?rev=4dfafe9355dc996d7d0702e7386a6fedcd9734c0)" = "<none>"
 "checksum h2 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "7dd33bafe2e6370e6c8eb0cf1b8c5f93390b90acde7e9b03723f166b28b648ed"
+"checksum heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
 "checksum hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 "checksum http 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)" = "02096a6d2c55e63f7fcb800690e4f889a25f6ec342e3adb4594e293b625215ab"
 "checksum httparse 1.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "e8734b0cfd3bc3e101ec59100e101c2eecd19282202e87808b3037b442777a83"
@@ -2424,6 +2619,7 @@ dependencies = [
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum miow 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "396aa0f2003d7df8395cb93e09871561ccc3e785f0acb369170e8cc74ddf9226"
 "checksum mktemp 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "77001ceb9eed65439f3dc2a2543f9ba1417d912686bf224a7738d0966e6dcd69"
+"checksum multimap 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2eb04b9f127583ed176e163fb9ec6f3e793b87e21deedd5734a69386a18a0151"
 "checksum native-tls 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ff8e08de0070bbf4c31f452ea2a70db092f36f6f2e4d897adf5674477d488fb2"
 "checksum net2 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)" = "42550d9fb7b6684a6d404d9fa7250c2eb2646df731d1c06afc06dcee9e1bcf88"
 "checksum nodrop 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "2f9667ddcc6cc8a43afc9b7917599d7216aa09c463919ea32c59ed6cac8bc945"
@@ -2448,6 +2644,10 @@ dependencies = [
 "checksum pkg-config 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)" = "676e8eb2b1b4c9043511a9b7bea0915320d7e502b0a079fb03f9635a5252b18c"
 "checksum proc-macro2 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)" = "1b06e2f335f48d24442b35a19df506a835fb3547bc3c06ef27340da9acf5cae7"
 "checksum proc-macro2 0.4.24 (registry+https://github.com/rust-lang/crates.io-index)" = "77619697826f31a02ae974457af0b29b723e5619e113e9397b8b82c6bd253f09"
+"checksum prost 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b9f36c478cd43382388dfc3a3679af175c03d19ed8039e79a3e4447e944cd3f3"
+"checksum prost-build 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b6325275b85605f58f576456a47af44417edf5956a6f670bb59fbe12aff69597"
+"checksum prost-derive 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9787d1977ea72e8066d58e46ae66100324a2815e677897fe78dfe54958f48252"
+"checksum prost-types 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5644c57d56bc085f9570e113495c1f08d7185beca700dcc296cb4672f380a679"
 "checksum protobuf 2.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "c72f6663900752624f6b9b78d16abfc014caaa17d0002ff991274533cdc06c62"
 "checksum protobuf-codegen 2.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3b3aabdbe464662cbdf305a7db531fa059aa4368e2dc3a80be3796fcc2f931a6"
 "checksum protoc 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5367f59e85854bd8db2b572e72ebaddb31f20ad99bf017f2faa554309c003f5d"
@@ -2505,6 +2705,7 @@ dependencies = [
 "checksum syn 0.15.22 (registry+https://github.com/rust-lang/crates.io-index)" = "ae8b29eb5210bc5cf63ed6149cbf9adfc82ac0be023d8735c176ee74a2db4da7"
 "checksum synstructure 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)" = "73687139bf99285483c96ac0add482c3776528beac1d97d444f6e91f203a2015"
 "checksum tar 0.4.20 (registry+https://github.com/rust-lang/crates.io-index)" = "a303ba60a099fcd2aaa646b14d2724591a96a75283e4b7ed3d1a1658909d9ae2"
+"checksum tempdir 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)" = "15f2b5fb00ccdf689e0149d1b1b3c03fead81c2b37735d812fa8bddbbf41b6d8"
 "checksum tempfile 3.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "7e91405c14320e5c79b3d148e1c86f40749a36e490642202a31689cb1a3452b2"
 "checksum termcolor 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "4096add70612622289f2fdcdbd5086dc81c1e2675e6ae58d6c4f62a16c6d7f2f"
 "checksum termion 1.5.1 (git+https://github.com/redox-os/termion.git?rev=ce6b43d071cd6edfc4b366bb945b45e06c239e2c)" = "<none>"
@@ -2515,6 +2716,7 @@ dependencies = [
 "checksum time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)" = "d825be0eb33fda1a7e68012d51e9c7f451dc1a69391e7fdc197060bb8c56667b"
 "checksum tokio 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "a7817d4c98cc5be21360b3b37d6036fe9b7aefa5b7a201b7b16ff33423822f7d"
 "checksum tokio-codec 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5c501eceaf96f0e1793cf26beb63da3d11c738c4a943fdf3746d81d64684c39f"
+"checksum tokio-connect 0.1.0 (git+https://github.com/pantsbuild/tokio-connect?rev=f7ad1ca437973d6e24037ac6f7d5ef1013833c0b)" = "<none>"
 "checksum tokio-current-thread 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "331c8acc267855ec06eb0c94618dcbbfea45bed2d20b77252940095273fb58f6"
 "checksum tokio-executor 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "c117b6cf86bb730aab4834f10df96e4dd586eff2c3c27d3781348da49e255bde"
 "checksum tokio-fs 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "60ae25f6b17d25116d2cba342083abe5255d3c2c79cb21ea11aa049c53bf7c75"
@@ -2528,6 +2730,14 @@ dependencies = [
 "checksum tokio-udp 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "66268575b80f4a4a710ef83d087fdfeeabdce9b74c797535fbac18a2cb906e92"
 "checksum tokio-uds 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "99ce87382f6c1a24b513a72c048b2c8efe66cb5161c9061d00bee510f08dc168"
 "checksum toml 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)" = "19782e145d5abefb03758958f06ea35f7b1d8421b534140e0238fd3d0bfd66e3"
+"checksum tower-add-origin 0.1.0 (git+https://github.com/pantsbuild/tower-http?rev=56049ee7f31d4f6c549f5d1d5fbbfd7937df3d00)" = "<none>"
+"checksum tower-direct-service 0.1.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)" = "<none>"
+"checksum tower-grpc 0.1.0 (git+https://github.com/pantsbuild/tower-grpc.git?rev=ef19f2e1715f415ecb699e8f17f5845ad2b45daf)" = "<none>"
+"checksum tower-grpc-build 0.1.0 (git+https://github.com/pantsbuild/tower-grpc.git?rev=ef19f2e1715f415ecb699e8f17f5845ad2b45daf)" = "<none>"
+"checksum tower-h2 0.1.0 (git+https://github.com/pantsbuild/tower-h2?rev=44b0efb4983b769283efd5b2a3bc3decbf7c33de)" = "<none>"
+"checksum tower-http 0.1.0 (git+https://github.com/pantsbuild/tower-http?rev=56049ee7f31d4f6c549f5d1d5fbbfd7937df3d00)" = "<none>"
+"checksum tower-service 0.2.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)" = "<none>"
+"checksum tower-util 0.1.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)" = "<none>"
 "checksum try-lock 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e604eb7b43c06650e854be16a2a03155743d3752dd1c943f6829e26b7a36e382"
 "checksum typenum 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
 "checksum ucd-util 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "535c204ee4d8434478593480b8f86ab45ec9aae0e83c568ca81abf0fd0e88f86"
@@ -2549,6 +2759,7 @@ dependencies = [
 "checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 "checksum walkdir 2.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "9d9d7ed3431229a144296213105a390676cc49c9b6a72bd19f3176c98e129fa1"
 "checksum want 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "797464475f30ddb8830cc529aaaae648d581f99e2036a928877dfde027ddf6b3"
+"checksum which 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b57acb10231b9493c8472b20cb57317d0679a49e0bdbee44b3b803a6473af164"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
 "checksum winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "92c1eb33641e276cfa214a0522acad57be5c56b10cb348b3c5117db75f3ac4b0"
 "checksum winapi-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2d315eee3b34aca4797b2da6b13ed88266e6d612562a0c46390af8299fc699bc"

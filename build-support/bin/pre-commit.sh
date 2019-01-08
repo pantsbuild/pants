@@ -16,6 +16,7 @@ echo "* Checking for banned imports" && ./build-support/bin/check_banned_imports
 if git diff master --name-only | grep '\.rs$' > /dev/null; then
   echo "* Checking formatting of rust files" && ./build-support/bin/check_rust_formatting.sh || exit 1
   echo "* Running cargo clippy" && ./build-support/bin/check_clippy.sh || exit 1
+  echo "* Checking rust target headers" && build-support/bin/check_rust_target_headers.sh || exit 1
 fi
 
 echo "* Checking for bad shell patterns" && ./build-support/bin/check_shell.sh || exit 1

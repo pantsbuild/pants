@@ -1,6 +1,5 @@
-// This file provides backward-compatibility for the deprecated BoxFuture type from futures.
-// https://github.com/alexcrichton/futures-rs/issues/228 has background for its removal.
-// This avoids needing to call Box::new() around every future that we produce.
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 #![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
@@ -30,6 +29,10 @@
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+
+// This file provides backward-compatibility for the deprecated BoxFuture type from futures.
+// https://github.com/alexcrichton/futures-rs/issues/228 has background for its removal.
+// This avoids needing to call Box::new() around every future that we produce.
 
 use futures::future::Future;
 
