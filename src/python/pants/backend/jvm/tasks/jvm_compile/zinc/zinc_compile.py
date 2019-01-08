@@ -14,7 +14,7 @@ from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
 
-from future.utils import PY3, text_type
+from future.utils import PY2, PY3, text_type
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -385,10 +385,12 @@ class BaseZincCompile(JvmCompile):
     self.log_zinc_file(ctx.analysis_file)
     with open(ctx.zinc_args_file, 'w') as fp:
       for arg in zinc_args:
-        # TODO: `zinc_args` include mixed bytes and strings. The values
-        # from this file's get_args_defaults(), like '-S-encoding', in particular are bytes, even though 
-        # they're defined as unicode in the source code.
-        fp.write(ensure_text(arg))
+        # NB: in Python 2, options are stored sometimes as bytes and sometimes as unicode in the OptionValueContainer.
+        # This is due to how Python 2 natively stores attributes as a map of `str` (aka `bytes`) to their value. So, 
+        # the setattr() and getattr() functions sometimes use bytes.
+        if PY2:
+          arg = ensure_text(arg)
+        fp.write(arg)
         fp.write('\n')
 
     if self.execution_strategy == self.HERMETIC:
