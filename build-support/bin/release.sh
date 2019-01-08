@@ -15,7 +15,10 @@ function run_local_pants() {
   ${ROOT}/pants "$@"
 }
 
-PANTS_STABLE_VERSION="$(cat "${ROOT}/src/python/pants/VERSION")"
+# NB: Pants core does not have the ability to change its own version, so we compute the
+# suffix here and mutate the VERSION_FILE to affect the current version.
+readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
+PANTS_STABLE_VERSION="$(cat "${VERSION_FILE}")"
 HEAD_SHA=$(git rev-parse --verify HEAD)
 readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
 
@@ -126,6 +129,20 @@ function execute_packaged_pants_with_internal_backends() {
     "$@"
 }
 
+function pants_version_reset() {
+  pushd ${ROOT} > /dev/null
+    git checkout -- ${VERSION_FILE}
+  popd > /dev/null
+}
+
+function pants_version_set() {
+  # Mutates `src/python/pants/VERSION` to temporarily override it. Sets a `trap` to restore to
+  # HEAD on exit.
+  local version=$1
+  trap pants_version_reset EXIT
+  echo "${version}" > "${VERSION_FILE}"
+}
+
 function build_3rdparty_packages() {
   # Builds whls for 3rdparty dependencies of pants.
   local version=$1
@@ -153,7 +170,7 @@ function build_pants_packages() {
   rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
   mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
 
-  export _PANTS_VERSION_OVERRIDE="${version}"
+  pants_version_set "${version}"
 
   start_travis_section "${NAME}" "Building packages"
   packages=($(run_packages_script build_and_print "${version}"))
@@ -166,7 +183,7 @@ function build_pants_packages() {
   done
   end_travis_section
 
-  unset _PANTS_VERSION_OVERRIDE
+  pants_version_reset
 }
 
 function build_fs_util() {
