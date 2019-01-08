@@ -793,7 +793,7 @@ dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "http 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.20 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustls 0.14.0 (git+https://github.com/illicitonion/rustls.git?rev=d414ea1536b04ebcace85627fbac1a3adccc8c31)",
+ "rustls 0.14.0 (git+https://github.com/pantsbuild/rustls.git?rev=d414ea1536b04ebcace85627fbac1a3adccc8c31)",
  "tokio-io 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-rustls 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-tcp 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1588,7 +1588,7 @@ dependencies = [
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mime 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "mime_guess 2.0.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustls 0.14.0 (git+https://github.com/illicitonion/rustls.git?rev=d414ea1536b04ebcace85627fbac1a3adccc8c31)",
+ "rustls 0.14.0 (git+https://github.com/pantsbuild/rustls.git?rev=d414ea1536b04ebcace85627fbac1a3adccc8c31)",
  "serde 1.0.80 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.33 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_urlencoded 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1652,7 +1652,7 @@ dependencies = [
 [[package]]
 name = "rustls"
 version = "0.14.0"
-source = "git+https://github.com/illicitonion/rustls.git?rev=d414ea1536b04ebcace85627fbac1a3adccc8c31#d414ea1536b04ebcace85627fbac1a3adccc8c31"
+source = "git+https://github.com/pantsbuild/rustls.git?rev=d414ea1536b04ebcace85627fbac1a3adccc8c31#d414ea1536b04ebcace85627fbac1a3adccc8c31"
 dependencies = [
  "base64 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2099,7 +2099,7 @@ name = "tokio-rustls"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "rustls 0.14.0 (git+https://github.com/illicitonion/rustls.git?rev=d414ea1536b04ebcace85627fbac1a3adccc8c31)",
+ "rustls 0.14.0 (git+https://github.com/pantsbuild/rustls.git?rev=d414ea1536b04ebcace85627fbac1a3adccc8c31)",
  "tokio 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "webpki 0.18.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2748,7 +2748,7 @@ dependencies = [
 "checksum rustc-demangle 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "bcfe5b13211b4d78e5c2cadfebd7769197d95c639c35a50057eb4c05de811395"
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
 "checksum rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
-"checksum rustls 0.14.0 (git+https://github.com/illicitonion/rustls.git?rev=d414ea1536b04ebcace85627fbac1a3adccc8c31)" = "<none>"
+"checksum rustls 0.14.0 (git+https://github.com/pantsbuild/rustls.git?rev=d414ea1536b04ebcace85627fbac1a3adccc8c31)" = "<none>"
 "checksum ryu 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "eb9e9b8cde282a9fe6a42dd4681319bfb63f121b8a8ee9439c6f4107e58a46f7"
 "checksum same-file 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8f20c4be53a8a1ff4c1f1b2bd14570d2f634628709752f0702ecdd2b3f9a5267"
 "checksum scoped_threadpool 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "1d51f5df5af43ab3f1360b429fa5e0152ac5ce8c0bd6485cae490332e96846a8"

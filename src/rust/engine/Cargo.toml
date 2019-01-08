@@ -102,7 +102,7 @@ tar_api = { path = "tar_api" }
 
 [patch.crates-io]
 # Patch deps of reqwest to tone down logging until https://github.com/ctz/rustls/pull/210 is merged and released.
-rustls = { git = "https://github.com/illicitonion/rustls.git", rev = "d414ea1536b04ebcace85627fbac1a3adccc8c31" }
+rustls = { git = "https://github.com/pantsbuild/rustls.git", rev = "d414ea1536b04ebcace85627fbac1a3adccc8c31" }
 # Patch deps of reqwest to tone down logging until https://github.com/bluejekyll/trust-dns/commit/45376cc2014cdd13f8da7aa86dac609d1bc7c402 is released.
 trust-dns-proto = { git = "https://github.com/bluejekyll/trust-dns.git", rev = "45376cc2014cdd13f8da7aa86dac609d1bc7c402" }
 trust-dns-resolver = { git = "https://github.com/bluejekyll/trust-dns.git", rev = "45376cc2014cdd13f8da7aa86dac609d1bc7c402" }
