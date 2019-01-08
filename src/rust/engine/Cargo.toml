@@ -91,8 +91,7 @@ num_enum = "0.1.1"
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 rand = "0.6"
-# TODO: Includes https://github.com/seanmonstar/reqwest/pull/391.
-reqwest = { git = "https://github.com/pantsbuild/reqwest.git", rev = "983409edb6ba1693f38a6fc230dfcd34f9249649", features = ["native-tls-vendored"] }
+reqwest = { version = "0.9.6", default_features = false, features = ["rustls-tls"] }
 resettable = { path = "resettable" }
 smallvec = "0.6"
 tokio = "0.1"
@@ -100,3 +99,10 @@ tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
 tar_api = { path = "tar_api" }
+
+[patch.crates-io]
+# Patch deps of reqwest to tone down logging until https://github.com/ctz/rustls/pull/210 is merged and released.
+rustls = { git = "https://github.com/illicitonion/rustls.git", rev = "d414ea1536b04ebcace85627fbac1a3adccc8c31" }
+# Patch deps of reqwest to tone down logging until https://github.com/bluejekyll/trust-dns/commit/45376cc2014cdd13f8da7aa86dac609d1bc7c402 is released.
+trust-dns-proto = { git = "https://github.com/bluejekyll/trust-dns.git", rev = "45376cc2014cdd13f8da7aa86dac609d1bc7c402" }
+trust-dns-resolver = { git = "https://github.com/bluejekyll/trust-dns.git", rev = "45376cc2014cdd13f8da7aa86dac609d1bc7c402" }
