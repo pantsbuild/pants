@@ -1,55 +1,50 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+#![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  deny(
-    clippy,
-    default_trait_access,
-    expl_impl_clone_on_copy,
-    if_not_else,
-    needless_continue,
-    single_match_else,
-    unseparated_literal_suffix,
-    used_underscore_binding
-  )
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
-#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+#![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(len_without_is_empty, redundant_field_names)
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(new_without_default, new_without_default_derive)
+#![allow(
+  clippy::new_without_default,
+  clippy::new_without_default_derive,
+  clippy::new_ret_no_self
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
-#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+#![allow(clippy::mutex_atomic)]
 
-extern crate async_semaphore;
-extern crate bazel_protos;
-extern crate boxfuture;
-extern crate bytes;
-extern crate digest;
-extern crate fs;
-extern crate futures;
-extern crate futures_timer;
-extern crate grpcio;
-extern crate hashing;
-extern crate log;
+use bazel_protos;
+
+use fs;
+
+use grpcio;
+use hashing;
+
 #[cfg(test)]
 extern crate mock;
-extern crate protobuf;
-extern crate resettable;
-extern crate sha2;
+use protobuf;
+
 #[cfg(test)]
 extern crate tempfile;
-#[cfg(test)]
-extern crate testutil;
-extern crate time;
-extern crate tokio_codec;
-extern crate tokio_process;
+
+use time;
 
 use boxfuture::BoxFuture;
 use bytes::Bytes;
@@ -160,11 +155,11 @@ pub trait CommandRunner: Send + Sync {
 ///
 #[derive(Clone)]
 pub struct BoundedCommandRunner {
-  inner: Arc<(Box<CommandRunner>, AsyncSemaphore)>,
+  inner: Arc<(Box<dyn CommandRunner>, AsyncSemaphore)>,
 }
 
 impl BoundedCommandRunner {
-  pub fn new(inner: Box<CommandRunner>, bound: usize) -> BoundedCommandRunner {
+  pub fn new(inner: Box<dyn CommandRunner>, bound: usize) -> BoundedCommandRunner {
     BoundedCommandRunner {
       inner: Arc::new((inner, AsyncSemaphore::new(bound))),
     }

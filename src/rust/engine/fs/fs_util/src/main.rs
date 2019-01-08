@@ -1,46 +1,44 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+#![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  deny(
-    clippy,
-    default_trait_access,
-    expl_impl_clone_on_copy,
-    if_not_else,
-    needless_continue,
-    single_match_else,
-    unseparated_literal_suffix,
-    used_underscore_binding
-  )
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
-#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+#![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(len_without_is_empty, redundant_field_names)
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(new_without_default, new_without_default_derive)
+#![allow(
+  clippy::new_without_default,
+  clippy::new_without_default_derive,
+  clippy::new_ret_no_self
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
-#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+#![allow(clippy::mutex_atomic)]
 
-extern crate boxfuture;
-extern crate bytes;
-extern crate clap;
-extern crate env_logger;
-extern crate fs;
-extern crate futures;
-extern crate futures_timer;
-extern crate hashing;
-extern crate parking_lot;
-extern crate protobuf;
-extern crate rand;
-extern crate serde;
-extern crate serde_derive;
-extern crate serde_json;
+use clap;
+use env_logger;
+use fs;
+use futures;
+use futures_timer;
+
+use rand;
+
+use serde_json;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
@@ -232,6 +230,21 @@ to this directory.",
               .long("chunk-bytes")
               .required(false)
               .default_value(&format!("{}", 3 * 1024 * 1024))
+        ).arg(
+          Arg::with_name("thread-count")
+              .help("Number of threads to use for uploads and downloads")
+              .takes_value(true)
+              .long("thread-count")
+              .required(false)
+              .default_value("1")
+        )
+        .arg(
+          Arg::with_name("rpc-attempts")
+              .help("Number of times to attempt any RPC before giving up.")
+              .takes_value(true)
+              .long("rpc-attempts")
+              .required(false)
+              .default_value("3")
         )
       .get_matches(),
   ) {
@@ -243,7 +256,7 @@ to this directory.",
   };
 }
 
-fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
+fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
   let store_dir = top_match
     .value_of("local-store-path")
     .map(PathBuf::from)
@@ -287,7 +300,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               .map(str::to_owned),
             &root_ca_certs,
             oauth_bearer_token,
-            1,
+            value_t!(top_match.value_of("thread-count"), usize).expect("Invalid thread count"),
             chunk_size,
             // This deadline is really only in place because otherwise DNS failures
             // leave this hanging forever.
@@ -304,6 +317,7 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               1.2,
               std::time::Duration::from_secs(20),
             )?,
+            value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
             futures_timer::TimerHandle::default(),
           ),
           true,
@@ -371,7 +385,8 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               format!(
                 "Tried to save file {:?} but it was not a file, was a {:?}",
                 path, o
-              ).into(),
+              )
+              .into(),
             ),
           }
         }
@@ -414,14 +429,16 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             // something here, or we don't care. Is that a valid assumption?
             fs::StrictGlobMatching::Ignore,
             fs::GlobExpansionConjunction::AllMatch,
-          )?).map_err(|e| format!("Error expanding globs: {:?}", e))
+          )?)
+          .map_err(|e| format!("Error expanding globs: {:?}", e))
           .and_then(move |paths| {
             Snapshot::from_path_stats(
               store_copy.clone(),
               &fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
               paths,
             )
-          }).map(|snapshot| snapshot.digest)
+          })
+          .map(|snapshot| snapshot.digest)
           .wait()?;
 
         let report = ensure_uploaded_to_remote(&store, store_has_remote, digest);
@@ -453,7 +470,8 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                   .map(|(name, _digest)| format!("{}\n", name))
                   .collect::<Vec<String>>()
                   .join("")
-              }).map(|s| s.into_bytes())
+              })
+              .map(|s| s.into_bytes())
           }),
           "recursive-file-list-with-digests" => expand_files(store, digest).map(|maybe_v| {
             maybe_v
@@ -462,7 +480,8 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                   .map(|(name, digest)| format!("{} {} {}\n", name, digest.0, digest.1))
                   .collect::<Vec<String>>()
                   .join("")
-              }).map(|s| s.into_bytes())
+              })
+              .map(|s| s.into_bytes())
           }),
           format => Err(format!(
             "Unexpected value of --output-format arg: {}",
@@ -501,7 +520,8 @@ fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
                   .expect("Error serializing Directory proto"),
               )
             })
-          }).wait()?,
+          })
+          .wait()?,
         some => some,
       };
       match v {
@@ -568,12 +588,15 @@ fn expand_files_helper(
                 format!("{}{}/", prefix, dir.name),
                 files.clone(),
               )
-            }).collect::<Vec<_>>(),
-        ).map(|_| Some(()))
+            })
+            .collect::<Vec<_>>(),
+        )
+        .map(|_| Some(()))
         .to_boxed()
       }
       None => futures::future::ok(None).to_boxed(),
-    }).to_boxed()
+    })
+    .to_boxed()
 }
 
 fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {

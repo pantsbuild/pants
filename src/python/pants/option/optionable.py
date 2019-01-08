@@ -4,15 +4,57 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import re
+from abc import abstractproperty
 from builtins import str
 
+from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
-from pants.option.scope import ScopeInfo
-from pants.util.meta import AbstractClass
+from pants.option.scope import Scope, ScopedOptions, ScopeInfo
+from pants.util.meta import AbstractClass, classproperty
 
 
-class Optionable(AbstractClass):
+def _construct_optionable(optionable_factory):
+  scope = optionable_factory.options_scope
+  scoped_options = yield Get(ScopedOptions, Scope(str(scope)))
+  yield optionable_factory.optionable_cls(scope, scoped_options.options)
+
+
+class OptionableFactory(AbstractClass):
+  """A mixin that provides a method that returns an @rule to construct subclasses of Optionable.
+
+  Optionable subclasses constructed in this manner must have a particular constructor shape, which is
+  loosely defined by `_construct_optionable` and `OptionableFactory.signature`.
+  """
+
+  @abstractproperty
+  def optionable_cls(self):
+    """The Optionable class that is constructed by this OptionableFactory."""
+
+  @abstractproperty
+  def options_scope(self):
+    """The scope from which the ScopedOptions for the target Optionable will be parsed."""
+
+  @classmethod
+  def signature(cls):
+    """Returns kwargs to construct a `TaskRule` that will construct the target Optionable.
+
+    TODO: This indirection avoids a cycle between this module and the `rules` module.
+    """
+    snake_scope = cls.options_scope.replace('-', '_')
+    partial_construct_optionable = functools.partial(_construct_optionable, cls)
+    partial_construct_optionable.__name__ = 'construct_scope_{}'.format(snake_scope)
+    return dict(
+        output_type=cls.optionable_cls,
+        input_selectors=tuple(),
+        func=partial_construct_optionable,
+        input_gets=(Get(ScopedOptions, Scope),),
+        dependency_optionables=(cls.optionable_cls,),
+      )
+
+
+class Optionable(OptionableFactory, AbstractClass):
   """A mixin for classes that can register options on some scope."""
 
   # Subclasses must override.
@@ -27,6 +69,11 @@ class Optionable(AbstractClass):
   deprecated_options_scope_removal_version = None
 
   _scope_name_component_re = re.compile(r'^(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*$')
+
+  @classproperty
+  def optionable_cls(cls):
+    # Fills the `OptionableFactory` contract.
+    return cls
 
   @classmethod
   def is_valid_scope_name_component(cls, s):

@@ -20,6 +20,8 @@ def has_python_version(version):
 
   :param string version: A python version string, such as 2.7, 3.
   """
+  # TODO: Tests that skip unless a python interpreter is present often need the path to that
+  # interpreter, and so end up calling python_interpreter_path again. Find a way to streamline this.
   return python_interpreter_path(version) is not None
 
 

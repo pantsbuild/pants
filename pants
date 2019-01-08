@@ -37,6 +37,14 @@ set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
+# Set RUN_PANTS_FROM_PEX to non-empty to cause this wrapper script to delegate directly
+# to ./pants.pex. We use this in CI to avoid bootstrapping in every shard.
+if [[ -n "${RUN_PANTS_FROM_PEX}" ]]; then
+  exec "${HERE}/pants.pex" "$@"
+fi
+
+# Otherwise, run directly from sources, bootstrapping if needed.
+
 # Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
 source ${HERE}/build-support/pants_venv

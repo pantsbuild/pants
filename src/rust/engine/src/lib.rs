@@ -1,38 +1,38 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  deny(
-    clippy,
-    default_trait_access,
-    expl_impl_clone_on_copy,
-    if_not_else,
-    needless_continue,
-    single_match_else,
-    unseparated_literal_suffix,
-    used_underscore_binding
-  )
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
-#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+#![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(len_without_is_empty, redundant_field_names)
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(new_without_default, new_without_default_derive)
+#![allow(
+  clippy::new_without_default,
+  clippy::new_without_default_derive,
+  clippy::new_ret_no_self
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
-#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+#![allow(clippy::mutex_atomic)]
 // We only use unsafe pointer derefrences in our no_mangle exposed API, but it is nicer to list
 // just the one minor call as unsafe, than to mark the whole function as unsafe which may hide
 // other unsafeness.
-#![cfg_attr(feature = "cargo-clippy", allow(not_unsafe_ptr_arg_deref))]
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 pub mod cffi_externs;
 mod context;
@@ -47,30 +47,20 @@ mod selectors;
 mod tasks;
 mod types;
 
-extern crate boxfuture;
-extern crate bytes;
-extern crate fnv;
-extern crate fs;
-extern crate futures;
-extern crate futures_timer;
-extern crate graph;
-extern crate hashing;
-extern crate indexmap;
-extern crate itertools;
-extern crate lazy_static;
-extern crate log;
-extern crate num_enum;
-extern crate parking_lot;
-extern crate process_execution;
-extern crate rand;
-extern crate reqwest;
-extern crate resettable;
-extern crate smallvec;
-extern crate tar_api;
-extern crate tempfile;
-extern crate tokio;
-extern crate ui;
-extern crate url;
+use bytes;
+
+use fs;
+use futures;
+
+use hashing;
+
+use log;
+
+use process_execution;
+
+use reqwest;
+
+use tar_api;
 
 use std::ffi::CStr;
 use std::fs::File;
@@ -81,23 +71,23 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use context::Core;
-use core::{Function, Key, Params, TypeConstraint, TypeId, Value};
-use externs::{
+use crate::context::Core;
+use crate::core::{Function, Key, Params, TypeConstraint, TypeId, Value};
+use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, HandleBuffer,
   IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
-  SatisfiedByExtern, SatisfiedByTypeExtern, StoreBytesExtern, StoreI64Extern, StoreTupleExtern,
-  StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
+  SatisfiedByExtern, SatisfiedByTypeExtern, StoreBoolExtern, StoreBytesExtern, StoreI64Extern,
+  StoreTupleExtern, StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
+use crate::handles::Handle;
+use crate::rule_graph::{GraphMaker, RuleGraph};
+use crate::scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
+use crate::tasks::Tasks;
+use crate::types::Types;
 use futures::Future;
-use handles::Handle;
 use hashing::Digest;
 use log::error;
-use rule_graph::{GraphMaker, RuleGraph};
-use scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
-use tasks::Tasks;
-use types::Types;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -139,9 +129,11 @@ pub extern "C" fn externs_set(
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
   store_tuple: StoreTupleExtern,
+  store_dict: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
   store_utf8: StoreUtf8Extern,
   store_i64: StoreI64Extern,
+  store_bool: StoreBoolExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
@@ -163,9 +155,11 @@ pub extern "C" fn externs_set(
     satisfied_by,
     satisfied_by_type,
     store_tuple,
+    store_dict,
     store_bytes,
     store_utf8,
     store_i64,
+    store_bool,
     project_ignoring_type,
     project_multi,
     create_exception,
@@ -230,6 +224,7 @@ pub extern "C" fn scheduler_create(
   remote_store_thread_count: u64,
   remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
+  remote_store_rpc_retries: u64,
   process_execution_parallelism: u64,
   process_execution_cleanup_local_dirs: bool,
 ) -> *const Scheduler {
@@ -301,7 +296,7 @@ pub extern "C" fn scheduler_create(
     root_type_ids.clone(),
     tasks,
     types,
-    build_root_buf.to_os_string().as_ref(),
+    PathBuf::from(build_root_buf.to_os_string()),
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
     PathBuf::from(local_store_dir_buf.to_os_string()),
@@ -326,6 +321,7 @@ pub extern "C" fn scheduler_create(
     remote_store_thread_count as usize,
     remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
+    remote_store_rpc_retries as usize,
     process_execution_parallelism as usize,
     process_execution_cleanup_local_dirs as bool,
   ))))
@@ -346,7 +342,8 @@ pub extern "C" fn scheduler_metrics(
         .into_iter()
         .map(|(metric, value)| {
           externs::store_tuple(&[externs::store_utf8(metric), externs::store_i64(value)])
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
       externs::store_tuple(&values).into()
     })
   })
@@ -514,7 +511,8 @@ pub extern "C" fn decompress_tarball(
         output_dir_str.as_path(),
         e
       )
-    }).into()
+    })
+    .into()
 }
 
 #[no_mangle]
@@ -560,9 +558,17 @@ pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 }
 
 #[no_mangle]
-pub extern "C" fn session_create(scheduler_ptr: *mut Scheduler) -> *const Session {
+pub extern "C" fn session_create(
+  scheduler_ptr: *mut Scheduler,
+  should_render_ui: bool,
+  ui_worker_count: u64,
+) -> *const Session {
   with_scheduler(scheduler_ptr, |scheduler| {
-    Box::into_raw(Box::new(Session::new(scheduler)))
+    Box::into_raw(Box::new(Session::new(
+      scheduler,
+      should_render_ui,
+      ui_worker_count as usize,
+    )))
   })
 }
 
@@ -572,14 +578,8 @@ pub extern "C" fn session_destroy(ptr: *mut Session) {
 }
 
 #[no_mangle]
-pub extern "C" fn execution_request_create(
-  should_render_ui: bool,
-  ui_worker_count: u64,
-) -> *const ExecutionRequest {
-  Box::into_raw(Box::new(ExecutionRequest::new(
-    should_render_ui,
-    ui_worker_count,
-  )))
+pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
+  Box::into_raw(Box::new(ExecutionRequest::new()))
 }
 
 #[no_mangle]
@@ -686,7 +686,8 @@ pub extern "C" fn capture_snapshots(
       let path_globs =
         nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
       path_globs.map(|path_globs| (path_globs, root))
-    }).collect();
+    })
+    .collect();
 
   let path_globs_and_roots = match path_globs_and_roots_result {
     Ok(v) => v,
@@ -708,10 +709,13 @@ pub extern "C" fn capture_snapshots(
             core.fs_pool.clone(),
             root,
             path_globs,
-          ).map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-        }).collect::<Vec<_>>(),
+          )
+          .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+        })
+        .collect::<Vec<_>>(),
     )
-  }).map(|values| externs::store_tuple(&values))
+  })
+  .map(|values| externs::store_tuple(&values))
   .wait()
   .into()
 }
@@ -755,7 +759,8 @@ pub extern "C" fn materialize_directories(
       let dir_digest =
         nodes::lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
       dir_digest.map(|dir_digest| (dir, dir_digest))
-    }).collect();
+    })
+    .collect();
 
   let dir_and_digests = match directories_paths_and_digests_results {
     Ok(d) => d,
@@ -772,7 +777,8 @@ pub extern "C" fn materialize_directories(
         .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
         .collect::<Vec<_>>(),
     )
-  }).map(|_| ())
+  })
+  .map(|_| ())
   .wait()
   .into()
 }

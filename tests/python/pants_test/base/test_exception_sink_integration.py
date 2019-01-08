@@ -27,8 +27,6 @@ process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
 Exception caught: \\(pants\\.build_graph\\.address_lookup_error\\.AddressLookupError\\)
-  File ".*", line [0-9]+, in <module>
-    main\\(\\)
 (.|\n)*
 
 Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:

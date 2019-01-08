@@ -124,7 +124,7 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
       target.walk(collect_sources)
     return sources
 
-  _COMMENT_WITH_TIMESTAMP_RE = re.compile('^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d')
+  _COMMENT_WITH_TIMESTAMP_RE = re.compile(r'^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d')
 
   def _rearrange_output_for_package(self, target_workdir, java_package):
     """Rearrange the output files to match a standard Java structure.

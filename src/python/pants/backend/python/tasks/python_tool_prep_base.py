@@ -21,6 +21,10 @@ class PythonToolInstance(object):
   def __init__(self, pex_path, interpreter):
     self._pex = PEX(pex_path, interpreter=interpreter)
 
+  @property
+  def pex(self):
+    return self._pex
+
   def run(self, workunit_factory, args, **kwargs):
     cmdline = ' '.join(self._pex.cmdline(args))
     with workunit_factory(cmd=cmdline) as workunit:
@@ -63,7 +67,7 @@ class PythonToolPrepBase(Task):
         builder=PEXBuilder(path=chroot, interpreter=interpreter),
         log=self.context.log)
       reqs = [PythonRequirement(r) for r in tool_subsystem.get_requirement_specs()]
-      pex_builder.add_resolved_requirements(reqs=reqs)
+      pex_builder.add_resolved_requirements(reqs=reqs, platforms=['current'])
       pex_builder.set_entry_point(tool_subsystem.get_entry_point())
       pex_builder.freeze()
 

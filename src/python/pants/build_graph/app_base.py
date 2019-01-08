@@ -226,7 +226,7 @@ class AppBase(Target):
     """
     :param string binary: Target spec of the ``jvm_binary`` or the ``python_binary``
       that contains the app main.
-    :param bundles: One or more ``bundle``\s
+    :param bundles: One or more ``bundle``\\s
       describing "extra files" that should be included with this app
       (e.g.: config files, startup scripts).
     :param string basename: Name of this application, if different from the

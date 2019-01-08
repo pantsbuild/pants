@@ -1,5 +1,5 @@
-extern crate log;
-extern crate tempfile;
+use log;
+use tempfile;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, Snapshot, StrictGlobMatching};
@@ -54,11 +54,13 @@ impl CommandRunner {
         let mut s = p.into_os_string();
         s.push("/**");
         s
-      }).chain(output_file_paths.into_iter().map(|p| p.into_os_string()))
+      })
+      .chain(output_file_paths.into_iter().map(|p| p.into_os_string()))
       .map(|s| {
         s.into_string()
           .map_err(|e| format!("Error stringifying output paths: {:?}", e))
-      }).collect();
+      })
+      .collect();
 
     let output_globs = try_future!(PathGlobs::create(
       &try_future!(output_paths),
@@ -76,7 +78,8 @@ impl CommandRunner {
           &fs::OneOffStoreFileByDigest::new(store, posix_fs),
           path_stats,
         )
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 }
 
@@ -193,7 +196,8 @@ impl ChildResults {
           };
           Ok((stdout, stderr, exit_code)) as Result<_, E>
         },
-      ).map(|(stdout, stderr, exit_code)| ChildResults {
+      )
+      .map(|(stdout, stderr, exit_code)| ChildResults {
         stdout: stdout.into(),
         stderr: stderr.into(),
         exit_code,
@@ -206,15 +210,13 @@ impl super::CommandRunner for CommandRunner {
   /// Runs a command on this machine in the passed working directory.
   ///
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let workdir = try_future!(
-      tempfile::Builder::new()
-        .prefix("process-execution")
-        .tempdir_in(&self.work_dir)
-        .map_err(|err| format!(
-          "Error making tempdir for local process execution: {:?}",
-          err
-        ))
-    );
+    let workdir = try_future!(tempfile::Builder::new()
+      .prefix("process-execution")
+      .tempdir_in(&self.work_dir)
+      .map_err(|err| format!(
+        "Error making tempdir for local process execution: {:?}",
+        err
+      )));
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
@@ -238,7 +240,8 @@ impl super::CommandRunner for CommandRunner {
         } else {
           Ok(())
         }
-      }).and_then(move |()| {
+      })
+      .and_then(move |()| {
         StreamedHermeticCommand::new(&argv[0])
           .args(&argv[1..])
           .current_dir(&workdir_path)
@@ -262,7 +265,8 @@ impl super::CommandRunner for CommandRunner {
                 "Error making posix_fs to fetch local process execution output files: {}",
                 err
               )
-            }).map(Arc::new)
+            })
+            .map(Arc::new)
             .and_then(|posix_fs| {
               CommandRunner::construct_output_snapshot(
                 store,
@@ -270,7 +274,8 @@ impl super::CommandRunner for CommandRunner {
                 output_file_paths,
                 output_dir_paths,
               )
-            }).to_boxed()
+            })
+            .to_boxed()
         };
 
         output_snapshot
@@ -280,8 +285,10 @@ impl super::CommandRunner for CommandRunner {
             exit_code: child_results.exit_code,
             output_directory: snapshot.digest,
             execution_attempts: vec![],
-          }).to_boxed()
-      }).then(move |result| {
+          })
+          .to_boxed()
+      })
+      .then(move |result| {
         // Force workdir not to get dropped until after we've ingested the outputs
         if !cleanup_local_dirs {
           // This consumes the `TempDir` without deleting directory on the filesystem, meaning
@@ -293,14 +300,15 @@ impl super::CommandRunner for CommandRunner {
           );
         } // Else, workdir gets dropped here
         result
-      }).to_boxed()
+      })
+      .to_boxed()
   }
 }
 
 #[cfg(test)]
 mod tests {
-  extern crate tempfile;
-  extern crate testutil;
+  use tempfile;
+  use testutil;
 
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
@@ -424,7 +432,8 @@ mod tests {
           parts.next().unwrap().to_string(),
           parts.next().unwrap_or("").to_string(),
         )
-      }).filter(|x| x.0 != "PATH")
+      })
+      .filter(|x| x.0 != "PATH")
       .collect();
 
     assert_eq!(env, got_env);
@@ -467,7 +476,8 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
       jdk_home: None,
-    }).expect_err("Want Err");
+    })
+    .expect_err("Want Err");
   }
 
   #[test]
@@ -778,7 +788,8 @@ mod tests {
       },
       preserved_work_root.clone(),
       false,
-    ).expect_err("Want process to fail");
+    )
+    .expect_err("Want process to fail");
 
     assert!(preserved_work_root.exists());
     // Collect all of the top level sub-dirs under our test workdir.

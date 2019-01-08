@@ -22,6 +22,7 @@ from pants.build_graph.address import Address
 from pants.task.task import Task
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir
+from pants.util.rwbuf import StringWriter
 
 
 def util():
@@ -201,7 +202,7 @@ class MarkdownToHtml(Task):
     source_path = os.path.join(get_buildroot(), source)
     with codecs.open(source_path, 'r', 'utf-8') as source_stream:
       rst_html, returncode = util().rst_to_html(source_stream.read(),
-                                                stderr=workunit.output('stderr'))
+                                                stderr=StringWriter(workunit.output('stderr')))
       if returncode != 0:
         message = '{} rendered with errors.'.format(source_path)
         if self.get_options().ignore_failure:

@@ -67,7 +67,7 @@ class ScopeInfoIterator(object):
     def subsys_deps(subsystem_client_cls):
       for dep in subsystem_client_cls.subsystem_dependencies_iter():
         if dep.scope != GLOBAL_SCOPE:
-          yield self._scope_to_info[dep.options_scope()]
+          yield self._scope_to_info[dep.options_scope]
           for x in subsys_deps(dep.subsystem_cls):
             yield x
 

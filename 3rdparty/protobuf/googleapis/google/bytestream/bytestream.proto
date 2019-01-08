@@ -16,9 +16,6 @@ syntax = "proto3";
 
 package google.bytestream;
 
-import "rustproto.proto";
-option (rustproto.carllerche_bytes_for_bytes_all) = true;
-
 import "google/api/annotations.proto";
 import "google/protobuf/wrappers.proto";
 

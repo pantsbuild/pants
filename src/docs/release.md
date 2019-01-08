@@ -125,7 +125,7 @@ whether a release is needed from a stable branch.
 1. Cherry pick [changes labelled needs-cherrypick][needs-cherrypick]
     for the relevant milestone directly to the stable branch.  Note that these pull requests must have been merged into
     master, and therefore will already be closed.
-2. In master, update `src/python/pants/notes/*.rst` to reflect all patches that were
+2. In master, update the branch-specific file in `src/python/pants/notes` to reflect all patches that were
     cherry-picked (can use `build-support/bin/release-changelog-helper.sh` to get a head start).
     For example if you were releasing 1.2.0rc1 you would edit `src/python/pants/notes/1.2.x.rst`.
 3. Create and land a review for the notes changes in master.

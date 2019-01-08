@@ -57,7 +57,7 @@ class JarDependencyParseContextWrapper(object):
       (specifying this parameter is unusual). Path of file URL can be either absolute or relative
       to the belonging BUILD file.
     :param string apidocs: URL of existing javadocs, which if specified, pants-generated javadocs
-      will properly hyperlink {\ @link}s.
+      will properly hyperlink {\\ @link}s.
     :param string classifier: Classifier specifying the artifact variant to use.
     :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
       Maven -SNAPSHOT style artifacts in an active development/integration cycle.

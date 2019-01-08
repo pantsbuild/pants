@@ -1,8 +1,8 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::{TypeConstraint, TypeId};
-use externs;
+use crate::core::{TypeConstraint, TypeId};
+use crate::externs;
 use std::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -23,7 +23,7 @@ impl Select {
 }
 
 impl fmt::Debug for Select {
-  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
     write!(
       f,
       "Select {{ product: {} }}",

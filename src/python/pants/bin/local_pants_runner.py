@@ -40,7 +40,7 @@ class LocalPantsRunner(object):
     return options, build_config, options_bootstrapper
 
   @staticmethod
-  def _maybe_init_graph_session(graph_session, options_bootstrapper, build_config):
+  def _maybe_init_graph_session(graph_session, options_bootstrapper,build_config, global_options):
     if graph_session:
       return graph_session
 
@@ -51,7 +51,8 @@ class LocalPantsRunner(object):
       options_bootstrapper,
       build_config
     )
-    return graph_scheduler_helper.new_session()
+
+    return graph_scheduler_helper.new_session(global_options.v2_ui)
 
   @staticmethod
   def _maybe_init_target_roots(target_roots, graph_session, options, build_root):
@@ -104,7 +105,8 @@ class LocalPantsRunner(object):
     graph_session = cls._maybe_init_graph_session(
       daemon_graph_session,
       options_bootstrapper,
-      build_config
+      build_config,
+      global_options
     )
 
     target_roots = cls._maybe_init_target_roots(
@@ -120,6 +122,7 @@ class LocalPantsRunner(object):
       build_root,
       exiter,
       options,
+      options_bootstrapper,
       build_config,
       target_roots,
       graph_session,
@@ -127,12 +130,13 @@ class LocalPantsRunner(object):
       profile_path
     )
 
-  def __init__(self, build_root, exiter, options, build_config, target_roots, graph_session,
-               is_daemon, profile_path):
+  def __init__(self, build_root, exiter, options, options_bootstrapper, build_config, target_roots,
+               graph_session, is_daemon, profile_path):
     """
     :param string build_root: The build root for this run.
     :param Exiter exiter: The Exiter instance to use for this run.
     :param Options options: The parsed options for this run.
+    :param OptionsBootstrapper options_bootstrapper: The OptionsBootstrapper instance to use.
     :param BuildConfiguration build_config: The parsed build configuration for this run.
     :param TargetRoots target_roots: The `TargetRoots` for this run.
     :param LegacyGraphSession graph_session: A LegacyGraphSession instance for graph reuse.
@@ -142,6 +146,7 @@ class LocalPantsRunner(object):
     self._build_root = build_root
     self._exiter = exiter
     self._options = options
+    self._options_bootstrapper = options_bootstrapper
     self._build_config = build_config
     self._target_roots = target_roots
     self._graph_session = graph_session
@@ -188,9 +193,9 @@ class LocalPantsRunner(object):
 
     try:
       self._graph_session.run_console_rules(
+        self._options_bootstrapper,
         self._options.goals_and_possible_v2_goals,
         self._target_roots,
-        self._global_options.v2_ui
       )
     except GracefulTerminationException as e:
       logger.debug('Encountered graceful termination exception {}; exiting'.format(e))

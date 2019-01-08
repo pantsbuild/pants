@@ -3,10 +3,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use core::{Function, Key, TypeConstraint, TypeId, Value, FNV};
-use externs;
-use selectors::{Get, Select};
-use types::Types;
+use crate::core::{Function, Key, TypeConstraint, TypeId, Value, FNV};
+use crate::externs;
+use crate::selectors::{Get, Select};
+use crate::types::Types;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {

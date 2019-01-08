@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import glob
 import logging
 import os
 from builtins import object, open, str
@@ -12,10 +13,11 @@ import mock
 from future.utils import PY2
 
 from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator,
-                                        BinaryUtil)
+                                        BinaryUtil, select)
 from pants.net.http.fetcher import Fetcher
-from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_open
+from pants.util.collections import assert_single_element
+from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import is_readable_dir, safe_file_dump, safe_open
 from pants_test.test_base import TestBase
 
 
@@ -339,3 +341,21 @@ class BinaryUtilTest(TestBase):
       "external_url_generator=ExternalUrlGenerator(<example __str__()>), archiver=None): "
       "--binaries-baseurls is empty.")
     self.assertIn(expected_msg, the_raised_exception_message)
+
+  def test_select_argv(self):
+    """Test invoking binary_util.py as a standalone script."""
+    with temporary_dir() as tmp_dir:
+      config_file_loc = os.path.join(tmp_dir, 'pants.ini')
+      safe_file_dump(config_file_loc, """\
+[GLOBAL]
+allow_external_binary_tool_downloads: True
+pants_bootstrapdir: {}
+""".format(tmp_dir), binary_mode=False)
+      expected_output_glob = os.path.join(
+        tmp_dir, 'bin', 'cmake', '*', '*', '3.9.5', 'cmake')
+      with environment_as(PANTS_CONFIG_FILES='[{!r}]'.format(config_file_loc)):
+        # Ignore the first argument, as per sys.argv.
+        output_file = select(['_', 'cmake', '3.9.5', 'cmake.tar.gz'])
+      self.assertTrue(is_readable_dir(output_file))
+      realized_glob = assert_single_element(glob.glob(expected_output_glob))
+      self.assertEqual(os.path.realpath(output_file), os.path.realpath(realized_glob))

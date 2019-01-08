@@ -1,48 +1,44 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  deny(
-    clippy,
-    default_trait_access,
-    expl_impl_clone_on_copy,
-    if_not_else,
-    needless_continue,
-    single_match_else,
-    unseparated_literal_suffix,
-    used_underscore_binding
-  )
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
-#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+#![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(len_without_is_empty, redundant_field_names)
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(new_without_default, new_without_default_derive)
+#![allow(
+  clippy::new_without_default,
+  clippy::new_without_default_derive,
+  clippy::new_ret_no_self
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
-#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+#![allow(clippy::mutex_atomic)]
 
-extern crate boxfuture;
-extern crate fnv;
-extern crate futures;
-extern crate hashing;
-extern crate indexmap;
-extern crate parking_lot;
-extern crate petgraph;
+use hashing;
+
+use petgraph;
 
 mod entry;
 mod node;
 
-pub use entry::Entry;
-use entry::{EntryKey, Generation, RunToken};
+pub use crate::entry::Entry;
+use crate::entry::{EntryKey, Generation, RunToken};
 
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -61,8 +57,8 @@ use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 
+pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeTracer, NodeVisualizer};
 use boxfuture::{BoxFuture, Boxable};
-pub use node::{EntryId, Node, NodeContext, NodeError, NodeTracer, NodeVisualizer};
 
 type FNV = BuildHasherDefault<FnvHasher>;
 
@@ -150,7 +146,7 @@ impl<N: Node> InnerGraph<N> {
   ///
   /// Begins a topological Walk from the given roots.
   ///
-  fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk<N> {
+  fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk<'_, N> {
     Walk {
       graph: self,
       direction: direction,
@@ -184,7 +180,8 @@ impl<N: Node> InnerGraph<N> {
         } else {
           None
         }
-      }).collect();
+      })
+      .collect();
     // And their transitive dependencies, which will be dirtied.
     let transitive_ids: Vec<_> = self
       .walk(root_ids.iter().cloned().collect(), Direction::Incoming)
@@ -596,8 +593,10 @@ impl<N: Node> Graph<N> {
             .get(context, dep_id)
             .map(|(_, generation)| generation)
             .to_boxed()
-        }).collect::<Vec<_>>(),
-    ).to_boxed()
+        })
+        .collect::<Vec<_>>(),
+    )
+    .to_boxed()
   }
 
   ///
@@ -648,7 +647,7 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     let (entry, entry_id, dep_generations) = {
-      let mut inner = self.inner.lock();
+      let inner = self.inner.lock();
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
@@ -755,7 +754,7 @@ impl<N: Node> Graph<N> {
 /// Represents the state of a particular topological walk through a Graph. Implements Iterator and
 /// has the same lifetime as the Graph itself.
 ///
-struct Walk<'a, N: Node + 'a> {
+struct Walk<'a, N: Node> {
   graph: &'a InnerGraph<N>,
   direction: Direction,
   deque: VecDeque<EntryId>,
@@ -784,8 +783,8 @@ impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
 
 #[cfg(test)]
 mod tests {
-  extern crate parking_lot;
-  extern crate rand;
+  use parking_lot;
+  use rand;
 
   use std::cmp;
   use std::collections::{HashMap, HashSet};
@@ -1049,7 +1048,8 @@ mod tests {
           .map(move |mut v| {
             v.push(token);
             v
-          }).to_boxed()
+          })
+          .to_boxed()
       } else {
         future::ok(vec![token]).to_boxed()
       }
@@ -1089,7 +1089,8 @@ mod tests {
         .map(|&T(node_id, context_id)| {
           // We cast to isize to allow comparison to -1.
           (node_id as isize, context_id)
-        }).unzip();
+        })
+        .unzip();
       // Confirm monotonically ordered.
       let mut previous: isize = -1;
       for node_id in node_ids {
