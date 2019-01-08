@@ -16,6 +16,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.contextutil import pushd
+from pants.util.memo import memoized_property
 
 
 class GrpcioRun(SimpleCodegenTask):
@@ -27,11 +28,13 @@ class GrpcioRun(SimpleCodegenTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(GrpcioRun, cls).prepare(options, round_manager)
-    round_manager.require_data(GrpcioPrep.Grpcio)
+    round_manager.require_data(GrpcioPrep.tool_instance_cls)
+
+  @memoized_property
+  def _grpcio_binary(self):
+    return self.context.products.get_data(GrpcioPrep.tool_instance_cls)
 
   def execute_codegen(self, target, target_workdir):
-    grpcio = self.context.products.get_data(GrpcioPrep.Grpcio)
-
     args = self.build_args(target, target_workdir)
     logging.debug("Executing grpcio code generation with args: [{}]".format(args))
 
@@ -39,7 +42,7 @@ class GrpcioRun(SimpleCodegenTask):
       workunit_factory = functools.partial(self.context.new_workunit,
                                            name='run-grpcio',
                                            labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT])
-      cmdline, exit_code = grpcio.run(workunit_factory, args)
+      cmdline, exit_code = self._grpcio_binary.run(workunit_factory, args)
       if exit_code != 0:
         raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
                         exit_code=exit_code)
