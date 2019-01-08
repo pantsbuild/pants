@@ -24,12 +24,15 @@ def generate_travis_yml():
     __name__, 'travis.yml.mustache').decode('utf-8')
   before_install_linux = pkg_resources.resource_string(
     __name__, 'before_install_linux.mustache').decode('utf-8')
+  before_install_osx = pkg_resources.resource_string(
+    __name__, 'before_install_osx.mustache').decode('utf-8')
   context = {
     'header': HEADER,
     'integration_shards': range(0, num_integration_shards),
     'integration_shards_length': num_integration_shards,
   }
   renderer = pystache.Renderer(partials={
-    'before_install_linux': before_install_linux
+    'before_install_linux': before_install_linux,
+    'before_install_osx': before_install_osx
   })
   print(renderer.render(template, context))

@@ -133,6 +133,7 @@ function pants_version_reset() {
   pushd ${ROOT} > /dev/null
     git checkout -- ${VERSION_FILE}
   popd > /dev/null
+  unset _PANTS_VERSION_OVERRIDE
 }
 
 function pants_version_set() {
@@ -141,6 +142,7 @@ function pants_version_set() {
   local version=$1
   trap pants_version_reset EXIT
   echo "${version}" > "${VERSION_FILE}"
+  export _PANTS_VERSION_OVERRIDE=${version}
 }
 
 function build_3rdparty_packages() {

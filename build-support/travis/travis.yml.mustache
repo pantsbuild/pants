@@ -110,10 +110,7 @@ default_osx_config: &default_osx_config
   os: osx
   language: generic
   before_install:
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - aws configure set default.s3.multipart_threshold 1024MB
-    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
-    - chmod 755 /usr/local/bin/jq
+    {{>before_install_osx}}
 
 default_osx_test_config: &default_osx_test_config
   <<: *default_osx_config
@@ -331,7 +328,7 @@ matrix:
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
       before_install:
-        - ./build-support/bin/install_aws_cli_for_ci.sh
+        {{>before_install_osx}}
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       script:
         - ./build-support/bin/travis-ci.sh -bez
