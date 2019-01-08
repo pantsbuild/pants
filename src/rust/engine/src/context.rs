@@ -34,6 +34,7 @@ use resettable::Resettable;
 /// to the Tokio `Runtime`. The next candidate is likely to be migrating PosixFS to tokio-fs once
 /// https://github.com/tokio-rs/tokio/issues/369 is resolved.
 ///
+#[allow(clippy::type_complexity)]
 pub struct Core {
   pub graph: Graph<NodeKey>,
   pub tasks: Tasks,
@@ -42,8 +43,11 @@ pub struct Core {
   pub fs_pool: Arc<ResettablePool>,
   pub runtime: Resettable<Arc<Runtime>>,
   pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
-  store_and_command_runner_and_http_client:
-    Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
+  store_and_command_runner_and_http_client: Resettable<(
+    Store,
+    futures::future::Shared<BoxFuture<BoundedCommandRunner, String>>,
+    reqwest::r#async::Client,
+  )>,
   pub vfs: PosixFS,
   pub build_root: PathBuf,
 }
@@ -129,8 +133,8 @@ impl Core {
         })
         .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
-      let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
-        Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
+      let underlying_command_runner = match &remote_execution_server {
+        Some(ref address) => process_execution::remote::CommandRunner::new(
           address,
           remote_execution_process_cache_namespace.clone(),
           remote_instance_name.clone(),
@@ -140,17 +144,23 @@ impl Core {
           process_execution_parallelism + 2,
           store.clone(),
           futures_timer_thread2.clone(),
-        )),
-        None => Box::new(process_execution::local::CommandRunner::new(
+        )
+        .map(|r| Box::new(r) as Box<dyn CommandRunner>)
+        .to_boxed(),
+        None => futures::future::ok(Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
           fs_pool2.clone(),
           work_dir.clone(),
           process_execution_cleanup_local_dirs,
-        )),
+        )) as Box<dyn CommandRunner>)
+        .to_boxed(),
       };
 
-      let command_runner =
-        BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
+      let process_execution_parallelism = process_execution_parallelism;
+      let command_runner = underlying_command_runner
+        .map(move |r| BoundedCommandRunner::new(r, process_execution_parallelism))
+        .to_boxed()
+        .shared();
 
       let http_client = reqwest::r#async::Client::new();
 
@@ -214,7 +224,7 @@ impl Core {
     self.store_and_command_runner_and_http_client.get().0
   }
 
-  pub fn command_runner(&self) -> BoundedCommandRunner {
+  pub fn command_runner(&self) -> futures::future::Shared<BoxFuture<BoundedCommandRunner, String>> {
     self.store_and_command_runner_and_http_client.get().1
   }
 

@@ -306,7 +306,7 @@ impl CommandRunner {
     thread_count: usize,
     store: Store,
     futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
-  ) -> CommandRunner {
+  ) -> impl Future<Item = Self, Error = String> {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = {
       let builder = grpcio::ChannelBuilder::new(env.clone());
@@ -329,7 +329,7 @@ impl CommandRunner {
       channel.clone(),
     ));
 
-    CommandRunner {
+    let r = CommandRunner {
       cache_key_gen_version,
       instance_name,
       authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
@@ -339,7 +339,8 @@ impl CommandRunner {
       operations_client,
       store,
       futures_timer_thread,
-    }
+    };
+    futures::future::ok(r)
   }
 
   fn call_option(&self) -> grpcio::CallOption {
@@ -1398,7 +1399,10 @@ mod tests {
       store,
       timer_thread,
     );
-    let result = cmd_runner.run(echo_roland_request()).wait().unwrap();
+    let result = cmd_runner
+      .and_then(|r| r.run(echo_roland_request()))
+      .wait()
+      .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
@@ -1774,7 +1778,7 @@ mod tests {
       store,
       timer_thread,
     )
-    .run(cat_roland_request())
+    .and_then(|r| r.run(cat_roland_request()))
     .wait()
     .unwrap();
     assert_eq!(
@@ -1870,7 +1874,7 @@ mod tests {
       store,
       timer_thread,
     )
-    .run(cat_roland_request())
+    .and_then(|r| r.run(cat_roland_request()))
     .wait();
     assert_eq!(
       result,
@@ -1938,7 +1942,7 @@ mod tests {
       store,
       timer_thread,
     )
-    .run(cat_roland_request())
+    .and_then(|r| r.run(cat_roland_request()))
     .wait()
     .expect_err("Want error");
     assert_contains(&error, &format!("{}", missing_digest.0));
@@ -2513,10 +2517,13 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner(address, &cas);
-    command_runner.run(request).wait()
+    command_runner.and_then(|r| r.run(request)).wait()
   }
 
-  fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
+  fn create_command_runner(
+    address: String,
+    cas: &mock::StubCAS,
+  ) -> impl Future<Item = CommandRunner, Error = String> {
     let store_dir = TempDir::new().unwrap();
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
@@ -2549,12 +2556,15 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner("".to_owned(), &cas);
+    let command_runner = create_command_runner("".to_owned(), &cas)
+      .map_err(|e| ExecutionError::Fatal(format!("Error making command runner: {}", e)));
     command_runner
-      .extract_execute_response(
-        super::OperationOrStatus::Operation(operation),
-        &mut ExecutionHistory::default(),
-      )
+      .and_then(|r| {
+        r.extract_execute_response(
+          super::OperationOrStatus::Operation(operation),
+          &mut ExecutionHistory::default(),
+        )
+      })
       .wait()
   }
 
@@ -2565,9 +2575,10 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner("".to_owned(), &cas);
+    let command_runner = create_command_runner("".to_owned(), &cas)
+      .map_err(|e| ExecutionError::Fatal(format!("Error making command runner: {}", e)));;
     command_runner
-      .extract_output_files(&execute_response)
+      .and_then(|r| r.extract_output_files(&execute_response))
       .wait()
   }
 

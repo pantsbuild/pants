@@ -36,6 +36,7 @@ use fs;
 
 use process_execution;
 
+use boxfuture::Boxable;
 use clap::{value_t, App, AppSettings, Arg};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
@@ -254,7 +255,7 @@ fn main() {
     jdk_home: args.value_of("jdk").map(PathBuf::from),
   };
 
-  let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
+  let runner = match server_arg {
     Some(address) => {
       let root_ca_certs = if let Some(path) = args.value_of("execution-root-ca-cert-file") {
         Some(std::fs::read(path).expect("Error reading root CA certs file"))
@@ -269,7 +270,7 @@ fn main() {
           None
         };
 
-      Box::new(process_execution::remote::CommandRunner::new(
+      process_execution::remote::CommandRunner::new(
         address,
         args.value_of("cache-key-gen-version").map(str::to_owned),
         remote_instance_arg,
@@ -278,14 +279,20 @@ fn main() {
         1,
         store,
         timer_thread,
-      ))
+      )
+      .map(|r| Box::new(r) as Box<dyn process_execution::CommandRunner>)
+      .to_boxed()
     }
-    None => Box::new(process_execution::local::CommandRunner::new(
+    None => futures::future::ok(Box::new(process_execution::local::CommandRunner::new(
       store, pool, work_dir, true,
-    )),
+    )) as Box<dyn process_execution::CommandRunner>)
+    .to_boxed(),
   };
 
-  let result = runner.run(request).wait().expect("Error executing");
+  let result = runner
+    .and_then(|r| r.run(request))
+    .wait()
+    .expect("Error executing");
 
   print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
   eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
