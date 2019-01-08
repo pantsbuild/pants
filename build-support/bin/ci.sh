@@ -104,12 +104,6 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
-if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
-  start_travis_section "PreCommit" "Running pre-commit checks"
-  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
-  end_travis_section
-fi
-
 if [[ "${run_bootstrap:-true}" == "true" ]]; then
   start_travis_section "Bootstrap" "Bootstrapping pants"
   (
@@ -129,6 +123,12 @@ fi
 # In this file we invoke ./pants.pex directly anyway, but some of those invocations will run
 # integration tests that shell out to `./pants`, so we set this env var for those cases.
 export RUN_PANTS_FROM_PEX=1
+
+if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
+  start_travis_section "PreCommit" "Running pre-commit checks"
+  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
+  end_travis_section
+fi
 
 # NB: Ordering matters here. We (currently) always bootstrap a Python 2 pex.
 if [[ "${python_three:-false}" == "true" ]]; then
