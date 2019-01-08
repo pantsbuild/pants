@@ -1,39 +1,36 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  deny(
-    clippy,
-    default_trait_access,
-    expl_impl_clone_on_copy,
-    if_not_else,
-    needless_continue,
-    single_match_else,
-    unseparated_literal_suffix,
-    used_underscore_binding
-  )
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
-#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+#![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(len_without_is_empty, redundant_field_names)
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(new_without_default, new_without_default_derive)
+#![allow(
+  clippy::new_without_default,
+  clippy::new_without_default_derive,
+  clippy::new_ret_no_self
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
-#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+#![allow(clippy::mutex_atomic)]
 
-extern crate digest;
-extern crate hex;
-extern crate serde;
-extern crate sha2;
+use hex;
 
 use digest::{Digest as DigestTrait, FixedOutput};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
@@ -81,13 +78,13 @@ impl Fingerprint {
 }
 
 impl fmt::Display for Fingerprint {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.to_hex())
   }
 }
 
 impl fmt::Debug for Fingerprint {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "Fingerprint<{}>", self.to_hex())
   }
 }
@@ -177,9 +174,9 @@ impl<W: Write> Write for WriterHasher<W> {
 
 #[cfg(test)]
 mod fingerprint_tests {
-  use super::Fingerprint;
-  extern crate serde_test;
   use self::serde_test::{assert_ser_tokens, Token};
+  use super::Fingerprint;
+  use serde_test;
 
   #[test]
   fn from_bytes_unsafe() {
@@ -198,7 +195,8 @@ mod fingerprint_tests {
     assert_eq!(
       Fingerprint::from_hex_string(
         "0123456789abcdefFEDCBA98765432100000000000000000ffFFfFfFFfFfFFff",
-      ).unwrap(),
+      )
+      .unwrap(),
       Fingerprint([
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
         0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -216,14 +214,16 @@ mod fingerprint_tests {
   fn from_hex_string_too_long() {
     Fingerprint::from_hex_string(
       "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0",
-    ).expect_err("Want err");
+    )
+    .expect_err("Want err");
   }
 
   #[test]
   fn from_hex_string_invalid_chars() {
     Fingerprint::from_hex_string(
       "Q123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
-    ).expect_err("Want err");
+    )
+    .expect_err("Want err");
   }
 
   #[test]
@@ -233,7 +233,8 @@ mod fingerprint_tests {
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
         0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0xff,
-      ],).to_hex(),
+      ],)
+      .to_hex(),
       "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_lowercase()
     )
   }
@@ -266,17 +267,18 @@ mod fingerprint_tests {
 
 #[cfg(test)]
 mod digest_tests {
+  use self::serde_test::{assert_ser_tokens, Token};
   use super::Digest;
   use super::Fingerprint;
-  extern crate serde_test;
-  use self::serde_test::{assert_ser_tokens, Token};
+  use serde_test;
 
   #[test]
   fn serialize_to_str() {
     let digest = Digest(
       Fingerprint::from_hex_string(
         "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
-      ).unwrap(),
+      )
+      .unwrap(),
       1,
     );
     assert_ser_tokens(
@@ -311,7 +313,8 @@ mod hasher_tests {
       super::Digest(
         super::Fingerprint::from_hex_string(
           "23e92dfba8fb0c93cfba31ad2962b4e35a47054296d1d375d7f7e13e0185de7a",
-        ).unwrap(),
+        )
+        .unwrap(),
         4,
       ),
       "meep".as_bytes().to_vec(),

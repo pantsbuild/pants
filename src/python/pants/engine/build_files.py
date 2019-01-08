@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import functools
 import logging
 from builtins import next
 from collections import MutableMapping, MutableSequence
@@ -22,7 +21,8 @@ from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
+from pants.engine.parser import TargetAdaptorContainer
+from pants.engine.rules import RootRule, SingletonRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
 from pants.util.objects import TypeConstraintError, datatype
@@ -135,13 +135,15 @@ def resolve_unhydrated_struct(address_mapper, address):
     dependencies)
 
 
-def hydrate_struct(symbol_table_constraint, address_mapper, unhydrated_struct):
+@rule(TargetAdaptorContainer, [Select(AddressMapper), Select(UnhydratedStruct)])
+def hydrate_struct(address_mapper, unhydrated_struct):
   """Hydrates a Struct from an UnhydratedStruct and its satisfied embedded addressable deps.
 
   Note that this relies on the guarantee that DependenciesNode provides dependencies in the
   order they were requested.
   """
-  dependencies = yield [Get(symbol_table_constraint, Address, a) for a in unhydrated_struct.dependencies]
+  dependencies = yield [Get(TargetAdaptorContainer, Address, a) for a in unhydrated_struct.dependencies]
+  dependencies = [d.value for d in dependencies]
   address = unhydrated_struct.address
   struct = unhydrated_struct.struct
 
@@ -182,7 +184,7 @@ def hydrate_struct(symbol_table_constraint, address_mapper, unhydrated_struct):
         hydrated_args[key] = maybe_consume(key, value)
     return _hydrate(type(item), address.spec_path, **hydrated_args)
 
-  yield consume_dependencies(struct, args={'address': address})
+  yield TargetAdaptorContainer(consume_dependencies(struct, args={'address': address}))
 
 
 def _hydrate(item_type, spec_path, **kwargs):
@@ -255,28 +257,17 @@ def _spec_to_globs(address_mapper, specs):
   return PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
 
 
-def create_graph_rules(address_mapper, symbol_table):
+def create_graph_rules(address_mapper):
   """Creates tasks used to parse Structs from BUILD files.
 
   :param address_mapper_key: The subject key for an AddressMapper instance.
   :param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
   """
-  symbol_table_constraint = symbol_table.constraint()
-
-  partial_hydrate_struct = functools.partial(hydrate_struct, symbol_table_constraint)
-  functools.update_wrapper(partial_hydrate_struct, hydrate_struct)
-
   return [
     # A singleton to provide the AddressMapper.
     SingletonRule(AddressMapper, address_mapper),
     # Support for resolving Structs from Addresses.
-    TaskRule(
-      symbol_table_constraint,
-      [Select(AddressMapper),
-       Select(UnhydratedStruct)],
-      partial_hydrate_struct,
-      input_gets=[Get(symbol_table_constraint, Address)],
-    ),
+    hydrate_struct,
     resolve_unhydrated_struct,
     # BUILD file parsing.
     parse_address_family,

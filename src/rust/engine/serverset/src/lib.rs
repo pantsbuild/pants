@@ -1,37 +1,37 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  deny(
-    clippy,
-    default_trait_access,
-    expl_impl_clone_on_copy,
-    if_not_else,
-    needless_continue,
-    single_match_else,
-    unseparated_literal_suffix,
-    used_underscore_binding
-  )
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
-#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+#![allow(clippy::match_ref_pats)]
 // Subjective style.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(len_without_is_empty, redundant_field_names)
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(new_without_default, new_without_default_derive)
+#![allow(
+  clippy::new_without_default,
+  clippy::new_without_default_derive,
+  clippy::new_ret_no_self
 )]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![allow(clippy::mutex_atomic)]
 
-extern crate boxfuture;
-extern crate futures;
-extern crate futures_timer;
-extern crate parking_lot;
+use futures;
+use futures_timer;
 
 use boxfuture::{BoxFuture, Boxable};
 use futures::Future;
@@ -42,7 +42,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 mod retry;
-pub use retry::Retry;
+pub use crate::retry::Retry;
 
 ///
 /// A collection of resources which are observed to be healthy or unhealthy.
@@ -202,7 +202,8 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
           .map(|s| Backend {
             server: s,
             unhealthy_info: Arc::new(Mutex::new(None)),
-          }).collect(),
+          })
+          .collect(),
         next: AtomicUsize::new(0),
         backoff_config,
         timer_handle,
@@ -292,9 +293,8 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
 }
 
 impl<T: std::fmt::Debug> std::fmt::Debug for Serverset<T> {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-    write!(f, "Serverset {{ {:?} }}", self.inner.servers);
-    Ok(())
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+    write!(f, "Serverset {{ {:?} }}", self.inner.servers)
   }
 }
 
@@ -327,7 +327,8 @@ mod tests {
       vec!["good", "bad"],
       backoff_config(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
 
     expect_both(&s, 2);
   }
@@ -338,7 +339,8 @@ mod tests {
       vec!["good", "bad"],
       backoff_config(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
     s.inner.next.store(std::usize::MAX, Ordering::SeqCst);
 
     // 3 because we may skip some values if the number of servers isn't a factor of
@@ -358,7 +360,8 @@ mod tests {
       vec!["good", "bad"],
       backoff_config(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
 
     mark_bad_as_bad(&s, Health::Unhealthy);
 
@@ -371,7 +374,8 @@ mod tests {
       vec!["good", "bad"],
       backoff_config(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
 
     mark_bad_as_bad(&s, Health::Unhealthy);
 
@@ -386,7 +390,8 @@ mod tests {
       vec!["good", "bad"],
       backoff_config(),
       TimerHandle::default(),
-    ).unwrap();
+    )
+    .unwrap();
 
     mark_bad_as_bad(&s, Health::Unhealthy);
 
@@ -445,8 +450,10 @@ mod tests {
             saw.lock().insert(server);
             s.report_health(token, Health::Healthy)
           })
-        }).collect::<Vec<_>>(),
-    ).wait()
+        })
+        .collect::<Vec<_>>(),
+    )
+    .wait()
     .unwrap();
 
     let expect: HashSet<_> = vec!["good", "bad"].into_iter().collect();
@@ -464,7 +471,8 @@ mod tests {
           } else {
             s.report_health(token, Health::Healthy);
           }
-        }).wait()
+        })
+        .wait()
         .unwrap();
     }
     assert!(mark_bad_as_baded_bad);
@@ -479,7 +487,8 @@ mod tests {
         .map(|(server, token)| {
           assert_eq!("good", server);
           s.report_health(token, Health::Healthy);
-        }).wait()
+        })
+        .wait()
         .unwrap();
     }
 

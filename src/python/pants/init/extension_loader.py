@@ -87,7 +87,11 @@ def load_plugins(build_configuration, plugins, working_set):
 
     if 'global_subsystems' in entries:
       subsystems = entries['global_subsystems'].load()()
-      build_configuration.register_subsystems(subsystems)
+      build_configuration.register_optionables(subsystems)
+
+    if 'rules' in entries:
+      rules = entries['rules'].load()()
+      build_configuration.register_rules(rules)
 
     loaded[dist.as_requirement().key] = dist
 
@@ -141,7 +145,7 @@ def load_backend(build_configuration, backend_package):
 
   subsystems = invoke_entrypoint('global_subsystems')
   if subsystems:
-    build_configuration.register_subsystems(subsystems)
+    build_configuration.register_optionables(subsystems)
 
   rules = invoke_entrypoint('rules')
   if rules:

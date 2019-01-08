@@ -2,6 +2,11 @@
 ======================
 This document describes releases leading up to the ``1.13.x`` ``stable`` series.
 
+1.13.0 (12/21/2018)
+-------------------
+
+The first stable release of the ``1.13.x`` series, with no changes since ``1.13.0rc1``.
+
 1.13.0rc1 (12/18/2018)
 ------------------------
 

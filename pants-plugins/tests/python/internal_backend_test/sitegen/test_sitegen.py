@@ -205,12 +205,13 @@ class AllTheThingsTestCase(unittest.TestCase):
                                    {{/site_toc}}
                                    """)
     self.assertIn("DEPTH=1 LINK=None HEADING=non_collapse", rendered)
+    escaped_single_quote = '&#x27;'
     # Py2 and Py3 order the elements differently and Py3 doesn't render 'u' in unicode literals. Both are valid.
-    rendered_expected = ("DEPTH=1 LINK=[{'link': 'subdir/page2.html', 'text': 'Page 2: Electric Boogaloo', 'here': False}, "
-                         "{'link': 'index.html', 'text': 'Pants Build System', 'here': True}] HEADING=collapse"
+    rendered_expected = ("DEPTH=1 LINK=[{{{q}link{q}: {q}subdir/page2.html{q}, {q}text{q}: {q}Page 2: Electric Boogaloo{q}, {q}here{q}: False}}, "
+                         "{{{q}link{q}: {q}index.html{q}, {q}text{q}: {q}Pants Build System{q}, {q}here{q}: True}}] HEADING=collapse".format(q=escaped_single_quote)
                          if PY3 else
-                         "DEPTH=1 LINK=[{'text': u'Page 2: Electric Boogaloo', 'link': u'subdir/page2.html', 'here': False}, "
-                         "{'text': u'Pants Build System', 'link': u'index.html', 'here': True}] HEADING=collapse")
+                         "DEPTH=1 LINK=[{{{q}text{q}: u{q}Page 2: Electric Boogaloo{q}, {q}link{q}: u{q}subdir/page2.html{q}, {q}here{q}: False}}, "
+                         "{{{q}text{q}: u{q}Pants Build System{q}, {q}link{q}: u{q}index.html{q}, {q}here{q}: True}}] HEADING=collapse".format(q=escaped_single_quote))
     self.assertIn(rendered_expected, rendered)
 
   def test_transform_fixes_up_internal_links(self):

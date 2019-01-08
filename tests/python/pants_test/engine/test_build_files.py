@@ -19,7 +19,8 @@ from pants.engine.fs import (Digest, FileContent, FilesContent, Path, PathGlobs,
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
-from pants.engine.parser import SymbolTable
+from pants.engine.parser import SymbolTable, TargetAdaptorContainer
+from pants.engine.rules import SingletonRule
 from pants.engine.struct import Struct, StructWithDeps
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsParser,
@@ -187,9 +188,8 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def create(self, build_patterns=None, parser=None):
     address_mapper = AddressMapper(build_patterns=build_patterns,
                                    parser=parser)
-    symbol_table = address_mapper.parser.symbol_table
 
-    rules = create_fs_rules() + create_graph_rules(address_mapper, symbol_table)
+    rules = create_fs_rules() + create_graph_rules(address_mapper) + [SingletonRule(SymbolTable, TestTable())]
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
     scheduler = self.mk_scheduler(rules=rules, project_tree=project_tree)
     return scheduler
@@ -199,7 +199,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
-    request = scheduler.execution_request([TestTable().constraint()], [address])
+    request = scheduler.execution_request([TargetAdaptorContainer], [address])
     returns, throws = scheduler.execute(request)
     if returns:
       state = returns[0][1]
@@ -215,7 +215,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def resolve(self, scheduler, address):
     _, state = self._populate(scheduler, address)
     self.assertEqual(type(state), Return, '{} is not a Return.'.format(state))
-    return state.value
+    return state.value.value
 
 
 class InlinedGraphTest(GraphTestBase):

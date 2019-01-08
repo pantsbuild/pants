@@ -32,7 +32,7 @@ class BuildFile(AbstractClass):
     """Raised when scan_buildfiles is called on a nonexistent directory."""
 
   _BUILD_FILE_PREFIX = 'BUILD'
-  _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
+  _PATTERN = re.compile(r'^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
   _cache = {}
 

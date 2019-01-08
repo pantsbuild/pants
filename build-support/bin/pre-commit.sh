@@ -16,6 +16,7 @@ echo "* Checking for banned imports" && ./build-support/bin/check_banned_imports
 if git diff master --name-only | grep '\.rs$' > /dev/null; then
   echo "* Checking formatting of rust files" && ./build-support/bin/check_rust_formatting.sh || exit 1
   echo "* Running cargo clippy" && ./build-support/bin/check_clippy.sh || exit 1
+  echo "* Checking rust target headers" && build-support/bin/check_rust_target_headers.sh || exit 1
 fi
 
 echo "* Checking for bad shell patterns" && ./build-support/bin/check_shell.sh || exit 1
@@ -31,4 +32,12 @@ else
   # When travis builds a tag, it does so in a shallow clone without master fetched, which
   # fails in pants changed.
   echo "* Skipping import/lint checks in partial working copy."
+fi
+
+if git diff master --name-only | grep build-support/travis > /dev/null; then
+  echo "* Checking .travis.yml generation" && \
+  actual_travis_yml=$(<.travis.yml) && \
+  expected_travis_yml=$(./pants --quiet run build-support/travis:generate_travis_yml) && \
+  [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
+  die "Travis config generator changed but .travis.yml file not regenerated. See top of that file for instructions."
 fi
