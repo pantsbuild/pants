@@ -61,7 +61,7 @@ function _build_native_code() {
 
   (
     cd "${REPO_ROOT}"
-    "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
+    RUST_LOG=cargo::ops::cargo_rustc::fingerprint "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
       --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine -v
   ) || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
