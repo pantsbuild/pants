@@ -336,8 +336,8 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
       # across all the python targets in-play.
       #
       # For now, make our arbitrary historical choice of a default interpreter explicit and use the
-      # lowest version.
-      default_interpreter = min(python_interpreter_targets_mapping.keys())
+      # highest version.
+      default_interpreter = max(python_interpreter_targets_mapping.keys())
 
       interpreters_info = {}
       for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):
