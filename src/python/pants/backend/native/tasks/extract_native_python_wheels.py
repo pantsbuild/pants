@@ -26,6 +26,7 @@ from pants.util.process_handler import subprocess
 
 
 class ExtractNativePythonWheels(Task):
+  """Extract native code from `NativePythonWheel` targets for use by downstream C/C++ sources."""
 
   @classmethod
   def product_types(cls):
@@ -43,13 +44,11 @@ class ExtractNativePythonWheels(Task):
       PythonSetup,
     )
 
-  @property
-  def _interpreter_cache(self):
-    return PythonInterpreterCache.global_instance()
+  class _NativeCodeExtractionSetupFailure(Exception): pass
 
   @staticmethod
   def _exercise_module(pex, expected_module):
-    # Ripped from test_resolve_requirements.py in upstream pants.
+    # Ripped from test_resolve_requirements.py.
     with temporary_file(binary_mode=False) as f:
       f.write('import {m}; print({m}.__file__)'.format(m=expected_module))
       f.close()
@@ -60,11 +59,22 @@ class ExtractNativePythonWheels(Task):
 
   @classmethod
   def _get_wheel_dir(cls, pex, module_name):
+    """Get the directory of a specific wheel contained within an unpacked pex."""
     stdout_data, stderr_data = cls._exercise_module(pex, module_name)
-    assert(stderr_data == '')
-    path = stdout_data.strip()
-    wheel_dir = os.path.join(path[0:path.find('{sep}.deps{sep}'.format(sep=os.sep))], '.deps')
-    assert(os.path.isdir(wheel_dir))
+    if stderr_data != '':
+      raise cls._NativeCodeExtractionSetupFailure(
+        "Error extracting module '{}' from pex at {}.\nstdout:\n{}\n----\nstderr:\n{}"
+        .format(module_name, pex.path, stdout_data, stderr_data))
+
+    module_path = stdout_data.strip()
+    wheel_dir = os.path.join(
+      module_path[0:module_path.find('{sep}.deps{sep}'.format(sep=os.sep))],
+      '.deps',
+    )
+    if not os.path.isdir(wheel_dir):
+      raise cls._NativeCodeExtractionSetupFailure(
+        "Wheel dir for module '{}' was not found in path '{}' of pex at '{}'."
+        .format(module_name, module_path, pex.path))
     return wheel_dir
 
   @staticmethod
@@ -72,20 +82,26 @@ class ExtractNativePythonWheels(Task):
     # The wheel filename is of the format
     # {distribution}-{version}(-{build tag})?-{python tag}-{abi tag}-{platform tag}.whl
     # See https://www.python.org/dev/peps/pep-0425/.
-    # We don't care about the python or abi versions (they depend on what we're currently
-    # running on), we just want to make sure we have all the platforms we expect.
+    # We don't care about the python or abi versions because we expect pex to resolve the
+    # appropriate versions for the current host.
     parts = os.path.splitext(whl)[0].split('-')
     return '{}-{}'.format(parts[0], parts[1]), parts[-1]
 
   @classmethod
-  def _get_matching_wheel(cls, wheel_dir, wheels, module_name):
+  def _get_matching_wheel(cls, wheel_dir, module_name):
+    wheels = os.listdir(wheel_dir)
+
     names_and_platforms = {w:cls._name_and_platform(w) for w in wheels}
     for whl_filename, (name, platform) in names_and_platforms.items():
       cur_platform_abbrev = re.sub(r'_.*', '', Platform.current().platform)
       if platform.startswith(cur_platform_abbrev):
         if name.startswith('{}-'.format(module_name)):
           return os.path.join(wheel_dir, whl_filename, module_name)
-    raise Exception("couldn't find anything in names_and_platforms: {}".format(names_and_platforms))
+
+    raise cls._NativeCodeExtractionSetupFailure(
+      "Could not find wheel in dir '{}' matching module name '{}' for current platform '{}'.\n"
+      "wheels: {}"
+      .format(wheel_dir, module_name, Platform.current().platform, wheels))
 
   def _generate_requirements_pex(self, pex_path, interpreter, requirement_target):
     if not os.path.exists(pex_path):
@@ -109,8 +125,8 @@ class ExtractNativePythonWheels(Task):
         wheel_wrapper = vt.target
         requirement_target = wheel_wrapper.requirement_target
 
-        interpreter = min(self._interpreter_cache.setup(
-          filters=PythonSetup.global_instance().interpreter_constraints))
+        interpreter = min(PythonInterpreterCache.global_instance().setup(
+          filters=PythonSetup.global_instance().compatibility_or_constraints(wheel_wrapper)))
 
         pex_path = os.path.join(
           vt.results_dir,
@@ -118,23 +134,27 @@ class ExtractNativePythonWheels(Task):
           requirement_target.transitive_invalidation_hash(),
           str(interpreter.identity),
         )
-        pex = self._generate_requirements_pex(pex_path, interpreter, requirement_target)
 
-        wheel_dir = self._get_wheel_dir(pex, wheel_wrapper.module_name)
-        wheels = os.listdir(wheel_dir)
-        if len(wheels) == 0:
-          raise self.NativeCodeExtractionError('no wheels found in dir {} for target {}!'
-                                               .format(wheel_dir, wheel_wrapper))
-        matching_wheel = self._get_matching_wheel(wheel_dir, wheels, wheel_wrapper.module_name)
+        try:
+          pex = self._generate_requirements_pex(pex_path, interpreter, requirement_target)
+          wheel_dir = self._get_wheel_dir(pex, wheel_wrapper.module_name)
+          matching_wheel = self._get_matching_wheel(wheel_dir, wheel_wrapper.module_name)
+        except Exception as e:
+          raise self.NativeCodeExtractionError(
+            "Error extracting wheel for target {}: {}"
+            .format(wheel_wrapper, str(e)))
 
         include_dir = os.path.join(matching_wheel, wheel_wrapper.include_relpath)
         if not os.path.isdir(include_dir):
-          raise self.NativeCodeExtractionError('include dir {} not found for target {}!'
-                                               .format(include_dir, wheel_wrapper))
+          raise self.NativeCodeExtractionError(
+            "Include dir '{}' not found for target {}!"
+            .format(include_dir, wheel_wrapper))
         lib_dir = os.path.join(matching_wheel, wheel_wrapper.lib_relpath)
         if not os.path.isdir(lib_dir):
-          raise self.NativeCodeExtractionError('lib dir {} not found for target {}!'
-                                               .format(lib_dir, wheel_wrapper))
+          raise self.NativeCodeExtractionError(
+            "Lib dir '{}' not found for target {}!"
+            .format(lib_dir, wheel_wrapper))
+
         wrapper_files_product = NativeExternalLibraryFiles(
           include_dir=include_dir,
           lib_dir=lib_dir,
