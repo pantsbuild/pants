@@ -113,8 +113,9 @@ export PANTS_DEV=1
 
 set -x
 
-mtime="$(date +%Y%m%d%H%M.%S -d @"$(git log --pretty='%ct' -1 src/rust/engine)")"
-find src/rust/engine -type f -not -path '*/target/*' -exec touch -mt "${mtime}" {} \;
+engine_relevant_paths=(build-support/bin/native/bootstrap_cffi.sh src/python/pants/engine/native.py src/rust/engine 3rdparty/protobuf)
+mtime="$(date +%Y%m%d%H%M.%S -d @"$(git log --pretty='%ct' -1 "${engine_relevant_paths[@]}" )")"
+find "${engine_relevant_paths[@]}" -type f -not -path '*/target/*' -exec touch -mt "${mtime}" {} \;
 
 if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
