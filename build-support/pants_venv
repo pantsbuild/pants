@@ -22,9 +22,15 @@ function activate_venv() {
 
 function create_venv() {
   rm -rf "$(venv_dir)"
-  # Also delete `pants_dev_deps.venv` to remove legacy folder now that 
-  # we use `pants_dev_deps.py2.venv` and `pants_dev_deps.py3.venv` folders
-  rm -rf "${REPO_ROOT}/build-support/pants_dev_deps.venv"
+  # If `pants_dev_deps.venv` still exists, delete both its legacy folder and the cached
+  # Python interpreter folder, which contains problematic symlinks.
+  # Note we only perform these removals for the first time, to avoid continually deleting
+  # the cache when switching between using `pants_dev_deps.py2.venv` and `pants_dev_deps.py3.venv`.
+  legacy_venv_dir="${REPO_ROOT}/build-support/pants_dev_deps.venv"
+  if [ -d "${legacy_venv_dir}" ]; then
+    rm -rf "${legacy_venv_dir}"
+    rm -rf "${HOME}/.cache/pants/python_cache/interpreters"
+  fi
   "${REPO_ROOT}/build-support/virtualenv" "$(venv_dir)"
 }
 
