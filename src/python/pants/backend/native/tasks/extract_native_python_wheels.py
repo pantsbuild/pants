@@ -12,6 +12,7 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.platforms import Platform
 
+from pants.backend.native.config.environment import Platform as NativeBackendPlatform
 from pants.backend.native.targets.native_python_wheel import NativePythonWheel
 from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFiles
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -22,6 +23,7 @@ from pants.goal.products import UnionProducts
 from pants.task.task import Task
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation
+from pants.util.memo import memoized_classproperty
 from pants.util.process_handler import subprocess
 
 
@@ -87,21 +89,36 @@ class ExtractNativePythonWheels(Task):
     parts = os.path.splitext(whl)[0].split('-')
     return '{}-{}'.format(parts[0], parts[1]), parts[-1]
 
+  @memoized_classproperty
+  def _current_platform_abbreviation(cls):
+    return NativeBackendPlatform.create().resolve_platform_specific({
+      'darwin': lambda: 'macosx',
+      'linux': lambda: 'linux',
+    })
+
   @classmethod
   def _get_matching_wheel(cls, wheel_dir, module_name):
     wheels = os.listdir(wheel_dir)
 
     names_and_platforms = {w:cls._name_and_platform(w) for w in wheels}
     for whl_filename, (name, platform) in names_and_platforms.items():
-      cur_platform_abbrev = re.sub(r'_.*', '', Platform.current().platform)
-      if platform.startswith(cur_platform_abbrev):
-        if name.startswith('{}-'.format(module_name)):
+      if cls._current_platform_abbreviation in platform:
+        # TODO: this guards against packages which have names that are prefixes of other packages by
+        # checking if there is a version number beginning -- is there a more canonical way to do
+        # this?
+        if re.match(r'^{}\-[0-9]'.format(re.escape(module_name)), name):
           return os.path.join(wheel_dir, whl_filename, module_name)
 
     raise cls._NativeCodeExtractionSetupFailure(
-      "Could not find wheel in dir '{}' matching module name '{}' for current platform '{}'.\n"
-      "wheels: {}"
-      .format(wheel_dir, module_name, Platform.current().platform, wheels))
+      "Could not find wheel in dir '{wheel_dir}' matching module name '{module_name}' "
+      "for current platform '{pex_current_platform}', when looking for platforms containing the "
+      "substring {cur_platform_abbrev}.\n"
+      "wheels: {wheels}"
+      .format(wheel_dir=wheel_dir,
+              module_name=module_name,
+              pex_current_platform=Platform.current().platform,
+              cur_platform_abbrev=cls._current_platform_abbreviation,
+              wheels=wheels))
 
   def _generate_requirements_pex(self, pex_path, interpreter, requirement_target):
     if not os.path.exists(pex_path):
