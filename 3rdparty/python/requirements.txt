@@ -18,7 +18,7 @@ pex==1.5.3
 psutil==4.3.0
 pycodestyle==2.4.0
 pyflakes==2.0.0
-Pygments==1.4
+Pygments==2.3.1
 pyopenssl==17.3.0
 pystache==0.5.3
 pytest-cov>=2.5,<2.6

@@ -179,7 +179,7 @@ class MarkdownToHtmlTest(TaskTestBase):
     with open(self.get_rendered_page(context, good_rst, 'good.html'), 'r') as fp:
       html = fp.read()
 
-      soup = bs4.BeautifulSoup(markup=html)
+      soup = bs4.BeautifulSoup(markup=html, features="html.parser")
       self.assertIsNotNone(soup.find(text='A good link:'))
 
       unordered_list = soup.find(name='ul')
