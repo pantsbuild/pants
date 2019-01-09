@@ -105,14 +105,14 @@ class SelectInterpreterTest(TaskTestBase):
 
   def test_interpreter_selection(self):
     self.assertIsNone(self._select_interpreter([]))
-    self.assertEqual('IronPython-2.77.777', self._select_interpreter_and_get_version([self.reqtgt]))
-    self.assertEqual('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt1]))
-    self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt2]))
+    self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.reqtgt]))
+    self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt1]))
+    self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt2]))
     self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt3]))
-    self.assertEqual('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt4]))
-    self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt20]))
+    self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt4]))
+    self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt20]))
     self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt30]))
-    self.assertEqual('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt40]))
+    self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt40]))
     self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt2, self.tgt3]))
     self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt2, self.tgt4]))
 

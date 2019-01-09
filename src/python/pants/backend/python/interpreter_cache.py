@@ -112,8 +112,8 @@ class PythonInterpreterCache(Subsystem):
         'Unable to detect a suitable interpreter for compatibilities: {} '
         '(Conflicting targets: {})'.format(' && '.join(sorted(unique_compatibilities_strs)),
                                            ', '.join(tgts_by_compatibilities_strs)))
-    # Return the lowest compatible interpreter.
-    return min(allowed_interpreters)
+    # Return the highest compatible interpreter.
+    return max(allowed_interpreters)
 
   def _interpreter_from_path(self, path, filters=()):
     try:
