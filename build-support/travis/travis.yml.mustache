@@ -274,6 +274,11 @@ matrix:
       osx_image: xcode8.3
       stage: *test
       language: generic
+      # TODO: workaround for Homebrew bug triggered by running `brew update`. 
+      # Follow at https://github.com/Homebrew/brew/issues/5513 and remove this workaround once its fixed.
+      env:
+        - HOMEBREW_LOGS=~/homebrew-logs
+        - HOMEBREW_TEMP=~/homebrew-temp
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
       before_script:
