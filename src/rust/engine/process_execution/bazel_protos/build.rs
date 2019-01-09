@@ -67,7 +67,10 @@ fn generate_for_grpcio(thirdpartyprotobuf: &Path, gen_dir: &Path) {
 
 fn mark_dir_as_rerun_trigger(dir: &Path) {
   for file in walkdir::WalkDir::new(dir) {
-    println!("cargo:rerun-if-changed={}", file.unwrap().path().display());
+    let file = file.unwrap();
+    if file.file_type().is_file() {
+      println!("cargo:rerun-if-changed={}", file.path().display());
+    }
   }
 }
 
