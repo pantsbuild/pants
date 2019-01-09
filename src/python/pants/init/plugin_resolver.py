@@ -131,15 +131,14 @@ class PluginResolver(object):
 
   def _create_global_subsystem(self, subsystem_type):
     options_scope = subsystem_type.options_scope
-    return subsystem_type(options_scope, self._options.for_scope(options_scope))
 
-  @memoized_property
-  def _options(self):
     # NB: The PluginResolver runs very early in the pants startup sequence before the standard
     # Subsystem facility is wired up.  As a result PluginResolver is not itself a Subsystem with
     # PythonRepos as a dependency.  Instead it does the minimum possible work to hand-roll
     # bootstrapping of the Subsystems it needs.
-    known_scope_infos = PythonRepos.known_scope_infos()
+    known_scope_infos = [ksi
+                         for optionable in [GlobalOptionsRegistrar, PythonRepos]
+                         for ksi in optionable.known_scope_infos()]
     options = self._options_bootstrapper.get_full_options(known_scope_infos)
 
     # Ignore command line flags since we'd blow up on any we don't understand (most of them).
@@ -147,9 +146,5 @@ class PluginResolver(object):
     # or a --pants-config-files pointing to a custom pants.ini snippet.
     defaulted_only_options = options.drop_flag_values()
 
-    GlobalOptionsRegistrar.register_options_on_scope(defaulted_only_options)
-    distinct_optionable_classes = sorted({si.optionable_cls for si in known_scope_infos},
-                                         key=lambda o: o.options_scope)
-    for optionable_cls in distinct_optionable_classes:
-      optionable_cls.register_options_on_scope(defaulted_only_options)
-    return defaulted_only_options
+    # Finally, construct the Subsystem.
+    return subsystem_type(options_scope, defaulted_only_options.for_scope(options_scope))

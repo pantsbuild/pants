@@ -80,7 +80,7 @@ class Scheduler(object):
     self._visualize_to_dir = visualize_to_dir
     # Validate and register all provided and intrinsic tasks.
     rule_index = RuleIndex.create(list(rules))
-    self._root_subject_types = sorted(rule_index.roots, key=repr)
+    self._root_subject_types = [r.output_constraint for r in rule_index.roots]
 
     # Create the native Scheduler and Session.
     # TODO: This `_tasks` reference could be a local variable, since it is not used
@@ -130,7 +130,7 @@ class Scheduler(object):
       self._assert_ruleset_valid()
 
   def _root_type_ids(self):
-    return self._to_ids_buf(sorted(self._root_subject_types, key=repr))
+    return self._to_ids_buf(self._root_subject_types)
 
   def graph_trace(self, execution_request):
     with temporary_file_path() as path:
@@ -354,9 +354,9 @@ class Scheduler(object):
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
 
-  def new_session(self):
+  def new_session(self, v2_ui=False):
     """Creates a new SchedulerSession for this Scheduler."""
-    return SchedulerSession(self, self._native.new_session(self._scheduler))
+    return SchedulerSession(self, self._native.new_session(self._scheduler, v2_ui, multiprocessing.cpu_count()))
 
 
 _PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
@@ -400,13 +400,13 @@ class SchedulerSession(object):
   def visualize_rule_graph_to_file(self, filename):
     self._scheduler.visualize_rule_graph_to_file(filename)
 
-  def execution_request_literal(self, request_specs, v2_ui):
-    native_execution_request = self._scheduler._native.new_execution_request(v2_ui, multiprocessing.cpu_count())
+  def execution_request_literal(self, request_specs):
+    native_execution_request = self._scheduler._native.new_execution_request()
     for subject, product in request_specs:
       self._scheduler.add_root_selection(native_execution_request, subject, product)
     return ExecutionRequest(request_specs, native_execution_request)
 
-  def execution_request(self, products, subjects, v2_ui=False):
+  def execution_request(self, products, subjects):
     """Create and return an ExecutionRequest for the given products and subjects.
 
     The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
@@ -420,11 +420,10 @@ class SchedulerSession(object):
     :param subjects: A list of Spec and/or PathGlobs objects.
     :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
       :class:`pants.engine.fs.PathGlobs` objects.
-    :param bool v2_ui: whether to render the v2 engine UI
     :returns: An ExecutionRequest for the given products and subjects.
     """
     roots = (tuple((s, p) for s in subjects for p in products))
-    return self.execution_request_literal(roots, v2_ui)
+    return self.execution_request_literal(roots)
 
   def invalidate_files(self, direct_filenames):
     """Invalidates the given filenames in an internal product Graph instance."""
@@ -492,13 +491,13 @@ class SchedulerSession(object):
         unique_exceptions
       )
 
-  def run_console_rule(self, product, subject, v2_ui):
+  def run_console_rule(self, product, subject):
     """
     :param product: product type for the request.
     :param subject: subject for the request.
     :param v2_ui: whether to render the v2 engine UI
     """
-    request = self.execution_request([product], [subject], v2_ui)
+    request = self.execution_request([product], [subject])
     returns, throws = self.execute(request)
 
     if throws:

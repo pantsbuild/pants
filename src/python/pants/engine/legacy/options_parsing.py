@@ -7,22 +7,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.scope import Scope
+from pants.option.scope import Scope, ScopedOptions
 from pants.util.objects import datatype
 
 
 class _Options(datatype([('options', Options)])):
   """A wrapper around bootstrapped options values: not for direct consumption."""
-
-
-class ScopedOptions(datatype([
-  ('scope', Scope),
-  ('options', OptionValueContainer),
-])):
-  """A wrapper around options selected for a particular Scope."""
 
 
 @rule(_Options, [Select(OptionsBootstrapper)])

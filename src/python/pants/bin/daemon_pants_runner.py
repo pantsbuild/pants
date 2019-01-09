@@ -84,9 +84,9 @@ class DaemonPantsRunner(ProcessManager):
       # to the nailgun session. We'll later do this a second time post-fork, because
       # threads.
       with cls.nailgunned_stdio(sock, env, handle_stdin=False):
-        options, build_config, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
+        options, _, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
         subprocess_dir = options.for_global_scope().pants_subprocessdir
-        graph_helper, target_roots = scheduler_service.prefork(options, build_config)
+        graph_helper, target_roots = scheduler_service.prefork(options, options_bootstrapper)
         deferred_exc = None
     except Exception:
       deferred_exc = sys.exc_info()

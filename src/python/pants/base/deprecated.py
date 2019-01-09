@@ -83,11 +83,11 @@ def validate_removal_semver(removal_version):
                                  '{}'.format(removal_version, e))
 
 
-def get_frame_info(stacklevel, context=1):
+def _get_frame_info(stacklevel, context=1):
   """Get a Traceback for the given `stacklevel`.
 
   For example:
-  `stacklevel=0` means this function's frame (get_frame_info()).
+  `stacklevel=0` means this function's frame (_get_frame_info()).
   `stacklevel=1` means the calling function's frame.
   See https://docs.python.org/2/library/inspect.html#inspect.getouterframes for more info.
 
@@ -130,7 +130,7 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
   # we have to reconstruct the `stacklevel` logic ourselves, but we do also gain the ability to have
   # multiple lines of context, which is neat.
   if frame_info is None:
-    frame_info = get_frame_info(stacklevel)
+    frame_info = _get_frame_info(stacklevel)
   _, filename, line_number, _, code_context, _ = frame_info
   if code_context:
     context_lines = ''.join(code_context)

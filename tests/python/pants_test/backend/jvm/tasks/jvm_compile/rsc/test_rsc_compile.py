@@ -99,16 +99,21 @@ class RscCompileTest(TaskTestBase):
 
       self.assertEqual(dedent("""
                      metacp(jdk) -> {
+                       metacp(java/classpath:java_lib),
                        rsc(java/classpath:scala_lib),
                        compile_against_rsc(java/classpath:scala_lib),
                        metacp(java/classpath:jar_lib)
                      }
-                     compile_against_rsc(java/classpath:java_lib) -> {}
+                     metacp(java/classpath:java_lib) -> {}
+                     compile_against_rsc(java/classpath:java_lib) -> {
+                       metacp(java/classpath:java_lib)
+                     }
                      rsc(java/classpath:scala_lib) -> {
                        compile_against_rsc(java/classpath:scala_lib)
                      }
                      compile_against_rsc(java/classpath:scala_lib) -> {}
                      metacp(java/classpath:jar_lib) -> {
+                       metacp(java/classpath:java_lib),
                        rsc(java/classpath:scala_lib)
                      }""").strip(),
         dependee_graph)
@@ -172,11 +177,22 @@ class RscCompileTest(TaskTestBase):
 
       self.assertEqual(dedent("""
                      metacp(jdk) -> {
+                       metacp(java/classpath:java_lib),
+                       metacp(java/classpath:scala_and_java_lib),
                        metacp(java/classpath:jar_lib)
                      }
-                     compile_against_rsc(java/classpath:java_lib) -> {}
-                     compile_against_rsc(java/classpath:scala_and_java_lib) -> {}
-                     metacp(java/classpath:jar_lib) -> {}""").strip(),
+                     metacp(java/classpath:java_lib) -> {}
+                     compile_against_rsc(java/classpath:java_lib) -> {
+                       metacp(java/classpath:java_lib)
+                     }
+                     metacp(java/classpath:scala_and_java_lib) -> {}
+                     compile_against_rsc(java/classpath:scala_and_java_lib) -> {
+                       metacp(java/classpath:scala_and_java_lib)
+                     }
+                     metacp(java/classpath:jar_lib) -> {
+                       metacp(java/classpath:java_lib),
+                       metacp(java/classpath:scala_and_java_lib)
+                     }""").strip(),
         dependee_graph)
 
   def test_desandbox_fn(self):

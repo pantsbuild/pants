@@ -37,11 +37,14 @@ function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
   # NB: We fork a subshell because one or both of `ls-files`/`hash-object` are
   # sensitive to the CWD, and the `--work-tree` option doesn't seem to resolve that.
+  #
+  # Assumes we're in the venv that will be used to build the native engine.
   (
    cd ${REPO_ROOT}
    (echo "${MODE_FLAG}"
     echo "${RUST_TOOLCHAIN}"
     uname
+    python --version 2>&1
     git ls-files -c -o --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/rust-toolchain" \

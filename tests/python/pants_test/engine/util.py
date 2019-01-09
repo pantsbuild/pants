@@ -44,7 +44,7 @@ def run_rule(rule, *args):
   :returns: The return value of the completed @rule.
   """
 
-  task_rule = getattr(rule, '_rule', None)
+  task_rule = getattr(rule, 'rule', None)
   if task_rule is None:
     raise TypeError('Expected to receive a decorated `@rule`; got: {}'.format(rule))
 

@@ -1,33 +1,40 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+#![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  deny(
-    clippy,
-    default_trait_access,
-    expl_impl_clone_on_copy,
-    if_not_else,
-    needless_continue,
-    single_match_else,
-    unseparated_literal_suffix,
-    used_underscore_binding
-  )
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
-#![cfg_attr(feature = "cargo-clippy", allow(match_ref_pats))]
+#![allow(clippy::match_ref_pats)]
+// Subjective style.
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
+)]
 // Default isn't as big a deal as people seem to think it is.
-#![cfg_attr(
-  feature = "cargo-clippy",
-  allow(new_without_default, new_without_default_derive)
+#![allow(
+  clippy::new_without_default,
+  clippy::new_without_default_derive,
+  clippy::new_ret_no_self
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
-#![cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+#![allow(clippy::mutex_atomic)]
 
-extern crate clap;
-extern crate env_logger;
-extern crate fs;
-extern crate futures;
-extern crate hashing;
-extern crate process_execution;
+use clap;
+use env_logger;
+use fs;
+
+use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use futures::future::Future;
@@ -171,7 +178,8 @@ fn main() {
           parts.next().unwrap().to_string(),
           parts.next().unwrap_or_default().to_string(),
         )
-      }).collect(),
+      })
+      .collect(),
     None => BTreeMap::new(),
   };
   let work_dir = args
@@ -215,12 +223,14 @@ fn main() {
         Duration::from_secs(30),
         // TODO: Take a command line arg.
         fs::BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
+        3,
         timer_thread.with(|t| t.handle()),
       )
     }
     (None, None) => fs::Store::local_only(local_store_path, pool.clone()),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
-  }.expect("Error making store");
+  }
+  .expect("Error making store");
 
   let input_files = {
     let fingerprint = Fingerprint::from_hex_string(args.value_of("input-digest").unwrap())
@@ -244,7 +254,7 @@ fn main() {
     jdk_home: args.value_of("jdk").map(PathBuf::from),
   };
 
-  let runner: Box<process_execution::CommandRunner> = match server_arg {
+  let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
     Some(address) => {
       let root_ca_certs = if let Some(path) = args.value_of("execution-root-ca-cert-file") {
         Some(std::fs::read(path).expect("Error reading root CA certs file"))

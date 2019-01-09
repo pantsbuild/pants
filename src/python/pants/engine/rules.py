@@ -7,16 +7,19 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import ast
 import functools
 import inspect
+import itertools
 import logging
 from abc import abstractproperty
 from builtins import bytes, str
-from collections import OrderedDict
+from collections import Iterable, OrderedDict
 from types import GeneratorType
 
 from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
 from pants.engine.selectors import Get, type_or_constraint_repr
+from pants.util.collections import assert_single_element
+from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 from pants.util.objects import Exactly, datatype
 
@@ -25,14 +28,105 @@ logger = logging.getLogger(__name__)
 
 
 class _RuleVisitor(ast.NodeVisitor):
-  def __init__(self):
+  """Pull `Get` calls out of an @rule body and validate `yield` statements."""
+
+  def __init__(self, func, frame, parents_table):
     super(_RuleVisitor, self).__init__()
     self.gets = []
+    self._func = func
+    self._frame = frame
+    self._parents_table = parents_table
+    self._yields_in_assignments = set()
+
+  class YieldVisitError(Exception):
+    def __init__(self, node, func, frame, msg, *args, **kwargs):
+      filename, line_number, _, context_lines, _ = inspect.getframeinfo(frame, context=4)
+      err_msg = ("""\
+In function {func_name}: {msg}
+{filename}:{line_number}:
+{context_lines}
+
+The invalid `yield` statement (in the body of the above function) was: {node}
+""".format(func_name=func.__name__, msg=msg,
+           filename=filename, line_number=line_number,
+           context_lines=''.join(context_lines).strip(),
+           node=ast.dump(node)))
+      super(_RuleVisitor.YieldVisitError, self).__init__(err_msg, *args, **kwargs)
+
+  def _maybe_end_of_stmt_list(self, attr_value):
+    """If `attr_value` is a non-empty iterable, return its final element."""
+    if (attr_value is not None) and isinstance(attr_value, Iterable):
+      result = list(attr_value)
+      if len(result) > 0:
+        return result[-1]
+    return None
+
+  def _stmt_is_at_end_of_parent_list(self, stmt):
+    """Determine if `stmt` is at the end of a list of statements (i.e. can be an implicit `return`).
+
+    If there are any statements following `stmt` at the same level of nesting, this method returns
+    False, such as the following (if `stmt` is a yield Expr):
+
+    if 2 + 2 == 5:
+      yield 'good'
+      a = 3
+
+    However, if `stmt` is at the end of a list of statements, it can be made more clear that `stmt`
+    is intended to represent a `return`. Another way to view this method is as a dead code
+    elimination check, for a `stmt` which is intended to represent control flow moving out of the
+    current @rule. For example, this method would return True for both of the yield Expr statements
+    in the below snippet.
+
+    if True:
+      yield 3
+    else:
+      a = 3
+      yield a
+
+    This checking is performed by getting the parent of `stmt` with a pre-generated table passed
+    into the constructor.
+
+    See https://docs.python.org/2/library/ast.html#abstract-grammar for the grammar specification.
+    'body', 'orelse', and 'finalbody' are the only attributes on any AST nodes which can contain
+    lists of stmts.  'body' is also an attribute in the Exec statement for some reason, but as a
+    single expr, so we check if it is iterable.
+    """
+    parent_stmt = self._parents_table[stmt]
+    last_body_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'body', None))
+    if stmt == last_body_stmt:
+      return True
+    last_orelse_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'orelse', None))
+    if stmt == last_orelse_stmt:
+      return True
+    last_finally_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'finalbody', None))
+    if stmt == last_finally_stmt:
+      return True
+    return False
 
   def visit_Call(self, node):
-    if not isinstance(node.func, ast.Name) or node.func.id != Get.__name__:
-      return
-    self.gets.append(Get.extract_constraints(node))
+    if isinstance(node.func, ast.Name) and node.func.id == Get.__name__:
+      self.gets.append(Get.extract_constraints(node))
+
+  def visit_Assign(self, node):
+    if isinstance(node.value, ast.Yield):
+      self._yields_in_assignments.add(node.value)
+    self.generic_visit(node)
+
+  def visit_Yield(self, node):
+    if node in self._yields_in_assignments:
+      self.generic_visit(node)
+    else:
+      # The current yield "expr" is the child of an "Expr" "stmt".
+      expr_for_yield = self._parents_table[node]
+
+      if not self._stmt_is_at_end_of_parent_list(expr_for_yield):
+        raise self.YieldVisitError(
+          node, self._func, self._frame,
+          """\
+A yield in an @rule without an assignment is equivalent to a return, and we
+currently require that it comes at the end of a series of statements.
+Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the result.
+""")
 
 
 class _GoalProduct(object):
@@ -71,6 +165,19 @@ def _terminated(generator, terminator):
     yield terminator
 
 
+@memoized
+def optionable_rule(optionable_factory):
+  """Returns a TaskRule that constructs an instance of the Optionable for the given OptionableFactory.
+
+  TODO: This API is slightly awkward for two reasons:
+    1) We should consider whether Subsystems/Optionables should be constructed explicitly using
+      `@rule`s, which would allow them to have non-option dependencies that would be explicit in
+      their constructors (which would avoid the need for the `Subsystem.Factory` pattern).
+    2) Optionable depending on TaskRule would create a cycle in the Python package graph.
+  """
+  return TaskRule(**optionable_factory.signature())
+
+
 def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -86,7 +193,11 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       raise ValueError('The @rule decorator must be applied innermost of all decorators.')
 
     caller_frame = inspect.stack()[1][0]
-    module_ast = ast.parse(inspect.getsource(func))
+    source = inspect.getsource(func)
+    if source.startswith(" "):
+      to_trim = sum(1 for _ in itertools.takewhile(lambda c: c in {' ', b' '}, source))
+      source = "\n".join(line[to_trim:] for line in source.split("\n"))
+    module_ast = ast.parse(source)
 
     def resolve_type(name):
       resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
@@ -97,11 +208,19 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       return resolved
 
     gets = OrderedSet()
-    for node in ast.iter_child_nodes(module_ast):
-      if isinstance(node, ast.FunctionDef) and node.name == func.__name__:
-        rule_visitor = _RuleVisitor()
-        rule_visitor.visit(node)
-        gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
+    rule_func_node = assert_single_element(
+      node for node in ast.iter_child_nodes(module_ast)
+      if isinstance(node, ast.FunctionDef) and node.name == func.__name__
+    )
+
+    parents_table = {}
+    for parent in ast.walk(rule_func_node):
+      for child in ast.iter_child_nodes(parent):
+        parents_table[child] = parent
+
+    rule_visitor = _RuleVisitor(func, caller_frame, parents_table)
+    rule_visitor.visit(rule_func_node)
+    gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
 
     # For @console_rule, redefine the function to avoid needing a literal return of the output type.
     if for_goal:
@@ -118,9 +237,14 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
     else:
       wrapped_func = func
 
-    wrapped_func._rule = TaskRule(output_type, input_selectors, wrapped_func, input_gets=list(gets), cacheable=cacheable)
-    wrapped_func.output_type = output_type
-    wrapped_func.goal = for_goal
+    wrapped_func.rule = TaskRule(
+        output_type,
+        tuple(input_selectors),
+        wrapped_func,
+        input_gets=tuple(gets),
+        goal=for_goal,
+        cacheable=cacheable
+      )
 
     return wrapped_func
   return wrapper
@@ -146,14 +270,35 @@ class Rule(AbstractClass):
   def output_constraint(self):
     """An output Constraint type for the rule."""
 
+  @abstractproperty
+  def dependency_optionables(self):
+    """A tuple of Optionable classes that are known to be necessary to run this rule."""
 
-class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', 'func', 'cacheable']), Rule):
+
+class TaskRule(datatype([
+  'output_constraint',
+  ('input_selectors', tuple),
+  ('input_gets', tuple),
+  'func',
+  'goal',
+  ('dependency_optionables', tuple),
+  ('cacheable', bool),
+]), Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied.
 
-  TODO: Make input_gets non-optional when more/all rules are using them.
+  NB: This API is experimental, and not meant for direct consumption. To create a `TaskRule` you
+  should always prefer the `@rule` constructor, and in cases where that is too constraining
+  (likely due to #4535) please bump or open a ticket to explain the usecase.
   """
 
-  def __new__(cls, output_type, input_selectors, func, input_gets=None, cacheable=True):
+  def __new__(cls,
+              output_type,
+              input_selectors,
+              func,
+              input_gets,
+              goal=None,
+              dependency_optionables=None,
+              cacheable=True):
     # Validate result type.
     if isinstance(output_type, Exactly):
       constraint = output_type
@@ -163,19 +308,16 @@ class TaskRule(datatype(['output_constraint', 'input_selectors', 'input_gets', '
       raise TypeError("Expected an output_type for rule `{}`, got: {}".format(
         func.__name__, output_type))
 
-    # Validate selectors.
-    if not isinstance(input_selectors, list):
-      raise TypeError("Expected a list of Selectors for rule `{}`, got: {}".format(
-        func.__name__, type(input_selectors)))
-
-    # Validate gets.
-    input_gets = [] if input_gets is None else input_gets
-    if not isinstance(input_gets, list):
-      raise TypeError("Expected a list of Gets for rule `{}`, got: {}".format(
-        func.__name__, type(input_gets)))
-
-    # Create.
-    return super(TaskRule, cls).__new__(cls, constraint, tuple(input_selectors), tuple(input_gets), func, cacheable)
+    return super(TaskRule, cls).__new__(
+        cls,
+        constraint,
+        input_selectors,
+        input_gets,
+        func,
+        goal,
+        dependency_optionables or tuple(),
+        cacheable,
+      )
 
   def __str__(self):
     return '({}, {!r}, {})'.format(type_or_constraint_repr(self.output_constraint),
@@ -202,6 +344,10 @@ class SingletonRule(datatype(['output_constraint', 'value']), Rule):
     # Create.
     return super(SingletonRule, cls).__new__(cls, constraint, value)
 
+  @property
+  def dependency_optionables(self):
+    return tuple()
+
   def __repr__(self):
     return '{}({}, {})'.format(type(self).__name__, type_or_constraint_repr(self.output_constraint), self.value)
 
@@ -214,16 +360,19 @@ class RootRule(datatype(['output_constraint']), Rule):
   of an execution.
   """
 
+  @property
+  def dependency_optionables(self):
+    return tuple()
+
 
 class RuleIndex(datatype(['rules', 'roots'])):
-  """Holds an index of Tasks and Singletons used to instantiate Nodes."""
+  """Holds a normalized index of Rules used to instantiate Nodes."""
 
   @classmethod
   def create(cls, rule_entries):
     """Creates a RuleIndex with tasks indexed by their output type."""
-    # NB make tasks ordered so that gen ordering is deterministic.
     serializable_rules = OrderedDict()
-    serializable_roots = set()
+    serializable_roots = OrderedSet()
 
     def add_task(product_type, rule):
       if product_type not in serializable_rules:
@@ -232,7 +381,7 @@ class RuleIndex(datatype(['rules', 'roots'])):
 
     def add_rule(rule):
       if isinstance(rule, RootRule):
-        serializable_roots.add(rule.output_constraint)
+        serializable_roots.add(rule)
         return
       # TODO: Ensure that interior types work by indexing on the list of types in
       # the constraint. This heterogenity has some confusing implications:
@@ -245,7 +394,7 @@ class RuleIndex(datatype(['rules', 'roots'])):
       if isinstance(entry, Rule):
         add_rule(entry)
       elif hasattr(entry, '__call__'):
-        rule = getattr(entry, '_rule', None)
+        rule = getattr(entry, 'rule', None)
         if rule is None:
           raise TypeError("Expected callable {} to be decorated with @rule.".format(entry))
         add_rule(rule)
@@ -255,3 +404,10 @@ class RuleIndex(datatype(['rules', 'roots'])):
                         "decorated with @rule.".format(type(entry)))
 
     return cls(serializable_rules, serializable_roots)
+
+  def normalized_rules(self):
+    rules = OrderedSet(rule
+                       for ruleset in self.rules.values()
+                       for rule in ruleset)
+    rules.update(self.roots)
+    return rules

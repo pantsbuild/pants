@@ -35,6 +35,7 @@ class ExecutionOptions(datatype([
   'remote_execution_server',
   'remote_store_chunk_bytes',
   'remote_store_chunk_upload_timeout_seconds',
+  'remote_store_rpc_retries',
   'process_execution_parallelism',
   'process_execution_cleanup_local_dirs',
   'remote_execution_process_cache_namespace',
@@ -56,6 +57,7 @@ class ExecutionOptions(datatype([
       remote_store_thread_count=bootstrap_options.remote_store_thread_count,
       remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
       remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
+      remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
       process_execution_parallelism=bootstrap_options.process_execution_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
       remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
@@ -71,6 +73,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_server=None,
     remote_store_chunk_bytes=1024*1024,
     remote_store_chunk_upload_timeout_seconds=60,
+    remote_store_rpc_retries=2,
     process_execution_parallelism=multiprocessing.cpu_count()*2,
     process_execution_cleanup_local_dirs=True,
     remote_execution_process_cache_namespace=None,
@@ -131,6 +134,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                       'pants.backend.python',
                       'pants.backend.jvm',
                       'pants.backend.native',
+                      # TODO: Move into the graph_info backend.
+                      'pants.rules.core',
                       'pants.backend.codegen.antlr.java',
                       'pants.backend.codegen.antlr.python',
                       'pants.backend.codegen.jaxb',
@@ -298,6 +303,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--remote-store-chunk-upload-timeout-seconds', type=int, advanced=True,
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
              help='Timeout (in seconds) for uploads of individual chunks to the remote file store.')
+    register('--remote-store-rpc-retries', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_retries,
+             help='Number of times to retry any RPC to the remote store before giving up.')
     register('--remote-execution-process-cache-namespace', advanced=True,
              help="The cache namespace for remote process execution. "
                   "Bump this to invalidate every artifact's remote execution. "

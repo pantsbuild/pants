@@ -1,5 +1,6 @@
 [package]
 version = "0.0.1"
+edition = "2018"
 name = "bazel_protos"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
@@ -9,9 +10,18 @@ bytes = "0.4.5"
 futures = "^0.1.16"
 grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec"] }
 hashing = { path = "../../hashing" }
+prost = "0.4"
+prost-derive = "0.4"
+prost-types = "0.4"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
+# Waiting for https://github.com/tower-rs/tower-grpc/pull/108 and a first actual release.
+tower-grpc = { git = "https://github.com/pantsbuild/tower-grpc.git", rev = "ef19f2e1715f415ecb699e8f17f5845ad2b45daf", features = ["prost"] }
 
 [build-dependencies]
 build_utils = { path = "../../build_utils" }
 grpcio-compiler = "0.3"
 protoc-grpcio = "0.2"
+tempfile = "3"
+# Waiting for https://github.com/tower-rs/tower-grpc/pull/108 and a first actual release.
+tower-grpc-build = { git = "https://github.com/pantsbuild/tower-grpc.git", rev = "ef19f2e1715f415ecb699e8f17f5845ad2b45daf" }
+walkdir = "2"

@@ -15,6 +15,7 @@ from pants.backend.native.targets.external_native_library import ExternalNativeL
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import CLibrary, CppLibrary
 from pants.backend.native.tasks.c_compile import CCompile
+from pants.backend.native.tasks.conan_prep import ConanPrep
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
 from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
@@ -42,6 +43,7 @@ def global_subsystems():
 def register_goals():
   # TODO(#5962): register these under the 'compile' goal when we eliminate the product transitive
   # dependency from export -> compile.
+  task(name='conan-prep', action=ConanPrep).install('native-compile')
   task(name='native-third-party-fetch', action=NativeExternalLibraryFetch).install('native-compile')
   task(name='c-for-ctypes', action=CCompile).install('native-compile')
   task(name='cpp-for-ctypes', action=CppCompile).install('native-compile')

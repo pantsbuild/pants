@@ -97,12 +97,12 @@ class BuildDictionaryInfoExtracter(object):
     (e.g., :param str a:), where there is a single word between the colons (e.g., :returns:),
     and where a newline immediately follows the second colon in the stanza.
     """
-    return re.compile(':(\w+)\s*(\w+\s+)?(\w*):\s*(.*)')
+    return re.compile(r':(\w+)\s*(\w+\s+)?(\w*):\s*(.*)')
 
   @classmethod
   @memoized_method
   def _get_default_value_re(cls):
-    return re.compile(' \([Dd]efault: (.*)\)')
+    return re.compile(r' \([Dd]efault: (.*)\)')
 
   @classmethod
   def get_arg_descriptions_from_docstring(cls, obj):

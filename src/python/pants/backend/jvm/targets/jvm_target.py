@@ -52,7 +52,7 @@ class JvmTarget(Target, Jarable):
     """
     :API: public
 
-    :param excludes: List of `exclude <#exclude>`_\s to filter this target's
+    :param excludes: List of `exclude <#exclude>`_\\s to filter this target's
       transitive dependencies against.
     :param sources: Source code files to build. Paths are relative to the BUILD
       file's directory.

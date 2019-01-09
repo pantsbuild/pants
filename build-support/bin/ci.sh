@@ -110,6 +110,8 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
+set -x
+
 if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
   FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
@@ -130,6 +132,12 @@ if [[ "${run_bootstrap:-true}" == "true" ]]; then
   ) || die "Failed to bootstrap pants."
   end_travis_section
 fi
+
+# We want all invocations of ./pants (apart from the bootstrapping one above) to delegate
+# to ./pants.pex, and not themselves attempt to bootstrap.
+# In this file we invoke ./pants.pex directly anyway, but some of those invocations will run
+# integration tests that shell out to `./pants`, so we set this env var for those cases.
+export RUN_PANTS_FROM_PEX=1
 
 if [[ "${run_sanity_checks:-false}" == "true" ]]; then
   start_travis_section "SanityCheck" "Sanity checking bootstrapped pants and repo BUILD files"
@@ -217,7 +225,8 @@ if [[ "${run_rust_tests:-false}" == "true" ]]; then
       test_threads_flag="--test-threads=1"
     fi
 
-    RUST_BACKTRACE=all "${REPO_ROOT}/build-support/bin/native/cargo" test --all \
+    # We pass --tests to skip doc tests, because our generated protos contain invalid doc tests in their comments.
+    RUST_BACKTRACE=all "${REPO_ROOT}/build-support/bin/native/cargo" test --all --tests \
       --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml" -- "${test_threads_flag}" --nocapture
   ) || die "Pants rust test failure"
   end_travis_section

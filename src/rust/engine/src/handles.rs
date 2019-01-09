@@ -3,7 +3,7 @@
 
 use std::os::raw;
 
-use externs;
+use crate::externs;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 
