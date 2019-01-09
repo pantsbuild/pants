@@ -13,57 +13,8 @@ env:
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
     - LC_ALL="en_US.UTF-8"
     - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
-    - BOOTSTRAPPED_PEX_KEY=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
-    - BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
-
-
-before_cache:
-  # Ensure permissions to do the below removals, which happen with or without caching enabled.
-  - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-  # Kill all python bytecode in our cached venvs.  Some files appear to
-  # get bytecode compiled in non-yet-understood circumstances leading to
-  # a full cache re-pack due to new bytecode files.
-  - find build-support -name "*.py[co]" -delete
-  # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
-  # effect on resolution time is in the noise, but they are
-  # re-timestamped in internal comments and fields on each run and this
-  # leads to travis-ci cache thrash.  Kill these files before the cache
-  # check to avoid un-needed cache re-packing and re-upload (a ~100s
-  # operation).
-  - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-  - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-  # We have several tests that do local file:// url resolves for
-  # com.example artifacts, these disrupt the cache but are fast since
-  # they're resolved from local files when omitted from the cache.
-  - rm -rf ${HOME}/.ivy2/pants/com.example
-  # The stats cache contains timestamped reports unused by CI but that
-  # thrash the cache.  Skip caching these.
-  - rm -rf ${HOME}/.cache/pants/stats
-  # While the bin directory and rust toolchains are relatively large, they're also very quick to
-  # restore/install: prune them to keep the total cache size down.
-  #   see https://docs.travis-ci.com/user/caching/#Things-not-to-cache
-  # NB: We do _not_ prune the cargo cache, since that holds compiled tools, package indexes and
-  # individually resolved crates.
-  - rm -rf ${HOME}/.cache/pants/bin
-  - rm -rf ${HOME}/.cache/pants/rust/rustup
-  - rm -rf ${HOME}/.cache/pants/lmdb_store
-  # Render a summary of what is left in the home directory, to assist with further pruning of
-  # the cache.
-  - du -m -d2 ${HOME} | sort -r -n
-
-cache:
-  # The default timeout is 180 seconds, and our larger cache uploads exceed this.
-  # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
-  timeout: 500
-  directories:
-    - ${HOME}/.cache/pants
-    - ${HOME}/.ivy2/pants
-    # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
-    # using its own isolated cache:
-    #   https://github.com/pantsbuild/pants/issues/2485
-    - ${HOME}/.npm
-    - build-support/pants_dev_deps.venv
-    - src/rust/engine/target
+    - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
+    - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
@@ -77,7 +28,57 @@ stages:
   - name: &build_unstable Deploy Pants Pex Unstable
     if: tag IS NOT present AND type NOT IN (pull_request, cron)
 
-default_test_config: &default_test_config
+# Travis cache config for jobs that build the native engine.
+native_engine_cache_config: &native_engine_cache_config
+  before_cache:
+    # Ensure permissions to do the below removals, which happen with or without caching enabled.
+    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    # Kill all python bytecode in our cached venvs.  Some files appear to
+    # get bytecode compiled in non-yet-understood circumstances leading to
+    # a full cache re-pack due to new bytecode files.
+    - find build-support -name "*.py[co]" -delete
+  cache:
+    # The default timeout is 180 seconds, and our larger cache uploads exceed this.
+    # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
+    timeout: 500
+    directories:
+      - ${HOME}/.cache/pants/rust/cargo
+      - build-support/pants_dev_deps.venv
+      - src/rust/engine/target
+
+# Travis cache config for jobs that run a bootstrapped pants.pex.
+pants_run_cache_config: &pants_run_cache_config
+  before_cache:
+    # Ensure permissions to do the below removals, which happen with or without caching enabled.
+    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
+    # effect on resolution time is in the noise, but they are
+    # re-timestamped in internal comments and fields on each run and this
+    # leads to travis-ci cache thrash.  Kill these files before the cache
+    # check to avoid un-needed cache re-packing and re-upload (a ~100s
+    # operation).
+    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
+    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
+    # We have several tests that do local file:// url resolves for
+    # com.example artifacts, these disrupt the cache but are fast since
+    # they're resolved from local files when omitted from the cache.
+    - rm -rf ${HOME}/.ivy2/pants/com.example
+    # Render a summary to assist with further tuning the cache.
+    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+  cache:
+    # The default timeout is 180 seconds, and our larger cache uploads exceed this.
+    # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
+    timeout: 500
+    directories:
+      - ${HOME}/.cache/pants/tools
+      - ${HOME}/.cache/pants/zinc
+      - ${HOME}/.ivy2/pants
+      # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
+      # using its own isolated cache:
+      #   https://github.com/pantsbuild/pants/issues/2485
+      - ${HOME}/.npm
+
+default_linux_config: &default_linux_config
   os: linux
   dist: xenial
   sudo: required
@@ -91,34 +92,45 @@ default_test_config: &default_test_config
         - python-dev
         - openssl
         - libssl-dev
-  stage: *test
+        - jq
+        - unzip
   language: python
   python: &python_version "2.7"
+  before_install:
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+  after_failure:
+    - ./build-support/bin/ci-failure.sh
+
+default_linux_test_config: &default_linux_test_config
+  <<: *default_linux_config
+  <<: *pants_run_cache_config
+  stage: *test
   before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     # Increase the max number of user watches to ensure that watchman is able to watch all
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - sudo pip install awscli
-    # Multipart operations aren't supported for anonymous users, so we set the
-    # threshold high to avoid them being used automatically by the aws cli.
-    - aws configure set default.s3.multipart_threshold 1024MB
-    - sudo apt-get install -y jq unzip
+    - ./build-support/bin/install_aws_cli_for_ci.sh
   before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.linux
 
-
-osx_test_config: &osx_test_config
+default_osx_config: &default_osx_config
   os: osx
-  stage: *test
   language: generic
-  script:
-    - MODE=debug ./build-support/bin/travis-ci.sh -m
+  before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
 
-default_cron_test_config: &default_cron_test_config
-  <<: *default_test_config
-  stage: *cron
+default_osx_test_config: &default_osx_test_config
+  <<: *default_osx_config
+  <<: *pants_run_cache_config
+  stage: *test
+  before_script:
+    - ulimit -c unlimited
+    - ulimit -n 8192
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.osx
 
 linux_with_fuse: &linux_with_fuse
   before_install:
@@ -127,11 +139,7 @@ linux_with_fuse: &linux_with_fuse
     # Increase the max number of user watches to ensure that watchman is able to watch all
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
-    - sudo pip install awscli
-    # Multipart operations aren't supported for anonymous users, so we set the
-    # threshold high to avoid them being used automatically by the aws cli.
-    - aws configure set default.s3.multipart_threshold 1024MB
-    - sudo apt-get install -y jq unzip
+    - ./build-support/bin/install_aws_cli_for_ci.sh
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -139,46 +147,15 @@ linux_with_fuse: &linux_with_fuse
 
 matrix:
   include:
-    - <<: *default_test_config
-      name: "Bootstrap Pants"
+    - <<: *default_linux_config
+      <<: *native_engine_cache_config
+      name: "Build Linux native engine and pants.pex"
       stage: *bootstrap
-      before_script:
-      script:
-        - ./build-support/bin/travis-ci.sh  # With no args this script just bootstraps.
-        - aws --no-sign-request --region us-east-1 s3 cp ./pants.pex ${BOOTSTRAPPED_PEX_URL}
-
-    # Build macOS engine
-    - name: "OSX Native Engine Binary Builder"
-      os: osx
-      # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
-      # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
-      # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
-      osx_image: xcode8
-      stage: *test
-      language: generic
-      env:
-        - PREPARE_DEPLOY=1
-      script:
-        - ./pants --version && ./build-support/bin/release.sh -n
-
-    # TODO: Update this to use 10.14 once it is available
-    - name: "OSX 10.12 Sanity Check"
-      <<: *osx_test_config
-      osx_image: xcode9.2
-
-    - name: "OSX 10.13 Sanity Check"
-      <<: *osx_test_config
-      osx_image: xcode10.1
-
-    # Build Linux engine
-    - name: "Linux Native Engine Binary Builder"
-      os: linux
-      stage: *test
-      language: generic
       services:
         - docker
       env:
-        - PREPARE_DEPLOY=1
+        - CACHE_NAME=linuxpexbuild
+        - PREPARE_DEPLOY=1  # To deploy fs_util.
       before_script:
         - ulimit -c unlimited
       script:
@@ -187,22 +164,83 @@ matrix:
           --build-arg "TRAVIS_UID=$(id -u)"
           --build-arg "TRAVIS_GROUP=$(id -gn)"
           --build-arg "TRAVIS_GID=$(id -g)"
-            build-support/docker/travis_ci/
-        # Mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain
+          build-support/docker/travis_ci/
+        # Note that:
+        # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
+        # * With no args ci.sh just bootstraps a pants.pex.
+        # * We also build fs_util, to take advantage of the rust code built during bootstrapping.
         - docker run --rm -t
           -v "${HOME}:/travis/home"
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
-          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
+          sh -c "git clean -xfd && ./build-support/bin/ci.sh && ./build-support/bin/release.sh -f"
+        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.linux
+
+    # Build macOS engine
+    - <<: *default_osx_config
+      <<: *native_engine_cache_config
+      name: "Build OSX native engine and pants.pex"
+      stage: *bootstrap
+      # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
+      # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
+      # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
+      osx_image: xcode8
+      env:
+        - CACHE_NAME=macospexbuild
+        - PREPARE_DEPLOY=1  # To deploy fs_util.
+      script:
+        # With no args ci.sh just bootstraps a pants.pex. We also build fs_util, to take advantage
+        # of the rust code built during bootstrapping.
+        - git clean -xfd && ./build-support/bin/ci.sh && ./build-support/bin/release.sh -f
+        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.osx
       after_failure:
-        - build-support/bin/ci-failure.sh
+        - ./build-support/bin/ci-failure.sh
+
+    - <<: *default_linux_test_config
+      name: "Build Linux wheels"
+      stage: *test
+      env:
+        - CACHE_NAME=linuxwheelsbuild
+        - RUN_PANTS_FROM_PEX=1
+        - PREPARE_DEPLOY=1
+      script:
+        - ./build-support/bin/release.sh -n
+
+    - <<: *default_osx_test_config
+      name: "Build OSX wheels"
+      osx_image: xcode8
+      env:
+        - CACHE_NAME=osxwheelsbuild
+        - RUN_PANTS_FROM_PEX=1
+        - PREPARE_DEPLOY=1
+      script:
+        - ./build-support/bin/release.sh -n
+
+    # TODO: Update this to use 10.14 once it is available
+    - <<: *default_osx_test_config
+      name: "OSX 10.12 sanity check"
+      osx_image: xcode9.2
+      env:
+        - CACHE_NAME=macos10.12sanity
+      script:
+        - MODE=debug ./build-support/bin/travis-ci.sh -bm
+
+    - <<: *default_osx_test_config
+      name: "OSX 10.13 sanity check"
+      osx_image: xcode10.1
+      env:
+        - CACHE_NAME=macos10.13sanity
+      script:
+        - MODE=debug ./build-support/bin/travis-ci.sh -bm
 
     # Deploy Pex Stable
-    - name: "Deploy Pants PEX"
+    - name: "Deploy stable multiplatform pants.pex"
       os: linux
       language: python
       stage: *build_stable
       env:
+        - CACHE_NAME=linuxpexdeploystable
+        - RUN_PANTS_FROM_PEX=1
         - PANTS_PEX_RELEASE=stable
       script:
         - ./build-support/bin/release.sh -p
@@ -221,325 +259,359 @@ matrix:
           repo: pantsbuild/pants
 
     # Deploy Pex Unstable to s3
-    - name: "Deploy Pants PEX Unstable"
+    - name: "Deploy unstable multiplatform pants.pex"
       os: linux
       language: python
       stage: *build_unstable
       env:
+        - CACHE_NAME=linuxpexdeployunstable
+        - RUN_PANTS_FROM_PEX=1
         - PREPARE_DEPLOY=1
       script:
         - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       <<: *linux_with_fuse
-      name: "Self checks, lint, and JVM tests"
+      name: "Self-checks, lint, and JVM tests"
+      env:
+        - CACHE_NAME=linuxselfchecks
       script:
-        - ./build-support/bin/travis-ci.sh -fbkmrjt
+        - ./build-support/bin/travis-ci.sh -fbmrjt
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py2 - Unit tests for pants and pants-plugins"
+      env:
+        - CACHE_NAME=linuxunittests.py2
       script:
         - ./build-support/bin/travis-ci.sh -blp
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py3 - Unit tests for pants and pants-plugins"
+      env:
+        - CACHE_NAME=linuxunittests.py3
       script:
         - ./build-support/bin/travis-ci.sh -3blp
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py2 - Python contrib tests"
+      env:
+        - CACHE_NAME=linuxcontribtests.py2
       script:
         - ./build-support/bin/travis-ci.sh -bn
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py3 - Python contrib tests"
+      env:
+        - CACHE_NAME=linuxcontribtests.py3
       script:
         - ./build-support/bin/travis-ci.sh -3bn
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 0"
       env:
-        - CACHE_NAME=integrationshard0  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard0
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 0/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 1"
       env:
-        - CACHE_NAME=integrationshard1  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard1
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 1/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 2"
       env:
-        - CACHE_NAME=integrationshard2  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard2
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 2/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 3"
       env:
-        - CACHE_NAME=integrationshard3  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard3
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 3/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 4"
       env:
-        - CACHE_NAME=integrationshard4  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard4
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 4/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 5"
       env:
-        - CACHE_NAME=integrationshard5  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard5
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 5/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 6"
       env:
-        - CACHE_NAME=integrationshard6  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard6
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 6/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 7"
       env:
-        - CACHE_NAME=integrationshard7  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard7
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 7/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 8"
       env:
-        - CACHE_NAME=integrationshard8  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard8
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 8/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 9"
       env:
-        - CACHE_NAME=integrationshard9  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard9
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 9/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 10"
       env:
-        - CACHE_NAME=integrationshard10  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard10
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 10/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 11"
       env:
-        - CACHE_NAME=integrationshard11  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard11
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 11/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 12"
       env:
-        - CACHE_NAME=integrationshard12  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard12
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 12/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 13"
       env:
-        - CACHE_NAME=integrationshard13  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard13
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 13/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 14"
       env:
-        - CACHE_NAME=integrationshard14  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard14
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 14/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 15"
       env:
-        - CACHE_NAME=integrationshard15  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard15
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 15/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 16"
       env:
-        - CACHE_NAME=integrationshard16  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard16
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 16/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 17"
       env:
-        - CACHE_NAME=integrationshard17  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard17
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 17/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 18"
       env:
-        - CACHE_NAME=integrationshard18  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard18
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 18/20
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard 19"
       env:
-        - CACHE_NAME=integrationshard19  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard19
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i 19/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 0"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard0  # Ensure distinct caches.
+        - CACHE_NAME=cronshard0
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 0/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 1"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard1  # Ensure distinct caches.
+        - CACHE_NAME=cronshard1
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 1/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 2"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard2  # Ensure distinct caches.
+        - CACHE_NAME=cronshard2
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 2/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 3"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard3  # Ensure distinct caches.
+        - CACHE_NAME=cronshard3
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 3/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 4"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard4  # Ensure distinct caches.
+        - CACHE_NAME=cronshard4
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 4/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 5"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard5  # Ensure distinct caches.
+        - CACHE_NAME=cronshard5
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 5/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 6"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard6  # Ensure distinct caches.
+        - CACHE_NAME=cronshard6
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 6/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 7"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard7  # Ensure distinct caches.
+        - CACHE_NAME=cronshard7
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 7/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 8"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard8  # Ensure distinct caches.
+        - CACHE_NAME=cronshard8
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 8/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 9"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard9  # Ensure distinct caches.
+        - CACHE_NAME=cronshard9
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 9/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 10"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard10  # Ensure distinct caches.
+        - CACHE_NAME=cronshard10
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 10/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 11"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard11  # Ensure distinct caches.
+        - CACHE_NAME=cronshard11
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 11/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 12"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard12  # Ensure distinct caches.
+        - CACHE_NAME=cronshard12
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 12/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 13"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard13  # Ensure distinct caches.
+        - CACHE_NAME=cronshard13
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 13/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 14"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard14  # Ensure distinct caches.
+        - CACHE_NAME=cronshard14
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 14/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 15"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard15  # Ensure distinct caches.
+        - CACHE_NAME=cronshard15
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 15/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 16"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard16  # Ensure distinct caches.
+        - CACHE_NAME=cronshard16
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 16/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 17"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard17  # Ensure distinct caches.
+        - CACHE_NAME=cronshard17
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 17/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 18"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard18  # Ensure distinct caches.
+        - CACHE_NAME=cronshard18
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 18/20
 
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard 19"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard19  # Ensure distinct caches.
+        - CACHE_NAME=cronshard19
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 19/20
 
 
     # Rust on linux
     - <<: *linux_with_fuse
-      name: "Rust Tests Linux"
+      name: "Linux Rust tests"
+      env:
+        - CACHE_NAME=linuxrusttests
       os: linux
       dist: xenial
       sudo: required
@@ -551,26 +623,27 @@ matrix:
         - ulimit -n 8192
       script:
         - ./build-support/bin/travis-ci.sh -be
+
     # Rust on macOS
-    - name: "Rust + Platform-specific Tests OSX"
-      os: osx
+    - <<: *default_osx_test_config
+      name: "OSX Rust + platform-specific tests"
+      env:
+        - CACHE_NAME=macosrusttests
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
-      stage: *test
-      language: generic
       before_install:
+        - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
+        - chmod 755 /usr/local/bin/jq
+        - ./build-support/bin/install_aws_cli_for_ci.sh
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
-      before_script:
-        - ulimit -c unlimited
-        - ulimit -n 8192
       script:
-        # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and
-        # set -z to run the platform-specific tests.
-        - ./build-support/bin/travis-ci.sh -ez
+        - ./build-support/bin/travis-ci.sh -bez
 
     # Rust Clippy on Linux
     - <<: *linux_with_fuse
-      name: "Rust Clippy on Linux"
+      name: "Linux Rust Clippy"
+      env:
+        - CACHE_NAME=linuxclippy
       os: linux
       dist: xenial
       sudo: required
@@ -586,6 +659,8 @@ matrix:
     # Cargo audit
     - <<: *linux_with_fuse
       name: "Cargo audit"
+      env:
+        - CACHE_NAME=linuxcargoaudit
       os: linux
       dist: xenial
       sudo: required
@@ -594,6 +669,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -ba
 
 deploy:
+  # Deploy whatever a previous stage has left in dist/deploy.
   # See: https://docs.travis-ci.com/user/deployment/s3/
   provider: s3
   access_key_id: AKIAIWOKBXVU3JLY6EGQ

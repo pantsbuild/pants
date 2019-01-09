@@ -133,14 +133,20 @@ function pants_version_reset() {
   pushd ${ROOT} > /dev/null
     git checkout -- ${VERSION_FILE}
   popd > /dev/null
+  unset _PANTS_VERSION_OVERRIDE
 }
 
 function pants_version_set() {
-  # Mutates `src/python/pants/VERSION` to temporarily override it. Sets a `trap` to restore to
-  # HEAD on exit.
+  #  Set the version in the wheels we build by mutating `src/python/pants/VERSION` to temporarily
+  # override it. Sets a `trap` to restore to HEAD on exit.
   local version=$1
   trap pants_version_reset EXIT
   echo "${version}" > "${VERSION_FILE}"
+  # Also set the version reported by the prebuilt pant.pex we use to build the wheels.
+  # This is so that we pass the sanity-check that verifies that the built wheels have the same
+  # version as the pants version used to build them.
+  # TODO: Do we actually need that sanity check?
+  export _PANTS_VERSION_OVERRIDE=${version}
 }
 
 function build_3rdparty_packages() {
@@ -187,8 +193,6 @@ function build_pants_packages() {
 }
 
 function build_fs_util() {
-  local version=$1
-
   start_travis_section "fs_util" "Building fs_util binary"
   # fs_util is a standalone tool which can be used to inspect and manipulate
   # Pants's engine's file store, and interact with content addressable storage
@@ -200,7 +204,7 @@ function build_fs_util() {
     set -e
     RUST_BACKTRACE=1 "${ROOT}/build-support/bin/native/cargo" build --release \
       --manifest-path="${ROOT}/src/rust/engine/Cargo.toml" -p fs_util
-    dst_dir="${DEPLOY_DIR}/bin/fs_util/$("${ROOT}/build-support/bin/get_os.sh")/${version}"
+    dst_dir="${DEPLOY_DIR}/bin/fs_util/$("${ROOT}/build-support/bin/get_os.sh")/${PANTS_UNSTABLE_VERSION}"
     mkdir -p "${dst_dir}"
     cp "${ROOT}/src/rust/engine/target/release/fs_util" "${dst_dir}/"
   ) || die "Failed to build fs_util"
@@ -615,13 +619,14 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] [-c] (-h|-n|-t|-l|-o|-e|-p)"
+  echo "Usage: $0 [-d] [-c] (-h|-n|-f|-t|-l|-o|-e|-p)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
   echo "       an ephemeral virtualenv and exercised to validate basic"
   echo "       functioning."
+  echo " -f  Build the fs_util binary."
   echo " -t  Tests a live release."
   echo "       Ensures the latest packages have been propagated to PyPi"
   echo "       and can be installed in an ephemeral virtualenv."
@@ -640,11 +645,12 @@ function usage() {
   fi
 }
 
-while getopts "hdntcloepqw" opt; do
+while getopts "hdnftcloepqw" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
     n) dry_run="true" ;;
+    f) build_fs_util ; exit $? ;;
     t) test_release="true" ;;
     l) run_packages_script list ; exit $? ;;
     o) run_packages_script list-owners ; exit $? ;;
@@ -666,7 +672,7 @@ if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
 elif [[ "${dry_run}" == "true" ]]; then
   banner "Performing a dry run release" && \
   (
-    dry_run_install && build_fs_util "${PANTS_UNSTABLE_VERSION}" && \
+    dry_run_install && \
     banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
