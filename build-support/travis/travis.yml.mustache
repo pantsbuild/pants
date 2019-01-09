@@ -335,6 +335,11 @@ matrix:
         - CACHE_NAME=macosrusttests
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
+      # TODO: workaround for Homebrew bug triggered by running `brew update`. 
+      # Follow at https://github.com/Homebrew/brew/issues/5513 and remove this workaround once its fixed.
+      env:
+        - HOMEBREW_LOGS=~/homebrew-logs
+        - HOMEBREW_TEMP=~/homebrew-temp
       before_install:
         {{>before_install_osx}}
         - brew tap caskroom/cask && brew update && brew cask install osxfuse

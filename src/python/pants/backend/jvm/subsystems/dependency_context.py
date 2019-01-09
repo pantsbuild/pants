@@ -103,7 +103,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
       classpath_entries = self._classpath_products.get_artifact_classpath_entries_for_targets(
         [target])
       for _, entry in classpath_entries:
-        hasher.update(str(entry.coordinate))
+        hasher.update(str(entry.coordinate).encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def direct(self, target):

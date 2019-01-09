@@ -189,6 +189,7 @@
        },
        {"collapsible_heading": "Release Notes",
         "pages" : [
+                    "notes-1.13.x",
                     "notes-1.12.x",
                     "notes-1.11.x",
                     "notes-1.10.x",

@@ -96,3 +96,20 @@ class RscCompileIntegration(BaseCompileIT):
           workdir, config)
         self.assert_success(pants_run)
         self.assertIn('Hello, Resource World!', pants_run.stdout_data)
+
+  def test_java_with_transitive_exported_scala_dep(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.rsc': {'write_to': [cache_dir]},
+        'jvm-platform': {'compiler': 'rsc'},
+        'compile.rsc': {
+          'execution_strategy': 'subprocess',
+          'worker_count': 1}
+      }
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          ['compile',
+            'testprojects/src/scala/org/pantsbuild/testproject/javadepsonscalatransitive:scala',
+          ],
+          workdir, config)
+        self.assert_success(pants_run)

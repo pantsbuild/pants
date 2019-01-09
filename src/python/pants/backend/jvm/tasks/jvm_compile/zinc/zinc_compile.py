@@ -14,7 +14,7 @@ from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
 
-from future.utils import PY3, text_type
+from future.utils import PY2, PY3, text_type
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -37,6 +37,7 @@ from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
+from pants.util.strutil import ensure_text
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -382,10 +383,15 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(ctx.sources)
 
     self.log_zinc_file(ctx.analysis_file)
-    with open(ctx.zinc_args_file, 'wb') as fp:
+    with open(ctx.zinc_args_file, 'w') as fp:
       for arg in zinc_args:
+        # NB: in Python 2, options are stored sometimes as bytes and sometimes as unicode in the OptionValueContainer.
+        # This is due to how Python 2 natively stores attributes as a map of `str` (aka `bytes`) to their value. So, 
+        # the setattr() and getattr() functions sometimes use bytes.
+        if PY2:
+          arg = ensure_text(arg)
         fp.write(arg)
-        fp.write(b'\n')
+        fp.write('\n')
 
     if self.execution_strategy == self.HERMETIC:
       zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
