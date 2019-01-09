@@ -189,8 +189,6 @@ function build_pants_packages() {
 }
 
 function build_fs_util() {
-  local version=$1
-
   start_travis_section "fs_util" "Building fs_util binary"
   # fs_util is a standalone tool which can be used to inspect and manipulate
   # Pants's engine's file store, and interact with content addressable storage
@@ -202,7 +200,7 @@ function build_fs_util() {
     set -e
     RUST_BACKTRACE=1 "${ROOT}/build-support/bin/native/cargo" build --release \
       --manifest-path="${ROOT}/src/rust/engine/Cargo.toml" -p fs_util
-    dst_dir="${DEPLOY_DIR}/bin/fs_util/$("${ROOT}/build-support/bin/get_os.sh")/${version}"
+    dst_dir="${DEPLOY_DIR}/bin/fs_util/$("${ROOT}/build-support/bin/get_os.sh")/${PANTS_UNSTABLE_VERSION}"
     mkdir -p "${dst_dir}"
     cp "${ROOT}/src/rust/engine/target/release/fs_util" "${dst_dir}/"
   ) || die "Failed to build fs_util"
@@ -617,13 +615,14 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] [-c] (-h|-n|-t|-l|-o|-e|-p)"
+  echo "Usage: $0 [-d] [-c] (-h|-n|-f|-t|-l|-o|-e|-p)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
   echo "       an ephemeral virtualenv and exercised to validate basic"
   echo "       functioning."
+  echo " -f  Build the fs_util binary."
   echo " -t  Tests a live release."
   echo "       Ensures the latest packages have been propagated to PyPi"
   echo "       and can be installed in an ephemeral virtualenv."
@@ -647,6 +646,7 @@ while getopts "hdntcloepqw" opt; do
     h) usage ;;
     d) debug="true" ;;
     n) dry_run="true" ;;
+    f) build_fs_util ; exit $? ;;
     t) test_release="true" ;;
     l) run_packages_script list ; exit $? ;;
     o) run_packages_script list-owners ; exit $? ;;
@@ -668,7 +668,7 @@ if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
 elif [[ "${dry_run}" == "true" ]]; then
   banner "Performing a dry run release" && \
   (
-    dry_run_install && build_fs_util "${PANTS_UNSTABLE_VERSION}" && \
+    dry_run_install && \
     banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
