@@ -63,7 +63,10 @@ cache:
     #   https://github.com/pantsbuild/pants/issues/2485
     - ${HOME}/.npm
     - build-support/pants_dev_deps.venv
-    - src/rust/engine
+    - src/rust/engine/target
+    - src/rust/engine/src/cffi
+    - src/rust/engine/process_execution/bazel_protos/src/gen
+    - src/rust/engine/process_execution/bazel_protos/src/gen_for_tower
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
