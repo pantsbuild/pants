@@ -119,12 +119,19 @@ if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
 fi
 
 if [[ "${run_bootstrap:-true}" == "true" ]]; then
-  start_travis_section "Bootstrap" "Bootstrapping pants"
+  # determine interpreter
+  if [[ "${python_two:-false}" == "false" ]]; then
+    py_version_number="3"
+    pants_script="./pants3"
+  else
+    py_version_number="2"
+    pants_script="./pants"
+  fi
+  start_travis_section "Bootstrap" "Bootstrapping pants with Python ${py_version_number} under-the-hood."
   (
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    pants_script="./pants"; [[ "${python_two:-false}" == "false" ]] && pants_script="./pants3"
     ${pants_script} ${bootstrap_compile_args[@]} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
@@ -138,6 +145,16 @@ fi
 # In this file we invoke ./pants.pex directly anyway, but some of those invocations will run
 # integration tests that shell out to `./pants`, so we set this env var for those cases.
 export RUN_PANTS_FROM_PEX=1
+
+# NB: In addition to choosing which interpreter we use under-the-hood to bootstrap Pants,
+# we must also set interpreter constraints for any subprocesses to use the corresponding interpreter.
+if [[ "${python_two:-false}" == "false" ]]; then
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
+fi
+banner "Using Python ${py_version_number} to execute subprocesses."
+# TODO: Clear interpreters, otherwise this constraint does not end up applying due to a cache
+# bug between the `./pants binary` and further runs.
+./pants.pex clean-all
 
 if [[ "${run_sanity_checks:-false}" == "true" ]]; then
   start_travis_section "SanityCheck" "Sanity checking bootstrapped pants and repo BUILD files"
