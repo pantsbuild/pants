@@ -486,7 +486,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       self.context.log.warn('Skipping {} compile for targets with no sources:\n  {}'
                             .format(self.name(), vts.targets))
     else:
-      counter_val = str(counter()).rjust(counter.format_length(), b' ')
+      counter_val = str(counter()).rjust(counter.format_length(), ' ')
       counter_str = '[{}/{}] '.format(counter_val, counter.size)
       # Do some reporting.
       self.context.log.info(

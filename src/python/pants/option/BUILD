@@ -7,7 +7,6 @@ python_library(
     '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     '3rdparty/python:setuptools',
-    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
