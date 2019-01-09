@@ -13,18 +13,27 @@ bytes = "0.4.5"
 digest = "0.8"
 fs = { path = "../fs" }
 futures = "^0.1.16"
+# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
+futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
 grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec"] }
+h2 = "0.1.13"
 hashing = { path = "../hashing" }
+http = "0.1"
 log = "0.4"
+parking_lot = "0.6"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
 resettable = { path = "../resettable" }
 sha2 = "0.8"
 tempfile = "3"
-# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
-futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
 time = "0.1.40"
+tokio = "0.1.14"
 tokio-codec = "0.1"
+tokio-connect = { git = "https://github.com/pantsbuild/tokio-connect.git", rev = "f7ad1ca437973d6e24037ac6f7d5ef1013833c0b" }
 tokio-process = "0.2.1"
+tower-grpc = { git = "https://github.com/pantsbuild/tower-grpc.git", rev = "ef19f2e1715f415ecb699e8f17f5845ad2b45daf" }
+tower-h2 = { git = "https://github.com/pantsbuild/tower-h2.git", rev = "44b0efb4983b769283efd5b2a3bc3decbf7c33de" }
+tower-http = { git = "https://github.com/pantsbuild/tower-http.git", rev = "56049ee7f31d4f6c549f5d1d5fbbfd7937df3d00" }
+tower-util = { git = "https://github.com/pantsbuild/tower.git", rev = "7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c" }
 
 [dev-dependencies]
 mock = { path = "../testutil/mock" }
