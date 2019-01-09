@@ -24,6 +24,7 @@ use std::cmp::min;
 
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
+use tokio::executor::DefaultExecutor;
 use tokio::net::tcp::{ConnectFuture, TcpStream};
 use tower_grpc::Request;
 use tower_h2::client;
@@ -50,15 +51,13 @@ pub struct CommandRunner {
   env: Arc<grpcio::Environment>,
   execution_client: futures::future::Shared<
     BoxFuture<
-      Arc<
-        Mutex<
-          bazel_protos::build::bazel::remote::execution::v2::client::Execution<
-            tower_http::add_origin::AddOrigin<
-              tower_h2::client::Connection<
-                tokio::net::tcp::TcpStream,
-                tokio::runtime::TaskExecutor,
-                tower_grpc::BoxBody,
-              >,
+      Mutex<
+        bazel_protos::build::bazel::remote::execution::v2::client::Execution<
+          tower_http::add_origin::AddOrigin<
+            tower_h2::client::Connection<
+              tokio::net::tcp::TcpStream,
+              DefaultExecutor,
+              tower_grpc::BoxBody,
             >,
           >,
         >,
@@ -330,7 +329,6 @@ impl CommandRunner {
     thread_count: usize,
     store: Store,
     futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
-    executor: tokio::runtime::TaskExecutor,
   ) -> Result<CommandRunner, String> {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = {
@@ -372,26 +370,29 @@ impl CommandRunner {
       .map_err(|err| format!("Failed to resolve remote socket address URL: {}", err))?
       .next()
       .ok_or_else(|| "Remote server address resolved to no addresses".to_owned())?;
-    let execution_client =
-      client::Connect::new(Dst(socket_addr), h2::client::Builder::default(), executor)
-        .make_service(())
-        .map_err(|err| format!("Error connecting to remote execution server: {}", err))
-        .and_then(move |conn| {
-          let conn = tower_http::add_origin::Builder::new()
-            .uri(uri)
-            .build(conn)
-            .map_err(|err| {
-              format!(
-                "Failed to add origin for remote execution server: {:?}",
-                err
-              )
-            })?;
-          Ok(Arc::new(Mutex::new(
-            bazel_protos::build::bazel::remote::execution::v2::client::Execution::new(conn),
-          )))
-        })
-        .to_boxed()
-        .shared();
+    let execution_client = client::Connect::new(
+      Dst(socket_addr),
+      h2::client::Builder::default(),
+      DefaultExecutor::current(),
+    )
+    .make_service(())
+    .map_err(|err| format!("Error connecting to remote execution server: {}", err))
+    .and_then(move |conn| {
+      let conn = tower_http::add_origin::Builder::new()
+        .uri(uri)
+        .build(conn)
+        .map_err(|err| {
+          format!(
+            "Failed to add origin for remote execution server: {:?}",
+            err
+          )
+        })?;
+      Ok(Mutex::new(
+        bazel_protos::build::bazel::remote::execution::v2::client::Execution::new(conn),
+      ))
+    })
+    .to_boxed()
+    .shared();
     Ok(CommandRunner {
       cache_key_gen_version,
       instance_name,
@@ -1487,7 +1488,6 @@ mod tests {
       1,
       store,
       timer_thread,
-      rt.executor(),
     )
     .unwrap();
     let result = rt.block_on(cmd_runner.run(echo_roland_request())).unwrap();
@@ -1869,7 +1869,6 @@ mod tests {
         1,
         store,
         timer_thread,
-        rt.executor(),
       )
       .unwrap()
       .run(cat_roland_request()),
@@ -1969,7 +1968,6 @@ mod tests {
         1,
         store,
         timer_thread,
-        rt.executor(),
       )
       .unwrap()
       .run(cat_roland_request()),
@@ -2041,7 +2039,6 @@ mod tests {
         1,
         store,
         timer_thread,
-        rt.executor(),
       )
       .unwrap()
       .run(cat_roland_request()),
@@ -2620,17 +2617,13 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    let command_runner = create_command_runner(address, &cas, &runtime);
+    let command_runner = create_command_runner(address, &cas);
     let result = runtime.block_on(command_runner.run(request));
     runtime.shutdown_now().wait().unwrap();
     result
   }
 
-  fn create_command_runner(
-    address: String,
-    cas: &mock::StubCAS,
-    runtime: &tokio::runtime::Runtime,
-  ) -> CommandRunner {
+  fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
     let store_dir = TempDir::new().unwrap();
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
@@ -2649,18 +2642,8 @@ mod tests {
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(
-      &address,
-      None,
-      None,
-      None,
-      None,
-      1,
-      store,
-      timer_thread,
-      runtime.executor(),
-    )
-    .expect("Failed to make command runner")
+    CommandRunner::new(&address, None, None, None, None, 1, store, timer_thread)
+      .expect("Failed to make command runner")
   }
 
   fn timer_thread() -> resettable::Resettable<futures_timer::HelperThread> {
@@ -2675,7 +2658,7 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    let command_runner = create_command_runner("127.0.0.1:0".to_owned(), &cas, &runtime);
+    let command_runner = create_command_runner("127.0.0.1:0".to_owned(), &cas);
     let result = runtime.block_on(command_runner.extract_execute_response(
       super::OperationOrStatus::Operation(operation),
       &mut ExecutionHistory::default(),
@@ -2694,7 +2677,7 @@ mod tests {
       .build();
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    let command_runner = create_command_runner("127.0.0.1:0".to_owned(), &cas, &runtime);
+    let command_runner = create_command_runner("127.0.0.1:0".to_owned(), &cas);
     let result = runtime.block_on(command_runner.extract_output_files(&execute_response));
     runtime.shutdown_now().wait().unwrap();
     result

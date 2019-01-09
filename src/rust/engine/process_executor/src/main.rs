@@ -195,8 +195,6 @@ fn main() {
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
 
-  let mut rt = tokio::runtime::Runtime::new().unwrap();
-
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {
       let chunk_size =
@@ -282,7 +280,6 @@ fn main() {
           1,
           store,
           timer_thread,
-          rt.executor(),
         )
         .expect("Could not initialize remote execution client"),
       ) as Box<dyn process_execution::CommandRunner>
@@ -291,6 +288,7 @@ fn main() {
       store, pool, work_dir, true,
     )) as Box<dyn process_execution::CommandRunner>,
   };
+  let mut rt = tokio::runtime::Runtime::new().unwrap();
   let result = rt.block_on(runner.run(request)).unwrap();
 
   print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
