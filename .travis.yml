@@ -609,6 +609,7 @@ matrix:
 
     # Rust on linux
     - <<: *linux_with_fuse
+    - <<: *native_engine_cache_config
       name: "Linux Rust tests"
       env:
         - CACHE_NAME=linuxrusttests
@@ -641,6 +642,7 @@ matrix:
 
     # Rust Clippy on Linux
     - <<: *linux_with_fuse
+    - <<: *native_engine_cache_config
       name: "Linux Rust Clippy"
       env:
         - CACHE_NAME=linuxclippy

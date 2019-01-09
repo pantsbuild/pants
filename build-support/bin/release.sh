@@ -137,7 +137,7 @@ function pants_version_reset() {
 }
 
 function pants_version_set() {
-  #  Set the version in the wheels we build by mutating `src/python/pants/VERSION` to temporarily
+  # Set the version in the wheels we build by mutating `src/python/pants/VERSION` to temporarily
   # override it. Sets a `trap` to restore to HEAD on exit.
   local version=$1
   trap pants_version_reset EXIT
