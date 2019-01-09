@@ -58,7 +58,8 @@ cache:
     # using its own isolated cache:
     #   https://github.com/pantsbuild/pants/issues/2485
     - ${HOME}/.npm
-    - build-support/pants_dev_deps.venv
+    - build-support/pants_dev_deps.py2.venv
+    - build-support/pants_dev_deps.py3.venv
     - src/rust/engine/target
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
@@ -89,7 +90,7 @@ default_test_config: &default_test_config
         - libssl-dev
   stage: *test
   language: python
-  python: &python_version "2.7"
+  python: &python_version "3.6"
   before_install:
 {{>before_install}}
   before_script:
@@ -100,6 +101,9 @@ osx_test_config: &osx_test_config
   os: osx
   stage: *test
   language: generic
+  before_install:
+    # Upgrade to Python 3
+    - brew upgrade python
   script:
     - MODE=debug ./build-support/bin/travis-ci.sh -m
 
@@ -217,22 +221,22 @@ matrix:
     - <<: *default_test_config
       name: "Py2 - Unit tests for pants and pants-plugins"
       script:
-        - ./build-support/bin/travis-ci.sh -blp
+        - ./build-support/bin/travis-ci.sh -2blp
 
     - <<: *default_test_config
       name: "Py3 - Unit tests for pants and pants-plugins"
       script:
-        - ./build-support/bin/travis-ci.sh -3blp
+        - ./build-support/bin/travis-ci.sh -blp
 
     - <<: *default_test_config
       name: "Py2 - Python contrib tests"
       script:
-        - ./build-support/bin/travis-ci.sh -bn
+        - ./build-support/bin/travis-ci.sh -2bn
 
     - <<: *default_test_config
       name: "Py3 - Python contrib tests"
       script:
-        - ./build-support/bin/travis-ci.sh -3bn
+        - ./build-support/bin/travis-ci.sh -bn
 
 {{#integration_shards}}
     - <<: *default_test_config
@@ -240,7 +244,7 @@ matrix:
       env:
         - CACHE_NAME=integrationshard{{.}}  # Ensure distinct caches.
       script:
-        - ./build-support/bin/travis-ci.sh -bc3 -i {{.}}/{{integration_shards_length}}
+        - ./build-support/bin/travis-ci.sh -bc -i {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 {{#integration_shards}}
@@ -249,7 +253,7 @@ matrix:
       env:
         - CACHE_NAME=cronshard{{.}}  # Ensure distinct caches.
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i {{.}}/{{integration_shards_length}}
+        - ./build-support/bin/travis-ci.sh -bc2 -i {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 
@@ -276,6 +280,8 @@ matrix:
       language: generic
       before_install:
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
+        # Upgrade to Python 3
+        - brew upgrade python
       before_script:
         - ulimit -c unlimited
         - ulimit -n 8192
