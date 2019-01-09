@@ -49,10 +49,7 @@ class AddressMap(datatype(['path', 'objects_by_name'])):
     :param parser: The parser cls to use.
     :type parser: A :class:`pants.engine.parser.Parser`.
     """
-    try:
-      objects = parser.parse(filepath, filecontent)
-    except Exception as e:
-      raise MappingError('Failed to parse {}:\n{}'.format(filepath, e))
+    objects = parser.parse(filepath, filecontent)
     objects_by_name = {}
     for obj in objects:
       if not Serializable.is_serializable(obj):
