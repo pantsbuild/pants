@@ -9,6 +9,7 @@ import tensorflow as tf
 from example.tensorflow_custom_op.zero_out_custom_op import zero_out_module
 
 
+# This code is from the guide in https://www.tensorflow.org/guide/extend/op.
 class ZeroOutTest(tf.test.TestCase):
 
   def test_zero_out(self):

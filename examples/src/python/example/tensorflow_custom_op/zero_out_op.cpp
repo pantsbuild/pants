@@ -7,7 +7,6 @@
 using namespace tensorflow;
 
 /* Describe the kernel. */
-/* TODO: put this in a separate file! */
 class ZeroOutOp : public OpKernel {
 public:
   explicit ZeroOutOp(OpKernelConstruction *context) : OpKernel(context) {}
