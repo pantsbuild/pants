@@ -641,7 +641,7 @@ function usage() {
   fi
 }
 
-while getopts "hdntcloepqw" opt; do
+while getopts "hdnftcloepqw" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
