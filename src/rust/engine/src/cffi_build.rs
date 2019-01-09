@@ -109,6 +109,13 @@ fn main() -> Result<(), CffiBuildError> {
   //    (which is equivalent to `-ldylib=stdc++`).
   //  * Specifying `rustc-link-lib=stdc++`
   //    (which is equivalent to `rustc-link-lib=dylib=stdc++).
+
+  // NB: When built with Python 3, `native_engine.so` only works with a Python 3 interpreter.
+  // When built with Python 2, it works with both Python 2 and Python 3.
+  // So, we check to see if the under-the-hood interpreter has changed and rebuild the native engine
+  // when needed.
+  println!("rerun-if-env-changed=PANTS_USE_PYTHON3");
+
   if cfg!(target_os = "linux") {
     println!("cargo:rustc-link-lib=static=stdc++");
   }
