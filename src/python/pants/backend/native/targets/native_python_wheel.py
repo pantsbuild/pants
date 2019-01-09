@@ -42,7 +42,7 @@ class NativePythonWheel(Target):
                         where native libraries are located. Use ``''`` if located in the top-level
                         directory.
     :param native_lib_names: Names of any native libraries contained in the wheel. For a library
-                        named ``libmylib.so``, use the name ``mylib``.
+                             named ``libmylib.so``, use the name ``mylib``.
     :param compatibility: Python interpreter constraints used to create the pex for the requirement
                           target. If unset, the default interpreter constraints are used. This
                           argument is unnecessary unless the native code depends on libpython.
