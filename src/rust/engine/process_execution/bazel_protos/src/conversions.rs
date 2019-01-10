@@ -18,11 +18,21 @@ impl<'a> From<&'a hashing::Digest> for crate::build::bazel::remote::execution::v
   }
 }
 
-impl<'a> From<&'a super::remote_execution::Digest> for Result<hashing::Digest, String> {
-  fn from(d: &super::remote_execution::Digest) -> Self {
+impl<'a> From<&'a crate::remote_execution::Digest> for Result<hashing::Digest, String> {
+  fn from(d: &crate::remote_execution::Digest) -> Self {
     hashing::Fingerprint::from_hex_string(d.get_hash())
       .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", d.get_hash(), err))
       .map(|fingerprint| hashing::Digest(fingerprint, d.get_size_bytes() as usize))
+  }
+}
+
+impl<'a> From<&'a crate::build::bazel::remote::execution::v2::Digest>
+  for Result<hashing::Digest, String>
+{
+  fn from(d: &crate::build::bazel::remote::execution::v2::Digest) -> Self {
+    hashing::Fingerprint::from_hex_string(&d.hash)
+      .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", d.hash, err))
+      .map(|fingerprint| hashing::Digest(fingerprint, d.size_bytes as usize))
   }
 }
 
@@ -30,7 +40,9 @@ impl From<crate::google::longrunning::Operation> for crate::operations::Operatio
   fn from(op: crate::google::longrunning::Operation) -> Self {
     let mut dst = Self::new();
     dst.set_name(op.name);
-    dst.set_metadata(prost_any_to_gcprio_any(op.metadata.unwrap()));
+    if let Some(metadata) = op.metadata {
+      dst.set_metadata(prost_any_to_gcprio_any(metadata));
+    }
     dst.set_done(op.done);
     match op.result {
       Some(crate::google::longrunning::operation::Result::Response(response)) => {
@@ -42,6 +54,46 @@ impl From<crate::google::longrunning::Operation> for crate::operations::Operatio
       None => {}
     };
     dst
+  }
+}
+
+// This should only be used in test contexts. It should be deleted when the mock systems use tower.
+impl From<crate::remote_execution::ExecuteRequest>
+  for crate::build::bazel::remote::execution::v2::ExecuteRequest
+{
+  fn from(req: crate::remote_execution::ExecuteRequest) -> Self {
+    if req.has_execution_policy() || req.has_results_cache_policy() {
+      panic!("Can't convert ExecuteRequest protos with execution policy or results cache policy");
+    }
+    let digest: Result<hashing::Digest, String> = req.get_action_digest().into();
+    Self {
+      action_digest: Some((&digest.expect("Bad digest converting ExecuteRequest proto")).into()),
+      instance_name: req.instance_name,
+      execution_policy: None,
+      results_cache_policy: None,
+      skip_cache_lookup: req.skip_cache_lookup,
+    }
+  }
+}
+
+// This should only be used in test contexts. It should be deleted when the mock systems use tower.
+impl From<crate::build::bazel::remote::execution::v2::ExecuteRequest>
+  for crate::remote_execution::ExecuteRequest
+{
+  fn from(req: crate::build::bazel::remote::execution::v2::ExecuteRequest) -> Self {
+    if req.execution_policy.is_some() || req.results_cache_policy.is_some() {
+      panic!("Can't convert ExecuteRequest protos with execution policy or results cache policy");
+    }
+    let digest: Result<hashing::Digest, String> = (&req
+      .action_digest
+      .expect("Missing digest converting ExecuteRequest proto"))
+      .into();
+
+    let mut ret = Self::new();
+    ret.set_action_digest((&digest.expect("Bad digest converting ExecuteRequest proto")).into());
+    ret.set_instance_name(req.instance_name);
+    ret.set_skip_cache_lookup(req.skip_cache_lookup);
+    ret
   }
 }
 

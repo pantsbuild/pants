@@ -273,6 +273,17 @@ class RscCompile(ZincCompile):
     else:
       raise TaskError('unexpected target for compiling with rsc .... {}'.format(compile_target))
 
+  def _metacp_dep_key_for_target(self, compile_target):
+    if self._only_zinc_compileable(compile_target):
+      # rsc outlining with java dependencies depends on the output of a second metacp job.
+      return self._metacp_key_for_target(compile_target)
+    elif self._rsc_compilable(compile_target):
+      return self._compile_against_rsc_key_for_target(compile_target)
+    elif self._metacpable(compile_target):
+      return self._metacp_key_for_target(compile_target)
+    else:
+      raise TaskError('unexpected target for compiling with rsc .... {}'.format(compile_target))
+
   def _metacp_key_for_target(self, compile_target):
     return "metacp({})".format(compile_target.address.spec)
 
@@ -684,7 +695,7 @@ class RscCompile(ZincCompile):
             ivts,
             compile_context_pair[0],
             'runtime_classpath'),
-          [self._metacp_key_for_target(target) for target in invalid_dependencies] + [
+            [self._metacp_dep_key_for_target(target) for target in invalid_dependencies] + [
               'metacp(jdk)',
               zinc_key,
             ],
@@ -902,3 +913,18 @@ class RscCompile(ZincCompile):
       return HermeticDistribution('.jdk', local_distribution)
     else:
       return local_distribution
+
+  def _on_invalid_compile_dependency(self, dep, compile_target):
+    """Decide whether to continue searching for invalid targets to use in the execution graph.
+
+    If a necessary dep is a Scala dep and the root is Java, continue to recurse because
+    otherwise we'll drop the path between Zinc compile of the Java target and a Zinc
+    compile of a transitive Scala dependency.
+
+    This is only an issue for graphs like J -> S1 -> S2, where J is a Java target,
+    S1/2 are Scala targets and S2 must be on the classpath to compile J successfully.
+    """
+    if dep.has_sources('.scala') and compile_target.has_sources('.java'):
+      return True
+    else:
+      return False

@@ -20,7 +20,6 @@ Usage: $0 (-h|-2fxbkmrjlpuneycitzs)
  -x           run bootstrap clean-all (assume bootstrapping from a
               fresh clone)
  -b           skip bootstrapping pants from local sources
- -k           run bootstrapped pants self compile check
  -m           run sanity checks of bootstrapped pants and repo BUILD
               files
  -r           run doc generation tests
@@ -54,25 +53,19 @@ EOF
   fi
 }
 
-bootstrap_compile_args=(
-  lint.python-eval
-  --transitive
-)
-
 # No python test sharding (1 shard) by default.
 python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 python_two="false"
 
-while getopts "h2fxbkmrjlpeasu:ny:ci:tz" opt; do
+while getopts "h2fxbmrjlpeasu:ny:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
     2) python_two="true" ;;
     f) run_pre_commit_checks="true" ;;
     x) run_bootstrap_clean="true" ;;
     b) run_bootstrap="false" ;;
-    k) bootstrap_compile_args=() ;;
     m) run_sanity_checks="true" ;;
     r) run_docs="true" ;;
     j) run_jvm="true" ;;
@@ -110,14 +103,6 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
-set -x
-
-if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
-  start_travis_section "PreCommit" "Running pre-commit checks"
-  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
-  end_travis_section
-fi
-
 # Determine interpreter for both under-the-hood and for subprocesses.
 # Order matters here. We must constrain subprocesses before running the bootstrap stage,
 # or we will encounter the _Py_Dealloc error when running `./pants.pex -V` with Python 3 under-the-hood.
@@ -137,7 +122,7 @@ if [[ "${run_bootstrap:-true}" == "true" ]]; then
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    ${pants_script} ${bootstrap_compile_args[@]} binary \
+    ${pants_script} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
     ./pants.pex -V
@@ -154,6 +139,12 @@ export RUN_PANTS_FROM_PEX=1
 # TODO: Clear interpreters, otherwise this constraint does not end up applying due to a cache
 # bug between the `./pants binary` and further runs.
 ./pants.pex clean-all
+
+if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
+  start_travis_section "PreCommit" "Running pre-commit checks"
+  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
+  end_travis_section
+fi
 
 if [[ "${run_sanity_checks:-false}" == "true" ]]; then
   start_travis_section "SanityCheck" "Sanity checking bootstrapped pants and repo BUILD files"
