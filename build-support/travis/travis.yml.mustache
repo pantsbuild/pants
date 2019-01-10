@@ -9,57 +9,8 @@ env:
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
     - LC_ALL="en_US.UTF-8"
     - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
-    - BOOTSTRAPPED_PEX_KEY=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
-    - BOOTSTRAPPED_PEX_URL=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
-
-
-before_cache:
-  # Ensure permissions to do the below removals, which happen with or without caching enabled.
-  - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-  # Kill all python bytecode in our cached venvs.  Some files appear to
-  # get bytecode compiled in non-yet-understood circumstances leading to
-  # a full cache re-pack due to new bytecode files.
-  - find build-support -name "*.py[co]" -delete
-  # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
-  # effect on resolution time is in the noise, but they are
-  # re-timestamped in internal comments and fields on each run and this
-  # leads to travis-ci cache thrash.  Kill these files before the cache
-  # check to avoid un-needed cache re-packing and re-upload (a ~100s
-  # operation).
-  - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-  - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-  # We have several tests that do local file:// url resolves for
-  # com.example artifacts, these disrupt the cache but are fast since
-  # they're resolved from local files when omitted from the cache.
-  - rm -rf ${HOME}/.ivy2/pants/com.example
-  # The stats cache contains timestamped reports unused by CI but that
-  # thrash the cache.  Skip caching these.
-  - rm -rf ${HOME}/.cache/pants/stats
-  # While the bin directory and rust toolchains are relatively large, they're also very quick to
-  # restore/install: prune them to keep the total cache size down.
-  #   see https://docs.travis-ci.com/user/caching/#Things-not-to-cache
-  # NB: We do _not_ prune the cargo cache, since that holds compiled tools, package indexes and
-  # individually resolved crates.
-  - rm -rf ${HOME}/.cache/pants/bin
-  - rm -rf ${HOME}/.cache/pants/rust/rustup
-  - rm -rf ${HOME}/.cache/pants/lmdb_store
-  # Render a summary of what is left in the home directory, to assist with further pruning of
-  # the cache.
-  - du -m -d2 ${HOME} | sort -r -n
-
-cache:
-  # The default timeout is 180 seconds, and our larger cache uploads exceed this.
-  # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
-  timeout: 500
-  directories:
-    - ${HOME}/.cache/pants
-    - ${HOME}/.ivy2/pants
-    # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
-    # using its own isolated cache:
-    #   https://github.com/pantsbuild/pants/issues/2485
-    - ${HOME}/.npm
-    - build-support/pants_dev_deps.venv
-    - src/rust/engine/target
+    - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
+    - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
@@ -73,7 +24,57 @@ stages:
   - name: &build_unstable Deploy Pants Pex Unstable
     if: tag IS NOT present AND type NOT IN (pull_request, cron)
 
-default_test_config: &default_test_config
+# Travis cache config for jobs that build the native engine.
+native_engine_cache_config: &native_engine_cache_config
+  before_cache:
+    # Ensure permissions to do the below removals, which happen with or without caching enabled.
+    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    # Kill all python bytecode in our cached venvs.  Some files appear to
+    # get bytecode compiled in non-yet-understood circumstances leading to
+    # a full cache re-pack due to new bytecode files.
+    - find build-support -name "*.py[co]" -delete
+  cache:
+    # The default timeout is 180 seconds, and our larger cache uploads exceed this.
+    # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
+    timeout: 500
+    directories:
+      - ${HOME}/.cache/pants/rust/cargo
+      - build-support/pants_dev_deps.venv
+      - src/rust/engine/target
+
+# Travis cache config for jobs that run a bootstrapped pants.pex.
+pants_run_cache_config: &pants_run_cache_config
+  before_cache:
+    # Ensure permissions to do the below removals, which happen with or without caching enabled.
+    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
+    # effect on resolution time is in the noise, but they are
+    # re-timestamped in internal comments and fields on each run and this
+    # leads to travis-ci cache thrash.  Kill these files before the cache
+    # check to avoid un-needed cache re-packing and re-upload (a ~100s
+    # operation).
+    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
+    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
+    # We have several tests that do local file:// url resolves for
+    # com.example artifacts, these disrupt the cache but are fast since
+    # they're resolved from local files when omitted from the cache.
+    - rm -rf ${HOME}/.ivy2/pants/com.example
+    # Render a summary to assist with further tuning the cache.
+    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
+  cache:
+    # The default timeout is 180 seconds, and our larger cache uploads exceed this.
+    # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
+    timeout: 500
+    directories:
+      - ${HOME}/.cache/pants/tools
+      - ${HOME}/.cache/pants/zinc
+      - ${HOME}/.ivy2/pants
+      # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
+      # using its own isolated cache:
+      #   https://github.com/pantsbuild/pants/issues/2485
+      - ${HOME}/.npm
+
+default_linux_config: &default_linux_config
   os: linux
   dist: xenial
   sudo: required
@@ -87,29 +88,42 @@ default_test_config: &default_test_config
         - python-dev
         - openssl
         - libssl-dev
-  stage: *test
+        - jq
+        - unzip
   language: python
   python: &python_version "2.7"
   before_install:
-{{>before_install}}
-  before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY}
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+  after_failure:
+    - ./build-support/bin/ci-failure.sh
 
-
-osx_test_config: &osx_test_config
-  os: osx
+default_linux_test_config: &default_linux_test_config
+  <<: *default_linux_config
+  <<: *pants_run_cache_config
   stage: *test
-  language: generic
-  script:
-    - MODE=debug ./build-support/bin/travis-ci.sh -m
+  before_install:
+    {{>before_install_linux}}
+  before_script:
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.linux
 
-default_cron_test_config: &default_cron_test_config
-  <<: *default_test_config
-  stage: *cron
+default_osx_config: &default_osx_config
+  os: osx
+  language: generic
+  before_install:
+    {{>before_install_osx}}
+
+default_osx_test_config: &default_osx_test_config
+  <<: *default_osx_config
+  <<: *pants_run_cache_config
+  stage: *test
+  before_script:
+    - ulimit -c unlimited
+    - ulimit -n 8192
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.osx
 
 linux_with_fuse: &linux_with_fuse
   before_install:
-{{>before_install}}
+    {{>before_install_linux}}
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
@@ -117,46 +131,15 @@ linux_with_fuse: &linux_with_fuse
 
 matrix:
   include:
-    - <<: *default_test_config
-      name: "Bootstrap Pants"
+    - <<: *default_linux_config
+      <<: *native_engine_cache_config
+      name: "Build Linux native engine and pants.pex"
       stage: *bootstrap
-      before_script:
-      script:
-        - ./build-support/bin/travis-ci.sh  # With no args this script just bootstraps.
-        - aws --no-sign-request --region us-east-1 s3 cp ./pants.pex ${BOOTSTRAPPED_PEX_URL}
-
-    # Build macOS engine
-    - name: "OSX Native Engine Binary Builder"
-      os: osx
-      # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
-      # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
-      # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
-      osx_image: xcode8
-      stage: *test
-      language: generic
-      env:
-        - PREPARE_DEPLOY=1
-      script:
-        - ./pants --version && ./build-support/bin/release.sh -n
-
-    # TODO: Update this to use 10.14 once it is available
-    - name: "OSX 10.12 Sanity Check"
-      <<: *osx_test_config
-      osx_image: xcode9.2
-
-    - name: "OSX 10.13 Sanity Check"
-      <<: *osx_test_config
-      osx_image: xcode10.1
-
-    # Build Linux engine
-    - name: "Linux Native Engine Binary Builder"
-      os: linux
-      stage: *test
-      language: generic
       services:
         - docker
       env:
-        - PREPARE_DEPLOY=1
+        - CACHE_NAME=linuxpexbuild
+        - PREPARE_DEPLOY=1  # To deploy fs_util.
       before_script:
         - ulimit -c unlimited
       script:
@@ -165,22 +148,83 @@ matrix:
           --build-arg "TRAVIS_UID=$(id -u)"
           --build-arg "TRAVIS_GROUP=$(id -gn)"
           --build-arg "TRAVIS_GID=$(id -g)"
-            build-support/docker/travis_ci/
-        # Mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain
+          build-support/docker/travis_ci/
+        # Note that:
+        # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
+        # * With no args ci.sh just bootstraps a pants.pex.
+        # * We also build fs_util, to take advantage of the rust code built during bootstrapping.
         - docker run --rm -t
           -v "${HOME}:/travis/home"
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
-          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
+          sh -c "./build-support/bin/ci.sh && ./build-support/bin/release.sh -f"
+        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.linux
+
+    # Build macOS engine
+    - <<: *default_osx_config
+      <<: *native_engine_cache_config
+      name: "Build OSX native engine and pants.pex"
+      stage: *bootstrap
+      # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
+      # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
+      # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
+      osx_image: xcode8
+      env:
+        - CACHE_NAME=macospexbuild
+        - PREPARE_DEPLOY=1  # To deploy fs_util.
+      script:
+        # With no args ci.sh just bootstraps a pants.pex. We also build fs_util, to take advantage
+        # of the rust code built during bootstrapping.
+        - ./build-support/bin/ci.sh && ./build-support/bin/release.sh -f
+        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.osx
       after_failure:
-        - build-support/bin/ci-failure.sh
+        - ./build-support/bin/ci-failure.sh
+
+    - <<: *default_linux_test_config
+      name: "Build Linux wheels"
+      stage: *test
+      env:
+        - CACHE_NAME=linuxwheelsbuild
+        - RUN_PANTS_FROM_PEX=1
+        - PREPARE_DEPLOY=1
+      script:
+        - ./build-support/bin/release.sh -n
+
+    - <<: *default_osx_test_config
+      name: "Build OSX wheels"
+      osx_image: xcode8
+      env:
+        - CACHE_NAME=osxwheelsbuild
+        - RUN_PANTS_FROM_PEX=1
+        - PREPARE_DEPLOY=1
+      script:
+        - ./build-support/bin/release.sh -n
+
+    # TODO: Update this to use 10.14 once it is available
+    - <<: *default_osx_test_config
+      name: "OSX 10.12 sanity check"
+      osx_image: xcode9.2
+      env:
+        - CACHE_NAME=macos10.12sanity
+      script:
+        - MODE=debug ./build-support/bin/travis-ci.sh -bm
+
+    - <<: *default_osx_test_config
+      name: "OSX 10.13 sanity check"
+      osx_image: xcode10.1
+      env:
+        - CACHE_NAME=macos10.13sanity
+      script:
+        - MODE=debug ./build-support/bin/travis-ci.sh -bm
 
     # Deploy Pex Stable
-    - name: "Deploy Pants PEX"
+    - name: "Deploy stable multiplatform pants.pex"
       os: linux
       language: python
       stage: *build_stable
       env:
+        - CACHE_NAME=linuxpexdeploystable
+        - RUN_PANTS_FROM_PEX=1
         - PANTS_PEX_RELEASE=stable
       script:
         - ./build-support/bin/release.sh -p
@@ -199,55 +243,68 @@ matrix:
           repo: pantsbuild/pants
 
     # Deploy Pex Unstable to s3
-    - name: "Deploy Pants PEX Unstable"
+    - name: "Deploy unstable multiplatform pants.pex"
       os: linux
       language: python
       stage: *build_unstable
       env:
+        - CACHE_NAME=linuxpexdeployunstable
+        - RUN_PANTS_FROM_PEX=1
         - PREPARE_DEPLOY=1
       script:
         - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       <<: *linux_with_fuse
-      name: "Self checks, lint, and JVM tests"
+      name: "Self-checks, lint, and JVM tests"
+      env:
+        - CACHE_NAME=linuxselfchecks
       script:
-        - ./build-support/bin/travis-ci.sh -fbkmrjt
+        - ./build-support/bin/travis-ci.sh -fbmrjt
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py2 - Unit tests for pants and pants-plugins"
+      env:
+        - CACHE_NAME=linuxunittests.py2
       script:
         - ./build-support/bin/travis-ci.sh -blp
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py3 - Unit tests for pants and pants-plugins"
+      env:
+        - CACHE_NAME=linuxunittests.py3
       script:
         - ./build-support/bin/travis-ci.sh -3blp
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py2 - Python contrib tests"
+      env:
+        - CACHE_NAME=linuxcontribtests.py2
       script:
         - ./build-support/bin/travis-ci.sh -bn
 
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Py3 - Python contrib tests"
+      env:
+        - CACHE_NAME=linuxcontribtests.py3
       script:
         - ./build-support/bin/travis-ci.sh -3bn
 
 {{#integration_shards}}
-    - <<: *default_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants - shard {{.}}"
       env:
-        - CACHE_NAME=integrationshard{{.}}  # Ensure distinct caches.
+        - CACHE_NAME=integrationshard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -bc3 -i {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 {{#integration_shards}}
-    - <<: *default_cron_test_config
+    - <<: *default_linux_test_config
       name: "Integration tests for pants (Python 2) - shard {{.}}"
+      stage: *cron
       env:
-        - CACHE_NAME=cronshard{{.}}  # Ensure distinct caches.
+        - CACHE_NAME=cronshard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -bc -i {{.}}/{{integration_shards_length}}
 
@@ -255,7 +312,10 @@ matrix:
 
     # Rust on linux
     - <<: *linux_with_fuse
-      name: "Rust Tests Linux"
+      <<: *native_engine_cache_config
+      name: "Linux Rust tests"
+      env:
+        - CACHE_NAME=linuxrusttests
       os: linux
       dist: xenial
       sudo: required
@@ -267,31 +327,31 @@ matrix:
         - ulimit -n 8192
       script:
         - ./build-support/bin/travis-ci.sh -be
+
     # Rust on macOS
-    - name: "Rust + Platform-specific Tests OSX"
-      os: osx
+    - <<: *default_osx_test_config
+      name: "OSX Rust + platform-specific tests"
+      env:
+        - CACHE_NAME=macosrusttests
       # Fuse actually works on this image. It hangs on many others.
       osx_image: xcode8.3
-      stage: *test
-      language: generic
       # TODO: workaround for Homebrew bug triggered by running `brew update`. 
       # Follow at https://github.com/Homebrew/brew/issues/5513 and remove this workaround once its fixed.
       env:
         - HOMEBREW_LOGS=~/homebrew-logs
         - HOMEBREW_TEMP=~/homebrew-temp
       before_install:
+        {{>before_install_osx}}
         - brew tap caskroom/cask && brew update && brew cask install osxfuse
-      before_script:
-        - ulimit -c unlimited
-        - ulimit -n 8192
       script:
-        # Platform-specific tests currently need a pants pex, so we bootstrap here (no -b) and
-        # set -z to run the platform-specific tests.
-        - ./build-support/bin/travis-ci.sh -ez
+        - ./build-support/bin/travis-ci.sh -bez
 
     # Rust Clippy on Linux
     - <<: *linux_with_fuse
-      name: "Rust Clippy on Linux"
+      <<: *native_engine_cache_config
+      name: "Linux Rust Clippy"
+      env:
+        - CACHE_NAME=linuxclippy
       os: linux
       dist: xenial
       sudo: required
@@ -307,6 +367,8 @@ matrix:
     # Cargo audit
     - <<: *linux_with_fuse
       name: "Cargo audit"
+      env:
+        - CACHE_NAME=linuxcargoaudit
       os: linux
       dist: xenial
       sudo: required
@@ -315,6 +377,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -ba
 
 deploy:
+  # Deploy whatever a previous stage has left in dist/deploy.
   # See: https://docs.travis-ci.com/user/deployment/s3/
   provider: s3
   access_key_id: AKIAIWOKBXVU3JLY6EGQ
