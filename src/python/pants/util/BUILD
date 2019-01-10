@@ -26,8 +26,8 @@ python_library(
 )
 
 python_library(
-  name = 'collections_backport',
-  sources = ['collections_backport.py'],
+  name = 'collections_abc_backport',
+  sources = ['collections_abc_backport.py'],
   dependencies = [
     '3rdparty/python:future',
   ]
@@ -112,7 +112,7 @@ python_library(
   name = 'objects',
   sources = ['objects.py'],
   dependencies = [
-    'src/python/pants/util:collections_backport',
+    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
     ':memo',

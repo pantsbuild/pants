@@ -20,7 +20,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.task.task import Task
-from pants.util.collections_backport import OrderedDict
+from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import safe_delete
 
 

@@ -11,7 +11,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathEntry, Classpath
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
-from pants.util.collections_backport import OrderedDict
+from pants.util.collections_abc_backport import OrderedDict
 from pants_test.test_base import TestBase
 
 

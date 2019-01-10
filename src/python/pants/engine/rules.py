@@ -18,7 +18,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.engine.selectors import Get, type_or_constraint_repr
 from pants.util.collections import assert_single_element
-from pants.util.collections_backport import Iterable, OrderedDict
+from pants.util.collections_abc_backport import Iterable, OrderedDict
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
 from pants.util.objects import Exactly, datatype

@@ -17,7 +17,7 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.engine.rules import RuleIndex
 from pants.option.optionable import Optionable
 from pants.subsystem.subsystem import Subsystem
-from pants.util.collections_backport import Iterable, namedtuple
+from pants.util.collections_abc_backport import Iterable, namedtuple
 from pants.util.memo import memoized_method
 
 

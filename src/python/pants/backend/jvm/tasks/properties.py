@@ -9,7 +9,7 @@ from builtins import next, object, open, str
 
 import six
 
-from pants.util.collections_backport import OrderedDict
+from pants.util.collections_abc_backport import OrderedDict
 
 
 class Properties(object):

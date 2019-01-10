@@ -29,7 +29,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.task.task import Task
 from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
-from pants.util.collections_backport import OrderedDict
+from pants.util.collections_abc_backport import OrderedDict
 from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property

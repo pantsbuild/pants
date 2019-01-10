@@ -10,7 +10,7 @@ from io import StringIO
 from tempfile import NamedTemporaryFile
 
 from pants.backend.jvm.tasks.properties import Properties
-from pants.util.collections_backport import OrderedDict
+from pants.util.collections_abc_backport import OrderedDict
 
 
 class PropertiesTest(unittest.TestCase):

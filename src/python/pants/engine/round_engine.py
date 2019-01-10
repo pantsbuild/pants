@@ -13,7 +13,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.legacy_engine import Engine
 from pants.engine.round_manager import RoundManager
-from pants.util.collections_backport import OrderedDict, namedtuple
+from pants.util.collections_abc_backport import OrderedDict, namedtuple
 
 
 class GoalExecutor(object):

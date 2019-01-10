@@ -8,7 +8,7 @@ import re
 
 from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
-from pants.util.collections_backport import OrderedDict
+from pants.util.collections_abc_backport import OrderedDict
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 

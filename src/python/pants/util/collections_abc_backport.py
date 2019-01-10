@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from future.utils import PY2, PY3
 
 
-"""Custom backport of collections, due to limitations with future.moves.
+"""Custom backport of collections.abc, due to limitations with future.moves.
 In Python 3, multiple classes moved from collections to collections.abc, such as Iterable and Mapping. The backport 
 future.moves.collections fails to support these values, so we must use our own custom interface.
 

@@ -14,7 +14,7 @@ from builtins import object, open
 from io import StringIO
 
 import six
-from pants.util.collections_backport import Sequence
+from pants.util.collections_abc_backport import Sequence
 
 
 __all__ = (

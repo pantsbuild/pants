@@ -30,7 +30,7 @@ from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.java.util import execute_runner
-from pants.util.collections_backport import OrderedDict, defaultdict, namedtuple
+from pants.util.collections_abc_backport import OrderedDict, defaultdict, namedtuple
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir, safe_open
 from pants.util.fileutil import atomic_copy, safe_hardlink_or_copy
 

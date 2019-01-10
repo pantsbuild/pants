@@ -24,7 +24,7 @@ from pants.engine.parser import TargetAdaptorContainer
 from pants.engine.rules import RootRule, SingletonRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
-from pants.util.collections_backport import MutableMapping, MutableSequence
+from pants.util.collections_abc_backport import MutableMapping, MutableSequence
 from pants.util.objects import TypeConstraintError, datatype
 
 
