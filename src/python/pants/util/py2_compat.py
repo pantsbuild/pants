@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from future.utils import PY3
 
+
 if PY3:
   import configparser  # noqa: F401
 else:
