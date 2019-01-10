@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from contextlib import contextmanager
 
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
@@ -15,6 +16,7 @@ from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.base.workunit import WorkUnitLabel
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
+from pants.util.strutil import safe_shlex_join
 
 
 class PythonToolInstance(object):
@@ -25,8 +27,9 @@ class PythonToolInstance(object):
   def pex(self):
     return self._pex
 
-  def run(self, workunit_factory, args, **kwargs):
-    cmdline = ' '.join(self._pex.cmdline(args))
+  @contextmanager
+  def run_with(self, workunit_factory, args, **kwargs):
+    cmdline = safe_shlex_join(self._pex.cmdline(args))
     with workunit_factory(cmd=cmdline) as workunit:
       exit_code = self._pex.run(args,
                                 stdout=workunit.output('stdout'),
@@ -34,6 +37,10 @@ class PythonToolInstance(object):
                                 with_chroot=False,
                                 blocking=True,
                                 **kwargs)
+      yield cmdline, exit_code, workunit
+
+  def run(self, *args, **kwargs):
+    with self.run_with(*args, **kwargs) as (cmdline, exit_code, _):
       return cmdline, exit_code
 
 

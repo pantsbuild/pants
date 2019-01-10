@@ -10,12 +10,12 @@ from pants.backend.native.config.environment import Linker, Platform
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.native_compile import ObjectFiles
-from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFiles
 from pants.backend.native.tasks.native_task import NativeTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_property
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.objects import datatype
 from pants.util.process_handler import subprocess
 
 
@@ -37,10 +37,6 @@ class LinkSharedLibraries(NativeTask):
 
   options_scope = 'link-shared-libraries'
 
-  # TODO(#6486): change this to include ExternalNativeLibrary, then add a test that strict-deps
-  # works on external libs.
-  source_target_constraint = SubclassesOf(NativeLibrary)
-
   @classmethod
   def product_types(cls):
     return [SharedLibrary]
@@ -49,7 +45,6 @@ class LinkSharedLibraries(NativeTask):
   def prepare(cls, options, round_manager):
     super(LinkSharedLibraries, cls).prepare(options, round_manager)
     round_manager.require(ObjectFiles)
-    round_manager.optional_product(NativeExternalLibraryFiles)
 
   @property
   def cache_target_dirs(self):
@@ -76,7 +71,6 @@ class LinkSharedLibraries(NativeTask):
     targets_providing_artifacts = self.context.targets(NativeLibrary.produces_ctypes_native_library)
     compiled_objects_product = self.context.products.get(ObjectFiles)
     shared_libs_product = self.context.products.get(SharedLibrary)
-    external_libs_product = self.context.products.get_data(NativeExternalLibraryFiles)
 
     all_shared_libs_by_name = {}
 
@@ -89,8 +83,7 @@ class LinkSharedLibraries(NativeTask):
           # TODO: We need to partition links based on proper dependency edges and not
           # perform a link to every native_external_library for all targets in the closure.
           # https://github.com/pantsbuild/pants/issues/6178
-          link_request = self._make_link_request(
-            vt, compiled_objects_product, external_libs_product)
+          link_request = self._make_link_request(vt, compiled_objects_product)
           self.context.log.debug("link_request: {}".format(link_request))
           shared_library = self._execute_link_request(link_request)
 
@@ -116,7 +109,7 @@ class LinkSharedLibraries(NativeTask):
                                           .format(path_to_cached_lib))
     return SharedLibrary(name=native_artifact.lib_name, path=path_to_cached_lib)
 
-  def _make_link_request(self, vt, compiled_objects_product, external_libs_product):
+  def _make_link_request(self, vt, compiled_objects_product):
     self.context.log.debug("link target: {}".format(vt.target))
 
     deps = self.native_deps(vt.target)
@@ -133,11 +126,10 @@ class LinkSharedLibraries(NativeTask):
 
     external_lib_dirs = []
     external_lib_names = []
-    if external_libs_product is not None:
-      for nelf in external_libs_product.get_for_targets(deps):
-        if nelf.lib_dir:
-          external_lib_dirs.append(nelf.lib_dir)
-        external_lib_names.extend(nelf.lib_names)
+    for ext_dep in self.packaged_native_deps(vt.target):
+      external_lib_dirs.append(
+        os.path.join(get_buildroot(), ext_dep.address.spec_path, ext_dep.lib_relpath))
+      external_lib_names.extend(ext_dep.native_lib_names)
 
     link_request = LinkSharedLibraryRequest(
       linker=self.linker,

@@ -128,6 +128,7 @@ class SimpleCodegenTask(Task):
     """
     return []
 
+  # TODO: this has no users in this repo -- deprecate it!
   def synthetic_target_type_by_target(self, target):
     """The type of target this codegen task generates.
 
@@ -176,6 +177,7 @@ class SimpleCodegenTask(Task):
 
     :return: an iterable of dependency targets.
     """
+    # TODO: use self.get_targets()?
     return self.context.targets(self.is_gentarget)
 
   def _do_validate_sources_present(self, target):
