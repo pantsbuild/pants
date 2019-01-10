@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -17,7 +18,7 @@ use crate::{
   GlobWithSource, Link, PathGlob, PathGlobs, PathStat, Stat, VFS,
 };
 
-pub trait GlobMatching<E: Send + Sync + 'static>: VFS<E> {
+pub trait GlobMatching<E: Display + Send + Sync + 'static>: VFS<E> {
   ///
   /// Canonicalize the Link for the given Path to an underlying File or Dir. May result
   /// in None if the PathStat represents a broken Link.
@@ -38,7 +39,7 @@ pub trait GlobMatching<E: Send + Sync + 'static>: VFS<E> {
   }
 }
 
-impl<E: Send + Sync + 'static, T: VFS<E>> GlobMatching<E> for T {}
+impl<E: Display + Send + Sync + 'static, T: VFS<E>> GlobMatching<E> for T {}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum GlobMatch {
@@ -77,7 +78,7 @@ struct PathGlobsExpansion<T: Sized> {
 // traits don't allow specifying private methods (and we don't want to use a top-level `fn` because
 // it's much more awkward than just specifying `&self`).
 // The methods of `GlobMatching` are forwarded to methods here.
-trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
+trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
   fn directory_listing(
     &self,
     canonical_dir: Dir,
@@ -399,10 +400,11 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
   }
 
   fn canonicalize(&self, symbolic_path: PathBuf, link: &Link) -> BoxFuture<Option<PathStat>, E> {
+    let link = link.clone();
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
     let context = self.clone();
     self
-      .read_link(link)
+      .read_link(&link)
       .map(|dest_path| {
         // If the link destination can't be parsed as PathGlob(s), it is broken.
         dest_path
@@ -413,11 +415,12 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
           })
           .unwrap_or_else(|| vec![])
       })
-      .and_then(|link_globs| {
-        let new_path_globs =
-          future::result(PathGlobs::from_globs(link_globs)).map_err(|e| Self::mk_error(e.as_str()));
-        new_path_globs.and_then(move |path_globs| context.expand(path_globs))
+      .and_then(move |link_globs| {
+        future::result(PathGlobs::from_globs(link_globs))
+          .map_err(|e| Self::mk_error(e.as_str()))
+          .and_then(move |path_globs| context.expand(path_globs))
       })
+      .map_err(move |e| Self::mk_error(&format!("While expanding link {:?}: {}", link.0, e)))
       .map(|mut path_stats| {
         // Since we've escaped any globs in the parsed path, expect either 0 or 1 destination.
         path_stats.pop().map(|ps| match ps {
@@ -429,4 +432,4 @@ trait GlobMatchingImplementation<E: Send + Sync + 'static>: VFS<E> {
   }
 }
 
-impl<E: Send + Sync + 'static, T: VFS<E>> GlobMatchingImplementation<E> for T {}
+impl<E: Display + Send + Sync + 'static, T: VFS<E>> GlobMatchingImplementation<E> for T {}

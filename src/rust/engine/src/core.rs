@@ -240,6 +240,15 @@ pub enum Failure {
   Throw(Value, String),
 }
 
+impl fmt::Display for Failure {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      Failure::Invalidated => write!(f, "Exhausted retries due to changed files."),
+      Failure::Throw(exc, _) => write!(f, "{}", externs::val_to_str(exc)),
+    }
+  }
+}
+
 pub fn throw(msg: &str) -> Failure {
   Failure::Throw(
     externs::create_exception(msg),
