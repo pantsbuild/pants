@@ -12,7 +12,7 @@ import threading
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
 from builtins import object, open, str
-from collections import OrderedDict, defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 from functools import total_ordering
 
 import six
@@ -31,6 +31,7 @@ from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.java.util import execute_runner
+from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir, safe_open
 from pants.util.fileutil import atomic_copy, safe_hardlink_or_copy
 
