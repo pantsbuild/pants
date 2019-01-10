@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 from builtins import next
-from collections import MutableMapping, MutableSequence
 from os.path import dirname, join
 
 import six
@@ -25,6 +24,7 @@ from pants.engine.parser import TargetAdaptorContainer
 from pants.engine.rules import RootRule, SingletonRule, rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
+from pants.util.collections_abc_backport import MutableMapping, MutableSequence
 from pants.util.objects import TypeConstraintError, datatype
 
 

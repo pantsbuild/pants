@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import object
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
 
 from twitter.common.collections.orderedset import OrderedSet
 
@@ -14,6 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.legacy_engine import Engine
 from pants.engine.round_manager import RoundManager
+from pants.util.collections_abc_backport import OrderedDict
 
 
 class GoalExecutor(object):

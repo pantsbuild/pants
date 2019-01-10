@@ -5,6 +5,7 @@ python_library(
   name='interpreter_cache_test_mixin',
   sources=['interpreter_cache_test_mixin.py'],
   dependencies = [
+    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:future',
   ]
 )

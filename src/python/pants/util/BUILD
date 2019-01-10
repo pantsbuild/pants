@@ -26,6 +26,14 @@ python_library(
 )
 
 python_library(
+  name = 'collections_abc_backport',
+  sources = ['collections_abc_backport.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ]
+)
+
+python_library(
   name = 'debug',
   sources = ['debug.py'],
   dependencies = [
@@ -106,6 +114,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
+    ':collections_abc_backport',
     ':memo',
     ':meta',
   ],

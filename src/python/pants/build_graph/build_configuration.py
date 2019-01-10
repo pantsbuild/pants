@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 from builtins import object, str
-from collections import Iterable, namedtuple
+from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
@@ -18,6 +18,7 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.engine.rules import RuleIndex
 from pants.option.optionable import Optionable
 from pants.subsystem.subsystem import Subsystem
+from pants.util.collections_abc_backport import Iterable
 from pants.util.memo import memoized_method
 
 
