@@ -208,7 +208,7 @@ class RscCompile(ZincCompile):
 
     for target in targets:
       rsc_cc, compile_cc = compile_contexts[target]
-      if self._only_zinc_compileable(target):
+      if self._only_zinc_compilable(target):
         self.context.products.get_data('rsc_classpath').add_for_target(
           compile_cc.target,
           confify([compile_cc.jar_file])
@@ -237,7 +237,7 @@ class RscCompile(ZincCompile):
   def _rsc_compilable(self, target):
     return target.has_sources('.scala') and not target.has_sources('.java')
 
-  def _only_zinc_compileable(self, target):
+  def _only_zinc_compilable(self, target):
     return target.has_sources('.java')
 
   def _is_scala_core_library(self, target):
@@ -260,10 +260,10 @@ class RscCompile(ZincCompile):
       return True
     if not isinstance(target, JvmTarget):
       return False
-    return self._only_zinc_compileable(target) or self._rsc_compilable(target)
+    return self._only_zinc_compilable(target) or self._rsc_compilable(target)
 
   def _rsc_key_for_target(self, compile_target):
-    if self._only_zinc_compileable(compile_target):
+    if self._only_zinc_compilable(compile_target):
       # rsc outlining with java dependencies depends on the output of a second metacp job.
       return self._metacp_key_for_target(compile_target)
     elif self._rsc_compilable(compile_target):
@@ -274,7 +274,7 @@ class RscCompile(ZincCompile):
       raise TaskError('unexpected target for compiling with rsc .... {}'.format(compile_target))
 
   def _metacp_dep_key_for_target(self, compile_target):
-    if self._only_zinc_compileable(compile_target):
+    if self._only_zinc_compilable(compile_target):
       # rsc outlining with java dependencies depends on the output of a second metacp job.
       return self._metacp_key_for_target(compile_target)
     elif self._rsc_compilable(compile_target):
@@ -583,7 +583,7 @@ class RscCompile(ZincCompile):
 
     # Create the rsc job.
     # Currently, rsc only supports outlining scala.
-    if self._only_zinc_compileable(compile_target):
+    if self._only_zinc_compilable(compile_target):
       pass
     elif self._rsc_compilable(compile_target):
       rsc_key = self._rsc_key_for_target(compile_target)
@@ -653,7 +653,7 @@ class RscCompile(ZincCompile):
           on_failure=ivts.force_invalidate,
         )
       )
-    elif self._only_zinc_compileable(compile_target):
+    elif self._only_zinc_compilable(compile_target):
       # write to both rsc classpath and runtime classpath
       class CompositeProductAdder(object):
         def __init__(self, runtime_classpath_product, rsc_classpath_product):
