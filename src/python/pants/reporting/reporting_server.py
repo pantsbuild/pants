@@ -30,7 +30,7 @@ from pants.stats.statsdb import StatsDBFactory
 logger = logging.getLogger(__name__)
 
 # Google Prettyprint plugin files.
-PPP_RE = re.compile("""^lang-.*\.js$""")
+PPP_RE = re.compile(r"^lang-.*\.js$")
 
 
 class PantsHandler(http.server.BaseHTTPRequestHandler):

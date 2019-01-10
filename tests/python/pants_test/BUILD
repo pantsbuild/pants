@@ -53,7 +53,6 @@ python_library(
   ],
   dependencies = [
     '3rdparty/python:future',
-    '3rdparty/python:configparser',
     '3rdparty/python:ansicolors',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
@@ -62,6 +61,7 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
+    'src/python/pants/util:py2_compat',
     'tests/python/pants_test/testutils:file_test_util',
     'tests/python/pants_test/testutils:pexrc_util',
   ]
