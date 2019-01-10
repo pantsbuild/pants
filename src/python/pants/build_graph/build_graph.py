@@ -8,6 +8,7 @@ import itertools
 import logging
 from abc import abstractmethod
 from builtins import filter, object
+from collections import defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
@@ -15,7 +16,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.build_graph.target import Target
-from pants.util.collections_abc_backport import OrderedDict, defaultdict, deque
+from pants.util.collections_abc_backport import OrderedDict
 from pants.util.meta import AbstractClass
 
 
