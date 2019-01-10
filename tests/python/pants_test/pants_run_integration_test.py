@@ -13,7 +13,6 @@ from contextlib import contextmanager
 from operator import eq, ne
 from threading import Lock
 
-from backports import configparser
 from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
@@ -25,6 +24,7 @@ from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_op
 from pants.util.objects import Exactly, datatype
 from pants.util.osutil import IntegerForPid
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
+from pants.util.py2_compat import configparser
 from pants.util.strutil import ensure_binary
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 

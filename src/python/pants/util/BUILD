@@ -130,6 +130,15 @@ python_library(
 )
 
 python_library(
+  name = 'py2_compat',
+  sources = ['py2_compat.py'],
+  dependencies= [
+    '3rdparty/python:future',
+    '3rdparty/python:configparser',
+  ]
+)
+
+python_library(
   name = 'retry',
   sources = ['retry.py'],
   dependencies = [
