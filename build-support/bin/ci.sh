@@ -118,15 +118,20 @@ if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   end_travis_section
 fi
 
+# Determine interpreter for both under-the-hood and for subprocesses.
+# Order matters here. We must constrain subprocesses before running the bootstrap stage,
+# or we will encounter the _Py_Dealloc error when running `./pants.pex -V` with Python 3 under-the-hood.
+if [[ "${python_two:-false}" == "false" ]]; then
+  py_version_number="3"
+  pants_script="./pants3"
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
+else
+  py_version_number="2"
+  pants_script="./pants"
+fi
+banner "Using Python ${py_version_number} to execute subprocesses."
+
 if [[ "${run_bootstrap:-true}" == "true" ]]; then
-  # determine interpreter
-  if [[ "${python_two:-false}" == "false" ]]; then
-    py_version_number="3"
-    pants_script="./pants3"
-  else
-    py_version_number="2"
-    pants_script="./pants"
-  fi
   start_travis_section "Bootstrap" "Bootstrapping pants with Python ${py_version_number} under-the-hood."
   (
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
@@ -146,12 +151,6 @@ fi
 # integration tests that shell out to `./pants`, so we set this env var for those cases.
 export RUN_PANTS_FROM_PEX=1
 
-# NB: In addition to choosing which interpreter we use under-the-hood to bootstrap Pants,
-# we must also set interpreter constraints for any subprocesses to use the corresponding interpreter.
-if [[ "${python_two:-false}" == "false" ]]; then
-  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
-fi
-banner "Using Python ${py_version_number} to execute subprocesses."
 # TODO: Clear interpreters, otherwise this constraint does not end up applying due to a cache
 # bug between the `./pants binary` and further runs.
 ./pants.pex clean-all
