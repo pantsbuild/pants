@@ -14,8 +14,15 @@ from builtins import object, open
 from io import StringIO
 
 import six
-from pants.util.collections_abc_backport import Sequence
+from future.utils import PY3
 
+
+# NB: we cannot use `pants.util.collections_abc_backport` because this library
+# must exist entirely independently of Pants src code.
+if PY3:
+  from collections.abc import Sequence
+else:
+  from collections import Sequence
 
 __all__ = (
   'CheckstylePlugin',
