@@ -131,10 +131,10 @@ base_osx_config: &base_osx_config
   language: generic
   # TODO: workaround for Homebrew bug triggered by running `brew update`.
   # Follow at https://github.com/Homebrew/brew/issues/5513 and remove this workaround once its fixed.
-  env:
+  env: &base_osx_config_env
     - HOMEBREW_LOGS=~/homebrew-logs
     - HOMEBREW_TEMP=~/homebrew-temp
-  before_install:
+  before_install: &base_osx_config_before_install
     {{>before_install_osx}}
 
 py2_osx_config: &py2_osx_config
@@ -143,6 +143,7 @@ py2_osx_config: &py2_osx_config
 py3_osx_config: &py3_osx_config
   <<: *base_osx_config
   before_install:
+    - <<: *base_osx_config_before_install
     # Upgrade to Python 3
     - brew upgrade python
 
@@ -159,12 +160,14 @@ py2_osx_test_config: &py2_osx_test_config
   <<: *py2_osx_config
   <<: *base_osx_test_config
   env:
+    - <<: *base_osx_config_env
     - BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.osx"
 
 py3_osx_test_config: &py3_osx_test_config
   <<: *py3_osx_config
   <<: *base_osx_test_config
   env:
+    - <<: *base_osx_config_env
     - BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.osx"
 
 base_linux_build_engine: &base_linux_build_engine
@@ -173,7 +176,7 @@ base_linux_build_engine: &base_linux_build_engine
   stage: *bootstrap
   services:
     - docker
-  env:
+  env: &base_linux_build_engine_env
     - PREPARE_DEPLOY=1  # To deploy fs_util.
   before_script:
     - ulimit -c unlimited
@@ -200,6 +203,7 @@ py2_linux_build_engine: &py2_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and Python 2 pants.pex"
   env:
+    - <<: *base_linux_build_engine_env
     - CACHE_NAME=linuxpexbuild_py2
     - BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.linux"
 
@@ -208,6 +212,7 @@ py3_linux_build_engine: &py3_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and Python 3 pants.pex"
   env:
+    - <<: *base_linux_build_engine_env
     - CACHE_NAME=linuxpexbuild_py3
     - BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.linux"
 
@@ -219,7 +224,7 @@ base_osx_build_engine: &base_osx_build_engine
   # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
   # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
   osx_image: xcode8
-  env:
+  env: &base_osx_build_engine_env
     - PREPARE_DEPLOY=1  # To deploy fs_util.
   script:
     # With no args ci.sh just bootstraps a pants.pex. We also build fs_util, to take advantage
@@ -234,6 +239,7 @@ py2_osx_build_engine: &py2_osx_build_engine
   <<: *base_osx_build_engine
   name: "Build OSX native engine and Python 2 pants.pex"
   env:
+    - <<: *base_osx_build_engine_env
     - CACHE_NAME=osxpexbuild_py2
     - BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.osx"
 
@@ -242,6 +248,7 @@ py3_osx_build_engine: &py3_osx_build_engine
   <<: *base_osx_build_engine
   name: "Build OSX native engine and Python 3 pants.pex"
   env:
+    - <<: *base_osx_build_engine_env
     - CACHE_NAME=osxpexbuild_py3
     - BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.osx"
 
