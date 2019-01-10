@@ -75,7 +75,7 @@ pants_run_cache_config: &pants_run_cache_config
       #   https://github.com/pantsbuild/pants/issues/2485
       - ${HOME}/.npm
 
-default_linux_config: &default_linux_config
+base_linux_config: &base_linux_config
   os: linux
   dist: xenial
   sudo: required
@@ -92,22 +92,41 @@ default_linux_config: &default_linux_config
         - jq
         - unzip
   language: python
-  python: &python_version "3.6"
   before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
-default_linux_test_config: &default_linux_test_config
-  <<: *default_linux_config
+py2_linux_config: &py2_linux_config
+  <<: *base_linux_config
+  python: &python_version "2.7"
+
+py3_linux_config: &py3_linux_config
+  <<: *base_linux_config
+  python: &python_version "3.6"
+
+base_linux_test_config: &base_linux_test_config
+  <<: *base_linux_config
   <<: *pants_run_cache_config
   stage: *test
   before_install:
     {{>before_install_linux}}
   before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.linux
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
 
-default_osx_config: &default_osx_config
+py2_linux_test_config: &py2_linux_test_config
+  <<: *py2_linux_config
+  <<: *base_linux_test_config
+  env:
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.linux"
+
+py3_linux_test_config: &py3_linux_test_config
+  <<: *py3_linux_config
+  <<: *base_linux_test_config
+  env:
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.linux"
+
+base_osx_config: &base_osx_config
   os: osx
   language: generic
   # TODO: workaround for Homebrew bug triggered by running `brew update`.
@@ -118,14 +137,113 @@ default_osx_config: &default_osx_config
   before_install:
     {{>before_install_osx}}
 
-default_osx_test_config: &default_osx_test_config
-  <<: *default_osx_config
+py2_osx_config: &py2_osx_config
+  <<: *base_osx_config
+
+py3_osx_config: &py3_osx_config
+  <<: *base_osx_config
+  before_install:
+    # Upgrade to Python 3
+    - brew upgrade python
+
+base_osx_test_config: &base_osx_test_config
+  <<: *base_osx_config
   <<: *pants_run_cache_config
   stage: *test
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.osx
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+
+py2_osx_test_config: &py2_osx_test_config
+  <<: *py2_osx_config
+  <<: *base_osx_test_config
+  env:
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.osx"
+
+py3_osx_test_config: &py3_osx_test_config
+  <<: *py3_osx_config
+  <<: *base_osx_test_config
+  env:
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.osx"
+
+base_linux_build_engine: &base_linux_build_engine
+  <<: *base_linux_config
+  <<: *native_engine_cache_config
+  stage: *bootstrap
+  services:
+    - docker
+  env:
+    - PREPARE_DEPLOY=1  # To deploy fs_util.
+  before_script:
+    - ulimit -c unlimited
+  script:
+    - docker build --rm -t travis_ci
+      --build-arg "TRAVIS_USER=$(id -un)"
+      --build-arg "TRAVIS_UID=$(id -u)"
+      --build-arg "TRAVIS_GROUP=$(id -gn)"
+      --build-arg "TRAVIS_GID=$(id -g)"
+      build-support/docker/travis_ci/
+    # Note that:
+    # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
+    # * With no args ci.sh just bootstraps a pants.pex.
+    # * We also build fs_util, to take advantage of the rust code built during bootstrapping.
+    - docker run --rm -t
+      -v "${HOME}:/travis/home"
+      -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest
+      sh -c "./build-support/bin/ci.sh && ./build-support/bin/release.sh -f"
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+
+py2_linux_build_engine: &py2_linux_build_engine
+  <<: *py2_linux_config
+  <<: *base_linux_build_engine
+  name: "Build Linux native engine and Python 2 pants.pex"
+  env:
+    - CACHE_NAME=linuxpexbuild_py2
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.linux"
+
+py3_linux_build_engine: &py3_linux_build_engine
+  <<: *py3_linux_config
+  <<: *base_linux_build_engine
+  name: "Build Linux native engine and Python 3 pants.pex"
+  env:
+    - CACHE_NAME=linuxpexbuild_py3
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.linux"
+
+base_osx_build_engine: &base_osx_build_engine
+  <<: *base_osx_config
+  <<: *native_engine_cache_config
+  stage: *bootstrap
+  # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
+  # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
+  # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
+  osx_image: xcode8
+  env:
+    - PREPARE_DEPLOY=1  # To deploy fs_util.
+  script:
+    # With no args ci.sh just bootstraps a pants.pex. We also build fs_util, to take advantage
+    # of the rust code built during bootstrapping.
+    - ./build-support/bin/ci.sh && ./build-support/bin/release.sh -f
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+  after_failure:
+    - ./build-support/bin/ci-failure.sh
+
+py2_osx_build_engine: &py2_osx_build_engine
+  <<: *py2_osx_config
+  <<: *base_osx_build_engine
+  name: "Build OSX native engine and Python 2 pants.pex"
+  env:
+    - CACHE_NAME=osxpexbuild_py2
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.osx"
+
+py3_osx_build_engine: &py3_osx_build_engine
+  <<: *py3_osx_config
+  <<: *base_osx_build_engine
+  name: "Build OSX native engine and Python 3 pants.pex"
+  env:
+    - CACHE_NAME=osxpexbuild_py3
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.osx"
 
 linux_with_fuse: &linux_with_fuse
   before_install:
@@ -137,56 +255,12 @@ linux_with_fuse: &linux_with_fuse
 
 matrix:
   include:
-    - <<: *default_linux_config
-      <<: *native_engine_cache_config
-      name: "Build Linux native engine and pants.pex"
-      stage: *bootstrap
-      services:
-        - docker
-      env:
-        - CACHE_NAME=linuxpexbuild
-        - PREPARE_DEPLOY=1  # To deploy fs_util.
-      before_script:
-        - ulimit -c unlimited
-      script:
-        - docker build --rm -t travis_ci
-          --build-arg "TRAVIS_USER=$(id -un)"
-          --build-arg "TRAVIS_UID=$(id -u)"
-          --build-arg "TRAVIS_GROUP=$(id -gn)"
-          --build-arg "TRAVIS_GID=$(id -g)"
-          build-support/docker/travis_ci/
-        # Note that:
-        # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
-        # * With no args ci.sh just bootstraps a pants.pex.
-        # * We also build fs_util, to take advantage of the rust code built during bootstrapping.
-        - docker run --rm -t
-          -v "${HOME}:/travis/home"
-          -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-          travis_ci:latest
-          sh -c "./build-support/bin/ci.sh && ./build-support/bin/release.sh -f"
-        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.linux
+    - <<: *py2_linux_build_engine
+    - <<: *py3_linux_build_engine
+    - <<: *py2_osx_build_engine
+    - <<: *py3_osx_build_engine
 
-    # Build macOS engine
-    - <<: *default_osx_config
-      <<: *native_engine_cache_config
-      name: "Build OSX native engine and pants.pex"
-      stage: *bootstrap
-      # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
-      # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
-      # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
-      osx_image: xcode8
-      env:
-        - CACHE_NAME=macospexbuild
-        - PREPARE_DEPLOY=1  # To deploy fs_util.
-      script:
-        # With no args ci.sh just bootstraps a pants.pex. We also build fs_util, to take advantage
-        # of the rust code built during bootstrapping.
-        - ./build-support/bin/ci.sh && ./build-support/bin/release.sh -f
-        - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.osx
-      after_failure:
-        - ./build-support/bin/ci-failure.sh
-
-    - <<: *default_linux_test_config
+    - <<: *py3_linux_test_config
       name: "Build Linux wheels"
       stage: *test
       env:
@@ -196,7 +270,7 @@ matrix:
       script:
         - ./build-support/bin/release.sh -n
 
-    - <<: *default_osx_test_config
+    - <<: *py3_osx_test_config
       name: "Build OSX wheels"
       osx_image: xcode8
       env:
@@ -207,7 +281,7 @@ matrix:
         - ./build-support/bin/release.sh -n
 
     # TODO: Update this to use 10.14 once it is available
-    - <<: *default_osx_test_config
+    - <<: *py3_osx_test_config
       name: "OSX 10.12 sanity check"
       osx_image: xcode9.2
       env:
@@ -215,7 +289,7 @@ matrix:
       script:
         - MODE=debug ./build-support/bin/travis-ci.sh -bm
 
-    - <<: *default_osx_test_config
+    - <<: *py3_osx_test_config
       name: "OSX 10.13 sanity check"
       osx_image: xcode10.1
       env:
@@ -260,7 +334,7 @@ matrix:
       script:
         - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
-    - <<: *default_linux_test_config
+    - <<: *py3_linux_test_config
       <<: *linux_with_fuse
       name: "Self-checks, lint, and JVM tests"
       env:
@@ -268,28 +342,28 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -fbmrjt
 
-    - <<: *default_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Py2 - Unit tests for pants and pants-plugins"
       env:
         - CACHE_NAME=linuxunittests.py2
       script:
         - ./build-support/bin/travis-ci.sh -2blp
 
-    - <<: *default_linux_test_config
+    - <<: *py3_linux_test_config
       name: "Py3 - Unit tests for pants and pants-plugins"
       env:
         - CACHE_NAME=linuxunittests.py3
       script:
         - ./build-support/bin/travis-ci.sh -blp
 
-    - <<: *default_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Py2 - Python contrib tests"
       env:
         - CACHE_NAME=linuxcontribtests.py2
       script:
         - ./build-support/bin/travis-ci.sh -2bn
 
-    - <<: *default_linux_test_config
+    - <<: *py3_linux_test_config
       name: "Py3 - Python contrib tests"
       env:
         - CACHE_NAME=linuxcontribtests.py3
@@ -297,7 +371,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -bn
 
 {{#integration_shards}}
-    - <<: *default_linux_test_config
+    - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard {{.}}"
       env:
         - CACHE_NAME=integrationshard{{.}}
@@ -306,7 +380,7 @@ matrix:
 
 {{/integration_shards}}
 {{#integration_shards}}
-    - <<: *default_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Integration tests for pants (Python 2) - shard {{.}}"
       stage: *cron
       env:
@@ -335,7 +409,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -be
 
     # Rust on macOS
-    - <<: *default_osx_test_config
+    - <<: *py3_osx_test_config
       name: "OSX Rust + platform-specific tests"
       env:
         - CACHE_NAME=macosrusttests
