@@ -6,11 +6,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 from builtins import str
-from collections import OrderedDict, namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
+from pants.util.collections_backport import OrderedDict, namedtuple
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 

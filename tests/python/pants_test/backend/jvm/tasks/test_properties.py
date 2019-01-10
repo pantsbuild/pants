@@ -6,11 +6,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import unittest
 from builtins import open
-from collections import OrderedDict
 from io import StringIO
 from tempfile import NamedTemporaryFile
 
 from pants.backend.jvm.tasks.properties import Properties
+from pants.util.collections_backport import OrderedDict
 
 
 class PropertiesTest(unittest.TestCase):
