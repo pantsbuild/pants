@@ -14,14 +14,16 @@ from builtins import object, open
 from io import StringIO
 
 import six
-from future.utils import PY3
 
 
 # NB: we cannot use `pants.util.collections_abc_backport` because this library
-# must exist entirely independently of Pants src code.
-if PY3:
+# must be able to be exported as universal. At the moment, Pants only is released with Py2,
+# so violates this. Even when we add Py3 support, we will want to keep this approach
+# because Pants will eventually drop internal Py2 support, yet this checker library
+# must still be universal.
+try:
   from collections.abc import Sequence
-else:
+except ImportError:
   from collections import Sequence
 
 __all__ = (
