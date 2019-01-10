@@ -763,7 +763,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
             .and_then(move |maybe_stat| {
               match maybe_stat {
                 // Note: This will drop PathStats for symlinks which don't point anywhere.
-                Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), &link),
+                Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), link),
                 Some(Stat::Dir(dir)) => {
                   future::ok(Some(PathStat::dir(dir.0.clone(), dir))).to_boxed()
                 }
