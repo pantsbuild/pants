@@ -125,6 +125,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
+    'src/python/pants/util:py2_compat',
     'tests/python/pants_test/backend/python:interpreter_selection_utils',
     'tests/python/pants_test/engine:scheduler_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
