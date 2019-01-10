@@ -16,8 +16,6 @@ from contextlib import contextmanager
 from io import StringIO
 from textwrap import dedent
 
-from backports import configparser
-
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
@@ -35,6 +33,7 @@ from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
+from pants.util.py2_compat import configparser
 from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
