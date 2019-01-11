@@ -51,7 +51,7 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
 
   @abstractmethod
   def unpack_target(unpackable_target, unpack_dir):
-    """???"""
+    """Unpack the remote resources indicated by `unpackable_target` into `unpack_dir`."""
 
   @property
   def _unpacked_sources_product(self):
@@ -90,7 +90,7 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
     return compiled_patterns
 
   @classmethod
-  def calculate_unpack_filter(cls, includes=None, excludes=None, spec=None):
+  def _calculate_unpack_filter(cls, includes=None, excludes=None, spec=None):
     """Take regex patterns and return a filter function.
 
     :param list includes: List of include patterns to pass to _file_filter.
@@ -116,9 +116,9 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
                                                        exclude_patterns attributes.
     """
     # TODO: we may be able to make use of glob matching in the engine to avoid doing this filtering.
-    return cls.calculate_unpack_filter(includes=unpackable_target.payload.include_patterns,
-                                       excludes=unpackable_target.payload.exclude_patterns,
-                                       spec=unpackable_target.address.spec)
+    return cls._calculate_unpack_filter(includes=unpackable_target.payload.include_patterns,
+                                        excludes=unpackable_target.payload.exclude_patterns,
+                                        spec=unpackable_target.address.spec)
 
   class DuplicateUnpackedSourcesError(TaskError): pass
 
@@ -131,7 +131,7 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
     rel_unpack_dir = os.path.relpath(unpack_dir, get_buildroot())
     return found_files, rel_unpack_dir
 
-  def add_unpacked_sources_for_target(self, target, unpack_dir):
+  def _add_unpacked_sources_for_target(self, target, unpack_dir):
     maybe_existing_sources = self._unpacked_sources_product.get(target, None)
     if maybe_existing_sources:
       raise self.DuplicateUnpackedSourcesError(
@@ -156,4 +156,4 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
         self.unpack_target(vt.target, vt.results_dir)
 
       for vt in invalidation_check.all_vts:
-        self.add_unpacked_sources_for_target(vt.target, vt.results_dir)
+        self._add_unpacked_sources_for_target(vt.target, vt.results_dir)
