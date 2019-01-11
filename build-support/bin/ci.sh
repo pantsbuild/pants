@@ -2,7 +2,7 @@
 
 # We use some subshell pipelines to collect target lists, make sure target collection failing
 # fails the build.
-set -o pipefail
+set -ox pipefail
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 cd ${REPO_ROOT}
