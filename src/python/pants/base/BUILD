@@ -175,6 +175,7 @@ python_library(
   name = 'run_info',
   sources = ['run_info.py'],
   dependencies = [
+    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:future',
     ':build_environment',
     'src/python/pants/util:dirutil',
