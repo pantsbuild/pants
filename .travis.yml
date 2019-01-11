@@ -176,7 +176,6 @@ py3_osx_config: &py3_osx_config
     - brew upgrade python
 
 base_osx_test_config: &base_osx_test_config
-  <<: *base_osx_config
   <<: *pants_run_cache_config
   before_script:
     - ulimit -c unlimited
@@ -215,7 +214,6 @@ linux_with_fuse: &linux_with_fuse
 # -------------------------------------------------------------------------
 
 base_linux_build_engine: &base_linux_build_engine
-  <<: *base_linux_config
   <<: *native_engine_cache_config
   stage: *bootstrap
   services:
@@ -263,7 +261,6 @@ py3_linux_build_engine: &py3_linux_build_engine
     - BOOTSTRAP_ARGS=''
 
 base_osx_build_engine: &base_osx_build_engine
-  <<: *base_osx_config
   <<: *native_engine_cache_config
   stage: *bootstrap
   # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
@@ -505,7 +502,6 @@ py3_linux_rust_tests: &py3_linux_rust_tests
     - ./build-support/bin/travis-ci.sh -be
 
 base_osx_rust_tests: &base_osx_rust_tests
-  <<: *base_osx_test_config
   # Fuse actually works on this image. It hangs on many others.
   osx_image: xcode8.3
   before_install:
