@@ -36,6 +36,9 @@ class GrpcioRun(SimpleCodegenTask):
 
   def execute_codegen(self, target, target_workdir):
     args = self.build_args(target, target_workdir)
+    print("grpcio execute for target:")
+    print(target)
+    print("========")
     logging.debug("Executing grpcio code generation with args: [{}]".format(args))
 
     with pushd(get_buildroot()):
@@ -51,17 +54,11 @@ class GrpcioRun(SimpleCodegenTask):
   def build_args(self, target, target_workdir):
     python_out = '--python_out={0}'.format(target_workdir)
     grpc_python_out = '--grpc_python_out={0}'.format(target_workdir)
+    proto_path = '--proto_path={0}'.format(target.target_base)
 
-    args = [python_out, grpc_python_out]
+    args = [python_out, grpc_python_out, proto_path]
 
-    sources = []
-    sources_by_base = self._calculate_sources(target)
-    for (base, source_list) in sources_by_base.items():
-      args.append('--proto_path={0}'.format(base))
-      sources.extend(source_list)
-
-    # We need those sources to be added as a very last in args array
-    args.extend(sources)
+    args.extend(target.sources_relative_to_buildroot())
     return args
 
   def _calculate_sources(self, target):

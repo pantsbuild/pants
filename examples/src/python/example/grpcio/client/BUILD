@@ -2,11 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_binary(
-  name='client',
+  name='service',
   dependencies=[
     '3rdparty/python:grpcio',
 
-    'examples/src/protobuf/org/pantsbuild/example/service',
+    'examples/src/protobuf/org/pantsbuild/example/grpcio/service',
   ],
-  source='client.py',
+  source='service_client.py',
+)
+
+python_binary(
+  name='imports',
+  dependencies=[
+    '3rdparty/python:grpcio',
+
+    'examples/src/protobuf/org/pantsbuild/example/grpcio/imports',
+  ],
+  source='imports_client.py',
 )

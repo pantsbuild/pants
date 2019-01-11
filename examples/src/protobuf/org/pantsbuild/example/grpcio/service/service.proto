@@ -1,5 +1,6 @@
 syntax = "proto3";
-package example;
+package org.pantsbuild.example.grpcio.service;
+
 service ExampleService {
     rpc Hello(HelloRequest) returns (HelloReply) {}
 }

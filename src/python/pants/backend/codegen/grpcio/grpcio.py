@@ -4,12 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import logging
-
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-
-
-logger = logging.getLogger(__name__)
 
 
 class Grpcio(PythonToolBase):
@@ -21,4 +16,3 @@ class Grpcio(PythonToolBase):
     'grpcio=={}'.format(grpcio_version),
   ]
   default_entry_point = 'grpc_tools.protoc'
-  pass
