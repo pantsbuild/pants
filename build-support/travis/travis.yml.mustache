@@ -130,14 +130,14 @@ py2_linux_test_config: &py2_linux_test_config
   <<: *base_linux_test_config
   stage: *cron
   env:
-    - &py2_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.linux"
+    - &py2_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py2.linux
 
 py3_linux_test_config: &py3_linux_test_config
   <<: *py3_linux_config
   <<: *base_linux_test_config
   stage: *test
   env:
-    - &py3_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.linux"
+    - &py3_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.linux
 
 base_osx_config: &base_osx_config
   os: osx
@@ -172,14 +172,14 @@ py2_osx_test_config: &py2_osx_test_config
   <<: *base_osx_test_config
   stage: *cron
   env:
-    - &py2_osx_test_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.osx"
+    - &py2_osx_test_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp BOOTSTRAPPED_PEX_KEY_SUFFIX=py2.osx
 
 py3_osx_test_config: &py3_osx_test_config
   <<: *py3_osx_config
   <<: *base_osx_test_config
   stage: *test
   env:
-    - &py3_osx_test_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.osx"
+    - &py3_osx_test_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
 
 linux_with_fuse: &linux_with_fuse
   before_install:
@@ -228,8 +228,8 @@ py2_linux_build_engine: &py2_linux_build_engine
   env:
     - *base_linux_build_engine_env
     - CACHE_NAME=linuxpexbuild.py2
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.linux"
-    - BOOTSTRAP_ARGS="-2"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py2.linux
+    - BOOTSTRAP_ARGS='-2'
 
 py3_linux_build_engine: &py3_linux_build_engine
   <<: *py3_linux_config
@@ -238,8 +238,8 @@ py3_linux_build_engine: &py3_linux_build_engine
   env:
     - *base_linux_build_engine_env
     - CACHE_NAME=linuxpexbuild.py3
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.linux"
-    - BOOTSTRAP_ARGS=""
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.linux
+    - BOOTSTRAP_ARGS=''
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *base_osx_config
@@ -266,8 +266,8 @@ py2_osx_build_engine: &py2_osx_build_engine
   env:
     - *base_osx_build_engine_env
     - CACHE_NAME=osxpexbuild.py2
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.osx"
-    - BOOTSTRAP_ARGS="-2"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py2.osx
+    - BOOTSTRAP_ARGS='-2'
 
 py3_osx_build_engine: &py3_osx_build_engine
   <<: *py3_osx_config
@@ -276,8 +276,8 @@ py3_osx_build_engine: &py3_osx_build_engine
   env:
     - *base_osx_build_engine_env
     - CACHE_NAME=osxpexbuild.py3
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.osx"
-    - BOOTSTRAP_ARGS=""
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
+    - BOOTSTRAP_ARGS=''
 
 # -------------------------------------------------------------------------
 # Build wheels
