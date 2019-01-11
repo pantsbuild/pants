@@ -239,7 +239,7 @@ base_linux_build_engine: &base_linux_build_engine
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest
-      sh -c "./build-support/bin/travis-ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f"
+      sh -c "./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
 
 py2_linux_build_engine: &py2_linux_build_engine
