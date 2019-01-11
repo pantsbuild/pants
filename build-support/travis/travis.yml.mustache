@@ -223,7 +223,7 @@ base_linux_build_engine: &base_linux_build_engine
 py2_linux_build_engine: &py2_linux_build_engine
   <<: *py2_linux_config
   <<: *base_linux_build_engine
-  name: "Build Linux native engine and Python 2 pants.pex"
+  name: "Build Linux native engine and pants.pex (Py2 PEX)"
   env:
     - *base_linux_build_engine_env
     - CACHE_NAME=linuxpexbuild.py2
@@ -233,7 +233,7 @@ py2_linux_build_engine: &py2_linux_build_engine
 py3_linux_build_engine: &py3_linux_build_engine
   <<: *py3_linux_config
   <<: *base_linux_build_engine
-  name: "Build Linux native engine and Python 3 pants.pex"
+  name: "Build Linux native engine and pants.pex (Py3 PEX)"
   env:
     - *base_linux_build_engine_env
     - CACHE_NAME=linuxpexbuild.py3
@@ -261,7 +261,7 @@ base_osx_build_engine: &base_osx_build_engine
 py2_osx_build_engine: &py2_osx_build_engine
   <<: *py2_osx_config
   <<: *base_osx_build_engine
-  name: "Build OSX native engine and Python 2 pants.pex"
+  name: "Build OSX native engine and pants.pex (Py2 PEX)"
   env:
     - *base_osx_build_engine_env
     - CACHE_NAME=osxpexbuild.py2
@@ -271,7 +271,7 @@ py2_osx_build_engine: &py2_osx_build_engine
 py3_osx_build_engine: &py3_osx_build_engine
   <<: *py3_osx_config
   <<: *base_osx_build_engine
-  name: "Build OSX native engine and Python 3 pants.pex"
+  name: "Build OSX native engine and pants.pex (Py3 PEX)"
   env:
     - *base_osx_build_engine_env
     - CACHE_NAME=osxpexbuild.py3
@@ -292,7 +292,7 @@ py2_linux_build_wheels: &py2_linux_build_wheels
   <<: *py2_linux_test_config
   <<: *base_build_wheels
   stage: *cron
-  name: "Build Linux wheels (Python 2 PEX)"
+  name: "Build Linux wheels (Py2 PEX)"
   env:
     - *py2_linux_test_config_env
     - *base_build_wheels_env
@@ -301,7 +301,7 @@ py2_linux_build_wheels: &py2_linux_build_wheels
 py3_linux_build_wheels: &py3_linux_build_wheels
   <<: *py3_linux_test_config
   <<: *base_build_wheels
-  name: "Build Linux wheels (Python 3 PEX)"
+  name: "Build Linux wheels (Py3 PEX)"
   env:
     - *py3_linux_test_config_env
     - *base_build_wheels_env
@@ -310,7 +310,7 @@ py3_linux_build_wheels: &py3_linux_build_wheels
 py2_osx_build_wheels: &py2_osx_build_wheels
   <<: *py2_osx_test_config
   <<: *base_build_wheels
-  name: "Build OSX wheels (Python 2 PEX)"
+  name: "Build OSX wheels (Py2 PEX)"
   stage: *cron
   env:
     - *py2_osx_test_config_env
@@ -320,7 +320,7 @@ py2_osx_build_wheels: &py2_osx_build_wheels
 py3_osx_build_wheels: &py3_osx_build_wheels
   <<: *py3_osx_test_config
   <<: *base_build_wheels
-  name: "Build OSX wheels (Python 3 PEX)"
+  name: "Build OSX wheels (Py3 PEX)"
   env:
     - *py3_osx_test_config_env
     - *base_build_wheels_env
@@ -342,7 +342,7 @@ base_osx_10_12_sanity_check: &base_osx_10_12_sanity_check
 py2_osx_10_12_sanity_check: &py2_osx_10_12_sanity_check
   <<: *py2_osx_test_config
   <<: *base_osx_10_12_sanity_check
-  name: "OSX 10.12 sanity check (Python 2 PEX)"
+  name: "OSX 10.12 sanity check (Py2 PEX)"
   stage: *cron
   env:
     - *py2_osx_test_config_env
@@ -351,7 +351,7 @@ py2_osx_10_12_sanity_check: &py2_osx_10_12_sanity_check
 py3_osx_10_12_sanity_check: &py3_osx_10_12_sanity_check
   <<: *py3_osx_test_config
   <<: *base_osx_10_12_sanity_check
-  name: "OSX 10.12 sanity check (Python 3 PEX)"
+  name: "OSX 10.12 sanity check (Py3 PEX)"
   env:
     - *py3_osx_test_config_env
     - CACHE_NAME=macos10.12sanity.py3
@@ -363,7 +363,7 @@ base_osx_10_13_sanity_check: &base_osx_10_13_sanity_check
 py2_osx_10_13_sanity_check: &py2_osx_10_13_sanity_check
   <<: *py2_osx_test_config
   <<: *base_osx_10_13_sanity_check
-  name: "OSX 10.13 sanity check (Python 2 PEX)"
+  name: "OSX 10.13 sanity check (Py2 PEX)"
   stage: *cron
   env:
     - *py2_osx_test_config_env
@@ -372,7 +372,7 @@ py2_osx_10_13_sanity_check: &py2_osx_10_13_sanity_check
 py3_osx_10_13_sanity_check: &py3_osx_10_13_sanity_check
   <<: *py3_osx_test_config
   <<: *base_osx_10_13_sanity_check
-  name: "OSX 10.13 sanity check (Python 3 PEX)"
+  name: "OSX 10.13 sanity check (Py3 PEX)"
   env:
     - *py3_osx_test_config_env
     - CACHE_NAME=macos10.13sanity.py3
@@ -389,7 +389,7 @@ base_lint: &base_lint
 py2_lint: &py2_lint
   <<: *py2_linux_test_config
   <<: *base_lint
-  name: "Self-checks, lint, and JVM tests (Python 2 PEX)"
+  name: "Self-checks, lint, and JVM tests (Py2 PEX)"
   env:
     - *py2_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py2
@@ -397,7 +397,7 @@ py2_lint: &py2_lint
 py3_lint: &py3_lint
   <<: *py3_linux_test_config
   <<: *base_lint
-  name: "Self-checks, lint, and JVM tests (Python 3 PEX)"
+  name: "Self-checks, lint, and JVM tests (Py3 PEX)"
   env:
     - *py3_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py3
@@ -450,7 +450,6 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
 base_linux_rust_tests: &base_linux_rust_tests
   <<: *linux_with_fuse
   <<: *native_engine_cache_config
-  name: "Linux Rust tests"
   env:
     - CACHE_NAME=linuxrusttests
   os: linux
@@ -463,7 +462,7 @@ base_linux_rust_tests: &base_linux_rust_tests
 
 py2_linux_rust_tests: &py2_linux_rust_tests
   <<: *base_linux_rust_tests
-  name: "Linux Rust tests (Python 2 PEX)"
+  name: "Linux Rust tests (Py2 PEX)"
   python: 2.7
   stage: *cron
   env:
@@ -474,7 +473,7 @@ py2_linux_rust_tests: &py2_linux_rust_tests
 
 py3_linux_rust_tests: &py3_linux_rust_tests
   <<: *base_linux_rust_tests
-  name: "Linux Rust tests (Python 3 PEX)"
+  name: "Linux Rust tests (Py3 PEX)"
   python: 3.6
   stage: *test
   env:
@@ -494,7 +493,7 @@ base_osx_rust_tests: &base_osx_rust_tests
 py2_osx_rust_tests: &py2_osx_rust_tests
   <<: *base_osx_rust_tests
   <<: *py2_osx_test_config
-  name: "OSX Rust + platform-specific tests (Python 2 PEX)"
+  name: "OSX Rust + platform-specific tests (Py2 PEX)"
   env:
     - *py2_osx_test_config_env
     - CACHE_NAME=macosrusttests.py2
@@ -504,7 +503,7 @@ py2_osx_rust_tests: &py2_osx_rust_tests
 py3_osx_rust_tests: &py3_osx_rust_tests
   <<: *base_osx_rust_tests
   <<: *py3_osx_test_config
-  name: "OSX Rust + platform-specific tests (Python 3 PEX)"
+  name: "OSX Rust + platform-specific tests (Py3 PEX)"
   env:
     - *py3_osx_test_config_env
     - CACHE_NAME=macosrusttests.py3
@@ -542,7 +541,7 @@ matrix:
     - <<: *py3_lint
 
     - <<: *py2_linux_test_config
-      name: "Py2 - Unit tests for pants and pants-plugins"
+      name: "Unit tests for pants and pants-plugins (Py2 PEX)"
       stage: *test
       env:
         - *py2_linux_test_config_env
@@ -551,7 +550,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -2blp
 
     - <<: *py3_linux_test_config
-      name: "Py3 - Unit tests for pants and pants-plugins"
+      name: "Unit tests for pants and pants-plugins (Py3 PEX)"
       env:
         - *py3_linux_test_config_env
         - CACHE_NAME=linuxunittests.py3
@@ -559,7 +558,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -blp
 
     - <<: *py2_linux_test_config
-      name: "Py2 - Python contrib tests"
+      name: "Python contrib tests (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py2
@@ -567,7 +566,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -2bn
 
     - <<: *py3_linux_test_config
-      name: "Py3 - Python contrib tests"
+      name: "Python contrib tests (Py3 PEX)"
       env:
         - *py3_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py3
@@ -576,7 +575,7 @@ matrix:
 
 {{#integration_shards}}
     - <<: *py3_linux_test_config
-      name: "Integration tests for pants - shard {{.}}"
+      name: "Integration tests for pants - shard {{.}} (Py3 PEX)"
       env:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}
@@ -586,7 +585,7 @@ matrix:
 {{/integration_shards}}
 {{#integration_shards}}
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants (Python 2) - shard {{.}}"
+      name: "Integration tests for pants - shard {{.}} (Py2 PEX)"
       stage: *cron
       env:
         - *py2_linux_test_config_env
