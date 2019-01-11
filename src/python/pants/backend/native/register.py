@@ -15,12 +15,11 @@ from pants.backend.native.targets.external_native_library import (ConanRequireme
                                                                   ExternalNativeLibrary)
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import CLibrary, CppLibrary
-from pants.backend.native.targets.native_python_wheel import NativePythonWheel
+from pants.backend.native.targets.packaged_native_library import PackagedNativeLibrary
 from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.conan_fetch import ConanFetch
 from pants.backend.native.tasks.conan_prep import ConanPrep
 from pants.backend.native.tasks.cpp_compile import CppCompile
-from pants.backend.native.tasks.extract_native_python_wheels import ExtractNativePythonWheels
 from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -32,7 +31,7 @@ def build_file_aliases():
       CLibrary.alias(): CLibrary,
       CppLibrary.alias(): CppLibrary,
       ExternalNativeLibrary.alias(): ExternalNativeLibrary,
-      NativePythonWheel.alias(): NativePythonWheel,
+      PackagedNativeLibrary.alias(): PackagedNativeLibrary,
     },
     objects={
       ConanRequirement.alias(): ConanRequirement,
@@ -53,7 +52,6 @@ def register_goals():
   task(name='c-for-ctypes', action=CCompile).install('native-compile')
   task(name='cpp-for-ctypes', action=CppCompile).install('native-compile')
   task(name='shared-libraries', action=LinkSharedLibraries).install('link')
-  task(name='extract-native-python-wheels', action=ExtractNativePythonWheels).install('extract-native-code')
 
 
 def rules():

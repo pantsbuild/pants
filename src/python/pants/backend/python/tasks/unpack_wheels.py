@@ -7,40 +7,54 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import re
 from builtins import str
+from hashlib import sha1
 
+from future.utils import PY3
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.platforms import Platform
 
 from pants.backend.native.config.environment import Platform as NativeBackendPlatform
-from pants.backend.native.targets.native_python_wheel import NativePythonWheel
-from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFiles
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.base.exceptions import TaskError
-from pants.goal.products import UnionProducts
-from pants.task.task import Task
-from pants.util.contextutil import temporary_file
-from pants.util.dirutil import safe_concurrent_creation
-from pants.util.memo import memoized_classproperty
+from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
+from pants.task.unpack_remote_sources_base import UnpackRemoteSourcesBase
+from pants.util.contextutil import temporary_dir, temporary_file
+from pants.util.dirutil import mergetree, safe_concurrent_creation
+from pants.util.memo import memoized_classproperty, memoized_method
+from pants.util.objects import SubclassesOf
 from pants.util.process_handler import subprocess
 
 
-class ExtractNativePythonWheels(Task):
+class UnpackWheelsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
+
+  def compute_fingerprint(self, target):
+    """UnpackedWheels targets need to be re-unpacked if any of its configuration changes or any of
+    the jars they import have changed.
+    """
+    if isinstance(target, UnpackedWheels):
+      hasher = sha1()
+      for cache_key in sorted(req.cache_key() for req in target.all_imported_requirements):
+        hasher.update(cache_key.encode('utf-8'))
+      hasher.update(target.payload.fingerprint().encode('utf-8'))
+      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return None
+
+
+class UnpackWheels(UnpackRemoteSourcesBase):
   """Extract native code from `NativePythonWheel` targets for use by downstream C/C++ sources."""
 
-  @classmethod
-  def product_types(cls):
-    return [NativeExternalLibraryFiles]
+  source_target_constraint = SubclassesOf(UnpackedWheels)
 
-  @property
-  def cache_target_dirs(self):
-    return True
+  def get_fingerprint_strategy(self):
+    return UnpackWheelsFingerprintStrategy()
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ExtractNativePythonWheels, cls).subsystem_dependencies() + (
+    return super(UnpackWheels, cls).subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonInterpreterCache,
       PythonSetup,
@@ -97,7 +111,7 @@ class ExtractNativePythonWheels(Task):
     })
 
   @classmethod
-  def _get_matching_wheel(cls, wheel_dir, module_name):
+  def _get_matching_wheel_dir(cls, wheel_dir, module_name):
     wheels = os.listdir(wheel_dir)
 
     names_and_platforms = {w:cls._name_and_platform(w) for w in wheels}
@@ -120,63 +134,42 @@ class ExtractNativePythonWheels(Task):
               cur_platform_abbrev=cls._current_platform_abbreviation,
               wheels=wheels))
 
-  def _generate_requirements_pex(self, pex_path, interpreter, requirement_target):
+  def _generate_requirements_pex(self, pex_path, interpreter, requirements):
     if not os.path.exists(pex_path):
       with self.context.new_workunit('extract-native-wheels'):
         with safe_concurrent_creation(pex_path) as chroot:
           pex_builder = PexBuilderWrapper.Factory.create(
             builder=PEXBuilder(path=chroot, interpreter=interpreter),
             log=self.context.log)
-          pex_builder.add_resolved_requirements(requirement_target.requirements)
+          pex_builder.add_resolved_requirements(requirements)
           pex_builder.freeze()
     return PEX(pex_path, interpreter=interpreter)
 
+  @memoized_method
+  def _compatible_interpreter(self, unpacked_whls):
+    constraints = PythonSetup.global_instance().compatibility_or_constraints(unpacked_whls)
+    allowable_interpreters = PythonInterpreterCache.global_instance().setup(filters=constraints)
+    return min(allowable_interpreters)
+
   class NativeCodeExtractionError(TaskError): pass
 
-  def execute(self):
-    external_lib_files_product = UnionProducts()
+  def unpack_target(self, unpacked_whls, unpack_dir):
+    interpreter = self._compatible_interpreter(unpacked_whls)
 
-    native_wheel_wrappers = self.get_targets(lambda t: isinstance(t, NativePythonWheel))
-    with self.invalidated(native_wheel_wrappers, invalidate_dependents=True) as invalidation_check:
-      for vt in invalidation_check.all_vts:
-        wheel_wrapper = vt.target
-        requirement_target = wheel_wrapper.requirement_target
-
-        interpreter = min(PythonInterpreterCache.global_instance().setup(
-          filters=PythonSetup.global_instance().compatibility_or_constraints(wheel_wrapper)))
-
-        pex_path = os.path.join(
-          vt.results_dir,
-          'extract-from-wheel',
-          requirement_target.transitive_invalidation_hash(),
-          str(interpreter.identity),
-        )
-
-        try:
-          pex = self._generate_requirements_pex(pex_path, interpreter, requirement_target)
-          wheel_dir = self._get_wheel_dir(pex, wheel_wrapper.module_name)
-          matching_wheel = self._get_matching_wheel(wheel_dir, wheel_wrapper.module_name)
-        except Exception as e:
-          raise self.NativeCodeExtractionError(
-            "Error extracting wheel for target {}: {}"
-            .format(wheel_wrapper, str(e)))
-
-        include_dir = os.path.join(matching_wheel, wheel_wrapper.include_relpath)
-        if not os.path.isdir(include_dir):
-          raise self.NativeCodeExtractionError(
-            "Include dir '{}' not found for target {}!"
-            .format(include_dir, wheel_wrapper))
-        lib_dir = os.path.join(matching_wheel, wheel_wrapper.lib_relpath)
-        if not os.path.isdir(lib_dir):
-          raise self.NativeCodeExtractionError(
-            "Lib dir '{}' not found for target {}!"
-            .format(lib_dir, wheel_wrapper))
-
-        wrapper_files_product = NativeExternalLibraryFiles(
-          include_dir=include_dir,
-          lib_dir=lib_dir,
-          lib_names=tuple(wheel_wrapper.native_lib_names),
-        )
-        external_lib_files_product.add_for_target(wheel_wrapper, [wrapper_files_product])
-
-    self.context.products.register_data(NativeExternalLibraryFiles, external_lib_files_product)
+    with temporary_dir() as tmp_dir:
+      # NB: The pex needs to be in a subdirectory for some reason, and pants task caching ensures it
+      # is the only member of this directory, so the dirname doesn't matter.
+      pex_path = os.path.join(tmp_dir, 'xxx.pex')
+      try:
+        pex = self._generate_requirements_pex(pex_path, interpreter,
+                                              unpacked_whls.all_imported_requirements)
+        wheel_dir = self._get_wheel_dir(pex, unpacked_whls.module_name)
+        matching_wheel_dir = self._get_matching_wheel_dir(wheel_dir, unpacked_whls.module_name)
+        unpack_filter = self.get_unpack_filter(unpacked_whls)
+        # Copy over the module's data files into `unpack_dir`.
+        mergetree(matching_wheel_dir, unpack_dir, file_filter=unpack_filter)
+      except Exception as e:
+        raise self.NativeCodeExtractionError(
+          "Error extracting wheel for target {}: {}"
+          .format(unpacked_whls, str(e)),
+          e)
