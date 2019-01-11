@@ -8,6 +8,7 @@ import logging
 
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
@@ -17,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
   """A Java library generated from Protocol Buffer IDL files."""
+
+  imported_target_kwargs_field = 'imports'
+  imported_target_payload_field = 'import_specs'
 
   def __init__(self, payload=None, buildflags=None, imports=None, **kwargs):
     """
@@ -32,15 +36,9 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
       'import_specs': PrimitiveField(imports or ())
     })
     super(JavaProtobufLibrary, self).__init__(payload=payload, **kwargs)
-    if buildflags is not None:
-      logger.warn("Target definition at {address} sets attribute 'buildflags' which is "
-                  "ignored and will be removed in a future release"
-                  .format(address=self.address.spec))
 
-  @classmethod
-  def imported_jar_library_spec_fields(cls):
-    """Fields to extract JarLibrary specs from.
-
-    Required to implement the ImportJarsMixin.
-    """
-    yield ('imports', 'import_specs')
+    deprecated_conditional(
+      lambda: buildflags is not None,
+      '1.16.0.dev1',
+      "Target definition at {addr} setting attribute 'buildflags'".format(addr=self.address.spec),
+      hint_message="is ignored")

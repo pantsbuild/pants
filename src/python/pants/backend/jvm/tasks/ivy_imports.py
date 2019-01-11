@@ -12,7 +12,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
 
 class IvyImports(IvyTaskMixin, NailgunTask):
-  """Resolves jar files for imported_jar_libraries on `ImportJarsMixin` targets.
+  """Resolves jar files for imported_targets on `ImportJarsMixin` targets.
 
   One use case is for JavaProtobufLibrary, which includes imports for jars containing .proto files.
   """
@@ -25,7 +25,7 @@ class IvyImports(IvyTaskMixin, NailgunTask):
 
   @staticmethod
   def has_imports(target):
-    return isinstance(target, ImportJarsMixin) and target.imported_jar_libraries
+    return isinstance(target, ImportJarsMixin) and target.imported_targets
 
   def execute(self):
     jar_import_products = self.context.products.get_data(JarImportProducts,
@@ -39,7 +39,7 @@ class IvyImports(IvyTaskMixin, NailgunTask):
     # Create a list of all of these targets plus the list of JarDependencies they depend on.
     all_targets = set(targets)
     for target in targets:
-      all_targets.update(target.imported_jar_libraries)
+      all_targets.update(target.imported_targets)
 
     imports_classpath = ClasspathProducts(self.get_options().pants_workdir)
     self.resolve(executor=self.create_java_executor(),
