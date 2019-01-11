@@ -121,7 +121,7 @@ class ExternalNativeLibrary(Target):
     return self.payload.packages
 
   # NB: These are always going to be include/ and lib/ as we populate the constituent requirements
-  # there in `NativeExternalLibraryFetch`, and we need to add these to the copied attributes for
+  # there in `ConanFetch`, and we need to add these to the copied attributes for
   # generated targets in ._copy_target_attributes. These need to have the same names as in
   # `packaged_native_library()` so that the methods in the `SimpleCodegenTask` superclass can copy
   # the attributes over.

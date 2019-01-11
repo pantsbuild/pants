@@ -20,8 +20,7 @@ from pants.util.dirutil import mergetree, safe_concurrent_creation, safe_file_du
 from pants.util.memo import memoized_property
 
 
-# TODO: rename this to ConanFetch, or move Conan-specific functionality into a subclass!
-class NativeExternalLibraryFetch(SimpleCodegenTask):
+class ConanFetch(SimpleCodegenTask):
 
   gentarget_type = ExternalNativeLibrary
 
@@ -40,35 +39,31 @@ class NativeExternalLibraryFetch(SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
-    super(NativeExternalLibraryFetch, cls).register_options(register)
+    super(ConanFetch, cls).register_options(register)
     register('--conan-remotes', type=dict, default=cls.default_remotes, advanced=True,
              fingerprint=True,
              help='The conan remotes to download conan packages from.')
 
   @classmethod
   def implementation_version(cls):
-    return (super(NativeExternalLibraryFetch, cls).implementation_version() + [('NativeExternalLibraryFetch', 1)])
+    return (super(ConanFetch, cls).implementation_version() + [('ConanFetch', 1)])
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NativeExternalLibraryFetch, cls).prepare(options, round_manager)
+    super(ConanFetch, cls).prepare(options, round_manager)
     round_manager.require_data(ConanPrep.tool_instance_cls)
 
-  class NativeExternalLibraryFetchError(TaskError): pass
-
-  @memoized_property
-  def _conan_pex_path(self):
-    return os.path.join(get_pants_cachedir(), 'conan-support', 'conan.pex')
+  class ConanFetchError(TaskError): pass
 
   @memoized_property
   def _conan_user_home(self):
-    # TODO: This should be get_pants_cachedir() to keep downloaded packages after a clean-all, but
-    # the remotes configuration is per-task since it uses this task's options. We may need to copy
-    # over downloaded entries from the workdir and implement our own cache in the pants cache to get
-    # around this. See
+    user_home_base = os.path.join(get_pants_cachedir(), 'conan-support', 'conan-user-home')
+    # Find a specific subdirectory of the pants shared cachedir specific to this task's option
+    # values.
+    user_home = os.path.join(user_home_base, self.fingerprint)
+    # Write a file overriding the conan remote's configuration with this task's options. See
     # https://docs.conan.io/en/latest/reference/commands/consumer/config.html#conan-config-install
     # for docs on configuring remotes.
-    user_home = os.path.join(self.workdir, 'conan-support', 'conan-user-home')
     remotes_txt = os.path.join(user_home, 'remotes.txt')
     if not os.path.isfile(remotes_txt):
       with safe_concurrent_creation(remotes_txt) as remotes_path:
@@ -90,7 +85,7 @@ class NativeExternalLibraryFetch(SimpleCodegenTask):
 
   @property
   def _copy_target_attributes(self):
-    basic_attributes = [a for a in super(NativeExternalLibraryFetch, self)._copy_target_attributes
+    basic_attributes = [a for a in super(ConanFetch, self)._copy_target_attributes
                         if a != 'provides']
     return basic_attributes + [
       'include_relpath',
@@ -133,7 +128,7 @@ class NativeExternalLibraryFetch(SimpleCodegenTask):
 
       with conan.run_with(workunit_factory, argv, env=env) as (cmdline, exit_code, workunit):
         if exit_code != 0:
-          raise self.NativeExternalLibraryFetchError(
+          raise self.ConanFetchError(
             'Error performing conan install with argv {} and environment {}: exited non-zero ({}).'
             .format(cmdline, env, exit_code),
             exit_code=exit_code)
