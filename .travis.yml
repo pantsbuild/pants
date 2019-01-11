@@ -2,6 +2,9 @@
 # GENERATED, DO NOT EDIT!
 # To change, edit build-support/travis/travis.yml.mustache and run
 # ./pants --quiet run build-support/travis:generate_travis_yml > .travis.yml
+#
+# Tip: Copy the generated `.travis.yml` into https://yamlvalidator.com to validate the YAML
+# and see how the entries resolve to normalized JSON (helpful to debug anchors).
 
 
 # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1
@@ -175,7 +178,6 @@ py3_osx_config: &py3_osx_config
 base_osx_test_config: &base_osx_test_config
   <<: *base_osx_config
   <<: *pants_run_cache_config
-  stage: *test
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -184,12 +186,14 @@ base_osx_test_config: &base_osx_test_config
 py2_osx_test_config: &py2_osx_test_config
   <<: *py2_osx_config
   <<: *base_osx_test_config
+  stage: *cron
   env:
     - &py2_osx_test_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.osx"
 
 py3_osx_test_config: &py3_osx_test_config
   <<: *py3_osx_config
   <<: *base_osx_test_config
+  stage: *test
   env:
     - &py3_osx_test_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.osx"
 

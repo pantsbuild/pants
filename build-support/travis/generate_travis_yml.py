@@ -15,6 +15,9 @@ HEADER = """
 # GENERATED, DO NOT EDIT!
 # To change, edit build-support/travis/travis.yml.mustache and run
 # ./pants --quiet run build-support/travis:generate_travis_yml > .travis.yml
+#
+# Tip: Copy the generated `.travis.yml` into https://yamlvalidator.com to validate the YAML
+# and see how the entries resolve to normalized JSON (helpful to debug anchors).
 """
 
 
