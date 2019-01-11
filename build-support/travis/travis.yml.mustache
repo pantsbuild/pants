@@ -171,16 +171,14 @@ base_osx_test_config: &base_osx_test_config
 py2_osx_test_config: &py2_osx_test_config
   <<: *py2_osx_config
   <<: *base_osx_test_config
-  env: &py2_osx_test_config_env
-    - *base_osx_config_env
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.osx"
+  env:
+    - &py2_osx_test_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp BOOTSTRAPPED_PEX_KEY_SUFFIX="py2.osx"
 
 py3_osx_test_config: &py3_osx_test_config
   <<: *py3_osx_config
   <<: *base_osx_test_config
-  env: &py3_osx_test_config_env
-    - *base_osx_config_env
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.osx"
+  env:
+    - &py3_osx_test_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp BOOTSTRAPPED_PEX_KEY_SUFFIX="py3.osx"
 
 linux_with_fuse: &linux_with_fuse
   before_install:
@@ -200,8 +198,8 @@ base_linux_build_engine: &base_linux_build_engine
   stage: *bootstrap
   services:
     - docker
-  env: &base_linux_build_engine_env
-    - PREPARE_DEPLOY=1  # To deploy fs_util.
+  env:
+    - &base_linux_build_engine_env PREPARE_DEPLOY=1  # To deploy fs_util.
   before_script:
     - ulimit -c unlimited
   script:
@@ -250,8 +248,8 @@ base_osx_build_engine: &base_osx_build_engine
   # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
   # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
   osx_image: xcode8
-  env: &base_osx_build_engine_env
-    - PREPARE_DEPLOY=1  # To deploy fs_util.
+  env:
+    - &base_osx_build_engine_env PREPARE_DEPLOY=1  # To deploy fs_util.
   script:
     # With no args ci.sh just bootstraps a pants.pex. We also build fs_util, to take advantage
     # of the rust code built during bootstrapping.
