@@ -15,7 +15,8 @@ RUN yum install -y \
   python27 \
   libffi \
   libffi-devel \
-  openssl-devel
+  openssl-devel \
+  wget
 
 # Install Python 3.6, which we must build because it's not available through yum
 RUN cd /usr/src && \
