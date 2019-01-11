@@ -142,10 +142,6 @@ py3_linux_test_config: &py3_linux_test_config
 base_osx_config: &base_osx_config
   os: osx
   language: generic
-  # TODO: workaround for Homebrew bug triggered by running `brew update`.
-  # Follow at https://github.com/Homebrew/brew/issues/5513 and remove this workaround once its fixed.
-  env:
-    - &base_osx_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp
   before_install:
     {{>before_install_osx}}
 
@@ -154,10 +150,10 @@ py2_osx_config: &py2_osx_config
 
 py3_osx_config: &py3_osx_config
   <<: *base_osx_config
-  before_install:
-    {{>before_install_osx}}
-    # Upgrade to Python 3
-    - brew upgrade python
+  addons:
+    homebrew:
+      packages: &py3_osx_config_brew_packages
+      - python3
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
@@ -171,14 +167,14 @@ py2_osx_test_config: &py2_osx_test_config
   <<: *base_osx_test_config
   stage: *cron
   env:
-    - &py2_osx_test_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp BOOTSTRAPPED_PEX_KEY_SUFFIX=py2.osx
+    - &py2_osx_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py2.osx
 
 py3_osx_test_config: &py3_osx_test_config
   <<: *py3_osx_config
   <<: *base_osx_test_config
   stage: *test
   env:
-    - &py3_osx_test_config_env HOMEBREW_LOGS=~/homebrew-log HOMEBREW_TEMP=~/homebrew-temp BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
+    - &py3_osx_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
 
 linux_with_fuse: &linux_with_fuse
   before_install:
@@ -486,6 +482,10 @@ base_osx_rust_tests: &base_osx_rust_tests
   before_install:
     {{>before_install_osx}}
     - brew tap caskroom/cask && brew update && brew cask install osxfuse
+  addons:
+    homebrew:
+      casks: &base_osx_rust_tests_brew_casks
+      - osxfuse
 
 py2_osx_rust_tests: &py2_osx_rust_tests
   <<: *base_osx_rust_tests
@@ -504,6 +504,10 @@ py3_osx_rust_tests: &py3_osx_rust_tests
   env:
     - *py3_osx_test_config_env
     - CACHE_NAME=macosrusttests.py3
+  addons:
+    homebrew:
+      packages: *py3_osx_config_brew_packages
+      casks: *base_osx_rust_tests_brew_casks
   script:
     - ./build-support/bin/travis-ci.sh -bez
 
