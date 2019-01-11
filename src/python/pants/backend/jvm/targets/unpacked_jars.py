@@ -47,8 +47,6 @@ class UnpackedJars(ImportJarsMixin, Target):
     })
     super(UnpackedJars, self).__init__(payload=payload, **kwargs)
 
-    self._files = None
-
     if not libraries:
       raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'
                                         .format(spec=self.address.spec))
