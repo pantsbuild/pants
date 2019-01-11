@@ -15,7 +15,7 @@ from pants.backend.native.targets.packaged_native_library import PackagedNativeL
 from pants.build_graph.dependency_context import DependencyContext
 from pants.task.task import Task
 from pants.util.collections import assert_single_element
-from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
 from pants.util.objects import Exactly, SubclassesOf
 
@@ -24,7 +24,7 @@ class NativeTask(Task):
 
   @classproperty
   def source_target_constraint(cls):
-    """Return a type constraint which is evaluated to determine "source" targets for this task.
+    """Return a type constraint which is used to filter "source" targets for this task.
 
     This is used to make it clearer which tasks act on which targets, since the compile and link
     tasks work on different target sets (just C and just C++ in the compile tasks, and both in the
@@ -34,19 +34,24 @@ class NativeTask(Task):
     """
     raise NotImplementedError()
 
-  @memoized_classproperty
+  @classproperty
   def dependent_target_constraint(cls):
-    """Return a type contraint which is evaluated to determine dependencies for a target.
+    """Return a type constraint which is used to filter dependencies for a target.
 
-    This is used to make strict_deps() calculation automatic and declarative.
+    This is used to make native_deps() calculation automatic and declarative.
 
     :return: :class:`pants.util.objects.TypeConstraint`
     """
     return SubclassesOf(NativeLibrary)
 
-  @memoized_classproperty
-  def external_dependent_constraint(cls):
-    """???"""
+  @classproperty
+  def packaged_dependent_constraint(cls):
+    """Return a type constraint which is used to filter 3rdparty dependencies for a target.
+
+    This is used to make packaged_native_deps() automatic and declarative.
+
+    :return: :class:`pants.util.objects.TypeConstraint`
+    """
     return Exactly(PackagedNativeLibrary)
 
   @classmethod
@@ -93,7 +98,7 @@ class NativeTask(Task):
   @memoized_method
   def packaged_native_deps(self, target):
     return self.strict_deps_for_target(
-      target, predicate=self.external_dependent_constraint.satisfied_by)
+      target, predicate=self.packaged_dependent_constraint.satisfied_by)
 
   def strict_deps_for_target(self, target, predicate=None):
     """Get the dependencies of `target` filtered by `predicate`, accounting for 'strict_deps'.

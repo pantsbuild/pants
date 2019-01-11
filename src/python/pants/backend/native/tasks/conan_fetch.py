@@ -46,7 +46,7 @@ class ConanFetch(SimpleCodegenTask):
 
   @classmethod
   def implementation_version(cls):
-    return (super(ConanFetch, cls).implementation_version() + [('ConanFetch', 1)])
+    return super(ConanFetch, cls).implementation_version() + [('ConanFetch', 1)]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -98,13 +98,13 @@ class ConanFetch(SimpleCodegenTask):
     Invoke the conan pex to fetch conan packages specified by a
     `ExternalLibLibrary` target.
 
-    TODO: fix this docstring!
-    :param vt: a versioned target containing conan package specifications, and with a results_dir
-      that we can clone outputs into.
+    :param ExternalNativeLibrary target: a target containing conan package specifications.
+    :param str target_workdir: where to copy the installed package contents to.
     """
     conan = self.context.products.get_data(ConanPrep.tool_instance_cls)
 
-    # TODO: we should really be able to download all of these in one go.
+    # TODO: we should really be able to download all of these in one go, and we should make an
+    # upstream PR to allow that against Conan if not.
     for conan_requirement in target.packages:
       # See https://docs.conan.io/en/latest/reference/commands/consumer/install.html for
       # documentation on the 'install' command.
