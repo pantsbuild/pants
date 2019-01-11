@@ -168,6 +168,7 @@ py3_osx_config: &py3_osx_config
     homebrew:
       packages: &py3_osx_config_brew_packages
       - python3
+      update: true
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
