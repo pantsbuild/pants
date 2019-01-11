@@ -24,6 +24,7 @@ protoc="$("${download_binary}" "protobuf" "3.4.1" "protoc")"
 
 export GOROOT="${goroot}"
 export PATH="${cmakeroot}/bin:${goroot}/bin:${CARGO_HOME}/bin:$(dirname "${protoc}"):${PATH}"
+export PROTOC="${protoc}"
 
 cargo_bin="${CARGO_HOME}/bin/cargo"
 
@@ -33,6 +34,7 @@ if [[ -n "${CARGO_WRAPPER_DEBUG}" ]]; then
 >>> In ENV:
 >>>   GOROOT=${GOROOT}
 >>>   PATH=${PATH}
+>>>   PROTOC=${PROTOC}
 >>>
 DEBUG
 fi

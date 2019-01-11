@@ -404,7 +404,7 @@ impl From<Result<Value, Failure>> for PyResult {
       },
       Err(f) => {
         let val = match f {
-          Failure::Invalidated => create_exception("Exhausted retries due to changed files."),
+          f @ Failure::Invalidated => create_exception(&format!("{}", f)),
           Failure::Throw(exc, _) => exc,
         };
         PyResult {

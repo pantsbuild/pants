@@ -12,12 +12,9 @@ import time
 import traceback
 import uuid
 from builtins import open, str
-from collections import OrderedDict
 from contextlib import contextmanager
 from io import StringIO
 from textwrap import dedent
-
-from backports import configparser
 
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -30,11 +27,13 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.task.task import Task
 from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
+from pants.util.collections_abc_backport import OrderedDict
 from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
+from pants.util.py2_compat import configparser
 from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
 

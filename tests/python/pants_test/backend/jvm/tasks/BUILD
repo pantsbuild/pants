@@ -181,6 +181,7 @@ python_tests(
   name = 'classpath_util',
   sources = ['test_classpath_util.py'],
   dependencies = [
+    'src/python/pants/util:collections_abc_backport',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classpath_products',
@@ -492,6 +493,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 120,
 )
 
 python_tests(
@@ -666,6 +668,7 @@ python_tests(
   name = 'properties',
   sources = ['test_properties.py'],
   dependencies = [
+    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:future',
     'src/python/pants/backend/jvm/tasks:properties',
   ]

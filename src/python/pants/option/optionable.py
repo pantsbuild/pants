@@ -9,8 +9,6 @@ import re
 from abc import abstractproperty
 from builtins import str
 
-from six import string_types
-
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
@@ -149,5 +147,5 @@ class Optionable(OptionableFactory, AbstractClass):
     # its __init__, as we do here. We usually only create a single instance of an Optionable
     # subclass anyway.
     cls = type(self)
-    if not isinstance(cls.options_scope, string_types):
+    if not isinstance(cls.options_scope, str):
       raise NotImplementedError('{} must set an options_scope class-level property.'.format(cls))

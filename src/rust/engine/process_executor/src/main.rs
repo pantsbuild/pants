@@ -1,3 +1,6 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 #![deny(unused_must_use)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
 #![deny(
@@ -191,6 +194,7 @@ fn main() {
   let timer_thread = resettable::Resettable::new(|| futures_timer::HelperThread::new().unwrap());
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
+
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {
       let chunk_size =
@@ -266,25 +270,31 @@ fn main() {
           None
         };
 
-      Box::new(process_execution::remote::CommandRunner::new(
-        address,
-        args.value_of("cache-key-gen-version").map(str::to_owned),
-        remote_instance_arg,
-        root_ca_certs,
-        oauth_bearer_token,
-        1,
-        store,
-        timer_thread,
-      ))
+      Box::new(
+        process_execution::remote::CommandRunner::new(
+          address,
+          args.value_of("cache-key-gen-version").map(str::to_owned),
+          remote_instance_arg,
+          root_ca_certs,
+          oauth_bearer_token,
+          1,
+          store,
+          timer_thread,
+        )
+        .expect("Could not initialize remote execution client"),
+      ) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store, pool, work_dir, true,
-    )),
+    )) as Box<dyn process_execution::CommandRunner>,
   };
-
-  let result = runner.run(request).wait().expect("Error executing");
+  let mut rt = tokio::runtime::Runtime::new().unwrap();
+  let result = rt.block_on(runner.run(request)).unwrap();
 
   print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
   eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
+
+  rt.shutdown_now().wait().unwrap();
+
   exit(result.exit_code);
 }

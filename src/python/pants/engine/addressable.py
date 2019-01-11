@@ -6,13 +6,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import inspect
 from builtins import object
-from collections import MutableMapping, MutableSequence
 from functools import update_wrapper
 
 from future.utils import string_types
 
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Resolvable, Serializable
+from pants.util.collections_abc_backport import MutableMapping, MutableSequence
 from pants.util.objects import Collection, TypeConstraintError
 
 

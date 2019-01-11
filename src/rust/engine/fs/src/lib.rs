@@ -380,9 +380,11 @@ impl PathGlob {
       let mut canonical_dir_parent = canonical_dir;
       let mut symbolic_path_parent = symbolic_path;
       if !canonical_dir_parent.0.pop() {
+        let mut symbolic_path = symbolic_path_parent;
+        symbolic_path.extend(parts.iter().map(|p| p.as_str()));
         return Err(format!(
-          "Globs may not traverse outside the root: {:?}",
-          parts
+          "Globs may not traverse outside of the buildroot: {:?}",
+          symbolic_path,
         ));
       }
       symbolic_path_parent.push(Path::new(*PARENT_DIR));
@@ -761,7 +763,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
             .and_then(move |maybe_stat| {
               match maybe_stat {
                 // Note: This will drop PathStats for symlinks which don't point anywhere.
-                Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), &link),
+                Some(Stat::Link(link)) => fs.canonicalize(link.0.clone(), link),
                 Some(Stat::Dir(dir)) => {
                   future::ok(Some(PathStat::dir(dir.0.clone(), dir))).to_boxed()
                 }

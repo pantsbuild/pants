@@ -286,7 +286,7 @@ class Zinc(object):
     """
     hasher = sha1()
     for cp_entry in [self.zinc, self.compiler_interface, self.compiler_bridge]:
-      hasher.update(os.path.relpath(cp_entry, self._workdir()))
+      hasher.update(os.path.relpath(cp_entry, self._workdir()).encode('utf-8'))
     key = hasher.hexdigest()[:12]
 
     return os.path.join(self._workdir(), 'zinc', 'compiler-bridge', key)

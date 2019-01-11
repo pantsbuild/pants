@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::mem::drop;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -14,6 +13,7 @@ use futures_timer::Delay;
 use grpcio;
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn};
+use parking_lot::Mutex;
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 use time;
@@ -21,6 +21,14 @@ use time;
 use super::{ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult};
 use std;
 use std::cmp::min;
+
+use std::net::SocketAddr;
+use std::net::ToSocketAddrs;
+use tokio::executor::DefaultExecutor;
+use tokio::net::tcp::{ConnectFuture, TcpStream};
+use tower_grpc::Request;
+use tower_h2::client;
+use tower_util::MakeService;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an ExecuteProcessRequest, and may be populated only by the
@@ -34,13 +42,29 @@ enum OperationOrStatus {
 }
 
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub struct CommandRunner {
   cache_key_gen_version: Option<String>,
   instance_name: Option<String>,
   authorization_header: Option<String>,
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
-  execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
+  execution_client: futures::future::Shared<
+    BoxFuture<
+      Mutex<
+        bazel_protos::build::bazel::remote::execution::v2::client::Execution<
+          tower_http::add_origin::AddOrigin<
+            tower_h2::client::Connection<
+              tokio::net::tcp::TcpStream,
+              DefaultExecutor,
+              tower_grpc::BoxBody,
+            >,
+          >,
+        >,
+      >,
+      String,
+    >,
+  >,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
   futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
@@ -72,35 +96,35 @@ impl CommandRunner {
   // behavior.
   fn oneshot_execute(
     &self,
-    execute_request: &Arc<bazel_protos::remote_execution::ExecuteRequest>,
-  ) -> BoxFuture<OperationOrStatus, String> {
-    let stream = try_future!(self
+    execute_request: bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest,
+  ) -> impl Future<Item = OperationOrStatus, Error = String> {
+    self
       .execution_client
-      .execute_opt(&execute_request, self.call_option())
-      .map_err(rpcerror_to_string));
-    stream
-      .take(1)
-      .into_future()
-      // If there was a response, drop the _stream to disconnect so that the server doesn't keep
-      // the connection alive and continue sending on it.
-      .map(|(maybe_operation, stream)| {
-        drop(stream);
-        maybe_operation
+      .clone()
+      .map_err(|err| format!("Error getting execution_client: {}", err))
+      .and_then(|execution_client| {
+        let mut execution_client = execution_client.lock();
+        execution_client
+          .execute(Request::new(execute_request))
+          .map_err(towergrpcerror_to_string)
+          .and_then(|response_stream| {
+            response_stream
+              .into_inner()
+              .take(1)
+              .into_future()
+              .map_err(|err| {
+                format!(
+                  "Error getting response from remote process execution {:?}",
+                  err
+                )
+              })
+              .and_then(|(resp, stream)| {
+                std::mem::drop(stream);
+                resp.ok_or_else(|| "Didn't get response from remote process execution".to_owned())
+              })
+              .map(|operation| OperationOrStatus::Operation(operation.into()))
+          })
       })
-      // If there was an error, drop the _stream to disconnect so that the server doesn't keep the
-      // connection alive and continue sending on it.
-      .map_err(|(error, stream)| {
-        drop(stream);
-        error
-      })
-      .then(|maybe_operation_result| match maybe_operation_result {
-        Ok(Some(operation)) => Ok(OperationOrStatus::Operation(operation)),
-        Ok(None) => {
-          Err("Didn't get proper stream response from server during remote execution".to_owned())
-        }
-        Err(err) => rpcerror_to_status_or_string(err).map(OperationOrStatus::Status),
-      })
-      .to_boxed()
   }
 }
 
@@ -145,7 +169,6 @@ impl super::CommandRunner for CommandRunner {
         let command_runner = self.clone();
         let command_runner2 = self.clone();
         let command_runner3 = self.clone();
-        let execute_request = Arc::new(execute_request);
         let execute_request2 = execute_request.clone();
         let futures_timer_thread = self.futures_timer_thread.clone();
 
@@ -166,7 +189,7 @@ impl super::CommandRunner for CommandRunner {
               command
             );
             command_runner
-              .oneshot_execute(&execute_request)
+              .oneshot_execute(execute_request)
               .join(future::ok(history))
           })
           .and_then(move |(operation, history)| {
@@ -212,7 +235,7 @@ impl super::CommandRunner for CommandRunner {
                           let mut history = history;
                           history.current_attempt += summary;
                           command_runner2
-                            .oneshot_execute(&execute_request)
+                            .oneshot_execute(execute_request)
                             .join(future::ok(history))
                         })
                         // Reset `iter_num` on `MissingDigests`
@@ -306,7 +329,7 @@ impl CommandRunner {
     thread_count: usize,
     store: Store,
     futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
-  ) -> CommandRunner {
+  ) -> Result<CommandRunner, String> {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = {
       let builder = grpcio::ChannelBuilder::new(env.clone());
@@ -322,24 +345,65 @@ impl CommandRunner {
         builder.connect(address)
       }
     };
-    let execution_client = Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
-      channel.clone(),
-    ));
     let operations_client = Arc::new(bazel_protos::operations_grpc::OperationsClient::new(
       channel.clone(),
     ));
 
-    CommandRunner {
+    struct Dst(SocketAddr);
+
+    impl tokio_connect::Connect for Dst {
+      type Connected = TcpStream;
+      type Error = ::std::io::Error;
+      type Future = ConnectFuture;
+
+      fn connect(&self) -> Self::Future {
+        TcpStream::connect(&self.0)
+      }
+    }
+
+    // TODO: Support https
+    let uri: http::Uri = format!("http://{}", address)
+      .parse()
+      .map_err(|err| format!("Failed to parse remote server address URL: {}", err))?;
+    let socket_addr = address
+      .to_socket_addrs()
+      .map_err(|err| format!("Failed to resolve remote socket address URL: {}", err))?
+      .next()
+      .ok_or_else(|| "Remote server address resolved to no addresses".to_owned())?;
+    let execution_client = client::Connect::new(
+      Dst(socket_addr),
+      h2::client::Builder::default(),
+      DefaultExecutor::current(),
+    )
+    .make_service(())
+    .map_err(|err| format!("Error connecting to remote execution server: {}", err))
+    .and_then(move |conn| {
+      let conn = tower_http::add_origin::Builder::new()
+        .uri(uri)
+        .build(conn)
+        .map_err(|err| {
+          format!(
+            "Failed to add origin for remote execution server: {:?}",
+            err
+          )
+        })?;
+      Ok(Mutex::new(
+        bazel_protos::build::bazel::remote::execution::v2::client::Execution::new(conn),
+      ))
+    })
+    .to_boxed()
+    .shared();
+    Ok(CommandRunner {
       cache_key_gen_version,
       instance_name,
       authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
       channel,
       env,
-      execution_client,
       operations_client,
+      execution_client,
       store,
       futures_timer_thread,
-    }
+    })
   }
 
   fn call_option(&self) -> grpcio::CallOption {
@@ -737,7 +801,7 @@ fn make_execute_request(
   (
     bazel_protos::remote_execution::Action,
     bazel_protos::remote_execution::Command,
-    bazel_protos::remote_execution::ExecuteRequest,
+    bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest,
   ),
   String,
 > {
@@ -806,11 +870,13 @@ fn make_execute_request(
   action.set_command_digest((&digest(&command)?).into());
   action.set_input_root_digest((&req.input_files).into());
 
-  let mut execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
-  if let Some(instance_name) = instance_name {
-    execute_request.set_instance_name(instance_name.clone());
-  }
-  execute_request.set_action_digest((&digest(&action)?).into());
+  let execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
+    action_digest: Some((&digest(&action)?).into()),
+    skip_cache_lookup: false,
+    instance_name: instance_name.clone().unwrap_or_default(),
+    execution_policy: None,
+    results_cache_policy: None,
+  };
 
   Ok((action, command, execute_request))
 }
@@ -845,29 +911,6 @@ fn rpcerror_recover_cancelled(
   Err(err)
 }
 
-fn rpcerror_to_status_or_string(
-  error: grpcio::Error,
-) -> Result<bazel_protos::status::Status, String> {
-  match error {
-    grpcio::Error::RpcFailure(grpcio::RpcStatus {
-      status_proto_bytes: Some(status_proto_bytes),
-      ..
-    }) => {
-      let mut status_proto = bazel_protos::status::Status::new();
-      status_proto.merge_from_bytes(&status_proto_bytes).unwrap();
-      Ok(status_proto)
-    }
-    grpcio::Error::RpcFailure(grpcio::RpcStatus {
-      status, details, ..
-    }) => Err(format!(
-      "{:?}: {:?}",
-      status,
-      details.unwrap_or_else(|| "[no message]".to_string())
-    )),
-    err => Err(format!("{:?}", err)),
-  }
-}
-
 fn rpcerror_to_string(error: grpcio::Error) -> String {
   match error {
     grpcio::Error::RpcFailure(status) => format!(
@@ -876,6 +919,20 @@ fn rpcerror_to_string(error: grpcio::Error) -> String {
       status.details.unwrap_or_else(|| "[no message]".to_string())
     ),
     err => format!("{:?}", err),
+  }
+}
+
+fn towergrpcerror_to_string<T: std::fmt::Debug>(error: tower_grpc::Error<T>) -> String {
+  match error {
+    tower_grpc::Error::Grpc(status) => {
+      let error_message = if status.error_message() == "" {
+        "[no message]"
+      } else {
+        &status.error_message()
+      };
+      format!("{:?}: {}", status.code(), error_message)
+    }
+    tower_grpc::Error::Inner(v) => format!("{:?}", v),
   }
 }
 
@@ -989,17 +1046,22 @@ mod tests {
     );
     want_action.set_input_root_digest((&input_directory.digest()).into());
 
-    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
-    want_execute_request.set_action_digest(
-      (&Digest(
-        Fingerprint::from_hex_string(
-          "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
-        )
-        .unwrap(),
-        140,
-      ))
-        .into(),
-    );
+    let want_execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
+      action_digest: Some(
+        (&Digest(
+          Fingerprint::from_hex_string(
+            "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
+          )
+          .unwrap(),
+          140,
+        ))
+          .into(),
+      ),
+      instance_name: String::new(),
+      execution_policy: None,
+      results_cache_policy: None,
+      skip_cache_lookup: false,
+    };
 
     assert_eq!(
       super::make_execute_request(&req, &None, &None),
@@ -1075,6 +1137,23 @@ mod tests {
         .into(),
     );
 
+    let want_execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
+      action_digest: Some(
+        (&Digest(
+          Fingerprint::from_hex_string(
+            "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
+          )
+          .unwrap(),
+          140,
+        ))
+          .into(),
+      ),
+      instance_name: "dark-tower".to_owned(),
+      execution_policy: None,
+      results_cache_policy: None,
+      skip_cache_lookup: false,
+    };
+
     assert_eq!(
       super::make_execute_request(&req, &Some("dark-tower".to_owned()), &None),
       Ok((want_action, want_command, want_execute_request))
@@ -1142,17 +1221,22 @@ mod tests {
     );
     want_action.set_input_root_digest((&input_directory.digest()).into());
 
-    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
-    want_execute_request.set_action_digest(
-      (&Digest(
-        Fingerprint::from_hex_string(
-          "0ee5d4c8ac12513a87c8d949c6883ac533a264d30215126af71a9028c4ab6edf",
-        )
-        .unwrap(),
-        140,
-      ))
-        .into(),
-    );
+    let want_execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
+      action_digest: Some(
+        (&Digest(
+          Fingerprint::from_hex_string(
+            "0ee5d4c8ac12513a87c8d949c6883ac533a264d30215126af71a9028c4ab6edf",
+          )
+          .unwrap(),
+          140,
+        ))
+          .into(),
+      ),
+      instance_name: String::new(),
+      execution_policy: None,
+      results_cache_policy: None,
+      skip_cache_lookup: false,
+    };
 
     assert_eq!(
       super::make_execute_request(&req, &None, &Some("meep".to_owned())),
@@ -1197,17 +1281,22 @@ mod tests {
     );
     want_action.set_input_root_digest((&input_directory.digest()).into());
 
-    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
-    want_execute_request.set_action_digest(
-      (&Digest(
-        Fingerprint::from_hex_string(
-          "b1fb7179ce496995a4e3636544ec000dca1b951f1f6216493f6c7608dc4dd910",
-        )
-        .unwrap(),
-        140,
-      ))
-        .into(),
-    );
+    let want_execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
+      action_digest: Some(
+        (&Digest(
+          Fingerprint::from_hex_string(
+            "b1fb7179ce496995a4e3636544ec000dca1b951f1f6216493f6c7608dc4dd910",
+          )
+          .unwrap(),
+          140,
+        ))
+          .into(),
+      ),
+      instance_name: String::new(),
+      execution_policy: None,
+      results_cache_policy: None,
+      skip_cache_lookup: false,
+    };
 
     assert_eq!(
       super::make_execute_request(&req, &None, &None),
@@ -1245,7 +1334,7 @@ mod tests {
     let error = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
     assert_eq!(
       error,
-      "InvalidArgument: \"Did not expect this request\"".to_string()
+      "InvalidArgument: Did not expect this request".to_string()
     );
   }
 
@@ -1388,6 +1477,8 @@ mod tests {
     )
     .expect("Failed to make store");
 
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
     let cmd_runner = CommandRunner::new(
       &mock_server.address(),
       None,
@@ -1397,8 +1488,10 @@ mod tests {
       1,
       store,
       timer_thread,
-    );
-    let result = cmd_runner.run(echo_roland_request()).wait().unwrap();
+    )
+    .unwrap();
+    let result = rt.block_on(cmd_runner.run(echo_roland_request())).unwrap();
+    rt.shutdown_now().wait().unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
@@ -1764,21 +1857,25 @@ mod tests {
       .wait()
       .expect("Saving directory bytes to store");
 
-    let result = CommandRunner::new(
-      &mock_server.address(),
-      None,
-      None,
-      None,
-      None,
-      1,
-      store,
-      timer_thread,
-    )
-    .run(cat_roland_request())
-    .wait()
-    .unwrap();
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    let result = rt.block_on(
+      CommandRunner::new(
+        &mock_server.address(),
+        None,
+        None,
+        None,
+        None,
+        1,
+        store,
+        timer_thread,
+      )
+      .unwrap()
+      .run(cat_roland_request()),
+    );
+    rt.shutdown_now().wait().unwrap();
     assert_eq!(
-      result.without_execution_attempts(),
+      result.unwrap().without_execution_attempts(),
       FallibleExecuteProcessResult {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
@@ -1860,18 +1957,21 @@ mod tests {
       .wait()
       .expect("Saving file bytes to store");
 
-    let result = CommandRunner::new(
-      &mock_server.address(),
-      None,
-      None,
-      None,
-      None,
-      1,
-      store,
-      timer_thread,
-    )
-    .run(cat_roland_request())
-    .wait();
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let result = rt.block_on(
+      CommandRunner::new(
+        &mock_server.address(),
+        None,
+        None,
+        None,
+        None,
+        1,
+        store,
+        timer_thread,
+      )
+      .unwrap()
+      .run(cat_roland_request()),
+    );
     assert_eq!(
       result,
       Ok(FallibleExecuteProcessResult {
@@ -1928,19 +2028,23 @@ mod tests {
     )
     .expect("Failed to make store");
 
-    let error = CommandRunner::new(
-      &mock_server.address(),
-      None,
-      None,
-      None,
-      None,
-      1,
-      store,
-      timer_thread,
-    )
-    .run(cat_roland_request())
-    .wait()
-    .expect_err("Want error");
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let result = rt.block_on(
+      CommandRunner::new(
+        &mock_server.address(),
+        None,
+        None,
+        None,
+        None,
+        1,
+        store,
+        timer_thread,
+      )
+      .unwrap()
+      .run(cat_roland_request()),
+    );
+    rt.shutdown_now().wait().unwrap();
+    let error = result.expect_err("Want error");
     assert_contains(&error, &format!("{}", missing_digest.0));
   }
 
@@ -2174,7 +2278,12 @@ mod tests {
       let messages = mock_server.mock_responder.received_messages.lock();
       assert!(messages.len() == 2);
       assert!(
-        messages.get(1).unwrap().2.sub(messages.get(0).unwrap().2) >= Duration::from_millis(500)
+        messages
+          .get(1)
+          .unwrap()
+          .received_at
+          .sub(messages.get(0).unwrap().received_at)
+          >= Duration::from_millis(500)
       );
     }
   }
@@ -2209,13 +2318,28 @@ mod tests {
       let messages = mock_server.mock_responder.received_messages.lock();
       assert!(messages.len() == 4);
       assert!(
-        messages.get(1).unwrap().2.sub(messages.get(0).unwrap().2) >= Duration::from_millis(500)
+        messages
+          .get(1)
+          .unwrap()
+          .received_at
+          .sub(messages.get(0).unwrap().received_at)
+          >= Duration::from_millis(500)
       );
       assert!(
-        messages.get(2).unwrap().2.sub(messages.get(1).unwrap().2) >= Duration::from_millis(1000)
+        messages
+          .get(2)
+          .unwrap()
+          .received_at
+          .sub(messages.get(1).unwrap().received_at)
+          >= Duration::from_millis(1000)
       );
       assert!(
-        messages.get(3).unwrap().2.sub(messages.get(2).unwrap().2) >= Duration::from_millis(1500)
+        messages
+          .get(3)
+          .unwrap()
+          .received_at
+          .sub(messages.get(2).unwrap().received_at)
+          >= Duration::from_millis(1500)
       );
     }
   }
@@ -2492,8 +2616,11 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     let command_runner = create_command_runner(address, &cas);
-    command_runner.run(request).wait()
+    let result = runtime.block_on(command_runner.run(request));
+    runtime.shutdown_now().wait().unwrap();
+    result
   }
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
@@ -2516,6 +2643,7 @@ mod tests {
     .expect("Failed to make store");
 
     CommandRunner::new(&address, None, None, None, None, 1, store, timer_thread)
+      .expect("Failed to make command runner")
   }
 
   fn timer_thread() -> resettable::Resettable<futures_timer::HelperThread> {
@@ -2529,13 +2657,15 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner("".to_owned(), &cas);
-    command_runner
-      .extract_execute_response(
-        super::OperationOrStatus::Operation(operation),
-        &mut ExecutionHistory::default(),
-      )
-      .wait()
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let command_runner = create_command_runner("127.0.0.1:0".to_owned(), &cas);
+    let result = runtime.block_on(command_runner.extract_execute_response(
+      super::OperationOrStatus::Operation(operation),
+      &mut ExecutionHistory::default(),
+    ));
+
+    runtime.shutdown_now().wait().unwrap();
+    result
   }
 
   fn extract_output_files_from_response(
@@ -2545,10 +2675,12 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner("".to_owned(), &cas);
-    command_runner
-      .extract_output_files(&execute_response)
-      .wait()
+
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let command_runner = create_command_runner("127.0.0.1:0".to_owned(), &cas);
+    let result = runtime.block_on(command_runner.extract_output_files(&execute_response));
+    runtime.shutdown_now().wait().unwrap();
+    result
   }
 
   fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {

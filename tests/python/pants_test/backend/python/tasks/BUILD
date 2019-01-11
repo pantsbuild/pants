@@ -5,6 +5,7 @@ python_library(
   name='interpreter_cache_test_mixin',
   sources=['interpreter_cache_test_mixin.py'],
   dependencies = [
+    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:future',
   ]
 )
@@ -125,6 +126,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
+    'src/python/pants/util:py2_compat',
     'tests/python/pants_test/backend/python:interpreter_selection_utils',
     'tests/python/pants_test/engine:scheduler_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',

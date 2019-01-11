@@ -1,25 +1,45 @@
+// Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use protoc_grpcio;
 
 use std::path::{Path, PathBuf};
 
 use build_utils::BuildRoot;
+use std::collections::HashSet;
 
 fn main() {
   let build_root = BuildRoot::find().unwrap();
   let thirdpartyprotobuf = build_root.join("3rdparty/protobuf");
-  println!(
-    "cargo:rerun-if-changed={}",
-    thirdpartyprotobuf.to_str().unwrap()
-  );
+  mark_dir_as_rerun_trigger(&thirdpartyprotobuf);
 
-  let amended_proto_root =
-    add_rustproto_header(&thirdpartyprotobuf).expect("Error adding proto bytes header");
+  let grpcio_output_dir = PathBuf::from("src/gen");
+  make_clean_dir(&grpcio_output_dir);
+  generate_for_grpcio(&thirdpartyprotobuf, &grpcio_output_dir);
 
-  let gen_dir = PathBuf::from("src/gen");
+  let tower_output_dir = PathBuf::from("src/gen_for_tower");
+  make_clean_dir(&tower_output_dir);
+  generate_for_tower(&thirdpartyprotobuf, tower_output_dir.clone());
+
+  let success = std::process::Command::new(env!("CARGO"))
+    .arg("fmt")
+    .arg("--package=bazel_protos")
+    .status()
+    .unwrap()
+    .success();
+  if !success {
+    panic!("Cargo formatting failed for generated protos. Output should be above.");
+  }
 
   // Re-gen if, say, someone does a git clean on the gen dir but not the target dir. This ensures
   // generated sources are available for reading by programmers and tools like rustfmt alike.
-  println!("cargo:rerun-if-changed={}", gen_dir.to_str().unwrap());
+  mark_dir_as_rerun_trigger(&grpcio_output_dir);
+  mark_dir_as_rerun_trigger(&tower_output_dir);
+}
+
+fn generate_for_grpcio(thirdpartyprotobuf: &Path, gen_dir: &Path) {
+  let amended_proto_root =
+    add_rustproto_header(&thirdpartyprotobuf).expect("Error adding proto bytes header");
 
   protoc_grpcio::compile_grpc_protos(
     &[
@@ -43,6 +63,12 @@ fn main() {
   disable_clippy_in_generated_code(&gen_dir).expect("Failed to strip clippy from generated code");
 
   generate_mod_rs(&gen_dir).expect("Failed to generate mod.rs");
+}
+
+fn mark_dir_as_rerun_trigger(dir: &Path) {
+  for file in walkdir::WalkDir::new(dir) {
+    println!("cargo:rerun-if-changed={}", file.unwrap().path().display());
+  }
 }
 
 const EXTRA_HEADER: &'static str = r#"import "rustproto.proto";
@@ -143,4 +169,67 @@ fn generate_mod_rs(dir: &Path) -> Result<(), String> {
 
   std::fs::write(dir.join("mod.rs"), contents)
     .map_err(|err| format!("Failed to write mod.rs: {}", err))
+}
+
+fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: PathBuf) {
+  tower_grpc_build::Config::new()
+    .enable_server(true)
+    .enable_client(true)
+    .build(
+      &[PathBuf::from(
+        "build/bazel/remote/execution/v2/remote_execution.proto",
+      )],
+      &std::fs::read_dir(&thirdpartyprotobuf)
+        .unwrap()
+        .into_iter()
+        .map(|d| d.unwrap().path())
+        .collect::<Vec<_>>(),
+    )
+    .unwrap_or_else(|e| panic!("protobuf compilation failed: {}", e));
+
+  let mut dirs_needing_mod_rs = HashSet::new();
+  dirs_needing_mod_rs.insert(out_dir.clone());
+
+  for f in walkdir::WalkDir::new(std::env::var("OUT_DIR").unwrap())
+    .into_iter()
+    .filter_map(|f| f.ok())
+    .filter(|f| f.path().extension() == Some("rs".as_ref()))
+  {
+    let mut parts: Vec<_> = f
+      .path()
+      .file_name()
+      .unwrap()
+      .to_str()
+      .unwrap()
+      .split('.')
+      .collect();
+    // pop .rs
+    parts.pop();
+
+    let mut dst = out_dir.clone();
+    for part in parts {
+      dst.push(part);
+      dirs_needing_mod_rs.insert(dst.clone());
+      if !dst.exists() {
+        std::fs::create_dir_all(&dst).unwrap();
+      }
+    }
+    dirs_needing_mod_rs.remove(&dst);
+    dst = dst.join("mod.rs");
+
+    std::fs::copy(f.path(), dst).unwrap();
+  }
+
+  disable_clippy_in_generated_code(&out_dir).expect("Failed to strip clippy from generated code");
+
+  for dir in &dirs_needing_mod_rs {
+    generate_mod_rs(dir).expect("Failed to write mod.rs");
+  }
+}
+
+fn make_clean_dir(path: &Path) {
+  if path.exists() {
+    std::fs::remove_dir_all(path).unwrap();
+  }
+  std::fs::create_dir_all(path).unwrap();
 }

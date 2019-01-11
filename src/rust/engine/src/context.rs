@@ -130,23 +130,26 @@ impl Core {
         .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
       let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
-        Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
-          address,
-          remote_execution_process_cache_namespace.clone(),
-          remote_instance_name.clone(),
-          root_ca_certs.clone(),
-          oauth_bearer_token.clone(),
-          // Allow for some overhead for bookkeeping threads (if any).
-          process_execution_parallelism + 2,
-          store.clone(),
-          futures_timer_thread2.clone(),
-        )),
+        Some(ref address) => Box::new(
+          process_execution::remote::CommandRunner::new(
+            address,
+            remote_execution_process_cache_namespace.clone(),
+            remote_instance_name.clone(),
+            root_ca_certs.clone(),
+            oauth_bearer_token.clone(),
+            // Allow for some overhead for bookkeeping threads (if any).
+            process_execution_parallelism + 2,
+            store.clone(),
+            futures_timer_thread2.clone(),
+          )
+          .expect("Could not initialize remote execution client"),
+        ) as Box<dyn CommandRunner>,
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
           fs_pool2.clone(),
           work_dir.clone(),
           process_execution_cleanup_local_dirs,
-        )),
+        )) as Box<dyn CommandRunner>,
       };
 
       let command_runner =

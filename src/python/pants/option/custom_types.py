@@ -5,15 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
-from builtins import object
-
-import six
+from builtins import bytes, object, str
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
 from pants.util.objects import enum
-from pants.util.strutil import ensure_text
 
 
 class UnsetBool(object):
@@ -207,8 +204,10 @@ class ListValueComponent(object):
                   May also be a comma-separated sequence of modifications.
     :rtype: `ListValueComponent`
     """
-    if isinstance(value, six.string_types):
-      value = ensure_text(value)
+    if isinstance(value, bytes):
+      value = value.decode('utf-8')
+
+    if isinstance(value, str):
       comma_separated_exprs = cls._split_modifier_expr(value)
       if len(comma_separated_exprs) > 1:
         return cls.merge([cls.create(x) for x in comma_separated_exprs])
@@ -230,7 +229,7 @@ class ListValueComponent(object):
       appends = _convert(value[1:], (list, tuple))
     elif value.startswith('-[') or value.startswith('-('):
       filters = _convert(value[1:], (list, tuple))
-    elif isinstance(value, six.string_types):
+    elif isinstance(value, str):
       appends = [value]
     else:
       appends = _convert('[{}]'.format(value), list)
@@ -287,8 +286,8 @@ class DictValueComponent(object):
                   or a string representation (possibly prefixed by +) of a dict.
     :rtype: `DictValueComponent`
     """
-    if isinstance(value, six.string_types):
-      value = ensure_text(value)
+    if isinstance(value, bytes):
+      value = value.decode('utf-8')
     if isinstance(value, cls):  # Ensure idempotency.
       action = value.action
       val = value.val
