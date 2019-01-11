@@ -21,4 +21,13 @@ USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 # Our newly created user is unlikely to have a sane environment: set a locale at least.
 ENV LC_ALL="en_US.UTF-8"
 
+# Install Python 3.6, which we must build because it's not available through yum
+RUN cd /usr/src && \
+  wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz && \
+  tar -xzf Python-3-6-8.tgz && \
+  cd Python-3-6-8 && \
+  ./configure --enable-optimizations && \
+  make altinstall && \
+  rm /usr/src/Python-3-6-8.tgz
+
 WORKDIR /travis/workdir
