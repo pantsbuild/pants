@@ -6,8 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pants.backend.codegen.grpcio.grpcio_prep import GrpcioPrep
-from pants.backend.codegen.grpcio.grpcio_run import GrpcioRun
+from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
+from pants.backend.codegen.grpcio.python.grpcio_run import GrpcioRun
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants_test.task_test_base import TaskTestBase
 

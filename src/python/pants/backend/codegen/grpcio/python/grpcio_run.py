@@ -6,10 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import functools
 import logging
-from collections import OrderedDict
 
-from pants.backend.codegen.grpcio.grpcio_prep import GrpcioPrep
-from pants.backend.codegen.grpcio.python_grpcio_library import PythonGrpcioLibrary
+from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
+from pants.backend.codegen.grpcio.python.python_grpcio_library import PythonGrpcioLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -20,7 +19,7 @@ from pants.util.memo import memoized_property
 
 
 class GrpcioRun(SimpleCodegenTask):
-  """Task to compile protobuf"""
+  """Task to compile protobuf into python code"""
 
   gentarget_type = PythonGrpcioLibrary
   sources_globs = ('**/*',)
@@ -30,15 +29,15 @@ class GrpcioRun(SimpleCodegenTask):
     super(GrpcioRun, cls).prepare(options, round_manager)
     round_manager.require_data(GrpcioPrep.tool_instance_cls)
 
+  def synthetic_target_type(self, target):
+    return PythonLibrary
+
   @memoized_property
   def _grpcio_binary(self):
     return self.context.products.get_data(GrpcioPrep.tool_instance_cls)
 
   def execute_codegen(self, target, target_workdir):
     args = self.build_args(target, target_workdir)
-    print("grpcio execute for target:")
-    print(target)
-    print("========")
     logging.debug("Executing grpcio code generation with args: [{}]".format(args))
 
     with pushd(get_buildroot()):
@@ -49,7 +48,7 @@ class GrpcioRun(SimpleCodegenTask):
       if exit_code != 0:
         raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
                         exit_code=exit_code)
-      logging.debug("Grpcio finished code generation")
+      logging.info("Grpcio finished code generation into: [{}]".format(target_workdir))
 
   def build_args(self, target, target_workdir):
     python_out = '--python_out={0}'.format(target_workdir)
@@ -60,25 +59,3 @@ class GrpcioRun(SimpleCodegenTask):
 
     args.extend(target.sources_relative_to_buildroot())
     return args
-
-  def _calculate_sources(self, target):
-    gentargets = set()
-
-    def add_to_gentargets(tgt):
-      if self.is_gentarget(tgt):
-        gentargets.add(tgt)
-
-    self.context.build_graph.walk_transitive_dependency_graph(
-      [target.address],
-      add_to_gentargets,
-      postorder=True)
-    sources_by_base = OrderedDict()
-    for gentarget in gentargets:
-      base = gentarget.target_base
-      if base not in sources_by_base:
-        sources_by_base[base] = set()
-      sources_by_base[base].update(gentarget.sources_relative_to_buildroot())
-    return sources_by_base
-
-  def synthetic_target_type(self, target):
-    return PythonLibrary

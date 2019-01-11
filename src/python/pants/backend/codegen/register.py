@@ -8,9 +8,9 @@ from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.antlr.python.antlr_py_gen import AntlrPyGen
 from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
-from pants.backend.codegen.grpcio.grpcio_prep import GrpcioPrep
-from pants.backend.codegen.grpcio.grpcio_run import GrpcioRun
-from pants.backend.codegen.grpcio.python_grpcio_library import PythonGrpcioLibrary
+from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
+from pants.backend.codegen.grpcio.python.grpcio_run import GrpcioRun
+from pants.backend.codegen.grpcio.python.python_grpcio_library import PythonGrpcioLibrary
 from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
 from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary

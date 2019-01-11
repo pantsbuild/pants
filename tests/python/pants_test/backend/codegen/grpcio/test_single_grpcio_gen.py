@@ -6,8 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from textwrap import dedent
 
-from pants.backend.codegen.grpcio.python_grpcio_library import PythonGrpcioLibrary
-from pants_test.backend.codegen.grpcio.grpcio_test_base import GrpcioTestBase
+from pants.backend.codegen.grpcio.python.python_grpcio_library import PythonGrpcioLibrary
+from pants_test.backend.codegen.grpcio.python.grpcio_test_base import GrpcioTestBase
 
 
 class GrpcioMultipleGenTest(GrpcioTestBase):
