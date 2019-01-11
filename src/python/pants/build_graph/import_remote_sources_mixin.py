@@ -27,11 +27,18 @@ class ImportRemoteSourcesMixin(Target, AbstractClass):
   class WrongTargetTypeError(AddressLookupError):
     """Thrown if the wrong type of target is encountered."""
 
-  # TODO: make a quick utility in pants.util.meta to register these standard `NotImplementedError`s!
   @classproperty
   def expected_target_constraint(cls):
-    """???"""
-    raise NotImplementedError('???')
+    """
+    :returns: A type constraint which is used to validate the targets containing remote sources,
+              specified `imported_target_kwargs_field` in a BUILD file.
+    :rtype: TypeConstraint
+    """
+    # TODO: make a utility in pants.util.meta to register these standard `NotImplementedError`s!
+    raise NotImplementedError(
+      'subclasses of ImportRemoteSourcesMixin must implement an '
+      '`expected_target_constraint` classproperty'
+    )
 
   @classproperty
   def imported_target_kwargs_field(cls):
