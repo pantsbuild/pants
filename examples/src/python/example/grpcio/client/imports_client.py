@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import grpc
-
 from org.pantsbuild.example.grpcio.imports import imports_pb2, imports_pb2_grpc
 from org.pantsbuild.example.grpcio.service import service_pb2
 
