@@ -92,7 +92,8 @@ class ImportRemoteSourcesMixin(Target, AbstractClass):
 
   @memoized_property
   def imported_targets(self):
-    """:returns: target instances for specs referenced by imported_target_specs.
+    """
+    :returns: target instances for specs referenced by imported_target_specs.
     :rtype: list of JarLibrary
     """
     libs = []
