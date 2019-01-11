@@ -479,9 +479,6 @@ py3_linux_rust_tests: &py3_linux_rust_tests
 base_osx_rust_tests: &base_osx_rust_tests
   # Fuse actually works on this image. It hangs on many others.
   osx_image: xcode8.3
-  before_install:
-    {{>before_install_osx}}
-    - brew tap caskroom/cask && brew update && brew cask install osxfuse
   addons:
     homebrew:
       casks: &base_osx_rust_tests_brew_casks
