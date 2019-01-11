@@ -67,8 +67,8 @@ class ImportRemoteSourcesMixin(Target, AbstractClass):
     """
     :param kwargs: A kwargs dict representing Target.__init__(**kwargs) (Optional).
     :param payload: A Payload object representing the Target.__init__(payload=...) param.  (Optional).
-    :returns: list of JarLibrary specs to be imported.
-    :rtype: list of JarLibrary
+    :returns: list of target specs to be imported.
+    :rtype: list of str
     """
     if kwargs is not None:
       assert payload is None, 'may not provide both kwargs and payload'
@@ -94,7 +94,7 @@ class ImportRemoteSourcesMixin(Target, AbstractClass):
   def imported_targets(self):
     """
     :returns: target instances for specs referenced by imported_target_specs.
-    :rtype: list of JarLibrary
+    :rtype: list of Target
     """
     libs = []
     for spec in self.imported_target_specs(payload=self.payload):
