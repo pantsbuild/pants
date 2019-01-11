@@ -6,6 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import re
 
+from future.utils import binary_type, text_type
+
 from pants.base.deprecated import warn_or_error
 from pants.base.hash_utils import stable_json_hash
 from pants.base.payload import Payload
@@ -18,11 +20,25 @@ from pants.util.objects import datatype
 
 # TODO: generalize this to a DatatypeSetField subclass in payload_field.py!
 class ConanRequirementSetField(tuple, PayloadField):
+
   def _compute_fingerprint(self):
     return stable_json_hash(tuple(hash(req) for req in self))
 
 
-class ConanRequirement(datatype(['pkg_spec', 'include_relpath', 'lib_relpath', ('lib_names', tuple)])):
+class ConanRequirement(datatype([
+    ('pkg_spec', text_type),
+    ('include_relpath', binary_type),
+    ('lib_relpath', binary_type),
+    ('lib_names', tuple),
+])):
+  """A specification for a conan package to be resolved against a remote repository.
+
+  Example `pkg_spec`: 'lzo/2.10@twitter/stable'
+
+  The include and lib dirs default to 'include/' and 'lib/', but as this is a convention, they can
+  be overridden for the specific package to be resolved. See
+  https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#imports for more info.
+  """
 
   @classmethod
   def alias(cls):
@@ -30,15 +46,22 @@ class ConanRequirement(datatype(['pkg_spec', 'include_relpath', 'lib_relpath', (
 
   def __new__(cls, pkg_spec, include_relpath=None, lib_relpath=None, lib_names=None):
     """
-    TODO: docstring! the reason for specifying these per-package is because they are a convention --
-    see https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#imports.
+    :param str pkg_spec: A string specifying a conan package at a specific version, as per
+                         https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#requires
+    :param str include_relpath: The relative path from the package root directory to where C/C++
+                                headers are located.
+    :param str lib_relpath: The relative path from the package root directory to where native
+                            libraries are located.
+    :param list lib_names: Strings containing the libraries to add to the linker command
+                           line. Collected into the `native_lib_names` field of a
+                           `packaged_native_library()` target.
     """
     return super(ConanRequirement, cls).__new__(
       cls,
-      pkg_spec,
-      include_relpath=include_relpath or 'include',
-      lib_relpath=lib_relpath or 'lib',
-      lib_names=lib_names or ())
+      text_type(pkg_spec),
+      include_relpath=binary_type(include_relpath or 'include'),
+      lib_relpath=binary_type(lib_relpath or 'lib'),
+      lib_names=tuple(lib_names or ()))
 
   def parse_conan_stdout_for_pkg_sha(self, stdout):
     # TODO(#6168): Add a JSON output mode in upstream Conan instead of parsing this.
@@ -73,10 +96,7 @@ class ExternalNativeLibrary(Target):
 
   def __init__(self, payload=None, packages=None, **kwargs):
     """
-    :param packages: a list of Conan-style package strings
-
-    Example:
-      lzo/2.10@twitter/stable
+    :param list packages: the `ConanRequirement`s to resolve into a `packaged_native_library()` target.
     """
     payload = payload or Payload()
 
@@ -100,9 +120,11 @@ class ExternalNativeLibrary(Target):
   def packages(self):
     return self.payload.packages
 
-  # These are always going to be include/ and lib/ as we populate the constituent requirements there
-  # in `NativeExternalLibraryFetch`, and we need to add these to the copied attributes for generated
-  # targets in ._copy_target_attributes.
+  # NB: These are always going to be include/ and lib/ as we populate the constituent requirements
+  # there in `NativeExternalLibraryFetch`, and we need to add these to the copied attributes for
+  # generated targets in ._copy_target_attributes. These need to have the same names as in
+  # `packaged_native_library()` so that the methods in the `SimpleCodegenTask` superclass can copy
+  # the attributes over.
   @property
   def include_relpath(self):
     return 'include'
