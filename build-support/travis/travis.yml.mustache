@@ -164,7 +164,7 @@ py3_osx_config: &py3_osx_config
     - HOMEBREW_NO_AUTO_UPDATE=1 brew install pyenv
     - pyenv install --list
     - pyenv install 3.6.5
-    = pyenv global 3.6.5
+    - pyenv global 3.6.5
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
