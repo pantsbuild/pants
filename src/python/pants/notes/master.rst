@@ -6,7 +6,7 @@ not undergo the vetting associated with ``stable`` releases.
 
 
 1.14.0.dev2 (1/11/2019)
-----------------------
+-----------------------
 
 New Features
 ~~~~~~~~~~~~
