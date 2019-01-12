@@ -168,7 +168,6 @@ py3_osx_config: &py3_osx_config
     homebrew:
       packages: &py3_osx_config_brew_packages
       - python3
-      update: true
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
@@ -286,6 +285,11 @@ py3_osx_build_engine: &py3_osx_build_engine
   <<: *py3_osx_config
   <<: *base_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py3 PEX)"
+  addons:
+    homebrew:
+      packages: *py3_osx_config_brew_packages
+      update: true
+
   env:
     - *base_osx_build_engine_env
     - CACHE_NAME=osxpexbuild.py3
