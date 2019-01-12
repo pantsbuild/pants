@@ -153,16 +153,14 @@ py3_osx_config: &py3_osx_config
   addons:
     brew:
       packages: &py3_osx_config_brew_packages
-      - pyenv
       - openssl
   env:
     # Fix Python 3 issue linking to OpenSSL
-    - PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include"
+    - &py3_osx_config_env PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include"
   before_install:
     {{>before_install_osx}}
     # Install pyenv the conventional brew way, instead of through addon, due to execution order
     - HOMEBREW_NO_AUTO_UPDATE=1 brew install pyenv
-    - pyenv install --list
     - pyenv install 3.6.5
     - pyenv global 3.6.5
 
@@ -280,6 +278,7 @@ py3_osx_build_engine: &py3_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py3 PEX)"
   env:
     - *base_osx_build_engine_env
+    - *py3_osx_config_env
     - CACHE_NAME=osxpexbuild.py3
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
     - BOOTSTRAP_ARGS=''
