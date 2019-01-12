@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 # Use our custom Centos6 image for binary compatibility with old linux distros.
-FROM pantsbuild/centos6:latest
+ARG BASE_IMAGE=pantsbuild/centos6:latest
+FROM ${BASE_IMAGE}
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
