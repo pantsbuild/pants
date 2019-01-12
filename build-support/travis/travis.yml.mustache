@@ -265,10 +265,6 @@ py3_osx_build_engine: &py3_osx_build_engine
   <<: *py3_osx_config
   <<: *base_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py3 PEX)"
-  addons:
-    homebrew:
-      packages: *py3_osx_config_brew_packages
-      update: true
 
   env:
     - *base_osx_build_engine_env
@@ -507,7 +503,6 @@ py3_osx_rust_tests: &py3_osx_rust_tests
     - CACHE_NAME=macosrusttests.py3
   addons:
     homebrew:
-      packages: *py3_osx_config_brew_packages
       casks: *base_osx_rust_tests_brew_casks
   script:
     - ./build-support/bin/travis-ci.sh -bez
