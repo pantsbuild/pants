@@ -590,17 +590,27 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -bn
 
-{{#integration_shards}}
+{{#py3_integration_shards}}
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard {{.}} (Py3 PEX)"
       env:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i {{.}}/{{integration_shards_length}}
+        - ./build-support/bin/travis-ci.sh -bc -i {{.}}/{{py3_integration_shards_length}}
 
-{{/integration_shards}}
-{{#integration_shards}}
+{{/py3_integration_shards}}
+{{#py2_blacklist_integration_shards}}
+    - <<: *py3_linux_test_config
+      name: "Blacklisted integration tests for pants - shard {{.}} (Py2 PEX)"
+      env:
+        - *py2_linux_test_config_env
+        - CACHE_NAME=integrationshard{{.}}.py2blacklist
+      script:
+        - ./build-support/bin/travis-ci.sh -bc2 -i {{.}}/{{py2_blacklist_integration_shards_length}}
+
+{{/py2_blacklist_integration_shards}}
+{{#cron_integration_shards}}
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard {{.}} (Py2 PEX)"
       stage: *cron
@@ -608,9 +618,9 @@ matrix:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard{{.}}
       script:
-        - ./build-support/bin/travis-ci.sh -bc2 -i {{.}}/{{integration_shards_length}}
+        - ./build-support/bin/travis-ci.sh -bc2 -i {{.}}/{{cron_integration_shards_length}}
 
-{{/integration_shards}}
+{{/cron_integration_shards}}
 
     - <<: *py2_linux_rust_tests
     - <<: *py3_linux_rust_tests
