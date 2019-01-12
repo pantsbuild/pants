@@ -12,6 +12,7 @@ RUN yum -y update
 RUN yum install -y centos-release-scl
 RUN yum install -y wget
 
+RUN /usr/bin/scl enable devtoolset-7
 RUN cd /usr/src && \
   wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz && \
   tar -xzf Python-3.6.8.tgz && \
