@@ -150,10 +150,9 @@ py2_osx_config: &py2_osx_config
 
 py3_osx_config: &py3_osx_config
   <<: *base_osx_config
-  addons:
-    homebrew:
-      packages: &py3_osx_config_brew_packages
-      - python3
+  before_install:
+    {{>before_install_osx}}
+    - pyenv install 3.6.8 && pyenv global 3.6.8
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config

@@ -164,10 +164,11 @@ py2_osx_config: &py2_osx_config
 
 py3_osx_config: &py3_osx_config
   <<: *base_osx_config
-  addons:
-    homebrew:
-      packages: &py3_osx_config_brew_packages
-      - python3
+  before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv install 3.6.8 && pyenv global 3.6.8
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
