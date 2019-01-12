@@ -164,6 +164,10 @@ py2_osx_config: &py2_osx_config
 
 py3_osx_config: &py3_osx_config
   <<: *base_osx_config
+  addons:
+    brew:
+      packages: &py3_osx_config_brew_packages
+      - pyenv
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
@@ -524,6 +528,7 @@ py3_osx_rust_tests: &py3_osx_rust_tests
     - CACHE_NAME=macosrusttests.py3
   addons:
     homebrew:
+      packages: *py3_osx_config_brew_packages
       casks: *base_osx_rust_tests_brew_casks
   script:
     - ./build-support/bin/travis-ci.sh -bez
