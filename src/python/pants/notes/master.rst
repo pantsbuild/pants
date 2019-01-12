@@ -4,6 +4,83 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.14.0.dev2 (1/11/2019)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+* Rerun proto compilation when protos change (#7029)
+  `PR #7029 <https://github.com/pantsbuild/pants/pull/7029>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+* Upgrade several dependencies to fix Py3 deprecations (#7053)
+  `PR #7053 <https://github.com/pantsbuild/pants/pull/7053>`_
+
+* Update pantsbuild/pants to scala 2.12, and bump the default patch version for 2.12 (#7035)
+  `PR #7035 <https://github.com/pantsbuild/pants/pull/7035>`_
+
+Bugfixes
+~~~~~~~~
+* [compile.rsc] fix key error; ensure java compiles get necessary zinc scala deps (#7038)
+  `PR #7038 <https://github.com/pantsbuild/pants/pull/7038>`_
+
+* Fix jvm compile unicode issues when using Python 3 (#6987)
+  `PR #6987 <https://github.com/pantsbuild/pants/pull/6987>`_
+
+* Revert "set PEX_PYTHON_PATH when invoking the checkstyle pex for pexrc to work (#7013)" (#7028)
+  `PR #7013 <https://github.com/pantsbuild/pants/pull/7013>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Use homebrew addon feature in CI (#7062)
+  `PR #7062 <https://github.com/pantsbuild/pants/pull/7062>`_
+
+* Add `collections.abc` backport to fix deprecation warning (#7055)
+  `PR #7055 <https://github.com/pantsbuild/pants/pull/7055>`_
+
+* Improve symlink errors (#7054)
+  `PR #7054 <https://github.com/pantsbuild/pants/pull/7054>`_
+
+* Fix invalid escape sequence problems (#7056)
+  `PR #7056 <https://github.com/pantsbuild/pants/pull/7056>`_
+
+* Build rust code only once per platform in a CI run (#7047)
+  `PR #7047 <https://github.com/pantsbuild/pants/pull/7047>`_
+
+* Remote execution uses tower-grpc to start executions (#7049)
+  `PR #7049 <https://github.com/pantsbuild/pants/pull/7049>`_
+
+* Workaround for homebrew bug with osx shard (#7050)
+  `PR #7050 <https://github.com/pantsbuild/pants/pull/7050>`_
+  `Issue #5513 <https://github.com/Homebrew/brew/issues/5513>`_
+
+* Support some conversions for prost protos (#7040)
+  `PR #7040 <https://github.com/pantsbuild/pants/pull/7040>`_
+
+* Expose 1.13.x in the docsite notes dropdown. (#7045)
+  `PR #7045 <https://github.com/pantsbuild/pants/pull/7045>`_
+
+* Reqwest uses rustls not openssl (#7002)
+  `PR #7002 <https://github.com/pantsbuild/pants/pull/7002>`_
+
+* Fix awscli install to be language agnostic. (#7033)
+  `PR #7033 <https://github.com/pantsbuild/pants/pull/7033>`_
+
+* Improve readability of integration test logging. (#7036)
+  `PR #7036 <https://github.com/pantsbuild/pants/pull/7036>`_
+
+* Generate protos for tower as well as grpcio (#7030)
+  `PR #7030 <https://github.com/pantsbuild/pants/pull/7030>`_
+
+* Ensure all rust crates have common prefix (#7031)
+  `PR #7031 <https://github.com/pantsbuild/pants/pull/7031>`_
+
+* Eliminate bs4 warning. (#7027)
+  `PR #7027 <https://github.com/pantsbuild/pants/pull/7027>`_
+
+
 1.14.0.dev1 (1/4/2019)
 ----------------------
 
