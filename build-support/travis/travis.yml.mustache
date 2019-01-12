@@ -283,7 +283,7 @@ py3_osx_build_engine: &py3_osx_build_engine
     - CACHE_NAME=osxpexbuild.py3
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
     - BOOTSTRAP_ARGS=''
-    - PYENV_ROOT="/.pyenv"
+    - PYENV_ROOT="${HOME}/.pyenv"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
   before_install:
     {{>before_install_osx}}

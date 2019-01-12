@@ -304,7 +304,7 @@ py3_osx_build_engine: &py3_osx_build_engine
     - CACHE_NAME=osxpexbuild.py3
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
     - BOOTSTRAP_ARGS=''
-    - PYENV_ROOT="/.pyenv"
+    - PYENV_ROOT="${HOME}/.pyenv"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
