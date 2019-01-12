@@ -9,7 +9,7 @@ import os
 import re
 from abc import abstractmethod
 
-from future.utils import binary_type
+from future.utils import text_type
 from twitter.common.dirutil.fileset import fnmatch_translate_extended
 
 from pants.base.build_environment import get_buildroot
@@ -22,13 +22,13 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-class UnpackedArchives(datatype([('found_files', tuple), ('rel_unpack_dir', binary_type)])):
+class UnpackedArchives(datatype([('found_files', tuple), ('rel_unpack_dir', text_type)])):
 
   def __new__(cls, found_files, rel_unpack_dir):
     return super(UnpackedArchives, cls).__new__(
       cls,
       tuple(found_files),
-      binary_type(rel_unpack_dir))
+      text_type(rel_unpack_dir))
 
 
 class UnpackRemoteSourcesBase(Task, AbstractClass):
