@@ -5,6 +5,8 @@
 FROM pantsbuild/centos6:latest
 # Install the desired version of python 3.
 ARG PYTHON_3_VERSION=3.6.8
+# NB: PYENV_ROOT must be set in the environment for `pyenv install` to work, otherwise it will
+# mysteriously fail to find the `install` command.
 ENV PYENV_ROOT /pyenv-py3-docker-build
 RUN mkdir ${PYENV_ROOT}
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
