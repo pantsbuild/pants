@@ -96,7 +96,7 @@ class ConanFetch(SimpleCodegenTask):
   def execute_codegen(self, target, target_workdir):
     """
     Invoke the conan pex to fetch conan packages specified by a
-    `ExternalLibLibrary` target.
+    `ExternalNativeLibrary` target.
 
     :param ExternalNativeLibrary target: a target containing conan package specifications.
     :param str target_workdir: where to copy the installed package contents to.
