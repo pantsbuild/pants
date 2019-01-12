@@ -935,24 +935,8 @@ matrix:
     - <<: *py2_linux_rust_tests
     - <<: *py3_linux_rust_tests
 
-<<<<<<< HEAD
     - <<: *py2_osx_rust_tests
     - <<: *py3_osx_rust_tests
-=======
-    # Rust on macOS
-    - <<: *default_osx_test_config
-      name: "OSX Rust + platform-specific tests"
-      env:
-        - CACHE_NAME=macosrusttests
-      # Fuse actually works on this image. It hangs on many others.
-      osx_image: xcode8.3
-      addons:
-        homebrew:
-          casks:
-          - osxfuse
-      script:
-        - ./build-support/bin/travis-ci.sh -bez
->>>>>>> 60f3c93cad6cf05f27403d0473f6d4741e5db2cb
 
     - <<: *linux_with_fuse
       <<: *native_engine_cache_config
