@@ -177,7 +177,7 @@ py3_osx_config: &py3_osx_config
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
     # Install pyenv the conventional way, instead of through addon, due to execution order
-    - brew install pyenv
+    - HOMEBREW_NO_AUTO_UPDATE=1 brew install pyenv
     - pyenv install 3.6.8 && pyenv global 3.6.8
 
 base_osx_test_config: &base_osx_test_config
@@ -589,6 +589,7 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Python contrib tests (Py2 PEX)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py2
