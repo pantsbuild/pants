@@ -160,6 +160,8 @@ py3_osx_config: &py3_osx_config
     - PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include"
   before_install:
     {{>before_install_osx}}
+    # Install pyenv the conventional way, instead of through addon, due to execution order
+    - brew install pyenv
     - pyenv install 3.6.8 && pyenv global 3.6.8
 
 base_osx_test_config: &base_osx_test_config
