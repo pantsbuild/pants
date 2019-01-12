@@ -154,6 +154,10 @@ py3_osx_config: &py3_osx_config
     brew:
       packages: &py3_osx_config_brew_packages
       - pyenv
+      - openssl
+  env:
+    # Fix Python 3 issue linking to OpenSSL
+    - PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include"
   before_install:
     {{>before_install_osx}}
     - pyenv install 3.6.8 && pyenv global 3.6.8
@@ -177,7 +181,8 @@ py3_osx_test_config: &py3_osx_test_config
   <<: *base_osx_test_config
   stage: *test
   env:
-    - &py3_osx_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
+    # Must duplicate OpenSSL config from py3_osx_config's env because it cannot be merged into a new anchor
+    - &py3_osx_test_config_env PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include" BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
 
 linux_with_fuse: &linux_with_fuse
   before_install:
