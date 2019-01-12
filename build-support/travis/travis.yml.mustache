@@ -162,7 +162,9 @@ py3_osx_config: &py3_osx_config
     {{>before_install_osx}}
     # Install pyenv the conventional brew way, instead of through addon, due to execution order
     - HOMEBREW_NO_AUTO_UPDATE=1 brew install pyenv
-    - pyenv install --list && pyenv install 3.6.5 && pyenv global 3.6.5
+    - pyenv install --list
+    - pyenv install 3.6.5
+    = pyenv global 3.6.5
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
@@ -282,13 +284,15 @@ py3_osx_build_engine: &py3_osx_build_engine
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
     - BOOTSTRAP_ARGS=''
     - PYENV_ROOT="~/.pyenv"
+    - PATH="${PYENV_ROOT}/shims:${PATH}"
   before_install:
     {{>before_install_osx}}
     # Clone pyenv directly from GitHub. Brew's version of pyenv on this osx_image is too old and only has
     # a beta version of Python 3.6 that does not work properly. We could `brew update && brew upgrade pyenv`,
     # but this would substantially slow down CI, so we instead circumvent Brew and download pyenv directly.
     - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
-    - ${PYENV_ROOT}/bin/pyenv install 3.6.5 && ${PYENV_ROOT}/bin/pyenv global 3.6.5
+    - ${PYENV_ROOT}/bin/pyenv install 3.6.5
+    - ${PYENV_ROOT}/bin/pyenv global 3.6.5
 
 # -------------------------------------------------------------------------
 # Build wheels
