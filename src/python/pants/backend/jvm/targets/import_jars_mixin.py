@@ -18,7 +18,6 @@ class ImportJarsMixin(ImportRemoteSourcesMixin):
 
   @memoized_property
   def all_imported_jar_deps(self):
-    # TODO: figure out if this OrderedSet is necessary.
     jar_deps = OrderedSet()
     for jar_lib in self.imported_targets:
       jar_deps.update(jar_lib.jar_dependencies)
