@@ -1,4 +1,4 @@
-#!/bin/bash
+# This script is intended to be sourced, not executed!
 
 if [[ -f ~/.bashrc ]]; then
   source ~/.bashrc
