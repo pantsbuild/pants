@@ -14,11 +14,11 @@ RUN yum install -y wget
 
 RUN cd /usr/src && \
   wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz && \
-  tar -xzf Python-3-6-8.tgz && \
-  cd Python-3-6-8 && \
+  tar -xzf Python-3.6.8.tgz && \
+  cd Python-3.6.8 && \
   ./configure --enable-optimizations && \
   make altinstall && \
-  rm /usr/src/Python-3-6-8.tgz
+  rm /usr/src/Python-3.6.8.tgz
 
 # -----------------------------------------------------------------------
 
