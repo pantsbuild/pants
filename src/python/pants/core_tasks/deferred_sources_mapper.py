@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class DeferredSourcesMapper(Task):
-  """Map DeferredSourcesFields to files that produce the product `UnpackedArchives`.
+  """Map `remote_sources()` to files that produce the product `UnpackedArchives`.
 
   If you want a task to be able to map sources like this, make it require the 'deferred_sources'
   product.
