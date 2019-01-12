@@ -8,17 +8,16 @@ FROM pantsbuild/centos6:latest
 # This section belongs in centos6, but is here temporarily because
 # centos6's build must first be published to Docker.
 
-RUN yum -y update
-RUN yum install -y centos-release-scl
-RUN yum install -y wget
-
-RUN /usr/bin/scl enable devtoolset-7 -- bash -c 'cd /usr/src && \
-  wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz && \
-  tar -xzf Python-3.6.8.tgz && \
-  cd Python-3.6.8 && \
-  ./configure --enable-optimizations && \
-  make altinstall && \
-  rm /usr/src/Python-3.6.8.tgz'
+RUN yum install sqlite-devel -y
+RUN mkdir -p /python-3-docker-build/python-3.6.8-{source,install}
+RUN curl -L -v https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz \
+    | tar -zxvC /python-3-docker-build/python-3.6.8-source
+RUN /usr/bin/scl enable devtoolset-7 -- \
+    bash -c 'pushd /python-3-docker-build/python-3.6.8-source/Python-3.6.8 \
+         && ./configure --prefix=/python-3-docker-build/python-3.6.8-install \
+                        --enable-optimizations \
+         && make install'
+ENV PATH "${PATH}:/python-3-docker-build/python-3.6.8-install/bin"
 
 # -----------------------------------------------------------------------
 
