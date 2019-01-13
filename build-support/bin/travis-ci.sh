@@ -5,7 +5,7 @@
 # TravisCI-specific environment fixups can live in this script which forwards to the generic ci
 # script post fixups.
 
-set -euox pipefail
+set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
