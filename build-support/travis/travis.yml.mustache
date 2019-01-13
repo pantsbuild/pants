@@ -620,6 +620,7 @@ matrix:
       name: "Blacklisted integration tests for pants - shard {{.}} (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
         - CACHE_NAME=integrationshard{{.}}.py2blacklist
       script:
         - ./build-support/bin/travis-ci.sh -bc2w -i {{.}}/{{py2_blacklist_integration_shards_length}}
