@@ -14,7 +14,6 @@ import datetime
 import os
 import re
 import sys
-from builtins import str
 from io import open
 
 EXPECTED_HEADER="""# coding=utf-8
@@ -85,11 +84,11 @@ def check_dir(directory, newly_created_files):
 def main():
   dirs = sys.argv
   header_parse_failures = []
-  if os.environ.get('IGNORE_ADDED_FILES', None):
-    newly_created_files = frozenset()
-  else:
-    # Input lines denote file paths relative to the repo root and are assumed to all end in \n.
-    newly_created_files = frozenset(line[0:-1] for line in sys.stdin)
+  # Input lines denote file paths relative to the repo root and are assumed to all end in \n.
+  newly_created_files = frozenset((line[0:-1] for line in sys.stdin)
+                                  if 'IGNORE_ADDED_FILES' not in os.environ
+                                  else [])
+
   for directory in dirs:
     header_parse_failures.extend(check_dir(directory, newly_created_files))
   if header_parse_failures:
