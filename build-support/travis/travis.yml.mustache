@@ -457,7 +457,7 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
     - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
 # -------------------------------------------------------------------------
-# Rust
+# Rust tests
 # -------------------------------------------------------------------------
 
 base_linux_rust_tests: &base_linux_rust_tests
@@ -643,9 +643,8 @@ matrix:
 
     - <<: *linux_with_fuse
       <<: *native_engine_cache_config
-      name: "Linux Rust Clippy"
+      name: "Linux Rust Clippy (No PEX)"
       env:
-        - *py2_linux_test_config_env
         - CACHE_NAME=linuxclippy
       os: linux
       dist: xenial
@@ -660,7 +659,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -bs2
 
     - <<: *linux_with_fuse
-      name: "Cargo audit"
+      name: "Cargo audit (No PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=linuxcargoaudit
