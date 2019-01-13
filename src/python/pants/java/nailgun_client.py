@@ -11,8 +11,6 @@ import socket
 import sys
 from builtins import object, str
 
-from future.utils import PY3
-
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.osutil import safe_kill
@@ -181,8 +179,8 @@ class NailgunClient(object):
     self._address = (host, port)
     self._address_string = ':'.join(str(i) for i in self._address)
     self._stdin = ins
-    self._stdout = out or (sys.stdout.buffer if PY3 else sys.stdout)
-    self._stderr = err or (sys.stderr.buffer if PY3 else sys.stderr)
+    self._stdout = out or sys.stdout
+    self._stderr = err or sys.stderr
     self._workdir = workdir or os.path.abspath(os.path.curdir)
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self._expects_pid = expects_pid
