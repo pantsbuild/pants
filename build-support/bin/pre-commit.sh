@@ -9,6 +9,8 @@ then
     export GIT_HOOK=1
 fi
 
+# TODO: Fix all these checks to only act on staged files with `git diff --cached --name-only`! See
+# check_header.sh for an example of this command.
 echo "* Checking packages" && ./build-support/bin/check_packages.sh || exit 1
 echo "* Checking headers" && ./build-support/bin/check_header.sh || exit 1
 echo "* Checking for banned imports" && ./build-support/bin/check_banned_imports.sh || exit 1

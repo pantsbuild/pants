@@ -49,7 +49,7 @@ def check_header(filename, is_newly_created=False):
         # Check if the copyright year can be parsed as within the current century, or the current
         # year if it is a new file.
         if line.startswith("# Copyright"):
-          year = line[12:-4]
+          year = line[12:16]
           if is_newly_created:
             if not year == _current_year:
               raise HeaderCheckFailure('{}: copyright year must be {} (was {})'
@@ -79,7 +79,7 @@ def check_dir(directory, newly_created_files):
           check_header(filename, filename in newly_created_files)
         except HeaderCheckFailure as e:
           header_parse_failures.append(e.message)
-  return failed_files
+  return header_parse_failures
 
 
 def main():
