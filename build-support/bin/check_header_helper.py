@@ -96,6 +96,8 @@ def main():
     print()
     print(EXPECTED_HEADER)
     print('---')
+    print('Some additional checking is performed on newly added files, such as \n'
+          'validating the copyright year. You can export IGNORE_ADDED_FILES to disable this check.')
     print('The following {} file(s) do not conform:'.format(len(header_parse_failures)))
     print('  {}'.format('\n  '.join(header_parse_failures)))
     sys.exit(1)
