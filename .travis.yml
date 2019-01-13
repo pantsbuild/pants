@@ -564,11 +564,16 @@ matrix:
     - <<: *py2_osx_build_engine
     - <<: *py3_osx_build_engine
 
+    # TODO(6450): add support for Py3 in the release script. This can't be done until
+    # Pants is ready to be built and released as a Py3 wheel.
     - <<: *py2_linux_build_wheels
-    - <<: *py3_linux_build_wheels
+      stage: *test
+    # - <<: *py3_linux_build_wheels
 
+    # TODO(6450): see above about adding support for Py3 in release script.
     - <<: *py2_osx_build_wheels
-    - <<: *py3_osx_build_wheels
+      stage: *test
+    # - <<: *py3_osx_build_wheels
 
     - <<: *py2_osx_10_12_sanity_check
     - <<: *py3_osx_10_12_sanity_check
