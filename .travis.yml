@@ -726,7 +726,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -bc -i 12/13
 
     - <<: *py2_linux_test_config
-      name: "Blacklisted integration tests for pants - shard 0 (Py2 PEX)"
+      name: "Blacklisted integration tests for pants - shard 0 (Py2 PEX w/ Py3 constraints)"
       stage: *test
       env:
         - *py2_linux_test_config_env
@@ -736,7 +736,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -bc2w -i 0/7
 
     - <<: *py2_linux_test_config
-      name: "Blacklisted integration tests for pants - shard 1 (Py2 PEX)"
+      name: "Blacklisted integration tests for pants - shard 1 (Py2 PEX w/ Py3 constraints)"
       stage: *test
       env:
         - *py2_linux_test_config_env
@@ -746,7 +746,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -bc2w -i 1/7
 
     - <<: *py2_linux_test_config
-      name: "Blacklisted integration tests for pants - shard 2 (Py2 PEX)"
+      name: "Blacklisted integration tests for pants - shard 2 (Py2 PEX w/ Py3 constraints)"
       stage: *test
       env:
         - *py2_linux_test_config_env
@@ -756,7 +756,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -bc2w -i 2/7
 
     - <<: *py2_linux_test_config
-      name: "Blacklisted integration tests for pants - shard 3 (Py2 PEX)"
+      name: "Blacklisted integration tests for pants - shard 3 (Py2 PEX w/ Py3 constraints)"
       stage: *test
       env:
         - *py2_linux_test_config_env
@@ -766,7 +766,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -bc2w -i 3/7
 
     - <<: *py2_linux_test_config
-      name: "Blacklisted integration tests for pants - shard 4 (Py2 PEX)"
+      name: "Blacklisted integration tests for pants - shard 4 (Py2 PEX w/ Py3 constraints)"
       stage: *test
       env:
         - *py2_linux_test_config_env
@@ -776,7 +776,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -bc2w -i 4/7
 
     - <<: *py2_linux_test_config
-      name: "Blacklisted integration tests for pants - shard 5 (Py2 PEX)"
+      name: "Blacklisted integration tests for pants - shard 5 (Py2 PEX w/ Py3 constraints)"
       stage: *test
       env:
         - *py2_linux_test_config_env
@@ -786,7 +786,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -bc2w -i 5/7
 
     - <<: *py2_linux_test_config
-      name: "Blacklisted integration tests for pants - shard 6 (Py2 PEX)"
+      name: "Blacklisted integration tests for pants - shard 6 (Py2 PEX w/ Py3 constraints)"
       stage: *test
       env:
         - *py2_linux_test_config_env

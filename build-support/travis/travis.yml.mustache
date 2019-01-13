@@ -612,7 +612,7 @@ matrix:
 {{/py3_integration_shards}}
 {{#py2_blacklist_integration_shards}}
     - <<: *py2_linux_test_config
-      name: "Blacklisted integration tests for pants - shard {{.}} (Py2 PEX)"
+      name: "Blacklisted integration tests for pants - shard {{.}} (Py2 PEX w/ Py3 constraints)"
       stage: *test
       env:
         - *py2_linux_test_config_env
