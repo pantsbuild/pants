@@ -156,13 +156,19 @@ py3_osx_config: &py3_osx_config
       - openssl
   env:
     # Fix Python 3 issue linking to OpenSSL
-    - &py3_osx_config_env PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include"
+    - &py3_osx_config_env >
+      PATH="/usr/local/opt/openssl/bin:$PATH"
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CPPFLAGS="-I/usr/local/opt/openssl/include"
+      PYENV_ROOT="${HOME}/.pyenv"
+      PATH="${PYENV_ROOT}/shims:${PATH}"
   before_install:
     {{>before_install_osx}}
-    # Install pyenv the conventional brew way, instead of through addon, due to execution order
-    - &install_pyenv HOMEBREW_NO_AUTO_UPDATE=1 brew install pyenv
-    - pyenv install 3.6.5
-    - pyenv global 3.6.5
+    # Clone pyenv directly from GitHub. For multiple osx images, brew's version of pyenv is too old to get
+    # modern Python 3.6. Pulling from GitHub instead allows us to use the same Python 3 version accross every OSX shard.
+    - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
+    - ${PYENV_ROOT}/bin/pyenv install 3.6.8
+    - ${PYENV_ROOT}/bin/pyenv global 3.6.8
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
@@ -183,8 +189,14 @@ py3_osx_test_config: &py3_osx_test_config
   <<: *base_osx_test_config
   stage: *test
   env:
-    # Must duplicate OpenSSL config from py3_osx_config's env because it cannot be merged into a new anchor
-    - &py3_osx_test_config_env PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include" BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
+    # Must duplicate py3_osx_config's env because it cannot be merged into a new anchor
+    - &py3_osx_test_config_env >
+      PATH="/usr/local/opt/openssl/bin:$PATH"
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CPPFLAGS="-I/usr/local/opt/openssl/include"
+      PYENV_ROOT="${HOME}/.pyenv"
+      PATH="${PYENV_ROOT}/shims:${PATH}"
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
 
 linux_with_fuse: &linux_with_fuse
   before_install:
@@ -282,16 +294,6 @@ py3_osx_build_engine: &py3_osx_build_engine
     - CACHE_NAME=osxpexbuild.py3
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
     - BOOTSTRAP_ARGS=''
-    - PYENV_ROOT="${HOME}/.pyenv"
-    - PATH="${PYENV_ROOT}/shims:${PATH}"
-  before_install:
-    {{>before_install_osx}}
-    # Clone pyenv directly from GitHub. Brew's version of pyenv on this osx_image is too old and only has
-    # a beta version of Python 3.6 that does not work properly. We could `brew update && brew upgrade pyenv`,
-    # but this would substantially slow down CI, so we instead circumvent Brew and download pyenv directly.
-    - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
-    - ${PYENV_ROOT}/bin/pyenv install 3.6.5
-    - ${PYENV_ROOT}/bin/pyenv global 3.6.5
 
 # -------------------------------------------------------------------------
 # Build wheels
@@ -370,12 +372,6 @@ py3_osx_10_12_sanity_check: &py3_osx_10_12_sanity_check
   env:
     - *py3_osx_test_config_env
     - CACHE_NAME=macos10.12sanity.py3
-  # Install earlier version of Python 3.6 than other shards, due to older osx_image
-  before_install:
-    {{>before_install_osx}}
-    - *install_pyenv
-    - pyenv install 3.6.3
-    - pyenv global 3.6.3
 
 base_osx_10_13_sanity_check: &base_osx_10_13_sanity_check
   <<: *base_osx_sanity_check
