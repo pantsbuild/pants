@@ -229,7 +229,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     :param upstream_analysis: A map from classpath entry to analysis file for dependencies.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
-    :param fatal_warnings: whether to convert compilation warnings to errors.
+    :param compiler_option_sets: .
     :param zinc_file_manager: whether to use zinc provided file manager.
     :param javac_plugin_map: Map of names of javac plugins to use to their arguments.
     :param scalac_plugin_map: Map of names of scalac plugins to use to their arguments.
