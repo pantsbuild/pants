@@ -68,7 +68,9 @@ class CoercingEncoder(json.JSONEncoder):
       # 3 (2.7 and 3.6-3.7 are known to have sorted keys, but with different definitions of sorted
       # orders across versions, including insertion order). We want unordered dicts to collide if
       # they have the same keys, in the same way we special-case sets below. Calling sorted() should
-      # be very fast if the keys happen to be pre-sorted.
+      # be very fast if the keys happen to be pre-sorted. Pants options don't support OrderedDict
+      # inputs, and allowing them creates an ambiguity we don't need to deal with right now. See
+      # discussion in #6475.
       if isinstance(o, OrderedDict):
         raise TypeError('{cls} does not support OrderedDict inputs: {val!r}.'
                         .format(cls=type(self).__name__, val=o))
