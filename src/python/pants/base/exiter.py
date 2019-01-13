@@ -8,6 +8,8 @@ import logging
 import sys
 from builtins import object
 
+from future.utils import PY3
+
 from pants.util.strutil import ensure_binary
 
 
@@ -51,11 +53,10 @@ class Exiter(object):
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
     if msg:
-      out = out or sys.stderr
-      # sys.stderr expects bytes in Py2, unicode in Py3
+      out = out or (sys.stderr.buffer if PY3 else sys.stderr)
       msg = ensure_binary(msg)
       try:
-        print(msg, file=out)
+        out.write(msg + b'\n')
         # TODO: Determine whether this call is a no-op because the stream gets flushed on exit, or
         # if we could lose what we just printed, e.g. if we get interrupted by a signal while
         # exiting and the stream is buffered like stdout.
