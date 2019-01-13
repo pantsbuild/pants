@@ -11,7 +11,7 @@ import time
 from builtins import object, str
 from contextlib import contextmanager
 
-from future.utils import raise_with_traceback, PY3
+from future.utils import PY3, raise_with_traceback
 
 from pants.base.exception_sink import ExceptionSink
 from pants.console.stty_utils import STTYSettings
