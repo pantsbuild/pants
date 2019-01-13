@@ -499,7 +499,7 @@ impl Snapshot {
     // and fs::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
-      .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
+      .map_err(|e| format!("PathGlobs expansion failed: {}", e))
       .and_then(move |path_stats| {
         fs::Snapshot::from_path_stats(context.core.store(), &context, path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))

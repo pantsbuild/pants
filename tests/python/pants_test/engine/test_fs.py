@@ -8,17 +8,17 @@ import logging
 import os
 import tarfile
 import unittest
-from builtins import object, open, str
+from builtins import open, str
 from contextlib import contextmanager
 
 from future.utils import PY2, text_type
 
-from pants.base.project_tree import Dir, Link
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize, FilesContent,
                              MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch,
                              create_fs_rules)
 from pants.engine.scheduler import ExecutionError
 from pants.util.contextutil import http_server, temporary_dir
+from pants.util.dirutil import relative_symlink
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.test_base import TestBase
@@ -28,14 +28,6 @@ if PY2:
   from BaseHTTPServer import BaseHTTPRequestHandler
 else:
   from http.server import BaseHTTPRequestHandler
-
-
-class DirectoryListing(object):
-  """TODO: See #4027."""
-
-
-class ReadLink(object):
-  """TODO: See #4027."""
 
 
 class FSTest(TestBase, SchedulerTestBase, AbstractClass):
@@ -57,15 +49,17 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     else:
       return PathGlobs(include=filespecs)
 
-  def assert_walk_dirs(self, filespecs_or_globs, paths, ignore_patterns=None):
-    self.assert_walk_snapshot('dirs', filespecs_or_globs, paths, ignore_patterns=ignore_patterns)
+  def assert_walk_dirs(self, filespecs_or_globs, paths, **kwargs):
+    self.assert_walk_snapshot('dirs', filespecs_or_globs, paths, **kwargs)
 
-  def assert_walk_files(self, filespecs_or_globs, paths, ignore_patterns=None):
-    self.assert_walk_snapshot('files', filespecs_or_globs, paths, ignore_patterns=ignore_patterns)
+  def assert_walk_files(self, filespecs_or_globs, paths, **kwargs):
+    self.assert_walk_snapshot('files', filespecs_or_globs, paths, **kwargs)
 
-  def assert_walk_snapshot(self, field, filespecs_or_globs, paths, ignore_patterns=None):
+  def assert_walk_snapshot(self, field, filespecs_or_globs, paths, ignore_patterns=None, prepare=None):
     with self.mk_project_tree(ignore_patterns=ignore_patterns) as project_tree:
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
+      if prepare:
+        prepare(project_tree)
       result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
       self.assertEqual(sorted([p.path for p in getattr(result, field)]), sorted(paths))
 
@@ -84,17 +78,6 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       # Confirm all expected files were digested.
       self.assertEqual(set(expected_files), {f.path for f in result.files})
       self.assertTrue(result.directory_digest.fingerprint is not None)
-
-  def assert_fsnodes(self, filespecs_or_globs, subject_product_pairs):
-    with self.mk_project_tree() as project_tree:
-      scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-      request = self.execute_request(scheduler, Snapshot, self.specs(filespecs_or_globs))
-
-      # Validate that FilesystemNodes for exactly the given subjects are reachable under this
-      # request.
-      fs_nodes = [n for n, _ in scheduler.product_graph.walk(roots=request.roots)
-                  if type(n) is "TODO: need a new way to filter for FS intrinsics"]
-      self.assertEqual({(n.subject, n.product) for n in fs_nodes}, set(subject_product_pairs))
 
   def test_walk_literal(self):
     self.assert_walk_files(['4.txt'], ['4.txt'])
@@ -140,6 +123,18 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
 
   def test_walk_parent_link(self):
     self.assert_walk_files(['c.ln/../3.txt'], ['c.ln/../3.txt'])
+
+  def test_walk_escaping_symlink(self):
+    link = 'subdir/escaping'
+    dest = '../../this-is-probably-nonexistent'
+    def prepare(project_tree):
+      link_path = os.path.join(project_tree.build_root, link)
+      dest_path = os.path.join(project_tree.build_root, dest)
+      relative_symlink(dest_path, link_path)
+
+    exc_reg = '.*While expanding link.*{}.*may not traverse outside of the buildroot.*{}.*'.format(link, dest)
+    with self.assertRaisesRegexp(Exception, exc_reg):
+      self.assert_walk_files([link], [], prepare=prepare)
 
   def test_walk_recursive_all(self):
     self.assert_walk_files(['**'], ['4.txt',
@@ -230,52 +225,6 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
 
   def test_files_digest_literal(self):
     self.assert_digest(['a/3.txt', '4.txt'], ['a/3.txt', '4.txt'])
-
-  @unittest.skip('Skipped to expedite landing #3821; see: #4027.')
-  def test_nodes_file(self):
-    self.assert_fsnodes(['4.txt'], [
-        (Dir(''), DirectoryListing),
-      ])
-
-  @unittest.skip('Skipped to expedite landing #3821; see: #4027.')
-  def test_nodes_symlink_file(self):
-    self.assert_fsnodes(['c.ln/2'], [
-        (Dir(''), DirectoryListing),
-        (Link('c.ln'), ReadLink),
-        (Dir('a'), DirectoryListing),
-        (Dir('a/b'), DirectoryListing),
-      ])
-    self.assert_fsnodes(['d.ln/b/1.txt'], [
-        (Dir(''), DirectoryListing),
-        (Link('d.ln'), ReadLink),
-        (Dir('a'), DirectoryListing),
-        (Dir('a/b'), DirectoryListing),
-      ])
-
-  @unittest.skip('Skipped to expedite landing #3821; see: #4027.')
-  def test_nodes_symlink_globbed_dir(self):
-    self.assert_fsnodes(['*/2'], [
-        # Scandir for the root.
-        (Dir(''), DirectoryListing),
-        # Read links to determine whether they're actually directories.
-        (Link('c.ln'), ReadLink),
-        (Link('d.ln'), ReadLink),
-        # Scan second level destinations: `a/b` is matched via `c.ln`.
-        (Dir('a'), DirectoryListing),
-        (Dir('a/b'), DirectoryListing),
-      ])
-
-  @unittest.skip('Skipped to expedite landing #3821; see: #4027.')
-  def test_nodes_symlink_globbed_file(self):
-    self.assert_fsnodes(['d.ln/b/*.txt'], [
-        # NB: Needs to scandir every Dir on the way down to track whether
-        # it is traversing a symlink.
-        (Dir(''), DirectoryListing),
-        # Traverse one symlink.
-        (Link('d.ln'), ReadLink),
-        (Dir('a'), DirectoryListing),
-        (Dir('a/b'), DirectoryListing),
-      ])
 
   def test_snapshot_from_outside_buildroot(self):
     with temporary_dir() as temp_dir:
