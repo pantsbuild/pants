@@ -625,7 +625,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard0
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 0/20
+        - ./build-support/bin/travis-ci.sh -bc -i 0/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 1 (Py3 PEX)"
@@ -633,7 +633,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard1
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 1/20
+        - ./build-support/bin/travis-ci.sh -bc -i 1/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 2 (Py3 PEX)"
@@ -641,7 +641,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard2
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 2/20
+        - ./build-support/bin/travis-ci.sh -bc -i 2/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 3 (Py3 PEX)"
@@ -649,7 +649,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard3
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 3/20
+        - ./build-support/bin/travis-ci.sh -bc -i 3/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 4 (Py3 PEX)"
@@ -657,7 +657,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard4
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 4/20
+        - ./build-support/bin/travis-ci.sh -bc -i 4/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 5 (Py3 PEX)"
@@ -665,7 +665,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard5
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 5/20
+        - ./build-support/bin/travis-ci.sh -bc -i 5/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 6 (Py3 PEX)"
@@ -673,7 +673,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard6
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 6/20
+        - ./build-support/bin/travis-ci.sh -bc -i 6/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 7 (Py3 PEX)"
@@ -681,7 +681,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard7
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 7/20
+        - ./build-support/bin/travis-ci.sh -bc -i 7/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 8 (Py3 PEX)"
@@ -689,7 +689,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard8
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 8/20
+        - ./build-support/bin/travis-ci.sh -bc -i 8/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 9 (Py3 PEX)"
@@ -697,7 +697,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard9
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 9/20
+        - ./build-support/bin/travis-ci.sh -bc -i 9/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 10 (Py3 PEX)"
@@ -705,7 +705,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard10
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 10/20
+        - ./build-support/bin/travis-ci.sh -bc -i 10/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 11 (Py3 PEX)"
@@ -713,7 +713,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard11
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 11/20
+        - ./build-support/bin/travis-ci.sh -bc -i 11/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 12 (Py3 PEX)"
@@ -721,7 +721,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard12
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 12/20
+        - ./build-support/bin/travis-ci.sh -bc -i 12/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 13 (Py3 PEX)"
@@ -729,7 +729,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard13
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 13/20
+        - ./build-support/bin/travis-ci.sh -bc -i 13/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 14 (Py3 PEX)"
@@ -737,7 +737,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard14
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 14/20
+        - ./build-support/bin/travis-ci.sh -bc -i 14/16
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 15 (Py3 PEX)"
@@ -745,39 +745,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard15
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i 15/20
-
-    - <<: *py3_linux_test_config
-      name: "Integration tests for pants - shard 16 (Py3 PEX)"
-      env:
-        - *py3_linux_test_config_env
-        - CACHE_NAME=integrationshard16
-      script:
-        - ./build-support/bin/travis-ci.sh -bc -i 16/20
-
-    - <<: *py3_linux_test_config
-      name: "Integration tests for pants - shard 17 (Py3 PEX)"
-      env:
-        - *py3_linux_test_config_env
-        - CACHE_NAME=integrationshard17
-      script:
-        - ./build-support/bin/travis-ci.sh -bc -i 17/20
-
-    - <<: *py3_linux_test_config
-      name: "Integration tests for pants - shard 18 (Py3 PEX)"
-      env:
-        - *py3_linux_test_config_env
-        - CACHE_NAME=integrationshard18
-      script:
-        - ./build-support/bin/travis-ci.sh -bc -i 18/20
-
-    - <<: *py3_linux_test_config
-      name: "Integration tests for pants - shard 19 (Py3 PEX)"
-      env:
-        - *py3_linux_test_config_env
-        - CACHE_NAME=integrationshard19
-      script:
-        - ./build-support/bin/travis-ci.sh -bc -i 19/20
+        - ./build-support/bin/travis-ci.sh -bc -i 15/16
 
     - <<: *py3_linux_test_config
       name: "Blacklisted integration tests for pants - shard 0 (Py2 PEX)"
@@ -785,7 +753,31 @@ matrix:
         - *py2_linux_test_config_env
         - CACHE_NAME=integrationshard0.py2blacklist
       script:
-        - ./build-support/bin/travis-ci.sh -bc2w -i 0/1
+        - ./build-support/bin/travis-ci.sh -bc2w -i 0/4
+
+    - <<: *py3_linux_test_config
+      name: "Blacklisted integration tests for pants - shard 1 (Py2 PEX)"
+      env:
+        - *py2_linux_test_config_env
+        - CACHE_NAME=integrationshard1.py2blacklist
+      script:
+        - ./build-support/bin/travis-ci.sh -bc2w -i 1/4
+
+    - <<: *py3_linux_test_config
+      name: "Blacklisted integration tests for pants - shard 2 (Py2 PEX)"
+      env:
+        - *py2_linux_test_config_env
+        - CACHE_NAME=integrationshard2.py2blacklist
+      script:
+        - ./build-support/bin/travis-ci.sh -bc2w -i 2/4
+
+    - <<: *py3_linux_test_config
+      name: "Blacklisted integration tests for pants - shard 3 (Py2 PEX)"
+      env:
+        - *py2_linux_test_config_env
+        - CACHE_NAME=integrationshard3.py2blacklist
+      script:
+        - ./build-support/bin/travis-ci.sh -bc2w -i 3/4
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 0 (Py2 PEX)"
