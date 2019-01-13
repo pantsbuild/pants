@@ -39,7 +39,7 @@ class JavaThriftLibraryFingerprintStrategy(FingerprintStrategy):
 
     default_java_namespace = self._thrift_defaults.default_java_namespace(target)
     if default_java_namespace:
-      hasher.update(default_java_namespace.encode('utf-8'))
+      hasher.update(default_java_namespace)
 
     if target.include_paths:
       hasher.update(str(target.include_paths).encode('utf-8'))
