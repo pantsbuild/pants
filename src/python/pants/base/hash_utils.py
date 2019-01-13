@@ -8,10 +8,10 @@ import hashlib
 import json
 from builtins import bytes, object, open, str
 
-from future.moves import collections
 from future.utils import PY3
 
 from pants.base.deprecated import deprecated
+from pants.util.collections_abc_backport import Iterable, Mapping, OrderedDict, Set
 from pants.util.strutil import ensure_binary
 
 
@@ -62,24 +62,24 @@ class CoercingEncoder(json.JSONEncoder):
       return self.encode(key_obj)
 
   def default(self, o):
-    if isinstance(o, collections.Mapping):
+    if isinstance(o, Mapping):
       # Preserve order to avoid collisions for OrderedDict inputs to json.dumps(). We don't do this
       # for general mappings because dicts have an arbitrary key ordering in some versions of python
       # 3 (2.7 and 3.6-3.7 are known to have sorted keys, but with different definitions of sorted
       # orders across versions, including insertion order). We want unordered dicts to collide if
       # they have the same keys, in the same way we special-case sets below. Calling sorted() should
       # be very fast if the keys happen to be pre-sorted.
-      if isinstance(o, collections.OrderedDict):
+      if isinstance(o, OrderedDict):
         raise TypeError('{cls} does not support OrderedDict inputs: {val!r}.'
                         .format(cls=type(self).__name__, val=o))
       else:
         ordered_kv_pairs = sorted(o.items(), key=lambda x: x[0])
-      return collections.OrderedDict(
+      return OrderedDict(
         (self._maybe_encode_dict_key(k), self.default(v))
         for k, v in ordered_kv_pairs)
-    elif isinstance(o, collections.Set):
+    elif isinstance(o, Set):
       return sorted(self.default(i) for i in o)
-    elif isinstance(o, collections.Iterable) and not isinstance(o, (bytes, list, str)):
+    elif isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
       return list(self.default(i) for i in o)
     return o
 
@@ -88,7 +88,7 @@ class CoercingEncoder(json.JSONEncoder):
 
 
 @deprecated(
-  '1.13.0.dev0',
+  '1.16.0.dev1',
   'Please use pants.base.hash_utils.stable_json_sha1 instead.')
 def stable_json_hash(obj, digest=None, encoder=None):
   """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.

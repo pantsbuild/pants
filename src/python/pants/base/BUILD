@@ -112,6 +112,7 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     ':deprecated',
+    'src/python/pants/util:collections_abc_backport',
   ]
 )
 

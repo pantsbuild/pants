@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.base.hash_utils import stable_json_hash
+from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload_field import PayloadField
 
 
@@ -67,7 +67,7 @@ class PythonArtifact(PayloadField):
     return self.name
 
   def _compute_fingerprint(self):
-    return stable_json_hash((self._kw, self._binaries))
+    return stable_json_sha1((self._kw, self._binaries))
 
   def with_binaries(self, *args, **kw):
     """Add binaries tagged to this artifact.

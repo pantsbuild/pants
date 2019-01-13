@@ -12,7 +12,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import CoercingEncoder, json_hash
 from pants.option.custom_types import (UnsetBool, dict_with_files_option, dir_option, file_option,
                                        target_option)
-from pants.util.collections_abc_backport import Iterable, Mapping
 
 
 class CoercingOptionEncoder(CoercingEncoder):
