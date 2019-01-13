@@ -176,7 +176,7 @@ py3_osx_config: &py3_osx_config
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
     # Install pyenv the conventional brew way, instead of through addon, due to execution order
-    - HOMEBREW_NO_AUTO_UPDATE=1 brew install pyenv
+    - &install_pyenv HOMEBREW_NO_AUTO_UPDATE=1 brew install pyenv
     - pyenv install 3.6.5
     - pyenv global 3.6.5
 
@@ -393,6 +393,14 @@ py3_osx_10_12_sanity_check: &py3_osx_10_12_sanity_check
   env:
     - *py3_osx_test_config_env
     - CACHE_NAME=macos10.12sanity.py3
+  # Install earlier version of Python 3.6 than other shards, due to older osx_image
+  before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - *install_pyenv
+    - pyenv install 3.6.3
+    - pyenv global 3.6.3
 
 base_osx_10_13_sanity_check: &base_osx_10_13_sanity_check
   <<: *base_osx_sanity_check
