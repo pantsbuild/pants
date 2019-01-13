@@ -308,7 +308,6 @@ base_build_wheels: &base_build_wheels
 py2_linux_build_wheels: &py2_linux_build_wheels
   <<: *py2_linux_test_config
   <<: *base_build_wheels
-  stage: *cron
   name: "Build Linux wheels (Py2 PEX)"
   env:
     - *py2_linux_test_config_env
@@ -328,7 +327,6 @@ py2_osx_build_wheels: &py2_osx_build_wheels
   <<: *py2_osx_test_config
   <<: *base_build_wheels
   name: "Build OSX wheels (Py2 PEX)"
-  stage: *cron
   env:
     - *py2_osx_test_config_env
     - *base_build_wheels_env
@@ -360,7 +358,6 @@ py2_osx_10_12_sanity_check: &py2_osx_10_12_sanity_check
   <<: *py2_osx_test_config
   <<: *base_osx_10_12_sanity_check
   name: "OSX 10.12 sanity check (Py2 PEX)"
-  stage: *cron
   env:
     - *py2_osx_test_config_env
     - CACHE_NAME=macos10.12sanity.py2
@@ -381,7 +378,6 @@ py2_osx_10_13_sanity_check: &py2_osx_10_13_sanity_check
   <<: *py2_osx_test_config
   <<: *base_osx_10_13_sanity_check
   name: "OSX 10.13 sanity check (Py2 PEX)"
-  stage: *cron
   env:
     - *py2_osx_test_config_env
     - CACHE_NAME=macos10.13sanity.py2
@@ -481,7 +477,6 @@ py2_linux_rust_tests: &py2_linux_rust_tests
   <<: *base_linux_rust_tests
   name: "Linux Rust tests (Py2 PEX)"
   python: 2.7
-  stage: *cron
   env:
     - *py2_linux_test_config_env
     - CACHE_NAME=linuxrusttests.py2
@@ -596,7 +591,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -2bn
 
     # TODO: get this passing with a Python 3 PEX.
-    - <<: *py3_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Python contrib tests (Py2 PEX w/ Py3 constraints)"
       env:
         - *py2_linux_test_config_env
@@ -616,8 +611,9 @@ matrix:
 
 {{/py3_integration_shards}}
 {{#py2_blacklist_integration_shards}}
-    - <<: *py3_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Blacklisted integration tests for pants - shard {{.}} (Py2 PEX)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
@@ -629,7 +625,6 @@ matrix:
 {{#cron_integration_shards}}
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard {{.}} (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard{{.}}

@@ -329,7 +329,6 @@ base_build_wheels: &base_build_wheels
 py2_linux_build_wheels: &py2_linux_build_wheels
   <<: *py2_linux_test_config
   <<: *base_build_wheels
-  stage: *cron
   name: "Build Linux wheels (Py2 PEX)"
   env:
     - *py2_linux_test_config_env
@@ -349,7 +348,6 @@ py2_osx_build_wheels: &py2_osx_build_wheels
   <<: *py2_osx_test_config
   <<: *base_build_wheels
   name: "Build OSX wheels (Py2 PEX)"
-  stage: *cron
   env:
     - *py2_osx_test_config_env
     - *base_build_wheels_env
@@ -381,7 +379,6 @@ py2_osx_10_12_sanity_check: &py2_osx_10_12_sanity_check
   <<: *py2_osx_test_config
   <<: *base_osx_10_12_sanity_check
   name: "OSX 10.12 sanity check (Py2 PEX)"
-  stage: *cron
   env:
     - *py2_osx_test_config_env
     - CACHE_NAME=macos10.12sanity.py2
@@ -402,7 +399,6 @@ py2_osx_10_13_sanity_check: &py2_osx_10_13_sanity_check
   <<: *py2_osx_test_config
   <<: *base_osx_10_13_sanity_check
   name: "OSX 10.13 sanity check (Py2 PEX)"
-  stage: *cron
   env:
     - *py2_osx_test_config_env
     - CACHE_NAME=macos10.13sanity.py2
@@ -502,7 +498,6 @@ py2_linux_rust_tests: &py2_linux_rust_tests
   <<: *base_linux_rust_tests
   name: "Linux Rust tests (Py2 PEX)"
   python: 2.7
-  stage: *cron
   env:
     - *py2_linux_test_config_env
     - CACHE_NAME=linuxrusttests.py2
@@ -617,7 +612,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -2bn
 
     # TODO: get this passing with a Python 3 PEX.
-    - <<: *py3_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Python contrib tests (Py2 PEX w/ Py3 constraints)"
       env:
         - *py2_linux_test_config_env
@@ -730,8 +725,9 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -bc -i 12/13
 
-    - <<: *py3_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Blacklisted integration tests for pants - shard 0 (Py2 PEX)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
@@ -739,8 +735,9 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -bc2w -i 0/7
 
-    - <<: *py3_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Blacklisted integration tests for pants - shard 1 (Py2 PEX)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
@@ -748,8 +745,9 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -bc2w -i 1/7
 
-    - <<: *py3_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Blacklisted integration tests for pants - shard 2 (Py2 PEX)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
@@ -757,8 +755,9 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -bc2w -i 2/7
 
-    - <<: *py3_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Blacklisted integration tests for pants - shard 3 (Py2 PEX)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
@@ -766,8 +765,9 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -bc2w -i 3/7
 
-    - <<: *py3_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Blacklisted integration tests for pants - shard 4 (Py2 PEX)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
@@ -775,8 +775,9 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -bc2w -i 4/7
 
-    - <<: *py3_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Blacklisted integration tests for pants - shard 5 (Py2 PEX)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
@@ -784,8 +785,9 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -bc2w -i 5/7
 
-    - <<: *py3_linux_test_config
+    - <<: *py2_linux_test_config
       name: "Blacklisted integration tests for pants - shard 6 (Py2 PEX)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
@@ -795,7 +797,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 0 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard0
@@ -804,7 +805,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 1 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard1
@@ -813,7 +813,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 2 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard2
@@ -822,7 +821,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 3 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard3
@@ -831,7 +829,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 4 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard4
@@ -840,7 +837,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 5 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard5
@@ -849,7 +845,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 6 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard6
@@ -858,7 +853,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 7 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard7
@@ -867,7 +861,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 8 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard8
@@ -876,7 +869,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 9 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard9
@@ -885,7 +877,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 10 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard10
@@ -894,7 +885,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 11 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard11
@@ -903,7 +893,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 12 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard12
@@ -912,7 +901,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 13 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard13
@@ -921,7 +909,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 14 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard14
@@ -930,7 +917,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 15 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard15
@@ -939,7 +925,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 16 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard16
@@ -948,7 +933,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 17 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard17
@@ -957,7 +941,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 18 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard18
@@ -966,7 +949,6 @@ matrix:
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 19 (Py2 PEX)"
-      stage: *cron
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard19
