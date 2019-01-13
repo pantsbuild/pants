@@ -785,7 +785,7 @@ matrix:
         - *py2_linux_test_config_env
         - CACHE_NAME=integrationshard0.py2blacklist
       script:
-        - ./build-support/bin/travis-ci.sh -bc2 -i 0/1
+        - ./build-support/bin/travis-ci.sh -bc2w -i 0/1
 
     - <<: *py2_linux_test_config
       name: "Integration tests for pants - shard 0 (Py2 PEX)"

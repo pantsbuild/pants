@@ -615,7 +615,7 @@ matrix:
         - *py2_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}.py2blacklist
       script:
-        - ./build-support/bin/travis-ci.sh -bc2 -i {{.}}/{{py2_blacklist_integration_shards_length}}
+        - ./build-support/bin/travis-ci.sh -bc2w -i {{.}}/{{py2_blacklist_integration_shards_length}}
 
 {{/py2_blacklist_integration_shards}}
 {{#cron_integration_shards}}
