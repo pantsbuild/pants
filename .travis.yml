@@ -169,13 +169,11 @@ py3_osx_config: &py3_osx_config
       packages: &py3_osx_config_brew_packages
       - openssl
   env:
-    # Fix Python 3 issue linking to OpenSSL
-    - &py3_osx_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
+    - PATH="/usr/local/opt/openssl/bin:$PATH"
+    - LDFLAGS="-L/usr/local/opt/openssl/lib"
+    - CPPFLAGS="-I/usr/local/opt/openssl/include"
+    - PYENV_ROOT="${HOME}/.pyenv"
+    - PATH="${PYENV_ROOT}/shims:${PATH}"
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
@@ -205,14 +203,12 @@ py3_osx_test_config: &py3_osx_test_config
   <<: *base_osx_test_config
   stage: *test
   env:
-    # Must duplicate py3_osx_config's env because it cannot be merged into a new anchor
-    - &py3_osx_test_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
-      BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
+    - PATH="/usr/local/opt/openssl/bin:$PATH"
+    - LDFLAGS="-L/usr/local/opt/openssl/lib"
+    - CPPFLAGS="-I/usr/local/opt/openssl/include"
+    - PYENV_ROOT="${HOME}/.pyenv"
+    - PATH="${PYENV_ROOT}/shims:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
 
 linux_with_fuse: &linux_with_fuse
   before_install:

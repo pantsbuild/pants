@@ -155,13 +155,7 @@ py3_osx_config: &py3_osx_config
       packages: &py3_osx_config_brew_packages
       - openssl
   env:
-    # Fix Python 3 issue linking to OpenSSL
-    - &py3_osx_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
+    {{>py3_osx_env}}
   before_install:
     {{>before_install_osx}}
     # Clone pyenv directly from GitHub. For multiple osx images, brew's version of pyenv is too old to get
@@ -189,14 +183,8 @@ py3_osx_test_config: &py3_osx_test_config
   <<: *base_osx_test_config
   stage: *test
   env:
-    # Must duplicate py3_osx_config's env because it cannot be merged into a new anchor
-    - &py3_osx_test_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
-      BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
+    {{>py3_osx_env}}
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
 
 linux_with_fuse: &linux_with_fuse
   before_install:
