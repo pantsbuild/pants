@@ -74,12 +74,14 @@ class CoercingEncoder(json.JSONEncoder):
       if isinstance(o, OrderedDict):
         raise TypeError('{cls} does not support OrderedDict inputs: {val!r}.'
                         .format(cls=type(self).__name__, val=o))
-      else:
-        ordered_kv_pairs = sorted(o.items(), key=lambda x: x[0])
+      # TODO(#7082): we can remove the sorted() and OrderedDict when we drop python 2.7 and simply
+      # ensure we encode the keys/values as we do right here.
+      ordered_kv_pairs = sorted(o.items(), key=lambda x: x[0])
       return OrderedDict(
         (self._maybe_encode_dict_key(k), self.default(v))
         for k, v in ordered_kv_pairs)
     elif isinstance(o, Set):
+      # Set order is arbitrary in python 3.6 and 3.7, so we need to keep this sorted() call.
       return sorted(self.default(i) for i in o)
     elif isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
       return list(self.default(i) for i in o)
