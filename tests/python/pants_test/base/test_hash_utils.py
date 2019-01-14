@@ -96,7 +96,7 @@ class CoercingJsonEncodingTest(unittest.TestCase):
     self.assertEqual(self._coercing_json_encode({}), '{}')
     self.assertEqual(self._coercing_json_encode(()), '[]')
     self.assertEqual(self._coercing_json_encode([]), '[]')
-    self.assertEqual(self._coercing_json_encode(set([])), '[]')
+    self.assertEqual(self._coercing_json_encode(set()), '[]')
     self.assertEqual(self._coercing_json_encode([{}]), '[{}]')
     self.assertEqual(self._coercing_json_encode([('a', 3)]), '[["a", 3]]')
     self.assertEqual(self._coercing_json_encode({'a': 3}), '{"a": 3}')
