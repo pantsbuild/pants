@@ -702,25 +702,27 @@ class RuleGraphMakerTest(unittest.TestCase):
         yield Get(B, D, D())
         yield A()
     exc_msg = str(cm.exception)
-    # Correctly matches the function name.
-    self.assertIn('In function g:', exc_msg)
-    # Matches the line, column, and text of the offending yield statement.
-    self.assertIn("""\
+    exc_msg_trimmed = re.sub(r'^.*?(test_rules\.py)', r'\1', exc_msg, flags=re.MULTILINE)
+    self.assertEquals(exc_msg_trimmed, """\
+In function g: yield in @rule without assignment must come at the end of a series of statements.
+
+A yield in an @rule without an assignment is equivalent to a return, and we
+currently require that no statements follow such a yield at the same level of nesting.
+Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the result.
+
+The invalid statement was:
 test_rules.py:{lineno}:{col}
         yield Get(B, D, D())
-""".format(lineno=(sys._getframe().f_lineno - 9),
-           col=8),
-                  exc_msg)
-    # Matches the line number of the @rule decorator.
-    self.assertIn('The rule defined by function `g` begins at:', exc_msg)
-    self.assertIn("""\
-test_rules.py:{lineno}:{col}
+
+The rule defined by function `g` begins at:
+test_rules.py:{rule_lineno}:{rule_col}
     with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
       @rule(A, [])
       def g():
-""".format(lineno=sys._getframe().f_lineno - 22,
-           col=6),
-                  exc_msg)
+""".format(lineno=(sys._getframe().f_lineno - 20),
+           col=8,
+           rule_lineno=(sys._getframe().f_lineno - 25),
+           rule_col=6))
 
   def create_full_graph(self, rules, validate=True):
     scheduler = create_scheduler(rules, validate=validate)
