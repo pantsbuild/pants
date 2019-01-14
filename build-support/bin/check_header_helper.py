@@ -10,6 +10,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import datetime
 import os
 import re
 import sys
@@ -24,8 +25,18 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 """
 
 
-def check_header(filename):
-  """Returns True if header check passes."""
+_current_year = str(datetime.datetime.now().year)
+
+
+_current_century_regex = re.compile(r'20\d\d')
+
+
+class HeaderCheckFailure(Exception):
+  """This is only used for control flow and to propagate the `.message` field."""
+
+
+def check_header(filename, is_newly_created=False):
+  """Raises `HeaderCheckFailure` if the header doesn't match."""
   try:
     with open(filename, 'r') as pyfile:
       buf = ""
@@ -34,42 +45,61 @@ def check_header(filename):
         # Skip shebang line
         if lineno == 1 and line.startswith('#!'):
           line = pyfile.readline()
-        # Don't care much about the actual year, just that its there
+        # Check if the copyright year can be parsed as within the current century, or the current
+        # year if it is a new file.
         if line.startswith("# Copyright"):
-          year = line[12:-4]
-          if not re.match(r'20\d\d', year):
-            return False
+          year = line[12:16]
+          if is_newly_created:
+            if not year == _current_year:
+              raise HeaderCheckFailure('{}: copyright year must be {} (was {})'
+                                       .format(filename, _current_year, year))
+          else:
+            if not _current_century_regex.match(year):
+              raise HeaderCheckFailure('{}: copyright year must match {} (was {})'
+                                       .format(filename, _current_century_regex.pattern, year))
           line = "# Copyright YYYY" + line[16:]
         buf += line
-      return buf == EXPECTED_HEADER
-  except IOError:
-    return False
+      if buf != EXPECTED_HEADER:
+        raise HeaderCheckFailure('{}: failed to parse header at all'
+                                 .format(filename))
+  except IOError as e:
+    raise HeaderCheckFailure('{}: error while reading input ({})'
+                             .format(filename, str(e)))
 
 
-def check_dir(directory):
+def check_dir(directory, newly_created_files):
   """Returns list of files that fail the check."""
-  failed_files = []
+  header_parse_failures = []
   for root, dirs, files in os.walk(directory):
     for f in files:
       if f.endswith('.py') and os.path.basename(f) != '__init__.py':
         filename = os.path.join(root, f)
-        if not check_header(filename):
-          failed_files.append(filename)
-  return failed_files
+        try:
+          check_header(filename, filename in newly_created_files)
+        except HeaderCheckFailure as e:
+          header_parse_failures.append(e.message)
+  return header_parse_failures
 
 
 def main():
   dirs = sys.argv
-  failed_files = []
+  header_parse_failures = []
+  # Input lines denote file paths relative to the repo root and are assumed to all end in \n.
+  newly_created_files = frozenset((line[0:-1] for line in sys.stdin)
+                                  if 'IGNORE_ADDED_FILES' not in os.environ
+                                  else [])
+
   for directory in dirs:
-    failed_files.extend(check_dir(directory))
-  if failed_files:
+    header_parse_failures.extend(check_dir(directory, newly_created_files))
+  if header_parse_failures:
     print('ERROR: All .py files other than __init__.py should start with the following header:')
     print()
     print(EXPECTED_HEADER)
     print('---')
-    print('The following {} file(s) do not conform:'.format(len(failed_files)))
-    print('  {}'.format('\n  '.join(failed_files)))
+    print('Some additional checking is performed on newly added files, such as \n'
+          'validating the copyright year. You can export IGNORE_ADDED_FILES to disable this check.')
+    print('The following {} file(s) do not conform:'.format(len(header_parse_failures)))
+    print('  {}'.format('\n  '.join(header_parse_failures)))
     sys.exit(1)
 
 
