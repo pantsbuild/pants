@@ -109,7 +109,7 @@ class CoercingJsonEncodingTest(unittest.TestCase):
 
   def test_non_string_dict_key_coercion(self):
     self.assertEqual(self._coercing_json_encode({('a', 'b'): 'asdf'}),
-                     '{"[\\"a\\", \\"b\\"]": "asdf"}')
+                     r'{"[\"a\", \"b\"]": "asdf"}')
 
   def test_string_like_dict_key_coercion(self):
     self.assertEqual(self._coercing_json_encode({'a': 3}), '{"a": 3}')
