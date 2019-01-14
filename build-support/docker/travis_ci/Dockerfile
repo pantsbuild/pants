@@ -4,22 +4,16 @@
 # Use our custom Centos6 image for binary compatibility with old linux distros.
 FROM pantsbuild/centos6:latest
 
-# -----------------------------------------------------------------------
-# This section belongs in centos6, but is here temporarily because
-# centos6's build must first be published to Docker.
-
+# TODO(7064) These changes belong in centos6/Dockerfile, because we always want that image to
+# have Py3 available and also avoid the cost of rebuilding Python 3 every time in CI. However,
+# this requires publishing an updated image to Docker hub, so we copy the code here until then.
+ARG PYTHON_3_VERSION=3.6.8
 RUN yum install sqlite-devel -y
-RUN mkdir -p /python-3-docker-build/python-3.6.8-{source,install}
-RUN curl -L -v https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz \
-    | tar -zxvC /python-3-docker-build/python-3.6.8-source
-RUN /usr/bin/scl enable devtoolset-7 -- \
-    bash -c 'pushd /python-3-docker-build/python-3.6.8-source/Python-3.6.8 \
-         && ./configure --prefix=/python-3-docker-build/python-3.6.8-install \
-                        --enable-optimizations \
-         && make install'
-ENV PATH "${PATH}:/python-3-docker-build/python-3.6.8-install/bin"
-
-# -----------------------------------------------------------------------
+ENV PYENV_ROOT /pyenv-docker-build
+RUN mkdir ${PYENV_ROOT}
+RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
+RUN /usr/bin/scl enable devtoolset-7 -- bash -c '${PYENV_ROOT}/bin/pyenv install ${PYTHON_3_VERSION}'
+ENV PATH "${PYENV_ROOT}/shims:${PATH}"
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home

@@ -15,17 +15,7 @@ RUN yum install -y \
   python27 \
   libffi \
   libffi-devel \
-  openssl-devel \
-  wget
-
-# Install Python 3.6, which we must build because it's not available through yum
-RUN cd /usr/src && \
-  wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz && \
-  tar -xzf Python-3.6.8.tgz && \
-  cd Python-3.6.8 && \
-  ./configure --enable-optimizations && \
-  make altinstall && \
-  rm /usr/src/Python-3.6.8.tgz
+  openssl-devel
 
 # By default, execute in an environment with python27 enabled.
 ENTRYPOINT ["/usr/bin/scl", "enable", "python27", "devtoolset-7",  "--"]
