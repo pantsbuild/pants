@@ -9,7 +9,7 @@ from builtins import object
 from pants.binaries.binary_util import BinaryUtil
 from pants.goal.run_tracker import RunTracker
 from pants.init.repro import Reproducer
-from pants.init.subprocess import Subprocess
+from pants.process.subprocess import Subprocess
 from pants.reporting.reporting import Reporting
 from pants.scm.subsystems.changed import Changed
 from pants.source.source_root import SourceRootConfig

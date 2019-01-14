@@ -8,7 +8,7 @@ import os
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
-from pants.init.subprocess import Subprocess
+from pants.process.subprocess import Subprocess
 from pants.java import util
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency

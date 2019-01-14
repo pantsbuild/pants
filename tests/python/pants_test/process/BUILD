@@ -7,5 +7,7 @@ python_tests(
     '3rdparty/python:mock',
     '3rdparty/python:six',
     'src/python/pants/process',
+    'tests/python/pants_test:test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
