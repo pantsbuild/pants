@@ -138,7 +138,7 @@ class JsonHashingTest(unittest.TestCase):
     self.assertEqual(stable_json_sha1({}), 'bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f')
     self.assertEqual(stable_json_sha1(()), '97d170e1550eee4afc0af065b78cda302a97674c')
     self.assertEqual(stable_json_sha1([]), '97d170e1550eee4afc0af065b78cda302a97674c')
-    self.assertEqual(stable_json_sha1(set([])), '97d170e1550eee4afc0af065b78cda302a97674c')
+    self.assertEqual(stable_json_sha1(set()), '97d170e1550eee4afc0af065b78cda302a97674c')
     self.assertEqual(stable_json_sha1([{}]), '4e9950a1f2305f56d358cad23f28203fb3aacbef')
     self.assertEqual(stable_json_sha1([('a', 3)]), 'd6abed2e53c1595fb3075ecbe020365a47af1f6f')
     self.assertEqual(stable_json_sha1({'a': 3}), '9e0e6d8a99c72daf40337183358cbef91bba7311')
