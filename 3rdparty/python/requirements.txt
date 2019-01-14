@@ -1,4 +1,5 @@
 ansicolors==1.0.2
+asttokens==1.1.13
 beautifulsoup4>=4.6.0,<4.7
 cffi==1.11.1
 configparser==3.5.0 ; python_version<'3'
