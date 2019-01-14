@@ -138,10 +138,6 @@ fi
 # integration tests that shell out to `./pants`, so we set this env var for those cases.
 export RUN_PANTS_FROM_PEX=1
 
-# TODO: Clear interpreters, otherwise the above subprocess interpreter constraint does not end up 
-# applying due to a cache bug between the `./pants binary` and further runs.
-./pants.pex clean-all
-
 if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
   FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
