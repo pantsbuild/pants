@@ -591,13 +591,14 @@ matrix:
         - ./build-support/bin/travis-ci.sh -2bn
 
     # TODO: get this passing with a Python 3 PEX.
-    - <<: *py3_linux_test_config
-      name: "Python contrib tests (Py3 PEX)"
+    - <<: *py2_linux_test_config
+      name: "Python contrib tests (Py2 PEX w/ Py3 constraints)"
       env:
-        - *py3_linux_test_config_env
+        - *py2_linux_test_config_env
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
         - CACHE_NAME=linuxcontribtests.py3
       script:
-        - ./build-support/bin/travis-ci.sh -bn
+        - ./build-support/bin/travis-ci.sh -bn2
 
 {{#py3_integration_shards}}
     - <<: *py3_linux_test_config

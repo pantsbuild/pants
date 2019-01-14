@@ -14,7 +14,6 @@ import traceback
 from builtins import object, str
 
 import setproctitle
-from future.utils import PY3
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import Exiter
@@ -382,4 +381,4 @@ ExceptionSink.reset_log_location(os.path.join(get_buildroot(), '.pants.d'))
 # Sets except hook.
 ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
-ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
+ExceptionSink.reset_interactive_output_stream(sys.stderr)
