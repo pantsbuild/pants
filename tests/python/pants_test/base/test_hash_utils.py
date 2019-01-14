@@ -120,7 +120,7 @@ class CoercingJsonEncodingTest(unittest.TestCase):
                      '{"[1]": {"[2]": 3}}')
 
   def test_collection_ordering(self):
-    self.assertEqual(self._coercing_json_encode(set([2, 1, 3])), '[1, 2, 3]')
+    self.assertEqual(self._coercing_json_encode({2, 1, 3}), '[1, 2, 3]')
     self.assertEqual(self._coercing_json_encode({'b': 4, 'a': 3}), '{"a": 3, "b": 4}')
     self.assertEqual(self._coercing_json_encode([('b', 4), ('a', 3)]), '[["b", 4], ["a", 3]]')
     self.assertEqual(self._coercing_json_encode([{'b': 4, 'a': 3}]),
