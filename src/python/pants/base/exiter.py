@@ -56,7 +56,8 @@ class Exiter(object):
       out = out or (sys.stderr.buffer if PY3 else sys.stderr)
       msg = ensure_binary(msg)
       try:
-        out.write(msg + b'\n')
+        out.write(msg)
+        out.write(b'\n')
         # TODO: Determine whether this call is a no-op because the stream gets flushed on exit, or
         # if we could lose what we just printed, e.g. if we get interrupted by a signal while
         # exiting and the stream is buffered like stdout.
