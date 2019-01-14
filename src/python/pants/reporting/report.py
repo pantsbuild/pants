@@ -23,18 +23,21 @@ class EmitterThread(threading.Thread):
   def __init__(self, report, name):
     super(EmitterThread, self).__init__(name=name)
     self._report = report
-    self._stop = threading.Event()
+    # N.B. We must not use the name `self._stop`, as it is already used by Threading.thread
+    # and overriding it results in `TypeError: 'Event' object is not callable` when ran with Py3.
+    # See https://stackoverflow.com/questions/27102881/python-threading-self-stop-event-object-is-not-callable
+    self._stopper = threading.Event()
     self.daemon = True
 
   def run(self):
     # NB(Eric Ayers) Using self._stop.wait(timeout=0.5) causes spurious exceptions on shutdown
     # on some platforms. See https://github.com/pantsbuild/pants/issues/2750
-    while not self._stop.is_set():
+    while not self._stopper.is_set():
       self._report.flush()
       time.sleep(0.5)
 
-  def stop(self):
-    self._stop.set()
+  def stop_thread(self):
+    self._stopper.set()
 
 
 class Report(object):
@@ -116,7 +119,7 @@ class Report(object):
       self._notify()
 
   def close(self):
-    self._emitter_thread.stop()
+    self._emitter_thread.stop_thread()
     with self._lock:
       self._notify()  # One final time.
       for reporter in self._reporters.values():
