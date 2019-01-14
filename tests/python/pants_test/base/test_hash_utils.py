@@ -143,7 +143,7 @@ class JsonHashingTest(unittest.TestCase):
     self.assertEqual(stable_json_sha1([('a', 3)]), 'd6abed2e53c1595fb3075ecbe020365a47af1f6f')
     self.assertEqual(stable_json_sha1({'a': 3}), '9e0e6d8a99c72daf40337183358cbef91bba7311')
     self.assertEqual(stable_json_sha1([{'a': 3}]), '8f4e36849a0b8fbe9c4a822c80fbee047c65458a')
-    self.assertEqual(stable_json_sha1(set([1])), 'f629ae44b7b3dcfed444d363e626edf411ec69a8')
+    self.assertEqual(stable_json_sha1({1}), 'f629ae44b7b3dcfed444d363e626edf411ec69a8')
 
   def test_rejects_ordered_dict(self):
     with self.assertRaisesRegexp(TypeError, r'CoercingEncoder does not support OrderedDict inputs'):
