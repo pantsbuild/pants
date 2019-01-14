@@ -30,7 +30,7 @@ class EmitterThread(threading.Thread):
     self.daemon = True
 
   def run(self):
-    # NB(Eric Ayers) Using self._stop.wait(timeout=0.5) causes spurious exceptions on shutdown
+    # NB(Eric Ayers) Using self._stopper.wait(timeout=0.5) causes spurious exceptions on shutdown
     # on some platforms. See https://github.com/pantsbuild/pants/issues/2750
     while not self._stopper.is_set():
       self._report.flush()
