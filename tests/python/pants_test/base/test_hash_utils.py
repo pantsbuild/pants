@@ -11,6 +11,8 @@ import unittest
 from builtins import range, str
 from collections import OrderedDict
 
+from future.utils import PY3
+
 from pants.base.hash_utils import CoercingEncoder, Sharder, hash_all, hash_file, stable_json_sha1
 from pants.util.contextutil import temporary_file
 
@@ -121,7 +123,8 @@ class CoercingJsonEncodingTest(unittest.TestCase):
     self.assertEqual(self._coercing_json_encode(set([2, 1, 3])), '[1, 2, 3]')
     self.assertEqual(self._coercing_json_encode({'b': 4, 'a': 3}), '{"a": 3, "b": 4}')
     self.assertEqual(self._coercing_json_encode([('b', 4), ('a', 3)]), '[["b", 4], ["a", 3]]')
-    self.assertEqual(self._coercing_json_encode([{'b': 4, 'a': 3}]), '[{"a": 3, "b": 4}]')
+    self.assertEqual(self._coercing_json_encode([{'b': 4, 'a': 3}]),
+                     '[{"b": 4, "a": 3}]' if PY3 else '[{"a": 3, "b": 4}]')
 
 
 class JsonHashingTest(unittest.TestCase):
