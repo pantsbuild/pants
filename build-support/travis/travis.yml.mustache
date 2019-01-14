@@ -591,6 +591,7 @@ matrix:
     # TODO: get this passing with a Python 3 PEX.
     - <<: *py2_linux_test_config
       name: "Python contrib tests (Py2 PEX w/ Py3 constraints)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
