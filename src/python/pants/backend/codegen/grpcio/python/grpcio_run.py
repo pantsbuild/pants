@@ -51,9 +51,9 @@ class GrpcioRun(SimpleCodegenTask):
       logging.info("Grpcio finished code generation into: [{}]".format(target_workdir))
 
   def build_args(self, target, target_workdir):
+    proto_path = '--proto_path={0}'.format(target.target_base)
     python_out = '--python_out={0}'.format(target_workdir)
     grpc_python_out = '--grpc_python_out={0}'.format(target_workdir)
-    proto_path = '--proto_path={0}'.format(target.target_base)
 
     args = [python_out, grpc_python_out, proto_path]
 
