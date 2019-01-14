@@ -101,7 +101,7 @@ The following is an abbreviated export file from a command in the pants repo:
     "python_setup": {
         "interpreters": {
             "CPython-2.7.10": {
-                "binary": "/Users/user/pants/build-support/pants_dev_deps.venv/bin/python2.7",
+                "binary": "/Users/user/pants/build-support/pants_dev_deps.py2.venv/bin/python2.7",
                 "chroot": "/Users/user/pants/.pants.d/python-setup/chroots/e8da2c200f36ca0a1b8a60c12590a59209250b1a"
             }
         },
