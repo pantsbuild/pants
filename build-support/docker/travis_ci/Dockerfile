@@ -15,6 +15,7 @@ RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
     ${PYENV_ROOT}/bin/pyenv install ${PYTHON_3_VERSION} \
     && ${PYENV_ROOT}/bin/pyenv global ${PYTHON_3_VERSION}'
+ENV PATH "${PYENV_ROOT}/shims:${PATH}"
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
