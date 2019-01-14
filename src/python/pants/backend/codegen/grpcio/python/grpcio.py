@@ -8,7 +8,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 
 
 class Grpcio(PythonToolBase):
-  grpcio_version = '1.17.1'
+  grpcio_version = '1.16.1'
 
   options_scope = 'grpcio'
   default_requirements = [
