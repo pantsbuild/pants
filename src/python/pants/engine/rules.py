@@ -13,6 +13,7 @@ from abc import abstractproperty
 from builtins import bytes, str
 from types import GeneratorType
 
+import asttokens
 from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
@@ -30,30 +31,67 @@ logger = logging.getLogger(__name__)
 class _RuleVisitor(ast.NodeVisitor):
   """Pull `Get` calls out of an @rule body and validate `yield` statements."""
 
-  def __init__(self, func, frame, parents_table):
+  def __init__(self, func, func_node, func_source, orig_indent, frame, parents_table):
     super(_RuleVisitor, self).__init__()
-    self.gets = []
+    self._gets = []
     self._func = func
+    self._func_node = func_node
+    self._func_source = func_source
+    self._orig_indent = orig_indent
     self._frame = frame
     self._parents_table = parents_table
     self._yields_in_assignments = set()
 
-  class YieldVisitError(Exception):
-    def __init__(self, node, func, frame, msg, *args, **kwargs):
-      filename, line_number, _, context_lines, _ = inspect.getframeinfo(frame, context=4)
-      err_msg = ("""\
-In function {func_name}: {msg}
-{filename}:{line_number}:
+  @property
+  def gets(self):
+    return self._gets
+
+  def _generate_ast_error_message(self, node, msg):
+    # This is the location info of the start of the decorated @rule.
+    filename, line_number, _, context_lines, _ = inspect.getframeinfo(self._frame, context=4)
+
+    # The asttokens library is able to keep track of line numbers and column offsets for us -- the
+    # stdlib ast library only provides these relative to each parent node.
+    tokenized_rule_body = asttokens.ASTTokens(self._func_source,
+                                              tree=self._func_node,
+                                              filename=filename)
+    start_offset, _ = tokenized_rule_body.get_text_range(node)
+    line_offset, col_offset = asttokens.LineNumbers(self._func_source).offset_to_line(start_offset)
+    node_file_line = line_number + line_offset - 1
+    # asttokens also very helpfully lets us provide the exact text of the node we want to highlight
+    # in an error message.
+    node_text = tokenized_rule_body.get_text(node)
+
+    fully_indented_node_col = col_offset + self._orig_indent
+    indented_node_text = '{}{}'.format(
+      # The node text doesn't have any initial whitespace, so we have to add it back.
+      col_offset * ' ',
+      '\n'.join(
+        # We removed the indentation from the original source in order to parse it with the ast
+        # library (otherwise it raises an exception), so we add it back here.
+        '{}{}'.format(self._orig_indent * ' ', l)
+        for l in node_text.split('\n')))
+
+    return ("""In function {func_name}: {msg}
+The invalid statement was:
+{filename}:{node_line_number}:{node_col}
+{node_text}
+
+The rule defined by function `{func_name}` begins at:
+{filename}:{line_number}:{orig_indent}
 {context_lines}
+""".format(func_name=self._func.__name__, msg=msg,
+           filename=filename, line_number=line_number, orig_indent=self._orig_indent,
+           node_line_number=node_file_line,
+           node_col=fully_indented_node_col,
+           node_text=indented_node_text,
+           # Strip any leading or trailing newlines from the start of the rule body.
+           context_lines=''.join(context_lines).strip('\n')))
 
-The invalid `yield` statement (in the body of the above function) was: {node}
-""".format(func_name=func.__name__, msg=msg,
-           filename=filename, line_number=line_number,
-           context_lines=''.join(context_lines).strip(),
-           node=ast.dump(node)))
-      super(_RuleVisitor.YieldVisitError, self).__init__(err_msg, *args, **kwargs)
+  class YieldVisitError(Exception): pass
 
-  def _maybe_end_of_stmt_list(self, attr_value):
+  @staticmethod
+  def _maybe_end_of_stmt_list(attr_value):
     """If `attr_value` is a non-empty iterable, return its final element."""
     if (attr_value is not None) and isinstance(attr_value, Iterable):
       result = list(attr_value)
@@ -65,11 +103,13 @@ The invalid `yield` statement (in the body of the above function) was: {node}
     """Determine if `stmt` is at the end of a list of statements (i.e. can be an implicit `return`).
 
     If there are any statements following `stmt` at the same level of nesting, this method returns
-    False, such as the following (if `stmt` is a yield Expr):
+    False, such as the following (if `stmt` is the Expr for `yield 'good'`):
 
     if 2 + 2 == 5:
       yield 'good'
       a = 3
+
+    Note that this returns False even if the statement following `stmt` is a `return`.
 
     However, if `stmt` is at the end of a list of statements, it can be made more clear that `stmt`
     is intended to represent a `return`. Another way to view this method is as a dead code
@@ -89,7 +129,7 @@ The invalid `yield` statement (in the body of the above function) was: {node}
     See https://docs.python.org/2/library/ast.html#abstract-grammar for the grammar specification.
     'body', 'orelse', and 'finalbody' are the only attributes on any AST nodes which can contain
     lists of stmts.  'body' is also an attribute in the Exec statement for some reason, but as a
-    single expr, so we check if it is iterable.
+    single expr, so we simply check if it is iterable in `_maybe_end_of_stmt_list()`.
     """
     parent_stmt = self._parents_table[stmt]
     last_body_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, 'body', None))
@@ -105,7 +145,7 @@ The invalid `yield` statement (in the body of the above function) was: {node}
 
   def visit_Call(self, node):
     if isinstance(node.func, ast.Name) and node.func.id == Get.__name__:
-      self.gets.append(Get.extract_constraints(node))
+      self._gets.append(Get.extract_constraints(node))
 
   def visit_Assign(self, node):
     if isinstance(node.value, ast.Yield):
@@ -121,12 +161,13 @@ The invalid `yield` statement (in the body of the above function) was: {node}
 
       if not self._stmt_is_at_end_of_parent_list(expr_for_yield):
         raise self.YieldVisitError(
-          node, self._func, self._frame,
-          """\
+          self._generate_ast_error_message(node, """\
+yield in @rule without assignment must come at the end of a series of statements.
+
 A yield in an @rule without an assignment is equivalent to a return, and we
-currently require that it comes at the end of a series of statements.
+currently require that no statements follow such a yield at the same level of nesting.
 Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the result.
-""")
+"""))
 
 
 class _GoalProduct(object):
@@ -178,6 +219,13 @@ def optionable_rule(optionable_factory):
   return TaskRule(**optionable_factory.signature())
 
 
+def _get_starting_indent(source):
+  """Remove leading indentation from `source` so ast.parse() doesn't raise an exception."""
+  if source.startswith(" "):
+    return sum(1 for _ in itertools.takewhile(lambda c: c in {' ', b' '}, source))
+  return 0
+
+
 def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -194,9 +242,9 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
 
     caller_frame = inspect.stack()[1][0]
     source = inspect.getsource(func)
-    if source.startswith(" "):
-      to_trim = sum(1 for _ in itertools.takewhile(lambda c: c in {' ', b' '}, source))
-      source = "\n".join(line[to_trim:] for line in source.split("\n"))
+    beginning_indent = _get_starting_indent(source)
+    if beginning_indent:
+      source = "\n".join(line[beginning_indent:] for line in source.split("\n"))
     module_ast = ast.parse(source)
 
     def resolve_type(name):
@@ -218,7 +266,14 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       for child in ast.iter_child_nodes(parent):
         parents_table[child] = parent
 
-    rule_visitor = _RuleVisitor(func, caller_frame, parents_table)
+    rule_visitor = _RuleVisitor(
+      func=func,
+      func_node=rule_func_node,
+      func_source=source,
+      orig_indent=beginning_indent,
+      frame=caller_frame,
+      parents_table=parents_table,
+    )
     rule_visitor.visit(rule_func_node)
     gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
 
