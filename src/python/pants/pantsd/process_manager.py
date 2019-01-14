@@ -16,8 +16,8 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.process.subprocess import Subprocess
 from pants.process.lock import OwnerPrintingInterProcessFileLock
+from pants.process.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
