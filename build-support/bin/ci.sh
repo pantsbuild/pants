@@ -110,11 +110,11 @@ export PANTS_DEV=1
 # or we will encounter the _Py_Dealloc error when running `./pants.pex -V` with Python 3 under-the-hood.
 if [[ "${python_two:-false}" == "false" ]]; then
   py_version_number="3"
-  pants_script="./pants3"
+  bootstrap_pants_script="./pants3"
   export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
 else
   py_version_number="2"
-  pants_script="./pants"
+  bootstrap_pants_script="./pants"
 fi
 banner "Using Python ${py_version_number} to execute subprocesses."
 
@@ -124,7 +124,7 @@ if [[ "${run_bootstrap:-true}" == "true" ]]; then
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    ${pants_script} binary \
+    ${bootstrap_pants_script} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
     ./pants.pex -V
