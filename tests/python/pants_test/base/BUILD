@@ -105,6 +105,7 @@ python_tests(
   sources = ['test_hash_utils.py'],
   dependencies = [
     '3rdparty/python:future',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:hash_utils',
     'src/python/pants/util:contextutil',
   ]

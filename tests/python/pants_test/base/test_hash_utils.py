@@ -7,11 +7,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import hashlib
 import json
 import math
+import re
 import unittest
 from builtins import range, str
 from collections import OrderedDict
 
 from future.utils import PY3
+from twitter.common.collections import OrderedSet
 
 from pants.base.hash_utils import CoercingEncoder, Sharder, hash_all, hash_file, stable_json_sha1
 from pants.util.contextutil import temporary_file
@@ -145,9 +147,13 @@ class JsonHashingTest(unittest.TestCase):
     self.assertEqual(stable_json_sha1([{'a': 3}]), '8f4e36849a0b8fbe9c4a822c80fbee047c65458a')
     self.assertEqual(stable_json_sha1({1}), 'f629ae44b7b3dcfed444d363e626edf411ec69a8')
 
-  def test_rejects_ordered_dict(self):
-    with self.assertRaisesRegexp(TypeError, r'CoercingEncoder does not support OrderedDict inputs'):
+  def test_rejects_ordered_collections(self):
+    with self.assertRaisesRegexp(TypeError,
+                                 re.escape('CoercingEncoder does not support OrderedDict inputs')):
       stable_json_sha1(OrderedDict([('a', 3)]))
+    with self.assertRaisesRegexp(TypeError,
+                                 re.escape('CoercingEncoder does not support OrderedSet inputs')):
+      stable_json_sha1(OrderedSet([3]))
 
   def test_non_string_dict_key_checksum(self):
     self.assertEqual(stable_json_sha1({('a', 'b'): 'asdf'}),

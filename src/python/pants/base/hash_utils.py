@@ -9,6 +9,7 @@ import json
 from builtins import bytes, object, open, str
 
 from future.utils import PY3
+from twitter.common.collections import OrderedSet
 
 from pants.base.deprecated import deprecated
 from pants.util.collections_abc_backport import Iterable, Mapping, OrderedDict, Set
@@ -81,6 +82,11 @@ class CoercingEncoder(json.JSONEncoder):
         (self._maybe_encode_dict_key(k), self.default(v))
         for k, v in ordered_kv_pairs)
     elif isinstance(o, Set):
+      # We disallow OrderedSet (although it is not a stdlib collection) for the same reasons as
+      # OrderedDict above.
+      if isinstance(o, OrderedSet):
+        raise TypeError('{cls} does not support OrderedSet inputs: {val!r}.'
+                        .format(cls=type(self).__name__, val=o))
       # Set order is arbitrary in python 3.6 and 3.7, so we need to keep this sorted() call.
       return sorted(self.default(i) for i in o)
     elif isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
