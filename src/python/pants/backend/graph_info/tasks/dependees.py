@@ -55,10 +55,10 @@ class ReverseDepmap(ConsoleTask):
       yield json.dumps(deps, indent=4, separators=(',', ': '), sort_keys=True)
     else:
       if self._closed:
-        for root in roots:
+        for root in sorted(roots):
           yield root.address.spec
 
-      for dependent in self.get_dependents(dependees_by_target, roots):
+      for dependent in sorted(self.get_dependents(dependees_by_target, roots)):
         yield dependent.address.spec
 
   def get_dependents(self, dependees_by_target, roots):
