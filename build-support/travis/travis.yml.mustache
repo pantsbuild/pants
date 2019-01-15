@@ -111,11 +111,11 @@ base_linux_config: &base_linux_config
 
 py2_linux_config: &py2_linux_config
   <<: *base_linux_config
-  python: &python_version "2.7"
+  python: &python2_version "2.7"
 
 py3_linux_config: &py3_linux_config
   <<: *base_linux_config
-  python: &python_version "3.6"
+  python: &python3_version "3.6"
 
 base_linux_test_config: &base_linux_test_config
   <<: *base_linux_config
@@ -460,38 +460,21 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
 # Rust tests
 # -------------------------------------------------------------------------
 
-base_linux_rust_tests: &base_linux_rust_tests
+linux_rust_tests: &linux_rust_tests
   <<: *linux_with_fuse
   <<: *native_engine_cache_config
+  name: "Linux Rust tests (No PEX)"
   env:
     - CACHE_NAME=linuxrusttests
   os: linux
   dist: xenial
   sudo: required
   language: python
+  python: *python3_version
+  stage: *test
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-
-py2_linux_rust_tests: &py2_linux_rust_tests
-  <<: *base_linux_rust_tests
-  name: "Linux Rust tests (Py2 PEX)"
-  python: 2.7
-  env:
-    - *py2_linux_test_config_env
-    - CACHE_NAME=linuxrusttests.py2
-  script:
-    - ./build-support/bin/travis-ci.sh -be2
-
-py3_linux_rust_tests: &py3_linux_rust_tests
-  <<: *base_linux_rust_tests
-  name: "Linux Rust tests (Py3 PEX)"
-  python: 3.6
-  stage: *test
-  env:
-    - *py3_linux_test_config_env
-    - CACHE_NAME=linuxrusttests.py3
-  script:
     - ./build-support/bin/travis-ci.sh -be
 
 base_osx_rust_tests: &base_osx_rust_tests
@@ -634,8 +617,7 @@ matrix:
 
 {{/cron_integration_shards}}
 
-    - <<: *py2_linux_rust_tests
-    - <<: *py3_linux_rust_tests
+    - <<: *linux_rust_tests
 
     # TODO: get this to pass using Python 3. In the meantime, just use Python 2.
     - <<: *py2_osx_rust_tests
