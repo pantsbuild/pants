@@ -10,7 +10,7 @@ from builtins import range, str
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.resources_task import ResourcesTask
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
-from pants.base.hash_utils import stable_json_hash
+from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
@@ -158,7 +158,7 @@ class MinimalImplResourcesTaskTest(ResourcesTaskTestBase):
 class CustomInvalidationStrategtResourcesTaskTest(ResourcesTaskTestBase):
   class TagsInvalidationStrategy(DefaultFingerprintStrategy):
     def compute_fingerprint(self, target):
-      return stable_json_hash(sorted(target.tags))
+      return stable_json_sha1(sorted(target.tags))
 
   class CustomInvalidationStrategyResourcesTask(ResourcesTaskTestBase.MinimalImplResourcesTask):
     def create_invalidation_strategy(self):
