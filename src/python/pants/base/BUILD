@@ -111,6 +111,8 @@ python_library(
   sources = ['hash_utils.py'],
   dependencies = [
     '3rdparty/python:future',
+    ':deprecated',
+    'src/python/pants/util:collections_abc_backport',
   ]
 )
 

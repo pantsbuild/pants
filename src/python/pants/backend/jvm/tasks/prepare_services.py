@@ -9,7 +9,7 @@ import os
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.resources_task import ResourcesTask
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
-from pants.base.hash_utils import stable_json_hash
+from pants.base.hash_utils import stable_json_sha1
 from pants.util.dirutil import safe_open
 
 
@@ -17,7 +17,7 @@ class JvmServiceFingerprintStrategy(DefaultFingerprintStrategy):
   """Fingerprints a JvmTarget for its service provider configuration."""
 
   def compute_fingerprint(self, target):
-    return stable_json_hash(target.services)
+    return stable_json_sha1(target.services)
 
 
 class PrepareServices(ResourcesTask):

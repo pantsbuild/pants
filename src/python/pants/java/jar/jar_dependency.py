@@ -10,7 +10,7 @@ from builtins import object
 from future.moves.urllib import parse
 
 from pants.base.build_environment import get_buildroot
-from pants.base.hash_utils import stable_json_hash
+from pants.base.hash_utils import stable_json_sha1
 from pants.base.validation import assert_list
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate
@@ -158,7 +158,7 @@ class JarDependency(datatype([
 
   def cache_key(self):
     excludes = [(e.org, e.name) for e in self.excludes]
-    return stable_json_hash(dict(org=self.org,
+    return stable_json_sha1(dict(org=self.org,
                                  name=self.name,
                                  rev=self.rev,
                                  force=self.force,
