@@ -457,6 +457,28 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
     - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
 # -------------------------------------------------------------------------
+# Platform specific tests
+# -------------------------------------------------------------------------
+
+py2_osx_platform_tests: &py2_osx_platform_tests
+  <<: *py2_osx_test_config
+  name: "OSX platform-specific tests (Py2 PEX)"
+  env:
+    - *py2_osx_test_config_env
+    - CACHE_NAME=macosplatformtests.py2
+  script:
+    - ./build-support/bin/travis-ci.sh -bz2
+
+py3_osx_platform_tests: &py3_osx_platform_tests
+  <<: *py3_osx_test_config
+  name: "OSX platform-specific tests (Py3 PEX)"
+  env:
+    - *py3_osx_test_config_env
+    - CACHE_NAME=macosplatformtests.py3
+  script:
+    - ./build-support/bin/travis-ci.sh -bz
+
+# -------------------------------------------------------------------------
 # Rust tests
 # -------------------------------------------------------------------------
 
@@ -478,37 +500,19 @@ linux_rust_tests: &linux_rust_tests
   script:
     - ./build-support/bin/travis-ci.sh -be
 
-base_osx_rust_tests: &base_osx_rust_tests
+osx_rust_tests: &osx_rust_tests
   # Fuse actually works on this image. It hangs on many others.
   osx_image: xcode8.3
+  name: "OSX Rust tests (No PEX)"
+  stage: *test
   addons:
     homebrew:
-      casks: &base_osx_rust_tests_brew_casks
+      casks:
       - osxfuse
-
-py2_osx_rust_tests: &py2_osx_rust_tests
-  <<: *base_osx_rust_tests
-  <<: *py2_osx_test_config
-  name: "OSX Rust + platform-specific tests (Py2 PEX)"
   env:
-    - *py2_osx_test_config_env
-    - CACHE_NAME=macosrusttests.py2
+    - CACHE_NAME=macosrusttests
   script:
-    - ./build-support/bin/travis-ci.sh -bez2
-
-py3_osx_rust_tests: &py3_osx_rust_tests
-  <<: *base_osx_rust_tests
-  <<: *py3_osx_test_config
-  name: "OSX Rust + platform-specific tests (Py3 PEX)"
-  env:
-    - *py3_osx_test_config_env
-    - CACHE_NAME=macosrusttests.py3
-  addons:
-    homebrew:
-      packages: *py3_osx_config_brew_packages
-      casks: *base_osx_rust_tests_brew_casks
-  script:
-    - ./build-support/bin/travis-ci.sh -bez
+    - ./build-support/bin/travis-ci.sh -be
 
 # -------------------------------------------------------------------------
 # Rust audits
@@ -652,12 +656,13 @@ matrix:
 
 {{/cron_integration_shards}}
 
-    - <<: *linux_rust_tests
-
     # TODO: get this to pass using Python 3. In the meantime, just use Python 2.
-    - <<: *py2_osx_rust_tests
+    - <<: *py2_osx_platform_tests
       stage: *test
-    # - <<: *py3_osx_rust_tests
+    # - <<: *py3_osx_platform_tests
+
+    - <<: *linux_rust_tests
+    - <<: *osx_rust_tests
 
     - <<: *linux_rust_clippy
     - <<: *cargo_audit
