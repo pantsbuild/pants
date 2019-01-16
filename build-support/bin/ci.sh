@@ -13,10 +13,9 @@ function usage() {
   cat <<EOF
 Runs commons tests for local or hosted CI.
 
-Usage: $0 (-h|-3fxbkmrjlpuneycitzs)
+Usage: $0 (-h|-2fxbkmrjlpuneycitzsw)
  -h           print out this help message
- -3           After pants is bootstrapped, set --python-setup-interpreter-constraints such that any
-              python tests run with Python 3.
+ -2           Run using Python 2 (defaults to using Python 3).
  -f           run python code formatting checks
  -x           run bootstrap clean-all (assume bootstrapping from a
               fresh clone)
@@ -46,6 +45,7 @@ Usage: $0 (-h|-3fxbkmrjlpuneycitzs)
               to run only even tests: '-i 0/2', odd: '-i 1/2'
  -t           run lint
  -z           test platform-specific behavior
+ -w           Run only blacklisted tests
 EOF
   if (( $# > 0 )); then
     die "$@"
@@ -58,12 +58,12 @@ EOF
 python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
-python_three="false"
+python_two="false"
 
-while getopts "h3fxbmrjlpeasu:ny:ci:tz" opt; do
+while getopts "h2fxbmrjlpeasu:ny:ci:tzw" opt; do
   case ${opt} in
     h) usage ;;
-    3) python_three="true" ;;
+    2) python_two="true" ;;
     f) run_pre_commit_checks="true" ;;
     x) run_bootstrap_clean="true" ;;
     b) run_bootstrap="false" ;;
@@ -82,6 +82,7 @@ while getopts "h3fxbmrjlpeasu:ny:ci:tz" opt; do
     i) python_intg_shard=${OPTARG} ;;
     t) run_lint="true" ;;
     z) test_platform_specific_behavior="true" ;;
+    w) run_blacklisted_tests_only="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -104,13 +105,26 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
+# Determine which Python interpreter to use for bootstrapping pex and for executing subprocesses.
+# Order matters here. We must constrain subprocesses before running the bootstrap stage,
+# or we will encounter the _Py_Dealloc error when bootstrapping a Python 3 PEX.
+if [[ "${python_two:-false}" == "false" ]]; then
+  py_version_number="3"
+  bootstrap_pants_script="./pants3"
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
+else
+  py_version_number="2"
+  bootstrap_pants_script="./pants"
+fi
+banner "Using Python ${py_version_number} to execute spawned subprocesses (e.g. tests)"
+
 if [[ "${run_bootstrap:-true}" == "true" ]]; then
-  start_travis_section "Bootstrap" "Bootstrapping pants"
+  start_travis_section "Bootstrap" "Bootstrapping pants as a Python ${py_version_number} PEX"
   (
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    ./pants binary \
+    ${bootstrap_pants_script} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
     ./pants.pex -V
@@ -128,15 +142,6 @@ if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
   FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
   end_travis_section
-fi
-
-# NB: Ordering matters here. We (currently) always bootstrap a Python 2 pex.
-if [[ "${python_three:-false}" == "true" ]]; then
-  banner "Setting interpreter constraints for 3!"
-  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
-  # TODO: Clear interpreters, otherwise this constraint does not end up applying due to a cache
-  # bug between the `./pants binary` and further runs.
-  ./pants.pex clean-all
 fi
 
 if [[ "${run_sanity_checks:-false}" == "true" ]]; then
@@ -267,9 +272,19 @@ if [[ "${run_integration:-false}" == "true" ]]; then
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
+    known_py3_pex_failures_file="${REPO_ROOT}/build-support/known_py3_pex_failures.txt"
+    if [[ "${python_two:-false}" == "false" ]]; then
+      targets="$(comm -23 <(./pants.pex --tag='+integration' list tests/python:: | grep '.' | sort) <(sort "${known_py3_pex_failures_file}"))"
+    else
+      if [[ "${run_blacklisted_tests_only:-false}" == "true" ]]; then
+        targets="$(cat ${known_py3_pex_failures_file})"
+      else
+        targets="tests/python::"
+      fi
+    fi
     ./pants.pex --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
-      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+      $targets -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants Integration test failure"
   end_travis_section
 fi

@@ -171,7 +171,7 @@ class Confluence(object):
     except (IOError, OSError) as e:
       log.error('Failed to read data from file %s: %s' % (filename, str(e)))
       return None
-    except XMLRPCError as e:
+    except XMLRPCError:
       log.error('Failed to add file attachment %s to page: %s' %
           (filename, page.get('title', '[unknown title]')))
       return None
