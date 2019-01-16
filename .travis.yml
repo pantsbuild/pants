@@ -415,26 +415,23 @@ py3_osx_10_13_sanity_check: &py3_osx_10_13_sanity_check
 # Lint
 # -------------------------------------------------------------------------
 
-base_lint: &base_lint
-  <<: *linux_with_fuse
-  script:
-    - ./build-support/bin/travis-ci.sh -fbmrjt
-
 py2_lint: &py2_lint
   <<: *py2_linux_test_config
-  <<: *base_lint
-  name: "Self-checks, lint, and JVM tests (Py2 PEX)"
+  name: "Self-checks and lint (Py2 PEX)"
   env:
     - *py2_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py2
+  script:
+    - ./build-support/bin/travis-ci.sh -fbmrt2
 
 py3_lint: &py3_lint
   <<: *py3_linux_test_config
-  <<: *base_lint
-  name: "Self-checks, lint, and JVM tests (Py3 PEX)"
+  name: "Self-checks and lint (Py3 PEX)"
   env:
     - *py3_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py3
+  script:
+    - ./build-support/bin/travis-ci.sh -fbmrt
 
 # -------------------------------------------------------------------------
 # Deploy
@@ -476,6 +473,33 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
     - PREPARE_DEPLOY=1
   script:
     - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
+
+# -------------------------------------------------------------------------
+# JVM tests
+# -------------------------------------------------------------------------
+
+base_jvm_tests: &base_jvm_tests
+  <<: *linux_with_fuse
+
+py2_jvm_tests: &py2_jvm_tests
+  <<: *py2_linux_test_config
+  <<: *base_jvm_tests
+  name: "JVM tests (Py2 PEX)"
+  env:
+    - *py2_linux_test_config_env
+    - CACHE_NAME=linuxjvmtests.py2
+  script:
+    - ./build-support/bin/travis-ci.sh -bj2
+
+py3_jvm_tests: &py3_jvm_tests
+  <<: *py3_linux_test_config
+  <<: *base_jvm_tests
+  name: "JVM tests (Py3 PEX)"
+  env:
+    - *py3_linux_test_config_env
+    - CACHE_NAME=linuxjvmtests.py3
+  script:
+    - ./build-support/bin/travis-ci.sh -bj
 
 # -------------------------------------------------------------------------
 # Platform specific tests
@@ -602,10 +626,7 @@ matrix:
     - <<: *deploy_unstable_multiplatform_pex
 
     - <<: *py2_lint
-      stage: *test
-    # TODO: lint shard fails with Py3 pex (see https://travis-ci.org/pantsbuild/pants/jobs/478884818#L3355)
-    # Temporarily use Py2 pex and fix this in a later PR.
-    # - <<: *py3_lint
+    - <<: *py3_lint
 
     - <<: *py2_linux_test_config
       name: "Unit tests for pants and pants-plugins (Py2 PEX)"
@@ -978,6 +999,11 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -bc2 -i 19/20
 
+
+    # TODO: get this to pass using Python 3. In the meantime, just use Python 2.
+    - <<: *py2_jvm_tests
+      stage: *test
+    # - <<: *py3_jvm_tests
 
     # TODO: get this to pass using Python 3. In the meantime, just use Python 2.
     - <<: *py2_osx_platform_tests
