@@ -475,6 +475,7 @@ linux_rust_tests: &linux_rust_tests
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
+  script:
     - ./build-support/bin/travis-ci.sh -be
 
 base_osx_rust_tests: &base_osx_rust_tests
