@@ -17,5 +17,5 @@ class YarnpkgDistribution(NativeTool):
 
   options_scope = 'yarnpkg-distribution'
   name = 'yarnpkg'
-  default_version = 'v1.6.0'
+  default_version = 'v1.12.3'
   archive_type = 'tgz'
