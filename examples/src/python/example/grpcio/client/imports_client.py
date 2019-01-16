@@ -17,7 +17,7 @@ def run_example():
 
       hello_request = service_pb2.HelloRequest(action='hello with imports')
       request = imports_pb2.HelloImportsRequest(hello_request=hello_request)
-      reply: imports_pb2.HelloImportsReply = stub.HelloImports(request)
+      reply = stub.HelloImports(request)
     except grpc.RpcError as error:
       if error.code() == grpc.StatusCode.UNAVAILABLE:
         print("[ERROR] Connection to server is unavailable. You should create a server instance first.")

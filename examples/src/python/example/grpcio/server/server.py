@@ -14,7 +14,7 @@ from org.pantsbuild.example.grpcio.service import service_pb2, service_pb2_grpc
 
 class ExampleHelloServer(service_pb2_grpc.ExampleServiceServicer):
 
-  def Hello(self, request: service_pb2.HelloRequest, context):
+  def Hello(self, request, context):
     print('request with action: [{}]'.format(request.action))
     reply = service_pb2.HelloReply()
     reply.response = '{} from server!'.format(request.action)
@@ -23,7 +23,7 @@ class ExampleHelloServer(service_pb2_grpc.ExampleServiceServicer):
 
 class ImportsServiceServer(imports_pb2_grpc.ImportsServiceServicer):
 
-  def HelloImports(self, request: imports_pb2.HelloImportsRequest, context):
+  def HelloImports(self, request, context):
     print('request with action: [{}]'.format(request.hello_request.action))
     hello_reply = service_pb2.HelloReply(response='{} from imports server!'.format(request.hello_request.action))
     reply = imports_pb2.HelloImportsReply(hello_reply=hello_reply)
