@@ -105,9 +105,9 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
-# Determine interpreter for both under-the-hood and for subprocesses.
+# Determine which Python interpreter to use for bootstrapping pex and for executing subprocesses.
 # Order matters here. We must constrain subprocesses before running the bootstrap stage,
-# or we will encounter the _Py_Dealloc error when running `./pants.pex -V` with Python 3 under-the-hood.
+# or we will encounter the _Py_Dealloc error when bootstrapping a Python 3 PEX.
 if [[ "${python_two:-false}" == "false" ]]; then
   py_version_number="3"
   bootstrap_pants_script="./pants3"
@@ -116,10 +116,10 @@ else
   py_version_number="2"
   bootstrap_pants_script="./pants"
 fi
-banner "Using Python ${py_version_number} to execute subprocesses."
+banner "Using Python ${py_version_number} to execute spawned subprocesses (e.g. tests)"
 
 if [[ "${run_bootstrap:-true}" == "true" ]]; then
-  start_travis_section "Bootstrap" "Bootstrapping pants with Python ${py_version_number} under-the-hood."
+  start_travis_section "Bootstrap" "Bootstrapping pants as a Python ${py_version_number} PEX"
   (
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
