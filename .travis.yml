@@ -187,6 +187,7 @@ matrix:
       osx_image: xcode8
       env:
         - CACHE_NAME=macospexbuild
+        - PEX_VERBOSE=9
         - PREPARE_DEPLOY=1  # To deploy fs_util.
       script:
         # With no args ci.sh just bootstraps a pants.pex. We also build fs_util, to take advantage
