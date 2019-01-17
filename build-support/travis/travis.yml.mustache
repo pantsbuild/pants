@@ -307,7 +307,7 @@ base_test_wheels: &base_test_wheels
     # Runs a dry run release to test that all wheels are installable.
     #
     # Note that these shards do not actually deploy the wheels to S3 via `PREPARE_DEPLOY`: that
-    # is accomplished in the bootstrap shardis, which necessarily build the wheels in order to
+    # is accomplished in the bootstrap shards, which necessarily build the wheels in order to
     # build a pex.
     - ./build-support/bin/release.sh -n
 
