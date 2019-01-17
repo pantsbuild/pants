@@ -544,7 +544,7 @@ linux_rust_tests: &linux_rust_tests
   language: python
   python: *python3_version
   script:
-    - ./build-support/bin/travis-ci.sh -be
+    - ./build-support/bin/travis-ci.sh -e
 
 osx_rust_tests: &osx_rust_tests
   <<: *base_rust_tests
@@ -559,7 +559,7 @@ osx_rust_tests: &osx_rust_tests
       casks:
       - osxfuse
   script:
-    - ./build-support/bin/travis-ci.sh -be
+    - ./build-support/bin/travis-ci.sh -e
 
 # -------------------------------------------------------------------------
 # Rust audits
@@ -581,7 +581,7 @@ linux_rust_clippy: &linux_rust_clippy
     - ulimit -c unlimited
     - ulimit -n 8192
   script:
-    - ./build-support/bin/travis-ci.sh -bs
+    - ./build-support/bin/travis-ci.sh -s
 
 cargo_audit: &cargo_audit
   <<: *linux_with_fuse
