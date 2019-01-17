@@ -228,7 +228,6 @@ base_linux_build_engine: &base_linux_build_engine
       build-support/docker/travis_ci/
     # Note that:
     # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
-    # * With no args ci.sh just bootstraps a pants.pex.
     # * We also build fs_util, to take advantage of the rust code built during bootstrapping.
     - docker run --rm -t
       -v "${HOME}:/travis/home"
@@ -245,7 +244,7 @@ py2_linux_build_engine: &py2_linux_build_engine
     - *base_linux_build_engine_env
     - CACHE_NAME=linuxpexbuild.py2
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py2.linux
-    - BOOTSTRAP_ARGS='-2'
+    - BOOTSTRAP_ARGS='-2b'
 
 py3_linux_build_engine: &py3_linux_build_engine
   <<: *py3_linux_config
@@ -255,7 +254,7 @@ py3_linux_build_engine: &py3_linux_build_engine
     - *base_linux_build_engine_env
     - CACHE_NAME=linuxpexbuild.py3
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.linux
-    - BOOTSTRAP_ARGS=''
+    - BOOTSTRAP_ARGS='-b'
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
@@ -267,8 +266,7 @@ base_osx_build_engine: &base_osx_build_engine
   env:
     - &base_osx_build_engine_env PREPARE_DEPLOY=1  # To deploy fs_util.
   script:
-    # With no args ci.sh just bootstraps a pants.pex. We also build fs_util, to take advantage
-    # of the rust code built during bootstrapping.
+    # We also build fs_util, to take advantage of the rust code built during bootstrapping.
     - ./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
   after_failure:
@@ -282,7 +280,7 @@ py2_osx_build_engine: &py2_osx_build_engine
     - *base_osx_build_engine_env
     - CACHE_NAME=osxpexbuild.py2
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py2.osx
-    - BOOTSTRAP_ARGS='-2'
+    - BOOTSTRAP_ARGS='-2b'
 
 py3_osx_build_engine: &py3_osx_build_engine
   <<: *py3_osx_config
@@ -293,7 +291,7 @@ py3_osx_build_engine: &py3_osx_build_engine
     - *py3_osx_config_env
     - CACHE_NAME=osxpexbuild.py3
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.osx
-    - BOOTSTRAP_ARGS=''
+    - BOOTSTRAP_ARGS='-b'
 
 # -------------------------------------------------------------------------
 # Build wheels
@@ -331,7 +329,7 @@ osx_build_wheels: &osx_build_wheels
 
 base_osx_sanity_check: &base_osx_sanity_check
   script:
-    - MODE=debug ./build-support/bin/travis-ci.sh -bm
+    - MODE=debug ./build-support/bin/travis-ci.sh -m
 
 # TODO: Update this to use 10.14 once it is available
 base_osx_10_12_sanity_check: &base_osx_10_12_sanity_check
@@ -385,7 +383,7 @@ py2_lint: &py2_lint
     - *py2_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py2
   script:
-    - ./build-support/bin/travis-ci.sh -fbmrt2
+    - ./build-support/bin/travis-ci.sh -fmrt2
 
 py3_lint: &py3_lint
   <<: *py3_linux_test_config
@@ -394,7 +392,7 @@ py3_lint: &py3_lint
     - *py3_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py3
   script:
-    - ./build-support/bin/travis-ci.sh -fbmrt
+    - ./build-support/bin/travis-ci.sh -fmrt
 
 # -------------------------------------------------------------------------
 # Deploy
@@ -452,7 +450,7 @@ py2_jvm_tests: &py2_jvm_tests
     - *py2_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py2
   script:
-    - ./build-support/bin/travis-ci.sh -bj2
+    - ./build-support/bin/travis-ci.sh -j2
 
 py3_jvm_tests: &py3_jvm_tests
   <<: *py3_linux_test_config
@@ -462,7 +460,7 @@ py3_jvm_tests: &py3_jvm_tests
     - *py3_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py3
   script:
-    - ./build-support/bin/travis-ci.sh -bj
+    - ./build-support/bin/travis-ci.sh -j
 
 # -------------------------------------------------------------------------
 # Platform specific tests
@@ -475,7 +473,7 @@ py2_osx_platform_tests: &py2_osx_platform_tests
     - *py2_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py2
   script:
-    - ./build-support/bin/travis-ci.sh -bz2
+    - ./build-support/bin/travis-ci.sh -z2
 
 py3_osx_platform_tests: &py3_osx_platform_tests
   <<: *py3_osx_test_config
@@ -484,7 +482,7 @@ py3_osx_platform_tests: &py3_osx_platform_tests
     - *py3_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py3
   script:
-    - ./build-support/bin/travis-ci.sh -bz
+    - ./build-support/bin/travis-ci.sh -z
 
 # -------------------------------------------------------------------------
 # Rust tests
@@ -558,7 +556,7 @@ cargo_audit: &cargo_audit
   sudo: required
   stage: *cron
   script:
-    - ./build-support/bin/travis-ci.sh -ba
+    - ./build-support/bin/travis-ci.sh -a
 
 # -------------------------------------------------------------------------
 # Test matrix
@@ -597,7 +595,7 @@ matrix:
         - *py2_linux_test_config_env
         - CACHE_NAME=linuxunittests.py2
       script:
-        - ./build-support/bin/travis-ci.sh -2blp
+        - ./build-support/bin/travis-ci.sh -2lp
 
     - <<: *py3_linux_test_config
       name: "Unit tests for pants and pants-plugins (Py3 PEX)"
@@ -605,7 +603,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=linuxunittests.py3
       script:
-        - ./build-support/bin/travis-ci.sh -blp
+        - ./build-support/bin/travis-ci.sh -lp
 
     - <<: *py2_linux_test_config
       name: "Python contrib tests (Py2 PEX)"
@@ -614,7 +612,7 @@ matrix:
         - *py2_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py2
       script:
-        - ./build-support/bin/travis-ci.sh -2bn
+        - ./build-support/bin/travis-ci.sh -2n
 
     # TODO: get this passing with a Python 3 PEX.
     - <<: *py2_linux_test_config
@@ -625,7 +623,7 @@ matrix:
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
         - CACHE_NAME=linuxcontribtests.py3
       script:
-        - ./build-support/bin/travis-ci.sh -bn2
+        - ./build-support/bin/travis-ci.sh -2n
 
 {{#py3_integration_shards}}
     - <<: *py3_linux_test_config
@@ -634,7 +632,7 @@ matrix:
         - *py3_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}
       script:
-        - ./build-support/bin/travis-ci.sh -bc -i {{.}}/{{py3_integration_shards_length}}
+        - ./build-support/bin/travis-ci.sh -c -i {{.}}/{{py3_integration_shards_length}}
 
 {{/py3_integration_shards}}
 {{#py2_blacklist_integration_shards}}
@@ -646,7 +644,7 @@ matrix:
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
         - CACHE_NAME=integrationshard{{.}}.py2blacklist
       script:
-        - ./build-support/bin/travis-ci.sh -bc2w -i {{.}}/{{py2_blacklist_integration_shards_length}}
+        - ./build-support/bin/travis-ci.sh -c2w -i {{.}}/{{py2_blacklist_integration_shards_length}}
 
 {{/py2_blacklist_integration_shards}}
 {{#cron_integration_shards}}
@@ -656,7 +654,7 @@ matrix:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard{{.}}
       script:
-        - ./build-support/bin/travis-ci.sh -bc2 -i {{.}}/{{cron_integration_shards_length}}
+        - ./build-support/bin/travis-ci.sh -c2 -i {{.}}/{{cron_integration_shards_length}}
 
 {{/cron_integration_shards}}
 
