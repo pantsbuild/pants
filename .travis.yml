@@ -27,13 +27,12 @@ env:
 stages:
   - &bootstrap Bootstrap Pants
   - name: &test Test Pants
-    if: type != cron
+    if: type == cron
   - name: &cron Cron
     if: type = cron
   - name: &build_stable Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
   - name: &build_unstable Deploy Pants Pex Unstable
-    if: tag IS NOT present AND type NOT IN (pull_request, cron)
 
 # -------------------------------------------------------------------------
 # Cache config
@@ -474,6 +473,7 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
     - CACHE_NAME=linuxpexdeployunstable
     - RUN_PANTS_FROM_PEX=1
     - PREPARE_DEPLOY=1
+    - PEX_VERBOSE=9
   script:
     - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
