@@ -8,13 +8,9 @@ from builtins import object
 from collections import namedtuple
 from textwrap import dedent
 
-from future.utils import text_type
-
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
-from pants.util.memo import memoized_method
-from pants.util.objects import Exactly, datatype
 
 
 class JvmToolMixin(object):
@@ -148,65 +144,6 @@ class JvmToolMixin(object):
     # definition of resolvable jvm binaries.
     jvm_tool = cls.JvmTool(register.scope, key, classpath, main, custom_rules)
     JvmToolMixin._jvm_tools.append(jvm_tool)
-
-  # TODO: Deprecate .register_jvm_tool()?
-  class JvmToolDeclaration(datatype([
-      ('tool_name', text_type),
-      # If the tool's `main` class name is supplied the tool classpath will be shaded!
-      ('main', Exactly(text_type, type(None))),
-      ('classpath', tuple),
-      ('custom_rules', tuple),
-  ])):
-    """A mostly-typed specification for a JVM tool.
-
-    This allows a specification for a JVM tool to be passed around verbatim across JvmToolMixin
-    subclasses.
-    """
-
-    def __new__(cls, tool_name, main=None, classpath=None, custom_rules=None):
-      return super(JvmToolMixin.JvmToolDeclaration, cls).__new__(
-        cls, text_type(tool_name), main, tuple(classpath or []), tuple(custom_rules or []))
-
-  class JvmToolDeclError(Exception): pass
-
-  @classmethod
-  def register_jvm_tool_decl(cls, register, decl, **kwargs):
-    """Register a `JvmToolDeclaration` with `.register_jvm_tool()`."""
-    if not isinstance(decl, cls.JvmToolDeclaration):
-      raise cls.JvmToolDeclError(
-        'decl {} must be an instance of {}.{}'
-        .format(decl, cls.__name__, cls.JvmToolDeclaration.__name__))
-    kwargs = dict(
-      classpath=list(decl.classpath),
-      custom_rules=list(decl.custom_rules)
-    )
-    if decl.main:
-      kwargs['main'] = decl.main
-    cls.register_jvm_tool(register,
-                          decl.tool_name,
-                          **kwargs)
-
-  class CombinedJvmToolsError(JvmToolDeclError): pass
-
-  @memoized_method
-  def ensure_combined_jvm_tool_classpath(self, tool_name, combined_jvm_tool_names):
-    """Get a single classpath for all tools returned by `combined_jvm_tool_names`.
-
-    Also check to ensure `tool_name` is a member of `combined_jvm_tool_names`.
-
-    This allows tools to be invoked one at a time, but with the combined classpath of all of
-    them. This allows creating nailgun instances for the tools which have the same fingerprint, and
-    allows a task to invoke multiple different JVM tools from the same nailgun instances. See #7089.
-    """
-    if tool_name not in combined_jvm_tool_names:
-      raise self.CombinedJvmToolsError(
-        "tool with name '{}' must be added to `combined_jvm_tool_names` "
-        "(which was: {})"
-        .format(tool_name, combined_jvm_tool_names))
-    cp = []
-    for component_tool_name in combined_jvm_tool_names:
-      cp.extend(self.tool_classpath(component_tool_name))
-    return cp
 
   @classmethod
   def prepare_tools(cls, round_manager):

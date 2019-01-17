@@ -14,9 +14,7 @@ from six import text_type
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
-from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
-from pants.backend.jvm.subsystems.zinc import ZINC_COMPILER_DECL
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -37,6 +35,7 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import (fast_relpath, fast_relpath_optional, maybe_read_file,
                                 safe_file_dump, safe_mkdir)
+from pants.util.memo import memoized_property
 
 
 #
@@ -140,7 +139,8 @@ class RscCompile(ZincCompile):
     rsc_toolchain_version = '0.0.0-446-c64e6937'
     scalameta_toolchain_version = '4.0.0'
 
-    rsc_decl = JvmToolMixin.JvmToolDeclaration(
+    cls.register_jvm_tool(
+      register,
       'rsc',
       classpath=[
           JarDependency(
@@ -153,7 +153,8 @@ class RscCompile(ZincCompile):
         Shader.exclude_package('rsc', recursive=True),
       ]
     )
-    metacp_decl = JvmToolMixin.JvmToolDeclaration(
+    cls.register_jvm_tool(
+      register,
       'metacp',
       classpath=[
           JarDependency(
@@ -166,7 +167,8 @@ class RscCompile(ZincCompile):
         Shader.exclude_package('scala', recursive=True),
       ]
     )
-    metai_decl = JvmToolMixin.JvmToolDeclaration(
+    cls.register_jvm_tool(
+      register,
       'metai',
       classpath=[
           JarDependency(
@@ -180,33 +182,27 @@ class RscCompile(ZincCompile):
       ]
     )
 
-    # Register all of these as "combined" JVM tools so that we can invoke their combined classpath
-    # in a single nailgun instance. We still invoke their classpaths separately when not using
-    # nailgun, however. Note that we have to register zinc again as in ZincCompile it is being
-    # accessed through the Zinc subsystem, but we want to invoke all of these as a combined tool
-    # through *this task's* implementation of JvmToolMixin.
-    # Note that registering as a "combined" JVM tool is only done by overriding
-    # combined_jvm_tool_names.
-    for decl in [rsc_decl, metacp_decl, metai_decl, ZINC_COMPILER_DECL]:
-      cls.register_jvm_tool_decl(register, decl)
-
-  def get_nailgunnable_combined_classpath(self, tool_name):
+  # TODO: allow @memoized_method to convert lists into tuples so they can be hashed!
+  @memoized_property
+  def _nailgunnable_combined_classpath(self):
     """Register all of the component tools of the rsc compile task as a "combined" jvm tool.
 
-    This allows us to invoke their combined classpath in a single nailgun instance. We still invoke
-    their classpaths separately when not using nailgun, however.
+    This allows us to invoke their combined classpath in a single nailgun instance (see #7089 and
+    #7092). We still invoke their classpaths separately when not using nailgun, however.
     """
-    return self.ensure_combined_jvm_tool_classpath(
-      tool_name,
-      # TODO: allow @memoized_method to convert lists into tuples so they can be hashed!
-      ('rsc', 'metai', 'metacp', ZINC_COMPILER_DECL.tool_name))
+    cp = []
+    for component_tool_name in ['rsc', 'metai', 'metacp']:
+      cp.extend(self.tool_classpath(component_tool_name))
+    # Add zinc's classpath so that it can be invoked from the same nailgun instance.
+    cp.extend(super(RscCompile, self).get_zinc_compiler_classpath())
+    return cp
 
   # Overrides the normal zinc compiler classpath, which only contains zinc.
   def get_zinc_compiler_classpath(self):
     return self.do_for_execution_strategy_variant({
       self.HERMETIC: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.SUBPROCESS: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
-      self.NAILGUN: lambda: self.get_nailgunnable_combined_classpath(ZINC_COMPILER_DECL.tool_name),
+      self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
     })
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
@@ -870,8 +866,7 @@ class RscCompile(ZincCompile):
         self.SUBPROCESS: lambda: self._runtool_nonhermetic(
           wu, self.tool_classpath(tool_name), main, tool_name, args, distribution),
         self.NAILGUN: lambda: self._runtool_nonhermetic(
-          wu, self.get_nailgunnable_combined_classpath(tool_name),
-          main, tool_name, args, distribution),
+          wu, self._nailgunnable_combined_classpath, main, tool_name, args, distribution),
       })
 
   def _run_metai_tool(self,
