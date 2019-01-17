@@ -11,12 +11,28 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 
 class RscCompileIntegration(BaseCompileIT):
-  def test_basic_binary(self):
+  def test_basic_binary_subprocess(self):
     with temporary_dir() as cache_dir:
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir]},
         'jvm-platform': {'compiler': 'rsc'},
         'compile.rsc': {'execution_strategy': 'subprocess'},
+      }
+
+      pants_run = self.run_pants(
+        ['compile',
+         'testprojects/src/scala/org/pantsbuild/testproject/mutual:bin',
+         ],
+        config)
+      self.assert_success(pants_run)
+
+  # TODO: determine if this is sufficient testing for the nailgun execution strategy.
+  def test_basic_binary_nailgun(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.rsc': {'write_to': [cache_dir]},
+        'jvm-platform': {'compiler': 'rsc'},
+        'compile.rsc': {'execution_strategy': 'nailgun'},
       }
 
       pants_run = self.run_pants(
