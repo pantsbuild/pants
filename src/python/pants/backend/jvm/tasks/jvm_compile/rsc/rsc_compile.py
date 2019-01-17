@@ -16,7 +16,7 @@ from pants.backend.jvm.subsystems.dependency_context import DependencyContext  #
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
-from pants.backend.jvm.subsystems.zinc import ZINC_COMPILER_DECL, Zinc
+from pants.backend.jvm.subsystems.zinc import ZINC_COMPILER_DECL
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -37,7 +37,6 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import (fast_relpath, fast_relpath_optional, maybe_read_file,
                                 safe_file_dump, safe_mkdir)
-from pants.util.meta import classproperty
 
 
 #
@@ -191,18 +190,24 @@ class RscCompile(ZincCompile):
     for decl in [rsc_decl, metacp_decl, metai_decl, ZINC_COMPILER_DECL]:
       cls.register_jvm_tool_decl(register, decl)
 
-  @classproperty
-  def combined_jvm_tool_names(cls):
+  def get_nailgunnable_combined_classpath(self, tool_name):
     """Register all of the component tools of the rsc compile task as a "combined" jvm tool.
 
     This allows us to invoke their combined classpath in a single nailgun instance. We still invoke
     their classpaths separately when not using nailgun, however.
     """
-    return ['rsc', 'metai', 'metacp', 'zinc']
+    return self.ensure_combined_jvm_tool_classpath(
+      tool_name,
+      # TODO: allow @memoized_method to convert lists into tuples so they can be hashed!
+      ('rsc', 'metai', 'metacp', ZINC_COMPILER_DECL.tool_name))
 
   # Overrides the normal zinc compiler classpath, which only contains zinc.
   def get_zinc_compiler_classpath(self):
-    return self.ensure_combined_jvm_tool_classpath(Zinc.ZINC_COMPILER_TOOL_NAME)
+    return self.do_for_execution_strategy_variant({
+      self.HERMETIC: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
+      self.SUBPROCESS: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
+      self.NAILGUN: lambda: self.get_nailgunnable_combined_classpath(ZINC_COMPILER_DECL.tool_name),
+    })
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
@@ -857,18 +862,17 @@ class RscCompile(ZincCompile):
 
   def _runtool(self, main, tool_name, args, distribution,
                tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
-    def workunit_factory(*args, **kwargs):
-      return self.context.new_workunit(tool_name, *args, **kwargs)
-    return self.do_for_execution_strategy_variant(workunit_factory, {
-      self.HERMETIC: lambda _wu: self._runtool_hermetic(
-        main, tool_name, args, distribution,
-        tgt=tgt, input_files=input_files, input_digest=input_digest, output_dir=output_dir),
-      self.SUBPROCESS: lambda wu: self._runtool_nonhermetic(
-        wu, self.tool_classpath(tool_name), main, tool_name, args, distribution),
-      self.NAILGUN: lambda wu: self._runtool_nonhermetic(
-        wu, self.ensure_combined_jvm_tool_classpath(tool_name),
-        main, tool_name, args, distribution),
-    })
+    with self.context.new_workunit(tool_name) as wu:
+      return self.do_for_execution_strategy_variant({
+        self.HERMETIC: lambda: self._runtool_hermetic(
+          main, tool_name, args, distribution,
+          tgt=tgt, input_files=input_files, input_digest=input_digest, output_dir=output_dir),
+        self.SUBPROCESS: lambda: self._runtool_nonhermetic(
+          wu, self.tool_classpath(tool_name), main, tool_name, args, distribution),
+        self.NAILGUN: lambda: self._runtool_nonhermetic(
+          wu, self.get_nailgunnable_combined_classpath(tool_name),
+          main, tool_name, args, distribution),
+      })
 
   def _run_metai_tool(self,
                       distribution,

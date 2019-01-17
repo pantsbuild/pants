@@ -13,8 +13,7 @@ from future.utils import text_type
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
-from pants.util.memo import memoized_property
-from pants.util.meta import classproperty
+from pants.util.memo import memoized_method
 from pants.util.objects import Exactly, datatype
 
 
@@ -158,7 +157,11 @@ class JvmToolMixin(object):
       ('classpath', tuple),
       ('custom_rules', tuple),
   ])):
-    """A mostly-typed specification for a JVM tool. Can be passed around across python modules."""
+    """A mostly-typed specification for a JVM tool.
+
+    This allows a specification for a JVM tool to be passed around verbatim across JvmToolMixin
+    subclasses.
+    """
 
     def __new__(cls, tool_name, main=None, classpath=None, custom_rules=None):
       return super(JvmToolMixin.JvmToolDeclaration, cls).__new__(
@@ -185,36 +188,25 @@ class JvmToolMixin(object):
 
   class CombinedJvmToolsError(JvmToolDeclError): pass
 
-  @classproperty
-  def combined_jvm_tool_names(cls):
-    """Return a list of tool names which can be invoked as a single jar.
+  @memoized_method
+  def ensure_combined_jvm_tool_classpath(self, tool_name, combined_jvm_tool_names):
+    """Get a single classpath for all tools returned by `combined_jvm_tool_names`.
 
-    This allows tools to be invoked one at a time, but with the combined classpath of all of them
-    using ensure_combined_jvm_tool_classpath(). This allows creating nailgun instances for the
-    tools which have the same fingerprint, and allows a task to invoke multiple different JVM tools
-    from the same nailgun instances. See #7089.
+    Also check to ensure `tool_name` is a member of `combined_jvm_tool_names`.
+
+    This allows tools to be invoked one at a time, but with the combined classpath of all of
+    them. This allows creating nailgun instances for the tools which have the same fingerprint, and
+    allows a task to invoke multiple different JVM tools from the same nailgun instances. See #7089.
     """
-    raise NotImplementedError('combined_jvm_tool_names is not implemented, see '
-                              'https://github.com/pantsbuild/pants/pull/7092')
-
-  @memoized_property
-  def _combined_jvm_tool_classpath(self):
-    cp = []
-    for tool_name in self.combined_jvm_tool_names:
-      cp.extend(self.tool_classpath(tool_name))
-    return cp
-
-  def ensure_combined_jvm_tool_classpath(self, tool_name):
-    """Get a single classpath for all tools returned by `combined_jvm_tool_names()`.
-
-    Also check to ensure the tool was registered for consumption as a combined JVM tool.
-    """
-    if tool_name not in self.combined_jvm_tool_names:
+    if tool_name not in combined_jvm_tool_names:
       raise self.CombinedJvmToolsError(
-        "tool with name '{}' must be added to {}.combined_jvm_tool_names "
-        "(known keys are: {})"
-        .format(tool_name, type(self).__name__, self.combined_jvm_tool_names))
-    return self._combined_jvm_tool_classpath
+        "tool with name '{}' must be added to `combined_jvm_tool_names` "
+        "(which was: {})"
+        .format(tool_name, combined_jvm_tool_names))
+    cp = []
+    for component_tool_name in combined_jvm_tool_names:
+      cp.extend(self.tool_classpath(component_tool_name))
+    return cp
 
   @classmethod
   def prepare_tools(cls, round_manager):
