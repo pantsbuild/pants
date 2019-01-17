@@ -506,7 +506,14 @@ py3_osx_platform_tests: &py3_osx_platform_tests
 # Rust tests
 # -------------------------------------------------------------------------
 
+base_rust_tests: &base_rust_tests
+  stage: *test
+  before_script:
+    - ulimit -c unlimited
+    - ulimit -n 8192
+
 linux_rust_tests: &linux_rust_tests
+  <<: *base_rust_tests
   <<: *linux_with_fuse
   <<: *native_engine_cache_config
   name: "Linux Rust tests (No PEX)"
@@ -517,25 +524,21 @@ linux_rust_tests: &linux_rust_tests
   sudo: required
   language: python
   python: *python3_version
-  stage: *test
-  before_script:
-    - ulimit -c unlimited
-    - ulimit -n 8192
   script:
     - ./build-support/bin/travis-ci.sh -be
 
 osx_rust_tests: &osx_rust_tests
+  <<: *base_rust_tests
+  name: "OSX Rust tests (No PEX)"
+  env:
+    - CACHE_NAME=macosrusttests
   os: osx
   # Fuse actually works on this image. It hangs on many others.
   osx_image: xcode8.3
-  name: "OSX Rust tests (No PEX)"
-  stage: *test
   addons:
     homebrew:
       casks:
       - osxfuse
-  env:
-    - CACHE_NAME=macosrusttests
   script:
     - ./build-support/bin/travis-ci.sh -be
 
