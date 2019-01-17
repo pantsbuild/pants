@@ -255,7 +255,7 @@ base_linux_build_engine: &base_linux_build_engine
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest
       sh -c "./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f"
-    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.linux
 
 py2_linux_build_engine: &py2_linux_build_engine
   <<: *py2_linux_config
@@ -290,7 +290,7 @@ base_osx_build_engine: &base_osx_build_engine
     # With no args ci.sh just bootstraps a pants.pex. We also build fs_util, to take advantage
     # of the rust code built during bootstrapping.
     - ./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f
-    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.osx
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
