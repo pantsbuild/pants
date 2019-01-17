@@ -529,6 +529,11 @@ osx_rust_tests: &osx_rust_tests
   osx_image: xcode8.3
   name: "OSX Rust tests (No PEX)"
   stage: *test
+  # N.B. Travis's brew addon has a bug where it will skip installing if the section `before_install` is 
+  # not present. So we add `before_install` with a no-op.
+  # See https://travis-ci.community/t/homebrew-addon-does-not-work-if-before-install-step-is-skipped/1564
+  before_install:
+    - :
   addons:
     homebrew:
       casks:
