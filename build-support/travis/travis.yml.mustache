@@ -215,8 +215,6 @@ base_linux_build_engine: &base_linux_build_engine
   stage: *bootstrap
   services:
     - docker
-  env:
-    - &base_linux_build_engine_env PREPARE_DEPLOY=1  # To deploy fs_util.
   before_script:
     - ulimit -c unlimited
   script:
@@ -242,7 +240,9 @@ py2_linux_build_engine: &py2_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2 PEX)"
   env:
-    - *base_linux_build_engine_env
+    # NB: Only the Py2 shard sets PREPARE_DEPLOY to cause the fs_util binary to be uploaded to S3:
+    # either linux shard could upload this binary, since it does not depend on python at all.
+    - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py2
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py2.linux
     - BOOTSTRAP_ARGS='-2'
@@ -252,7 +252,6 @@ py3_linux_build_engine: &py3_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3 PEX)"
   env:
-    - *base_linux_build_engine_env
     - CACHE_NAME=linuxpexbuild.py3
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.linux
     - BOOTSTRAP_ARGS=''
