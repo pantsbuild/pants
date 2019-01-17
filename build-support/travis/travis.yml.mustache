@@ -206,24 +206,27 @@ linux_with_fuse: &linux_with_fuse
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
 
-# -------------------------------------------------------------------------
-# Bootstrap engine shards
-# -------------------------------------------------------------------------
-
-base_linux_build_engine: &base_linux_build_engine
-  <<: *native_engine_cache_config
-  stage: *bootstrap
+travis_docker_image: &travis_docker_image
   services:
     - docker
   before_script:
     - ulimit -c unlimited
-  script:
     - docker build --rm -t travis_ci
       --build-arg "TRAVIS_USER=$(id -un)"
       --build-arg "TRAVIS_UID=$(id -u)"
       --build-arg "TRAVIS_GROUP=$(id -gn)"
       --build-arg "TRAVIS_GID=$(id -g)"
       build-support/docker/travis_ci/
+
+# -------------------------------------------------------------------------
+# Bootstrap engine shards
+# -------------------------------------------------------------------------
+
+base_linux_build_engine: &base_linux_build_engine
+  <<: *native_engine_cache_config
+  <<: *travis_docker_image
+  stage: *bootstrap
+  script:
     # Note that:
     # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
     # * With no args ci.sh just bootstraps a pants.pex.
@@ -302,10 +305,11 @@ base_build_wheels: &base_build_wheels
   stage: *test
   env:
     - &base_build_wheels_env RUN_PANTS_FROM_PEX=1 PREPARE_DEPLOY=1
-  script:
-    - ./build-support/bin/release.sh -n
 
 linux_build_wheels: &linux_build_wheels
+  # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize
+  # compatibility. This is a Py2 shard, so it is not subject to #6985.
+  <<: *travis_docker_image
   <<: *py2_linux_test_config
   <<: *base_build_wheels
   name: "Build Linux wheels (No PEX)"
@@ -313,6 +317,12 @@ linux_build_wheels: &linux_build_wheels
     - *py2_linux_test_config_env
     - *base_build_wheels_env
     - CACHE_NAME=linuxwheelsbuild
+  script:
+    - docker run --rm -t
+      -v "${HOME}:/travis/home"
+      -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest
+      sh -c "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
 
 osx_build_wheels: &osx_build_wheels
   <<: *py2_osx_test_config
@@ -323,6 +333,8 @@ osx_build_wheels: &osx_build_wheels
     - *py2_osx_test_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild
+  script:
+    - ./build-support/bin/release.sh -n
 
 # -------------------------------------------------------------------------
 # OSX sanity checks
