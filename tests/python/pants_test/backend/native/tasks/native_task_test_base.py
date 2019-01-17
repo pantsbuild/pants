@@ -9,7 +9,7 @@ from textwrap import dedent
 
 from pants.backend.native import register
 from pants.backend.native.targets.native_library import CppLibrary
-from pants.backend.native.tasks.native_external_library_fetch import NativeExternalLibraryFetch
+from pants.backend.native.tasks.conan_fetch import ConanFetch
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -59,7 +59,7 @@ class NativeCompileTestMixin(object):
                             **kwargs)
 
   def prepare_context_for_compile(self, target_roots, for_task_types=None, **kwargs):
-    native_elf_fetch_task_type = self.synthesize_task_subtype(NativeExternalLibraryFetch,
+    native_elf_fetch_task_type = self.synthesize_task_subtype(ConanFetch,
                                                               'native_elf_fetch_scope')
 
     for_task_types = list(for_task_types or ()) + [native_elf_fetch_task_type]

@@ -285,7 +285,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     Useful for invalidating unchanging targets being executed beneath changing task
     options that affect outputted artifacts.
 
-    A task's fingerprint is only valid afer the task has been fully initialized.
+    A task's fingerprint is only valid after the task has been fully initialized.
     """
     hasher = sha1()
     hasher.update(self.stable_name().encode('utf-8'))

@@ -59,7 +59,7 @@ class FingerprintStrategy(AbstractClass):
 
 
 class DefaultFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
-  """The default FingerprintStrategy, which delegates to target.payload.invalidation_hash().
+  """The default FingerprintStrategy, which delegates to target.payload.fingerprint().
 
   :API: public
   """

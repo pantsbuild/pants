@@ -15,6 +15,7 @@ from pants.util.meta import AbstractClass
 class NativeLibrary(Target, AbstractClass):
   """A class wrapping targets containing sources for C-family languages and related code."""
 
+  # TODO: replace this awkward classmethod with a mixin!
   @classmethod
   def produces_ctypes_native_library(cls, target):
     return isinstance(target, cls) and bool(target.ctypes_native_library)
