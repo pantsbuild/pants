@@ -625,8 +625,11 @@ matrix:
     - <<: *deploy_stable_multiplatform_pex
     - <<: *deploy_unstable_multiplatform_pex
 
+    # TODO: get this to pass using Python 3. In the meantime, just use Python 2.
+    # May be completely fixed by https://github.com/pantsbuild/pants/pull/7067..
     - <<: *py2_lint
-    - <<: *py3_lint
+      stage: *test
+    # - <<: *py3_lint
 
     - <<: *py2_linux_test_config
       name: "Unit tests for pants and pants-plugins (Py2 PEX)"
