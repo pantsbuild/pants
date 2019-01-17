@@ -546,18 +546,11 @@ linux_rust_tests: &linux_rust_tests
     - ./build-support/bin/travis-ci.sh -be
 
 osx_rust_tests: &osx_rust_tests
+  os: osx
   # Fuse actually works on this image. It hangs on many others.
   osx_image: xcode8.3
   name: "OSX Rust tests (No PEX)"
   stage: *bootstrap
-  language: generic
-  # N.B. Travis's brew addon has a bug where it will skip installing if the section `before_install` is 
-  # not present. So we add `before_install` with a no-op.
-  # See https://travis-ci.community/t/homebrew-addon-does-not-work-if-before-install-step-is-skipped/1564
-  before_install:
-    - echo ''
-  before_script:
-    - echo ''
   addons:
     homebrew:
       casks:
