@@ -320,6 +320,7 @@ py3_osx_build_engine: &py3_osx_build_engine
 # -------------------------------------------------------------------------
 
 base_build_wheels: &base_build_wheels
+  stage: *test
   env:
     - &base_build_wheels_env RUN_PANTS_FROM_PEX=1 PREPARE_DEPLOY=1
   script:
@@ -338,7 +339,6 @@ osx_build_wheels: &osx_build_wheels
   <<: *py2_osx_test_config
   <<: *base_build_wheels
   name: "Build OSX wheels (No PEX)"
-  stage: *test
   osx_image: xcode8
   env:
     - *py2_osx_test_config_env
