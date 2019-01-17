@@ -236,8 +236,6 @@ base_linux_build_engine: &base_linux_build_engine
   stage: *bootstrap
   services:
     - docker
-  env:
-    - &base_linux_build_engine_env PREPARE_DEPLOY=1  # To deploy fs_util.
   before_script:
     - ulimit -c unlimited
   script:
@@ -263,7 +261,10 @@ py2_linux_build_engine: &py2_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2 PEX)"
   env:
-    - *base_linux_build_engine_env
+    # NB: Only the Py2 shard sets PREPARE_DEPLOY to cause its release wheels and fs_util binary to
+    # be uploaded to S3. This needs to be the Py2 shard due to:
+    #   https://github.com/pantsbuild/pants/issues/6985
+    - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py2
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py2.linux
     - BOOTSTRAP_ARGS='-2'
@@ -273,7 +274,6 @@ py3_linux_build_engine: &py3_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3 PEX)"
   env:
-    - *base_linux_build_engine_env
     - CACHE_NAME=linuxpexbuild.py3
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py3.linux
     - BOOTSTRAP_ARGS=''
@@ -317,33 +317,38 @@ py3_osx_build_engine: &py3_osx_build_engine
     - BOOTSTRAP_ARGS=''
 
 # -------------------------------------------------------------------------
-# Build wheels
+# Test wheels
 # -------------------------------------------------------------------------
 
-base_build_wheels: &base_build_wheels
+base_test_wheels: &base_test_wheels
   stage: *test
   env:
-    - &base_build_wheels_env RUN_PANTS_FROM_PEX=1 PREPARE_DEPLOY=1
+    - &base_test_wheels_env RUN_PANTS_FROM_PEX=1
   script:
+    # Runs a dry run release to test that all wheels are installable.
+    #
+    # Note that these shards do not actually deploy the wheels to S3 via `PREPARE_DEPLOY`: that
+    # is accomplished in the bootstrap shardis, which necessarily build the wheels in order to
+    # build a pex.
     - ./build-support/bin/release.sh -n
 
-linux_build_wheels: &linux_build_wheels
+linux_test_wheels: &linux_test_wheels
   <<: *py2_linux_test_config
-  <<: *base_build_wheels
-  name: "Build Linux wheels (No PEX)"
+  <<: *base_test_wheels
+  name: "Test Linux wheels (No PEX)"
   env:
     - *py2_linux_test_config_env
-    - *base_build_wheels_env
+    - *base_test_wheels_env
     - CACHE_NAME=linuxwheelsbuild
 
-osx_build_wheels: &osx_build_wheels
+osx_test_wheels: &osx_test_wheels
   <<: *py2_osx_test_config
-  <<: *base_build_wheels
-  name: "Build OSX wheels (No PEX)"
+  <<: *base_test_wheels
+  name: "Test OSX wheels (No PEX)"
   osx_image: xcode8
   env:
     - *py2_osx_test_config_env
-    - *base_build_wheels_env
+    - *base_test_wheels_env
     - CACHE_NAME=osxwheelsbuild
 
 # -------------------------------------------------------------------------
@@ -593,8 +598,8 @@ matrix:
     - <<: *py2_osx_build_engine
     - <<: *py3_osx_build_engine
 
-    - <<: *linux_build_wheels
-    - <<: *osx_build_wheels
+    - <<: *linux_test_wheels
+    - <<: *osx_test_wheels
 
     - <<: *py2_osx_10_12_sanity_check
     - <<: *py3_osx_10_12_sanity_check
