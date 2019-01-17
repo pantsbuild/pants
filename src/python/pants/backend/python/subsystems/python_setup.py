@@ -26,10 +26,12 @@ class PythonSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonSetup, cls).register_options(register)
-    register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3', 'CPython>=3.6,<4'], type=list,
+    # TODO: ORd bounds do not work in all situations, so this currently continues to constrain
+    # to Py2 by default. See https://github.com/pantsbuild/pants/issues/7097
+    register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3'], type=list,
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
-                  "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
+                  "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3) "
                   "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
                   "be ORed together. These constraints are applied in addition to any "
                   "compatibilities required by the relevant targets.")
