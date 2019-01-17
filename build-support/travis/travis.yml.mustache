@@ -300,46 +300,30 @@ py3_osx_build_engine: &py3_osx_build_engine
 # -------------------------------------------------------------------------
 
 base_build_wheels: &base_build_wheels
+  stage: *test
   env:
     - &base_build_wheels_env RUN_PANTS_FROM_PEX=1 PREPARE_DEPLOY=1
   script:
     - ./build-support/bin/release.sh -n
 
-py2_linux_build_wheels: &py2_linux_build_wheels
+linux_build_wheels: &linux_build_wheels
   <<: *py2_linux_test_config
   <<: *base_build_wheels
-  name: "Build Linux wheels (Py2 PEX)"
+  name: "Build Linux wheels (No PEX)"
   env:
     - *py2_linux_test_config_env
     - *base_build_wheels_env
-    - CACHE_NAME=linuxwheelsbuild.py2
+    - CACHE_NAME=linuxwheelsbuild
 
-py3_linux_build_wheels: &py3_linux_build_wheels
-  <<: *py3_linux_test_config
-  <<: *base_build_wheels
-  name: "Build Linux wheels (Py3 PEX)"
-  env:
-    - *py3_linux_test_config_env
-    - *base_build_wheels_env
-    - CACHE_NAME=linuxwheelsbuild.py3
-
-py2_osx_build_wheels: &py2_osx_build_wheels
+osx_build_wheels: &osx_build_wheels
   <<: *py2_osx_test_config
   <<: *base_build_wheels
-  name: "Build OSX wheels (Py2 PEX)"
+  name: "Build OSX wheels (No PEX)"
+  osx_image: xcode8
   env:
     - *py2_osx_test_config_env
     - *base_build_wheels_env
-    - CACHE_NAME=osxwheelsbuild.py2
-
-py3_osx_build_wheels: &py3_osx_build_wheels
-  <<: *py3_osx_test_config
-  <<: *base_build_wheels
-  name: "Build OSX wheels (Py3 PEX)"
-  env:
-    - *py3_osx_test_config_env
-    - *base_build_wheels_env
-    - CACHE_NAME=osxwheelsbuild.py3
+    - CACHE_NAME=osxwheelsbuild
 
 # -------------------------------------------------------------------------
 # OSX sanity checks
@@ -556,16 +540,8 @@ matrix:
     - <<: *py2_osx_build_engine
     - <<: *py3_osx_build_engine
 
-    # TODO(6450): add support for Py3 in the release script. This can't be done until
-    # Pants is ready to be built and released as a Py3 wheel.
-    - <<: *py2_linux_build_wheels
-      stage: *test
-    # - <<: *py3_linux_build_wheels
-
-    # TODO(6450): see above about adding support for Py3 in release script.
-    - <<: *py2_osx_build_wheels
-      stage: *test
-    # - <<: *py3_osx_build_wheels
+    - <<: *linux_build_wheels
+    - <<: *osx_build_wheels
 
     - <<: *py2_osx_10_12_sanity_check
     - <<: *py3_osx_10_12_sanity_check
