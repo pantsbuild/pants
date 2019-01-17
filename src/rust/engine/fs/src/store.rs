@@ -666,7 +666,6 @@ mod local {
   use super::{EntryType, ShrinkBehavior};
 
   use boxfuture::{BoxFuture, Boxable};
-  use byteorder::{ByteOrder, LittleEndian};
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::future;
@@ -787,9 +786,12 @@ mod local {
       until_secs_since_epoch: u64,
       txn: &mut RwTransaction<'_>,
     ) -> Result<(), lmdb::Error> {
-      let mut buf = [0; 8];
-      LittleEndian::write_u64(&mut buf, until_secs_since_epoch);
-      txn.put(database, &fingerprint.as_ref(), &buf, WriteFlags::empty())
+      txn.put(
+        database,
+        &fingerprint.as_ref(),
+        &until_secs_since_epoch.to_le_bytes(),
+        WriteFlags::empty(),
+      )
     }
 
     ///
@@ -886,7 +888,11 @@ mod local {
           // when we delete from lmdb to track how much we've freed).
           let lease_until_unix_timestamp = txn
             .get(*lease_database, &key)
-            .map(|b| LittleEndian::read_u64(b))
+            .map(|b| {
+              let mut array = [0_u8; 8];
+              array.copy_from_slice(b);
+              u64::from_le_bytes(array)
+            })
             .unwrap_or_else(|e| match e {
               NotFound => 0,
               e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),
