@@ -554,7 +554,7 @@ osx_rust_tests: &osx_rust_tests
   # not present. So we add `before_install` with a no-op.
   # See https://travis-ci.community/t/homebrew-addon-does-not-work-if-before-install-step-is-skipped/1564
   before_install:
-    - :
+    - echo ''
   addons:
     homebrew:
       casks:
