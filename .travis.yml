@@ -27,7 +27,7 @@ env:
 stages:
   - &bootstrap Bootstrap Pants
   - name: &test Test Pants
-    if: type == cron
+    if: type != cron
   - name: &cron Cron
     if: type = cron
   - name: &build_stable Deploy Pants Pex
@@ -233,7 +233,7 @@ linux_with_fuse: &linux_with_fuse
 
 base_linux_build_engine: &base_linux_build_engine
   <<: *native_engine_cache_config
-  stage: *test
+  stage: *bootstrap
   services:
     - docker
   env:
@@ -280,7 +280,7 @@ py3_linux_build_engine: &py3_linux_build_engine
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
-  stage: *test
+  stage: *bootstrap
   # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
   # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
   # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
@@ -550,7 +550,7 @@ osx_rust_tests: &osx_rust_tests
   # Fuse actually works on this image. It hangs on many others.
   osx_image: xcode8.3
   name: "OSX Rust tests (No PEX)"
-  stage: *bootstrap
+  stage: *test
   addons:
     homebrew:
       casks:
