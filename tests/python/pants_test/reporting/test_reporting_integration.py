@@ -4,14 +4,23 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import json
 import os.path
 import re
 import unittest
 from builtins import open
 
+from future.utils import PY2
 from parameterized import parameterized
 
+from pants.util.contextutil import http_server
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+
+
+if PY2:
+  from BaseHTTPServer import BaseHTTPRequestHandler
+else:
+  from http.server import BaseHTTPRequestHandler
 
 
 _HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key_hash,phase,valid\n'
@@ -154,3 +163,46 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     self.assert_success(pants_run)
     self.assertIn('Cumulative Timings', pants_run.stderr_data)
     self.assertNotIn('Cumulative Timings', pants_run.stdout_data)
+
+  def test_zipkin_reporter(self):
+    with http_server(ZipkinHandler) as port:
+      endpoint = "http://localhost:{}".format(port)
+      command = [
+        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        '--reporting-zipkin-encoding=json',
+        'cloc',
+        'src/python/pants:version'
+      ]
+
+      pants_run = self.run_pants(command)
+      self.assert_success(pants_run)
+
+      num_of_traces = len(ZipkinHandler._traces)
+      self.assertEqual(num_of_traces, 1)
+
+      trace = ZipkinHandler._traces[-1]
+      main_span = self.find_span_by_name(trace, 'main')
+      self.assertEqual(len(main_span), 1)
+
+      parent_id = main_span[0]
+      main_children = self.find_span_by_parentId(trace, parent_id)
+      self.assertTrue(main_children)
+      self.assertTrue(any(name == 'cloc' for name in main_children))
+
+  @staticmethod
+  def find_span_by_name(trace, name):
+    return [span['id'] for span in trace if span['name'] == name]
+
+  @staticmethod
+  def find_span_by_parentId(trace, parent_id):
+    return [span['name'] for span in trace if span.get('parentId') == parent_id]
+
+
+class ZipkinHandler(BaseHTTPRequestHandler):
+  _traces = []
+
+  def do_POST(self):
+    trace = json.loads(self.rfile.read(int(self.headers.getheader('content-length'))))
+    self.__class__._traces.append(trace)
+    code = 200 if trace else 404
+    self.send_response(code)

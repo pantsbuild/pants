@@ -16,6 +16,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python:parameterized',
+    '3rdparty/python:py-zipkin',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test'
   ],
