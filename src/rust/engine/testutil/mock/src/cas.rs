@@ -408,7 +408,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
                       "Bad fingerprint in resource name: {}: {}",
                       parts[4], err
                     )),
-                  ))
+                  ));
                 }
               };
               let size = match parts[5].parse::<usize>() {
@@ -417,7 +417,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
                   return Err(grpcio::RpcStatus::new(
                     grpcio::RpcStatusCode::InvalidArgument,
                     Some(format!("Bad size in resource name: {}: {}", parts[5], err)),
-                  ))
+                  ));
                 }
               };
               if size != bytes.len() {

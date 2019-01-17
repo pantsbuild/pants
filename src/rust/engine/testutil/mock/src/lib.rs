@@ -30,13 +30,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use bazel_protos;
-
-use futures;
-use grpcio;
-
-use protobuf;
-
 mod cas;
 pub use crate::cas::StubCAS;
 pub mod execution_server;

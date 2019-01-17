@@ -296,11 +296,10 @@ impl Store {
   ) -> BoxFuture<UploadSummary, String> {
     let start_time = Instant::now();
 
-    let remote = match self.remote {
-      Some(ref remote) => remote,
-      None => {
-        return future::err("Cannot ensure remote has blobs without a remote".to_owned()).to_boxed()
-      }
+    let remote = if let Some(ref remote) = self.remote {
+      remote
+    } else {
+      return future::err("Cannot ensure remote has blobs without a remote".to_owned()).to_boxed();
     };
 
     let mut expanding_futures = Vec::new();
@@ -315,10 +314,10 @@ impl Store {
           expanding_futures.push(self.expand_directory(digest));
         }
         Ok(None) => {
-          return future::err(format!("Failed to upload digest {:?}: Not found", digest)).to_boxed()
+          return future::err(format!("Failed to upload digest {:?}: Not found", digest)).to_boxed();
         }
         Err(err) => {
-          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err)).to_boxed()
+          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err)).to_boxed();
         }
       };
     }
@@ -494,7 +493,7 @@ impl Store {
           future::join_all(
             directory
               .get_directories()
-              .into_iter()
+              .iter()
               .map(move |subdir| {
                 store.clone().expand_directory_helper(
                   try_future!(subdir.get_digest().into()),
@@ -634,7 +633,7 @@ impl Store {
     let dir_futures = future::join_all(
       directory
         .get_directories()
-        .into_iter()
+        .iter()
         .map(move |dir_node| {
           let digest = try_future!(dir_node.get_digest().into());
           let path = path_so_far.join(dir_node.get_name());
@@ -736,7 +735,7 @@ mod local {
             return Err(format!(
               "Error reading from store when determining type of fingerprint {}: {}",
               fingerprint, err
-            ))
+            ));
           }
         };
       }
@@ -751,7 +750,7 @@ mod local {
           return Err(format!(
             "Error reading from store when determining type of fingerprint {}: {}",
             fingerprint, err
-          ))
+          ));
         }
       };
       Ok(None)

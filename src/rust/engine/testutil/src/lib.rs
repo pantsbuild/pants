@@ -30,13 +30,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use bazel_protos;
-use bytes;
-
-use hashing;
-
-use sha2;
-
 use bytes::Bytes;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
@@ -46,7 +39,7 @@ pub mod data;
 pub mod file;
 
 pub fn owned_string_vec(args: &[&str]) -> Vec<String> {
-  args.into_iter().map(|s| s.to_string()).collect()
+  args.iter().map(|s| s.to_string()).collect()
 }
 
 pub fn as_byte_owned_vec(str: &str) -> Vec<u8> {

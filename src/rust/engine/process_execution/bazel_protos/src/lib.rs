@@ -6,9 +6,6 @@
 #[macro_use]
 extern crate prost_derive;
 
-use hashing;
-use protobuf;
-
 mod gen;
 pub use crate::gen::*;
 
