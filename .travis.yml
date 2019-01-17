@@ -232,7 +232,10 @@ travis_docker_image: &travis_docker_image
     - docker
   before_script:
     - ulimit -c unlimited
-    - docker build --rm -t travis_ci
+  script:
+    # NB: This script definition is very likely to be overridden in a consumer, so we alias it
+    # for re-inclusion.
+    - &travis_docker_image_launch docker build --rm -t travis_ci
       --build-arg "TRAVIS_USER=$(id -un)"
       --build-arg "TRAVIS_UID=$(id -u)"
       --build-arg "TRAVIS_GROUP=$(id -gn)"
@@ -248,6 +251,7 @@ base_linux_build_engine: &base_linux_build_engine
   <<: *travis_docker_image
   stage: *bootstrap
   script:
+    - *travis_docker_image_launch
     # Note that:
     # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
     # * With no args ci.sh just bootstraps a pants.pex.
@@ -339,6 +343,7 @@ linux_build_wheels: &linux_build_wheels
     - *base_build_wheels_env
     - CACHE_NAME=linuxwheelsbuild
   script:
+    - *travis_docker_image_launch
     - docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
