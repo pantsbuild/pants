@@ -528,6 +528,7 @@ py3_osx_platform_tests: &py3_osx_platform_tests
 # -------------------------------------------------------------------------
 
 base_rust_tests: &base_rust_tests
+  <<: *native_engine_cache_config
   stage: *test
   before_script:
     - ulimit -c unlimited
@@ -536,7 +537,6 @@ base_rust_tests: &base_rust_tests
 linux_rust_tests: &linux_rust_tests
   <<: *base_rust_tests
   <<: *linux_with_fuse
-  <<: *native_engine_cache_config
   name: "Linux Rust tests (No PEX)"
   env:
     - CACHE_NAME=linuxrusttests
