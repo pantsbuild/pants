@@ -15,7 +15,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, datatype
 
 
 class JvmToolMixin(object):
@@ -152,11 +152,12 @@ class JvmToolMixin(object):
 
   # TODO: Deprecate .register_jvm_tool()?
   class JvmToolDeclaration(datatype([
-    ('tool_name', text_type),
-    'main',                     # Optional
-    ('classpath', tuple),
-    ('custom_rules', tuple),
-])):
+      ('tool_name', text_type),
+      # If the tool's `main` class name is supplied the tool classpath will be shaded!
+      ('main', Exactly(text_type, type(None))),
+      ('classpath', tuple),
+      ('custom_rules', tuple),
+  ])):
     """A mostly-typed specification for a JVM tool. Can be passed around across python modules."""
 
     def __new__(cls, tool_name, main=None, classpath=None, custom_rules=None):
@@ -193,9 +194,8 @@ class JvmToolMixin(object):
     tools which have the same fingerprint, and allows a task to invoke multiple different JVM tools
     from the same nailgun instances. See #7089.
     """
-    raise NotImplementedError(
-      'combined_jvm_tool_names must be implemented to use multiple JVM tools '
-      'with the nailgun execution strategy!')
+    raise NotImplementedError('combined_jvm_tool_names is not implemented, see '
+                              'https://github.com/pantsbuild/pants/pull/7092')
 
   @memoized_property
   def _combined_jvm_tool_classpath(self):
