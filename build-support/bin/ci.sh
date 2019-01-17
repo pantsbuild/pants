@@ -118,7 +118,7 @@ else
 fi
 banner "Using Python ${py_version_number} to execute spawned subprocesses (e.g. tests)"
 
-if [[ "${run_bootstrap:-true}" == "true" ]]; then
+if [[ "${run_bootstrap:-false}" == "true" ]]; then
   start_travis_section "Bootstrap" "Bootstrapping pants as a Python ${py_version_number} PEX"
   (
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
