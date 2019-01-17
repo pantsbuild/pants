@@ -26,7 +26,6 @@ stages:
   - name: &build_stable Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
   - name: &build_unstable Deploy Pants Pex Unstable
-    if: tag IS NOT present AND type NOT IN (pull_request, cron)
 
 # -------------------------------------------------------------------------
 # Cache config
