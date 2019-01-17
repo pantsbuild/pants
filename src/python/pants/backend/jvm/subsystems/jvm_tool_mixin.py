@@ -8,9 +8,13 @@ from builtins import object
 from collections import namedtuple
 from textwrap import dedent
 
+from future.utils import text_type
+
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
+from pants.util.memo import memoized_property
+from pants.util.objects import datatype
 
 
 class JvmToolMixin(object):
@@ -144,6 +148,78 @@ class JvmToolMixin(object):
     # definition of resolvable jvm binaries.
     jvm_tool = cls.JvmTool(register.scope, key, classpath, main, custom_rules)
     JvmToolMixin._jvm_tools.append(jvm_tool)
+
+  # TODO: Deprecate .register_jvm_tool()?
+  class JvmToolDeclaration(datatype([
+    ('tool_name', text_type),
+    'main',
+    ('classpath', tuple),
+    ('custom_rules', tuple),
+])):
+    """A specification for a JVM tool."""
+
+    def __new__(cls, tool_name, main=None, classpath=None, custom_rules=None):
+      return super(JvmToolMixin.JvmToolDeclaration, cls).__new__(
+        cls, text_type(tool_name), main, tuple(classpath or []), tuple(custom_rules or []))
+
+  class JvmToolDeclError(Exception): pass
+
+  @classmethod
+  def register_jvm_tool_decl(cls, register, decl, **kwargs):
+    """Register a `JvmToolDeclaration` with `.register_jvm_tool()`."""
+    if not isinstance(decl, cls.JvmToolDeclaration):
+      raise cls.JvmToolDeclError(
+        'decl {} must be an instance of {}.{}'
+        .format(decl, cls.__name__, cls.JvmToolDeclaration.__name__))
+    kwargs = dict(
+      classpath=list(decl.classpath),
+      custom_rules=list(decl.custom_rules)
+    )
+    if decl.main:
+      kwargs['main'] = decl.main
+    cls.register_jvm_tool(register,
+                          decl.tool_name,
+                          **kwargs)
+
+  class CombinedJvmToolsError(JvmToolDeclError): pass
+
+  _combined_tools = []
+
+  @classmethod
+  def register_combined_jvm_tools(cls, register, tool_decls):
+    """Register `JvmToolDeclaration`s as JVM tools, which can be invoked as a single jar.
+
+    This allows tools to be invoked one at a time, but with the combined classpath of all of them
+    using ensure_combined_jvm_tool_classpath(). This allows creating nailgun instances for the
+    tools which have the same fingerprint, and allows a task to invoke multiple different JVM tools
+    from the same nailgun instances.
+    """
+    for decl in tool_decls:
+      cls.register_jvm_tool_decl(register, decl)
+      cls._combined_tools.append(decl)
+
+  @memoized_property
+  def _combined_jvm_tool_classpath(self):
+    cp = []
+    for decl in self._combined_tools:
+      cp.extend(self.tool_classpath(decl.tool_name))
+    return cp
+
+  @memoized_property
+  def _registered_combined_tool_keys(self):
+    return frozenset(decl.tool_name for decl in self._combined_tools)
+
+  def ensure_combined_jvm_tool_classpath(self, tool_name):
+    """Get a single classpath for all tools registered with `register_combined_jvm_tools()`.
+
+    Also check to ensure the tool was registered for consumption as a combined JVM tool.
+    """
+    if tool_name not in self._registered_combined_tool_keys:
+      raise self.CombinedJvmToolsError(
+        "tool with name '{}' must be registered with register_combined_jvm_tools() "
+        "(known keys are: {})"
+        .format(tool_name, type(self).__name__, self._registered_combined_tool_keys))
+    return self._combined_jvm_tool_classpath
 
   @classmethod
   def prepare_tools(cls, round_manager):

@@ -32,6 +32,19 @@ from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
 
+_ZINC_SHADER_RULES = [
+  # The compiler-interface and compiler-bridge tool jars carry xsbt and
+  # xsbti interfaces that are used across the shaded tool jar boundary so
+  # we preserve these root packages wholesale along with the core scala
+  # APIs.
+  Shader.exclude_package('scala', recursive=True),
+  Shader.exclude_package('xsbt', recursive=True),
+  Shader.exclude_package('xsbti', recursive=True),
+  # Unfortunately, is loaded reflectively by the compiler.
+  Shader.exclude_package('org.apache.logging.log4j', recursive=True),
+]
+
+
 class Zinc(object):
   """Configuration for Pants' zinc wrapper tool."""
 
@@ -61,34 +74,17 @@ class Zinc(object):
 
       zinc_rev = '1.0.3'
 
-      shader_rules = [
-          # The compiler-interface and compiler-bridge tool jars carry xsbt and
-          # xsbti interfaces that are used across the shaded tool jar boundary so
-          # we preserve these root packages wholesale along with the core scala
-          # APIs.
-          Shader.exclude_package('scala', recursive=True),
-          Shader.exclude_package('xsbt', recursive=True),
-          Shader.exclude_package('xsbti', recursive=True),
-          # Unfortunately, is loaded reflectively by the compiler.
-          Shader.exclude_package('org.apache.logging.log4j', recursive=True),
-        ]
-
       cls.register_jvm_tool(register,
                             Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
                             classpath=[
                               JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', '0.0.4'),
                             ],
                             main=Zinc.ZINC_BOOTSTRAPER_MAIN,
-                            custom_rules=shader_rules,
+                            custom_rules=_ZINC_SHADER_RULES,
                           )
 
-      cls.register_jvm_tool(register,
-                            Zinc.ZINC_COMPILER_TOOL_NAME,
-                            classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.9'),
-                            ],
-                            main=Zinc.ZINC_COMPILE_MAIN,
-                            custom_rules=shader_rules)
+      # Defined at the bottom of this file so it can be consumed elsewhere.
+      cls.register_jvm_tool_decl(register, ZINC_COMPILER_DECL)
 
       cls.register_jvm_tool(register,
                             'compiler-bridge',
@@ -111,7 +107,7 @@ class Zinc(object):
                             # broken up into multiple jars, but zinc does not yet support a sequence
                             # of jars for the interface.
                             main='no.such.main.Main',
-                            custom_rules=shader_rules)
+                            custom_rules=_ZINC_SHADER_RULES)
 
       cls.register_jvm_tool(register,
                             Zinc.ZINC_EXTRACTOR_TOOL_NAME,
@@ -435,3 +431,13 @@ class Zinc(object):
              "Classpath entry does not start with buildroot: {}".format(entry)
 
     return classpath_entries
+
+
+ZINC_COMPILER_DECL = JvmToolMixin.JvmToolDeclaration(
+  Zinc.ZINC_COMPILER_TOOL_NAME,
+  main=Zinc.ZINC_COMPILE_MAIN,
+  classpath=[
+    JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.9'),
+  ],
+  custom_rules=_ZINC_SHADER_RULES,
+)

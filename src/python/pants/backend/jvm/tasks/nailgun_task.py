@@ -29,6 +29,10 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   _all_execution_strategies = frozenset([NAILGUN, SUBPROCESS, HERMETIC])
 
   def do_for_execution_strategy_variant(self, workunit_factory, mapping):
+    """Invoke the method in `mapping` with the key corresponding to the execution strategy.
+
+    `mapping` is a dict mapping execution strategy -> method accepting a workunit argument.
+    """
     variants = frozenset(mapping.keys())
     if variants != self._all_execution_strategies:
       raise self.InvalidExecutionStrategyMapping(

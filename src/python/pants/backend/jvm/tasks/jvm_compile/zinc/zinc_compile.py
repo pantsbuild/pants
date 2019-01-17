@@ -443,7 +443,12 @@ class BaseZincCompile(JvmCompile):
       # TODO: This should probably return a ClasspathEntry rather than a Digest
       return res.output_directory_digest
     else:
-      if self.runjava(classpath=[self._zinc.zinc],
+      # This will just be the zinc compiler tool classpath normally, but tasks which invoke zinc
+      # along with other JVM tools with nailgun (such as RscCompile) require zinc to be invoked with
+      # this method to ensure a single classpath is used for all the tools they need to invoke so
+      # that the nailgun instance (which is keyed by classpath and JVM options) isn't invalidated.
+      zinc_combined_cp = self.ensure_combined_jvm_tool_classpath(Zinc.ZINC_COMPILER_TOOL_NAME)
+      if self.runjava(classpath=zinc_combined_cp,
                       main=Zinc.ZINC_COMPILE_MAIN,
                       jvm_options=jvm_options,
                       args=zinc_args,

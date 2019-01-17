@@ -14,7 +14,9 @@ from six import text_type
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.subsystems.zinc import ZINC_COMPILER_DECL
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -35,7 +37,6 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import (fast_relpath, fast_relpath_optional, maybe_read_file,
                                 safe_file_dump, safe_mkdir)
-from pants.util.memo import memoized_property
 
 
 #
@@ -132,11 +133,6 @@ class RscCompile(ZincCompile):
   def implementation_version(cls):
     return super(RscCompile, cls).implementation_version() + [('RscCompile', 171)]
 
-  # Bundle all the jvm tool classpaths together so that we can persist a single nailgun instance for
-  # all of them.
-  # TODO: move this in JvmToolMixin or NailgunTask as a register_nailgunnable_jvm_tools() method!
-  _joined_jvm_tool_keys = ['rsc', 'metacp', 'metai']
-
   @classmethod
   def register_options(cls, register):
     super(RscCompile, cls).register_options(register)
@@ -144,8 +140,7 @@ class RscCompile(ZincCompile):
     rsc_toolchain_version = '0.0.0-446-c64e6937'
     scalameta_toolchain_version = '4.0.0'
 
-    cls.register_jvm_tool(
-      register,
+    rsc_decl = JvmToolMixin.JvmToolDeclaration(
       'rsc',
       classpath=[
           JarDependency(
@@ -156,9 +151,9 @@ class RscCompile(ZincCompile):
       ],
       custom_rules=[
         Shader.exclude_package('rsc', recursive=True),
-      ])
-    cls.register_jvm_tool(
-      register,
+      ]
+    )
+    metacp_decl = JvmToolMixin.JvmToolDeclaration(
       'metacp',
       classpath=[
           JarDependency(
@@ -169,9 +164,9 @@ class RscCompile(ZincCompile):
       ],
       custom_rules=[
         Shader.exclude_package('scala', recursive=True),
-      ])
-    cls.register_jvm_tool(
-      register,
+      ]
+    )
+    metai_decl = JvmToolMixin.JvmToolDeclaration(
       'metai',
       classpath=[
           JarDependency(
@@ -182,7 +177,14 @@ class RscCompile(ZincCompile):
       ],
       custom_rules=[
         Shader.exclude_package('scala', recursive=True),
-      ])
+      ]
+    )
+
+    # Register all of these as "combined" JVM tools so that we can invoke their combined classpath
+    # in a single nailgun instance. We still invoke their classpaths separately when not using
+    # nailgun, however.
+    cls.register_combined_jvm_tools(
+      register, [rsc_decl, metacp_decl, metai_decl, ZINC_COMPILER_DECL])
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
@@ -830,30 +832,13 @@ class RscCompile(ZincCompile):
       if c.name is tool_name:
         runjava_workunit = c
         break
-    # TODO: when would this happen?
+    # TODO: figure out and document when would this happen.
     if runjava_workunit is None:
       raise Exception('couldnt find work unit for underlying execution')
     return runjava_workunit
 
-  class UnregisteredCombinedJvmTool(Exception): pass
-
-  @memoized_property
-  def _combined_tool_classpath(self):
-    cp = []
-    for k in self._joined_jvm_tool_keys:
-      cp.extend(self.tool_classpath(k))
-    return cp
-
-  def _ensure_combined_tool_classpath(self, tool_name):
-    if tool_name not in self._joined_jvm_tool_keys:
-      raise self.UnregisteredCombinedJvmTool(
-        "tool with name '{}' must be in _joined_jvm_tool_keys in {} (known keys are: {})"
-        .format(tool_name, type(self).__name__, self._joined_jvm_tool_keys))
-    return self._combined_tool_classpath
-
   def _runtool(self, main, tool_name, args, distribution,
                tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
-    # ???
     def workunit_factory(*args, **kwargs):
       return self.context.new_workunit(tool_name, *args, **kwargs)
     return self.do_for_execution_strategy_variant(workunit_factory, {
@@ -863,7 +848,8 @@ class RscCompile(ZincCompile):
       self.SUBPROCESS: lambda wu: self._runtool_nonhermetic(
         wu, self.tool_classpath(tool_name), main, tool_name, args, distribution),
       self.NAILGUN: lambda wu: self._runtool_nonhermetic(
-        wu, self._ensure_combined_tool_classpath(tool_name), main, tool_name, args, distribution),
+        wu, self.ensure_combined_jvm_tool_classpath(tool_name),
+        main, tool_name, args, distribution),
     })
 
   def _run_metai_tool(self,
