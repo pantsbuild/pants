@@ -14,6 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
 from pants.util.memo import memoized_property
+from pants.util.meta import classproperty
 from pants.util.objects import datatype
 
 
@@ -152,11 +153,11 @@ class JvmToolMixin(object):
   # TODO: Deprecate .register_jvm_tool()?
   class JvmToolDeclaration(datatype([
     ('tool_name', text_type),
-    'main',
+    'main',                     # Optional
     ('classpath', tuple),
     ('custom_rules', tuple),
 ])):
-    """A specification for a JVM tool."""
+    """A mostly-typed specification for a JVM tool. Can be passed around across python modules."""
 
     def __new__(cls, tool_name, main=None, classpath=None, custom_rules=None):
       return super(JvmToolMixin.JvmToolDeclaration, cls).__new__(
@@ -183,42 +184,36 @@ class JvmToolMixin(object):
 
   class CombinedJvmToolsError(JvmToolDeclError): pass
 
-  _combined_tools = []
-
-  @classmethod
-  def register_combined_jvm_tools(cls, register, tool_decls):
-    """Register `JvmToolDeclaration`s as JVM tools, which can be invoked as a single jar.
+  @classproperty
+  def combined_jvm_tool_names(cls):
+    """Return a list of tool names which can be invoked as a single jar.
 
     This allows tools to be invoked one at a time, but with the combined classpath of all of them
     using ensure_combined_jvm_tool_classpath(). This allows creating nailgun instances for the
     tools which have the same fingerprint, and allows a task to invoke multiple different JVM tools
-    from the same nailgun instances.
+    from the same nailgun instances. See #7089.
     """
-    for decl in tool_decls:
-      cls.register_jvm_tool_decl(register, decl)
-      cls._combined_tools.append(decl)
+    raise NotImplementedError(
+      'combined_jvm_tool_names must be implemented to use multiple JVM tools '
+      'with the nailgun execution strategy!')
 
   @memoized_property
   def _combined_jvm_tool_classpath(self):
     cp = []
-    for decl in self._combined_tools:
-      cp.extend(self.tool_classpath(decl.tool_name))
+    for tool_name in self.combined_jvm_tool_names:
+      cp.extend(self.tool_classpath(tool_name))
     return cp
 
-  @memoized_property
-  def _registered_combined_tool_keys(self):
-    return frozenset(decl.tool_name for decl in self._combined_tools)
-
   def ensure_combined_jvm_tool_classpath(self, tool_name):
-    """Get a single classpath for all tools registered with `register_combined_jvm_tools()`.
+    """Get a single classpath for all tools returned by `combined_jvm_tool_names()`.
 
     Also check to ensure the tool was registered for consumption as a combined JVM tool.
     """
-    if tool_name not in self._registered_combined_tool_keys:
+    if tool_name not in self.combined_jvm_tool_names:
       raise self.CombinedJvmToolsError(
-        "tool with name '{}' must be registered with register_combined_jvm_tools() "
+        "tool with name '{}' must be added to {}.combined_jvm_tool_names "
         "(known keys are: {})"
-        .format(tool_name, type(self).__name__, self._registered_combined_tool_keys))
+        .format(tool_name, type(self).__name__, self.combined_jvm_tool_names))
     return self._combined_jvm_tool_classpath
 
   @classmethod

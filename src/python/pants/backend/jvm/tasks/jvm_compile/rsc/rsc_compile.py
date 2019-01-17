@@ -16,7 +16,7 @@ from pants.backend.jvm.subsystems.dependency_context import DependencyContext  #
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
-from pants.backend.jvm.subsystems.zinc import ZINC_COMPILER_DECL
+from pants.backend.jvm.subsystems.zinc import ZINC_COMPILER_DECL, Zinc
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -37,6 +37,7 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import (fast_relpath, fast_relpath_optional, maybe_read_file,
                                 safe_file_dump, safe_mkdir)
+from pants.util.meta import classproperty
 
 
 #
@@ -182,9 +183,26 @@ class RscCompile(ZincCompile):
 
     # Register all of these as "combined" JVM tools so that we can invoke their combined classpath
     # in a single nailgun instance. We still invoke their classpaths separately when not using
-    # nailgun, however.
-    cls.register_combined_jvm_tools(
-      register, [rsc_decl, metacp_decl, metai_decl, ZINC_COMPILER_DECL])
+    # nailgun, however. Note that we have to register zinc again as in ZincCompile it is being
+    # accessed through the Zinc subsystem, but we want to invoke all of these as a combined tool
+    # through *this task's* implementation of JvmToolMixin.
+    # Note that registering as a "combined" JVM tool is only done by overriding
+    # combined_jvm_tool_names.
+    for decl in [rsc_decl, metacp_decl, metai_decl, ZINC_COMPILER_DECL]:
+      cls.register_jvm_tool_decl(register, decl)
+
+  @classproperty
+  def combined_jvm_tool_names(cls):
+    """Register all of the component tools of the rsc compile task as a "combined" jvm tool.
+
+    This allows us to invoke their combined classpath in a single nailgun instance. We still invoke
+    their classpaths separately when not using nailgun, however.
+    """
+    return ['rsc', 'metai', 'metacp', 'zinc']
+
+  # Overrides the normal zinc compiler classpath, which only contains zinc.
+  def get_zinc_compiler_classpath(self):
+    return self.ensure_combined_jvm_tool_classpath(Zinc.ZINC_COMPILER_TOOL_NAME)
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
