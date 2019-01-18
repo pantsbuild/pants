@@ -1,4 +1,7 @@
+use bytes::BytesMut;
 use hashing;
+use log::error;
+use prost::Message;
 
 impl<'a> From<&'a hashing::Digest> for crate::remote_execution::Digest {
   fn from(d: &hashing::Digest) -> Self {
@@ -94,6 +97,47 @@ impl From<crate::build::bazel::remote::execution::v2::ExecuteRequest>
     ret.set_instance_name(req.instance_name);
     ret.set_skip_cache_lookup(req.skip_cache_lookup);
     ret
+  }
+}
+
+// This should only be used in test contexts. It should be deleted when the mock systems use tower.
+impl Into<grpcio::RpcStatus> for crate::google::rpc::Status {
+  fn into(self) -> grpcio::RpcStatus {
+    let mut buf = BytesMut::with_capacity(self.encoded_len());
+    self.encode(&mut buf).unwrap();
+    grpcio::RpcStatus {
+      status: self.code.into(),
+      details: None,
+      status_proto_bytes: Some(buf.to_vec()),
+    }
+  }
+}
+
+// TODO: Use num_enum or similar here when TryInto is stable.
+pub fn code_from_i32(i: i32) -> crate::google::rpc::Code {
+  use crate::google::rpc::Code::*;
+  match i {
+    0 => Ok,
+    1 => Cancelled,
+    2 => Unknown,
+    3 => InvalidArgument,
+    4 => DeadlineExceeded,
+    5 => NotFound,
+    6 => AlreadyExists,
+    7 => PermissionDenied,
+    8 => ResourceExhausted,
+    9 => FailedPrecondition,
+    10 => Aborted,
+    11 => OutOfRange,
+    12 => Unimplemented,
+    13 => Internal,
+    14 => Unavailable,
+    15 => DataLoss,
+    16 => Unauthenticated,
+    _ => {
+      error!("Unknown grpc error code: {}, default to Unknown", i);
+      Unknown
+    }
   }
 }
 

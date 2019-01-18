@@ -22,12 +22,13 @@ use protobuf;
 ///
 #[derive(Clone, Debug)]
 pub struct MockOperation {
-  pub op: Result<Option<bazel_protos::operations::Operation>, grpcio::RpcStatus>,
+  pub op:
+    Result<Option<bazel_protos::google::longrunning::Operation>, bazel_protos::google::rpc::Status>,
   pub duration: Option<Duration>,
 }
 
 impl MockOperation {
-  pub fn new(op: bazel_protos::operations::Operation) -> MockOperation {
+  pub fn new(op: bazel_protos::google::longrunning::Operation) -> MockOperation {
     MockOperation {
       op: Ok(Some(op)),
       duration: None,
@@ -190,9 +191,9 @@ impl MockResponder {
       }
       if let Ok(Some(op)) = op {
         // Complete the channel with the op.
-        sink.success(op.clone());
+        sink.success(op.clone().into());
       } else if let Err(status) = op {
-        sink.fail(status);
+        sink.fail(status.into());
       } else {
         // Cancel the request by dropping the sink.
         drop(sink);
@@ -218,13 +219,13 @@ impl MockResponder {
         if let Ok(Some(op)) = op {
           ctx.spawn(
             sink
-              .send((op.clone(), grpcio::WriteFlags::default()))
+              .send((op.clone().into(), grpcio::WriteFlags::default()))
               .map(|mut stream| stream.close())
               .map(|_| ())
               .map_err(|_| ()),
           )
         } else if let Err(status) = op {
-          sink.fail(status);
+          sink.fail(status.into());
         } else {
           // Cancel the request by dropping the sink.
           drop(sink)
