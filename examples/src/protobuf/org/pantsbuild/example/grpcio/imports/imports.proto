@@ -1,0 +1,16 @@
+syntax = "proto3";
+package org.pantsbuild.example.grpcio.imports;
+
+import "org/pantsbuild/example/grpcio/service/service.proto";
+
+service ImportsService {
+    rpc HelloImports(HelloImportsRequest) returns (HelloImportsReply) {}
+}
+
+message HelloImportsRequest {
+    org.pantsbuild.example.grpcio.service.HelloRequest hello_request = 1;
+}
+
+message HelloImportsReply{
+    org.pantsbuild.example.grpcio.service.HelloReply hello_reply = 1;
+}

@@ -10,6 +10,7 @@ fasteners==0.14.1
 faulthandler==2.6 ; python_version<'3'
 future==0.16.0
 futures==3.0.5 ; python_version<'3'
+grpcio==1.16.1
 Markdown==2.1.1
 mock==2.0.0
 packaging==16.8
@@ -17,6 +18,7 @@ parameterized==0.6.1
 pathspec==0.5.9
 pex==1.5.3
 psutil==4.3.0
+protobuf==3.6.1
 pycodestyle==2.4.0
 pyflakes==2.0.0
 Pygments==2.3.1
