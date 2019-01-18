@@ -28,8 +28,14 @@ class PantsLoader(object):
     # We want to present warnings to the user, set this up before importing any of our own code,
     # to ensure all deprecation warnings are seen, including module deprecations.
     # The "default" action displays a warning for a particular file and line number exactly once.
-    # See https://docs.python.org/2/library/warnings.html#the-warnings-filter for the complete list.
-    warnings.simplefilter('default', DeprecationWarning)
+    # See https://docs.python.org/3/library/warnings.html#the-warnings-filter for the complete list.
+    #
+    # However, we do turn off deprecation warnings for libraries that Pants uses for which we do not have a fixed
+    # upstream version, often if the library is no longer maintained.
+    warnings.simplefilter('default', category=DeprecationWarning)
+    # TODO: Future has a pending PR to fix deprecation warnings at https://github.com/PythonCharmers/python-future/pull/421.
+    # Remove this filter once that gets merged.
+    warnings.filterwarnings('ignore', categry=DeprecationWarning, module="future")
 
   @classmethod
   def ensure_locale(cls):
