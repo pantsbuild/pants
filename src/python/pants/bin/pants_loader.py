@@ -31,7 +31,7 @@ class PantsLoader(object):
     # See https://docs.python.org/3/library/warnings.html#the-warnings-filter for the complete list.
     #
     # However, we do turn off deprecation warnings for libraries that Pants uses for which we do not have a fixed
-    # upstream version, often if the library is no longer maintained.
+    # upstream version, typically because the library is no longer maintained.
     warnings.simplefilter('default', category=DeprecationWarning)
     # TODO: Future has a pending PR to fix deprecation warnings at https://github.com/PythonCharmers/python-future/pull/421.
     # Remove this filter once that gets merged.
