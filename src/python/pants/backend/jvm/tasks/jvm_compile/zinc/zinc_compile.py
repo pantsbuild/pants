@@ -443,7 +443,7 @@ class BaseZincCompile(JvmCompile):
       # TODO: This should probably return a ClasspathEntry rather than a Digest
       return res.output_directory_digest
     else:
-      if self.runjava(classpath=[self._zinc.zinc],
+      if self.runjava(classpath=self.get_zinc_compiler_classpath(),
                       main=Zinc.ZINC_COMPILE_MAIN,
                       jvm_options=jvm_options,
                       args=zinc_args,
@@ -451,6 +451,16 @@ class BaseZincCompile(JvmCompile):
                       workunit_labels=[WorkUnitLabel.COMPILER],
                       dist=self._zinc.dist):
         raise TaskError('Zinc compile failed.')
+
+  def get_zinc_compiler_classpath(self):
+    """Get the classpath for the zinc compiler JVM tool.
+
+    This will just be the zinc compiler tool classpath normally, but tasks which invoke zinc along
+    with other JVM tools with nailgun (such as RscCompile) require zinc to be invoked with this
+    method to ensure a single classpath is used for all the tools they need to invoke so that the
+    nailgun instance (which is keyed by classpath and JVM options) isn't invalidated.
+    """
+    return [self._zinc.zinc]
 
   def _verify_zinc_classpath(self, classpath, allow_dist=True):
     def is_outside(path, putative_parent):

@@ -153,7 +153,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
 
   def _check_nailgun_state(self, new_fingerprint):
     running = self.is_alive()
-    updated = self.needs_restart(new_fingerprint) or self.cmd != self._distribution.java
+    updated = self.needs_restart(new_fingerprint)
     logging.debug('Nailgun {nailgun} state: updated={up!s} running={run!s} fingerprint={old_fp} '
                   'new_fingerprint={new_fp} distribution={old_dist} new_distribution={new_dist}'
                   .format(nailgun=self._identity, up=updated, run=running,

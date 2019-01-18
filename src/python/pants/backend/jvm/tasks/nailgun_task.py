@@ -24,6 +24,24 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   SUBPROCESS = 'subprocess'
   HERMETIC = 'hermetic'
 
+  class InvalidExecutionStrategyMapping(Exception): pass
+
+  _all_execution_strategies = frozenset([NAILGUN, SUBPROCESS, HERMETIC])
+
+  def do_for_execution_strategy_variant(self, mapping):
+    """Invoke the method in `mapping` with the key corresponding to the execution strategy.
+
+    `mapping` is a dict mapping execution strategy -> zero-argument lambda.
+    """
+    variants = frozenset(mapping.keys())
+    if variants != self._all_execution_strategies:
+      raise self.InvalidExecutionStrategyMapping(
+        'Must specify a mapping with exactly the keys {} (was: {})'
+        .format(self._all_execution_strategies, variants))
+    method_for_variant = mapping[self.execution_strategy]
+    # The methods need not return a value, but we pass it along if they do.
+    return method_for_variant()
+
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)

@@ -35,6 +35,7 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import (fast_relpath, fast_relpath_optional, maybe_read_file,
                                 safe_file_dump, safe_mkdir)
+from pants.util.memo import memoized_property
 
 
 #
@@ -150,7 +151,8 @@ class RscCompile(ZincCompile):
       ],
       custom_rules=[
         Shader.exclude_package('rsc', recursive=True),
-      ])
+      ]
+    )
     cls.register_jvm_tool(
       register,
       'metacp',
@@ -163,7 +165,8 @@ class RscCompile(ZincCompile):
       ],
       custom_rules=[
         Shader.exclude_package('scala', recursive=True),
-      ])
+      ]
+    )
     cls.register_jvm_tool(
       register,
       'metai',
@@ -176,7 +179,31 @@ class RscCompile(ZincCompile):
       ],
       custom_rules=[
         Shader.exclude_package('scala', recursive=True),
-      ])
+      ]
+    )
+
+  # TODO: allow @memoized_method to convert lists into tuples so they can be hashed!
+  @memoized_property
+  def _nailgunnable_combined_classpath(self):
+    """Register all of the component tools of the rsc compile task as a "combined" jvm tool.
+
+    This allows us to invoke their combined classpath in a single nailgun instance (see #7089 and
+    #7092). We still invoke their classpaths separately when not using nailgun, however.
+    """
+    cp = []
+    for component_tool_name in ['rsc', 'metai', 'metacp']:
+      cp.extend(self.tool_classpath(component_tool_name))
+    # Add zinc's classpath so that it can be invoked from the same nailgun instance.
+    cp.extend(super(RscCompile, self).get_zinc_compiler_classpath())
+    return cp
+
+  # Overrides the normal zinc compiler classpath, which only contains zinc.
+  def get_zinc_compiler_classpath(self):
+    return self.do_for_execution_strategy_variant({
+      self.HERMETIC: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
+      self.SUBPROCESS: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
+      self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
+    })
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
@@ -747,87 +774,100 @@ class RscCompile(ZincCompile):
       )
     ]
 
-  def _runtool(
-    self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
-    if self.execution_strategy == self.HERMETIC:
-      with self.context.new_workunit(tool_name) as wu:
-        tool_classpath_abs = self.tool_classpath(tool_name)
-        tool_classpath = fast_relpath_collection(tool_classpath_abs)
+  def _runtool_hermetic(self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
+    tool_classpath_abs = self.tool_classpath(tool_name)
+    tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
-        classpath_for_cmd = os.pathsep.join(tool_classpath)
-        cmd = [
-          distribution.java,
-        ]
-        cmd.extend(self.get_options().jvm_options)
-        cmd.extend(['-cp', classpath_for_cmd])
-        cmd.extend([main])
-        cmd.extend(args)
+    classpath_for_cmd = os.pathsep.join(tool_classpath)
+    cmd = [
+      distribution.java,
+    ]
+    cmd.extend(self.get_options().jvm_options)
+    cmd.extend(['-cp', classpath_for_cmd])
+    cmd.extend([main])
+    cmd.extend(args)
 
-        pathglobs = list(tool_classpath)
-        pathglobs.extend(f if os.path.isfile(f) else '{}/**'.format(f) for f in input_files)
+    pathglobs = list(tool_classpath)
+    pathglobs.extend(f if os.path.isfile(f) else '{}/**'.format(f) for f in input_files)
 
-        if pathglobs:
-          root = PathGlobsAndRoot(
-          PathGlobs(tuple(pathglobs)),
-          text_type(get_buildroot()))
-          # dont capture snapshot, if pathglobs is empty
-          path_globs_input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
+    if pathglobs:
+      root = PathGlobsAndRoot(
+      PathGlobs(tuple(pathglobs)),
+      text_type(get_buildroot()))
+      # dont capture snapshot, if pathglobs is empty
+      path_globs_input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
 
-        if path_globs_input_digest and input_digest:
-          epr_input_files = self.context._scheduler.merge_directories(
-              (path_globs_input_digest, input_digest))
-        else:
-          epr_input_files = path_globs_input_digest or input_digest
-
-        epr = ExecuteProcessRequest(
-          argv=tuple(cmd),
-          input_files=epr_input_files,
-          output_files=tuple(),
-          output_directories=(output_dir,),
-          timeout_seconds=15*60,
-          description='run {} for {}'.format(tool_name, tgt),
-          # TODO: These should always be unicodes
-          # Since this is always hermetic, we need to use `underlying_dist`
-          jdk_home=text_type(self._zinc.underlying_dist.home),
-        )
-        res = self.context.execute_process_synchronously_without_raising(
-          epr,
-          self.name(),
-          [WorkUnitLabel.TOOL])
-
-        if res.exit_code != 0:
-          raise TaskError(res.stderr)
-
-        if output_dir:
-          dump_digest(output_dir, res.output_directory_digest)
-          self.context._scheduler.materialize_directories((
-            DirectoryToMaterialize(
-              # NB the first element here is the root to materialize into, not the dir to snapshot
-              text_type(get_buildroot()),
-              res.output_directory_digest),
-          ))
-          # TODO drop a file containing the digest, named maybe output_dir.digest
-        return res
+    if path_globs_input_digest and input_digest:
+      epr_input_files = self.context._scheduler.merge_directories(
+          (path_globs_input_digest, input_digest))
     else:
-      with self.context.new_workunit(tool_name) as wu:
-        result = self.runjava(classpath=self.tool_classpath(tool_name),
-                              main=main,
-                              jvm_options=self.get_options().jvm_options,
-                              args=args,
-                              workunit_name=tool_name,
-                              workunit_labels=[WorkUnitLabel.TOOL],
-                              dist=distribution
-        )
-        if result != 0:
-          raise TaskError('Running {} failed'.format(tool_name))
-        runjava_wu = None
-        for c in wu.children:
-          if c.name is tool_name:
-            runjava_wu = c
-            break
-        if runjava_wu is None:
-          raise Exception('couldnt find work unit for underlying execution')
-        return runjava_wu
+      epr_input_files = path_globs_input_digest or input_digest
+
+    epr = ExecuteProcessRequest(
+      argv=tuple(cmd),
+      input_files=epr_input_files,
+      output_files=tuple(),
+      output_directories=(output_dir,),
+      timeout_seconds=15*60,
+      description='run {} for {}'.format(tool_name, tgt),
+      # TODO: These should always be unicodes
+      # Since this is always hermetic, we need to use `underlying_dist`
+      jdk_home=text_type(self._zinc.underlying_dist.home),
+    )
+    res = self.context.execute_process_synchronously_without_raising(
+      epr,
+      self.name(),
+      [WorkUnitLabel.TOOL])
+
+    if res.exit_code != 0:
+      raise TaskError(res.stderr)
+
+    if output_dir:
+      dump_digest(output_dir, res.output_directory_digest)
+      self.context._scheduler.materialize_directories((
+        DirectoryToMaterialize(
+          # NB the first element here is the root to materialize into, not the dir to snapshot
+          text_type(get_buildroot()),
+          res.output_directory_digest),
+      ))
+      # TODO drop a file containing the digest, named maybe output_dir.digest
+    return res
+
+  # The classpath is parameterized so that we can have a single nailgun instance serving all of our
+  # execution requests.
+  def _runtool_nonhermetic(self, parent_workunit, classpath, main, tool_name, args, distribution):
+    result = self.runjava(classpath=classpath,
+                          main=main,
+                          jvm_options=self.get_options().jvm_options,
+                          args=args,
+                          workunit_name=tool_name,
+                          workunit_labels=[WorkUnitLabel.TOOL],
+                          dist=distribution
+    )
+    if result != 0:
+      raise TaskError('Running {} failed'.format(tool_name))
+    runjava_workunit = None
+    for c in parent_workunit.children:
+      if c.name is tool_name:
+        runjava_workunit = c
+        break
+    # TODO: figure out and document when would this happen.
+    if runjava_workunit is None:
+      raise Exception('couldnt find work unit for underlying execution')
+    return runjava_workunit
+
+  def _runtool(self, main, tool_name, args, distribution,
+               tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
+    with self.context.new_workunit(tool_name) as wu:
+      return self.do_for_execution_strategy_variant({
+        self.HERMETIC: lambda: self._runtool_hermetic(
+          main, tool_name, args, distribution,
+          tgt=tgt, input_files=input_files, input_digest=input_digest, output_dir=output_dir),
+        self.SUBPROCESS: lambda: self._runtool_nonhermetic(
+          wu, self.tool_classpath(tool_name), main, tool_name, args, distribution),
+        self.NAILGUN: lambda: self._runtool_nonhermetic(
+          wu, self._nailgunnable_combined_classpath, main, tool_name, args, distribution),
+      })
 
   def _run_metai_tool(self,
                       distribution,
