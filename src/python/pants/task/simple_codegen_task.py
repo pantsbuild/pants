@@ -13,6 +13,7 @@ from future.utils import text_type
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
@@ -128,6 +129,7 @@ class SimpleCodegenTask(Task):
     """
     return []
 
+  @deprecated('1.16.0.dev1', hint_message='Use synthetic_target_type instead!')
   def synthetic_target_type_by_target(self, target):
     """The type of target this codegen task generates.
 
@@ -176,7 +178,7 @@ class SimpleCodegenTask(Task):
 
     :return: an iterable of dependency targets.
     """
-    return self.context.targets(self.is_gentarget)
+    return self.get_targets(self.is_gentarget)
 
   def _do_validate_sources_present(self, target):
     """Checks whether sources is empty, and either raises a TaskError or just returns False.

@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from six import string_types
 
 from pants.backend.jvm.repository import Repository
-from pants.base.hash_utils import stable_json_hash
+from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload_field import PayloadField
 
 
@@ -75,7 +75,7 @@ class Artifact(PayloadField):
       fingerprint = self.publication_metadata.fingerprint()
       if fingerprint:
         data += (fingerprint,)
-    return stable_json_hash(data)
+    return stable_json_sha1(data)
 
   def __ne__(self, other):
     return not self.__eq__(other)

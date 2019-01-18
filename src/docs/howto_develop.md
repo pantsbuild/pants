@@ -21,7 +21,7 @@ If you want to run pants from sources, but in another repo to test changes befor
 can run it like so:
 
     :::bash
-    (other repo) $ PANTS_PLUGINS="[]" \
+    (other repo) $ PANTS_DEV=0 PANTS_PLUGINS="[]" \
       PANTS_PYTHONPATH="+['/path/to/pants/repo/contrib/python/src/python']" \
       PANTS_BACKEND_PACKAGES="+['pants.contrib.python.checks']" \
       PANTS_VERSION=1.2.0-dev0 \
@@ -30,6 +30,10 @@ can run it like so:
 Here the environment variables are used to make sure any pants plugins your other repo uses will
 also be run from pants sources. Explaining each environment variable:
 
+* `PANTS_DEV`: The `./pants` runner script in this repo will set this to 1 and export it unless
+  explicitly set to 0 in the environment. When `PANTS_DEV=1`, pants will resolve certain packages
+  such as checkstyle checkers from paths to source targets instead of 3rdparty requirements, which
+  will most likely fail in another repo.
 + `PANTS_PLUGINS`: This should always be as-shown, ie: an empty list.
 + `PANTS_PYTHONPATH`: This is a comma-separated list of PYTHONPATH elements. Note the plus symbol
   before the list - this indicates the given elements should be appended to the PYTHONPATH.

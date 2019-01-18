@@ -100,7 +100,7 @@ def _get_frame_info(stacklevel, context=1):
 
 
 def warn_or_error(removal_version, deprecated_entity_description, hint=None, stacklevel=3,
-                  frame_info=None, ensure_stderr=False):
+                  frame_info=None, context=1, ensure_stderr=False):
   """Check the removal_version against the current pants version.
 
   Issues a warning if the removal version is > current pants version, or an error otherwise.
@@ -130,7 +130,7 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None, sta
   # we have to reconstruct the `stacklevel` logic ourselves, but we do also gain the ability to have
   # multiple lines of context, which is neat.
   if frame_info is None:
-    frame_info = _get_frame_info(stacklevel)
+    frame_info = _get_frame_info(stacklevel, context=context)
   _, filename, line_number, _, code_context, _ = frame_info
   if code_context:
     context_lines = ''.join(code_context)

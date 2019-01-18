@@ -34,13 +34,13 @@ python_binary(
 external_native_library(
   name='rang',
   packages=[
-     'rang/3.1.0@rang/stable',
+    conan_requirement('rang/3.1.0@rang/stable'),
   ],
 )
 
 external_native_library(
   name='cereal',
   packages=[
-     'cereal/1.2.2@conan/stable',
+    conan_requirement('cereal/1.2.2@conan/stable'),
   ],
 )

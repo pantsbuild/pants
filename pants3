@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+# This bootstrap script invokes Pants using a Python 3 interpreter.
+
+# Use Py3 under-the-hood
+export PANTS_USE_PYTHON3=true
+
+# Use Py3 for subprocesses
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
+
+./pants "$@"
