@@ -135,10 +135,7 @@ impl Core {
             address,
             remote_execution_process_cache_namespace.clone(),
             remote_instance_name.clone(),
-            root_ca_certs.clone(),
             oauth_bearer_token.clone(),
-            // Allow for some overhead for bookkeeping threads (if any).
-            process_execution_parallelism + 2,
             store.clone(),
             futures_timer_thread2.clone(),
           )

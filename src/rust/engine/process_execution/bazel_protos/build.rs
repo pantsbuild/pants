@@ -176,9 +176,11 @@ fn generate_for_tower(thirdpartyprotobuf: &Path, out_dir: PathBuf) {
     .enable_server(true)
     .enable_client(true)
     .build(
-      &[PathBuf::from(
-        "build/bazel/remote/execution/v2/remote_execution.proto",
-      )],
+      &[
+        PathBuf::from("build/bazel/remote/execution/v2/remote_execution.proto"),
+        PathBuf::from("google/rpc/code.proto"),
+        PathBuf::from("google/rpc/error_details.proto"),
+      ],
       &std::fs::read_dir(&thirdpartyprotobuf)
         .unwrap()
         .into_iter()

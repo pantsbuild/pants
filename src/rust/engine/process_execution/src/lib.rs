@@ -34,7 +34,6 @@ use bazel_protos;
 
 use fs;
 
-use grpcio;
 use hashing;
 
 #[cfg(test)]

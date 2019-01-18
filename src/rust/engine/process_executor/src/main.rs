@@ -93,13 +93,6 @@ fn main() {
         ),
     )
       .arg(
-        Arg::with_name("execution-root-ca-cert-file")
-            .help("Path to file containing root certificate authority certificates for the execution server. If not set, TLS will not be used when connecting to the execution server.")
-            .takes_value(true)
-            .long("execution-root-ca-cert-file")
-            .required(false)
-      )
-      .arg(
         Arg::with_name("execution-oauth-bearer-token-path")
             .help("Path to file containing oauth bearer token for communication with the execution server. If not set, no authorization will be provided to remote servers.")
             .takes_value(true)
@@ -257,12 +250,6 @@ fn main() {
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
     Some(address) => {
-      let root_ca_certs = if let Some(path) = args.value_of("execution-root-ca-cert-file") {
-        Some(std::fs::read(path).expect("Error reading root CA certs file"))
-      } else {
-        None
-      };
-
       let oauth_bearer_token =
         if let Some(path) = args.value_of("execution-oauth-bearer-token-path") {
           Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
@@ -275,9 +262,7 @@ fn main() {
           address,
           args.value_of("cache-key-gen-version").map(str::to_owned),
           remote_instance_arg,
-          root_ca_certs,
           oauth_bearer_token,
-          1,
           store,
           timer_thread,
         )

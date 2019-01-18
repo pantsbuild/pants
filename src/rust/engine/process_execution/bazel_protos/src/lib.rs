@@ -16,5 +16,6 @@ mod gen_for_tower;
 pub use crate::gen_for_tower::*;
 
 mod conversions;
+pub use crate::conversions::code_from_i32;
 mod verification;
 pub use crate::verification::verify_directory_canonical;
