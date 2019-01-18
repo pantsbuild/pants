@@ -19,7 +19,7 @@ Usage: $0 (-h|-2fxbkmrjlpuneycitzsw)
  -f           run python code formatting checks
  -x           run bootstrap clean-all (assume bootstrapping from a
               fresh clone)
- -b           skip bootstrapping pants from local sources
+ -b           bootstrap pants from local sources
  -m           run sanity checks of bootstrapped pants and repo BUILD
               files
  -r           run doc generation tests
@@ -66,7 +66,7 @@ while getopts "h2fxbmrjlpeasu:ny:ci:tzw" opt; do
     2) python_two="true" ;;
     f) run_pre_commit_checks="true" ;;
     x) run_bootstrap_clean="true" ;;
-    b) run_bootstrap="false" ;;
+    b) run_bootstrap="true" ;;
     m) run_sanity_checks="true" ;;
     r) run_docs="true" ;;
     j) run_jvm="true" ;;
@@ -118,7 +118,7 @@ else
 fi
 banner "Using Python ${py_version_number} to execute spawned subprocesses (e.g. tests)"
 
-if [[ "${run_bootstrap:-true}" == "true" ]]; then
+if [[ "${run_bootstrap:-false}" == "true" ]]; then
   start_travis_section "Bootstrap" "Bootstrapping pants as a Python ${py_version_number} PEX"
   (
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
