@@ -29,6 +29,12 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
       targets which contain .proto definitions.
     """
     payload = payload or Payload()
+    deprecated_conditional(
+      lambda: imports is not None,
+      '1.16.0.dev1',
+      "{cls} target definition at {addr} setting attribute 'imports'"
+      .format(cls=type(self).__name__, addr=self.address.spec),
+      hint_message="Use a combination of remote_sources() and unpacked_jars() instead.")
     # TODO(Eric Ayers): The target needs to incorporate the settings of --gen-protoc-version
     # and --gen-protoc-plugins into the fingerprint.  Consider adding a custom FingeprintStrategy
     # into ProtobufGen to get it.
@@ -40,5 +46,6 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
     deprecated_conditional(
       lambda: buildflags is not None,
       '1.16.0.dev1',
-      "Target definition at {addr} setting attribute 'buildflags'".format(addr=self.address.spec),
-      hint_message="is ignored")
+      "{cls} target definition at {addr} setting attribute 'buildflags'"
+      .format(cls=type(self).__name__, addr=self.address.spec),
+      hint_message="Use the options denoted in `./pants help gen.protoc` instead.")
