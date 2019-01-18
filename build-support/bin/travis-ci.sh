@@ -9,6 +9,8 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
+export RUNNING_VIA_TRAVIS_CI_SCRIPT=1
+
 PYENV="$(which pyenv 2>/dev/null)"
 PYENV_ROOT="$(pyenv root 2>/dev/null || true)"
 
