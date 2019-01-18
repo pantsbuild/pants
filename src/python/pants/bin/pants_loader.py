@@ -36,6 +36,9 @@ class PantsLoader(object):
     # TODO: Future has a pending PR to fix deprecation warnings at https://github.com/PythonCharmers/python-future/pull/421.
     # Remove this filter once that gets merged.
     warnings.filterwarnings('ignore', categry=DeprecationWarning, module="future")
+    # TODO: Eric-Arellano has emailed the author to see if he is willing to accept a PR fixing the deprecation warnings
+    # and to release the fix. If he says yes, remove this once fixed.
+    warnings.filterwarnings('ignore', categry=DeprecationWarning, module="ansicolors")
 
   @classmethod
   def ensure_locale(cls):
