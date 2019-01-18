@@ -377,6 +377,46 @@ cargo_audit: &cargo_audit
     - ./build-support/bin/travis-ci.sh -a
 
 # -------------------------------------------------------------------------
+# Build wheels
+# -------------------------------------------------------------------------
+
+base_build_wheels: &base_build_wheels
+  stage: *test
+  env:
+    - &base_build_wheels_env RUN_PANTS_FROM_PEX=1 PREPARE_DEPLOY=1
+
+linux_build_wheels: &linux_build_wheels
+  # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize
+  # compatibility. This is a Py2 shard, so it is not subject to #6985.
+  <<: *travis_docker_image
+  <<: *py2_linux_test_config
+  <<: *base_build_wheels
+  name: "Build Linux wheels (No PEX)"
+  env:
+    - *py2_linux_test_config_env
+    - *base_build_wheels_env
+    - CACHE_NAME=linuxwheelsbuild
+  script:
+    - *travis_docker_image_launch
+    - docker run --rm -t
+      -v "${HOME}:/travis/home"
+      -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest
+      sh -c "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
+
+osx_build_wheels: &osx_build_wheels
+  <<: *py2_osx_test_config
+  <<: *base_build_wheels
+  name: "Build OSX wheels (No PEX)"
+  osx_image: xcode8
+  env:
+    - *py2_osx_test_config_env
+    - *base_build_wheels_env
+    - CACHE_NAME=osxwheelsbuild
+  script:
+    - ./build-support/bin/release.sh -n
+
+# -------------------------------------------------------------------------
 # Rust tests
 # -------------------------------------------------------------------------
 
@@ -515,46 +555,6 @@ py3_jvm_tests: &py3_jvm_tests
     - ./build-support/bin/travis-ci.sh -j
 
 # -------------------------------------------------------------------------
-# Build wheels
-# -------------------------------------------------------------------------
-
-base_build_wheels: &base_build_wheels
-  stage: *test
-  env:
-    - &base_build_wheels_env RUN_PANTS_FROM_PEX=1 PREPARE_DEPLOY=1
-
-linux_build_wheels: &linux_build_wheels
-  # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize
-  # compatibility. This is a Py2 shard, so it is not subject to #6985.
-  <<: *travis_docker_image
-  <<: *py2_linux_test_config
-  <<: *base_build_wheels
-  name: "Build Linux wheels (No PEX)"
-  env:
-    - *py2_linux_test_config_env
-    - *base_build_wheels_env
-    - CACHE_NAME=linuxwheelsbuild
-  script:
-    - *travis_docker_image_launch
-    - docker run --rm -t
-      -v "${HOME}:/travis/home"
-      -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest
-      sh -c "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
-
-osx_build_wheels: &osx_build_wheels
-  <<: *py2_osx_test_config
-  <<: *base_build_wheels
-  name: "Build OSX wheels (No PEX)"
-  osx_image: xcode8
-  env:
-    - *py2_osx_test_config_env
-    - *base_build_wheels_env
-    - CACHE_NAME=osxwheelsbuild
-  script:
-    - ./build-support/bin/release.sh -n
-
-# -------------------------------------------------------------------------
 # Deploy
 # -------------------------------------------------------------------------
 
@@ -615,6 +615,9 @@ matrix:
 
     - <<: *linux_rust_clippy
     - <<: *cargo_audit
+
+    - <<: *linux_build_wheels
+    - <<: *osx_build_wheels
 
     - <<: *py2_linux_test_config
       name: "Unit tests for pants and pants-plugins (Py2 PEX)"
@@ -1006,9 +1009,6 @@ matrix:
     - <<: *py2_jvm_tests
       stage: *test
     # - <<: *py3_jvm_tests
-
-    - <<: *linux_build_wheels
-    - <<: *osx_build_wheels
 
     - <<: *deploy_stable_multiplatform_pex
     - <<: *deploy_unstable_multiplatform_pex
