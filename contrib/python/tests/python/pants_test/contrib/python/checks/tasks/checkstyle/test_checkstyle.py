@@ -187,17 +187,6 @@ class CheckstyleTest(PythonTaskTestBase):
       self.execute_task(target_roots=[target_py2, target_py3])
     self.assertIn('7 Python Style issues found', str(task_error.exception))
 
-  def test_lint_runs_for_default_constraints_only(self):
-    target_py2 = self.create_py2_failing_target()
-    target_py3 = self.create_py3_failing_target()
-    with self.assertRaises(TaskError) as task_error:
-      self.execute_task(target_roots=[target_py2, target_py3])
-    self.assertIn('4 Python Style issues found', str(task_error.exception))
-
-  def test_lint_ignores_unwhitelisted_constraints(self):
-    target_py3 = self.create_py3_failing_target()
-    self.assertEqual(0, self.execute_task(target_roots=[target_py3]))
-
   def test_lint_runs_for_single_whitelisted_constraints(self):
     target_py3 = self.create_py3_failing_target()
     self.set_options(interpreter_constraints_whitelist=[self.py3_constraint])
