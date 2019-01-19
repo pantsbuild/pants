@@ -116,7 +116,7 @@ class JavacCompile(JvmCompile):
         f.write('{}\n'.format(processor.strip()))
 
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
-              settings, fatal_warnings, zinc_file_manager,
+              settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     classpath = (ctx.classes_dir.path,) + tuple(ce.path for ce in dependency_classpath)
 
@@ -168,10 +168,9 @@ class JavacCompile(JvmCompile):
 
     javac_cmd.extend(args)
 
-    if fatal_warnings:
-      javac_cmd.extend(self.get_options().fatal_warnings_enabled_args)
-    else:
-      javac_cmd.extend(self.get_options().fatal_warnings_disabled_args)
+    compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(compiler_option_sets)
+    javac_cmd.extend(compiler_option_sets_args)
+
 
     with argfile.safe_args(ctx.sources, self.get_options()) as batched_sources:
       javac_cmd.extend(batched_sources)

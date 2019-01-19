@@ -43,15 +43,17 @@ class CompilerOptionSetsMixin(object):
     """Override to set default for this option."""
     return {}
 
+  # TODO(mateo): The compiler_option_sets could use an API so implementing platforms can
+  # surface documentation - this took me awhile to unwind.
   def get_merged_args_for_compiler_option_sets(self, compiler_option_sets):
     compiler_options = set()
 
-    # Set values for enabled options (ignoring fatal_warnings if it has been handled above).
+    # Set values for enabled options.
     for option_set_key in compiler_option_sets:
       val = self.get_options().compiler_option_sets_enabled_args.get(option_set_key, ())
       compiler_options.update(val)
 
-    # Set values for disabled options (ignoring fatal_warnings if it has been handled above).
+    # Set values for disabled options.
     for option_set_key, disabled_args in self.get_options().compiler_option_sets_disabled_args.items():
       if not option_set_key in compiler_option_sets:
         compiler_options.update(disabled_args)

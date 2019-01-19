@@ -81,6 +81,8 @@ class JvmTarget(Target, Jarable):
                          dependents have access to the closure of exports. An example will be that
                          if A exports B, and B exports C, then any targets that depends on A will
                          have access to both B and C.
+    :param list compiler_option_sets: A list of compiler_option_sets keys for the target. Platform
+      dependent.
     :param bool zinc_file_manager: Whether to use zinc provided file manager that allows
                                    transactional rollbacks, but in certain cases may conflict with
                                    user libraries.
