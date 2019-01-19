@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 from future.utils import PY3
 from mock import MagicMock
-from psutil.tests import safe_remove
+from psutil.tests import safe_rmpath
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
@@ -247,7 +247,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
         conf, path = jar_cp[0]
 
         # Remove the hard link under .pants.d/
-        safe_remove(path)
+        safe_rmpath(path)
 
         # Remove coursier's cache
         safe_rmtree(couriser_cache_dir)
