@@ -19,12 +19,13 @@ from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesC
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, Throw
+from pants.engine.objects import Collection
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Params, Select, constraint_for
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
-from pants.util.objects import Collection, datatype
+from pants.util.objects import datatype
 from pants.util.strutil import pluralize
 
 

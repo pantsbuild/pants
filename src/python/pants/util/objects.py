@@ -4,16 +4,14 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import sys
 from abc import abstractmethod
-from builtins import object, zip
+from builtins import zip
 from collections import namedtuple
 
-from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
 from pants.util.collections_abc_backport import OrderedDict
-from pants.util.memo import memoized, memoized_classproperty
+from pants.util.memo import memoized_classproperty
 from pants.util.meta import AbstractClass
 
 
@@ -391,34 +389,3 @@ class SubclassesOf(TypeConstraint):
 
   def satisfied_by_type(self, obj_type):
     return issubclass(obj_type, self._types)
-
-
-class Collection(object):
-  """Constructs classes representing collections of objects of a particular type.
-
-  The produced class will expose its values under a field named dependencies - this is a stable API
-  which may be consumed e.g. over FFI from the engine.
-
-  Python consumers of a Collection should prefer to use its standard iteration API.
-  """
-  # TODO: could we check that the input is iterable in the ctor?
-
-  @classmethod
-  @memoized
-  def of(cls, *element_types):
-    union = '|'.join(element_type.__name__ for element_type in element_types)
-    type_name = '{}.of({})'.format(cls.__name__, union)
-    if PY2:
-      type_name = type_name.encode('utf-8')
-    # TODO: could we allow type checking in the datatype() invocation here?
-    supertypes = (cls, datatype(['dependencies'], superclass_name='Collection'))
-    properties = {'element_types': element_types}
-    collection_of_type = type(type_name, supertypes, properties)
-
-    # Expose the custom class type at the module level to be pickle compatible.
-    setattr(sys.modules[cls.__module__], type_name, collection_of_type)
-
-    return collection_of_type
-
-  def __iter__(self):
-    return iter(self.dependencies)

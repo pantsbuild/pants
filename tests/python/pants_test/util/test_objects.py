@@ -12,14 +12,9 @@ from builtins import object, str
 
 from future.utils import PY2, PY3, text_type
 
-from pants.util.objects import (Collection, Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
+from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
                                 TypedDatatypeInstanceConstructionError, datatype, enum)
 from pants_test.test_base import TestBase
-
-
-class CollectionTest(TestBase):
-  def test_collection_iteration(self):
-    self.assertEqual([1, 2], [x for x in Collection.of(int)([1, 2])])
 
 
 class TypeConstraintTestBase(TestBase):

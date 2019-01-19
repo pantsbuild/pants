@@ -5,10 +5,16 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
+import sys
 from abc import abstractmethod, abstractproperty
+from builtins import object
 from collections import namedtuple
 
+from future.utils import PY2
+
+from pants.util.memo import memoized_classmethod
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 class SerializationError(Exception):
@@ -146,3 +152,36 @@ class Validatable(AbstractClass):
 
     :raises: :class:`ValidationError` if this object is invalid.
     """
+
+
+class Collection(object):
+  """Constructs classes representing collections of objects of a particular type.
+
+  The produced class will expose its values under a field named dependencies - this is a stable API
+  which may be consumed e.g. over FFI from the engine.
+
+  Python consumers of a Collection should prefer to use its standard iteration API.
+  """
+  # TODO: could we check that the input is iterable in the ctor?
+
+  @memoized_classmethod
+  def of(cls, *element_types):
+    union = '|'.join(element_type.__name__ for element_type in element_types)
+    type_name = '{}.of({})'.format(cls.__name__, union)
+    if PY2:
+      type_name = type_name.encode('utf-8')
+    # TODO: could we allow type checking in the datatype() invocation here?
+    # TODO: we are using `datatype` here, so all we need to do to sync `Collection.of` is to use the
+    # collection type checking we develop in this PR!
+    # TODO: also consider whether we can make Collection.of() the exact same thing? not sure
+    supertypes = (cls, datatype(['dependencies'], superclass_name=cls.__name__))
+    properties = {'element_types': element_types}
+    collection_of_type = type(type_name, supertypes, properties)
+
+    # Expose the custom class type at the module level to be pickle compatible.
+    setattr(sys.modules[cls.__module__], type_name, collection_of_type)
+
+    return collection_of_type
+
+  def __iter__(self):
+    return iter(self.dependencies)
