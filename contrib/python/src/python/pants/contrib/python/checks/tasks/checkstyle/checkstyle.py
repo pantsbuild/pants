@@ -78,7 +78,7 @@ class Checkstyle(LintTaskMixin, Task):
     register('--fail', fingerprint=True, default=True, type=bool,
              help='Prevent test failure but still produce output for problems.')
     register('--interpreter-constraints-whitelist', fingerprint=True,
-             default=None,
+             type=list,
              help='A list of interpreter constraints for which matching targets will be linted '
                   'in addition to targets that match the global interpreter constraints '
                   '(either from defaults or pants.ini). If the user supplies an empty list, '
@@ -227,25 +227,14 @@ class Checkstyle(LintTaskMixin, Task):
         [vt.target for vt in invalidation_check.invalid_vts]
       )
       for filters, targets in tgts_by_compatibility.items():
-        if self.get_options().interpreter_constraints_whitelist is None and not self._constraints_are_whitelisted(filters):
-          deprecated_conditional(
-            lambda: self.get_options().interpreter_constraints_whitelist is None,
-            '1.14.0.dev2',
-            "Python linting is currently restricted to targets that match the global "
-            "interpreter constraints: {}. Pants detected unacceptable filters: {}. "
-            "Use the `--interpreter-constraints-whitelist` lint option to whitelist "
-            "compatibiltiy constraints."
-            .format(PythonSetup.global_instance().interpreter_constraints, filters)
-          )
-        else:
-          sources = self.calculate_sources([tgt for tgt in targets])
-          if sources:
-            allowed_interpreters = set(interpreter_cache.setup(filters=filters))
-            if not allowed_interpreters:
-              raise TaskError('No valid interpreters found for targets: {}\n(filters: {})'
-                              .format(targets, filters))
-            interpreter = min(allowed_interpreters)
-            failure_count += self.checkstyle(interpreter, sources)
+        sources = self.calculate_sources([tgt for tgt in targets])
+        if sources:
+          allowed_interpreters = set(interpreter_cache.setup(filters=filters))
+          if not allowed_interpreters:
+            raise TaskError('No valid interpreters found for targets: {}\n(filters: {})'
+                            .format(targets, filters))
+          interpreter = min(allowed_interpreters)
+          failure_count += self.checkstyle(interpreter, sources)
       if failure_count > 0 and self.get_options().fail:
         raise TaskError('{} Python Style issues found. You may try `./pants fmt <targets>`'
                         .format(failure_count))
