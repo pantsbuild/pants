@@ -567,6 +567,7 @@ python_library(
     'src/python/pants/java:executor',
     'src/python/pants/java:nailgun_executor',
     'src/python/pants/java:util',
+    'src/python/pants/process',
     'src/python/pants/task',
   ],
 )

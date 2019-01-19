@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.init.subprocess import Subprocess
+from pants.process.subprocess import Subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 from pants_test.test_base import TestBase
 
