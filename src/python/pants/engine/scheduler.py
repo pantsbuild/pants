@@ -16,11 +16,11 @@ from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
                              MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.native import Function, TypeConstraint, TypeId
+from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import Params, Select, constraint_for
+from pants.engine.selectors import Params, Select
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
@@ -83,7 +83,7 @@ class Scheduler(object):
     self._visualize_to_dir = visualize_to_dir
     # Validate and register all provided and intrinsic tasks.
     rule_index = RuleIndex.create(list(rules), union_rules)
-    self._root_subject_types = [r.output_constraint for r in rule_index.roots]
+    self._root_subject_types = [r.output_type for r in rule_index.roots]
 
     # Create the native Scheduler and Session.
     # TODO: This `_tasks` reference could be a local variable, since it is not used
@@ -104,19 +104,19 @@ class Scheduler(object):
       construct_file_content=FileContent,
       construct_files_content=FilesContent,
       construct_process_result=FallibleExecuteProcessResult,
-      constraint_address=constraint_for(Address),
-      constraint_path_globs=constraint_for(PathGlobs),
-      constraint_directory_digest=constraint_for(Digest),
-      constraint_snapshot=constraint_for(Snapshot),
-      constraint_merge_snapshots_request=constraint_for(MergedDirectories),
-      constraint_files_content=constraint_for(FilesContent),
-      constraint_dir=constraint_for(Dir),
-      constraint_file=constraint_for(File),
-      constraint_link=constraint_for(Link),
-      constraint_process_request=constraint_for(ExecuteProcessRequest),
-      constraint_process_result=constraint_for(FallibleExecuteProcessResult),
-      constraint_generator=constraint_for(GeneratorType),
-      constraint_url_to_fetch=constraint_for(UrlToFetch),
+      type_address=Address,
+      type_path_globs=PathGlobs,
+      type_directory_digest=Digest,
+      type_snapshot=Snapshot,
+      type_merge_snapshots_request=MergedDirectories,
+      type_files_content=FilesContent,
+      type_dir=Dir,
+      type_file=File,
+      type_link=Link,
+      type_process_request=ExecuteProcessRequest,
+      type_process_result=FallibleExecuteProcessResult,
+      type_generator=GeneratorType,
+      type_url_to_fetch=UrlToFetch,
     )
 
 
@@ -159,14 +159,11 @@ class Scheduler(object):
   def _to_key(self, obj):
     return self._native.context.to_key(obj)
 
-  def _from_id(self, cdata):
-    return self._native.context.from_id(cdata)
-
   def _from_key(self, cdata):
     return self._native.context.from_key(cdata)
 
-  def _to_constraint(self, type_or_constraint):
-    return TypeConstraint(self._to_key(constraint_for(type_or_constraint)))
+  def _to_type(self, type_obj):
+    return TypeId(self._to_id(type_obj))
 
   def _to_ids_buf(self, types):
     return self._native.to_ids_buf(types)
@@ -177,59 +174,53 @@ class Scheduler(object):
   def _register_rules(self, rule_index):
     """Record the given RuleIndex on `self._tasks`."""
     registered = set()
-    for product_type, rules in rule_index.rules.items():
-      # TODO: The rules map has heterogeneous keys, so we normalize them to type constraints
-      # and dedupe them before registering to the native engine:
-      #   see: https://github.com/pantsbuild/pants/issues/4005
-      output_constraint = self._to_constraint(product_type)
+    for output_type, rules in rule_index.rules.items():
       for rule in rules:
-        key = (output_constraint, rule)
+        key = (output_type, rule)
         if key in registered:
           continue
         registered.add(key)
 
         if type(rule) is SingletonRule:
-          self._register_singleton(output_constraint, rule)
+          self._register_singleton(output_type, rule)
         elif type(rule) is TaskRule:
-          self._register_task(output_constraint, rule, rule_index.union_rules)
+          self._register_task(output_type, rule, rule_index.union_rules)
         else:
           raise ValueError('Unexpected Rule type: {}'.format(rule))
 
-  def _register_singleton(self, output_constraint, rule):
+  def _register_singleton(self, output_type, rule):
     """Register the given SingletonRule.
 
     A SingletonRule installed for a type will be the only provider for that type.
     """
     self._native.lib.tasks_singleton_add(self._tasks,
                                          self._to_value(rule.value),
-                                         output_constraint)
+                                         TypeId(self._to_id(output_type)))
 
-  def _register_task(self, output_constraint, rule, union_rules):
+  def _register_task(self, output_type, rule, union_rules):
     """Register the given TaskRule with the native scheduler."""
     func = Function(self._to_key(rule.func))
-    self._native.lib.tasks_task_begin(self._tasks, func, output_constraint, rule.cacheable)
+    self._native.lib.tasks_task_begin(self._tasks, func, self._to_type(output_type), rule.cacheable)
     for selector in rule.input_selectors:
       selector_type = type(selector)
-      product_constraint = self._to_constraint(selector.product)
       if selector_type is Select:
-        self._native.lib.tasks_add_select(self._tasks, product_constraint)
+        self._native.lib.tasks_add_select(self._tasks, self._to_type(selector.product))
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
 
     def add_get_edge(product, subject):
-      self._native.lib.tasks_add_get(self._tasks,
-                                     self._to_constraint(product),
-                                     TypeId(self._to_id(subject)))
+      self._native.lib.tasks_add_get(self._tasks, self._to_type(product), self._to_type(subject))
 
-    for get in rule.input_gets:
-      union_members = union_rules.get(get.subject_declared_type, None)
+    for the_get in rule.input_gets:
+      union_members = union_rules.get(the_get.subject_declared_type, None)
       if union_members:
-        # If the registered subject type is a union, add get edges to all registered union members.
+        # If the registered subject type is a union, add Get edges to all registered union members.
         for union_member in union_members:
-          add_get_edge(get.product, union_member)
+          add_get_edge(the_get.product, union_member)
       else:
-        # Otherwise, the Get subject is a "concrete" type, so add a single get edge.
-        add_get_edge(get.product, get.subject_declared_type)
+        # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
+        add_get_edge(the_get.product, the_get.subject_declared_type)
+
     self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, session, filename):
@@ -252,7 +243,7 @@ class Scheduler(object):
   def rule_subgraph_visualization(self, root_subject_type, product_type):
     root_type_id = TypeId(self._to_id(root_subject_type))
 
-    product_type_id = TypeConstraint(self._to_key(constraint_for(product_type)))
+    product_type_id = TypeId(self._to_id(product_type))
     with temporary_file_path() as path:
       self._native.lib.rule_subgraph_visualize(
         self._scheduler,
@@ -285,7 +276,7 @@ class Scheduler(object):
     res = self._native.lib.execution_add_root_select(self._scheduler,
                                                      execution_request,
                                                      self._to_vals_buf(params),
-                                                     self._to_constraint(product))
+                                                     self._to_type(product))
     self._raise_or_return(res)
 
   def visualize_to_dir(self):

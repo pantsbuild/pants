@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::hash;
 
 use crate::core::{Key, Value, FNV};
-use crate::externs;
+use crate::externs::{self, Ident, ProductTypeId};
 
 ///
 /// A struct that encapsulates interning of python `Value`s as comparable `Key`s.
@@ -43,14 +43,31 @@ impl Interns {
     Interns::default()
   }
 
-  pub fn insert(&mut self, v: Value) -> Key {
-    let ident = externs::identify(&v);
-    let type_id = ident.type_id;
+  pub fn insert_product(&mut self, v: Value) -> Key {
+    let ProductTypeId { hash, type_id } = externs::product_type(&v);
     let mut inserted = false;
     let id_generator = self.id_generator;
     let key = *self
       .forward
-      .entry(InternKey(ident.hash, v.clone()))
+      .entry(InternKey(hash, v.clone()))
+      .or_insert_with(|| {
+        inserted = true;
+        Key::new(id_generator, type_id)
+      });
+    if inserted {
+      self.reverse.insert(key, v);
+      self.id_generator += 1;
+    }
+    key
+  }
+
+  pub fn insert(&mut self, v: Value) -> Key {
+    let Ident { hash, type_id } = externs::identify(&v);
+    let mut inserted = false;
+    let id_generator = self.id_generator;
+    let key = *self
+      .forward
+      .entry(InternKey(hash, v.clone()))
       .or_insert_with(|| {
         inserted = true;
         Key::new(id_generator, type_id)

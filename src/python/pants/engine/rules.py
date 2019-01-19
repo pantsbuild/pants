@@ -17,15 +17,18 @@ import asttokens
 from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
-from pants.engine.selectors import Get, type_or_constraint_repr
+from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
 from pants.util.collections_abc_backport import Iterable, OrderedDict
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
-from pants.util.objects import Exactly, datatype
+from pants.util.objects import Exactly, SubclassesOf, datatype
 
 
 logger = logging.getLogger(__name__)
+
+
+_type_field = SubclassesOf(type)
 
 
 class _RuleVisitor(ast.NodeVisitor):
@@ -368,16 +371,17 @@ class Rule(AbstractClass):
   """
 
   @abstractproperty
-  def output_constraint(self):
-    """An output Constraint type for the rule."""
+  def output_type(self):
+    """An output `type` for the rule."""
 
-  @abstractproperty
+  @property
   def dependency_optionables(self):
     """A tuple of Optionable classes that are known to be necessary to run this rule."""
+    return ()
 
 
 class TaskRule(datatype([
-  'output_constraint',
+  ('output_type', _type_field),
   ('input_selectors', tuple),
   ('input_gets', tuple),
   'func',
@@ -400,18 +404,10 @@ class TaskRule(datatype([
               goal=None,
               dependency_optionables=None,
               cacheable=True):
-    # Validate result type.
-    if isinstance(output_type, Exactly):
-      constraint = output_type
-    elif isinstance(output_type, type):
-      constraint = Exactly(output_type)
-    else:
-      raise TypeError("Expected an output_type for rule `{}`, got: {}".format(
-        func.__name__, output_type))
 
     return super(TaskRule, cls).__new__(
         cls,
-        constraint,
+        output_type,
         input_selectors,
         input_gets,
         func,
@@ -422,41 +418,22 @@ class TaskRule(datatype([
 
   def __str__(self):
     return ('({}, {!r}, {}, gets={}, opts={})'
-            .format(type_or_constraint_repr(self.output_constraint),
+            .format(self.output_type.__name__,
                     self.input_selectors,
                     self.func.__name__,
                     self.input_gets,
                     self.dependency_optionables))
 
 
-class SingletonRule(datatype(['output_constraint', 'value']), Rule):
+class SingletonRule(datatype([('output_type', _type_field), 'value']), Rule):
   """A default rule for a product, which is thus a singleton for that product."""
 
   @classmethod
   def from_instance(cls, obj):
     return cls(type(obj), obj)
 
-  def __new__(cls, output_type, value):
-    # Validate result type.
-    if isinstance(output_type, Exactly):
-      constraint = output_type
-    elif isinstance(output_type, type):
-      constraint = Exactly(output_type)
-    else:
-      raise TypeError("Expected an output_type for rule; got: {}".format(output_type))
 
-    # Create.
-    return super(SingletonRule, cls).__new__(cls, constraint, value)
-
-  @property
-  def dependency_optionables(self):
-    return tuple()
-
-  def __repr__(self):
-    return '{}({}, {})'.format(type(self).__name__, type_or_constraint_repr(self.output_constraint), self.value)
-
-
-class RootRule(datatype(['output_constraint']), Rule):
+class RootRule(datatype([('output_type', _type_field)]), Rule):
   """Represents a root input to an execution of a rule graph.
 
   Roots act roughly like parameters, in that in some cases the only source of a
@@ -464,17 +441,15 @@ class RootRule(datatype(['output_constraint']), Rule):
   of an execution.
   """
 
-  @property
-  def dependency_optionables(self):
-    return tuple()
 
-
+# TODO: add typechecking here -- would need to have a TypedCollection for dicts for `union_rules`.
 class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
   """Holds a normalized index of Rules used to instantiate Nodes."""
 
   @classmethod
   def create(cls, rule_entries, union_rules=None):
     """Creates a RuleIndex with tasks indexed by their output type."""
+    # TODO: make a defaultdict-like wrapper for OrderedDict (and other types?)!
     serializable_rules = OrderedDict()
     serializable_roots = OrderedSet()
     union_rules = OrderedDict(union_rules or ())
@@ -491,12 +466,7 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
       if isinstance(rule, RootRule):
         add_root_rule(rule)
       else:
-        # TODO: Ensure that interior types work by indexing on the list of types in
-        # the constraint. This heterogenity has some confusing implications:
-        #   see https://github.com/pantsbuild/pants/issues/4005
-        for kind in rule.output_constraint.types:
-          add_task(kind, rule)
-        add_task(rule.output_constraint, rule)
+        add_task(rule.output_type, rule)
 
     def add_type_transition_rule(union_rule):
       # NB: This does not require that union bases be supplied to `def rules():`, as the union type

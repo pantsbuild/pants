@@ -248,7 +248,7 @@ class EngineInitializer(object):
           'could not map goal `{}` to rule `{}`: already claimed by product `{}`'
           .format(goal, rule, goal_map[goal])
         )
-      goal_map[goal] = rule.output_constraint
+      goal_map[goal] = rule.output_type
     return goal_map
 
   @staticmethod
