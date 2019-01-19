@@ -17,7 +17,7 @@ packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.9
 pex==1.5.3
-psutil==4.3.0
+psutil==5.4.8
 protobuf==3.6.1
 pycodestyle==2.4.0
 pyflakes==2.0.0
