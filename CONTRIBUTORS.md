@@ -116,6 +116,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Luca Clementi
 + Lukasz Jastrzebski
 + Marc Abramowitz
++ Marcin Podolski
 + Marilyn Cruz
 + Marius Eriksen
 + Mark Chu-Carroll
