@@ -8,7 +8,7 @@ import os
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.targets.jvm_binary import JvmBinary, JarRules, Duplicate, Skip
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
@@ -240,3 +240,36 @@ class DuplicateDetectorTest(JvmTaskTestBase):
 
     # Defaults are now overridden
     self.assertFalse(task._is_excluded('META-INF/services/foo'))
+
+  def _setup_external_duplicate_with_rules(self, rules):
+    jvm_binary = self.make_target(spec='src/java/com/twitter:thing',
+                                  target_type=JvmBinary,
+                                  dependencies=[self.test_jarlib, self.dups_jarlib],
+                                  deploy_jar_rules=rules)
+    context = self.context(target_roots=[jvm_binary])
+    task = self.create_task(context)
+
+    classpath = self.get_runtime_classpath(context)
+    classpath.add_jars_for_targets([self.test_jarlib], 'default', [self.test_resolved_jar])
+    classpath.add_jars_for_targets([self.dups_jarlib], 'default', [self.dups_resolved_jar])
+    return task, jvm_binary
+
+  def test_duplicate_rule_skip(self):
+    self.set_options(fail_fast=False)
+    task, _ = self._setup_external_duplicate_with_rules(
+      rules=JarRules([Skip('^com/twitter/commons/Duplicate.class$')]))
+    conflicts_by_binary = task.execute()
+    self.assertEqual({}, conflicts_by_binary)
+
+  def test_duplicate_rule_no_match(self):
+    self.set_options(fail_fast=False)
+    task, jvm_binary = self._setup_external_duplicate_with_rules(
+      rules=JarRules([Skip('^com/twitter/commons/DoesNotExist.class$')]))
+    conflicts_by_binary = task.execute()
+    expected = {
+      jvm_binary: {
+        ('org.example-dups-0.0.1.jar', 'org.example-test-0.0.1.jar'):
+          {'com/twitter/commons/Duplicate.class'}
+      }
+    }
+    self.assertEqual(expected, conflicts_by_binary)
