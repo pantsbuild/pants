@@ -56,7 +56,7 @@ Bugfixes
   `PR #6987 <https://github.com/pantsbuild/pants/pull/6987>`_
 
 * Revert "set PEX_PYTHON_PATH when invoking the checkstyle pex for pexrc to work (#7013)" (#7028)
-  `PR #7013 <https://github.com/pantsbuild/pants/pull/7013>`_
+  `PR #7028 <https://github.com/pantsbuild/pants/pull/7028>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
