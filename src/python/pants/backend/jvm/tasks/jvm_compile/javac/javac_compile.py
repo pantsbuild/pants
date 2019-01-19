@@ -171,7 +171,6 @@ class JavacCompile(JvmCompile):
     compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(compiler_option_sets)
     javac_cmd.extend(compiler_option_sets_args)
 
-
     with argfile.safe_args(ctx.sources, self.get_options()) as batched_sources:
       javac_cmd.extend(batched_sources)
 

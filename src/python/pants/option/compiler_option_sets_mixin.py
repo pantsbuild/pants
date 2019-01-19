@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from builtins import object
 
-from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
 
 
@@ -24,16 +23,6 @@ class CompilerOptionSetsMixin(object):
              help='Extra compiler args to use for each disabled option set.')
 
   @classproperty
-  def get_fatal_warnings_enabled_args_default(cls):
-    """Override to set default for this option."""
-    return ()
-
-  @classproperty
-  def get_fatal_warnings_disabled_args_default(cls):
-    """Override to set default for this option."""
-    return ()
-
-  @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):
     """Override to set default for this option."""
     return {}
@@ -43,7 +32,17 @@ class CompilerOptionSetsMixin(object):
     """Override to set default for this option."""
     return {}
 
-  # TODO(mateo): The compiler_option_sets could use an API so implementing platforms can
+  @classproperty
+  def get_fatal_warnings_enabled_args_default(cls):
+    """Override to set default for this option."""
+    return ()
+
+  @classproperty
+  def get_fatal_warnings_disabled_args_default(cls):
+    """Override to set default for this option."""
+    return ()
+
+  # TODO(mateo): The compiler_option_sets could use an API that requires implementing platforms to
   # surface documentation - this took me awhile to unwind.
   def get_merged_args_for_compiler_option_sets(self, compiler_option_sets):
     compiler_options = set()
