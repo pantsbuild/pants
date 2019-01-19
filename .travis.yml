@@ -321,6 +321,62 @@ py3_osx_build_engine: &py3_osx_build_engine
     - BOOTSTRAP_ARGS='-b'
 
 # -------------------------------------------------------------------------
+# Lint
+# -------------------------------------------------------------------------
+
+py2_lint: &py2_lint
+  <<: *py2_linux_test_config
+  name: "Self-checks and lint (Py2 PEX)"
+  env:
+    - *py2_linux_test_config_env
+    - CACHE_NAME=linuxselfchecks.py2
+  script:
+    - ./build-support/bin/travis-ci.sh -fmrt2
+
+py3_lint: &py3_lint
+  <<: *py3_linux_test_config
+  name: "Self-checks and lint (Py3 PEX)"
+  env:
+    - *py3_linux_test_config_env
+    - CACHE_NAME=linuxselfchecks.py3
+  script:
+    - ./build-support/bin/travis-ci.sh -fmrt
+
+# -------------------------------------------------------------------------
+# Rust lints
+# -------------------------------------------------------------------------
+
+linux_rust_clippy: &linux_rust_clippy
+  <<: *linux_with_fuse
+  <<: *native_engine_cache_config
+  name: "Linux Rust Clippy (No PEX)"
+  env:
+    - CACHE_NAME=linuxclippy
+  os: linux
+  dist: xenial
+  sudo: required
+  stage: *test
+  language: python
+  python: *python3_version
+  before_script:
+    - ulimit -c unlimited
+    - ulimit -n 8192
+  script:
+    - ./build-support/bin/travis-ci.sh -s
+
+cargo_audit: &cargo_audit
+  <<: *linux_with_fuse
+  name: "Cargo audit (No PEX)"
+  env:
+    - CACHE_NAME=linuxcargoaudit
+  os: linux
+  dist: xenial
+  sudo: required
+  stage: *cron
+  script:
+    - ./build-support/bin/travis-ci.sh -a
+
+# -------------------------------------------------------------------------
 # Build wheels
 # -------------------------------------------------------------------------
 
@@ -359,6 +415,46 @@ osx_build_wheels: &osx_build_wheels
     - CACHE_NAME=osxwheelsbuild
   script:
     - ./build-support/bin/release.sh -n
+
+# -------------------------------------------------------------------------
+# Rust tests
+# -------------------------------------------------------------------------
+
+base_rust_tests: &base_rust_tests
+  <<: *native_engine_cache_config
+  stage: *test
+  before_script:
+    - ulimit -c unlimited
+    - ulimit -n 8192
+
+linux_rust_tests: &linux_rust_tests
+  <<: *base_rust_tests
+  <<: *linux_with_fuse
+  name: "Linux Rust tests (No PEX)"
+  env:
+    - CACHE_NAME=linuxrusttests
+  os: linux
+  dist: xenial
+  sudo: required
+  language: python
+  python: *python3_version
+  script:
+    - ./build-support/bin/travis-ci.sh -e
+
+osx_rust_tests: &osx_rust_tests
+  <<: *base_rust_tests
+  name: "OSX Rust tests (No PEX)"
+  env:
+    - CACHE_NAME=macosrusttests
+  os: osx
+  # Fuse actually works on this image. It hangs on many others.
+  osx_image: xcode8.3
+  addons:
+    homebrew:
+      casks:
+      - osxfuse
+  script:
+    - ./build-support/bin/travis-ci.sh -e
 
 # -------------------------------------------------------------------------
 # OSX sanity checks
@@ -410,26 +506,53 @@ py3_osx_10_13_sanity_check: &py3_osx_10_13_sanity_check
     - CACHE_NAME=macos10.13sanity.py3
 
 # -------------------------------------------------------------------------
-# Lint
+# Platform specific tests
 # -------------------------------------------------------------------------
 
-py2_lint: &py2_lint
+py2_osx_platform_tests: &py2_osx_platform_tests
+  <<: *py2_osx_test_config
+  name: "OSX platform-specific tests (Py2 PEX)"
+  env:
+    - *py2_osx_test_config_env
+    - CACHE_NAME=macosplatformtests.py2
+  script:
+    - ./build-support/bin/travis-ci.sh -z2
+
+py3_osx_platform_tests: &py3_osx_platform_tests
+  <<: *py3_osx_test_config
+  name: "OSX platform-specific tests (Py3 PEX)"
+  env:
+    - *py3_osx_test_config_env
+    - CACHE_NAME=macosplatformtests.py3
+  script:
+    - ./build-support/bin/travis-ci.sh -z
+
+# -------------------------------------------------------------------------
+# JVM tests
+# -------------------------------------------------------------------------
+
+base_jvm_tests: &base_jvm_tests
+  <<: *linux_with_fuse
+
+py2_jvm_tests: &py2_jvm_tests
   <<: *py2_linux_test_config
-  name: "Self-checks and lint (Py2 PEX)"
+  <<: *base_jvm_tests
+  name: "JVM tests (Py2 PEX)"
   env:
     - *py2_linux_test_config_env
-    - CACHE_NAME=linuxselfchecks.py2
+    - CACHE_NAME=linuxjvmtests.py2
   script:
-    - ./build-support/bin/travis-ci.sh -fmrt2
+    - ./build-support/bin/travis-ci.sh -j2
 
-py3_lint: &py3_lint
+py3_jvm_tests: &py3_jvm_tests
   <<: *py3_linux_test_config
-  name: "Self-checks and lint (Py3 PEX)"
+  <<: *base_jvm_tests
+  name: "JVM tests (Py3 PEX)"
   env:
     - *py3_linux_test_config_env
-    - CACHE_NAME=linuxselfchecks.py3
+    - CACHE_NAME=linuxjvmtests.py3
   script:
-    - ./build-support/bin/travis-ci.sh -fmrt
+    - ./build-support/bin/travis-ci.sh -j
 
 # -------------------------------------------------------------------------
 # Deploy
@@ -473,129 +596,6 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
     - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
 
 # -------------------------------------------------------------------------
-# JVM tests
-# -------------------------------------------------------------------------
-
-base_jvm_tests: &base_jvm_tests
-  <<: *linux_with_fuse
-
-py2_jvm_tests: &py2_jvm_tests
-  <<: *py2_linux_test_config
-  <<: *base_jvm_tests
-  name: "JVM tests (Py2 PEX)"
-  env:
-    - *py2_linux_test_config_env
-    - CACHE_NAME=linuxjvmtests.py2
-  script:
-    - ./build-support/bin/travis-ci.sh -j2
-
-py3_jvm_tests: &py3_jvm_tests
-  <<: *py3_linux_test_config
-  <<: *base_jvm_tests
-  name: "JVM tests (Py3 PEX)"
-  env:
-    - *py3_linux_test_config_env
-    - CACHE_NAME=linuxjvmtests.py3
-  script:
-    - ./build-support/bin/travis-ci.sh -j
-
-# -------------------------------------------------------------------------
-# Platform specific tests
-# -------------------------------------------------------------------------
-
-py2_osx_platform_tests: &py2_osx_platform_tests
-  <<: *py2_osx_test_config
-  name: "OSX platform-specific tests (Py2 PEX)"
-  env:
-    - *py2_osx_test_config_env
-    - CACHE_NAME=macosplatformtests.py2
-  script:
-    - ./build-support/bin/travis-ci.sh -z2
-
-py3_osx_platform_tests: &py3_osx_platform_tests
-  <<: *py3_osx_test_config
-  name: "OSX platform-specific tests (Py3 PEX)"
-  env:
-    - *py3_osx_test_config_env
-    - CACHE_NAME=macosplatformtests.py3
-  script:
-    - ./build-support/bin/travis-ci.sh -z
-
-# -------------------------------------------------------------------------
-# Rust tests
-# -------------------------------------------------------------------------
-
-base_rust_tests: &base_rust_tests
-  <<: *native_engine_cache_config
-  stage: *test
-  before_script:
-    - ulimit -c unlimited
-    - ulimit -n 8192
-
-linux_rust_tests: &linux_rust_tests
-  <<: *base_rust_tests
-  <<: *linux_with_fuse
-  name: "Linux Rust tests (No PEX)"
-  env:
-    - CACHE_NAME=linuxrusttests
-  os: linux
-  dist: xenial
-  sudo: required
-  language: python
-  python: *python3_version
-  script:
-    - ./build-support/bin/travis-ci.sh -e
-
-osx_rust_tests: &osx_rust_tests
-  <<: *base_rust_tests
-  name: "OSX Rust tests (No PEX)"
-  env:
-    - CACHE_NAME=macosrusttests
-  os: osx
-  # Fuse actually works on this image. It hangs on many others.
-  osx_image: xcode8.3
-  addons:
-    homebrew:
-      casks:
-      - osxfuse
-  script:
-    - ./build-support/bin/travis-ci.sh -e
-
-# -------------------------------------------------------------------------
-# Rust audits
-# -------------------------------------------------------------------------
-
-linux_rust_clippy: &linux_rust_clippy
-  <<: *linux_with_fuse
-  <<: *native_engine_cache_config
-  name: "Linux Rust Clippy (No PEX)"
-  env:
-    - CACHE_NAME=linuxclippy
-  os: linux
-  dist: xenial
-  sudo: required
-  stage: *test
-  language: python
-  python: *python3_version
-  before_script:
-    - ulimit -c unlimited
-    - ulimit -n 8192
-  script:
-    - ./build-support/bin/travis-ci.sh -s
-
-cargo_audit: &cargo_audit
-  <<: *linux_with_fuse
-  name: "Cargo audit (No PEX)"
-  env:
-    - CACHE_NAME=linuxcargoaudit
-  os: linux
-  dist: xenial
-  sudo: required
-  stage: *cron
-  script:
-    - ./build-support/bin/travis-ci.sh -a
-
-# -------------------------------------------------------------------------
 # Test matrix
 # -------------------------------------------------------------------------
 
@@ -607,23 +607,17 @@ matrix:
     - <<: *py2_osx_build_engine
     - <<: *py3_osx_build_engine
 
-    - <<: *linux_build_wheels
-    - <<: *osx_build_wheels
-
-    - <<: *py2_osx_10_12_sanity_check
-    - <<: *py3_osx_10_12_sanity_check
-
-    - <<: *py2_osx_10_13_sanity_check
-    - <<: *py3_osx_10_13_sanity_check
-
-    - <<: *deploy_stable_multiplatform_pex
-    - <<: *deploy_unstable_multiplatform_pex
-
     # TODO: get this to pass using Python 3. In the meantime, just use Python 2.
     # May be completely fixed by https://github.com/pantsbuild/pants/pull/7067..
     - <<: *py2_lint
       stage: *test
     # - <<: *py3_lint
+
+    - <<: *linux_rust_clippy
+    - <<: *cargo_audit
+
+    - <<: *linux_build_wheels
+    - <<: *osx_build_wheels
 
     - <<: *py2_linux_test_config
       name: "Unit tests for pants and pants-plugins (Py2 PEX)"
@@ -641,26 +635,6 @@ matrix:
         - CACHE_NAME=linuxunittests.py3
       script:
         - ./build-support/bin/travis-ci.sh -lp
-
-    - <<: *py2_linux_test_config
-      name: "Python contrib tests (Py2 PEX)"
-      stage: *test
-      env:
-        - *py2_linux_test_config_env
-        - CACHE_NAME=linuxcontribtests.py2
-      script:
-        - ./build-support/bin/travis-ci.sh -2n
-
-    # TODO: get this passing with a Python 3 PEX.
-    - <<: *py2_linux_test_config
-      name: "Python contrib tests (Py2 PEX w/ Py3 constraints)"
-      stage: *test
-      env:
-        - *py2_linux_test_config_env
-        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
-        - CACHE_NAME=linuxcontribtests.py3
-      script:
-        - ./build-support/bin/travis-ci.sh -2n
 
     - <<: *py3_linux_test_config
       name: "Integration tests for pants - shard 0 (Py3 PEX)"
@@ -997,21 +971,47 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 19/20
 
 
-    # TODO: get this to pass using Python 3. In the meantime, just use Python 2.
-    - <<: *py2_jvm_tests
+    - <<: *linux_rust_tests
+    - <<: *osx_rust_tests
+
+    - <<: *py2_linux_test_config
+      name: "Python contrib tests (Py2 PEX)"
       stage: *test
-    # - <<: *py3_jvm_tests
+      env:
+        - *py2_linux_test_config_env
+        - CACHE_NAME=linuxcontribtests.py2
+      script:
+        - ./build-support/bin/travis-ci.sh -2n
+
+    # TODO: get this passing with a Python 3 PEX.
+    - <<: *py2_linux_test_config
+      name: "Python contrib tests (Py2 PEX w/ Py3 constraints)"
+      stage: *test
+      env:
+        - *py2_linux_test_config_env
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
+        - CACHE_NAME=linuxcontribtests.py3
+      script:
+        - ./build-support/bin/travis-ci.sh -2n
+
+    - <<: *py2_osx_10_12_sanity_check
+    - <<: *py3_osx_10_12_sanity_check
+
+    - <<: *py2_osx_10_13_sanity_check
+    - <<: *py3_osx_10_13_sanity_check
 
     # TODO: get this to pass using Python 3. In the meantime, just use Python 2.
     - <<: *py2_osx_platform_tests
       stage: *test
     # - <<: *py3_osx_platform_tests
 
-    - <<: *linux_rust_tests
-    - <<: *osx_rust_tests
+    # TODO: get this to pass using Python 3. In the meantime, just use Python 2.
+    - <<: *py2_jvm_tests
+      stage: *test
+    # - <<: *py3_jvm_tests
 
-    - <<: *linux_rust_clippy
-    - <<: *cargo_audit
+    - <<: *deploy_stable_multiplatform_pex
+    - <<: *deploy_unstable_multiplatform_pex
 
 deploy:
   # Deploy whatever a previous stage has left in dist/deploy.
