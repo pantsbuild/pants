@@ -314,6 +314,21 @@ def console_rule(goal_name, input_selectors):
   return _make_rule(output_type, input_selectors, goal_name, False)
 
 
+def union_rule(cls):
+  # TODO: do some checking!
+  assert(isinstance(cls, type))
+  return type(cls.__name__, (cls,), dict(_is_union=True))
+
+
+def union_member_rule(union_type):
+  assert(isinstance(union_type, type))
+  assert(union_type._is_union)
+  def class_wrapper(cls):
+    assert(isinstance(cls, type))
+    return type(cls.__name__, (cls,), dict(_union_type=union_type))
+  return class_wrapper
+
+
 class Rule(AbstractClass):
   """Rules declare how to produce products for the product graph.
 
@@ -420,7 +435,7 @@ class RootRule(datatype(['output_constraint']), Rule):
     return tuple()
 
 
-class RuleIndex(datatype(['rules', 'roots'])):
+class RuleIndex(datatype(['rules', 'roots', 'union_rules', 'union_roots'])):
   """Holds a normalized index of Rules used to instantiate Nodes."""
 
   @classmethod
@@ -428,22 +443,45 @@ class RuleIndex(datatype(['rules', 'roots'])):
     """Creates a RuleIndex with tasks indexed by their output type."""
     serializable_rules = OrderedDict()
     serializable_roots = OrderedSet()
+    union_roots = OrderedSet()
+    union_rules = OrderedDict()
 
     def add_task(product_type, rule):
       if product_type not in serializable_rules:
         serializable_rules[product_type] = OrderedSet()
       serializable_rules[product_type].add(rule)
 
+    def add_root_rule(root_rule):
+      serializable_roots.add(root_rule)
+
     def add_rule(rule):
       if isinstance(rule, RootRule):
-        serializable_roots.add(rule)
-        return
-      # TODO: Ensure that interior types work by indexing on the list of types in
-      # the constraint. This heterogenity has some confusing implications:
-      #   see https://github.com/pantsbuild/pants/issues/4005
-      for kind in rule.output_constraint.types:
-        add_task(kind, rule)
-      add_task(rule.output_constraint, rule)
+        add_root_rule(rule)
+      else:
+        # TODO: Ensure that interior types work by indexing on the list of types in
+        # the constraint. This heterogenity has some confusing implications:
+        #   see https://github.com/pantsbuild/pants/issues/4005
+        for kind in rule.output_constraint.types:
+          add_task(kind, rule)
+        add_task(rule.output_constraint, rule)
+
+    def add_type_transition_rule(union_rule):
+      if getattr(union_rule, '_is_union', False):
+        add_union_base(entry)
+      elif hasattr(entry, '_union_type'):
+        add_union_member_rule(entry)
+      else:
+        raise TypeError('???/types must be a union_rule or union_member_rule!')
+
+    def add_union_base(union_rule):
+      assert(union_rule not in union_roots)
+      union_roots.add(union_rule)
+
+    def add_union_member_rule(union_member_rule):
+      union_base = union_member_rule._union_type
+      if union_base not in union_rules:
+        union_rules[union_base] = OrderedSet()
+      union_rules[union_base].add(union_member_rule)
 
     for entry in rule_entries:
       if isinstance(entry, Rule):
@@ -453,12 +491,14 @@ class RuleIndex(datatype(['rules', 'roots'])):
         if rule is None:
           raise TypeError("Expected callable {} to be decorated with @rule.".format(entry))
         add_rule(rule)
+      elif isinstance(entry, type):
+        add_type_transition_rule(entry)
       else:
         raise TypeError("Unexpected rule type: {}. "
                         "Rules either extend Rule, or are static functions "
                         "decorated with @rule.".format(type(entry)))
 
-    return cls(serializable_rules, serializable_roots)
+    return cls(serializable_rules, serializable_roots, union_rules, union_roots)
 
   def normalized_rules(self):
     rules = OrderedSet(rule

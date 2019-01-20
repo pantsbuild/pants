@@ -1,6 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::mem;
@@ -226,21 +227,41 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
     PyGeneratorResponseType::Throw => Err(PyResult::failure_from(response.values.unwrap_one())),
     PyGeneratorResponseType::Get => {
       let mut interns = INTERNS.write();
-      let constraint = TypeConstraint(interns.insert(response.constraints.unwrap_one()));
-      Ok(GeneratorResponse::Get(Get(
-        constraint,
-        interns.insert(response.values.unwrap_one()),
-      )))
+      let product = TypeConstraint(interns.insert(response.products.unwrap_one()));
+      let subject_declared_type =
+        TypeConstraint(interns.insert(response.declared_types.unwrap_one()));
+      let subject = interns.insert(response.values.unwrap_one());
+      Ok(GeneratorResponse::Get(Get {
+        product,
+        subject_declared_type,
+        subject,
+      }))
     }
     PyGeneratorResponseType::GetMulti => {
       let mut interns = INTERNS.write();
-      let continues = response
-        .constraints
-        .to_vec()
-        .into_iter()
-        .zip(response.values.to_vec().into_iter())
-        .map(|(c, v)| Get(TypeConstraint(interns.insert(c)), interns.insert(v)))
-        .collect();
+      let PyGeneratorResponse {
+        values: values_buf,
+        declared_types: declared_types_buf,
+        products: products_buf,
+        ..
+      } = response;
+      let mut values = VecDeque::from(values_buf.to_vec());
+      let mut declared_types = VecDeque::from(declared_types_buf.to_vec());
+      let mut products = VecDeque::from(products_buf.to_vec());
+      assert_eq!(values.len(), declared_types.len());
+      assert_eq!(values.len(), products.len());
+      let mut continues = vec![];
+      while !values.is_empty() {
+        let subject = interns.insert(values.pop_front().unwrap());
+        let subject_declared_type =
+          TypeConstraint(interns.insert(declared_types.pop_front().unwrap()));
+        let product = TypeConstraint(interns.insert(products.pop_front().unwrap()));
+        continues.push(Get {
+          product,
+          subject_declared_type,
+          subject,
+        });
+      }
       Ok(GeneratorResponse::GetMulti(continues))
     }
   }
@@ -476,11 +497,17 @@ pub enum PyGeneratorResponseType {
 pub struct PyGeneratorResponse {
   res_type: PyGeneratorResponseType,
   values: HandleBuffer,
-  constraints: HandleBuffer,
+  declared_types: HandleBuffer,
+  products: HandleBuffer,
 }
 
 #[derive(Debug)]
-pub struct Get(pub TypeConstraint, pub Key);
+pub struct Get {
+  pub product: TypeConstraint,
+  // TODO(#7114): convert all of these into `TypeId`s!
+  pub subject_declared_type: TypeConstraint,
+  pub subject: Key,
+}
 
 pub enum GeneratorResponse {
   Break(Value),

@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
-from builtins import str
 
 from pants.util.objects import Exactly, datatype
 
@@ -28,11 +27,11 @@ def constraint_for(type_or_constraint):
     raise TypeError("Expected a type or constraint: got: {}".format(type_or_constraint))
 
 
-class Get(datatype(['product', 'subject'])):
+class Get(datatype(['product', 'subject_declared_type', 'subject'])):
   """Experimental synchronous generator API.
 
   May be called equivalently as either:
-    # verbose form: Get(product_type, subject_type, subject)
+    # verbose form: Get(product_type, subject_declared_type, subject)
     # shorthand form: Get(product_type, subject_type(subject))
   """
 
@@ -49,15 +48,17 @@ class Get(datatype(['product', 'subject'])):
     if len(call_node.args) == 2:
       product_type, subject_constructor = call_node.args
       if not isinstance(product_type, ast.Name) or not isinstance(subject_constructor, ast.Call):
-        raise ValueError('Two arg form of {} expected (product_type, subject_type(subject)), but '
+        raise ValueError(
+          'Two arg form of {} expected (product_type, subject_type(subject)), but '
                         'got: ({})'.format(Get.__name__, render_args()))
       return (product_type.id, subject_constructor.func.id)
     elif len(call_node.args) == 3:
-      product_type, subject_type, _ = call_node.args
-      if not isinstance(product_type, ast.Name) or not isinstance(subject_type, ast.Name):
-        raise ValueError('Three arg form of {} expected (product_type, subject_type, subject), but '
+      product_type, subject_declared_type, _ = call_node.args
+      if not isinstance(product_type, ast.Name) or not isinstance(subject_declared_type, ast.Name):
+        raise ValueError(
+          'Three arg form of {} expected (product_type, subject_declared_type, subject), but '
                         'got: ({})'.format(Get.__name__, render_args()))
-      return (product_type.id, subject_type.id)
+      return (product_type.id, subject_declared_type.id)
     else:
       raise ValueError('Invalid {}; expected either two or three args, but '
                       'got: ({})'.format(Get.__name__, render_args()))
@@ -65,15 +66,13 @@ class Get(datatype(['product', 'subject'])):
   def __new__(cls, *args):
     if len(args) == 2:
       product, subject = args
+      subject_declared_type = type(subject)
     elif len(args) == 3:
-      product, subject_type, subject = args
-      if type(subject) is not subject_type:
-        raise TypeError('Declared type did not match actual type for {}({}).'.format(
-          Get.__name__, ', '.join(str(a) for a in args)))
+      product, subject_declared_type, subject = args
     else:
       raise Exception('Expected either two or three arguments to {}; got {}.'.format(
         Get.__name__, args))
-    return super(Get, cls).__new__(cls, product, subject)
+    return super(Get, cls).__new__(cls, product, subject_declared_type, subject)
 
 
 class Params(datatype([('params', tuple)])):
