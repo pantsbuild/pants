@@ -4,6 +4,7 @@
 use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 use std::io;
 
+use indexmap::IndexSet;
 use itertools::Itertools;
 
 use crate::core::{Function, Key, Params, TypeConstraint, TypeId, Value};
@@ -164,6 +165,12 @@ pub enum SelectKey {
 
 type RuleDependencyEdges = HashMap<EntryWithDeps, RuleEdges>;
 type UnfulfillableRuleMap = HashMap<EntryWithDeps, Vec<Diagnostic>>;
+// TODO(#7114): when `TypeConstraint`s are converted to `TypeId`s, we can make the values a
+// HashSet<TypeId>!
+// The keys are the `subject_declared_type` of a Get (@union_rule), and the values are the type
+// constraints (soon to be type ids) which correspond to the `@union_member_rule`s registered to
+// have mapped to that type!
+pub type UnionMemberMap = HashMap<TypeConstraint, IndexSet<TypeConstraint>>;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Diagnostic {
@@ -216,14 +223,22 @@ enum ConstructGraphResult {
 pub struct GraphMaker<'t> {
   tasks: &'t Tasks,
   root_param_types: ParamTypes,
+  union_rules: UnionMemberMap,
+  // TODO: plumb the union mappings into this so that they can be populated in construct_graph()
+  // where RuleGraph is created below!
 }
 
 impl<'t> GraphMaker<'t> {
-  pub fn new(tasks: &'t Tasks, root_param_types: Vec<TypeId>) -> GraphMaker<'t> {
+  pub fn new(
+    tasks: &'t Tasks,
+    root_param_types: Vec<TypeId>,
+    union_rules: UnionMemberMap,
+  ) -> GraphMaker<'t> {
     let root_param_types = root_param_types.into_iter().collect();
     GraphMaker {
       tasks,
       root_param_types,
+      union_rules,
     }
   }
 
@@ -262,6 +277,7 @@ impl<'t> GraphMaker<'t> {
       root_param_types: self.root_param_types.clone(),
       rule_dependency_edges: dependency_edges,
       unfulfillable_rules: unfulfillable_rules,
+      union_mappings: self.union_rules.clone(),
       unreachable_rules: unreachable_rules,
     }
   }
@@ -780,6 +796,7 @@ pub struct RuleGraph {
   root_param_types: ParamTypes,
   rule_dependency_edges: RuleDependencyEdges,
   unfulfillable_rules: UnfulfillableRuleMap,
+  union_mappings: UnionMemberMap,
   unreachable_rules: Vec<UnreachableError>,
 }
 
@@ -910,8 +927,12 @@ fn task_display(task: &Task) -> String {
 }
 
 impl RuleGraph {
-  pub fn new(tasks: &Tasks, root_param_types: Vec<TypeId>) -> RuleGraph {
-    GraphMaker::new(tasks, root_param_types).full_graph()
+  pub fn new(
+    tasks: &Tasks,
+    root_param_types: Vec<TypeId>,
+    union_rules: UnionMemberMap,
+  ) -> RuleGraph {
+    GraphMaker::new(tasks, root_param_types, union_rules).full_graph()
   }
 
   pub fn find_root_edges<I: IntoIterator<Item = TypeId>>(
@@ -966,6 +987,44 @@ impl RuleGraph {
           match_strs.join("\n  "),
         ))
       }
+    }
+  }
+
+  ///
+  /// ???/resolve any union types, check that the declared type matches the actual subject, then
+  /// create a SelectKey for the appropriate Get edges
+  ///
+  // TODO: make more error types instead of using String!
+  pub fn generate_get_select_key(&self, get: &externs::Get) -> Result<SelectKey, String> {
+    let subject = externs::val_for(&get.subject);
+    match self.union_mappings.get(&get.subject_declared_type) {
+      // If subject_declared_type is an @union_rule, check the registered union mappings, and fail
+      // if none are registered which match the actual subject.
+      Some(ref union_member_constraints) => union_member_constraints
+        .iter()
+        .find(|union_member| externs::satisfied_by(union_member, &subject))
+        .map(|_| Ok(SelectKey::JustGet(
+          // TODO: This is the same Get selector as we create below when no union is involved, which
+          // feels a little redundant (can we infer union membership from class relationships?).
+          Get {
+            product: get.product,
+            subject: *get.subject.type_id(),
+          })))
+        .unwrap_or_else(|| Err(format!(
+          "None of the registered union members matched the subject. declared union type: {:?}, union members: {:?}, subject: {:?}", get.subject_declared_type, union_member_constraints, subject))),
+      // This isn't a union, so we just check that the declared type of the Get matches the subject
+      // type. For the two-arg form of Get(Product, SubjectType(...)), this will always be true.
+      None => if externs::satisfied_by(&get.subject_declared_type, &subject) {
+        Ok(SelectKey::JustGet(Get {
+          product: get.product,
+          subject: *get.subject.type_id(),
+        }))
+      } else {
+        Err(format!(
+          "Declared type did not match actual type for {:?}",
+          get
+        ))
+      },
     }
   }
 

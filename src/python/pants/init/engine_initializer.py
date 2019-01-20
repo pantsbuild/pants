@@ -364,12 +364,15 @@ class EngineInitializer(object):
 
     goal_map = EngineInitializer._make_goal_map_from_rules(rules)
 
+    union_rules = build_configuration.union_rules()
+
     scheduler = Scheduler(
       native,
       project_tree,
       workdir,
       local_store_dir,
       rules,
+      union_rules,
       execution_options,
       include_trace_on_error=include_trace_on_error,
       visualize_to_dir=bootstrap_options.native_engine_visualize_to,

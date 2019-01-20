@@ -64,6 +64,7 @@ class Get(datatype(['product', 'subject_declared_type', 'subject'])):
                       'got: ({})'.format(Get.__name__, render_args()))
 
   def __new__(cls, *args):
+    # TODO: typecheck the args!
     if len(args) == 2:
       product, subject = args
       subject_declared_type = type(subject)

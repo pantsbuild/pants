@@ -435,7 +435,7 @@ class RootRule(datatype(['output_constraint']), Rule):
     return tuple()
 
 
-class RuleIndex(datatype(['rules', 'roots', 'union_rules', 'union_roots'])):
+class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
   """Holds a normalized index of Rules used to instantiate Nodes."""
 
   @classmethod
@@ -443,7 +443,6 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules', 'union_roots'])):
     """Creates a RuleIndex with tasks indexed by their output type."""
     serializable_rules = OrderedDict()
     serializable_roots = OrderedSet()
-    union_roots = OrderedSet()
     union_rules = OrderedDict()
 
     def add_task(product_type, rule):
@@ -466,22 +465,18 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules', 'union_roots'])):
         add_task(rule.output_constraint, rule)
 
     def add_type_transition_rule(union_rule):
-      if getattr(union_rule, '_is_union', False):
-        add_union_base(entry)
-      elif hasattr(entry, '_union_type'):
-        add_union_member_rule(entry)
+      if hasattr(entry, '_union_type'):
+        union_base = union_member_rule._union_type
+        # TODO: better checking here -- this is how we ensure the union base was decorated with
+        # @union_rule
+        # NB: Note that this does not require that union bases be supplied to `def rules():`! not
+        # sure if that's what we want.
+        assert(union_base._is_union)
+        if union_base not in union_rules:
+          union_rules[union_base] = OrderedSet()
+        union_rules[union_base].add(union_member_rule)
       else:
-        raise TypeError('???/types must be a union_rule or union_member_rule!')
-
-    def add_union_base(union_rule):
-      assert(union_rule not in union_roots)
-      union_roots.add(union_rule)
-
-    def add_union_member_rule(union_member_rule):
-      union_base = union_member_rule._union_type
-      if union_base not in union_rules:
-        union_rules[union_base] = OrderedSet()
-      union_rules[union_base].add(union_member_rule)
+        raise TypeError('???/types must be an @union_member_rule!')
 
     for entry in rule_entries:
       if isinstance(entry, Rule):
@@ -498,11 +493,11 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules', 'union_roots'])):
                         "Rules either extend Rule, or are static functions "
                         "decorated with @rule.".format(type(entry)))
 
-    return cls(serializable_rules, serializable_roots, union_rules, union_roots)
+    return cls(serializable_rules, serializable_roots, union_rules)
 
   def normalized_rules(self):
     rules = OrderedSet(rule
                        for ruleset in self.rules.values()
                        for rule in ruleset)
     rules.update(self.roots)
-    return rules
+    return (rules, self.union_rules)

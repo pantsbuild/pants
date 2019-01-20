@@ -533,6 +533,10 @@ class ExternContext(object):
     buf = self._ffi.new('TypeId[]', types)
     return (buf, len(types), self.to_value(buf))
 
+  def type_constraints_buf(self, type_constraints):
+    buf = self._ffi.new('TypeConstraint[]', type_constraints)
+    return (buf, len(type_constraints), self.to_value(buf))
+
   def to_value(self, obj):
     handle = self._ffi.new_handle(obj)
     self._handles.add(handle)
@@ -699,6 +703,7 @@ class Native(Singleton):
   def new_scheduler(self,
                     tasks,
                     root_subject_types,
+                    union_rules,
                     build_root,
                     work_dir,
                     local_store_dir,
@@ -728,9 +733,20 @@ class Native(Singleton):
       return Function(self.context.to_key(constraint))
     def tc(constraint):
       return TypeConstraint(self.context.to_key(constraint))
+    def flatten_type_map_to_constraints(type_constraints_map):
+      """???/assumes the result is a dict type -> collection<type>"""
+      flattened_type_constraint_pairs = []
+      for union_base, union_rules in type_constraints_map.items():
+        union_base = constraint_for(union_base)
+        for union_member in union_rules:
+          flattened_type_constraint_pairs.extend([union_base, constraint_for(union_member)])
+      return self.context.type_constraints_buf([tc(c) for c in flattened_type_constraint_pairs])
+
+    flattened_union_rules = flatten_type_map_to_constraints(union_rules)
 
     scheduler = self.lib.scheduler_create(
         tasks,
+        flattened_union_rules,
         # Constructors/functions.
         func(construct_directory_digest),
         func(construct_snapshot),

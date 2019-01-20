@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::mem;
@@ -12,6 +12,8 @@ use std::string::FromUtf8Error;
 use crate::core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use crate::handles::{DroppingHandle, Handle};
 use crate::interning::Interns;
+use crate::rule_graph;
+use indexmap::IndexSet;
 use lazy_static::lazy_static;
 use log;
 use num_enum::CustomTryInto;
@@ -574,6 +576,41 @@ pub struct TypeIdBuffer {
 impl TypeIdBuffer {
   pub fn to_vec(&self) -> Vec<TypeId> {
     with_vec(self.ids_ptr, self.ids_len as usize, |vec| vec.clone())
+  }
+}
+
+// Points to an array of TypeConstraints.
+#[repr(C)]
+pub struct TypeConstraintBuffer {
+  constraints_ptr: *mut TypeConstraint,
+  constraints_len: u64,
+  // A Handle to hold the underlying array alive.
+  handle_: Handle,
+}
+
+impl TypeConstraintBuffer {
+  pub fn to_type_map(&self) -> rule_graph::UnionMemberMap {
+    if self.constraints_len % 2 != 0 {
+      panic!("to_type_map requires an even number of elements");
+    }
+    let constraints_vec = with_vec(self.constraints_ptr, self.constraints_len as usize, |vec| {
+      vec.clone()
+    });
+    let mut union_rules: HashMap<TypeConstraint, IndexSet<TypeConstraint>> = HashMap::new();
+    let mut cur_union_base: Option<TypeConstraint> = None;
+    for (constraint_ind, cur_constraint) in constraints_vec.into_iter().enumerate() {
+      // This is a union base.
+      if constraint_ind % 2 == 0 {
+        cur_union_base = Some(cur_constraint);
+      } else {
+        // This is a union member.
+        let cur_members = union_rules
+          .entry(cur_union_base.unwrap())
+          .or_insert_with(IndexSet::new);
+        (*cur_members).insert(cur_constraint);
+      }
+    }
+    union_rules
   }
 }
 

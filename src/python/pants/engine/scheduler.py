@@ -55,6 +55,7 @@ class Scheduler(object):
     work_dir,
     local_store_dir,
     rules,
+    union_rules,
     execution_options,
     include_trace_on_error=True,
     validate=True,
@@ -66,6 +67,7 @@ class Scheduler(object):
     :param work_dir: The pants work dir.
     :param local_store_dir: The directory to use for storing the engine's LMDB store in.
     :param rules: A set of Rules which is used to compute values in the graph.
+    :param union_rules: ???
     :param execution_options: Execution options for (remote) processes.
     :param include_trace_on_error: Include the trace through the graph upon encountering errors.
     :type include_trace_on_error: bool
@@ -91,6 +93,7 @@ class Scheduler(object):
     self._scheduler = native.new_scheduler(
       tasks=self._tasks,
       root_subject_types=self._root_subject_types,
+      union_rules=union_rules,
       build_root=project_tree.build_root,
       work_dir=work_dir,
       local_store_dir=local_store_dir,
