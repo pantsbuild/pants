@@ -66,23 +66,76 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       if not hasattr(cls.__eq__, '_eq_override_canary'):
         raise cls.make_type_error('Should not override __eq__.')
 
-      try:
-        this_object = super(DataType, cls).__new__(cls, *args, **kwargs)
-      except TypeError as e:
-        raise cls.make_type_error(e)
+      # NB: `TypeConstraint#validate_satisfied_by()` can return a different result than its input if
+      # a `wrapper_type` argument is provided to the base class constructor. Because `namedtuple` is
+      # immutable, we have to do any modifications here. The extra work in this method which
+      # duplicates the positional and keyword argument checking in `namedtuple` reduces a
+      # significant amount of boilerplate when creating `datatype` objects which accept collections,
+      # allowing the object's creator to pass in any type of collection as an argument and ensure
+      # the object is still hashable (by converting it to a tuple). We can also improve the quality
+      # of the argument checking error messages and ensure they are consistent across python
+      # versions.
+      if len(args) > len(field_names):
+        raise cls.make_type_error(
+          """\
+too many positional arguments: {} arguments for {} fields!
+args: {}
+fields: {}"""
+          .format(len(args), len(field_names), args, field_names))
+
+      # Create a dictionary of the positional and keyword arguments.
+      # NB: We use an OrderedDict() to ensure reproducible error messages.
+      arg_dict = OrderedDict()
+      selected_field_names = []
+      for field_index, arg_value in enumerate(args):
+        field_name = field_names[field_index]
+        arg_dict[field_name] = arg_value
+        selected_field_names.append(field_name)
+
+      # Raise if an argument was specified positionally and with a keyword.
+      overlapping_field_names = frozenset(selected_field_names) & frozenset(kwargs.keys())
+      if overlapping_field_names:
+        raise cls.make_type_error(
+          """\
+arguments were specified positionally and by keyword: {}!
+args: {}
+kwargs: {}""".format(list(overlapping_field_names), args, kwargs))
+
+      # The arguments were non-overlapping, so we can safely populate the arg dict.
+      arg_dict.update(kwargs)
+
+      # Check that we don't have any unknown arguments *before* we perform type checking.
+      unrecognized_args = frozenset(arg_dict.keys()) - frozenset(field_names)
+      if unrecognized_args:
+        raise cls.make_type_error("unrecognized arguments: {}".format(list(unrecognized_args)))
+      # Check that we have specified all of the non-optional arguments.
+      missing_args = frozenset(field_names) - frozenset(arg_dict.keys())
+      if missing_args:
+        raise cls.make_type_error("missing arguments: {}".format(list(missing_args)))
 
       # TODO: Make this kind of exception pattern (filter for errors then display them all at once)
       # more ergonomic.
       type_failure_msgs = []
-      for field_name, field_constraint in fields_with_constraints.items():
-        field_value = getattr(this_object, field_name)
-        try:
-          field_constraint.validate_satisfied_by(field_value)
-        except TypeConstraintError as e:
-          type_failure_msgs.append(
-            "field '{}' was invalid: {}".format(field_name, e))
+      for arg_name, arg_value in arg_dict.items():
+        field_constraint = fields_with_constraints.get(arg_name, None)
+        if field_constraint:
+          try:
+            new_arg_val = field_constraint.validate_satisfied_by(arg_value)
+          except TypeConstraintError as e:
+            type_failure_msgs.append("field '{}' was invalid: {}".format(arg_name, e))
+            new_arg_val = 'ERROR: {}'.format(e)
+        else:
+          new_arg_val = arg_value
+        arg_dict[arg_name] = new_arg_val
       if type_failure_msgs:
         raise cls.make_type_error('\n'.join(type_failure_msgs))
+
+      # NB: We haven't checked that we specified all of the non-optional arguments -- we let the
+      # `namedtuple` constructor do that checking for us.
+      try:
+        this_object = super(DataType, cls).__new__(cls, **arg_dict)
+      except TypeError as e:
+        raise cls.make_type_error(e)
 
       return this_object
 
@@ -302,7 +355,8 @@ class TypeConstraint(AbstractClass):
   def validate_satisfied_by(self, obj):
     """Return `obj` if the object satisfies this type constraint, or raise.
 
-    # TODO: consider disallowing overriding this too?
+    If this `TypeConstraint` instance provided a `wrapper_type` to the base class constructor, the
+    result will be of the type `self._wrapper_type`.
 
     :raises: `TypeConstraintError` if `obj` does not satisfy the constraint.
     """
