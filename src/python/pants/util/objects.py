@@ -10,9 +10,9 @@ from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
-from pants.util.collections_abc_backport import OrderedDict
+from pants.util.collections_abc_backport import Iterable, OrderedDict
 from pants.util.memo import memoized_classproperty
-from pants.util.meta import AbstractClass
+from pants.util.meta import AbstractClass, classproperty
 
 
 def datatype(field_decls, superclass_name=None, **kwargs):
@@ -264,6 +264,7 @@ class TypeCheckError(TypedDatatypeInstanceConstructionError):
       type_name, formatted_msg, *args, **kwargs)
 
 
+# TODO: make these members of the `TypeConstraint` class!
 class TypeConstraintError(TypeError):
   """Indicates a :class:`TypeConstraint` violation."""
 
@@ -271,11 +272,11 @@ class TypeConstraintError(TypeError):
 class TypeConstraint(AbstractClass):
   """Represents a type constraint.
 
-  Not intended for direct use; instead, use one of :class:`SuperclassesOf`, :class:`Exact` or
+  Not intended for direct use; instead, use one of :class:`SuperclassesOf`, :class:`Exactly` or
   :class:`SubclassesOf`.
   """
 
-  def __init__(self, *types, **kwargs):
+  def __init__(self, variance_symbol, wrapper_type, description):
     """Creates a type constraint centered around the given types.
 
     The type constraint is satisfied as a whole if satisfied for at least one of the given types.
@@ -283,30 +284,79 @@ class TypeConstraint(AbstractClass):
     :param type *types: The focus of this type constraint.
     :param str description: A description for this constraint if the list of types is too long.
     """
-    if not types:
-      raise ValueError('Must supply at least one type')
-    if any(not isinstance(t, type) for t in types):
-      raise TypeError('Supplied types must be types. {!r}'.format(types))
+    assert(variance_symbol)
+    assert(wrapper_type is None or isinstance(wrapper_type, type))
+    self._variance_symbol = variance_symbol
+    self._wrapper_type = wrapper_type
+    self._description = description
 
-    # NB: `types` is converted to tuple here because self.types's docstring says
-    # it returns a tuple. Does it matter what type this field is?
-    self._types = tuple(types)
-    self._desc = kwargs.get('description', None)
-
-  @property
-  def types(self):
-    """Return the subject types of this type constraint.
-
-    :type: tuple of type
-    """
-    return self._types
-
+  @abstractmethod
   def satisfied_by(self, obj):
     """Return `True` if the given object satisfies this type constraint.
 
     :rtype: bool
     """
-    return self.satisfied_by_type(type(obj))
+
+  # NB: we currently use the return value and drop the input in all usages of this method, to allow
+  # for the possibility of modifying the returned value in the future.
+  def validate_satisfied_by(self, obj):
+    """Return `obj` if the object satisfies this type constraint, or raise.
+
+    # TODO: consider disallowing overriding this too?
+
+    :raises: `TypeConstraintError` if `obj` does not satisfy the constraint.
+    """
+
+    if self.satisfied_by(obj):
+      if self._wrapper_type:
+        return self._wrapper_type(obj)
+      return obj
+
+    raise TypeConstraintError(
+      "value {!r} (with type {!r}) must satisfy this type constraint: {!r}."
+      .format(obj, type(obj).__name__, self))
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __str__(self):
+    return '{}{}'.format(self._variance_symbol, self._description)
+
+
+class BasicTypeConstraint(TypeConstraint):
+  """???"""
+
+  @classproperty
+  def _variance_symbol(cls):
+    """???"""
+    raise NotImplementedError('???')
+
+  def __init__(self, *types):
+    """Creates a type constraint centered around the given types.
+
+    The type constraint is satisfied as a whole if satisfied for at least one of the given types.
+
+    :param type *types: The focus of this type constraint.
+    :param str description: A description for this constraint if the list of types is too long.
+    """
+
+    if not types:
+      raise ValueError('Must supply at least one type')
+    if any(not isinstance(t, type) for t in types):
+      raise TypeError('Supplied types must be types. {!r}'.format(types))
+
+    if len(types) == 1:
+      constrained_type = types[0].__name__
+    else:
+      constrained_type = '({})'.format(', '.join(t.__name__ for t in types))
+
+    super(BasicTypeConstraint, self).__init__(
+      variance_symbol=self._variance_symbol,
+      wrapper_type=None,
+      description=constrained_type)
+
+    # NB: This is made into a tuple so that we can use self._types in issubclass() and others!
+    self._types = tuple(types)
 
   @abstractmethod
   def satisfied_by_type(self, obj_type):
@@ -315,18 +365,8 @@ class TypeConstraint(AbstractClass):
     :rtype: bool
     """
 
-  def validate_satisfied_by(self, obj):
-    """Return `obj` if the object satisfies this type constraint, or raise.
-
-    :raises: `TypeConstraintError` if `obj` does not satisfy the constraint.
-    """
-
-    if self.satisfied_by(obj):
-      return obj
-
-    raise TypeConstraintError(
-      "value {!r} (with type {!r}) must satisfy this type constraint: {!r}."
-      .format(obj, type(obj).__name__, self))
+  def satisfied_by(self, obj):
+    return self.satisfied_by_type(type(obj))
 
   def __hash__(self):
     return hash((type(self), self._types))
@@ -334,31 +374,14 @@ class TypeConstraint(AbstractClass):
   def __eq__(self, other):
     return type(self) == type(other) and self._types == other._types
 
-  def __ne__(self, other):
-    return not (self == other)
-
-  def __str__(self):
-    if self._desc:
-      constrained_type = '({})'.format(self._desc)
-    else:
-      if len(self._types) == 1:
-        constrained_type = self._types[0].__name__
-      else:
-        constrained_type = '({})'.format(', '.join(t.__name__ for t in self._types))
-    return '{variance_symbol}{constrained_type}'.format(variance_symbol=self._variance_symbol,
-                                                        constrained_type=constrained_type)
-
   def __repr__(self):
-    if self._desc:
-      constrained_type = self._desc
-    else:
-      constrained_type = ', '.join(t.__name__ for t in self._types)
+    constrained_type = ', '.join(t.__name__ for t in self._types)
     return ('{type_constraint_type}({constrained_type})'
       .format(type_constraint_type=type(self).__name__,
-                    constrained_type=constrained_type))
+              constrained_type=constrained_type))
 
 
-class SuperclassesOf(TypeConstraint):
+class SuperclassesOf(BasicTypeConstraint):
   """Objects of the exact type as well as any super-types are allowed."""
 
   _variance_symbol = '-'
@@ -367,7 +390,7 @@ class SuperclassesOf(TypeConstraint):
     return any(issubclass(t, obj_type) for t in self._types)
 
 
-class Exactly(TypeConstraint):
+class Exactly(BasicTypeConstraint):
   """Only objects of the exact type are allowed."""
 
   _variance_symbol = '='
@@ -382,10 +405,44 @@ class Exactly(TypeConstraint):
       return repr(self)
 
 
-class SubclassesOf(TypeConstraint):
+class SubclassesOf(BasicTypeConstraint):
   """Objects of the exact type as well as any sub-types are allowed."""
 
   _variance_symbol = '+'
 
   def satisfied_by_type(self, obj_type):
     return issubclass(obj_type, self._types)
+
+
+class TypedCollection(TypeConstraint):
+
+  @classmethod
+  def _generate_variance_symbol(cls, constraint):
+    return '[{}]'.format(constraint._variance_symbol)
+
+  def __init__(self, constraint, wrapper_type=tuple):
+
+    assert(isinstance(constraint, BasicTypeConstraint))
+    self._constraint = constraint
+
+    super(TypedCollection, self).__init__(
+      variance_symbol=self._generate_variance_symbol(constraint),
+      wrapper_type=wrapper_type,
+      description=constraint._description)
+
+  def satisfied_by(self, obj):
+    if isinstance(obj, Iterable):
+      return all(self._constraint.satisfied_by(el) for el in obj)
+    return False
+
+  def __hash__(self):
+    return hash((type(self), self._constraint, self._wrapper_type))
+
+  def __eq__(self, other):
+    return type(self) == type(other) and self._constraint == other._constraint
+
+  def __repr__(self):
+    return ('{type_constraint_type}({constraint!r}, wrapper_type={wrapper_type!r})'
+            .format(type_constraint_type=type(self).__name__,
+                    constraint=self._constraint,
+                    wrapper_type=self._wrapper_type))

@@ -38,7 +38,6 @@ class SuperclassesOfTest(TypeConstraintTestBase):
 
   def test_single(self):
     superclasses_of_b = SuperclassesOf(self.B)
-    self.assertEqual((self.B,), superclasses_of_b.types)
     self.assertTrue(superclasses_of_b.satisfied_by(self.A()))
     self.assertTrue(superclasses_of_b.satisfied_by(self.B()))
     self.assertFalse(superclasses_of_b.satisfied_by(self.BPrime()))
@@ -46,7 +45,6 @@ class SuperclassesOfTest(TypeConstraintTestBase):
 
   def test_multiple(self):
     superclasses_of_a_or_b = SuperclassesOf(self.A, self.B)
-    self.assertEqual((self.A, self.B), superclasses_of_a_or_b.types)
     self.assertTrue(superclasses_of_a_or_b.satisfied_by(self.A()))
     self.assertTrue(superclasses_of_a_or_b.satisfied_by(self.B()))
     self.assertFalse(superclasses_of_a_or_b.satisfied_by(self.BPrime()))
@@ -60,7 +58,6 @@ class ExactlyTest(TypeConstraintTestBase):
 
   def test_single(self):
     exactly_b = Exactly(self.B)
-    self.assertEqual((self.B,), exactly_b.types)
     self.assertFalse(exactly_b.satisfied_by(self.A()))
     self.assertTrue(exactly_b.satisfied_by(self.B()))
     self.assertFalse(exactly_b.satisfied_by(self.BPrime()))
@@ -68,7 +65,6 @@ class ExactlyTest(TypeConstraintTestBase):
 
   def test_multiple(self):
     exactly_a_or_b = Exactly(self.A, self.B)
-    self.assertEqual((self.A, self.B), exactly_a_or_b.types)
     self.assertTrue(exactly_a_or_b.satisfied_by(self.A()))
     self.assertTrue(exactly_a_or_b.satisfied_by(self.B()))
     self.assertFalse(exactly_a_or_b.satisfied_by(self.BPrime()))
@@ -79,10 +75,6 @@ class ExactlyTest(TypeConstraintTestBase):
       Exactly([1])
 
   def test_str_and_repr(self):
-    exactly_b_types = Exactly(self.B, description='B types')
-    self.assertEqual("=(B types)", str(exactly_b_types))
-    self.assertEqual("Exactly(B types)", repr(exactly_b_types))
-
     exactly_b = Exactly(self.B)
     self.assertEqual("=B", str(exactly_b))
     self.assertEqual("Exactly(B)", repr(exactly_b))
@@ -103,7 +95,6 @@ class SubclassesOfTest(TypeConstraintTestBase):
 
   def test_single(self):
     subclasses_of_b = SubclassesOf(self.B)
-    self.assertEqual((self.B,), subclasses_of_b.types)
     self.assertFalse(subclasses_of_b.satisfied_by(self.A()))
     self.assertTrue(subclasses_of_b.satisfied_by(self.B()))
     self.assertFalse(subclasses_of_b.satisfied_by(self.BPrime()))
@@ -111,7 +102,6 @@ class SubclassesOfTest(TypeConstraintTestBase):
 
   def test_multiple(self):
     subclasses_of_b_or_c = SubclassesOf(self.B, self.C)
-    self.assertEqual((self.B, self.C), subclasses_of_b_or_c.types)
     self.assertTrue(subclasses_of_b_or_c.satisfied_by(self.B()))
     self.assertTrue(subclasses_of_b_or_c.satisfied_by(self.C()))
     self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.BPrime()))
