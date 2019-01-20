@@ -350,10 +350,8 @@ class TypeConstraint(AbstractClass):
     :rtype: bool
     """
 
-  # NB: we currently use the return value and drop the input in all usages of this method, to allow
-  # for the possibility of modifying the returned value in the future.
   def validate_satisfied_by(self, obj):
-    """Return `obj` if the object satisfies this type constraint, or raise.
+    """Return some version of `obj` if the object satisfies this type constraint, or raise.
 
     If this `TypeConstraint` instance provided a `wrapper_type` to the base class constructor, the
     result will be of the type `self._wrapper_type`.
