@@ -81,7 +81,7 @@ class Scheduler(object):
     self.include_trace_on_error = include_trace_on_error
     self._visualize_to_dir = visualize_to_dir
     # Validate and register all provided and intrinsic tasks.
-    rule_index = RuleIndex.create(list(rules))
+    rule_index = RuleIndex.create(list(rules), union_rules)
     self._root_subject_types = [r.output_constraint for r in rule_index.roots]
 
     # Create the native Scheduler and Session.
@@ -93,7 +93,7 @@ class Scheduler(object):
     self._scheduler = native.new_scheduler(
       tasks=self._tasks,
       root_subject_types=self._root_subject_types,
-      union_rules=union_rules,
+      union_rules=rule_index.union_rules,
       build_root=project_tree.build_root,
       work_dir=work_dir,
       local_store_dir=local_store_dir,
@@ -191,7 +191,7 @@ class Scheduler(object):
         if type(rule) is SingletonRule:
           self._register_singleton(output_constraint, rule)
         elif type(rule) is TaskRule:
-          self._register_task(output_constraint, rule)
+          self._register_task(output_constraint, rule, rule_index.union_rules)
         else:
           raise ValueError('Unexpected Rule type: {}'.format(rule))
 
@@ -204,7 +204,7 @@ class Scheduler(object):
                                          self._to_value(rule.value),
                                          output_constraint)
 
-  def _register_task(self, output_constraint, rule):
+  def _register_task(self, output_constraint, rule, union_rules):
     """Register the given TaskRule with the native scheduler."""
     func = Function(self._to_key(rule.func))
     self._native.lib.tasks_task_begin(self._tasks, func, output_constraint, rule.cacheable)
@@ -215,10 +215,21 @@ class Scheduler(object):
         self._native.lib.tasks_add_select(self._tasks, product_constraint)
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
-    for get in rule.input_gets:
+
+    def add_get_edge(product, subject):
       self._native.lib.tasks_add_get(self._tasks,
-                                     self._to_constraint(get.product),
-                                     TypeId(self._to_id(get.subject)))
+                                     self._to_constraint(product),
+                                     TypeId(self._to_id(subject)))
+
+    for get in rule.input_gets:
+      union_members = union_rules.get(get.subject, None)
+      if union_members:
+        # If the registered subject type is a union, add get edges to all registered union members.
+        for union_member in union_members:
+          add_get_edge(get.product, union_member)
+      else:
+        # Otherwise, the Get subject is a "concrete" type, so add a single get edge.
+        add_get_edge(get.product, get.subject)
     self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, session, filename):

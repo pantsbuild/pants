@@ -4,11 +4,14 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
 import unittest
 from builtins import object, str
+from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.engine.rules import RootRule, rule, union, union_rule
+from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Params, Select
 from pants.util.objects import datatype
 from pants_test.engine.util import (assert_equal_with_printing, create_scheduler,
@@ -131,7 +134,9 @@ class SchedulerTest(TestBase):
     self.assertEquals(result_str, consumes_a_and_b(a, b))
 
     # But not a subset.
-    with self.assertRaises(Exception):
+    expected_msg = ("No installed @rules can satisfy Select({}) for input Params(A)"
+                    .format(str.__name__))
+    with self.assertRaisesRegexp(Exception, re.escape(expected_msg)):
       self.scheduler.product_request(str, [Params(a)])
 
   def test_transitive_params(self):
@@ -149,15 +154,22 @@ class SchedulerTest(TestBase):
     # we're just testing transitively resolving products in this file.
     self.assertTrue(isinstance(result_d, D))
 
+  @contextmanager
+  def _assert_execution_error(self, expected_msg):
+    with self.assertRaises(ExecutionError) as cm:
+      yield
+    self.assertIn(expected_msg, remove_locations_from_traceback(str(cm.exception)))
+
   def test_union_rules(self):
-    a = self.scheduler.product_request(A, [Params(UnionWrapper(UnionA()))])
+    a, = self.scheduler.product_request(A, [Params(UnionWrapper(UnionA()))])
     # TODO: figure out what to assert here!
-    self.assertIsNotNone(a)
-    a = self.scheduler.product_request(A, [Params(UnionWrapper(UnionB()))])
-    self.assertIsNotNone(a)
+    self.assertTrue(isinstance(a, A))
+    a, = self.scheduler.product_request(A, [Params(UnionWrapper(UnionB()))])
+    self.assertTrue(isinstance(a, A))
     # Fails due to no union relationship from A -> UnionBase.
-    a = self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
-    self.assertIsNotNone(a)
+    expected_msg = "Exception: None of the registered union members matched the subject. declared union type: TypeConstraint(=UnionBase), union members: {TypeConstraint(=UnionA), TypeConstraint(=UnionB)}, subject: <pants_test.engine.test_scheduler.A object at 0xEEEEEEEEE>"
+    with self._assert_execution_error(expected_msg):
+      self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
 
 
 class SchedulerTraceTest(unittest.TestCase):

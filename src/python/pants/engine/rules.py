@@ -439,11 +439,11 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
   """Holds a normalized index of Rules used to instantiate Nodes."""
 
   @classmethod
-  def create(cls, rule_entries):
+  def create(cls, rule_entries, union_rules=None):
     """Creates a RuleIndex with tasks indexed by their output type."""
     serializable_rules = OrderedDict()
     serializable_roots = OrderedSet()
-    union_rules = OrderedDict()
+    union_rules = OrderedDict(union_rules or ())
 
     def add_task(product_type, rule):
       if product_type not in serializable_rules:

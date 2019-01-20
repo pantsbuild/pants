@@ -15,7 +15,7 @@ from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import (RootRule, RuleIndex, SingletonRule, _GoalProduct, _RuleVisitor,
-                                console_rule, rule, union, union_rule)
+                                console_rule, rule)
 from pants.engine.selectors import Get, Select
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import JsonParser
@@ -66,33 +66,6 @@ def a_console_rule_generator(console):
   console.print_stdout(str(a))
 
 
-@union
-class UnionBase(object):
-  pass
-
-
-class UnionWrapper(object):
-  def __init__(self, inner):
-    self.inner = inner
-
-
-@union_rule(UnionBase)
-class UnionA(object):
-
-  def a(self):
-    return A()
-
-
-@union_rule(UnionBase)
-class UnionB(object):
-
-  def a(self):
-    return A()
-
-
-# TODO: test creating these, but testing for using them can go in test_scheduler.py!
-# @rule(A, [Select(UnionWrapper)])
-# def a_union_test(union_wrapper):
 class RuleTest(unittest.TestCase):
   def test_run_rule_console_rule_generator(self):
     res = run_rule(a_console_rule_generator, Console(), {
