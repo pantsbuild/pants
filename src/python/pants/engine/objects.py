@@ -14,7 +14,7 @@ from future.utils import PY2
 
 from pants.util.memo import memoized_classmethod
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, TypedCollection, datatype
 
 
 class SerializationError(Exception):
@@ -162,7 +162,6 @@ class Collection(object):
 
   Python consumers of a Collection should prefer to use its standard iteration API.
   """
-  # TODO: could we check that the input is iterable in the ctor?
 
   @memoized_classmethod
   def of(cls, *element_types):
@@ -170,11 +169,15 @@ class Collection(object):
     type_name = '{}.of({})'.format(cls.__name__, union)
     if PY2:
       type_name = type_name.encode('utf-8')
-    # TODO: could we allow type checking in the datatype() invocation here?
-    # TODO: we are using `datatype` here, so all we need to do to sync `Collection.of` is to use the
-    # collection type checking we develop in this PR!
-    # TODO: also consider whether we can make Collection.of() the exact same thing? not sure
-    supertypes = (cls, datatype(['dependencies'], superclass_name=cls.__name__))
+    type_checked_collection_class = datatype([
+      # Create a datatype with a single field 'dependencies' which is type-checked on construction
+      # to be a collection containing elements of only the exact `element_types` specified, and
+      # which is converted into a tuple upon construction. A tuple `wrapper_type` is required for
+      # the resulting datatype to be hashable, so we set it explicitly here although it is the
+      # default.
+      ('dependencies', TypedCollection(Exactly(*element_types), wrapper_type=tuple))
+    ], superclass_name=cls.__name__)
+    supertypes = (cls, type_checked_collection_class)
     properties = {'element_types': element_types}
     collection_of_type = type(type_name, supertypes, properties)
 
