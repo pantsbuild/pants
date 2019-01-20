@@ -476,7 +476,9 @@ class TypedCollection(TypeConstraint):
 
   def __init__(self, constraint, wrapper_type=tuple):
 
-    assert(isinstance(constraint, BasicTypeConstraint))
+    if not isinstance(constraint, BasicTypeConstraint):
+      raise TypeError("constraint for collection must be a {}! was: {}"
+                      .format(BasicTypeConstraint.__name__, constraint))
     self._constraint = constraint
 
     super(TypedCollection, self).__init__(
@@ -496,7 +498,7 @@ class TypedCollection(TypeConstraint):
     return type(self) == type(other) and self._constraint == other._constraint
 
   def __repr__(self):
-    return ('{type_constraint_type}({constraint!r}, wrapper_type={wrapper_type!r})'
+    return ('{type_constraint_type}({constraint!r}, wrapper_type={wrapper_type})'
             .format(type_constraint_type=type(self).__name__,
                     constraint=self._constraint,
-                    wrapper_type=self._wrapper_type))
+                    wrapper_type=self._wrapper_type.__name__))

@@ -13,13 +13,16 @@ from builtins import object, str
 from future.utils import PY2, PY3, text_type
 
 from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
-                                TypedDatatypeInstanceConstructionError, datatype, enum)
+                                TypedCollection, TypedDatatypeInstanceConstructionError, datatype,
+                                enum)
 from pants_test.test_base import TestBase
 
 
 class TypeConstraintTestBase(TestBase):
   class A(object):
-    pass
+
+    def __eq__(self, other):
+      return type(self) == type(other)
 
   class B(A):
     pass
@@ -35,6 +38,15 @@ class SuperclassesOfTest(TypeConstraintTestBase):
   def test_none(self):
     with self.assertRaises(ValueError):
       SubclassesOf()
+
+  def test_str_and_repr(self):
+    superclasses_of_b = SuperclassesOf(self.B)
+    self.assertEqual("-B", str(superclasses_of_b))
+    self.assertEqual("SuperclassesOf(B)", repr(superclasses_of_b))
+
+    superclasses_of_multiple = SuperclassesOf(self.A, self.B)
+    self.assertEqual("-(A, B)", str(superclasses_of_multiple))
+    self.assertEqual("SuperclassesOf(A, B)", repr(superclasses_of_multiple))
 
   def test_single(self):
     superclasses_of_b = SuperclassesOf(self.B)
@@ -93,6 +105,15 @@ class SubclassesOfTest(TypeConstraintTestBase):
     with self.assertRaises(ValueError):
       SubclassesOf()
 
+  def test_str_and_repr(self):
+    subclasses_of_b = SubclassesOf(self.B)
+    self.assertEqual("+B", str(subclasses_of_b))
+    self.assertEqual("SubclassesOf(B)", repr(subclasses_of_b))
+
+    subclasses_of_multiple = SubclassesOf(self.A, self.B)
+    self.assertEqual("+(A, B)", str(subclasses_of_multiple))
+    self.assertEqual("SubclassesOf(A, B)", repr(subclasses_of_multiple))
+
   def test_single(self):
     subclasses_of_b = SubclassesOf(self.B)
     self.assertFalse(subclasses_of_b.satisfied_by(self.A()))
@@ -106,6 +127,59 @@ class SubclassesOfTest(TypeConstraintTestBase):
     self.assertTrue(subclasses_of_b_or_c.satisfied_by(self.C()))
     self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.BPrime()))
     self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.A()))
+
+
+class TypedCollectionTest(TypeConstraintTestBase):
+  def test_str_and_repr(self):
+    collection_of_exactly_b = TypedCollection(Exactly(self.B))
+    self.assertEqual("[=]B", str(collection_of_exactly_b))
+    self.assertEqual("TypedCollection(Exactly(B), wrapper_type=tuple)",
+                     repr(collection_of_exactly_b))
+
+    collection_of_multiple_subclasses = TypedCollection(
+      SubclassesOf(self.A, self.B), wrapper_type=list)
+    self.assertEqual("[+](A, B)", str(collection_of_multiple_subclasses))
+    self.assertEqual("TypedCollection(SubclassesOf(A, B), wrapper_type=list)",
+                     repr(collection_of_multiple_subclasses))
+
+  def test_collection_single(self):
+    collection_constraint = TypedCollection(Exactly(self.A))
+    self.assertTrue(collection_constraint.satisfied_by([self.A()]))
+    self.assertFalse(collection_constraint.satisfied_by([self.A(), self.B()]))
+    self.assertTrue(collection_constraint.satisfied_by([self.A(), self.A()]))
+
+  def test_collection_multiple(self):
+    collection_constraint = TypedCollection(SubclassesOf(self.B, self.BPrime))
+    self.assertTrue(collection_constraint.satisfied_by([self.B(), self.C(), self.BPrime()]))
+    self.assertFalse(collection_constraint.satisfied_by([self.B(), self.A()]))
+
+  def test_collection_converts_wrapper_type(self):
+    collection_constraint = TypedCollection(Exactly(self.A, self.C))
+    self.assertEquals(
+      # Defaults to converting to tuple.
+      (self.A(), self.C(), self.A()),
+      collection_constraint.validate_satisfied_by([self.A(), self.C(), self.A()]))
+
+    def collection_generator():
+      yield self.A()
+      yield self.C()
+      yield self.A()
+
+    # Test conversion to a different wrapper type.
+    collection_constraint = TypedCollection(Exactly(self.A, self.C), wrapper_type=list)
+    self.assertEquals(
+      [self.A(), self.C(), self.A()],
+      collection_constraint.validate_satisfied_by(tuple(collection_generator())))
+    # NB: For now, passing a generator without wrapping it in a concrete collection means it gets
+    # consumed. This makes sense (how else would you type check all its elements?).
+    self.assertEquals(
+      [],
+      collection_constraint.validate_satisfied_by(collection_generator()))
+
+  def test_construction(self):
+    with self.assertRaisesRegexp(TypeError, re.escape(
+        "constraint for collection must be a BasicTypeConstraint! was: {}".format(self.A))):
+      TypedCollection(self.A)
 
 
 class ExportedDatatype(datatype(['val'])):
@@ -158,6 +232,12 @@ class SomeDatatypeClass(SomeBaseClass):
 
 
 class WithSubclassTypeConstraint(datatype([('some_value', SubclassesOf(SomeBaseClass))])): pass
+
+
+class WithCollectionTypeConstraint(datatype([
+    ('dependencies', TypedCollection(Exactly(int))),
+])):
+  pass
 
 
 class NonNegativeInt(datatype([('an_int', int)])):
@@ -453,6 +533,13 @@ class TypedDatatypeTest(TestBase):
     self.assertEqual(obj_with_mixin.as_str(), ' asdf ')
     self.assertEqual(obj_with_mixin.stripped(), 'asdf')
 
+  def test_instance_with_collection_construction_str_repr(self):
+    obj_with_collection = WithCollectionTypeConstraint([3])
+    self.assertEqual("WithCollectionTypeConstraint(dependencies<[=]int>=(3,))",
+                     str(obj_with_collection))
+    self.assertEqual("WithCollectionTypeConstraint(dependencies=(3,))",
+                     repr(obj_with_collection))
+
   def test_instance_construction_errors(self):
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype(something=3)
@@ -557,6 +644,20 @@ value is negative: -3.""")
     expected_msg = (
       """error: in constructor of type WithSubclassTypeConstraint: type check error:
 field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(SomeBaseClass).""")
+    self.assertEqual(str(cm.exception), expected_msg)
+
+    with self.assertRaises(TypeCheckError) as cm:
+      WithCollectionTypeConstraint(3)
+    expected_msg = """\
+error: in constructor of type WithCollectionTypeConstraint: type check error:
+field 'dependencies' was invalid: value 3 (with type 'int') must satisfy this type constraint: TypedCollection(Exactly(int), wrapper_type=tuple)."""
+    self.assertEqual(str(cm.exception), expected_msg)
+
+    with self.assertRaises(TypeCheckError) as cm:
+      WithCollectionTypeConstraint([3, "asdf"])
+    expected_msg = """\
+error: in constructor of type WithCollectionTypeConstraint: type check error:
+field 'dependencies' was invalid: value [3, u'asdf'] (with type 'list') must satisfy this type constraint: TypedCollection(Exactly(int), wrapper_type=tuple)."""
     self.assertEqual(str(cm.exception), expected_msg)
 
   def test_copy(self):
