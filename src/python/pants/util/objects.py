@@ -485,9 +485,13 @@ class TypedCollection(TypeConstraint):
     return '[{}]'.format(constraint._variance_symbol)
 
   def __init__(self, constraint, wrapper_type=tuple):
-    """
-    :param BasicTypeConstraint constraint: ???
-    :param type wrapper_type:
+    """Create a TypeConstraint which validates each member of a collection with `constraint`.
+
+    :param BasicTypeConstraint constraint: the TypeConstraint to apply to each element. This is
+                                           currently required to be a BasicTypeConstraint to avoid
+                                           complex prototypal type relationships.
+    :param type wrapper_type: the type of the returned collection when invoking
+                              validate_satisfied_by().
     """
 
     if not isinstance(constraint, BasicTypeConstraint):
