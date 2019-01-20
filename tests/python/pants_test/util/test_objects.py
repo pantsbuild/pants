@@ -558,7 +558,7 @@ unrecognized arguments: ['something']"""
       SomeTypedDatatype()
     expected_msg = """\
 error: in constructor of type SomeTypedDatatype: type check error:
-missing arguments: [u'val']"""
+missing arguments: [{}'val']""".format('u' if PY2 else '')
     self.assertEqual(str(cm.exception), expected_msg)
 
     # unrecognized fields
@@ -568,7 +568,7 @@ missing arguments: [u'val']"""
 error: in constructor of type SomeTypedDatatype: type check error:
 too many positional arguments: 2 arguments for 1 fields!
 args: (3, 4)
-fields: [u'val']"""
+fields: [{}'val']""".format('u' if PY2 else '')
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
@@ -662,7 +662,7 @@ field 'dependencies' was invalid: value 3 (with type 'int') must satisfy this ty
       WithCollectionTypeConstraint([3, "asdf"])
     expected_msg = """\
 error: in constructor of type WithCollectionTypeConstraint: type check error:
-field 'dependencies' was invalid: value [3, u'asdf'] (with type 'list') must satisfy this type constraint: TypedCollection(Exactly(int), wrapper_type=tuple)."""
+field 'dependencies' was invalid: value [3, {}'asdf'] (with type 'list') must satisfy this type constraint: TypedCollection(Exactly(int), wrapper_type=tuple).""".format('u' if PY2 else '')
     self.assertEqual(str(cm.exception), expected_msg)
 
   def test_copy(self):
