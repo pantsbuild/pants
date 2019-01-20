@@ -130,8 +130,6 @@ kwargs: {}""".format(list(overlapping_field_names), args, kwargs))
       if type_failure_msgs:
         raise cls.make_type_error('\n'.join(type_failure_msgs))
 
-      # NB: We haven't checked that we specified all of the non-optional arguments -- we let the
-      # `namedtuple` constructor do that checking for us.
       try:
         this_object = super(DataType, cls).__new__(cls, **arg_dict)
       except TypeError as e:
