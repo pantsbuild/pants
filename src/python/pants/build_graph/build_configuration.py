@@ -153,7 +153,9 @@ class BuildConfiguration(object):
       raise TypeError('The rules must be an iterable, given {!r}'.format(rules))
 
     # "Index" the rules to normalize them and expand their dependencies.
-    indexed_rules, union_rules = RuleIndex.create(rules).normalized_rules()
+    normalized_rules = RuleIndex.create(rules).normalized_rules()
+    indexed_rules = normalized_rules.rules
+    union_rules = normalized_rules.union_rules
 
     # Store the rules and record their dependency Optionables.
     self._rules.update(indexed_rules)

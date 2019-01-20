@@ -495,9 +495,11 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
 
     return cls(serializable_rules, serializable_roots, union_rules)
 
+  class NormalizedRules(datatype(['rules', 'union_rules'])): pass
+
   def normalized_rules(self):
     rules = OrderedSet(rule
                        for ruleset in self.rules.values()
                        for rule in ruleset)
     rules.update(self.roots)
-    return (rules, self.union_rules)
+    return self.NormalizedRules(rules, self.union_rules)
