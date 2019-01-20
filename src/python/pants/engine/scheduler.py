@@ -67,7 +67,8 @@ class Scheduler(object):
     :param work_dir: The pants work dir.
     :param local_store_dir: The directory to use for storing the engine's LMDB store in.
     :param rules: A set of Rules which is used to compute values in the graph.
-    :param union_rules: ???
+    :param union_rules: A dict mapping union base types to member types so that rules can be written
+                        against abstract union types without knowledge of downstream rulesets.
     :param execution_options: Execution options for (remote) processes.
     :param include_trace_on_error: Include the trace through the graph upon encountering errors.
     :type include_trace_on_error: bool
@@ -222,7 +223,6 @@ class Scheduler(object):
                                      TypeId(self._to_id(subject)))
 
     for get in rule.input_gets:
-      # ???
       union_members = union_rules.get(get.subject_declared_type, None)
       if union_members:
         # If the registered subject type is a union, add get edges to all registered union members.

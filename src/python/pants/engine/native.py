@@ -734,7 +734,13 @@ class Native(Singleton):
     def tc(constraint):
       return TypeConstraint(self.context.to_key(constraint))
     def flatten_type_map_to_constraints(type_constraints_map):
-      """???/assumes the result is a dict type -> collection<type>"""
+      """Flatten a dict of types into a buffer of `TypeConstraint`s for the engine.
+
+      Given a mapping of (type -> [collection of other types]), first ensure every `type` is
+      converted into a `TypeConstraint`, then return a flat list alternating between key and value.
+      The result of this method is processed by `externs::TypeConstraintBuffer` back into a hash map
+      in the engine.
+      """
       flattened_type_constraint_pairs = []
       for union_base, union_rules in type_constraints_map.items():
         union_base = constraint_for(union_base)

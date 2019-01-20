@@ -65,7 +65,11 @@ class Get(datatype(['product', 'subject_declared_type', 'subject'])):
 
   @classmethod
   def create_statically_for_rule_graph(cls, product_type, subject_type):
-    """???"""
+    """Construct a `Get` with a None value.
+
+    This method is used to help make it explicit which `Get` instances are parsed from @rule bodies
+    and which are instantiated during rule execution.
+    """
     return cls(product_type, subject_type, None)
 
   def __new__(cls, *args):

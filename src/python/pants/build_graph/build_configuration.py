@@ -169,12 +169,15 @@ class BuildConfiguration(object):
   def rules(self):
     """Returns the registered rules.
 
-    :rtype list
+    :rtype: list
     """
     return list(self._rules)
 
   def union_rules(self):
-    """???"""
+    """Returns a mapping of registered union base types -> [a list of union member types].
+
+    :rtype: OrderedDict
+    """
     return self._union_rules
 
   @memoized_method

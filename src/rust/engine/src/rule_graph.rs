@@ -991,8 +991,8 @@ impl RuleGraph {
   }
 
   ///
-  /// ???/resolve any union types, check that the declared type matches the actual subject, then
-  /// create a SelectKey for the appropriate Get edges
+  /// Check that the declared type matches the actual subject (including checking union members),
+  /// then create a SelectKey for the appropriate Get edges.
   ///
   // TODO: make more error types instead of using String!
   pub fn generate_get_select_key(&self, get: &externs::Get) -> Result<SelectKey, String> {
