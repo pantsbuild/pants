@@ -130,6 +130,11 @@ class SubclassesOfTest(TypeConstraintTestBase):
 
 
 class TypedCollectionTest(TypeConstraintTestBase):
+  def test_construction_errors(self):
+    with self.assertRaisesRegexp(TypeError, re.escape(
+        "wrapper_type must be a type! was: 3 (type 'int')")):
+      TypedCollection(Exactly(self.B), wrapper_type=3)
+
   def test_str_and_repr(self):
     collection_of_exactly_b = TypedCollection(Exactly(self.B))
     self.assertEqual("[=]B", str(collection_of_exactly_b))

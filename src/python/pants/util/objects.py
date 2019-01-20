@@ -338,7 +338,10 @@ class TypeConstraint(AbstractClass):
     :param str description: A description for this constraint if the list of types is too long.
     """
     assert(variance_symbol)
-    assert(wrapper_type is None or isinstance(wrapper_type, type))
+    if wrapper_type is not None:
+      if not isinstance(wrapper_type, type):
+        raise TypeError("wrapper_type must be a type! was: {} (type '{}')"
+                        .format(wrapper_type, type(wrapper_type).__name__))
     self._variance_symbol = variance_symbol
     self._wrapper_type = wrapper_type
     self._description = description
@@ -475,12 +478,17 @@ class SubclassesOf(BasicTypeConstraint):
 
 
 class TypedCollection(TypeConstraint):
+  """A `TypeConstraint` which accepts a BasicTypeConstraint and validates a collection."""
 
   @classmethod
   def _generate_variance_symbol(cls, constraint):
     return '[{}]'.format(constraint._variance_symbol)
 
   def __init__(self, constraint, wrapper_type=tuple):
+    """
+    :param BasicTypeConstraint constraint: ???
+    :param type wrapper_type:
+    """
 
     if not isinstance(constraint, BasicTypeConstraint):
       raise TypeError("constraint for collection must be a {}! was: {}"
