@@ -222,14 +222,15 @@ class Scheduler(object):
                                      TypeId(self._to_id(subject)))
 
     for get in rule.input_gets:
-      union_members = union_rules.get(get.subject, None)
+      # ???
+      union_members = union_rules.get(get.subject_declared_type, None)
       if union_members:
         # If the registered subject type is a union, add get edges to all registered union members.
         for union_member in union_members:
           add_get_edge(get.product, union_member)
       else:
         # Otherwise, the Get subject is a "concrete" type, so add a single get edge.
-        add_get_edge(get.product, get.subject)
+        add_get_edge(get.product, get.subject_declared_type)
     self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, session, filename):

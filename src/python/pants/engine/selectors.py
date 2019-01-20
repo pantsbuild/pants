@@ -63,6 +63,11 @@ class Get(datatype(['product', 'subject_declared_type', 'subject'])):
       raise ValueError('Invalid {}; expected either two or three args, but '
                       'got: ({})'.format(Get.__name__, render_args()))
 
+  @classmethod
+  def create_statically_for_rule_graph(cls, product_type, subject_type):
+    """???"""
+    return cls(product_type, subject_type, None)
+
   def __new__(cls, *args):
     # TODO: typecheck the args!
     if len(args) == 2:

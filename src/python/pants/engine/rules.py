@@ -275,7 +275,9 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       parents_table=parents_table,
     )
     rule_visitor.visit(rule_func_node)
-    gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
+    gets.update(
+      Get.create_statically_for_rule_graph(resolve_type(p), resolve_type(s))
+      for p, s in rule_visitor.gets)
 
     # For @console_rule, redefine the function to avoid needing a literal return of the output type.
     if for_goal:
