@@ -167,8 +167,8 @@ type RuleDependencyEdges = HashMap<EntryWithDeps, RuleEdges>;
 type UnfulfillableRuleMap = HashMap<EntryWithDeps, Vec<Diagnostic>>;
 // TODO(#7114): when `TypeConstraint`s are converted to `TypeId`s, we can make the values a
 // HashSet<TypeId>!
-// The keys are the `subject_declared_type` of a Get (@union_rule), and the values are the type
-// constraints (soon to be type ids) which correspond to the `@union_member_rule`s registered to
+// The keys are the `subject_declared_type` of a Get (@union), and the values are the type
+// constraints (soon to be type ids) which correspond to the `@union_rule`s registered to
 // have mapped to that type!
 pub type UnionMemberMap = HashMap<TypeConstraint, IndexSet<TypeConstraint>>;
 
@@ -998,7 +998,7 @@ impl RuleGraph {
   pub fn generate_get_select_key(&self, get: &externs::Get) -> Result<SelectKey, String> {
     let subject = externs::val_for(&get.subject);
     match self.union_mappings.get(&get.subject_declared_type) {
-      // If subject_declared_type is an @union_rule, check the registered union mappings, and fail
+      // If subject_declared_type is an @union, check the registered union mappings, and fail
       // if none are registered which match the actual subject.
       Some(ref union_member_constraints) => union_member_constraints
         .iter()

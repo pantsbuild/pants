@@ -8,7 +8,7 @@ import unittest
 from builtins import object, str
 from textwrap import dedent
 
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, rule, union, union_rule
 from pants.engine.selectors import Get, Params, Select
 from pants.util.objects import datatype
 from pants_test.engine.util import (assert_equal_with_printing, create_scheduler,
@@ -57,6 +57,47 @@ def transitive_coroutine_rule(c):
   yield D(b)
 
 
+@union
+class UnionBase(object):
+  pass
+
+
+class UnionWrapper(object):
+  def __init__(self, inner):
+    self.inner = inner
+
+
+@union_rule(UnionBase)
+class UnionA(object):
+
+  def a(self):
+    return A()
+
+
+@rule(A, [Select(UnionA)])
+def select_union_a(union_a):
+  return union_a.a()
+
+
+@union_rule(UnionBase)
+class UnionB(object):
+
+  def a(self):
+    return A()
+
+
+@rule(A, [Select(UnionB)])
+def select_union_b(union_b):
+  return union_b.a()
+
+
+# TODO: add GetMulti testing!
+@rule(A, [Select(UnionWrapper)])
+def a_union_test(union_wrapper):
+  union_a = yield Get(A, UnionBase, union_wrapper.inner)
+  yield union_a
+
+
 class SchedulerTest(TestBase):
 
   @classmethod
@@ -69,6 +110,14 @@ class SchedulerTest(TestBase):
       consumes_a_and_b,
       transitive_b_c,
       transitive_coroutine_rule,
+      RootRule(UnionWrapper),
+      UnionA,
+      RootRule(UnionA),
+      select_union_a,
+      UnionB,
+      RootRule(UnionB),
+      select_union_b,
+      a_union_test,
     ]
 
   def test_use_params(self):
@@ -99,6 +148,16 @@ class SchedulerTest(TestBase):
     # We don't need the inner B objects to be the same, and we know the arguments are type-checked,
     # we're just testing transitively resolving products in this file.
     self.assertTrue(isinstance(result_d, D))
+
+  def test_union_rules(self):
+    a = self.scheduler.product_request(A, [Params(UnionWrapper(UnionA()))])
+    # TODO: figure out what to assert here!
+    self.assertIsNotNone(a)
+    a = self.scheduler.product_request(A, [Params(UnionWrapper(UnionB()))])
+    self.assertIsNotNone(a)
+    # Fails due to no union relationship from A -> UnionBase.
+    a = self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
+    self.assertIsNotNone(a)
 
 
 class SchedulerTraceTest(unittest.TestCase):

@@ -314,13 +314,13 @@ def console_rule(goal_name, input_selectors):
   return _make_rule(output_type, input_selectors, goal_name, False)
 
 
-def union_rule(cls):
+def union(cls):
   # TODO: do some checking!
   assert(isinstance(cls, type))
   return type(cls.__name__, (cls,), dict(_is_union=True))
 
 
-def union_member_rule(union_type):
+def union_rule(union_type):
   assert(isinstance(union_type, type))
   assert(union_type._is_union)
   def class_wrapper(cls):
@@ -465,30 +465,28 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
         add_task(rule.output_constraint, rule)
 
     def add_type_transition_rule(union_rule):
-      if hasattr(entry, '_union_type'):
-        union_base = union_member_rule._union_type
-        # TODO: better checking here -- this is how we ensure the union base was decorated with
-        # @union_rule
-        # NB: Note that this does not require that union bases be supplied to `def rules():`! not
-        # sure if that's what we want.
-        assert(union_base._is_union)
-        if union_base not in union_rules:
-          union_rules[union_base] = OrderedSet()
-        union_rules[union_base].add(union_member_rule)
-      else:
-        raise TypeError('???/types must be an @union_member_rule!')
+      union_base = union_rule._union_type
+      # TODO: better checking here -- this is how we ensure the union base was decorated with
+      # @union
+      # NB: Note that this does not require that union bases be supplied to `def rules():`! not
+      # sure if that's what we want.
+      assert(union_base._is_union)
+      if union_base not in union_rules:
+        union_rules[union_base] = OrderedSet()
+      union_rules[union_base].add(union_rule)
 
     for entry in rule_entries:
       if isinstance(entry, Rule):
         add_rule(entry)
+      elif hasattr(entry, '_union_type'):
+        add_type_transition_rule(entry)
       elif hasattr(entry, '__call__'):
         rule = getattr(entry, 'rule', None)
         if rule is None:
           raise TypeError("Expected callable {} to be decorated with @rule.".format(entry))
         add_rule(rule)
-      elif isinstance(entry, type):
-        add_type_transition_rule(entry)
       else:
+        # TODO: update this message!
         raise TypeError("Unexpected rule type: {}. "
                         "Rules either extend Rule, or are static functions "
                         "decorated with @rule.".format(type(entry)))
