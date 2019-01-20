@@ -29,6 +29,7 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
       targets which contain .proto definitions.
     """
     payload = payload or Payload()
+    # TODO(#7111): Remove the `imports` field and make this not subclass `ImportJarsMixin`!
     deprecated_conditional(
       lambda: imports is not None,
       '1.16.0.dev1',
