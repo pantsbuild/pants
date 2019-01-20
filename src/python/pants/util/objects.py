@@ -378,12 +378,14 @@ class TypeConstraint(AbstractClass):
 
 
 class BasicTypeConstraint(TypeConstraint):
-  """???"""
+  """A `TypeConstraint` predicated only on the object's type."""
 
+  # TODO: make an @abstract_classproperty decorator to do this boilerplate!
   @classproperty
   def _variance_symbol(cls):
-    """???"""
-    raise NotImplementedError('???')
+    """This is propagated to the the `TypeConstraint` constructor."""
+    raise NotImplementedError('{} must implement the _variance_symbol classproperty!'
+                              .format(cls.__name__))
 
   def __init__(self, *types):
     """Creates a type constraint centered around the given types.
@@ -411,6 +413,12 @@ class BasicTypeConstraint(TypeConstraint):
 
     # NB: This is made into a tuple so that we can use self._types in issubclass() and others!
     self._types = tuple(types)
+
+  # TODO(#7114): remove this after the engine is converted to use `TypeId` instead of
+  # `TypeConstraint`!
+  @property
+  def types(self):
+    return self._types
 
   @abstractmethod
   def satisfied_by_type(self, obj_type):
