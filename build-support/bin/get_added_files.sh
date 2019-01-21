@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# TODO: This is in a separate file so it can be tested in isolation in test_git.py. This can and
+# TODO: This is in a separate file so it can be tested in isolation in test_git_hooks.py. This can and
 # should all be moved to python code.
 
 # Check for copies (-C) and moves (-M), so we don't get false positives when people do

@@ -20,7 +20,7 @@ DIRS_TO_CHECK=(
 # TODO(#7068): Fix all these checks to only act on staged files with
 # `git diff --cached --name-only`!
 
-# TODO: test all the scripts in this file in test_git.py, remove uses of `|| exit 1`, and add an
+# TODO: test all the scripts in this file in test_git_hooks.py, remove uses of `|| exit 1`, and add an
 # integration test!
 set -e
 
