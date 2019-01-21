@@ -137,7 +137,7 @@ def safe_file_write(filename, payload=None, mode=None):
   doc there.
 
   When `payload` is an empty string (the default), this method can be used as a concise way to
-  create an empty file along with its containing directory or truncate it if it already exists.
+  create an empty file along with its containing directory (or truncate it if it already exists).
 
   :param string filename: The filename of the file to write to.
   :param string payload: The string to write to the file. Defaults to the empty string.
