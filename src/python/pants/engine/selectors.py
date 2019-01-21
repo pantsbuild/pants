@@ -43,11 +43,17 @@ class Get(datatype(['product', 'subject_declared_type', 'subject'])):
     :return: A tuple of product type id and subject type id.
     """
     def render_args():
-      return ', '.join(a.id for a in call_node.args)
+      return ', '.join(
+        # Dump the Name's id to simplify output when available, falling back to the name of the
+        # node's class.
+        getattr(a, 'id', type(a).__name__)
+        for a in call_node.args)
 
     if len(call_node.args) == 2:
       product_type, subject_constructor = call_node.args
       if not isinstance(product_type, ast.Name) or not isinstance(subject_constructor, ast.Call):
+        # TODO(#7114): describe what types of objects are expected in the get call, not just the
+        # argument names. After #7114 this will be easier because they will just be types!
         raise ValueError(
           'Two arg form of {} expected (product_type, subject_type(subject)), but '
                         'got: ({})'.format(Get.__name__, render_args()))
@@ -73,7 +79,8 @@ class Get(datatype(['product', 'subject_declared_type', 'subject'])):
     return cls(product_type, subject_type, None)
 
   def __new__(cls, *args):
-    # TODO: typecheck the args!
+    # TODO(#7114): typecheck the args (as in, ensure they are types or constraints)! After #7114, we
+    # can just check that they are types.
     if len(args) == 2:
       product, subject = args
       subject_declared_type = type(subject)

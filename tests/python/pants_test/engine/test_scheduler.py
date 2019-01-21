@@ -94,11 +94,29 @@ def select_union_b(union_b):
   return union_b.a()
 
 
-# TODO: add GetMulti testing!
+# TODO: add GetMulti testing for unions!
 @rule(A, [Select(UnionWrapper)])
 def a_union_test(union_wrapper):
   union_a = yield Get(A, UnionBase, union_wrapper.inner)
   yield union_a
+
+
+class TypeCheckFailWrapper(object):
+  """
+  This object wraps another object which will be used to demonstrate a type check failure when the
+  engine processes a `yield Get(...)` statement.
+  """
+
+  def __init__(self, inner):
+    self.inner = inner
+
+
+@rule(A, [Select(TypeCheckFailWrapper)])
+def a_typecheck_fail_test(wrapper):
+  # This `yield Get(A, B, ...)` will use the `nested_raise` rule defined above, but it won't get to
+  # the point of raising since the type check will fail at the Get.
+  supposedly_a = yield Get(A, B, wrapper.inner)
+  yield supposedly_a
 
 
 class SchedulerTest(TestBase):
@@ -121,6 +139,8 @@ class SchedulerTest(TestBase):
       RootRule(UnionB),
       select_union_b,
       a_union_test,
+      a_typecheck_fail_test,
+      RootRule(TypeCheckFailWrapper),
     ]
 
   def test_use_params(self):
@@ -170,6 +190,13 @@ class SchedulerTest(TestBase):
     expected_msg = "Exception: None of the registered union members matched the subject. declared union type: TypeConstraint(=UnionBase), union members: {TypeConstraint(=UnionA), TypeConstraint(=UnionB)}, subject: <pants_test.engine.test_scheduler.A object at 0xEEEEEEEEE>"
     with self._assert_execution_error(expected_msg):
       self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
+
+  def test_get_type_match_failure(self):
+    """Test that Get(...)s are now type-checked during rule execution, to allow for union types."""
+    expected_msg = "Exception: Declared type did not match actual type for Get { product: TypeConstraint(=A), subject_declared_type: TypeConstraint(=B), subject: <pants_test.engine.test_scheduler.A object at 0xEEEEEEEEE>"
+    with self._assert_execution_error(expected_msg):
+      # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
+      self.scheduler.product_request(A, [Params(TypeCheckFailWrapper(A()))])
 
 
 class SchedulerTraceTest(unittest.TestCase):
