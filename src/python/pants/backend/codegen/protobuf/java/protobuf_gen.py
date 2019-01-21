@@ -84,13 +84,13 @@ class ProtobufGen(SimpleCodegenTask):
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     deps = OrderedSet()
-    if target.imported_jars:
+    if target.all_imported_jar_deps:
       # We need to add in the proto imports jars.
       jars_address = Address(os.path.relpath(target_workdir, get_buildroot()),
                              target.id + '-rjars')
       jars_target = self.context.add_new_target(jars_address,
                                                 JarLibrary,
-                                                jars=target.imported_jars,
+                                                jars=target.all_imported_jar_deps,
                                                 derived_from=target)
       deps.update([jars_target])
     deps.update(self.javadeps)

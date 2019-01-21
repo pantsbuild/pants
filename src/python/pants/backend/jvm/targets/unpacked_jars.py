@@ -21,6 +21,9 @@ class UnpackedJars(ImportJarsMixin, Target):
   :API: public
   """
 
+  imported_target_kwargs_field = 'libraries'
+  imported_target_payload_field = 'library_specs'
+
   class ExpectedLibrariesError(Exception):
     """Thrown when the target has no libraries defined."""
     pass
@@ -44,16 +47,6 @@ class UnpackedJars(ImportJarsMixin, Target):
     })
     super(UnpackedJars, self).__init__(payload=payload, **kwargs)
 
-    self._files = None
-
     if not libraries:
       raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'
                                         .format(spec=self.address.spec))
-
-  @classmethod
-  def imported_jar_library_spec_fields(cls):
-    """Fields to extract JarLibrary specs from.
-
-    Required to implement the ImportJarsMixin.
-    """
-    yield ('libraries', 'library_specs')

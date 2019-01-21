@@ -35,7 +35,7 @@ class JavaProtobufLibraryTest(TestBase):
     )'''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    self.assertSequenceEqual([], target.imported_jars)
+    self.assertSequenceEqual([], target.all_imported_jar_deps)
 
   def test_jar_library_imports(self):
     self.add_to_build_file('BUILD', dedent('''
@@ -51,8 +51,8 @@ class JavaProtobufLibraryTest(TestBase):
     '''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    self.assertEqual(1, len(target.imported_jars))
-    import_jar_dep = target.imported_jars[0]
+    self.assertEqual(1, len(target.all_imported_jar_deps))
+    import_jar_dep = target.all_imported_jar_deps[0]
     self.assertIsInstance(import_jar_dep, JarDependency)
 
   def test_wrong_import_type1(self):
@@ -68,8 +68,8 @@ class JavaProtobufLibraryTest(TestBase):
       '''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    with self.assertRaises(JarLibrary.WrongTargetTypeError):
-      target.imported_jars
+    with self.assertRaises(JavaProtobufLibrary.WrongTargetTypeError):
+      target.all_imported_jar_deps
 
   def test_wrong_import_type2(self):
     self.add_to_build_file('BUILD', dedent('''
@@ -80,7 +80,7 @@ class JavaProtobufLibraryTest(TestBase):
         ],
       )
       '''))
-    with self.assertRaises(JarLibrary.ExpectedAddressError):
+    with self.assertRaises(JavaProtobufLibrary.ExpectedAddressError):
       self.target('//:foo')
 
   def test_compute_dependency_specs(self):

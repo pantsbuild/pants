@@ -4,8 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from textwrap import dedent
-
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
@@ -49,42 +47,3 @@ class JarLibraryTest(TestBase):
     lib = JarLibrary(name='foo', address=Address.parse('//:foo'),
                      build_graph=self.build_graph, jars=[jar1])
     self.assertEqual([], lib.excludes)
-
-  def test_to_jar_dependencies(self):
-    def assert_dep(dep, org, name, rev):
-      self.assertTrue(isinstance(dep, JarDependency))
-      self.assertEqual(org, dep.org)
-      self.assertEqual(name, dep.name)
-      self.assertEqual(rev, dep.rev)
-
-    self.add_to_build_file('BUILD', dedent('''
-    jar_library(name='lib1',
-      jars=[
-        jar(org='testOrg1', name='testName1', rev='123'),
-      ],
-    )
-    jar_library(name='lib2',
-      jars=[
-        jar(org='testOrg2', name='testName2', rev='456'),
-        jar(org='testOrg3', name='testName3', rev='789'),
-      ],
-    )
-    '''))
-    lib1 = self.target('//:lib1')
-    self.assertIsInstance(lib1, JarLibrary)
-    self.assertEqual(1, len(lib1.jar_dependencies))
-    assert_dep(lib1.jar_dependencies[0], 'testOrg1', 'testName1', '123')
-
-    lib2 = self.target('//:lib2')
-    self.assertIsInstance(lib2, JarLibrary)
-    self.assertEqual(2, len(lib2.jar_dependencies))
-    assert_dep(lib2.jar_dependencies[0], 'testOrg2', 'testName2', '456')
-    assert_dep(lib2.jar_dependencies[1], 'testOrg3', 'testName3', '789')
-
-    deps = JarLibrary.to_jar_dependencies(lib1.address,
-                                          [':lib1', ':lib2'],
-                                          self.build_graph)
-    self.assertEqual(3, len(deps))
-    assert_dep(lib1.jar_dependencies[0], 'testOrg1', 'testName1', '123')
-    assert_dep(lib2.jar_dependencies[0], 'testOrg2', 'testName2', '456')
-    assert_dep(lib2.jar_dependencies[1], 'testOrg3', 'testName3', '789')

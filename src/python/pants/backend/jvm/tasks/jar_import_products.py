@@ -30,7 +30,7 @@ class JarImportProducts(object):
     """Registers a :class`JarImportProducts.JarImport` for the given target.
 
     :param target: The :class:`pants.backend.jvm.targets.import_jars_mixin.ImportJarsMixin` target
-                   whose `imported_jar_library_specs` were resolved.
+                   whose `all_imported_jar_deps` were resolved.
     :param coordinate: The maven coordinate of the import jar.
     :type coordinate: :class:`pants.java.jar_utls.M2Coordinate`
     :param string jar: The path of the resolved import jar.

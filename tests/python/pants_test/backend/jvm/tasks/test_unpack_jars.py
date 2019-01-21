@@ -15,6 +15,8 @@ from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars, UnpackJarsFingerprintStrategy
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.task.unpack_remote_sources_base import UnpackedArchives
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import open_zip, temporary_dir
 from pants_test.task_test_base import TaskTestBase
 
@@ -134,14 +136,11 @@ class UnpackJarsTest(TaskTestBase):
         if not intransitive:
           expected_files.add('a/b/c/bar.proto')
 
-        actual = {k: [set(v[0]), v[1]]
-                  for k, v in context.products.get_data('unpacked_archives', dict).items()}
-
-        self.assertEqual(
-          {unpacked_jar_tgt:
-             [expected_files,
-              '.pants.d/pants_backend_jvm_tasks_unpack_jars_UnpackJars/unpack.foo']},
-          actual)
+        with unpack_task.invalidated([unpacked_jar_tgt]) as invalidation_check:
+          vt = assert_single_element(invalidation_check.all_vts)
+          self.assertEqual(vt.target, unpacked_jar_tgt)
+          archives = context.products.get_data(UnpackedArchives, dict)[vt.target]
+          self.assertEqual(expected_files, set(archives.found_files))
 
   def test_transitive(self):
     self._do_test_products(intransitive=False)
