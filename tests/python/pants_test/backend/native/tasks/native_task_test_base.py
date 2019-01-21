@@ -10,7 +10,7 @@ from textwrap import dedent
 from pants.backend.native import register
 from pants.backend.native.targets.native_library import CppLibrary
 from pants.backend.native.tasks.conan_fetch import ConanFetch
-from pants.backend.native.tasks.unpack_wheels import UnpackWheels
+from pants.backend.python.tasks.unpack_wheels import UnpackWheels
 from pants_test.task_test_base import TaskTestBase
 
 

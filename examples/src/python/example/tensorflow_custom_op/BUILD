@@ -31,7 +31,7 @@ python_dist(
 
 ctypes_compatible_cpp_library(
   name='tensorflow-zero-out-op',
-  compiler_option_sets={'ndebug', 'glibcxx_use_old_abi'},
+  compiler_option_sets={'glibcxx_use_old_abi'},
   dependencies=[
     'examples/3rdparty/python:tensorflow-framework',
   ],
