@@ -9,7 +9,7 @@ import time
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import fast_relpath, safe_file_dump
+from pants.util.dirutil import fast_relpath, safe_file_write
 from pants_test.pants_run_integration_test import ensure_daemon
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
@@ -78,7 +78,7 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
       rel_tmpdir = fast_relpath(tmpdir, get_buildroot())
 
       def dump(content):
-        safe_file_dump(os.path.join(tmpdir, 'BUILD'), content, mode="w")
+        safe_file_write(os.path.join(tmpdir, 'BUILD'), content)
 
       # Dump an initial target before starting the loop.
       dump('target(name="one")')

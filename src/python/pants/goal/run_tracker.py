@@ -31,7 +31,7 @@ from pants.option.config import Config
 from pants.reporting.report import Report
 from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import relative_symlink, safe_file_dump
+from pants.util.dirutil import relative_symlink, safe_file_write
 
 
 class RunTracker(Subsystem):
@@ -412,7 +412,7 @@ class RunTracker(Subsystem):
     stats_file = os.path.join(get_pants_cachedir(), 'stats',
                               '{}.json'.format(self.run_info.get_info('id')))
     mode = 'w' if PY3 else 'wb'
-    safe_file_dump(stats_file, json.dumps(stats), mode=mode)
+    safe_file_write(stats_file, json.dumps(stats), mode=mode)
 
     # Add to local stats db.
     StatsDBFactory.global_instance().get_db().insert_stats(stats)

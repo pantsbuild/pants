@@ -15,7 +15,7 @@ import zipfile
 from builtins import open, str
 
 from pants.util.contextutil import open_zip, temporary_dir
-from pants.util.dirutil import read_file, safe_file_dump
+from pants.util.dirutil import read_file, safe_file_write
 
 
 def replace_in_file(workspace, src_file_path, from_str, to_str):
@@ -30,7 +30,7 @@ def replace_in_file(workspace, src_file_path, from_str, to_str):
     return None
 
   dst_file_path = src_file_path.replace(from_str, to_str)
-  safe_file_dump(os.path.join(workspace, dst_file_path), data.replace(from_bytes, to_bytes))
+  safe_file_write(os.path.join(workspace, dst_file_path), data.replace(from_bytes, to_bytes), mode='wb')
   if src_file_path != dst_file_path:
     os.unlink(os.path.join(workspace, src_file_path))
   return dst_file_path
@@ -88,7 +88,7 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
       output_line = line
     output_records.append(output_line)
 
-  safe_file_dump(file_name, '\r\n'.join(output_records) + '\r\n', binary_mode=False)
+  safe_file_write(file_name, '\r\n'.join(output_records) + '\r\n')
 
 
 # The wheel METADATA file will contain a line like: `Version: 1.11.0.dev3+7951ec01`.

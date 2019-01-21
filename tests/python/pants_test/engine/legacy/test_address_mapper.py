@@ -15,7 +15,7 @@ from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.nodes import Throw
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_file_dump, safe_mkdir
+from pants.util.dirutil import safe_file_write, safe_mkdir
 from pants_test.test_base import TestBase
 
 
@@ -40,15 +40,15 @@ class LegacyAddressMapperTest(TestBase):
     safe_mkdir(dir_b)
     safe_mkdir(dir_a_subdir)
 
-    safe_file_dump(os.path.join(self.build_root, 'BUILD'), 'target(name="a")\ntarget(name="b")', binary_mode=False)
-    safe_file_dump(os.path.join(self.build_root, 'BUILD.other'), 'target(name="c")', binary_mode=False)
+    safe_file_write(os.path.join(self.build_root, 'BUILD'), 'target(name="a")\ntarget(name="b")')
+    safe_file_write(os.path.join(self.build_root, 'BUILD.other'), 'target(name="c")')
 
-    safe_file_dump(os.path.join(dir_a, 'BUILD'), 'target(name="a")\ntarget(name="b")', binary_mode=False)
-    safe_file_dump(os.path.join(dir_a, 'BUILD.other'), 'target(name="c")', binary_mode=False)
+    safe_file_write(os.path.join(dir_a, 'BUILD'), 'target(name="a")\ntarget(name="b")')
+    safe_file_write(os.path.join(dir_a, 'BUILD.other'), 'target(name="c")')
 
-    safe_file_dump(os.path.join(dir_b, 'BUILD'), 'target(name="a")', binary_mode=False)
+    safe_file_write(os.path.join(dir_b, 'BUILD'), 'target(name="a")')
 
-    safe_file_dump(os.path.join(dir_a_subdir, 'BUILD'), 'target(name="a")', binary_mode=False)
+    safe_file_write(os.path.join(dir_a_subdir, 'BUILD'), 'target(name="a")')
 
   def test_is_valid_single_address(self):
     self.create_build_files()

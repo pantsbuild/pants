@@ -13,7 +13,7 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.consolidate_classpath import ConsolidateClasspath
 from pants.build_graph.resources import Resources
 from pants.java.jar.jar_dependency import JarDependency
-from pants.util.dirutil import safe_file_dump
+from pants.util.dirutil import safe_file_write
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 
 
@@ -48,12 +48,12 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
                                           JarDependency(org='org.gnu', name='gary', rev='4.0.0',
                                                         ext='tar.gz')])
 
-    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content', binary_mode=False)
+    safe_file_write(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content')
     self.resources_target = self.make_target('//resources:foo-resources', Resources,
                                              sources=['foo/file'])
 
     # This is so that payload fingerprint can be computed.
-    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content', binary_mode=False)
+    safe_file_write(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content')
     self.java_lib_target = self.make_target('//foo:foo-library', JavaLibrary, sources=['Foo.java'])
 
     self.binary_target = self.make_target(spec='//foo:foo-binary',

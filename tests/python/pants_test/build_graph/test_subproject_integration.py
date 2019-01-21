@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.util.dirutil import safe_file_dump, safe_rmtree
+from pants.util.dirutil import safe_file_write, safe_rmtree
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -76,7 +76,7 @@ testprojects/
 def harness():
   try:
     for name, content in BUILD_FILES.items():
-      safe_file_dump(name, dedent(content), binary_mode=False)
+      safe_file_write(name, dedent(content))
     yield
   finally:
     safe_rmtree(SUBPROJ_SPEC)
@@ -102,7 +102,7 @@ class SubprojectIntegrationTest(PantsRunIntegrationTest):
     """
     with harness():
       # Has dependencies below the subproject.
-      pants_args = ['--subproject-roots={}'.format(SUBPROJ_ROOT), 
+      pants_args = ['--subproject-roots={}'.format(SUBPROJ_ROOT),
                     'dependencies', SUBPROJ_SPEC]
       self.assert_success(self.run_pants(pants_args))
 
