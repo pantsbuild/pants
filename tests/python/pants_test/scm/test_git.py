@@ -4,10 +4,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import datetime
 import os
 import unittest
-from builtins import open, str
+from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 from unittest import skipIf
@@ -15,11 +14,9 @@ from unittest import skipIf
 from pants.scm.git import Git
 from pants.scm.scm import Scm
 from pants.util.contextutil import environment_as, pushd, temporary_dir
-from pants.util.dirutil import (chmod_plus_x, safe_file_dump, safe_mkdir, safe_mkdtemp, safe_open,
-                                safe_rmtree, touch)
+from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
 from pants.util.process_handler import subprocess
-from pants_test.testutils.git_util import (MIN_REQUIRED_GIT_VERSION, get_repo_root, git_version,
-                                           initialize_repo)
+from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version
 
 
 @skipIf(git_version() < MIN_REQUIRED_GIT_VERSION,
@@ -554,148 +551,3 @@ class DetectWorktreeFakeGitTest(unittest.TestCase):
         fp.write('echo ' + expected_worktree_dir)
       self.assertEqual(expected_worktree_dir, Git.detect_worktree())
       self.assertEqual(expected_worktree_dir, Git.detect_worktree(binary=git))
-
-
-class PreCommitHookTest(unittest.TestCase):
-
-  def setUp(self):
-    self.pants_repo_root = get_repo_root()
-
-  @contextmanager
-  def _create_tiny_git_repo(self):
-    with temporary_dir() as gitdir,\
-         temporary_dir() as worktree:
-      # A tiny little fake git repo we will set up. initialize_repo() requires at least one file.
-      readme_file = os.path.join(worktree, 'README')
-      touch(readme_file)
-      # The contextmanager interface is only necessary if an explicit gitdir is not provided.
-      with initialize_repo(worktree, gitdir=gitdir) as git:
-        yield git, worktree, gitdir
-
-  def _assert_subprocess_error(self, worktree, cmd, expected_excerpt):
-    with self.assertRaises(subprocess.CalledProcessError) as cm:
-      subprocess.check_output(cmd, cwd=worktree)
-    self.assertIn(expected_excerpt, str(cm.exception.output))
-
-  def _assert_subprocess_success(self, worktree, cmd, **kwargs):
-    self.assertEqual(0, subprocess.check_call(cmd, cwd=worktree, **kwargs))
-
-  def _assert_subprocess_success_with_output(self, worktree, cmd, full_expected_output):
-    output = subprocess.check_output(cmd, cwd=worktree)
-    self.assertEqual(full_expected_output, output)
-
-  def _assert_subprocess_error_with_input(self, worktree, cmd, input, expected_excerpt):
-    proc = subprocess.Popen(
-      cmd,
-      cwd=worktree,
-      stdin=subprocess.PIPE,
-      stdout=subprocess.PIPE,
-      stderr=subprocess.PIPE,
-    )
-    (stdout_data, stderr_data) = proc.communicate(input=input)
-    self.assertEqual(1, proc.returncode)
-    all_output = '{}\n{}'.format(stdout_data, stderr_data)
-    self.assertIn(expected_excerpt, all_output)
-
-  def test_check_packages(self):
-    package_check_script = os.path.join(self.pants_repo_root, 'build-support/bin/check_packages.sh')
-    with self._create_tiny_git_repo() as (_, worktree, _):
-      init_py_path = os.path.join(worktree, 'subdir/__init__.py')
-
-      # Check that an invalid __init__.py errors.
-      safe_file_dump(init_py_path, 'asdf')
-      self._assert_subprocess_error(worktree, [package_check_script, 'subdir'], """\
-ERROR: All '__init__.py' files should be empty or else only contain a namespace
-declaration, but the following contain code:
----
-subdir/__init__.py
-""")
-
-      # Check that a valid __init__.py succeeds.
-      safe_file_dump(init_py_path, '')
-      self._assert_subprocess_success(worktree, [package_check_script, 'subdir'])
-      safe_file_dump(init_py_path,
-                     "__import__('pkg_resources').declare_namespace(__name__)")
-      self._assert_subprocess_success(worktree, [package_check_script, 'subdir'])
-
-  def test_added_files(self):
-    get_added_files_script = os.path.join(self.pants_repo_root,
-                                          'build-support/bin/get_added_files.sh')
-    with self._create_tiny_git_repo() as (git, worktree, _):
-      # Create a new file.
-      new_file = os.path.join(worktree, 'wow.txt')
-      safe_file_dump(new_file, '')
-      # Stage the file.
-      rel_new_file = os.path.relpath(new_file, worktree)
-      git.add(rel_new_file)
-      self._assert_subprocess_success_with_output(
-        worktree, [get_added_files_script],
-        # This should be the only entry in the index, and it is a newly added file.
-        full_expected_output="{}\n".format(rel_new_file))
-
-  def test_check_headers(self):
-    header_check_script = os.path.join(self.pants_repo_root,
-                                       'build-support/bin/check_header_helper.py')
-    with self._create_tiny_git_repo() as (_, worktree, _):
-      new_py_path = os.path.join(worktree, 'subdir/file.py')
-
-      # Check that a file with an empty header fails.
-      safe_file_dump(new_py_path, '')
-      self._assert_subprocess_error_with_input(
-        worktree, [header_check_script, 'subdir'],
-        # The python process reads from stdin, so we have to explicitly pass an empty string in
-        # order to close it.
-        input='',
-        expected_excerpt="""\
-subdir/file.py: failed to parse header at all
-""")
-
-      # Check that a file with a random header fails.
-      safe_file_dump(new_py_path, 'asdf')
-      self._assert_subprocess_error_with_input(
-        worktree, [header_check_script, 'subdir'],
-        input='',
-        expected_excerpt="""\
-subdir/file.py: failed to parse header at all
-""")
-      # Check that a file without a valid copyright year fails.
-      safe_file_dump(new_py_path, """\
-# coding=utf-8
-# Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
-# Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-""")
-      self._assert_subprocess_error_with_input(
-        worktree, [header_check_script, 'subdir'],
-        input='',
-        expected_excerpt="""\
-subdir/file.py: copyright year must match '20\\d\\d' (was YYYY)
-""")
-
-      # Check that a file read from stdin is checked against the current year.
-      cur_year_num = datetime.datetime.now().year
-      last_year = str(cur_year_num - 1)
-      cur_year = str(cur_year_num)
-      safe_file_dump(new_py_path, """\
-# coding=utf-8
-# Copyright {} Pants project contributors (see CONTRIBUTORS.md).
-# Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-""".format(last_year))
-      rel_new_py_path = os.path.relpath(new_py_path, worktree)
-      self._assert_subprocess_error_with_input(
-        worktree, [header_check_script, 'subdir'],
-        input='{}\n'.format(rel_new_py_path),
-        expected_excerpt="""\
-subdir/file.py: copyright year must be {} (was {})
-""".format(cur_year, last_year))
-
-      # Check that a file read from stdin isn't checked against the current year if
-      # IGNORE_ADDED_FILES is set.
-      # Use the same file as last time, with last year's copyright date.
-      self._assert_subprocess_success(worktree, [header_check_script, 'subdir'],
-                                      env={'IGNORE_ADDED_FILES': 'y'})
