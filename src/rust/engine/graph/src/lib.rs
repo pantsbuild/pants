@@ -270,7 +270,7 @@ impl<N: Node> InnerGraph<N> {
 
   fn trace<T: NodeTracer<N>>(&self, roots: &[N], file_path: &Path) -> Result<(), String> {
     let root_ids: IndexSet<EntryId, FNV> = roots
-      .into_iter()
+      .iter()
       .filter_map(|nk| self.entry_id(&EntryKey::Valid(nk.clone())))
       .cloned()
       .collect();

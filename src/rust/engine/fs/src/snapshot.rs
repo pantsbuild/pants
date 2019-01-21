@@ -188,7 +188,7 @@ impl Snapshot {
                 "Snapshots contained duplicate path: {:?} vs {:?}",
                 x, y
               ))
-              .to_boxed()
+              .to_boxed();
             }
           },
           indexmap::map::Entry::Vacant(v) => {

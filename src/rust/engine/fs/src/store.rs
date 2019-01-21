@@ -296,11 +296,10 @@ impl Store {
   ) -> BoxFuture<UploadSummary, String> {
     let start_time = Instant::now();
 
-    let remote = match self.remote {
-      Some(ref remote) => remote,
-      None => {
-        return future::err("Cannot ensure remote has blobs without a remote".to_owned()).to_boxed()
-      }
+    let remote = if let Some(ref remote) = self.remote {
+      remote
+    } else {
+      return future::err("Cannot ensure remote has blobs without a remote".to_owned()).to_boxed();
     };
 
     let mut expanding_futures = Vec::new();
@@ -315,10 +314,10 @@ impl Store {
           expanding_futures.push(self.expand_directory(digest));
         }
         Ok(None) => {
-          return future::err(format!("Failed to upload digest {:?}: Not found", digest)).to_boxed()
+          return future::err(format!("Failed to upload digest {:?}: Not found", digest)).to_boxed();
         }
         Err(err) => {
-          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err)).to_boxed()
+          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err)).to_boxed();
         }
       };
     }
@@ -494,7 +493,7 @@ impl Store {
           future::join_all(
             directory
               .get_directories()
-              .into_iter()
+              .iter()
               .map(move |subdir| {
                 store.clone().expand_directory_helper(
                   try_future!(subdir.get_digest().into()),
@@ -634,7 +633,7 @@ impl Store {
     let dir_futures = future::join_all(
       directory
         .get_directories()
-        .into_iter()
+        .iter()
         .map(move |dir_node| {
           let digest = try_future!(dir_node.get_digest().into());
           let path = path_so_far.join(dir_node.get_name());
@@ -666,7 +665,6 @@ mod local {
   use super::{EntryType, ShrinkBehavior};
 
   use boxfuture::{BoxFuture, Boxable};
-  use byteorder::{ByteOrder, LittleEndian};
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::future;
@@ -737,7 +735,7 @@ mod local {
             return Err(format!(
               "Error reading from store when determining type of fingerprint {}: {}",
               fingerprint, err
-            ))
+            ));
           }
         };
       }
@@ -752,7 +750,7 @@ mod local {
           return Err(format!(
             "Error reading from store when determining type of fingerprint {}: {}",
             fingerprint, err
-          ))
+          ));
         }
       };
       Ok(None)
@@ -787,9 +785,12 @@ mod local {
       until_secs_since_epoch: u64,
       txn: &mut RwTransaction<'_>,
     ) -> Result<(), lmdb::Error> {
-      let mut buf = [0; 8];
-      LittleEndian::write_u64(&mut buf, until_secs_since_epoch);
-      txn.put(database, &fingerprint.as_ref(), &buf, WriteFlags::empty())
+      txn.put(
+        database,
+        &fingerprint.as_ref(),
+        &until_secs_since_epoch.to_le_bytes(),
+        WriteFlags::empty(),
+      )
     }
 
     ///
@@ -886,7 +887,11 @@ mod local {
           // when we delete from lmdb to track how much we've freed).
           let lease_until_unix_timestamp = txn
             .get(*lease_database, &key)
-            .map(|b| LittleEndian::read_u64(b))
+            .map(|b| {
+              let mut array = [0_u8; 8];
+              array.copy_from_slice(b);
+              u64::from_le_bytes(array)
+            })
             .unwrap_or_else(|e| match e {
               NotFound => 0,
               e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),

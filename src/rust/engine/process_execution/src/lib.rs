@@ -30,21 +30,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use bazel_protos;
-
-use fs;
-
-use hashing;
-
-#[cfg(test)]
-extern crate mock;
-use protobuf;
-
-#[cfg(test)]
-extern crate tempfile;
-
-use time;
-
 use boxfuture::BoxFuture;
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};

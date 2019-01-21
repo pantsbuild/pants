@@ -579,7 +579,7 @@ fn expand_files_helper(
         futures::future::join_all(
           dir
             .get_directories()
-            .into_iter()
+            .iter()
             .map(move |dir| {
               let digest: Result<Digest, String> = dir.get_digest().into();
               expand_files_helper(

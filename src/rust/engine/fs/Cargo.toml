@@ -8,7 +8,6 @@ publish = false
 [dependencies]
 bazel_protos = { path = "../process_execution/bazel_protos" }
 boxfuture = { path = "../boxfuture" }
-byteorder = "1"
 bytes = "0.4.5"
 digest = "0.8"
 dirs = "1"

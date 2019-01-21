@@ -41,22 +41,6 @@ pub use crate::store::{ShrinkBehavior, Store, UploadSummary, DEFAULT_LOCAL_STORE
 mod pool;
 pub use crate::pool::ResettablePool;
 
-use bazel_protos;
-
-use dirs;
-use futures;
-use futures_cpupool;
-
-use grpcio;
-
-use indexmap;
-
-use lmdb;
-
-use protobuf;
-
-use uuid;
-
 pub use serverset::BackoffConfig;
 
 use std::cmp::min;
@@ -302,7 +286,7 @@ impl PathGlob {
     for component in Path::new(filespec).components() {
       let part = match component {
         Component::Prefix(..) | Component::RootDir => {
-          return Err(format!("Absolute paths not supported: {:?}", filespec))
+          return Err(format!("Absolute paths not supported: {:?}", filespec));
         }
         Component::CurDir => continue,
         c => c.as_os_str(),
