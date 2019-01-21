@@ -224,8 +224,6 @@ pub struct GraphMaker<'t> {
   tasks: &'t Tasks,
   root_param_types: ParamTypes,
   union_rules: UnionMemberMap,
-  // TODO: plumb the union mappings into this so that they can be populated in construct_graph()
-  // where RuleGraph is created below!
 }
 
 impl<'t> GraphMaker<'t> {

@@ -586,7 +586,7 @@ pub extern "C" fn rule_graph_visualize(
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = PathBuf::from(path_str);
 
-    // TODO: we want to represent union types in the graph visualizer somehow!!!
+    // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
     let graph = graph_full(
       scheduler,
       subject_types.to_vec(),
@@ -609,7 +609,7 @@ pub extern "C" fn rule_subgraph_visualize(
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = PathBuf::from(path_str);
 
-    // TODO: we want to represent union types in the graph visualizer somehow!!!
+    // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
     let graph = graph_sub(
       scheduler,
       subject_type,
