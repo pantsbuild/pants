@@ -143,8 +143,10 @@ def safe_file_write(filename, payload=None, mode=None):
   :param string payload: The string to write to the file. Defaults to the empty string.
   :param string mode: A mode argument for the python `open` builtin. Defaults to 'w' (text).
   """
+  if payload is None:
+    payload = ''
   with safe_open(filename, mode=mode or 'w') as f:
-    f.write(payload or '')
+    f.write(payload)
 
 
 def maybe_read_file(filename, binary_mode=None):
