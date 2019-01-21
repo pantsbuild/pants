@@ -27,6 +27,7 @@ from pants.base.workunit import WorkUnit
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.goal.pantsd_stats import PantsDaemonStats
+from pants.option.config import Config
 from pants.reporting.report import Report
 from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
@@ -85,6 +86,8 @@ class RunTracker(Subsystem):
              help='Number of threads for background work.')
     register('--stats-local-json-file', advanced=True, default=None,
              help='Write stats to this local json file on run completion.')
+    register('--stats-option-scopes-to-record', advanced=True, type=list, default=[],
+             help='Options or option scopes to record in stats on run completion.')
 
   def __init__(self, *args, **kwargs):
     """
@@ -387,6 +390,40 @@ class RunTracker(Subsystem):
     if target_data:
       run_information['target_data'] = ast.literal_eval(target_data)
 
+    def get_option(scope_or_scope_with_flag, flag=None):
+      """Looks up a scope in the options parsed by Pants.
+
+      scope_or_scope_with_flag is a string either either of form scope or scope.flag
+      If it's a scope, the scope's values will be gotten as a dict, and either returned if flag is
+        None, or else the flag will be looked up inside the dict.
+      If it's a scope.flag, the scope will be looked up and the flag looked up and returned.
+      If the scope or flag can't be found, ValueError will be raised.
+      """
+      scope_to_look_up = scope_or_scope_with_flag if scope_or_scope_with_flag != 'GLOBAL' else ''
+      try:
+        # Yeah, it's a little sketchy to be looking up Subsystem._options here, but... Someone went
+        # to some care to make sure that Subsystems only get scoped options, and we need to
+        # circumvent that in this one specific place...
+        value = Subsystem._options.for_scope(scope_to_look_up, inherit_from_enclosing_scope=False).as_dict()
+        if flag is None:
+          return value
+        else:
+          return value[flag]
+      except Config.ConfigValidationError:
+        # We only support one level of scope.flag - if we already were looking up a flag, or there
+        # are no parent scopes, don't traverse into parent scopes.
+        if flag is None and '.' in scope_to_look_up:
+          # Option wasn't a scope - maybe it was a scope.flagname?
+          return get_option(*scope_to_look_up.rsplit('.', 1))
+        raise ValueError("Couldn't find option scope {} for recording".format(scope))
+      except AttributeError:
+        # If we looked up a flag in a set of scopes, and it wasn't found, error.
+        raise ValueError("Couldn't find option scope {} for recording".format(scope))
+
+    recorded_options = {}
+    for scope in self.get_options().stats_option_scopes_to_record:
+      recorded_options[scope] = get_option(scope)
+
     stats = {
       'run_info': run_information,
       'cumulative_timings': self.cumulative_timings.get_all(),
@@ -394,8 +431,10 @@ class RunTracker(Subsystem):
       'critical_path_timings': self.get_critical_path_timings().get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
       'pantsd_stats': self.pantsd_stats.get_all(),
-      'outcomes': self.outcomes
+      'outcomes': self.outcomes,
+      'recorded_options': recorded_options,
     }
+
     # Dump individual stat file.
     # TODO(benjy): Do we really need these, once the statsdb is mature?
     stats_file = os.path.join(get_pants_cachedir(), 'stats',

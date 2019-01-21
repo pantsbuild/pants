@@ -15,9 +15,12 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class RunTrackerIntegrationTest(PantsRunIntegrationTest):
   def test_stats_local_json_file(self):
     with temporary_file_path() as tmpfile:
-      pants_run = self.run_pants(['test',
-                                  '--run-tracker-stats-local-json-file={}'.format(tmpfile),
-                                  'testprojects/src/java/org/pantsbuild/testproject/unicode/main'])
+      pants_run = self.run_pants([
+        'test',
+        '--run-tracker-stats-local-json-file={}'.format(tmpfile),
+        '--run-tracker-stats-option-scopes-to-record=["GLOBAL", "GLOBAL.enable_pantsd", "compile.zinc.execution_strategy"]',
+        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
+      ])
       self.assert_success(pants_run)
 
       with open(tmpfile, 'r') as fp:
@@ -29,6 +32,12 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('self_timings', stats_json)
         self.assertIn('cumulative_timings', stats_json)
         self.assertIn('pantsd_stats', stats_json)
+        self.assertIn('recorded_options', stats_json)
+        self.assertIn('GLOBAL', stats_json['recorded_options'])
+        self.assertIs(stats_json['recorded_options']['GLOBAL']['enable_pantsd'], False)
+        self.assertEqual(stats_json['recorded_options']['GLOBAL']['level'], 'info')
+        self.assertIs(stats_json['recorded_options']['GLOBAL.enable_pantsd'], False)
+        self.assertEqual(stats_json['recorded_options']['compile.zinc.execution_strategy'], 'nailgun')
 
   def test_workunit_failure(self):
     pants_run = self.run_pants([
