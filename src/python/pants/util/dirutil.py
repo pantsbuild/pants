@@ -16,7 +16,7 @@ from builtins import open
 from collections import defaultdict
 from contextlib import contextmanager
 
-from pants.base.deprecated import deprecated
+from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.util.strutil import ensure_text
 
 
@@ -136,8 +136,8 @@ def safe_file_write(filename, mode=None, payload=None):
   This method is "safe" to the extent that `safe_open` is "safe". See the explanation on the method
   doc there.
 
-  When `payload` is an empty string, this method can be used as a concise way to create an empty
-  file along with its containing directory or truncate it if it already exists.
+  When `payload` is an empty string (the default), this method can be used as a concise way to
+  create an empty file along with its containing directory or truncate it if it already exists.
 
   :param string filename: The filename of the file to write to.
   :param string mode: A mode argument for the python `open` builtin. Defaults to 'w' (text).
@@ -147,7 +147,7 @@ def safe_file_write(filename, mode=None, payload=None):
     f.write(payload or '')
 
 
-def maybe_read_file(filename, binary_mode=True):
+def maybe_read_file(filename, binary_mode=None):
   """Read and return the contents of a file in a single file.read().
 
   :param string filename: The filename of the file to read.
@@ -155,13 +155,21 @@ def maybe_read_file(filename, binary_mode=True):
   :returns: The contents of the file, or opening the file fails for any reason
   :rtype: string
   """
+  deprecated_conditional(
+    lambda: binary_mode is None,
+    removal_version='1.16.0.dev2',
+    entity_description='Not specifying binary_mode explicitly in maybe_read_file()',
+    hint_message='This will default to unicode when pants migrates to python 3!')
+  if binary_mode is None:
+    binary_mode = True
+
   try:
     return read_file(filename, binary_mode=binary_mode)
   except IOError:
     return None
 
 
-def read_file(filename, binary_mode=True):
+def read_file(filename, binary_mode=None):
   """Read and return the contents of a file in a single file.read().
 
   :param string filename: The filename of the file to read.
@@ -169,6 +177,14 @@ def read_file(filename, binary_mode=True):
   :returns: The contents of the file.
   :rtype: string
   """
+  deprecated_conditional(
+    lambda: binary_mode is None,
+    removal_version='1.16.0.dev2',
+    entity_description='Not specifying binary_mode explicitly in read_file()',
+    hint_message='This will default to unicode when pants migrates to python 3!')
+  if binary_mode is None:
+    binary_mode = True
+
   mode = 'rb' if binary_mode else 'r'
   with open(filename, mode) as f:
     return f.read()
