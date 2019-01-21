@@ -155,6 +155,7 @@ def maybe_read_file(filename, binary_mode=None):
   :returns: The contents of the file, or opening the file fails for any reason
   :rtype: string
   """
+  # TODO(#7121): Default binary_mode=False after the python 3 switchover!
   deprecated_conditional(
     lambda: binary_mode is None,
     removal_version='1.16.0.dev2',
@@ -177,6 +178,7 @@ def read_file(filename, binary_mode=None):
   :returns: The contents of the file.
   :rtype: string
   """
+  # TODO(#7121): Default binary_mode=False after the python 3 switchover!
   deprecated_conditional(
     lambda: binary_mode is None,
     removal_version='1.16.0.dev2',
