@@ -622,12 +622,15 @@ subdir/__init__.py
     get_added_files_script = os.path.join(self.pants_repo_root,
                                           'build-support/bin/get_added_files.sh')
     with self._create_tiny_git_repo() as (git, worktree, _):
+      # Create a new file.
       new_file = os.path.join(worktree, 'wow.txt')
       safe_file_dump(new_file, '')
+      # Stage the file.
       rel_new_file = os.path.relpath(new_file, worktree)
       git.add(rel_new_file)
       self._assert_subprocess_success_with_output(
         worktree, [get_added_files_script],
+        # This should be the only entry in the index, and it is a newly added file.
         full_expected_output="{}\n".format(rel_new_file))
 
   def test_check_headers(self):
