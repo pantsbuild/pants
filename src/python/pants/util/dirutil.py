@@ -127,10 +127,10 @@ def safe_file_dump(filename, payload, binary_mode=None, mode=None):
     else:
       mode = 'wb'
 
-  safe_file_write(filename, mode=mode, payload=payload)
+  safe_file_write(filename, payload=payload, mode=mode)
 
 
-def safe_file_write(filename, mode=None, payload=None):
+def safe_file_write(filename, payload=None, mode=None):
   """Write a string to a file.
 
   This method is "safe" to the extent that `safe_open` is "safe". See the explanation on the method
@@ -140,8 +140,8 @@ def safe_file_write(filename, mode=None, payload=None):
   create an empty file along with its containing directory or truncate it if it already exists.
 
   :param string filename: The filename of the file to write to.
-  :param string mode: A mode argument for the python `open` builtin. Defaults to 'w' (text).
   :param string payload: The string to write to the file. Defaults to the empty string.
+  :param string mode: A mode argument for the python `open` builtin. Defaults to 'w' (text).
   """
   with safe_open(filename, mode=mode or 'w') as f:
     f.write(payload or '')
