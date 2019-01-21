@@ -6,7 +6,7 @@ IFS=$'\n\t'
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd ${REPO_ROOT}
 
-DIRS_TO_CHECK=($@)
+DIRS_TO_CHECK=("$@")
 
 non_empty_files=$(find ${DIRS_TO_CHECK[@]} -type f -name "__init__.py" -not -empty)
 

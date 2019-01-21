@@ -32,14 +32,14 @@ readarray ADDED_FILES -t < <(./build-support/bin/get_added_files.sh)
 echo "* Checking packages"
 # TODO: Determine the most *hygienic* way to split an array on the command line in portable bash,
 # and stick to it.
-./build-support/bin/check_packages.sh ${DIRS_TO_CHECK[@]}
+./build-support/bin/check_packages.sh "${DIRS_TO_CHECK[@]}"
 
 echo "* Checking headers"
 # Read added files from stdin, and ensure check_header_helper.py checks for the current copyright
 # year for the intersection of these files with the ones it checks.
 # Exporting IGNORE_ADDED_FILES will avoid checking the specific copyright year for added files.
-printf "%s\n" ${ADDED_FILES[@]} \
-  | ./build-support/bin/check_header_helper.py ${DIRS_TO_CHECK[@]}
+printf "%s\n" "${ADDED_FILES[@]}" \
+  | ./build-support/bin/check_header_helper.py "${DIRS_TO_CHECK[@]}"
 
 echo "* Checking for banned imports"
 ./build-support/bin/check_banned_imports.sh
