@@ -16,7 +16,9 @@ class AClass(object):
 
 
 class BClass(object):
-  pass
+
+  def __eq__(self, other):
+    return type(self) == type(other)
 
 
 class SubBClass(BClass):
@@ -33,6 +35,29 @@ class SelectorsTest(unittest.TestCase):
 
 
 class GetTest(unittest.TestCase):
+  def test_create(self):
+    # Test the equivalence of the 2-arg and 3-arg versions.
+    self.assertEqual(Get(AClass, BClass()),
+                     Get(AClass, BClass, BClass()))
+
+    with self.assertRaises(TypeError) as cm:
+      Get(AClass, BClass)
+    self.assertEqual("""\
+The two-argument form of Get does not accept a type as its second argument.
+
+args were: Get(({a!r}, {b!r}))
+
+Get.create_statically_for_rule_graph() should be used to generate a Get() for
+the `input_gets` field of a rule. If you are using a `yield Get(...)` in a rule
+and a type was intended, use the 3-argument version:
+Get({a!r}, {t!r}, {b!r})
+""".format(a=AClass, t=type(BClass), b=BClass), str(cm.exception))
+
+    with self.assertRaises(ValueError) as cm:
+      Get(1)
+    self.assertEqual("Expected either two or three arguments to Get; got (1,).",
+                     str(cm.exception))
+
   def _get_call_node(self, input_string):
     return ast.parse(input_string).body[0].value
 

@@ -392,9 +392,12 @@ class TaskRule(datatype([
       )
 
   def __str__(self):
-    return '({}, {!r}, {})'.format(type_or_constraint_repr(self.output_constraint),
-                                   self.input_selectors,
-                                   self.func.__name__)
+    return ('({}, {!r}, {}, gets={}, opts={})'
+            .format(type_or_constraint_repr(self.output_constraint),
+                    self.input_selectors,
+                    self.func.__name__,
+                    self.input_gets,
+                    self.dependency_optionables))
 
 
 class SingletonRule(datatype(['output_constraint', 'value']), Rule):

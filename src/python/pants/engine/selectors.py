@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import ast
 
-from pants.util.objects import Exactly, datatype
+from pants.util.objects import Exactly, TypeConstraint, datatype
 
 
 def type_or_constraint_repr(constraint):
@@ -79,16 +79,29 @@ class Get(datatype(['product', 'subject_declared_type', 'subject'])):
     return cls(product_type, subject_type, None)
 
   def __new__(cls, *args):
-    # TODO(#7114): typecheck the args (as in, ensure they are types or constraints)! After #7114, we
-    # can just check that they are types.
+    # TODO(#7114): Use datatype type checking for these fields! We can wait until after #7114, when
+    # we can just check that they are types.
     if len(args) == 2:
       product, subject = args
+
+      if isinstance(subject, (type, TypeConstraint)):
+        raise TypeError("""\
+The two-argument form of Get does not accept a type as its second argument.
+
+args were: Get({args!r})
+
+Get.create_statically_for_rule_graph() should be used to generate a Get() for
+the `input_gets` field of a rule. If you are using a `yield Get(...)` in a rule
+and a type was intended, use the 3-argument version:
+Get({product!r}, {subject_type!r}, {subject!r})
+""".format(args=args, product=product, subject_type=type(subject), subject=subject))
+
       subject_declared_type = type(subject)
     elif len(args) == 3:
       product, subject_declared_type, subject = args
     else:
-      raise Exception('Expected either two or three arguments to {}; got {}.'.format(
-        Get.__name__, args))
+      raise ValueError('Expected either two or three arguments to {}; got {}.'
+                       .format(Get.__name__, args))
     return super(Get, cls).__new__(cls, product, subject_declared_type, subject)
 
 

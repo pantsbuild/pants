@@ -505,7 +505,6 @@ class SchedulerSession(object):
     """
     :param product: product type for the request.
     :param subject: subject for the request.
-    :param v2_ui: whether to render the v2 engine UI
     """
     request = self.execution_request([product], [subject])
     returns, throws = self.execute(request)
