@@ -22,7 +22,7 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
   imported_target_kwargs_field = 'imports'
   imported_target_payload_field = 'import_specs'
 
-  def __init__(self, payload=None, buildflags=None, imports=None, **kwargs):
+  def __init__(self, address, payload=None, buildflags=None, imports=None, **kwargs):
     """
     :param buildflags: Unused, and will be removed in a future release.
     :param list imports: List of addresses of `jar_library <#jar_library>`_
@@ -34,7 +34,7 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
       lambda: imports is not None,
       '1.16.0.dev1',
       "{cls} target definition at {addr} setting attribute 'imports'"
-      .format(cls=type(self).__name__, addr=self.address.spec),
+      .format(cls=type(self).__name__, addr=address.spec),
       hint_message="Use a combination of remote_sources() and unpacked_jars() instead.")
     # TODO(Eric Ayers): The target needs to incorporate the settings of --gen-protoc-version
     # and --gen-protoc-plugins into the fingerprint.  Consider adding a custom FingeprintStrategy
@@ -42,7 +42,7 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
     payload.add_fields({
       'import_specs': PrimitiveField(imports or ())
     })
-    super(JavaProtobufLibrary, self).__init__(payload=payload, **kwargs)
+    super(JavaProtobufLibrary, self).__init__(address=address, payload=payload, **kwargs)
 
     deprecated_conditional(
       lambda: buildflags is not None,
