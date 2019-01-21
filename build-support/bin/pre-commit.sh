@@ -37,7 +37,7 @@ echo "* Checking packages"
 echo "* Checking headers"
 # Read added files from stdin, and ensure check_header_helper.py checks for the current copyright
 # year for the intersection of these files with the ones it checks.
-# Exporting IGNORE_ADDED_FILES will avoid checking the specific copyright year for added files.
+# Exporting PANTS_IGNORE_ADDED_FILES will avoid checking the specific copyright year for added files.
 printf "%s\n" "${ADDED_FILES[@]}" \
   | ./build-support/bin/check_header_helper.py "${DIRS_TO_CHECK[@]}"
 

@@ -63,7 +63,7 @@ class PreCommitHookTest(unittest.TestCase):
       init_py_path = os.path.join(worktree, 'subdir/__init__.py')
 
       # Check that an invalid __init__.py errors.
-      safe_file_dump(init_py_path, 'asdf')
+      safe_file_dump(init_py_path, 'asdf', mode='w')
       self._assert_subprocess_error(worktree, [package_check_script, 'subdir'], """\
 ERROR: All '__init__.py' files should be empty or else only contain a namespace
 declaration, but the following contain code:
@@ -71,20 +71,25 @@ declaration, but the following contain code:
 subdir/__init__.py
 """)
 
-      # Check that a valid __init__.py succeeds.
-      safe_file_dump(init_py_path, '')
-      self._assert_subprocess_success(worktree, [package_check_script, 'subdir'])
-      safe_file_dump(init_py_path,
-                     "__import__('pkg_resources').declare_namespace(__name__)")
+      # Check that a valid empty __init__.py succeeds.
+      safe_file_dump(init_py_path, '', mode='w')
       self._assert_subprocess_success(worktree, [package_check_script, 'subdir'])
 
-  def test_added_files(self):
+      # Check that a valid __init__.py with `pkg_resources` setup succeeds.
+      safe_file_dump(init_py_path,
+                     "__import__('pkg_resources').declare_namespace(__name__)",
+                     mode='w')
+      self._assert_subprocess_success(worktree, [package_check_script, 'subdir'])
+
+  # TODO: consider testing the degree to which copies (-C) and moves (-M) are detected by making
+  # some small edits to a file, then moving it, and seeing if it is detected as a new file!
+  def test_added_files_correctly_detected(self):
     get_added_files_script = os.path.join(self.pants_repo_root,
                                           'build-support/bin/get_added_files.sh')
     with self._create_tiny_git_repo() as (git, worktree, _):
       # Create a new file.
       new_file = os.path.join(worktree, 'wow.txt')
-      safe_file_dump(new_file, '')
+      safe_file_dump(new_file, '', mode='w')
       # Stage the file.
       rel_new_file = os.path.relpath(new_file, worktree)
       git.add(rel_new_file)
@@ -99,25 +104,27 @@ subdir/__init__.py
     with self._create_tiny_git_repo() as (_, worktree, _):
       new_py_path = os.path.join(worktree, 'subdir/file.py')
 
+      def assert_header_check(added_files, expected_excerpt):
+        added_files_process_input = '\n'.join(added_files)
+        self._assert_subprocess_error_with_input(
+          worktree, [header_check_script, 'subdir'],
+          # The python process reads from stdin, so we have to explicitly pass an empty string in
+          # order to close it.
+          input='{}\n'.format(added_files_process_input) if added_files_process_input else '',
+          expected_excerpt=expected_excerpt)
+
       # Check that a file with an empty header fails.
-      safe_file_dump(new_py_path, '')
-      self._assert_subprocess_error_with_input(
-        worktree, [header_check_script, 'subdir'],
-        # The python process reads from stdin, so we have to explicitly pass an empty string in
-        # order to close it.
-        input='',
-        expected_excerpt="""\
+      safe_file_dump(new_py_path, '', mode='w')
+      assert_header_check(added_files=[], expected_excerpt="""\
 subdir/file.py: failed to parse header at all
 """)
 
       # Check that a file with a random header fails.
-      safe_file_dump(new_py_path, 'asdf')
-      self._assert_subprocess_error_with_input(
-        worktree, [header_check_script, 'subdir'],
-        input='',
-        expected_excerpt="""\
+      safe_file_dump(new_py_path, 'asdf', mode='w')
+      assert_header_check(added_files=[], expected_excerpt="""\
 subdir/file.py: failed to parse header at all
 """)
+
       # Check that a file without a valid copyright year fails.
       cur_year_num = datetime.datetime.now().year
       cur_year = str(cur_year_num)
@@ -128,11 +135,8 @@ subdir/file.py: failed to parse header at all
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-""")
-      self._assert_subprocess_error_with_input(
-        worktree, [header_check_script, 'subdir'],
-        input='',
-        expected_excerpt="""\
+""", mode='w')
+      assert_header_check(added_files=[], expected_excerpt="""\
 subdir/file.py: copyright year must match '20\\d\\d' (was YYYY): current year is {}
 """.format(cur_year))
 
@@ -145,17 +149,15 @@ subdir/file.py: copyright year must match '20\\d\\d' (was YYYY): current year is
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-""".format(last_year))
+""".format(last_year),
+                     mode='w')
       rel_new_py_path = os.path.relpath(new_py_path, worktree)
-      self._assert_subprocess_error_with_input(
-        worktree, [header_check_script, 'subdir'],
-        input='{}\n'.format(rel_new_py_path),
-        expected_excerpt="""\
+      assert_header_check(added_files=[rel_new_py_path], expected_excerpt="""\
 subdir/file.py: copyright year must be {} (was {})
 """.format(cur_year, last_year))
 
       # Check that a file read from stdin isn't checked against the current year if
-      # IGNORE_ADDED_FILES is set.
+      # PANTS_IGNORE_ADDED_FILES is set.
       # Use the same file as last time, with last year's copyright date.
       self._assert_subprocess_success(worktree, [header_check_script, 'subdir'],
-                                      env={'IGNORE_ADDED_FILES': 'y'})
+                                      env={'PANTS_IGNORE_ADDED_FILES': 'y'})
