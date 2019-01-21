@@ -396,6 +396,8 @@ class DirutilTest(unittest.TestCase):
   def assert_write_and_read(self, test_content, write_kwargs, read_kwargs):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
+      # TODO: remove all tests of safe_file_dump() and convert the relevant ones to
+      # safe_file_write() after the deprecation period is over!
       safe_file_dump(test_filename, test_content, **write_kwargs)
       self.assertEqual(read_file(test_filename, **read_kwargs), test_content)
 

@@ -101,7 +101,9 @@ def safe_mkdir_for_all(paths):
       created_dirs.add(dir_to_make)
 
 
-@deprecated('1.16.0.dev2', hint_message='Use safe_file_write() instead!')
+@deprecated(
+  '1.16.0.dev2',
+  hint_message='Use safe_file_write() instead. It removes the deprecated `binary_mode` argument to instead only allow `mode`. It also defaults to writing unicode, rather than defaulting to bytes.')
 def safe_file_dump(filename, payload, binary_mode=None, mode=None):
   """Write a string to a file.
 
@@ -130,7 +132,10 @@ def safe_file_dump(filename, payload, binary_mode=None, mode=None):
   safe_file_write(filename, payload=payload, mode=mode)
 
 
-def safe_file_write(filename, payload=None, mode=None):
+# TODO(#6742): payload should be Union[str, bytes] in type hint syntax, but from
+# https://pythonhosted.org/an_example_pypi_project/sphinx.html#full-code-example it doesn't appear
+# that is possible to represent in docstring type syntax.
+def safe_file_write(filename, payload='', mode='w'):
   """Write a string to a file.
 
   This method is "safe" to the extent that `safe_open` is "safe". See the explanation on the method
@@ -140,12 +145,10 @@ def safe_file_write(filename, payload=None, mode=None):
   create an empty file along with its containing directory (or truncate it if it already exists).
 
   :param string filename: The filename of the file to write to.
-  :param string payload: The string to write to the file. Defaults to the empty string.
-  :param string mode: A mode argument for the python `open` builtin. Defaults to 'w' (text).
+  :param string payload: The string to write to the file.
+  :param string mode: A mode argument for the python `open` builtin.
   """
-  if payload is None:
-    payload = ''
-  with safe_open(filename, mode=mode or 'w') as f:
+  with safe_open(filename, mode=mode) as f:
     f.write(payload)
 
 
@@ -162,7 +165,7 @@ def maybe_read_file(filename, binary_mode=None):
     lambda: binary_mode is None,
     removal_version='1.16.0.dev2',
     entity_description='Not specifying binary_mode explicitly in maybe_read_file()',
-    hint_message='This will default to unicode when pants migrates to python 3!')
+    hint_message='Function will default to unicode when pants migrates to python 3!')
   if binary_mode is None:
     binary_mode = True
 
@@ -185,7 +188,7 @@ def read_file(filename, binary_mode=None):
     lambda: binary_mode is None,
     removal_version='1.16.0.dev2',
     entity_description='Not specifying binary_mode explicitly in read_file()',
-    hint_message='This will default to unicode when pants migrates to python 3!')
+    hint_message='Function will default to unicode when pants migrates to python 3!')
   if binary_mode is None:
     binary_mode = True
 
