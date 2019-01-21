@@ -9,11 +9,39 @@ then
     export GIT_HOOK=1
 fi
 
+DIRS_TO_CHECK=(
+  src
+  tests
+  pants-plugins
+  examples
+  contrib
+)
+
 # TODO(#7068): Fix all these checks to only act on staged files with
-# `git diff --cached --name-only`! See check_header.sh for an example of this command.
-echo "* Checking packages" && ./build-support/bin/check_packages.sh || exit 1
-echo "* Checking headers" && ./build-support/bin/check_header.sh || exit 1
-echo "* Checking for banned imports" && ./build-support/bin/check_banned_imports.sh || exit 1
+# `git diff --cached --name-only`!
+
+set -e
+
+# Read lines of output into the array variable ADDED_FILES, without trailing newlines (-t). See
+# https://www.gnu.org/software/bash/manual/html_node/Bash-Builtins.html#index-readarray.
+# NB: `readarray` is available on bash >=4.
+readarray ADDED_FILES -t < <(./build-support/bin/get_added_files.sh)
+
+echo "* Checking packages"
+# TODO: What is the most *hygienic* way to split an array on the command line in portable bash?
+./build-support/bin/check_packages.sh ${DIRS_TO_CHECK[@]}
+
+echo "* Checking headers"
+# Read added files from stdin, and ensure check_header_helper.py checks for the current copyright
+# year for the intersection of these files with the ones it checks.
+# Exporting IGNORE_ADDED_FILES will avoid checking the specific copyright year for added files.
+printf "%s\n" ${ADDED_FILES[@]} \
+  | ./build-support/bin/check_header_helper.py ${DIRS_TO_CHECK[@]}
+
+# TODO: test the scripts below this line as well, remove `|| exit 1`, and add an integration test!
+
+echo "* Checking for banned imports"
+./build-support/bin/check_banned_imports.sh
 
 if git diff master --name-only | grep '\.rs$' > /dev/null; then
   echo "* Checking formatting of rust files" && ./build-support/bin/check_rust_formatting.sh || exit 1

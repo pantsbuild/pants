@@ -55,7 +55,7 @@ def check_header(filename, is_newly_created=False):
                                        .format(filename, _current_year, year))
           else:
             if not _current_century_regex.match(year):
-              raise HeaderCheckFailure('{}: copyright year must match {} (was {})'
+              raise HeaderCheckFailure("{}: copyright year must match '{}' (was {})"
                                        .format(filename, _current_century_regex.pattern, year))
           line = "# Copyright YYYY" + line[16:]
         buf += line
