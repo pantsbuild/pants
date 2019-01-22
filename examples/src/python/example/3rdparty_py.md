@@ -77,27 +77,12 @@ If you're building a python binary for use on multiple platforms, you might have
 dependencies that rely on platform-specific code.
 
 Currently, Pants tries to resolve dependencies for every platform specified in the options
-(either in the `[pyhton_setup]` field of a `pants.ini` file or via command line args such as
- `--python-setup-platforms='["linux-x86_64"]'`). These
- <a href="https://pip.pypa.io/en/stable/reference/pip_wheel/">wheels</a> will be available to
- <a pantsref="bdict_python_binary">`python_binary`</a> targets, which can include them with the
- `platforms` field. For instance, the following target:
-
-    :::python
-    python_binary(
-      name='main',
-      source='main.py',
-      ...
-      platforms=['current','linux-x86_64']
-    )
-
-Will include wheels of every 3rdparty requirement for both 64-bit Intel Linux and whatever platform
-the binary is currently being built in. Note that there is currently no way to specify that some
-dependency of a target should only be resolved for a specific platform
-(see [#7105](https://github.com/pantsbuild/pants/issues/7105)).
-Therefore, in addition to specifying the platforms with which your binary is intended to be
-compatible in the `platforms` field of your <a pantsref="bdict_python_binary">`python_binary`</a>
-target, you will need to make files for each package and platform available at build time.
+(either in the `[python_setup]` field of a `pants.ini` file or via command line args such as
+ `--python-setup-platforms='["linux-x86_64"]'`). For instance, if the settings specify a `platforms`
+ field of `["linux-x86_65", "current"]`, pants will:
+ 
+ 1. Figure out which wheels it needs to fetch, from the dependencies specified in the targets to build.
+ 2. Fetch the versions of those wheels for 64-bit Intel Linux and whatever platform we're calling Pants from.
 
 Pants will look for those files in the location specified in the
 [[`python-repos`|pants('src/docs:setup_repo')#redirecting-python-requirements-to-other-servers]] field
@@ -112,3 +97,42 @@ If you opt for the local directory method under version control, you may want to
 <a href="https://git-lfs.github.com/">git-lfs</a> or similar to avoid storing large binaries in your
 repository. If you opt for a hosted solution, <a href="https://pages.github.com/">Github pages</a> may
 be helpful.
+
+### Supporting platforms for specific targets
+
+A <a pantsref="bdict_python_binary">`python_binary`</a> target can use the `platforms =` field to specify
+which platforms it should run on.
+
+For instance, the following target:
+
+    :::python
+    python_binary(
+      name='main',
+      source='main.py',
+      ...
+      platforms=['current','linux-x86_64']
+    )
+
+will include wheels of every 3rdparty requirement for both 64-bit Intel Linux and whatever platform
+the binary is currently being built in.
+
+Therefore, in addition to specifying the platforms with which your binary is intended to be
+compatible in the `platforms` field of your <a pantsref="bdict_python_binary">`python_binary`</a>
+target, you will need to make files for each package and platform available at build time.
+
+If a `python_binary` target specifies a platform not specifically supported by the pants configuration,
+it will fail to build a pex binary.
+
+There is currently no way for `python_binary` targets to override the `platforms` configuration.
+Say, for example, that the global pants configuration specifies `platforms: ["linux-x86_64", "macosx-10.13-x84_64"]` as supported platforms, and we want to build the following target:
+
+    :::python
+    python_binary(
+      ...
+      dependencies=['3rdparty/tensorflow-gpu']
+      platforms=['linux-x86_64']
+    )
+
+Tensorflow-gpu depends on some CUDA code, and therefore there _cannot_ be a wheel available for OSX.
+In this case, pants will try to resolve `tensorflow-gpu` both for Linux and OSX, and will fail at resolve time,
+even though the target only claims to support Linux. Discussion around this topic is being [#7105](https://github.com/pantsbuild/pants/issues/7105).
