@@ -87,7 +87,10 @@ class RunTracker(Subsystem):
     register('--stats-local-json-file', advanced=True, default=None,
              help='Write stats to this local json file on run completion.')
     register('--stats-option-scopes-to-record', advanced=True, type=list, default=[],
-             help='Options or option scopes to record in stats on run completion.')
+             help="Option scopes to record in stats on run completion. "
+                  "Options may be selected by joining the scope and the option with a ^ character, "
+                  "i.e. to get option enable_pantsd in the GLOBAL scope, you'd pass "
+                  "GLOBAL^enable_pantsd")
 
   def __init__(self, *args, **kwargs):
     """
@@ -109,6 +112,7 @@ class RunTracker(Subsystem):
     # Initialized in `start()`.
     self.report = None
     self._main_root_workunit = None
+    self._all_options = None
 
     # A lock to ensure that adding to stats at the end of a workunit
     # operates thread-safely.
@@ -168,7 +172,7 @@ class RunTracker(Subsystem):
     """Is the workunit running under the main thread's root."""
     return workunit.root() == self._main_root_workunit
 
-  def initialize(self):
+  def initialize(self, all_options):
     """Create run_info and relevant directories, and return the run id.
 
     Must be called before `start`.
@@ -210,6 +214,8 @@ class RunTracker(Subsystem):
 
     # Daemon stats.
     self.pantsd_stats = PantsDaemonStats()
+
+    self._all_options = all_options
 
     return run_id
 
@@ -390,40 +396,6 @@ class RunTracker(Subsystem):
     if target_data:
       run_information['target_data'] = ast.literal_eval(target_data)
 
-    def get_option(scope_or_scope_with_flag, flag=None):
-      """Looks up a scope in the options parsed by Pants.
-
-      scope_or_scope_with_flag is a string either either of form scope or scope.flag
-      If it's a scope, the scope's values will be gotten as a dict, and either returned if flag is
-        None, or else the flag will be looked up inside the dict.
-      If it's a scope.flag, the scope will be looked up and the flag looked up and returned.
-      If the scope or flag can't be found, ValueError will be raised.
-      """
-      scope_to_look_up = scope_or_scope_with_flag if scope_or_scope_with_flag != 'GLOBAL' else ''
-      try:
-        # Yeah, it's a little sketchy to be looking up Subsystem._options here, but... Someone went
-        # to some care to make sure that Subsystems only get scoped options, and we need to
-        # circumvent that in this one specific place...
-        value = Subsystem._options.for_scope(scope_to_look_up, inherit_from_enclosing_scope=False).as_dict()
-        if flag is None:
-          return value
-        else:
-          return value[flag]
-      except Config.ConfigValidationError:
-        # We only support one level of scope.flag - if we already were looking up a flag, or there
-        # are no parent scopes, don't traverse into parent scopes.
-        if flag is None and '.' in scope_to_look_up:
-          # Option wasn't a scope - maybe it was a scope.flagname?
-          return get_option(*scope_to_look_up.rsplit('.', 1))
-        raise ValueError("Couldn't find option scope {} for recording".format(scope))
-      except AttributeError:
-        # If we looked up a flag in a set of scopes, and it wasn't found, error.
-        raise ValueError("Couldn't find option scope {} for recording".format(scope))
-
-    recorded_options = {}
-    for scope in self.get_options().stats_option_scopes_to_record:
-      recorded_options[scope] = get_option(scope)
-
     stats = {
       'run_info': run_information,
       'cumulative_timings': self.cumulative_timings.get_all(),
@@ -432,7 +404,7 @@ class RunTracker(Subsystem):
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
       'pantsd_stats': self.pantsd_stats.get_all(),
       'outcomes': self.outcomes,
-      'recorded_options': recorded_options,
+      'recorded_options': self._get_options_to_record(),
     }
 
     # Dump individual stat file.
@@ -560,6 +532,37 @@ class RunTracker(Subsystem):
     N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
     """
     SubprocPool.shutdown(self._aborted)
+
+  def _get_options_to_record(self):
+    recorded_options = {}
+    for scope in self.get_options().stats_option_scopes_to_record:
+      scope_and_maybe_option = scope.split("^")
+      recorded_options[scope] = self._get_option_to_record(*scope_and_maybe_option)
+    return recorded_options
+
+  def _get_option_to_record(self, scope, option=None):
+    """Looks up an option scope (and optionally option therein) in the options parsed by Pants.
+
+    Returns a dict of of all options in the scope, if option is None.
+    Returns the specific option if option is not None.
+    Raises ValueError if scope or option could not be found.
+    """
+    scope_to_look_up = scope if scope != 'GLOBAL' else ''
+    try:
+      # Yeah, it's a little sketchy to be looking up Subsystem._options here, but... Someone went
+      # to some care to make sure that Subsystems only get scoped options, and we need to
+      # circumvent that in this one specific place...
+      value = self._all_options.for_scope(scope_to_look_up, inherit_from_enclosing_scope=False).as_dict()
+      if option is None:
+        return value
+      else:
+        return value[option]
+    except (Config.ConfigValidationError, AttributeError) as e:
+      raise ValueError("Couldn't find option scope {}{} for recording ({})".format(
+        scope,
+        "" if option is None else " option {}".format(option),
+        e
+      ))
 
   @classmethod
   def _create_dict_with_nested_keys_and_val(cls, keys, value):
