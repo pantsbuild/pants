@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
+from builtins import str
 from contextlib import contextmanager
 
 from pants.base.revision import Revision
@@ -28,7 +29,7 @@ def git_version():
 
 def get_repo_root():
   """Return the absolute path to the root directory of the Pants git repo."""
-  return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip()
+  return str(subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip())
 
 
 @contextmanager

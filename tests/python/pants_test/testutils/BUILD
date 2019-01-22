@@ -26,6 +26,7 @@ python_library(
     'git_util.py',
   ],
   dependencies = [
+    '3rdparty/python:future',
     'src/python/pants/base:revision',
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
