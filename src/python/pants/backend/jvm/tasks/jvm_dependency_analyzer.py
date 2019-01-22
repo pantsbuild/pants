@@ -103,7 +103,7 @@ class JvmDependencyAnalyzer(object):
   def _jar_classfiles(self, jar_file):
     """Returns an iterator over the classfiles inside jar_file."""
     for cls in ClasspathUtil.classpath_entries_contents([jar_file]):
-      if cls.endswith(b'.class'):
+      if cls.endswith('.class'):
         yield cls
 
   def count_products(self, target):
