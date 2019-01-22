@@ -17,13 +17,13 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.py2_compat import assertRegex
 
 
-class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
+class BuildLocalPythonDistributionsIntegrationTest(PantsRunIntegrationTest):
   hello_install_requires_dir = 'testprojects/src/python/python_distribution/hello_with_install_requires'
   hello_setup_requires = 'examples/src/python/example/python_distribution/hello/setup_requires'
   py_dist_test = 'examples/tests/python/example_test/python_distribution'
 
   def _assert_greeting(self, output):
-    self.assertEquals('hello!', output)
+    self.assertIn('hello!', output)
 
   def test_pants_binary(self):
     with temporary_dir() as tmp_dir:

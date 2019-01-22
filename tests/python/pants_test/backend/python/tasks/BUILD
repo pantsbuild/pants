@@ -24,7 +24,7 @@ python_library(
 
 python_native_code_test_files = [
   'test_build_local_python_distributions.py',
-  'test_python_distribution_integration.py',
+  'test_build_local_python_distributions_integration.py',
   'test_ctypes.py',
   'test_ctypes_integration.py',
 ]
