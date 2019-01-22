@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import next
+
 from pants.base.build_environment import get_buildroot
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.jar.jar_dependency_utils import ResolvedJar
@@ -59,7 +61,7 @@ class JvmResolverBase(TaskBase):
       snapshotted_jars = [ResolvedJar(coordinate=jar.coordinate,
                                       cache_path=jar.cache_path,
                                       pants_path=jar.pants_path,
-                                      directory_digest=digest_iterator.next()) for jar in jars_to_snapshot]
+                                      directory_digest=next(digest_iterator)) for jar in jars_to_snapshot]
       snapshotted_targets_and_jars.append((target, snapshotted_jars))
 
     return snapshotted_targets_and_jars

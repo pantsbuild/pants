@@ -632,6 +632,9 @@ python_library(
 python_library(
   name = 'resolve_shared',
   sources = ['resolve_shared.py'],
+  dependencies = [
+    '3rdparty/python:future',
+  ],
 )
 
 python_library(

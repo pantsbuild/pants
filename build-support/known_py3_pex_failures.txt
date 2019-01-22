@@ -1,4 +1,3 @@
-tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:zinc_compile_integration
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/rsc:rsc_compile_integration
 tests/python/pants_test/backend/jvm/tasks/jvm_compile:declared_deps_integration
 tests/python/pants_test/backend/jvm/tasks:classmap_integration
