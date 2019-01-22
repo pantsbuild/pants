@@ -12,17 +12,13 @@ import shutil
 from pex import pep425tags
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.native.config.environment import CppToolchain, CToolchain, Platform
-from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
-from pants.backend.native.subsystems.native_toolchain import ToolchainVariantRequest
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import is_local_python_dist
 from pants.backend.python.subsystems.python_native_code import (BuildSetupRequiresPex,
                                                                 PythonNativeCode,
-                                                                SetupPyExecutionEnvironment,
-                                                                SetupPyNativeTools)
+                                                                SetupPyExecutionEnvironment)
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
@@ -32,7 +28,7 @@ from pants.task.task import Task
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import pushd
 from pants.util.dirutil import safe_mkdir_for, split_basename_and_dirname
-from pants.util.memo import memoized_classproperty, memoized_property
+from pants.util.memo import memoized_property
 from pants.util.strutil import safe_shlex_join
 
 
@@ -73,51 +69,18 @@ class BuildLocalPythonDistributions(Task):
   def subsystem_dependencies(cls):
     return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (
       BuildSetupRequiresPex.scoped(cls),
-      NativeBuildSettings,
       PythonNativeCode.scoped(cls),
     )
 
   class BuildLocalPythonDistributionsError(TaskError): pass
-
-  @memoized_classproperty
-  def _platform(cls):
-    return Platform.create()
 
   @memoized_property
   def _python_native_code_settings(self):
     return PythonNativeCode.scoped_instance(self)
 
   @memoized_property
-  def _native_toolchain(self):
-    return self._python_native_code_settings.native_toolchain
-
-  @memoized_property
-  def _toolchain_variant_request(self):
-    return ToolchainVariantRequest(
-      toolchain=self._native_toolchain,
-      variant=self._native_build_settings.toolchain_variant)
-
-  @memoized_property
-  def _native_build_settings(self):
-    return NativeBuildSettings.global_instance()
-
-  @memoized_property
   def _build_setup_requires_pex_settings(self):
     return BuildSetupRequiresPex.scoped_instance(self)
-
-  # TODO(#5869): delete this and get Subsystems from options, when that is possible.
-  def _request_single(self, product, subject):
-    # NB: This is not supposed to be exposed to Tasks yet -- see #4769 to track the status of
-    # exposing v2 products in v1 tasks.
-    return self.context._scheduler.product_request(product, [subject])[0]
-
-  @memoized_property
-  def _c_toolchain(self):
-    return self._request_single(CToolchain, self._toolchain_variant_request)
-
-  @memoized_property
-  def _cpp_toolchain(self):
-    return self._request_single(CppToolchain, self._toolchain_variant_request)
 
   # TODO: This should probably be made into an @classproperty (see PR #5901).
   @property
@@ -228,20 +191,14 @@ class BuildLocalPythonDistributions(Task):
     all_native_artifacts = self._add_artifacts(
       dist_output_dir, shared_libs_product, native_artifact_deps)
 
-    is_platform_specific = False
-    native_tools = None
-    if self._python_native_code_settings.pydist_has_native_sources(dist_target):
-      # We add the native tools if we need to compile code belonging to this python_dist() target.
-      # TODO: test this branch somehow!
-      native_tools = SetupPyNativeTools(
-        c_toolchain=self._c_toolchain,
-        cpp_toolchain=self._cpp_toolchain,
-        platform=self._platform)
-      # Native code in this python_dist() target requires marking the dist as platform-specific.
-      is_platform_specific = True
-    elif len(all_native_artifacts) > 0:
+    # TODO: remove the triplication all of this validation across _get_native_artifact_deps(),
+    # check_build_for_current_platform_only(), and len(all_native_artifacts) > 0!
+    is_platform_specific = (
       # We are including a platform-specific shared lib in this dist, so mark it as such.
-      is_platform_specific = True
+      len(all_native_artifacts) > 0
+      or self._python_native_code_settings.check_build_for_current_platform_only(
+        # NB: This doesn't reach into transitive dependencies, but that doesn't matter currently.
+        [dist_target] + dist_target.dependencies))
 
     versioned_target_fingerprint = versioned_target.cache_key.hash
 
@@ -261,9 +218,7 @@ class BuildLocalPythonDistributions(Task):
     self.context.log.debug('Using pex file as setup.py interpreter: {}'
                            .format(setup_requires_pex))
 
-    setup_py_execution_environment = SetupPyExecutionEnvironment(
-      setup_requires_pex=setup_requires_pex,
-      setup_py_native_tools=native_tools)
+    setup_py_execution_environment = SetupPyExecutionEnvironment(setup_requires_pex)
 
     self._create_dist(
       dist_target,
@@ -311,13 +266,11 @@ class BuildLocalPythonDistributions(Task):
       snapshot_fingerprint, is_platform_specific)
 
     setup_requires_pex = setup_py_execution_environment.setup_requires_pex
-    setup_py_env = setup_py_execution_environment.as_environment()
 
     cmd = safe_shlex_join(setup_requires_pex.cmdline(setup_py_snapshot_version_argv))
     with self.context.new_workunit('setup.py', cmd=cmd, labels=[WorkUnitLabel.TOOL]) as workunit:
       with pushd(dist_target_dir):
         result = setup_requires_pex.run(args=setup_py_snapshot_version_argv,
-                                        env=setup_py_env,
                                         stdout=workunit.output('stdout'),
                                         stderr=workunit.output('stderr'))
         if result != 0:
@@ -325,13 +278,12 @@ class BuildLocalPythonDistributions(Task):
             "Installation of python distribution from target {target} into directory {into_dir} "
             "failed (return value of run() was: {rc!r}).\n"
             "The chosen interpreter was: {interpreter}.\n"
-            "The execution environment was: {env}.\n"
+            "The host system's compiler and linker were used.\n"
             "The setup command was: {command}."
             .format(target=dist_tgt,
                     into_dir=dist_target_dir,
                     rc=result,
                     interpreter=setup_requires_pex.path(),
-                    env=setup_py_env,
                     command=setup_py_snapshot_version_argv))
 
   def _inject_synthetic_dist_requirements(self, dist, req_lib_addr):

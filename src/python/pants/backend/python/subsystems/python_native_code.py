@@ -4,15 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 from builtins import str
 from collections import defaultdict
 
 from pex.pex import PEX
 
-from pants.backend.native.config.environment import CppToolchain, CToolchain, Platform
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
-from pants.backend.native.subsystems.xcode_cli_tools import MIN_OSX_VERSION_ARG
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -23,7 +20,6 @@ from pants.binaries.executable_pex_tool import ExecutablePexTool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf, datatype
-from pants.util.strutil import create_path_env_var
 
 
 class PythonNativeCode(Subsystem):
@@ -65,14 +61,11 @@ class PythonNativeCode(Subsystem):
   def pydist_has_native_sources(self, target):
     return target.has_sources(extension=tuple(self._native_source_extensions))
 
-  def native_target_has_native_sources(self, target):
-    return target.has_sources()
-
   @memoized_property
   def _native_target_matchers(self):
     return {
       SubclassesOf(PythonDistribution): self.pydist_has_native_sources,
-      SubclassesOf(NativeLibrary): self.native_target_has_native_sources,
+      SubclassesOf(NativeLibrary): NativeLibrary.produces_ctypes_native_library,
     }
 
   def _any_targets_have_native_sources(self, targets):
@@ -160,66 +153,7 @@ class BuildSetupRequiresPex(ExecutablePexTool):
     ]
 
 
-class SetupPyNativeTools(datatype([
-    ('c_toolchain', CToolchain),
-    ('cpp_toolchain', CppToolchain),
-    ('platform', Platform),
-])):
-  """The native tools needed for a setup.py invocation.
-
-  This class exists because `SetupPyExecutionEnvironment` is created manually, one per target.
-  """
-
-
-# TODO: It might be pretty useful to have an Optional TypeConstraint.
 class SetupPyExecutionEnvironment(datatype([
     # If None, don't set PYTHONPATH in the setup.py environment.
     ('setup_requires_pex', PEX),
-    # If None, don't execute in the toolchain environment.
-    'setup_py_native_tools',
-])):
-
-  _SHARED_CMDLINE_ARGS = {
-    'darwin': lambda: [
-      MIN_OSX_VERSION_ARG,
-      '-Wl,-dylib',
-      '-undefined',
-      'dynamic_lookup',
-    ],
-    'linux': lambda: ['-shared'],
-  }
-
-  def as_environment(self):
-    ret = {}
-
-    # TODO(#5951): the below is a lot of error-prone repeated logic -- we need a way to compose
-    # executables more hygienically. We should probably be composing each datatype's members, and
-    # only creating an environment at the very end.
-    native_tools = self.setup_py_native_tools
-    if native_tools:
-      # An as_tuple() method for datatypes could make this destructuring cleaner!  Alternatively,
-      # constructing this environment could be done more compositionally instead of requiring all of
-      # these disparate fields together at once.
-      c_toolchain = native_tools.c_toolchain
-      c_compiler = c_toolchain.c_compiler
-      c_linker = c_toolchain.c_linker
-
-      cpp_toolchain = native_tools.cpp_toolchain
-      cpp_compiler = cpp_toolchain.cpp_compiler
-      cpp_linker = cpp_toolchain.cpp_linker
-
-      all_path_entries = (
-        c_compiler.path_entries +
-        c_linker.path_entries +
-        cpp_compiler.path_entries +
-        cpp_linker.path_entries)
-      # TODO(#6273): We prepend our toolchain to the PATH instead of overwriting it -- we need
-      # better control of the distutils compilation environment if we want to actually isolate the
-      # PATH (distutils does lots of sneaky things).
-      ret['PATH'] = create_path_env_var(all_path_entries, env=os.environ.copy(), prepend=True)
-
-      # GCC will output smart quotes in a variety of situations (leading to decoding errors
-      # downstream) unless we set this environment variable.
-      ret['LC_ALL'] = 'C'
-
-    return ret
+])): pass
