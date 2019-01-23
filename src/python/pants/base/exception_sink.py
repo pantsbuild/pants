@@ -143,9 +143,6 @@ class ExceptionSink(object):
     # NB: mutate process-global state!
     sys.excepthook = cls._log_unhandled_exception_and_exit
 
-  # TODO(7080): audit all usages of this function and add Py3 support, e.g. use `sys.stderr.buffer` instead
-  # of sys.stdout. However, we shouldn't need to proactively enforce that the stream is BytesIO, because Py3
-  # should already check when we try to use this.
   @classmethod
   def reset_interactive_output_stream(cls, interactive_output_stream):
     """
