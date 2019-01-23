@@ -82,7 +82,9 @@ subdir/__init__.py
       self._assert_subprocess_success(worktree, [package_check_script, 'subdir'])
 
   # TODO: consider testing the degree to which copies (-C) and moves (-M) are detected by making
-  # some small edits to a file, then moving it, and seeing if it is detected as a new file!
+  # some small edits to a file, then moving it, and seeing if it is detected as a new file! That's
+  # more testing git functionality, but since it's not clear how this is measured, it could be
+  # useful if correctly detecting copies and moves ever becomes a concern.
   def test_added_files_correctly_detected(self):
     get_added_files_script = os.path.join(self.pants_repo_root,
                                           'build-support/bin/get_added_files.sh')
