@@ -86,6 +86,9 @@ class OptionValueContainer(object):
     for k, v in other._value_map.items():
       self._set(k, v)
 
+  def as_dict(self):
+    return {key: self.get(key) for key in self._value_map}
+
   def _get_underlying_value(self, key):
     # Note that the key may exist with a value of None, so we can't just
     # test self._value_map.get() for None.

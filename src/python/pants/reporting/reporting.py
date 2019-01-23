@@ -47,13 +47,13 @@ class Reporting(Subsystem):
                   '{workunits}.  Possible formatting values are {formats}'.format(
                workunits=list(WorkUnitLabel.keys()), formats=list(ToolOutputFormat.keys())))
 
-  def initialize(self, run_tracker, start_time=None):
+  def initialize(self, run_tracker, all_options, start_time=None):
     """Initialize with the given RunTracker.
 
     TODO: See `RunTracker.start`.
     """
 
-    run_id = run_tracker.initialize()
+    run_id = run_tracker.initialize(all_options)
     run_dir = os.path.join(self.get_options().reports_dir, run_id)
 
     html_dir = os.path.join(run_dir, 'html')
