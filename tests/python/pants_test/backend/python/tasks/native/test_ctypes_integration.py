@@ -38,12 +38,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     'testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin'
   )
 
-  def test_ctypes_run(self):
-    pants_run = self.run_pants(command=['-q', 'run', self._binary_target])
-    self.assert_success(pants_run)
-
-    self.assertEqual('x=3, f(x)=17\n', pants_run.stdout_data)
-
   def test_ctypes_binary_creation(self):
     """Create a python_binary() with all native toolchain variants, and test the result."""
     # TODO: this pattern could be made more ergonomic for `enum()`, along with exhaustiveness
