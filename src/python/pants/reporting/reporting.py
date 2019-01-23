@@ -48,9 +48,8 @@ class Reporting(Subsystem):
                   '{workunits}.  Possible formatting values are {formats}'.format(
                workunits=list(WorkUnitLabel.keys()), formats=list(ToolOutputFormat.keys())))
     register('--zipkin-endpoint', advanced=True, default=None,
-              help='Enables Zipkin reporter and sets the endpoint')
-    register('--zipkin-encoding', choices=['json', 'x-thrift'], advanced=True, default='x-thrift',
-              help='Sets the encoding format for Zipkin trace')
+              help='The full HTTP URL of a zipkin server to which traces should be posted.'
+                    'No traces will be made if this is not set.')
 
   def initialize(self, run_tracker, start_time=None):
     """Initialize with the given RunTracker.
@@ -90,11 +89,8 @@ class Reporting(Subsystem):
     # Set up Zipkin reporting.
     zipkin_endpoint = self.get_options().zipkin_endpoint
     if zipkin_endpoint is not None:
-      zipkin_encoding = self.get_options().zipkin_encoding
       zipkin_reporter_settings = ZipkinReporter.Settings(log_level=Report.INFO)
-      zipkin_reporter = ZipkinReporter(
-        run_tracker, zipkin_reporter_settings, zipkin_endpoint, zipkin_encoding
-      )
+      zipkin_reporter = ZipkinReporter(run_tracker, zipkin_reporter_settings, zipkin_endpoint)
       report.add_reporter('zipkin', zipkin_reporter)
 
     # Add some useful RunInfo.
