@@ -1,0 +1,11 @@
+tests/python/pants_test/backend/jvm/tasks:classmap_integration
+tests/python/pants_test/backend/jvm/tasks:jvm_platform_analysis_integration
+tests/python/pants_test/backend/project_info/tasks:idea_plugin_integration
+tests/python/pants_test/backend/python/tasks:integration
+tests/python/pants_test/backend/python/tasks:python_native_code_testing_1
+tests/python/pants_test/backend/python:integration
+tests/python/pants_test/engine/legacy:console_rule_integration
+tests/python/pants_test/engine/legacy:graph_integration
+tests/python/pants_test/pantsd:pantsd_integration
+tests/python/pants_test/projects:testprojects_integration
+tests/python/pants_test/rules:test_integration
