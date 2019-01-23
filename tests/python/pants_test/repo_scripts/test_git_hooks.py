@@ -35,14 +35,14 @@ class PreCommitHookTest(unittest.TestCase):
   def _assert_subprocess_error(self, worktree, cmd, expected_excerpt):
     with self.assertRaises(subprocess.CalledProcessError) as cm:
       subprocess.check_output(cmd, cwd=worktree)
-    self.assertIn(expected_excerpt, str(cm.exception.output))
+    self.assertIn(expected_excerpt, cm.exception.output.decode('utf-8'))
 
   def _assert_subprocess_success(self, worktree, cmd, **kwargs):
     self.assertEqual(0, subprocess.check_call(cmd, cwd=worktree, **kwargs))
 
   def _assert_subprocess_success_with_output(self, worktree, cmd, full_expected_output):
     output = subprocess.check_output(cmd, cwd=worktree)
-    self.assertEqual(full_expected_output, output)
+    self.assertEqual(full_expected_output, output.decode('utf-8'))
 
   def _assert_subprocess_error_with_input(self, worktree, cmd, input, expected_excerpt):
     proc = subprocess.Popen(
@@ -55,7 +55,7 @@ class PreCommitHookTest(unittest.TestCase):
     (stdout_data, stderr_data) = proc.communicate(input=input)
     self.assertNotEqual(0, proc.returncode)
     all_output = '{}\n{}'.format(stdout_data, stderr_data)
-    self.assertIn(expected_excerpt, all_output)
+    self.assertIn(expected_excerpt, all_output.decode('utf-8'))
 
   def test_check_packages(self):
     package_check_script = os.path.join(self.pants_repo_root, 'build-support/bin/check_packages.sh')
