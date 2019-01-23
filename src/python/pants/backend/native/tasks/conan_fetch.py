@@ -133,8 +133,9 @@ class ConanFetch(SimpleCodegenTask):
             .format(cmdline, env, exit_code),
             exit_code=exit_code)
 
-        # Read the stdout from the read-write buffer, from the beginning of the output.
-        conan_install_stdout = workunit.output('stdout').read_from(0)
+        # Read the stdout from the read-write buffer, from the beginning of the output, and convert
+        # to unicode.
+        conan_install_stdout = workunit.output('stdout').read_from(0).decode('utf-8')
         pkg_sha = conan_requirement.parse_conan_stdout_for_pkg_sha(conan_install_stdout)
 
       installed_data_dir = os.path.join(

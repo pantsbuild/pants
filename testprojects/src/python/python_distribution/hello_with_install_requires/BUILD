@@ -18,15 +18,6 @@ python_binary(
   platforms=['current']
 )
 
-python_binary(
-  name='main_with_conflicting_dep',
-  source='main.py',
-  dependencies=[
-    ':hello_with_install_requires',
-    ':pycountry'
-  ],
-)
-
 python_requirement_library(
   name='pycountry',
   requirements=[
