@@ -42,5 +42,8 @@ class ClassmapTaskIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn(self.EXTERNAL_MAPPING, pants_run.stdout_data)
 
   def test_classmap_unicode(self):
+    # N.B. Our classmap goal assumes that the JAR/Zip file has correctly marked itself as utf-8
+    # in order for us to properly render unicode, due to how Python 3's Zipfile decodes filenames.
+    # See https://github.com/pantsbuild/pants/issues/7123 for further information
     pants_run = self.do_command('classmap', self.UNICODE_TEST_TARGET, success=True)
     self.assertIn(self.UNICODE_MAPPING, pants_run.stdout_data)
