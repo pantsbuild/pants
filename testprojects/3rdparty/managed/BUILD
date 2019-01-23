@@ -4,7 +4,7 @@
 
 managed_jar_libraries(
   artifacts=[
-    jar('info.cukes', 'cucumber-core', '1.2.4'),
+    jar('info.cukes', 'cucumber-core', '1.2.5'),
     jar('org.eclipse.jetty', 'jetty-jsp', '9.2.9.v20150224'),
     jar('jersey', 'jersey', '0.7-ea', classifier='sources'),
     ':args4j.args4j',

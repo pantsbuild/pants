@@ -75,7 +75,7 @@ jar_library(name='commons-lang',
 
 jar_library(name='cucumber-java',
             jars=[
-              jar(org='info.cukes', name='cucumber-java', rev='1.1.7'),
+              jar(org='info.cukes', name='cucumber-java', rev='1.2.5'),
             ])
 
 jar_library(name='ivy',

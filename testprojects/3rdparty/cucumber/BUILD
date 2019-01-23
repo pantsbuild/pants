@@ -3,13 +3,13 @@
 
 jar_library(name='cuke-core',
   jars=[
-    jar(org='info.cukes', name='cucumber-core', rev='1.2.4')
+    jar(org='info.cukes', name='cucumber-core', rev='1.2.5')
   ],
 )
 
 jar_library(name='cuke-guice',
   jars=[
-    jar(org='info.cukes', name='cucumber-guice', rev='1.2.4'),
+    jar(org='info.cukes', name='cucumber-guice', rev='1.2.5'),
   ],
   dependencies=[
     # The cucumber-guice jar has a 'provided' scope dep on guice itself so we're forced to adjoin
@@ -20,13 +20,13 @@ jar_library(name='cuke-guice',
 
 jar_library(name='cuke-java',
   jars=[
-    jar(org='info.cukes', name='cucumber-java', rev='1.2.4')
+    jar(org='info.cukes', name='cucumber-java', rev='1.2.5')
   ],
 )
 
 jar_library(name='cuke-junit',
   jars=[
-    jar(org='info.cukes', name='cucumber-junit', rev='1.2.4')
+    jar(org='info.cukes', name='cucumber-junit', rev='1.2.5')
   ],
 )
 
