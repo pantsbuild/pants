@@ -182,7 +182,6 @@ class RscCompile(ZincCompile):
       ]
     )
 
-  # TODO: allow @memoized_method to convert lists into tuples so they can be hashed!
   @memoized_property
   def _nailgunnable_combined_classpath(self):
     """Register all of the component tools of the rsc compile task as a "combined" jvm tool.
