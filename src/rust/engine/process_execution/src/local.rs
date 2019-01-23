@@ -7,6 +7,7 @@ use futures::{future, Future, Stream};
 use log::info;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
+use std::fs::create_dir_all;
 use std::ops::Neg;
 use std::os::unix::{fs::symlink, process::ExitStatusExt};
 use std::path::{Path, PathBuf};
@@ -225,7 +226,9 @@ impl super::CommandRunner for CommandRunner {
 
     let env = req.env;
     let output_file_paths = req.output_files;
+    let output_file_paths2 = output_file_paths.clone();
     let output_dir_paths = req.output_directories;
+    let output_dir_paths2 = output_dir_paths.clone();
     let cleanup_local_dirs = self.cleanup_local_dirs;
     let argv = req.argv;
     let req_description = req.description;
@@ -234,12 +237,29 @@ impl super::CommandRunner for CommandRunner {
       .store
       .materialize_directory(workdir_path.clone(), req.input_files)
       .and_then(move |()| {
-        if let Some(jdk_home) = maybe_jdk_home {
-          symlink(jdk_home, workdir_path3.join(".jdk"))
+        let jdk_home: Result<(), _> = maybe_jdk_home.map_or(Ok(()), |jdk_home| {
+          symlink(jdk_home, workdir_path3.clone().join(".jdk"))
             .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
-        } else {
-          Ok(())
-        }
+        });
+        // The bazel remote execution API specifies that the parent directories for output files and
+        // output directories should be created before execution completes: see
+        // https://github.com/pantsbuild/pants/issues/7084.
+        let parent_paths_created: Result<(), _> = output_file_paths2
+          .iter()
+          .chain(output_dir_paths2.iter())
+          // Path#parent() returns None if the parent is root on unix.
+          .flat_map(|rel_path| rel_path.parent().unwrap())
+          .map(|parent_relpath| workdir_path3.clone().join(parent_relpath))
+          .map(|parent_path| {
+            create_dir_all(parent_path.clone()).map_err(|err| {
+              format!(
+                "Error making parent directory {:?} for local execution: {:?}",
+                parent_path, err
+              )
+            })
+          })
+          .collect();
+        future::result(jdk_home.and(parent_paths_created))
       })
       .and_then(move |()| {
         StreamedHermeticCommand::new(&argv[0])
