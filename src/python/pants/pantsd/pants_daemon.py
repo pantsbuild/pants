@@ -11,6 +11,7 @@ import threading
 from builtins import object
 from contextlib import contextmanager
 
+from future.utils import PY3
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
@@ -39,7 +40,11 @@ from pants.util.strutil import ensure_text
 
 
 class _LoggerStream(object):
-  """A sys.{stdout,stderr} replacement that pipes output to a logger."""
+  """A sys.std{out,err}.buffer replacement that pipes output to a logger.
+
+  N.B. while the Logger object expects unicodes, the Exiter.py code expects us to be writing to a bytes interface.
+  So we pretend this is a bytes interface, and overwrite `write()` to output unicode no matter what.
+  """
 
   def __init__(self, logger, log_level, handler):
     """
@@ -53,6 +58,7 @@ class _LoggerStream(object):
     self._handler = handler
 
   def write(self, msg):
+    msg = ensure_text(msg)
     for line in msg.rstrip().splitlines():
       self._logger.log(self._log_level, line.rstrip())
 
@@ -292,8 +298,14 @@ class PantsDaemon(FingerprintedProcessManager):
       # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
       # TODO: Consider giving these pipes/actual fds, in order to make them "deep" replacements
       # for `1,2`, and allow them to be used via `stdio_as`.
-      sys.stdout = _LoggerStream(logging.getLogger(), logging.INFO, result.log_handler)
-      sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_handler)
+      new_stdout = _LoggerStream(logging.getLogger(), logging.INFO, result.log_handler)
+      new_stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_handler)
+      if PY3:
+        sys.stdout.buffer = new_stdout
+        sys.stderr.buffer = new_stderr
+      else:
+        sys.stdout = new_stdout
+        sys.stderr = new_stderr
 
       self._logger.debug('logging initialized')
       yield result.log_handler.stream
