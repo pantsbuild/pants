@@ -807,7 +807,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2w -i 4/5
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 0 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 0 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard0
@@ -815,7 +815,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 0/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 1 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 1 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard1
@@ -823,7 +823,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 1/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 2 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 2 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard2
@@ -831,7 +831,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 2/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 3 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 3 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard3
@@ -839,7 +839,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 3/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 4 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 4 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard4
@@ -847,7 +847,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 4/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 5 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 5 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard5
@@ -855,7 +855,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 5/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 6 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 6 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard6
@@ -863,7 +863,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 6/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 7 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 7 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard7
@@ -871,7 +871,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 7/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 8 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 8 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard8
@@ -879,7 +879,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 8/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 9 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 9 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard9
@@ -887,7 +887,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 9/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 10 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 10 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard10
@@ -895,7 +895,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 10/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 11 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 11 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard11
@@ -903,7 +903,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 11/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 12 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 12 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard12
@@ -911,7 +911,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 12/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 13 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 13 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard13
@@ -919,7 +919,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 13/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 14 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 14 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard14
@@ -927,7 +927,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 14/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 15 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 15 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard15
@@ -935,7 +935,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 15/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 16 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 16 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard16
@@ -943,7 +943,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 16/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 17 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 17 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard17
@@ -951,7 +951,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 17/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 18 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 18 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard18
@@ -959,7 +959,7 @@ matrix:
         - ./build-support/bin/travis-ci.sh -c2 -i 18/20
 
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard 19 (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard 19 (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard19

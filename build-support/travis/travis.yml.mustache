@@ -639,7 +639,7 @@ matrix:
 {{/py2_blacklist_integration_shards}}
 {{#cron_integration_shards}}
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard {{.}} (Py2 PEX w/ Py3 constraints)"
+      name: "Integration tests for pants - shard {{.}} (Py2 PEX)"
       env:
         - *py2_linux_test_config_env
         - CACHE_NAME=cronshard{{.}}
