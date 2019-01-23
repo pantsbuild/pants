@@ -9,7 +9,8 @@ import sys
 from builtins import str
 
 from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
-from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
+                                           FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import TransitiveHydratedTarget
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, Select
@@ -69,7 +70,7 @@ def run_python_test(transitive_hydrated_target):
     output_files=(output_pytest_requirements_pex_filename,),
   )
   requirements_pex_response = yield Get(
-    FallibleExecuteProcessResult, ExecuteProcessRequest, requirements_pex_request)
+    ExecuteProcessResult, ExecuteProcessRequest, requirements_pex_request)
 
   # Gather sources.
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
