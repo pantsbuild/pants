@@ -5,7 +5,7 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, Snapshot, StrictGlobMatching};
 use futures::{future, Future, Stream};
 use log::info;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
 use std::ops::Neg;
@@ -237,7 +237,7 @@ impl super::CommandRunner for CommandRunner {
       .store
       .materialize_directory(workdir_path.clone(), req.input_files)
       .and_then(move |()| {
-        let jdk_home: Result<(), _> = maybe_jdk_home.map_or(Ok(()), |jdk_home| {
+        let jdk_home_symlinked: Result<(), _> = maybe_jdk_home.map_or(Ok(()), |jdk_home| {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))
             .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
         });
@@ -248,8 +248,10 @@ impl super::CommandRunner for CommandRunner {
           .iter()
           .chain(output_dir_paths2.iter())
           // Path#parent() returns None if the parent is root on unix.
-          .flat_map(|rel_path| rel_path.parent().unwrap())
-          .map(|parent_relpath| workdir_path3.clone().join(parent_relpath))
+          .filter_map(|rel_path| rel_path.parent())
+          .map(|parent_relpath| workdir_path3.join(parent_relpath))
+          .collect::<HashSet<_>>()
+          .iter()
           .map(|parent_path| {
             create_dir_all(parent_path.clone()).map_err(|err| {
               format!(
@@ -259,7 +261,7 @@ impl super::CommandRunner for CommandRunner {
             })
           })
           .collect();
-        future::result(jdk_home.and(parent_paths_created))
+        future::result(jdk_home_symlinked.and(parent_paths_created))
       })
       .and_then(move |()| {
         StreamedHermeticCommand::new(&argv[0])
@@ -598,7 +600,7 @@ mod tests {
         find_bash(),
         "-c".to_owned(),
         format!(
-          "/bin/mkdir cats ; echo -n {} > cats/roland ; echo -n {} > treats",
+          "echo -n {} > cats/roland ; echo -n {} > treats",
           TestData::roland().string(),
           TestData::catnip().string()
         ),
@@ -696,10 +698,7 @@ mod tests {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
-        format!(
-          "/bin/mkdir cats && echo -n {} > cats/roland",
-          TestData::roland().string()
-        ),
+        format!("echo -n {} > cats/roland", TestData::roland().string()),
       ],
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
@@ -814,6 +813,41 @@ mod tests {
     assert!(preserved_work_root.exists());
     // Collect all of the top level sub-dirs under our test workdir.
     assert_eq!(testutil::file::list_dir(&preserved_work_root).len(), 1);
+  }
+
+  #[test]
+  fn all_containing_directories_for_outputs_are_created() {
+    let result = run_command_locally(ExecuteProcessRequest {
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        format!(
+          // mkdir would normally fail, since birds/ doesn't yet exist, as would echo, since cats/
+          // does not exist, but we create the containing directories for all outputs before the
+          // process executes.
+          "/bin/mkdir birds/falcons && echo -n {} > cats/roland",
+          TestData::roland().string()
+        ),
+      ],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: vec![PathBuf::from("cats/roland")].into_iter().collect(),
+      output_directories: vec![PathBuf::from("birds/falcons")].into_iter().collect(),
+      timeout: Duration::from_millis(1000),
+      description: "create nonoverlapping directories and file".to_string(),
+      jdk_home: None,
+    });
+
+    assert_eq!(
+      result.unwrap(),
+      FallibleExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: TestDirectory::nested().digest(),
+        execution_attempts: vec![],
+      }
+    )
   }
 
   fn run_command_locally(
