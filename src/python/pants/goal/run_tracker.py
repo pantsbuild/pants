@@ -27,6 +27,7 @@ from pants.base.workunit import WorkUnit
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.goal.pantsd_stats import PantsDaemonStats
+from pants.option.config import Config
 from pants.reporting.report import Report
 from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
@@ -85,6 +86,11 @@ class RunTracker(Subsystem):
              help='Number of threads for background work.')
     register('--stats-local-json-file', advanced=True, default=None,
              help='Write stats to this local json file on run completion.')
+    register('--stats-option-scopes-to-record', advanced=True, type=list, default=[],
+             help="Option scopes to record in stats on run completion. "
+                  "Options may be selected by joining the scope and the option with a ^ character, "
+                  "i.e. to get option enable_pantsd in the GLOBAL scope, you'd pass "
+                  "GLOBAL^enable_pantsd")
 
   def __init__(self, *args, **kwargs):
     """
@@ -106,6 +112,7 @@ class RunTracker(Subsystem):
     # Initialized in `start()`.
     self.report = None
     self._main_root_workunit = None
+    self._all_options = None
 
     # A lock to ensure that adding to stats at the end of a workunit
     # operates thread-safely.
@@ -165,7 +172,7 @@ class RunTracker(Subsystem):
     """Is the workunit running under the main thread's root."""
     return workunit.root() == self._main_root_workunit
 
-  def initialize(self):
+  def initialize(self, all_options):
     """Create run_info and relevant directories, and return the run id.
 
     Must be called before `start`.
@@ -207,6 +214,8 @@ class RunTracker(Subsystem):
 
     # Daemon stats.
     self.pantsd_stats = PantsDaemonStats()
+
+    self._all_options = all_options
 
     return run_id
 
@@ -394,8 +403,10 @@ class RunTracker(Subsystem):
       'critical_path_timings': self.get_critical_path_timings().get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
       'pantsd_stats': self.pantsd_stats.get_all(),
-      'outcomes': self.outcomes
+      'outcomes': self.outcomes,
+      'recorded_options': self._get_options_to_record(),
     }
+
     # Dump individual stat file.
     # TODO(benjy): Do we really need these, once the statsdb is mature?
     stats_file = os.path.join(get_pants_cachedir(), 'stats',
@@ -521,6 +532,34 @@ class RunTracker(Subsystem):
     N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
     """
     SubprocPool.shutdown(self._aborted)
+
+  def _get_options_to_record(self):
+    recorded_options = {}
+    for scope in self.get_options().stats_option_scopes_to_record:
+      scope_and_maybe_option = scope.split("^")
+      recorded_options[scope] = self._get_option_to_record(*scope_and_maybe_option)
+    return recorded_options
+
+  def _get_option_to_record(self, scope, option=None):
+    """Looks up an option scope (and optionally option therein) in the options parsed by Pants.
+
+    Returns a dict of of all options in the scope, if option is None.
+    Returns the specific option if option is not None.
+    Raises ValueError if scope or option could not be found.
+    """
+    scope_to_look_up = scope if scope != 'GLOBAL' else ''
+    try:
+      value = self._all_options.for_scope(scope_to_look_up, inherit_from_enclosing_scope=False).as_dict()
+      if option is None:
+        return value
+      else:
+        return value[option]
+    except (Config.ConfigValidationError, AttributeError) as e:
+      raise ValueError("Couldn't find option scope {}{} for recording ({})".format(
+        scope,
+        "" if option is None else " option {}".format(option),
+        e
+      ))
 
   @classmethod
   def _create_dict_with_nested_keys_and_val(cls, keys, value):

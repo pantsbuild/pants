@@ -220,7 +220,7 @@ class LocalPantsRunner(object):
     # Launch RunTracker as early as possible (just after Subsystem options are initialized).
     run_tracker = RunTracker.global_instance()
     reporting = Reporting.global_instance()
-    reporting.initialize(run_tracker, self._run_start_time)
+    reporting.initialize(run_tracker, self._options, self._run_start_time)
 
     try:
       # Capture a repro of the 'before' state for this build, if needed.
