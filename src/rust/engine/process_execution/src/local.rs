@@ -250,6 +250,11 @@ impl super::CommandRunner for CommandRunner {
           // Path#parent() returns None if the parent is root on unix.
           .filter_map(|rel_path| rel_path.parent())
           .map(|parent_relpath| workdir_path3.join(parent_relpath))
+          // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably
+          // be even more efficient to only retain the directories at greatest nesting depth, as
+          // create_dir_all() will ensure all parents are created. At that point, we might consider
+          // explicitly enumerating all the directories to be created and just using create_dir(),
+          // unless there is some optimization in create_dir_all() that makes that less efficient.
           .collect::<HashSet<_>>()
           .iter()
           .map(|parent_path| {
