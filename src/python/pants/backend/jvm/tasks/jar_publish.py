@@ -882,12 +882,12 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
     if isinstance(target, ScalaLibrary):
       for java_source in sorted(target.java_sources):
-        sha.update(java_source.invalidation_hash())
+        sha.update(java_source.invalidation_hash().encode('utf-8'))
 
     # TODO(John Sirois): handle resources
 
     for jarsig in sorted([jar_coordinate(j) for j in target.jar_dependencies if j.rev]):
-      sha.update(jarsig)
+      sha.update(jarsig.encode('utf-8'))
 
     # TODO(tdesai) Handle resource type in get_db.
     internal_dependencies = sorted(target_internal_dependencies(target), key=lambda t: t.id)

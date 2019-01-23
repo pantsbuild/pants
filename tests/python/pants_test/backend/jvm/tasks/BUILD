@@ -810,6 +810,7 @@ python_tests(
   sources = ['test_classmap_integration.py'],
   dependencies = [
     'tests/python/pants_test:task_test_base',
+    'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
 )
