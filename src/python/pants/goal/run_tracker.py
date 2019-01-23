@@ -549,9 +549,6 @@ class RunTracker(Subsystem):
     """
     scope_to_look_up = scope if scope != 'GLOBAL' else ''
     try:
-      # Yeah, it's a little sketchy to be looking up Subsystem._options here, but... Someone went
-      # to some care to make sure that Subsystems only get scoped options, and we need to
-      # circumvent that in this one specific place...
       value = self._all_options.for_scope(scope_to_look_up, inherit_from_enclosing_scope=False).as_dict()
       if option is None:
         return value
