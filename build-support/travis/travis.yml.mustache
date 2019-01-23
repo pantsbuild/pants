@@ -639,9 +639,11 @@ matrix:
 {{/py2_blacklist_integration_shards}}
 {{#cron_integration_shards}}
     - <<: *py2_linux_test_config
-      name: "Integration tests for pants - shard {{.}} (Py2 PEX)"
+      name: "Integration tests for pants - shard {{.}} (Py2 PEX w/ Py3 constraints)"
+      stage: *test
       env:
         - *py2_linux_test_config_env
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
         - CACHE_NAME=cronshard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i {{.}}/{{cron_integration_shards_length}}
