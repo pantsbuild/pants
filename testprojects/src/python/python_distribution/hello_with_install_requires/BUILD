@@ -17,10 +17,3 @@ python_binary(
   ],
   platforms=['current']
 )
-
-python_requirement_library(
-  name='pycountry',
-  requirements=[
-    python_requirement('pycountry==17.9.23'),
-  ]
-)
