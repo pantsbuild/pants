@@ -4,12 +4,16 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
 import unittest
 from builtins import object
 
-from pants.util.memo import (memoized, memoized_classmethod, memoized_classproperty,
-                             memoized_method, memoized_property, memoized_staticmethod,
-                             memoized_staticproperty, per_instance, testable_memoized_property)
+from twitter.common.collections import OrderedSet
+
+from pants.util.memo import (coerce_collections, coerce_collections_per_instance, memoized,
+                             memoized_classmethod, memoized_classproperty, memoized_method,
+                             memoized_property, memoized_staticmethod, memoized_staticproperty,
+                             per_instance, testable_memoized_property)
 
 
 class MemoizeTest(unittest.TestCase):
@@ -354,3 +358,48 @@ class MemoizeTest(unittest.TestCase):
 
     self.assertEqual(4, foo2.calls)
     self.assertEqual(4, foo2.calls)
+
+  def test_collection_coercion(self):
+    @memoized
+    def f(x):
+      return sum(x)
+    with self.assertRaisesRegexp(TypeError, re.escape("unhashable type: 'list'")):
+      f([3, 4])
+
+    g_called = self._Called(increment=1)
+    @memoized(key_factory=coerce_collections)
+    def g(x):
+      g_called._called()
+      return sum(x)
+    x = [3, 4]
+    # x is converted into a tuple by coerce_collections, so this will only call g once.
+    self.assertEqual(7, g(tuple(x)))
+    self.assertEqual(7, g(x))
+    x[0] = 2
+    self.assertEqual(6, g(x))
+    # OrderedSet is converted into a tuple which is equal to the previous call, so this should not
+    # increase the call count.
+    self.assertEqual(6, g(OrderedSet(x)))
+    self.assertEqual(2, g_called._calls)
+
+    class C(self._Called):
+      def __init__(self):
+        super(C, self).__init__(increment=1)
+
+      @memoized_method
+      def f(self, x):
+        return sum(x)
+
+      @memoized(key_factory=coerce_collections_per_instance)
+      def g(self, x):
+        self._called()
+        return sum(x)
+    c = C()
+    x = [3, 4]
+    with self.assertRaisesRegexp(TypeError, re.escape("unhashable type: 'list'")):
+      c.f(x)
+    self.assertEqual(7, c.f(tuple(x)))
+    self.assertEqual(7, c.g(x))
+    x[0] = 2
+    self.assertEqual(6, c.g(x))
+    self.assertEqual(2, c._calls)

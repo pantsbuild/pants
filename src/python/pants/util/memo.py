@@ -8,6 +8,8 @@ import functools
 import inspect
 from contextlib import contextmanager
 
+from twitter.common.collections import OrderedSet
+
 from pants.util.meta import classproperty, staticproperty
 
 
@@ -22,6 +24,44 @@ def equal_args(*args, **kwargs):
   if kwargs:
     key += _kwargs_separator + tuple(sorted(kwargs.items()))
   return key
+
+
+def coercing_arg_normalizer(type_coercions, base_normalizer, args, kwargs):
+  """Generate a tuple based off of arguments, applying any specified coercions.
+
+  :param dict type_coercions: Map of type -> 1-arg function. If an argument's type matches any
+                              element, the function is called on the argument and stored in the
+                              returned tuple in its place.
+  :param func base_normalizer: A key factory like `equal_args`.
+
+  :rtype: tuple
+  """
+  args_key = base_normalizer(*args, **kwargs)
+  coerced = []
+  for arg in args_key:
+    arg_type = type(arg)
+    coercing_function = type_coercions.get(arg_type, None)
+    if coercing_function:
+      arg = coercing_function(arg)
+    coerced.append(arg)
+  return tuple(coerced)
+
+
+collection_coercions = {
+  list: tuple,
+  OrderedSet: tuple,
+}
+
+
+def coerce_collections(*args, **kwargs):
+  """Generate a key based off of arguments like `equal_args`, coercing ordered collections to tuple.
+
+  Although `list` and `OrderedSet` are mutable and therefore python doesn't let them be hashable,
+  since we convert these arguments to tuple (a hashable type) before entering them in the cache, we
+  can accept a greater range of inputs.
+  """
+  return coercing_arg_normalizer(type_coercions=collection_coercions, base_normalizer=equal_args,
+                                 args=args, kwargs=kwargs)
 
 
 class InstanceKey(object):
@@ -56,6 +96,12 @@ def per_instance(*args, **kwargs):
   """
   instance_and_rest = (InstanceKey(args[0]),) + args[1:]
   return equal_args(*instance_and_rest, **kwargs)
+
+
+def coerce_collections_per_instance(*args, **kwargs):
+  """Analogous to `coerce_collections`, but uses an `InstanceKey` like `per_instance`."""
+  return coercing_arg_normalizer(type_coercions=collection_coercions, base_normalizer=per_instance,
+                                 args=args, kwargs=kwargs)
 
 
 def memoized(func=None, key_factory=equal_args, cache_factory=dict):

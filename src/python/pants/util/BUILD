@@ -88,6 +88,7 @@ python_library(
   name = 'memo',
   sources = ['memo.py'],
   dependencies = [
+      '3rdparty/python/twitter/commons:twitter.common.collections',
       ':meta'
   ],
 )
