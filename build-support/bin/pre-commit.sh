@@ -24,10 +24,8 @@ DIRS_TO_CHECK=(
 # integration test!
 set -e
 
-# Read lines of output into the array variable ADDED_FILES, without trailing newlines (-t). See
-# https://www.gnu.org/software/bash/manual/html_node/Bash-Builtins.html#index-readarray.
-# NB: `readarray` is available on bash >=4.
-readarray ADDED_FILES -t < <(./build-support/bin/get_added_files.sh)
+# You can use ("$()") with double quotes in zsh, I assume this splits by IFS...
+ADDED_FILES=($(./build-support/bin/get_added_files.sh))
 
 echo "* Checking packages"
 # TODO: Determine the most *hygienic* way to split an array on the command line in portable bash,
@@ -37,7 +35,8 @@ echo "* Checking packages"
 echo "* Checking headers"
 # Read added files from stdin, and ensure check_header_helper.py checks for the current copyright
 # year for the intersection of these files with the ones it checks.
-# Exporting PANTS_IGNORE_ADDED_FILES will avoid checking the specific copyright year for added files.
+# Exporting PANTS_IGNORE_ADDED_FILES will avoid checking the specific copyright year for added
+# files.
 printf "%s\n" "${ADDED_FILES[@]}" \
   | ./build-support/bin/check_header_helper.py "${DIRS_TO_CHECK[@]}"
 
