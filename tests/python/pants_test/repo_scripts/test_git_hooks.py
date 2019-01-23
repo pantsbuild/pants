@@ -55,7 +55,7 @@ class PreCommitHookTest(unittest.TestCase):
     (stdout_data, stderr_data) = proc.communicate(input=input)
     self.assertNotEqual(0, proc.returncode)
     all_output = '{}\n{}'.format(stdout_data, stderr_data)
-    self.assertIn(expected_excerpt, all_output.decode('utf-8'))
+    self.assertIn(expected_excerpt, all_output)
 
   def test_check_packages(self):
     package_check_script = os.path.join(self.pants_repo_root, 'build-support/bin/check_packages.sh')
