@@ -135,4 +135,5 @@ Say, for example, that the global pants configuration specifies `platforms: ["li
 
 Tensorflow-gpu depends on some CUDA code, and therefore there _cannot_ be a wheel available for OSX.
 In this case, pants will try to resolve `tensorflow-gpu` both for Linux and OSX, and will fail at resolve time,
-even though the target only claims to support Linux. Discussion around this topic is being [#7105](https://github.com/pantsbuild/pants/issues/7105).
+even though the target only claims to support Linux. Discussion around this topic is being held at [#7105](https://github.com/pantsbuild/pants/issues/7105).
+
