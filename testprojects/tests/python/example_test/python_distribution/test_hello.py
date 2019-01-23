@@ -6,10 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import unittest
 
-from hello import hello_string
+from hello_package import hello
 
 
 class HelloTest(unittest.TestCase):
 
   def test_hello_import(self):
-    self.assertEqual('hello!', hello_string())
+    self.assertEqual('hello!', hello.hello_string())

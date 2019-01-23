@@ -7,8 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import str
 from collections import defaultdict
 
-from pex.pex import PEX
-
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement
@@ -19,7 +17,7 @@ from pants.base.exceptions import IncompatiblePlatformsError
 from pants.binaries.executable_pex_tool import ExecutablePexTool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.objects import SubclassesOf
 
 
 class PythonNativeCode(Subsystem):
@@ -151,9 +149,3 @@ class BuildSetupRequiresPex(ExecutablePexTool):
       PythonRequirement('setuptools=={}'.format(self.python_setup.setuptools_version)),
       PythonRequirement('wheel=={}'.format(self.python_setup.wheel_version)),
     ]
-
-
-class SetupPyExecutionEnvironment(datatype([
-    # If None, don't set PYTHONPATH in the setup.py environment.
-    ('setup_requires_pex', PEX),
-])): pass

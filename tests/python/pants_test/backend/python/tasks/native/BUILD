@@ -1,29 +1,8 @@
-# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
-  name='interpreter_cache_test_mixin',
-  sources=['interpreter_cache_test_mixin.py'],
-  dependencies = [
-    'src/python/pants/util:collections_abc_backport',
-    '3rdparty/python:future',
-  ]
-)
-
-python_library(
-  name='python_task_test_base',
-  sources=['python_task_test_base.py'],
-  dependencies=[
-    ':interpreter_cache_test_mixin',
-    '3rdparty/python:future',
-    'src/python/pants/backend/python:plugin',
-    'src/python/pants/build_graph',
-    'tests/python/pants_test:task_test_base'
-  ]
-)
-
 python_tests(
-  sources=globs('test_*.py', exclude=([globs('*_integration.py')])),
+  sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
@@ -31,7 +10,6 @@ python_tests(
     '3rdparty/python:future',
     '3rdparty/python:mock',
     '3rdparty/python:pex',
-    ':python_task_test_base',
     'src/python/pants/backend/native',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
@@ -51,30 +29,35 @@ python_tests(
     'src/python/pants/util:process_handler',
     'src/python/pants/util:py2_compat',
     'tests/python/pants_test/backend/python:interpreter_selection_utils',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
     'tests/python/pants_test/backend/python/tasks/util',
     'tests/python/pants_test/engine:scheduler_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
     'tests/python/pants_test:task_test_base',
   ],
-  timeout=600
+  tags={'platform_specific_behavior'},
+  timeout=600,
 )
-
 
 python_tests(
   name='integration',
   sources=globs('*_integration.py'),
   dependencies=[
-    '3rdparty/python:pex',
-    'src/python/pants/base:build_environment',
+    '3rdparty/python:future',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/native',
+    'src/python/pants/backend/native/targets',
+    'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python/targets',
+    'src/python/pants/backend/python/tasks',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
-    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
-    'tests/python/pants_test/backend/python:interpreter_selection_utils',
-    'tests/python/pants_test/backend/python:pants_requirement_integration_test_base',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/backend/python/tasks/util',
+    'tests/python/pants_test/engine:scheduler_test_base',
     'tests/python/pants_test/testutils:py2_compat',
   ],
-  tags={'integration'},
-  timeout=2400
+  tags={'platform_specific_behavior', 'integration'},
+  timeout=2400,
 )

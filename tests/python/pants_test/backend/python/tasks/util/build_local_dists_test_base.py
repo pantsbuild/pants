@@ -4,18 +4,23 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 import re
-from builtins import next
+from builtins import next, str
 
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
+from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
+from pants.build_graph.address import Address
 from pants.util.collections import assert_single_element
-from pants.util.memo import memoized_property
-from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
+from pants.util.memo import memoized_method
+from pants.util.meta import classproperty
+from pants_test.backend.python.tasks.python_task_test_base import (PythonTaskTestBase,
+                                                                   name_and_platform)
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
@@ -25,22 +30,37 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
   def task_type(cls):
     return BuildLocalPythonDistributions
 
-  # This is an informally-specified nested dict -- see ../test_ctypes.py for an example. Special
-  # keys are 'key' (used to index into `self.target_dict`) and 'filemap' (creates files at the
-  # specified relative paths). The rest of the keys are fed into `self.make_target()`. An
-  # `OrderedDict` of 2-tuples may be used if targets need to be created in a specific order (e.g. if
-  # they have dependencies on each other).
-  _dist_specs = None
-  # By default, we just use a `BuildLocalPythonDistributions` task. When testing with C/C++ targets,
-  # we want to compile and link them as well to get the resulting dist to build, so we add those
-  # task types here and execute them beforehand.
-  _extra_relevant_task_types = [SelectInterpreter]
+  @classproperty
+  def _dist_specs(cls):
+    """
+    This is an informally-specified nested dict -- see ../test_ctypes.py for an example. Special
+    keys are 'key' (used to index into `self.target_dict`) and 'filemap' (creates files at the
+    specified relative paths). The rest of the keys are fed into `self.make_target()`. An
+    `OrderedDict` of 2-tuples may be used if targets need to be created in a specific order (e.g. if
+    they have dependencies on each other).
+    """
+    raise NotImplementedError('_dist_specs must be implemented!')
 
-  @memoized_property
-  def _all_other_synthesized_task_types(self):
+  @classproperty
+  def _run_before_task_types(cls):
+    """
+    By default, we just use a `BuildLocalPythonDistributions` task. When testing with C/C++ targets,
+    we want to compile and link them as well to get the resulting dist to build, so we add those
+    task types here and execute them beforehand.
+    """
+    return [SelectInterpreter]
+
+  @classproperty
+  def _run_after_task_types(cls):
+    """Tasks to run after local dists are built, similar to `_run_before_task_types`."""
+    return [ResolveRequirements]
+
+  @memoized_method
+  def _synthesize_task_types(self, task_types=()):
     return [
       self.synthesize_task_subtype(tsk, '__tmp_{}'.format(tsk.__name__))
-      for tsk in self._extra_relevant_task_types
+      # TODO: make @memoized_method convert lists to tuples for hashing!
+      for tsk in task_types
     ]
 
   def setUp(self):
@@ -48,20 +68,31 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
 
     self.target_dict = {}
 
-    # Create a python_dist() target from each specification and insert it into `self.target_dict`.
-    for target_spec, file_spec in self._dist_specs.items():
-      file_spec = file_spec.copy()
-      filemap = file_spec.pop('filemap')
-      for rel_path, content in filemap.items():
-        self.create_file(rel_path, content)
+    # Create a target from each specification and insert it into `self.target_dict`.
+    for target_spec, target_kwargs in self._dist_specs.items():
+      unprocessed_kwargs = target_kwargs.copy()
 
-      key = file_spec.pop('key')
+      target_base = Address.parse(target_spec).spec_path
+
+      # Populate the target's owned files from the specification.
+      filemap = unprocessed_kwargs.pop('filemap', {})
+      for rel_path, content in filemap.items():
+        buildroot_path = os.path.join(target_base, rel_path)
+        self.create_file(buildroot_path, content)
+
+      # Ensure any dependencies exist in the target dict (`_dist_specs` must then be an
+      # OrderedDict).
+      # The 'key' is used to access the target in `self.target_dict`.
+      key = unprocessed_kwargs.pop('key')
       dep_targets = []
-      for dep_spec in file_spec.pop('dependencies', []):
+      for dep_spec in unprocessed_kwargs.pop('dependencies', []):
         existing_tgt_key = self._dist_specs[dep_spec]['key']
         dep_targets.append(self.target_dict[existing_tgt_key])
-      python_dist_tgt = self.make_target(spec=target_spec, dependencies=dep_targets, **file_spec)
-      self.target_dict[key] = python_dist_tgt
+
+      # Register the generated target.
+      generated_target = self.make_target(
+        spec=target_spec, dependencies=dep_targets, **unprocessed_kwargs)
+      self.target_dict[key] = generated_target
 
   def _all_specified_targets(self):
     return list(self.target_dict.values())
@@ -105,15 +136,16 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
     return task_type(context, self.test_workdir)
 
   def _create_distribution_synthetic_target(self, python_dist_target, extra_targets=[]):
-
+    run_before_synthesized_task_types = self._synthesize_task_types(tuple(self._run_before_task_types))
     python_create_distributions_task_type = self._testing_task_type
-    all_synthesized_task_types = self._all_other_synthesized_task_types + [
+    run_after_synthesized_task_types = self._synthesize_task_types(tuple(self._run_after_task_types))
+    all_synthesized_task_types = run_before_synthesized_task_types + [
       python_create_distributions_task_type,
-    ]
+    ] + run_after_synthesized_task_types
 
     context = self._scheduling_context(
       target_roots=([python_dist_target] + extra_targets),
-      for_task_types=(all_synthesized_task_types),
+      for_task_types=all_synthesized_task_types,
       for_subsystems=[PythonRepos, LibcDev],
       # TODO(#6848): we should be testing all of these with both of our toolchains.
       options={
@@ -123,18 +155,22 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
       })
     self.assertEqual(set(self._all_specified_targets()), set(context.build_graph.targets()))
 
-    all_other_task_instances = [
+    run_before_task_instances = [
       self._create_task(task_type, context)
-      for task_type in self._all_other_synthesized_task_types
+      for task_type in run_before_synthesized_task_types
     ]
     python_create_distributions_task_instance = self._create_task(
-      python_create_distributions_task_type,
-      context)
+      python_create_distributions_task_type, context)
+    run_after_task_instances = [
+      self._create_task(task_type, context)
+      for task_type in run_after_synthesized_task_types
+    ]
+    all_task_instances = run_before_task_instances + [
+      python_create_distributions_task_instance
+    ] + run_after_task_instances
 
-    for tsk in all_other_task_instances:
+    for tsk in all_task_instances:
       tsk.execute()
-
-    python_create_distributions_task_instance.execute()
 
     synthetic_tgts = set(context.build_graph.targets()) - set(self._all_specified_targets())
     self.assertEqual(1, len(synthetic_tgts))
@@ -144,3 +180,20 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
       python_create_distributions_task_instance, python_dist_target)
 
     return context, synthetic_target, snapshot_version
+
+  def _assert_dist_and_wheel_identity(self, expected_name, expected_version, expected_platform,
+                                      dist_target, **kwargs):
+    context, synthetic_target, fingerprint_suffix = self._create_distribution_synthetic_target(
+      dist_target, **kwargs)
+    resulting_dist_req = assert_single_element(synthetic_target.requirements.value)
+    expected_snapshot_version = '{}+{}'.format(expected_version, fingerprint_suffix)
+    self.assertEquals(
+      '{}=={}'.format(expected_name, expected_snapshot_version),
+      str(resulting_dist_req.requirement))
+
+    local_wheel_products = context.products.get('local_wheels')
+    local_wheel = self._retrieve_single_product_at_target_base(local_wheel_products, dist_target)
+    dist, version, platform = name_and_platform(local_wheel)
+    self.assertEquals(dist, expected_name)
+    self.assertEquals(version, expected_snapshot_version)
+    self.assertEquals(platform, expected_platform)

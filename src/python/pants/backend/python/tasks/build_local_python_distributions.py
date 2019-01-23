@@ -17,8 +17,7 @@ from pants.backend.native.tasks.link_shared_libraries import SharedLibrary
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import is_local_python_dist
 from pants.backend.python.subsystems.python_native_code import (BuildSetupRequiresPex,
-                                                                PythonNativeCode,
-                                                                SetupPyExecutionEnvironment)
+                                                                PythonNativeCode)
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
@@ -32,6 +31,7 @@ from pants.util.memo import memoized_property
 from pants.util.strutil import safe_shlex_join
 
 
+# TODO: make this a SimpleCodegenTask!!!
 class BuildLocalPythonDistributions(Task):
   """Create python distributions (.whl) from python_dist targets."""
 
@@ -212,18 +212,15 @@ class BuildLocalPythonDistributions(Task):
     setup_reqs_pex_path = os.path.join(
       setup_requires_dir,
       'setup-requires-{}.pex'.format(versioned_target_fingerprint))
-    extra_reqs = list(setup_reqs_to_resolve or [])
     setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
-      interpreter, setup_reqs_pex_path, extra_reqs=extra_reqs)
+      interpreter, setup_reqs_pex_path, extra_reqs=setup_reqs_to_resolve)
     self.context.log.debug('Using pex file as setup.py interpreter: {}'
                            .format(setup_requires_pex))
-
-    setup_py_execution_environment = SetupPyExecutionEnvironment(setup_requires_pex)
 
     self._create_dist(
       dist_target,
       dist_output_dir,
-      setup_py_execution_environment,
+      setup_requires_pex,
       versioned_target_fingerprint,
       is_platform_specific)
 
@@ -256,7 +253,7 @@ class BuildLocalPythonDistributions(Task):
   def _create_dist(self,
                    dist_tgt,
                    dist_target_dir,
-                   setup_py_execution_environment,
+                   setup_requires_pex,
                    snapshot_fingerprint,
                    is_platform_specific):
     """Create a .whl file for the specified python_distribution target."""
@@ -264,8 +261,6 @@ class BuildLocalPythonDistributions(Task):
 
     setup_py_snapshot_version_argv = self._generate_snapshot_bdist_wheel_argv(
       snapshot_fingerprint, is_platform_specific)
-
-    setup_requires_pex = setup_py_execution_environment.setup_requires_pex
 
     cmd = safe_shlex_join(setup_requires_pex.cmdline(setup_py_snapshot_version_argv))
     with self.context.new_workunit('setup.py', cmd=cmd, labels=[WorkUnitLabel.TOOL]) as workunit:
@@ -277,7 +272,7 @@ class BuildLocalPythonDistributions(Task):
           raise self.BuildLocalPythonDistributionsError(
             "Installation of python distribution from target {target} into directory {into_dir} "
             "failed (return value of run() was: {rc!r}).\n"
-            "The chosen interpreter was: {interpreter}.\n"
+            "The pex with any requirements is located at: {interpreter}.\n"
             "The host system's compiler and linker were used.\n"
             "The setup command was: {command}."
             .format(target=dist_tgt,
@@ -307,7 +302,9 @@ class BuildLocalPythonDistributions(Task):
     dists = glob.glob(os.path.join(dist_dir, '*.whl'))
     if len(dists) == 0:
       raise cls.BuildLocalPythonDistributionsError(
-        'No distributions were produced by python_create_distribution task.')
+        'No distributions were produced by python_create_distribution task.\n'
+        'dist_dir: {}, install_dir: {}'
+        .format(dist_dir, install_dir))
     if len(dists) > 1:
       # TODO: is this ever going to happen?
       raise cls.BuildLocalPythonDistributionsError('Ambiguous local python distributions found: {}'

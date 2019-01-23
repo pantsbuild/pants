@@ -33,11 +33,3 @@ python_requirement_library(
     python_requirement('pycountry==17.9.23'),
   ]
 )
-
-python_binary(
-  name='main_with_no_pycountry',
-  source='main.py',
-  dependencies=[
-    ':hello_with_install_requires'
-  ],
-)
