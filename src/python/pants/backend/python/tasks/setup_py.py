@@ -14,7 +14,6 @@ from abc import abstractmethod
 from builtins import bytes, map, object, str, zip
 from collections import defaultdict
 
-from future.utils import PY2
 from pex.installer import InstallerBase, Packager
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
@@ -501,7 +500,7 @@ class SetupPy(Task):
       # and then writing it out after the process has finished like we do here.
       def write(stream_name, data):
         stream = workunit.output(stream_name)
-        stream.write(ensure_binary(data) if PY2 else ensure_text(data))
+        stream.write(ensure_binary(data))
         stream.flush()
 
       write('stdout', stdout)
