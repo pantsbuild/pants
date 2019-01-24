@@ -71,6 +71,10 @@ class _LoggerStream(object):
   def fileno(self):
     return self._handler.stream.fileno()
 
+  @property
+  def buffer(self):
+    return self
+
 
 class PantsDaemon(FingerprintedProcessManager):
   """A daemon that manages PantsService instances."""
@@ -298,14 +302,8 @@ class PantsDaemon(FingerprintedProcessManager):
       # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
       # TODO: Consider giving these pipes/actual fds, in order to make them "deep" replacements
       # for `1,2`, and allow them to be used via `stdio_as`.
-      new_stdout = _LoggerStream(logging.getLogger(), logging.INFO, result.log_handler)
-      new_stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_handler)
-      if PY3:
-        sys.stdout.buffer = new_stdout
-        sys.stderr.buffer = new_stderr
-      else:
-        sys.stdout = new_stdout
-        sys.stderr = new_stderr
+      sys.stdout = _LoggerStream(logging.getLogger(), logging.INFO, result.log_handler)
+      sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_handler)
 
       self._logger.debug('logging initialized')
       yield result.log_handler.stream
