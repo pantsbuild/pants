@@ -146,10 +146,13 @@ class IdeaPluginGen(ConsoleTask):
     # Generate (without merging in any extra components).
     safe_mkdir(os.path.abspath(self.intellij_output_dir))
 
-    ipr = self._generate_to_tempfile(
-      Generator(pkgutil.get_data(__name__, self.project_template), project=configured_project))
-    iws = self._generate_to_tempfile(
-      Generator(pkgutil.get_data(__name__, self.workspace_template), workspace=configured_workspace))
+    def gen_file(template_file_name, **mustache_kwargs):
+      return self._generate_to_tempfile(
+        Generator(pkgutil.get_data(__name__, template_file_name).decode('utf-8'), **mustache_kwargs)
+      )
+
+    ipr = gen_file(self.project_template, project=configured_project)
+    iws = gen_file(self.workspace_template, workspace=configured_workspace)
 
     self._outstream.write(self.gen_project_workdir.encode('utf-8'))
 
