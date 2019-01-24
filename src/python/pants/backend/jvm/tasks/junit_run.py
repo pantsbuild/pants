@@ -5,10 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import fnmatch
-import functools
 import itertools
 import os
-import shutil
 import sys
 from abc import abstractmethod
 from builtins import object, range, str
@@ -29,7 +27,6 @@ from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport, N
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.build_graph.files import Files
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
@@ -39,8 +36,8 @@ from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
 from pants.util import desktop
 from pants.util.argutil import ensure_arg, remove_arg
-from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for, safe_rmtree, safe_walk
+from pants.util.contextutil import environment_as
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_rmtree, safe_walk
 from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
 from pants.util.strutil import pluralize
@@ -358,29 +355,6 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       return RegistryOfTests(possible_test_to_target)
     else:
       return test_registry
-
-  @staticmethod
-  def _copy_files(dest_dir, target):
-    if isinstance(target, Files):
-      for source in target.sources_relative_to_buildroot():
-        src = os.path.join(get_buildroot(), source)
-        dest = os.path.join(dest_dir, source)
-        safe_mkdir_for(dest)
-        shutil.copy(src, dest)
-
-  @contextmanager
-  def _chroot(self, targets, workdir):
-    if workdir is not None:
-      yield workdir
-    else:
-      root_dir = os.path.join(self.workdir, '_chroots')
-      safe_mkdir(root_dir)
-      with temporary_dir(root_dir=root_dir) as chroot:
-        self.context.build_graph.walk_transitive_dependency_graph(
-          addresses=[t.address for t in targets],
-          work=functools.partial(self._copy_files, chroot)
-        )
-        yield chroot
 
   @property
   def _batched(self):

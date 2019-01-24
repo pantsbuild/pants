@@ -4,15 +4,21 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import filter
+from contextlib import contextmanager
 
-from pants.base.exceptions import TaskError
+from future.utils import text_type
+from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
+from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
+from pants.util.memo import memoized_property
+from pants.util.objects import datatype
+from pants.util.process_handler import SubprocessProcessHandler
+from pants.util.strutil import create_path_env_var, safe_shlex_join, safe_shlex_split
 
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
 
-class GoTest(GoWorkspaceTask):
+class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
   """Runs `go test` on Go packages.
 
   To run a library's tests, GoTest only requires a Go workspace to be initialized
@@ -26,6 +32,8 @@ class GoTest(GoWorkspaceTask):
   @classmethod
   def register_options(cls, register):
     super(GoTest, cls).register_options(register)
+    # TODO: turn these into a list of individually-shlexed strings and deprecate using a single
+    # string!
     register('--build-and-test-flags', default='',
              fingerprint=True,
              help='Flags to pass in to `go test` tool.')
@@ -34,20 +42,69 @@ class GoTest(GoWorkspaceTask):
   def supports_passthru_args(cls):
     return True
 
-  def execute(self):
-    # Only executes the tests from the package specified by the target roots, so
-    # we don't run the tests for _all_ dependencies of said package.
-    targets = filter(self.is_local_src, self.context.target_roots)
-    for target in targets:
-      self.ensure_workspace(target)
-      self._go_test(target)
+  def _test_target_filter(self):
+    return self.is_local_src
 
-  def _go_test(self, target):
-    args = (self.get_options().build_and_test_flags.split()
-            + [target.import_path]
-            + self.get_passthru_args())
-    result, go_cmd = self.go_dist.execute_go_cmd('test', gopath=self.get_gopath(target), args=args,
-                                                 workunit_factory=self.context.new_workunit,
-                                                 workunit_labels=[WorkUnitLabel.TEST])
-    if result != 0:
-      raise TaskError('{} failed with exit code {}'.format(go_cmd, result))
+  def _validate_target(self, target):
+    self.ensure_workspace(target)
+
+  class _GoTestTargetInfo(datatype([('import_path', text_type), ('gopath', text_type)])): pass
+
+  def _generate_args_for_targets(self, targets):
+    """???"""
+    return {
+      t: self._GoTestTargetInfo(import_path=t.import_path, gopath=self.get_gopath(t))
+      for t in targets
+    }
+
+  @contextmanager
+  def partitions(self, per_target, all_targets, test_targets):
+    if per_target:
+      def iter_partitions():
+        for test_target in test_targets:
+          partition = (test_target,)
+          args = (self._generate_args_for_targets([test_target]),)
+          yield partition, args
+    else:
+      def iter_partitions():
+        if test_targets:
+          partition = tuple(test_targets)
+          args = (self._generate_args_for_targets(test_targets),)
+          yield partition, args
+    yield iter_partitions
+
+  def collect_files(self, *args):
+    pass
+
+  @memoized_property
+  def _build_and_test_flags(self):
+    return safe_shlex_split(self.get_options().build_and_test_flags)
+
+  def _spawn(self, workunit, go_cmd, chroot):
+    return SubprocessProcessHandler(go_cmd.spawn(
+      cwd=chroot,
+      stdout=workunit.output('stdout'),
+      stderr=workunit.output('stderr')))
+
+  @property
+  def _maybe_workdir(self):
+    if self.run_tests_in_chroot:
+      return None
+    return get_buildroot()
+
+  def run_tests(self, fail_fast, test_targets, args_by_target):
+    with self._chroot(test_targets, self._maybe_workdir) as chroot:
+      cmdline_args = self._build_and_test_flags + [
+        args_by_target[t].import_path for t in test_targets
+      ] + self.get_passthru_args()
+      gopath = create_path_env_var(
+        args_by_target[t].gopath for t in test_targets
+      )
+      go_cmd = self.go_dist.create_go_cmd('test', gopath=gopath, args=cmdline_args)
+
+      workunit_labels = [WorkUnitLabel.TOOL, WorkUnitLabel.TEST]
+      with self.context.new_workunit(
+          name='go test', cmd=safe_shlex_join(go_cmd.cmdline), labels=workunit_labels) as workunit:
+
+        exit_code = self._spawn_and_wait(workunit=workunit, go_cmd=go_cmd, chroot=chroot)
+        return TestResult.rc(exit_code)
