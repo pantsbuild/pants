@@ -16,6 +16,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
   """Make sure jvm-platform-analysis runs properly, especially with respect to caching behavior."""
 
+  FAILURE_MESSAGE = "Dependencies cannot have a higher java target level than dependees!"
+
   class JavaSandbox(object):
     """Testing sandbox for making temporary java_library targets."""
 
@@ -82,29 +84,38 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
     with self.setup_sandbox() as sandbox:
       sandbox.write_build_file(self._good_one_two)
       self.assert_success(sandbox.clean_all())
-      self.assert_success(sandbox.jvm_platform_validate('one', 'two'))
+      run = sandbox.jvm_platform_validate('one', 'two')
+      self.assert_success(run)
 
   def test_bad_targets_fails_fresh(self):
     with self.setup_sandbox() as sandbox:
       sandbox.write_build_file(self._bad_one_two)
       self.assert_success(sandbox.clean_all())
-      self.assert_failure(sandbox.jvm_platform_validate('one', 'two'))
+      run = sandbox.jvm_platform_validate('one', 'two')
+      self.assert_failure(run)
+      self.assertIn(cls.FAILURE_MESSAGE, run.stdout_data)
 
   def test_good_then_bad(self):
     with self.setup_sandbox() as sandbox:
       sandbox.write_build_file(self._good_one_two)
       self.assert_success(sandbox.clean_all())
-      self.assert_success(sandbox.jvm_platform_validate('one', 'two'))
+      good_run = sandbox.jvm_platform_validate('one', 'two')
+      self.assert_success(good_run)
       sandbox.write_build_file(self._bad_one_two)
-      self.assert_failure(sandbox.jvm_platform_validate('one', 'two'))
+      bad_run = sandbox.jvm_platform_validate('one', 'two')
+      self.assert_failure(bad_run)
+      self.assertIn(cls.FAILURE_MESSAGE, bad_run.stdout_data)
 
   def test_bad_then_good(self):
     with self.setup_sandbox() as sandbox:
       sandbox.write_build_file(self._bad_one_two)
       self.assert_success(sandbox.clean_all())
-      self.assert_failure(sandbox.jvm_platform_validate('one', 'two'))
+      bad_run = sandbox.jvm_platform_validate('one', 'two')
+      self.assert_failure(bad_run)
+      self.assertIn(cls.FAILURE_MESSAGE, bad_run.stdout_data)
       sandbox.write_build_file(self._good_one_two)
-      self.assert_success(sandbox.jvm_platform_validate('one', 'two'))
+      good_run = sandbox.jvm_platform_validate('one', 'two')
+      self.assert_success(good_run)
 
   def test_good_caching(self):
     # Make sure targets are cached after a good run.
