@@ -11,6 +11,7 @@ import unittest
 from builtins import open
 from http.server import BaseHTTPRequestHandler
 
+from future.utils import PY3
 from parameterized import parameterized
 from py_zipkin import Encoding
 from py_zipkin.encoding import convert_spans
@@ -176,20 +177,20 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assertEqual(num_of_traces, 1)
 
       trace = ZipkinHandler.traces[-1]
-      main_span = self.find_span_by_name(trace, 'main')
+      main_span = self.find_spans_by_name(trace, 'main')
       self.assertEqual(len(main_span), 1)
 
       parent_id = main_span[0]['id']
-      main_children = self.find_span_by_parentId(trace, parent_id)
+      main_children = self.find_spans_by_parentId(trace, parent_id)
       self.assertTrue(main_children)
       self.assertTrue(any(span['name'] == 'cloc' for span in main_children))
 
   @staticmethod
-  def find_span_by_name(trace, name):
+  def find_spans_by_name(trace, name):
     return [span for span in trace if span['name'] == name]
 
   @staticmethod
-  def find_span_by_parentId(trace, parent_id):
+  def find_spans_by_parentId(trace, parent_id):
     return [span for span in trace if span.get('parentId') == parent_id]
 
 
@@ -197,7 +198,8 @@ class ZipkinHandler(BaseHTTPRequestHandler):
   traces = []
 
   def do_POST(self):
-    thrift_trace = self.rfile.read(int(self.headers.getheader('content-length')))
+    content_length = self.headers.get('content-length') if PY3 else self.headers.getheader('content-length')
+    thrift_trace = self.rfile.read(int(content_length))
     json_trace = convert_spans(thrift_trace, Encoding.V1_JSON, Encoding.V1_THRIFT)
     trace = json.loads(json_trace)
     self.__class__.traces.append(trace)
