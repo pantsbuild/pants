@@ -1,4 +1,3 @@
-tests/python/pants_test/backend/jvm/tasks:jvm_platform_analysis_integration
 tests/python/pants_test/backend/jvm/tasks:scala_repl_integration
 tests/python/pants_test/backend/project_info/tasks:idea_plugin_integration
 tests/python/pants_test/backend/python/tasks:integration
