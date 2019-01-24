@@ -17,6 +17,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
   """Make sure jvm-platform-analysis runs properly, especially with respect to caching behavior."""
 
   FAILURE_MESSAGE = "Dependencies cannot have a higher java target level than dependees!"
+  CACHE_MESSAGE = "Invalidated 2 targets"
 
   class JavaSandbox(object):
     """Testing sandbox for making temporary java_library targets."""
@@ -124,10 +125,10 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(sandbox.clean_all())
       first_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_success(first_run)
-      self.assertIn('Invalidated 2 targets', first_run.stdout_data)
+      self.assertIn(cls.CACHE_MESSAGE, first_run.stdout_data)
       second_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_success(second_run)
-      self.assertNotIn('Invalidated 2 targets', second_run.stdout_data)
+      self.assertNotIn(cls.CACHE_MESSAGE, second_run.stdout_data)
 
   def test_bad_caching(self):
     # Make sure targets aren't cached after a bad run.
@@ -136,7 +137,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(sandbox.clean_all())
       first_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_failure(first_run)
-      self.assertIn('Invalidated 2 targets', first_run.stdout_data)
+      self.assertIn(cls.CACHE_MESSAGE, first_run.stdout_data)
       second_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_failure(second_run)
-      self.assertIn('Invalidated 2 targets', second_run.stdout_data)
+      self.assertIn(cls.CACHE_MESSAGE, second_run.stdout_data)
