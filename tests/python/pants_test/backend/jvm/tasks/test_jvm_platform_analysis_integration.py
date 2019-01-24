@@ -94,7 +94,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(sandbox.clean_all())
       run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_failure(run)
-      self.assertIn(cls.FAILURE_MESSAGE, run.stdout_data)
+      self.assertIn(self.FAILURE_MESSAGE, run.stdout_data)
 
   def test_good_then_bad(self):
     with self.setup_sandbox() as sandbox:
@@ -105,7 +105,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       sandbox.write_build_file(self._bad_one_two)
       bad_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_failure(bad_run)
-      self.assertIn(cls.FAILURE_MESSAGE, bad_run.stdout_data)
+      self.assertIn(self.FAILURE_MESSAGE, bad_run.stdout_data)
 
   def test_bad_then_good(self):
     with self.setup_sandbox() as sandbox:
@@ -113,7 +113,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(sandbox.clean_all())
       bad_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_failure(bad_run)
-      self.assertIn(cls.FAILURE_MESSAGE, bad_run.stdout_data)
+      self.assertIn(self.FAILURE_MESSAGE, bad_run.stdout_data)
       sandbox.write_build_file(self._good_one_two)
       good_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_success(good_run)
@@ -125,10 +125,10 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(sandbox.clean_all())
       first_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_success(first_run)
-      self.assertIn(cls.CACHE_MESSAGE, first_run.stdout_data)
+      self.assertIn(self.CACHE_MESSAGE, first_run.stdout_data)
       second_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_success(second_run)
-      self.assertNotIn(cls.CACHE_MESSAGE, second_run.stdout_data)
+      self.assertNotIn(self.CACHE_MESSAGE, second_run.stdout_data)
 
   def test_bad_caching(self):
     # Make sure targets aren't cached after a bad run.
@@ -137,7 +137,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(sandbox.clean_all())
       first_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_failure(first_run)
-      self.assertIn(cls.CACHE_MESSAGE, first_run.stdout_data)
+      self.assertIn(self.CACHE_MESSAGE, first_run.stdout_data)
       second_run = sandbox.jvm_platform_validate('one', 'two')
       self.assert_failure(second_run)
-      self.assertIn(cls.CACHE_MESSAGE, second_run.stdout_data)
+      self.assertIn(self.CACHE_MESSAGE, second_run.stdout_data)
