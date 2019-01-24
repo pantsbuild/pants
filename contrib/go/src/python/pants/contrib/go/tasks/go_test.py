@@ -51,7 +51,10 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
   class _GoTestTargetInfo(datatype([('import_path', text_type), ('gopath', text_type)])): pass
 
   def _generate_args_for_targets(self, targets):
-    """???"""
+    """
+    Generate a dict mapping target -> _GoTestTargetInfo so that the import path and gopath can be
+    reconstructed for spawning test commands regardless of how the targets are partitioned.
+    """
     return {
       t: self._GoTestTargetInfo(import_path=t.import_path, gopath=self.get_gopath(t))
       for t in targets
@@ -80,11 +83,11 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
   def _build_and_test_flags(self):
     return safe_shlex_split(self.get_options().build_and_test_flags)
 
-  def _spawn(self, workunit, go_cmd, chroot):
-    return SubprocessProcessHandler(go_cmd.spawn(
-      cwd=chroot,
-      stdout=workunit.output('stdout'),
-      stderr=workunit.output('stderr')))
+  def _spawn(self, workunit, go_cmd, cwd):
+    go_process = go_cmd.spawn(cwd=cwd,
+                              stdout=workunit.output('stdout'),
+                              stderr=workunit.output('stderr'))
+    return SubprocessProcessHandler(go_process)
 
   @property
   def _maybe_workdir(self):
@@ -106,5 +109,5 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
       with self.context.new_workunit(
           name='go test', cmd=safe_shlex_join(go_cmd.cmdline), labels=workunit_labels) as workunit:
 
-        exit_code = self._spawn_and_wait(workunit=workunit, go_cmd=go_cmd, chroot=chroot)
+        exit_code = self._spawn_and_wait(workunit=workunit, go_cmd=go_cmd, cwd=chroot)
         return TestResult.rc(exit_code)
