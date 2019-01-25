@@ -95,7 +95,8 @@ class DuplicateDetector(JvmBinaryTask):
     return self._check_conflicts(artifacts_by_file_name, binary_target)
 
   def _check_conflicts(self, artifacts_by_file_name, binary_target):
-    conflicts_by_artifacts = self._get_conflicts_by_artifacts(artifacts_by_file_name)
+    conflicts_by_artifacts = self._get_conflicts_by_artifacts(
+      artifacts_by_file_name, binary_target.payload.deploy_jar_rules)
     if len(conflicts_by_artifacts) > 0:
       self._log_conflicts(conflicts_by_artifacts, binary_target)
       if self.get_options().fail_fast:
@@ -136,12 +137,20 @@ class DuplicateDetector(JvmBinaryTask):
         return True
     return False
 
-  def _get_conflicts_by_artifacts(self, artifacts_by_file_name):
+  def _jar_rule_handled(self, path, jar_rules):
+    for rule in jar_rules.rules:
+      if rule.apply_pattern.match(path):
+        return True
+    return False
+
+  def _get_conflicts_by_artifacts(self, artifacts_by_file_name, jar_rules):
     conflicts_by_artifacts = defaultdict(set)
     for (file_name, artifacts) in artifacts_by_file_name.items():
       if (not artifacts) or len(artifacts) < 2:
         continue
       if self._is_excluded(file_name):
+        continue
+      if self._jar_rule_handled(file_name, jar_rules):
         continue
       conflicts_by_artifacts[tuple(sorted(str(a) for a in artifacts))].add(file_name)
     return conflicts_by_artifacts
