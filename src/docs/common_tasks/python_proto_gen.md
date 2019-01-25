@@ -1,4 +1,4 @@
-# Generate Python code from Protoc Definitions
+# Python gRPC + protobufs
 
 ## Problem
 I would like to have a task, to generate python code from protobufs and grpc services.
@@ -23,12 +23,11 @@ Then, you can relay on this target in your python code `BUILD` file `dependencie
 
 ```build
 python_binary(
-  name='server',
+  source='server.py',
   dependencies=[
 #    [...]
     'examples/src/protobuf/org/pantsbuild/example/grpcio/service'
   ],
-  source='server.py',
 )
 ```
 
