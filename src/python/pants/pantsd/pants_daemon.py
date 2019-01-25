@@ -11,7 +11,6 @@ import threading
 from builtins import object
 from contextlib import contextmanager
 
-from future.utils import PY3
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
