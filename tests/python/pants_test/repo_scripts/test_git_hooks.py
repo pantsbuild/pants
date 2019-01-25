@@ -52,9 +52,14 @@ class PreCommitHookTest(unittest.TestCase):
       stdout=subprocess.PIPE,
       stderr=subprocess.PIPE,
     )
-    (stdout_data, stderr_data) = proc.communicate(input=input)
+    (stdout_data, stderr_data) = proc.communicate(input=input.encode())
+    # Attempting to call '{}\n{}'.format(...) on bytes in python 3 gives you the string:
+    #   "b'<the first string>'\nb'<the second string>'"
+    # So we explicitly decode both stdout and stderr here.
+    stdout_data = stdout_data.decode('utf-8')
+    stderr_data = stderr_data.decode('utf-8')
     self.assertNotEqual(0, proc.returncode)
-    all_output = '{}\n{}'.format(stdout_data, stderr_data).decode('utf-8')
+    all_output = '{}\n{}'.format(stdout_data, stderr_data)
     self.assertIn(expected_excerpt, all_output)
 
   def test_check_packages(self):
