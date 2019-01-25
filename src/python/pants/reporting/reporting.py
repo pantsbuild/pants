@@ -19,6 +19,7 @@ from pants.reporting.quiet_reporter import QuietReporter
 from pants.reporting.report import Report
 from pants.reporting.reporter import ReporterDestination
 from pants.reporting.reporting_server import ReportingServerManager
+from pants.reporting.zipkin_reporter import ZipkinReporter
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_mkdir
 
@@ -46,6 +47,9 @@ class Reporting(Subsystem):
              help='Controls the printing of workunit tool output to the console. Workunit types are '
                   '{workunits}.  Possible formatting values are {formats}'.format(
                workunits=list(WorkUnitLabel.keys()), formats=list(ToolOutputFormat.keys())))
+    register('--zipkin-endpoint', advanced=True, default=None,
+              help='The full HTTP URL of a zipkin server to which traces should be posted.'
+                    'No traces will be made if this is not set.')
 
   def initialize(self, run_tracker, all_options, start_time=None):
     """Initialize with the given RunTracker.
@@ -81,6 +85,13 @@ class Reporting(Subsystem):
                                                    template_dir=self.get_options().template_dir)
     html_reporter = HtmlReporter(run_tracker, html_reporter_settings)
     report.add_reporter('html', html_reporter)
+
+    # Set up Zipkin reporting.
+    zipkin_endpoint = self.get_options().zipkin_endpoint
+    if zipkin_endpoint is not None:
+      zipkin_reporter_settings = ZipkinReporter.Settings(log_level=Report.INFO)
+      zipkin_reporter = ZipkinReporter(run_tracker, zipkin_reporter_settings, zipkin_endpoint)
+      report.add_reporter('zipkin', zipkin_reporter)
 
     # Add some useful RunInfo.
     run_tracker.run_info.add_info('default_report', html_reporter.report_path())

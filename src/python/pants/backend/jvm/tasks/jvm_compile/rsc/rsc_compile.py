@@ -10,7 +10,7 @@ import logging
 import os
 import re
 
-from future.utils import text_type
+from future.utils import PY3, text_type
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -330,7 +330,7 @@ class RscCompile(ZincCompile):
 
       metacp_inputs = tuple(jvm_lib_jars_abs)
 
-      counter_val = str(counter()).rjust(counter.format_length(), ' ')
+      counter_val = str(counter()).rjust(counter.format_length(), ' ' if PY3 else b' ')
       counter_str = '[{}/{}] '.format(counter_val, counter.size)
       self.context.log.info(
         counter_str,
@@ -409,7 +409,7 @@ class RscCompile(ZincCompile):
       tgt, = vts.targets
 
       if not hit_cache:
-        counter_val = str(counter()).rjust(counter.format_length(), ' ')
+        counter_val = str(counter()).rjust(counter.format_length(), ' ' if PY3 else b' ')
         counter_str = '[{}/{}] '.format(counter_val, counter.size)
         self.context.log.info(
           counter_str,
@@ -524,7 +524,7 @@ class RscCompile(ZincCompile):
       metacp_inputs = []
       metacp_inputs.extend(classpath_rel)
 
-      counter_val = str(counter()).rjust(counter.format_length(), ' ')
+      counter_val = str(counter()).rjust(counter.format_length(), ' ' if PY3 else b' ')
       counter_str = '[{}/{}] '.format(counter_val, counter.size)
       self.context.log.info(
         counter_str,
