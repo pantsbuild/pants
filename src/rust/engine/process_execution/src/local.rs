@@ -237,36 +237,33 @@ impl super::CommandRunner for CommandRunner {
       .store
       .materialize_directory(workdir_path.clone(), req.input_files)
       .and_then(move |()| {
-        let jdk_home_symlinked: Result<(), _> = maybe_jdk_home.map_or(Ok(()), |jdk_home| {
+        maybe_jdk_home.map_or(Ok(()), |jdk_home| {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))
             .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
-        });
+        })?;
         // The bazel remote execution API specifies that the parent directories for output files and
         // output directories should be created before execution completes: see
-        // https://github.com/pantsbuild/pants/issues/7084.
-        let parent_paths_created: Result<(), _> = output_file_paths2
+        //   https://github.com/pantsbuild/pants/issues/7084.
+        let parent_paths_to_create: HashSet<_> = output_file_paths2
           .iter()
           .chain(output_dir_paths2.iter())
-          // Path#parent() returns None if the parent is root on unix.
           .filter_map(|rel_path| rel_path.parent())
           .map(|parent_relpath| workdir_path3.join(parent_relpath))
-          // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably
-          // be even more efficient to only retain the directories at greatest nesting depth, as
-          // create_dir_all() will ensure all parents are created. At that point, we might consider
-          // explicitly enumerating all the directories to be created and just using create_dir(),
-          // unless there is some optimization in create_dir_all() that makes that less efficient.
-          .collect::<HashSet<_>>()
-          .iter()
-          .map(|parent_path| {
-            create_dir_all(parent_path.clone()).map_err(|err| {
-              format!(
-                "Error making parent directory {:?} for local execution: {:?}",
-                parent_path, err
-              )
-            })
-          })
           .collect();
-        future::result(jdk_home_symlinked.and(parent_paths_created))
+        // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably be
+        // even more efficient to only retain the directories at greatest nesting depth, as
+        // create_dir_all() will ensure all parents are created. At that point, we might consider
+        // explicitly enumerating all the directories to be created and just using create_dir(),
+        // unless there is some optimization in create_dir_all() that makes that less efficient.
+        for path in parent_paths_to_create {
+          create_dir_all(path.clone()).map_err(|err| {
+            format!(
+              "Error making parent directory {:?} for local execution: {:?}",
+              path, err
+            )
+          })?;
+        }
+        Ok(())
       })
       .and_then(move |()| {
         StreamedHermeticCommand::new(&argv[0])
