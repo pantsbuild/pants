@@ -9,4 +9,3 @@ tests/python/pants_test/engine/legacy:owners_integration
 tests/python/pants_test/engine:scheduler_integration
 tests/python/pants_test/pantsd:pantsd_integration
 tests/python/pants_test/projects:testprojects_integration
-tests/python/pants_test/rules:test_integration
