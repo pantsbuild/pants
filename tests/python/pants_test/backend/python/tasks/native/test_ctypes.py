@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import str
-from textwrap import dedent
 
 from twitter.common.collections import OrderedDict
 
@@ -15,6 +14,7 @@ from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
 from pants.backend.python.targets.python_distribution import PythonDistribution
+from pants.util.meta import classproperty
 from pants_test.backend.python.tasks.python_task_test_base import check_wheel_platform_matches_host
 from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
   BuildLocalPythonDistributionsTestBase
@@ -22,11 +22,13 @@ from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
 
 class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTestBase):
 
-  _extra_relevant_task_types = ([
-    CCompile,
-    CppCompile,
-    LinkSharedLibraries,
-  ] + BuildLocalPythonDistributionsTestBase._extra_relevant_task_types)
+  @classproperty
+  def _run_before_task_types(cls):
+    return [
+      CCompile,
+      CppCompile,
+      LinkSharedLibraries,
+    ] + super(TestBuildLocalDistsWithCtypesNativeSources, cls)._run_before_task_types
 
   _dist_specs = OrderedDict([
 
@@ -36,14 +38,14 @@ class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTe
       'ctypes_native_library': NativeArtifact(lib_name='c-math-lib'),
       'sources': ['c_math_lib.c', 'c_math_lib.h'],
       'filemap': {
-        'src/python/plat_specific_c_dist/c_math_lib.c': dedent("""
-        #include "c_math_lib.h"
-        int add_two(int x) { return x + 2; }
-"""),
-        'src/python/plat_specific_c_dist/c_math_lib.h': dedent("""
-        int add_two(int);
-"""),
-      }
+        'c_math_lib.c': """\
+#include "c_math_lib.h"
+int add_two(int x) { return x + 2; }
+        """,
+        'c_math_lib.h': """\
+int add_two(int);
+        """,
+      },
     }),
 
     ('src/python/plat_specific_c_dist:plat_specific_ctypes_c_dist', {
@@ -52,17 +54,17 @@ class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTe
       'sources': ['__init__.py', 'setup.py'],
       'dependencies': ['src/python/plat_specific_c_dist:ctypes_c_library'],
       'filemap': {
-        'src/python/plat_specific_c_dist/__init__.py': '',
-        'src/python/plat_specific_c_dist/setup.py': dedent("""
-        from setuptools import setup, find_packages
-        setup(
-          name='platform_specific_ctypes_c_dist',
-          version='0.0.0',
-          packages=find_packages(),
-          data_files=[('', ['libc-math-lib.so'])],
-        )
-      """),
-      }
+        '__init__.py': '',
+        'setup.py': """\
+from setuptools import setup, find_packages
+setup(
+  name='platform_specific_ctypes_c_dist',
+  version='0.0.0',
+  packages=find_packages(),
+  data_files=[('', ['libc-math-lib.so'])],
+)
+        """,
+      },
     }),
 
     ('src/python/plat_specific_cpp_dist:ctypes_cpp_library', {
@@ -71,13 +73,13 @@ class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTe
       'ctypes_native_library': NativeArtifact(lib_name='cpp-math-lib'),
       'sources': ['cpp_math_lib.cpp', 'cpp_math_lib.hpp'],
       'filemap': {
-        'src/python/plat_specific_cpp_dist/cpp_math_lib.cpp': dedent("""
+        'cpp_math_lib.cpp': """\
 #include "cpp_math_lib.hpp"
 int add_two(int x) { return (x++) + 1; }
-"""),
-        'src/python/plat_specific_cpp_dist/cpp_math_lib.hpp': dedent("""
+        """,
+        'cpp_math_lib.hpp': """\
 int add_two(int);
-"""),
+        """,
       },
     }),
 
@@ -87,17 +89,17 @@ int add_two(int);
       'sources': ['__init__.py', 'setup.py'],
       'dependencies': ['src/python/plat_specific_cpp_dist:ctypes_cpp_library'],
       'filemap': {
-        'src/python/plat_specific_cpp_dist/__init__.py': '',
-        'src/python/plat_specific_cpp_dist/setup.py': dedent("""
-        from setuptools import setup, find_packages
-        setup(
-          name='platform_specific_ctypes_cpp_dist',
-          version='0.0.0',
-          packages=find_packages(),
-          data_files=[('', ['libcpp-math-lib.so'])],
-        )
-      """),
-      }
+        '__init__.py': '',
+        'setup.py': """\
+from setuptools import setup, find_packages
+setup(
+  name='platform_specific_ctypes_cpp_dist',
+  version='0.0.0',
+  packages=find_packages(),
+  data_files=[('', ['libcpp-math-lib.so'])],
+)
+        """,
+      },
     }),
 
   ])

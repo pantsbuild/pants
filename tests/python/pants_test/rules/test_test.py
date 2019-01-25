@@ -38,7 +38,7 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
 
   def test_outputs_success(self):
     self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout=str('Here is some output from a test')),
+      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
       """Here is some output from a test
 
 some/target                                                                     .....   SUCCESS
@@ -48,7 +48,7 @@ some/target                                                                     
   def test_output_failure(self):
     with self.assertRaises(GracefulTerminationException) as cm:
       self.single_target_test(
-        TestResult(status=Status.FAILURE, stdout=str('Here is some output from a test')),
+        TestResult(status=Status.FAILURE, stdout='Here is some output from a test'),
         """Here is some output from a test
 
 some/target                                                                     .....   FAILURE
@@ -58,7 +58,7 @@ some/target                                                                     
 
   def test_output_no_trailing_newline(self):
     self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout=str('Here is some output from a test')),
+      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
       """Here is some output from a test
 
 some/target                                                                     .....   SUCCESS
@@ -67,7 +67,7 @@ some/target                                                                     
 
   def test_output_trailing_newline(self):
     self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout=str('Here is some output from a test\n')),
+      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test\n'),
       """Here is some output from a test
 
 some/target                                                                     .....   SUCCESS
@@ -81,9 +81,9 @@ some/target                                                                     
 
     def make_result(target):
       if target == target1:
-        return TestResult(status=Status.SUCCESS, stdout=str('I passed'))
+        return TestResult(status=Status.SUCCESS, stdout='I passed')
       elif target == target2:
-        return TestResult(status=Status.FAILURE, stdout=str('I failed'))
+        return TestResult(status=Status.FAILURE, stdout='I failed')
       else:
         raise Exception("Unrecognised target")
 
@@ -104,17 +104,17 @@ testprojects/tests/python/pants/fails                                           
     target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
 
     result = run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
-      (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout=str('foo')),
+      (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo'),
     })
 
-    self.assertEqual(result, TestResult(status=Status.FAILURE, stdout=str('foo')))
+    self.assertEqual(result, TestResult(status=Status.FAILURE, stdout='foo'))
 
   def test_coordinator_unknown_test(self):
     target_adaptor = PythonTestsAdaptor(type_alias='unknown_tests')
 
     with self.assertRaises(Exception) as cm:
       run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
-        (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout=str('foo')),
+        (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo'),
       })
 
     self.assertEqual(str(cm.exception), "Didn't know how to run tests for type unknown_tests")

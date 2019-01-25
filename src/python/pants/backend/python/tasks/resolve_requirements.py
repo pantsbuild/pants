@@ -14,6 +14,8 @@ class ResolveRequirements(ResolveRequirementsTaskBase):
   """Resolve external Python requirements."""
   REQUIREMENTS_PEX = 'python_requirements_pex'
 
+  options_scope = 'resolve-requirements'
+
   @classmethod
   def product_types(cls):
     return [cls.REQUIREMENTS_PEX]
