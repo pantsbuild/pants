@@ -9,6 +9,7 @@ from textwrap import dedent
 
 from pants.util.dirutil import safe_open
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class GoTestIntegrationTest(PantsRunIntegrationTest):
@@ -17,6 +18,19 @@ class GoTestIntegrationTest(PantsRunIntegrationTest):
             'contrib/go/examples/src/go/libA']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
+    # libA depends on libB, so both tests should be run.
+    assertRegex(self, pants_run.stdout_data, r'ok\s+libA')
+    assertRegex(self, pants_run.stdout_data, r'ok\s+libB')
+
+  def test_no_fast(self):
+    args = ['test.go',
+            '--no-fast',
+            'contrib/go/examples/src/go/libA']
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)
+    # libA depends on libB, so both tests should be run.
+    assertRegex(self, pants_run.stdout_data, r'ok\s+libA')
+    assertRegex(self, pants_run.stdout_data, r'ok\s+libB')
 
   def test_go_test_unstyle(self):
     with self.temporary_sourcedir() as srcdir:
