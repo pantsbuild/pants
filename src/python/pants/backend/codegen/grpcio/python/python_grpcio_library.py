@@ -12,3 +12,7 @@ class PythonGrpcioLibrary(PythonTarget):
 
   def __init__(self, sources=None, **kwargs):
     super(PythonGrpcioLibrary, self).__init__(sources=sources, **kwargs)
+
+  @classmethod
+  def alias(cls):
+    return 'python_grpcio_library'
