@@ -10,6 +10,7 @@ from collections import defaultdict
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.subsystems import pex_build_util
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -75,7 +76,7 @@ class PythonNativeCode(Subsystem):
           return True
     return False
 
-  def get_targets_by_declared_platform(self, targets):
+  def _get_targets_by_declared_platform_with_placeholders(self, targets_by_platform):
     """
     Aggregates a dict that maps a platform string to a list of targets that specify the platform.
     If no targets have platforms arguments, return a dict containing platforms inherited from
@@ -84,19 +85,12 @@ class PythonNativeCode(Subsystem):
     :param tgts: a list of :class:`Target` objects.
     :returns: a dict mapping a platform string to a list of targets that specify the platform.
     """
-    targets_by_platforms = defaultdict(list)
 
-    for tgt in targets:
-      for platform in tgt.platforms:
-        targets_by_platforms[platform].append(tgt)
-
-    if not targets_by_platforms:
+    if not targets_by_platform:
       for platform in self._python_setup.platforms:
-        targets_by_platforms[platform] = ['(No target) Platform inherited from either the '
+        targets_by_platform[platform] = ['(No target) Platform inherited from either the '
                                           '--platforms option or a pants.ini file.']
-    return targets_by_platforms
-
-  _PYTHON_PLATFORM_TARGETS_CONSTRAINT = SubclassesOf(PythonBinary, PythonDistribution)
+    return targets_by_platform
 
   def check_build_for_current_platform_only(self, targets):
     """
@@ -110,9 +104,8 @@ class PythonNativeCode(Subsystem):
     if not self._any_targets_have_native_sources(targets):
       return False
 
-    targets_with_platforms = [target for target in targets
-                              if self._PYTHON_PLATFORM_TARGETS_CONSTRAINT.satisfied_by(target)]
-    platforms_with_sources = self.get_targets_by_declared_platform(targets_with_platforms)
+    targets_by_platform = pex_build_util.targets_by_platform(targets, self._python_setup)
+    platforms_with_sources = self._get_targets_by_declared_platform_with_placeholders(targets_by_platform)
     platform_names = list(platforms_with_sources.keys())
 
     if len(platform_names) < 1:
