@@ -2,6 +2,32 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+function expected_python_version_to_run() {
+  if [[ "$PANTS_USE_PYTHON3" == 'true' ]]; then
+    echo '3'
+  else
+    echo '2'
+  fi
+}
+
+_PYTHON_VERSION_FILE="./.pants-python-version"
+
+if [[ -z "$_RECURSIVE_PANTS_SHELL_SCRIPT_INVOCATION" ]]; then
+  _EXPECTED_PYTHON_VERSION="$(expected_python_version_to_run)"
+  _PREV_RUN_PYTHON_VERSION="$(cat 2>/dev/null "$_PYTHON_VERSION_FILE")"
+
+  if [[ "$_EXPECTED_PYTHON_VERSION" != "$_PREV_RUN_PYTHON_VERSION" ]]; then
+    export _RECURSIVE_PANTS_SHELL_SCRIPT_INVOCATION='y'
+    cat >&2 <<EOF
+Caches must be cleared before switching pants python versions in this repo.
+Preparing a python ${_EXPECTED_PYTHON_VERSION} invocation...
+EOF
+    ./pants clean-all
+    echo "$_EXPECTED_PYTHON_VERSION" > "$_PYTHON_VERSION_FILE"
+    unset _RECURSIVE_PANTS_SHELL_SCRIPT_INVOCATION
+  fi
+fi
+
 # This bootstrap script runs pants from the live sources in this repo.
 #
 # Further support is added for projects wrapping pants with custom external extensions.  In the
