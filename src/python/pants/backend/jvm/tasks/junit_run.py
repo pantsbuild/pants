@@ -420,11 +420,11 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
       batch_test_specs = [test.render_test_spec() for test in batch]
       with argfile.safe_args(batch_test_specs, self.get_options()) as batch_tests:
-        with self._chroot(relevant_targets, workdir) as chroot:
+        with self.chroot(relevant_targets, workdir) as chroot:
           self.context.log.debug('CWD = {}'.format(chroot))
           self.context.log.debug('platform = {}'.format(platform))
           with environment_as(**dict(target_env_vars)):
-            subprocess_result = self._spawn_and_wait(
+            subprocess_result = self.spawn_and_wait(
               executor=SubprocessExecutor(distribution),
               distribution=distribution,
               classpath=complete_classpath,

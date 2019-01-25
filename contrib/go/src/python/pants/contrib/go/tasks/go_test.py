@@ -96,7 +96,7 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     return get_buildroot()
 
   def run_tests(self, fail_fast, test_targets, args_by_target):
-    with self._chroot(test_targets, self._maybe_workdir) as chroot:
+    with self.chroot(test_targets, self._maybe_workdir) as chroot:
       cmdline_args = self._build_and_test_flags + [
         args_by_target[t].import_path for t in test_targets
       ] + self.get_passthru_args()
@@ -109,5 +109,5 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
       with self.context.new_workunit(
           name='go test', cmd=safe_shlex_join(go_cmd.cmdline), labels=workunit_labels) as workunit:
 
-        exit_code = self._spawn_and_wait(workunit=workunit, go_cmd=go_cmd, cwd=chroot)
+        exit_code = self.spawn_and_wait(workunit=workunit, go_cmd=go_cmd, cwd=chroot)
         return TestResult.rc(exit_code)
