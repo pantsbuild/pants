@@ -38,7 +38,7 @@ def run_python_test(transitive_hydrated_target):
     (3, 7): ("pex37", Digest('51bf8e84d5290fe5ff43d45be78d58eaf88cf2a5e995101c8ff9e6a73a73343d', 1813189))
   }.get((interpreter_major, interpreter_minor), (None, None))
   if pex_name is None:
-    raise OSError("Current interpreter {}.{} is not supported, as there is no corresponding PEX to download.".format(interpreter_major, interpreter_minor))
+    raise ValueError("Current interpreter {}.{} is not supported, as there is no corresponding PEX to download.".format(interpreter_major, interpreter_minor))
 
   pex_snapshot = yield Get(Snapshot,
     UrlToFetch("https://github.com/pantsbuild/pex/releases/download/v1.6.1/{}".format(pex_name), digest))
