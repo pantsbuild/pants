@@ -4,9 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import c_greet
-import cpp_greet
+
+def hello_string():
+  return 'hello!'
+
 
 def hello():
-  print(c_greet.c_greet())
-  print(cpp_greet.cpp_greet())
+  print(hello_string())

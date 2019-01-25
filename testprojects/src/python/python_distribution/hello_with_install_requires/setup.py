@@ -4,9 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-# hello_package is a python module within the fasthello python_distribution
-from hello_package import hello
+from setuptools import setup, find_packages
 
-
-if __name__ == '__main__':
-  print(hello.hello())
+setup(
+  name='hello_with_install_requires',
+  version='1.0.0',
+  packages=find_packages(),
+  install_requires=['pycountry==17.1.2']
+)
