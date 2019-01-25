@@ -4,8 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import str
-
 from pants.backend.python.rules.python_test_runner import PyTestResult
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
@@ -27,15 +25,15 @@ def fast_test(console, addresses):
     # Assume \n-terminated
     console.write_stdout(test_result.stdout)
     if test_result.stdout and not test_result.stdout[-1] == '\n':
-      console.write_stdout(str('\n'))
+      console.write_stdout('\n')
     if test_result.status == Status.FAILURE:
       did_any_fail = True
 
   if wrote_any_stdout:
-    console.write_stdout(str('\n'))
+    console.write_stdout('\n')
 
   for address, test_result in zip(addresses, test_results):
-    console.print_stdout(str('{0:80}.....{1:>10}'.format(address.reference(), test_result.status)))
+    console.print_stdout('{0:80}.....{1:>10}'.format(address.reference(), test_result.status))
 
   if did_any_fail:
     raise GracefulTerminationException("Tests failed", exit_code=1)

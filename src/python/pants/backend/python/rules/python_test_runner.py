@@ -31,8 +31,17 @@ def run_python_test(transitive_hydrated_target):
   target_root = transitive_hydrated_target.root
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
-  pex_snapshot = yield Get(Snapshot, UrlToFetch("https://github.com/pantsbuild/pex/releases/download/v1.5.2/pex27",
-                                                Digest('8053a79a5e9c2e6e9ace3999666c9df910d6289555853210c1bbbfa799c3ecda', 1757011)))
+  interpreter_major, interpreter_minor = sys.version_info[0:2]
+  pex_name, digest = {
+    (2, 7): ("pex27", Digest('0ecbf48e3e240a413189194a9f829aec10446705c84db310affe36e23e741dbc', 1812737)),
+    (3, 6): ("pex36", Digest('ba865e7ce7a840070d58b7ba24e7a67aff058435cfa34202abdd878e7b5d351d', 1812158)),
+    (3, 7): ("pex37", Digest('51bf8e84d5290fe5ff43d45be78d58eaf88cf2a5e995101c8ff9e6a73a73343d', 1813189))
+  }.get((interpreter_major, interpreter_minor), (None, None))
+  if pex_name is None:
+    raise ValueError("Current interpreter {}.{} is not supported, as there is no corresponding PEX to download.".format(interpreter_major, interpreter_minor))
+
+  pex_snapshot = yield Get(Snapshot,
+    UrlToFetch("https://github.com/pantsbuild/pex/releases/download/v1.6.1/{}".format(pex_name), digest))
 
   all_targets = [target_root] + [dep.root for dep in transitive_hydrated_target.dependencies]
 
@@ -102,4 +111,4 @@ def run_python_test(transitive_hydrated_target):
   # TODO: Do something with stderr?
   status = Status.SUCCESS if result.exit_code == 0 else Status.FAILURE
 
-  yield PyTestResult(status=status, stdout=str(result.stdout))
+  yield PyTestResult(status=status, stdout=result.stdout.decode('utf-8'))
