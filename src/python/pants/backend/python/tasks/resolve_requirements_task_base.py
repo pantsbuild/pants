@@ -14,7 +14,7 @@ from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems import pex_build_util
-from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper, is_python_target
+from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary

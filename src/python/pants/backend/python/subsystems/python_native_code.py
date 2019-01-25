@@ -5,14 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import str
-from collections import defaultdict
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems import pex_build_util
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.binaries.executable_pex_tool import ExecutablePexTool
