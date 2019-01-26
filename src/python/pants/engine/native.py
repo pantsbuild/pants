@@ -17,6 +17,7 @@ from contextlib import closing
 import cffi
 import pkg_resources
 from future.utils import PY2, binary_type, text_type
+from twitter.common.collections.orderedset import OrderedSet
 
 from pants.engine.selectors import Get, constraint_for
 from pants.util.contextutil import temporary_dir
@@ -337,6 +338,12 @@ class _FFISpecification(object):
     return c.to_value(tuple(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len)))
 
   @_extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
+  def extern_store_set(self, context_handle, vals_ptr, vals_len):
+    """Given storage and an array of Handles, return a new Handle to represent the set."""
+    c = self._ffi.from_handle(context_handle)
+    return c.to_value(OrderedSet(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len)))
+
+  @_extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
   def extern_store_dict(self, context_handle, vals_ptr, vals_len):
     """Given storage and an array of Handles, return a new Handle to represent the dict.
 
@@ -622,6 +629,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_satisfied_by,
                            self.ffi_lib.extern_satisfied_by_type,
                            self.ffi_lib.extern_store_tuple,
+                           self.ffi_lib.extern_store_set,
                            self.ffi_lib.extern_store_dict,
                            self.ffi_lib.extern_store_bytes,
                            self.ffi_lib.extern_store_utf8,
