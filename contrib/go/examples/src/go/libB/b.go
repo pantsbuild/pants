@@ -4,8 +4,16 @@ import (
 	"libD"
 )
 
+func SpeakPrologue() string {
+	return "Hello from libB!"
+}
+
+func SpeakEpilogue() string {
+	return "Bye from libB!"
+}
+
 func Speak() {
-	println("Hello from libB!")
+	println(SpeakPrologue())
 	libD.Speak()
-	println("Bye from libB!")
+	println(SpeakEpilogue())
 }

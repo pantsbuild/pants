@@ -4,16 +4,22 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import os
 import re
+import shutil
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
 from builtins import filter, next, object, str
+from contextlib import contextmanager
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.process_handler import subprocess
 
@@ -241,16 +247,16 @@ class TestRunnerTaskMixin(object):
     return tests_in_path
 
   def _get_test_targets_for_spawn(self):
-    """Invoked by _spawn_and_wait to know targets being executed. Defaults to _get_test_targets().
+    """Invoked by spawn_and_wait to know targets being executed. Defaults to _get_test_targets().
 
-    _spawn_and_wait passes all its arguments through to _spawn, but it needs to know what targets
-    are being executed by _spawn. A caller to _spawn_and_wait can override this method to return
-    the targets being executed by the current _spawn_and_wait. By default it returns
+    spawn_and_wait passes all its arguments through to _spawn, but it needs to know what targets
+    are being executed by _spawn. A caller to spawn_and_wait can override this method to return
+    the targets being executed by the current spawn_and_wait. By default it returns
     _get_test_targets(), which is all test targets.
     """
     return self._get_test_targets()
 
-  def _spawn_and_wait(self, *args, **kwargs):
+  def spawn_and_wait(self, *args, **kwargs):
     """Spawn the actual test runner process, and wait for it to complete."""
 
     test_targets = self._get_test_targets_for_spawn()
@@ -432,6 +438,29 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
     :rtype: bool
     """
     return self.get_options().chroot
+
+  @staticmethod
+  def _copy_files(dest_dir, target):
+    if isinstance(target, Files):
+      for source in target.sources_relative_to_buildroot():
+        src = os.path.join(get_buildroot(), source)
+        dest = os.path.join(dest_dir, source)
+        safe_mkdir_for(dest)
+        shutil.copy(src, dest)
+
+  @contextmanager
+  def chroot(self, targets, workdir):
+    if workdir is not None:
+      yield workdir
+    else:
+      root_dir = os.path.join(self.workdir, '_chroots')
+      safe_mkdir(root_dir)
+      with temporary_dir(root_dir=root_dir) as chroot:
+        self.context.build_graph.walk_transitive_dependency_graph(
+          addresses=[t.address for t in targets],
+          work=functools.partial(self._copy_files, chroot)
+        )
+        yield chroot
 
   def _execute(self, all_targets):
     test_targets = self._get_test_targets()

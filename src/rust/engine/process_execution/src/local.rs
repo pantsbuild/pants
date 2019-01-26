@@ -5,8 +5,9 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, Snapshot, StrictGlobMatching};
 use futures::{future, Future, Stream};
 use log::info;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
+use std::fs::create_dir_all;
 use std::ops::Neg;
 use std::os::unix::{fs::symlink, process::ExitStatusExt};
 use std::path::{Path, PathBuf};
@@ -225,7 +226,9 @@ impl super::CommandRunner for CommandRunner {
 
     let env = req.env;
     let output_file_paths = req.output_files;
+    let output_file_paths2 = output_file_paths.clone();
     let output_dir_paths = req.output_directories;
+    let output_dir_paths2 = output_dir_paths.clone();
     let cleanup_local_dirs = self.cleanup_local_dirs;
     let argv = req.argv;
     let req_description = req.description;
@@ -234,12 +237,33 @@ impl super::CommandRunner for CommandRunner {
       .store
       .materialize_directory(workdir_path.clone(), req.input_files)
       .and_then(move |()| {
-        if let Some(jdk_home) = maybe_jdk_home {
-          symlink(jdk_home, workdir_path3.join(".jdk"))
+        maybe_jdk_home.map_or(Ok(()), |jdk_home| {
+          symlink(jdk_home, workdir_path3.clone().join(".jdk"))
             .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
-        } else {
-          Ok(())
+        })?;
+        // The bazel remote execution API specifies that the parent directories for output files and
+        // output directories should be created before execution completes: see
+        //   https://github.com/pantsbuild/pants/issues/7084.
+        let parent_paths_to_create: HashSet<_> = output_file_paths2
+          .iter()
+          .chain(output_dir_paths2.iter())
+          .filter_map(|rel_path| rel_path.parent())
+          .map(|parent_relpath| workdir_path3.join(parent_relpath))
+          .collect();
+        // TODO: we use a HashSet to deduplicate directory paths to create, but it would probably be
+        // even more efficient to only retain the directories at greatest nesting depth, as
+        // create_dir_all() will ensure all parents are created. At that point, we might consider
+        // explicitly enumerating all the directories to be created and just using create_dir(),
+        // unless there is some optimization in create_dir_all() that makes that less efficient.
+        for path in parent_paths_to_create {
+          create_dir_all(path.clone()).map_err(|err| {
+            format!(
+              "Error making parent directory {:?} for local execution: {:?}",
+              path, err
+            )
+          })?;
         }
+        Ok(())
       })
       .and_then(move |()| {
         StreamedHermeticCommand::new(&argv[0])
@@ -578,7 +602,7 @@ mod tests {
         find_bash(),
         "-c".to_owned(),
         format!(
-          "/bin/mkdir cats ; echo -n {} > cats/roland ; echo -n {} > treats",
+          "echo -n {} > cats/roland ; echo -n {} > treats",
           TestData::roland().string(),
           TestData::catnip().string()
         ),
@@ -676,10 +700,7 @@ mod tests {
       argv: vec![
         find_bash(),
         "-c".to_owned(),
-        format!(
-          "/bin/mkdir cats && echo -n {} > cats/roland",
-          TestData::roland().string()
-        ),
+        format!("echo -n {} > cats/roland", TestData::roland().string()),
       ],
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
@@ -794,6 +815,41 @@ mod tests {
     assert!(preserved_work_root.exists());
     // Collect all of the top level sub-dirs under our test workdir.
     assert_eq!(testutil::file::list_dir(&preserved_work_root).len(), 1);
+  }
+
+  #[test]
+  fn all_containing_directories_for_outputs_are_created() {
+    let result = run_command_locally(ExecuteProcessRequest {
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        format!(
+          // mkdir would normally fail, since birds/ doesn't yet exist, as would echo, since cats/
+          // does not exist, but we create the containing directories for all outputs before the
+          // process executes.
+          "/bin/mkdir birds/falcons && echo -n {} > cats/roland",
+          TestData::roland().string()
+        ),
+      ],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: vec![PathBuf::from("cats/roland")].into_iter().collect(),
+      output_directories: vec![PathBuf::from("birds/falcons")].into_iter().collect(),
+      timeout: Duration::from_millis(1000),
+      description: "create nonoverlapping directories and file".to_string(),
+      jdk_home: None,
+    });
+
+    assert_eq!(
+      result.unwrap(),
+      FallibleExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: TestDirectory::nested().digest(),
+        execution_attempts: vec![],
+      }
+    )
   }
 
   fn run_command_locally(
