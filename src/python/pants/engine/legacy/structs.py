@@ -8,6 +8,7 @@ import logging
 import os.path
 from abc import abstractproperty
 from builtins import object, str
+from collections import MutableSet, MutableSequence
 
 from six import string_types
 
@@ -311,7 +312,7 @@ class BaseGlobs(Locatable, AbstractClass):
       return sources
     elif isinstance(sources, string_types):
       return Files(sources, spec_path=spec_path)
-    elif isinstance(sources, (set, list, tuple)) and \
+    elif isinstance(sources, (MutableSet, MutableSequence, tuple)) and \
          all(isinstance(s, string_types) for s in sources):
       return Files(*sources, spec_path=spec_path)
     else:
