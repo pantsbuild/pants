@@ -972,7 +972,7 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -2n
 
-    - <<: *py2_linux_test_config
+    - <<: *py3_linux_test_config
       name: "Python contrib tests (Py3 PEX)"
       env:
         - *py3_linux_test_config_env
