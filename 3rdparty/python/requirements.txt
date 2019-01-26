@@ -27,6 +27,7 @@ pystache==0.5.3
 pytest-cov>=2.5,<2.6
 pytest>=3.4,<4.0
 pywatchman==1.4.1
+py_zipkin==0.17.0
 requests[security]>=2.20.1
 responses==0.10.4
 scandir==1.2
@@ -37,4 +38,3 @@ subprocess32==3.2.7 ; python_version<'3'
 thrift>=0.10.0
 wheel==0.31.1
 www-authenticate==0.9.2
-py_zipkin==0.16.1
