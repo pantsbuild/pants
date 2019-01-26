@@ -147,10 +147,10 @@ class GoCompile(GoWorkspaceTask):
     # Note that environment variables don't invalidate the build graph, so changes to GOOS or GOARCH
     # require a clean-all.
 
-    host_goos = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOHOSTOS"]).check_output().strip()
-    target_goos = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOOS"]).check_output().strip()
-    host_arch = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOARCH"]).check_output().strip()
-    target_arch = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOHOSTARCH"]).check_output().strip()
+    host_goos = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOHOSTOS"]).check_output().decode('utf-8').strip()
+    target_goos = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOOS"]).check_output().decode('utf-8').strip()
+    host_arch = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOARCH"]).check_output().decode('utf-8').strip()
+    target_arch = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOHOSTARCH"]).check_output().decode('utf-8').strip()
 
     host_pair = "{}_{}".format(host_goos, host_arch)
     target_pair = "{}_{}".format(target_goos, target_arch)
