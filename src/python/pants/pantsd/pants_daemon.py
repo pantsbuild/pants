@@ -41,10 +41,11 @@ from pants.util.strutil import ensure_text
 class _LoggerStream(object):
   """A sys.std{out,err} replacement that pipes output to a logger.
 
-  N.B. the Logger object expects unicode.
-  However, most of our outstream logic, such as in `Exiter.py`, will use `sys.std{out,err}.buffer`
-  and thus a bytes interface when running with Python 3. So, we must provide a `buffer` property,
-  and change the semantics of the buffer to always convert the message to unicode.
+  N.B. `logging.Logger` expects unicode. However, most of our outstream logic, such as in `Exiter.py`,
+  will use `sys.std{out,err}.buffer` and thus a bytes interface when running with Python 3. So, we must provide
+  a `buffer` property, and change the semantics of the buffer to always convert the message to unicode. This
+  is an unfortunate code smell, as `logging` does not expose a bytes interface so this is
+  the best solution we could think of.
   """
 
   def __init__(self, logger, log_level, handler):
