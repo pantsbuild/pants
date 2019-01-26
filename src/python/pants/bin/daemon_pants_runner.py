@@ -12,7 +12,7 @@ import time
 from builtins import open, zip
 from contextlib import contextmanager
 
-from future.utils import raise_with_traceback
+from future.utils import PY3, raise_with_traceback
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
@@ -284,7 +284,7 @@ class DaemonPantsRunner(ProcessManager):
     # TODO: test the above!
     ExceptionSink.reset_exiter(self._exiter)
 
-    ExceptionSink.reset_interactive_output_stream(sys.stderr)
+    ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
 
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
