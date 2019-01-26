@@ -124,21 +124,29 @@ impl Drop for TestServer {
       .operation_responses
       .lock()
       .len();
-    assert_eq!(
-      remaining_expected_responses,
-      0,
-      "Expected {} more requests. Remaining expected responses:\n{}\nReceived requests:\n{}",
-      remaining_expected_responses,
-      MockResponder::display_all(&Vec::from_iter(
-        self
-          .mock_responder
-          .mock_execution
-          .operation_responses
-          .lock()
-          .clone(),
-      )),
-      MockResponder::display_all(&self.mock_responder.received_messages.deref().lock())
-    )
+    if remaining_expected_responses != 0 {
+      let message = format!(
+        "Expected {} more requests. Remaining expected responses:\n{}\nReceived requests:\n{}",
+        remaining_expected_responses,
+        MockResponder::display_all(&Vec::from_iter(
+          self
+            .mock_responder
+            .mock_execution
+            .operation_responses
+            .lock()
+            .clone(),
+        )),
+        MockResponder::display_all(&self.mock_responder.received_messages.deref().lock())
+      );
+      if std::thread::panicking() {
+        eprintln!(
+          "TestServer missing requests, but not panicking because caller is already panicking: {}",
+          message
+        );
+      } else {
+        assert_eq!(remaining_expected_responses, 0, "{}", message,);
+      }
+    }
   }
 }
 
