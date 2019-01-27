@@ -21,6 +21,7 @@ use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
 
 use bytes::{Bytes, BytesMut};
 
+#[derive(Clone)]
 pub struct CommandRunner {
   store: fs::Store,
   fs_pool: Arc<fs::ResettablePool>,

@@ -109,10 +109,10 @@ pub struct FallibleExecuteProcessResult {
 }
 
 impl FallibleExecuteProcessResult {
-  pub fn without_execution_attempts(&self) -> CacheableExecuteProcessResult {
+  pub fn into_cacheable(self) -> CacheableExecuteProcessResult {
     CacheableExecuteProcessResult {
-      stdout: self.stdout.clone(),
-      stderr: self.stderr.clone(),
+      stdout: self.stdout,
+      stderr: self.stderr,
       exit_code: self.exit_code,
       output_directory: self.output_directory,
     }

@@ -48,7 +48,7 @@ use super::{CommandRunner, ExecuteProcessRequest, ExecutionStats, FallibleExecut
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an ExecuteProcessRequest, and may be populated only by the
 // CommandRunner.
-const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
+pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
 /// ???/DON'T LET THE `cache_key_gen_version` BECOME A KITCHEN SINK!!!
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -118,6 +118,61 @@ pub trait SerializableProcessExecutionCodec<
 #[derive(Clone)]
 pub struct BazelProtosProcessExecutionCodec {
   store: fs::Store,
+}
+
+impl
+  SerializableProcessExecutionCodec<
+    CacheableExecuteProcessRequest,
+    bazel_protos::remote_execution::Action,
+    CacheableExecuteProcessResult,
+    bazel_protos::remote_execution::ActionResult,
+    // TODO: better error type?
+    String,
+  > for BazelProtosProcessExecutionCodec
+{
+  fn convert_request(
+    &self,
+    req: CacheableExecuteProcessRequest,
+  ) -> Result<bazel_protos::remote_execution::Action, String> {
+    let (action, _) = Self::make_action_with_command(req)?;
+    Ok(action)
+  }
+
+  fn convert_response(
+    &self,
+    res: CacheableExecuteProcessResult,
+  ) -> Result<bazel_protos::remote_execution::ActionResult, String> {
+    let mut action_proto = bazel_protos::remote_execution::ActionResult::new();
+    let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
+    let output_directory_digest = Self::convert_digest(res.output_directory);
+    output_directory.set_tree_digest(output_directory_digest);
+    action_proto.set_output_directories(protobuf::RepeatedField::from_vec(vec![output_directory]));
+    action_proto.set_exit_code(res.exit_code);
+    action_proto.set_stdout_raw(res.stdout.clone());
+    action_proto.set_stdout_digest(Self::convert_digest(Self::digest_bytes(&res.stdout)));
+    action_proto.set_stderr_raw(res.stderr.clone());
+    action_proto.set_stderr_digest(Self::convert_digest(Self::digest_bytes(&res.stderr)));
+    Ok(action_proto)
+  }
+
+  fn extract_response(
+    &self,
+    res: bazel_protos::remote_execution::ActionResult,
+  ) -> BoxFuture<CacheableExecuteProcessResult, String> {
+    self
+      .extract_stdout(res.clone())
+      .join(self.extract_stderr(res.clone()))
+      .join(self.extract_output_files(res.clone()))
+      .map(
+        move |((stdout, stderr), output_directory)| CacheableExecuteProcessResult {
+          stdout,
+          stderr,
+          exit_code: res.exit_code,
+          output_directory,
+        },
+      )
+      .to_boxed()
+  }
 }
 
 impl BazelProtosProcessExecutionCodec {
@@ -413,61 +468,6 @@ impl BazelProtosProcessExecutionCodec {
   }
 }
 
-impl
-  SerializableProcessExecutionCodec<
-    CacheableExecuteProcessRequest,
-    bazel_protos::remote_execution::Action,
-    CacheableExecuteProcessResult,
-    bazel_protos::remote_execution::ActionResult,
-    // TODO: better error type?
-    String,
-  > for BazelProtosProcessExecutionCodec
-{
-  fn convert_request(
-    &self,
-    req: CacheableExecuteProcessRequest,
-  ) -> Result<bazel_protos::remote_execution::Action, String> {
-    let (action, _) = Self::make_action_with_command(req)?;
-    Ok(action)
-  }
-
-  fn convert_response(
-    &self,
-    res: CacheableExecuteProcessResult,
-  ) -> Result<bazel_protos::remote_execution::ActionResult, String> {
-    let mut action_proto = bazel_protos::remote_execution::ActionResult::new();
-    let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
-    let output_directory_digest = Self::convert_digest(res.output_directory);
-    output_directory.set_tree_digest(output_directory_digest);
-    action_proto.set_output_directories(protobuf::RepeatedField::from_vec(vec![output_directory]));
-    action_proto.set_exit_code(res.exit_code);
-    action_proto.set_stdout_raw(res.stdout.clone());
-    action_proto.set_stdout_digest(Self::convert_digest(Self::digest_bytes(&res.stdout)));
-    action_proto.set_stderr_raw(res.stderr.clone());
-    action_proto.set_stderr_digest(Self::convert_digest(Self::digest_bytes(&res.stderr)));
-    Ok(action_proto)
-  }
-
-  fn extract_response(
-    &self,
-    res: bazel_protos::remote_execution::ActionResult,
-  ) -> BoxFuture<CacheableExecuteProcessResult, String> {
-    self
-      .extract_stdout(res.clone())
-      .join(self.extract_stderr(res.clone()))
-      .join(self.extract_output_files(res.clone()))
-      .map(
-        move |((stdout, stderr), output_directory)| CacheableExecuteProcessResult {
-          stdout,
-          stderr,
-          exit_code: res.exit_code,
-          output_directory,
-        },
-      )
-      .to_boxed()
-  }
-}
-
 /// ???/it's called "immediate" because it's a best-effort thing located locally (???)
 pub trait ImmediateExecutionCache<ProcessRequest, ProcessResult>: Send + Sync {
   fn record_process_result(&self, req: ProcessRequest, res: ProcessResult)
@@ -516,7 +516,7 @@ impl ImmediateExecutionCache<CacheableExecuteProcessRequest, CacheableExecutePro
           .join(store.store_file_bytes(res.stderr, true))
           .and_then(move |(_, _)| {
             // NB: We wait until the stdout and stderr digests have been successfully recorded, so
-            // that we don't later attempt to read digests in the `action_result` that don't exist.
+            // that we don't later attempt to read digests in the `action_result` which don't exist.
             store.record_process_result(action_request, action_result)
           })
           .to_boxed()
@@ -604,7 +604,7 @@ impl CommandRunner for CachingCommandRunner {
           .run(req.clone())
           .and_then(move |res| {
             debug!("uncached execution for request {:?}: {:?}", req, res);
-            let cacheable_process_result = res.without_execution_attempts();
+            let cacheable_process_result = res.into_cacheable();
             cache
               .record_process_result(cacheable_request.clone(), cacheable_process_result.clone())
               .map(move |()| {
@@ -622,5 +622,194 @@ impl CommandRunner for CachingCommandRunner {
       // result.
       .map(|cacheable_process_result| cacheable_process_result.with_execution_attempts(vec![]))
       .to_boxed()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::{
+    ActionCache, CacheableExecuteProcessRequest, CacheableExecuteProcessResult,
+    CachingCommandRunner, CommandRunner, ExecuteProcessRequest, ImmediateExecutionCache,
+  };
+  use futures::future::Future;
+  use std::collections::{BTreeMap, BTreeSet};
+  use std::ops::Deref;
+  use std::path::Path;
+  use std::sync::Arc;
+  use std::time::Duration;
+  use tempfile::TempDir;
+  use testutil::owned_string_vec;
+
+  // // TODO: test codec back and forth
+  // #[test]
+  // fn bazel_proto_process_execution_codec() {
+  //   let req = ExecuteProcessRequest {
+  //     argv: owned_string_vec(&["ls", "-R", "/"]),
+  //     env: BTreeMap::new(),
+  //     input_files: fs::EMPTY_DIGEST,
+  //     output_files:
+  //   }
+  // }
+
+  #[test]
+  #[cfg(unix)]
+  fn cached_process_execution() {
+    let random_perl = output_only_process_request(owned_string_vec(&[
+      "/usr/bin/perl",
+      "-e",
+      "print(rand(10))",
+    ]));
+    let store_dir = TempDir::new().unwrap();
+    let work_dir = TempDir::new().unwrap();
+    let (_, base_runner, action_cache) = cache_in_dir(store_dir.path(), work_dir.path());
+    let cacheable_perl = CacheableExecuteProcessRequest {
+      req: random_perl.clone(),
+      cache_key_gen_version: None,
+    };
+    assert_eq!(
+      Ok(None),
+      action_cache
+        .load_process_result(cacheable_perl.clone())
+        .wait()
+    );
+    let caching_runner = make_caching_runner(base_runner.clone(), action_cache.clone(), None);
+    let process_result = caching_runner.run(random_perl.clone()).wait().unwrap();
+    assert_eq!(0, process_result.exit_code);
+    // A "cacheable" process execution result won't have e.g. the number of attempts that the
+    // process was tried, for idempotency, but everything else should be the same.
+    assert_eq!(
+      process_result.clone().into_cacheable(),
+      action_cache
+        .load_process_result(cacheable_perl)
+        .wait()
+        .unwrap()
+        .unwrap()
+    );
+    let perl_number = String::from_utf8(process_result.stdout.deref().to_vec())
+      .unwrap()
+      .parse::<f64>()
+      .unwrap();
+    // Try again and verify the result is cached (the random number is still the same).
+    let second_process_result = caching_runner.run(random_perl.clone()).wait().unwrap();
+    let second_perl_number = String::from_utf8(second_process_result.stdout.deref().to_vec())
+      .unwrap()
+      .parse::<f64>()
+      .unwrap();
+    assert_eq!(perl_number, second_perl_number);
+    // See that the result is invalidated if a `cache_key_gen_version` is provided.
+    let new_key = "xx".to_string();
+    let new_cacheable_perl = CacheableExecuteProcessRequest {
+      req: random_perl.clone(),
+      cache_key_gen_version: Some(new_key.clone()),
+    };
+    assert_eq!(
+      Ok(None),
+      action_cache
+        .load_process_result(new_cacheable_perl.clone())
+        .wait()
+    );
+    let new_caching_runner =
+      make_caching_runner(base_runner.clone(), action_cache.clone(), Some(new_key));
+    let new_process_result = new_caching_runner.run(random_perl.clone()).wait().unwrap();
+    assert_eq!(0, new_process_result.exit_code);
+    // The new `cache_key_gen_version` is propagated to the requests made against the
+    // CachingCommandRunner.
+    assert_eq!(
+      new_process_result.clone().into_cacheable(),
+      action_cache
+        .load_process_result(new_cacheable_perl)
+        .wait()
+        .unwrap()
+        .unwrap()
+    );
+    let new_perl_number = String::from_utf8(new_process_result.stdout.deref().to_vec())
+      .unwrap()
+      .parse::<f64>()
+      .unwrap();
+    // The output of the rand(10) call in the perl invocation is different, because the process
+    // execution wasn't cached.
+    assert!(new_perl_number != perl_number);
+    // Make sure that changing the cache key string from non-None to non-None also invalidates the
+    // process result.
+    let second_string_key = "yy".to_string();
+    let second_cache_string_perl = CacheableExecuteProcessRequest {
+      req: random_perl.clone(),
+      cache_key_gen_version: Some(second_string_key.clone()),
+    };
+    assert_eq!(
+      Ok(None),
+      action_cache
+        .load_process_result(second_cache_string_perl.clone())
+        .wait()
+    );
+    let second_string_caching_runner = make_caching_runner(
+      base_runner.clone(),
+      action_cache.clone(),
+      Some(second_string_key),
+    );
+    let second_string_process_result = second_string_caching_runner
+      .run(random_perl)
+      .wait()
+      .unwrap();
+    assert_eq!(0, second_string_process_result.exit_code);
+    assert_eq!(
+      second_string_process_result.clone().into_cacheable(),
+      action_cache
+        .load_process_result(second_cache_string_perl)
+        .wait()
+        .unwrap()
+        .unwrap()
+    );
+    let second_string_perl_number =
+      String::from_utf8(second_string_process_result.stdout.deref().to_vec())
+        .unwrap()
+        .parse::<f64>()
+        .unwrap();
+    // The new result is distinct from all the previously cached invocations.
+    assert!(second_string_perl_number != perl_number);
+    assert!(second_string_perl_number != new_perl_number);
+  }
+
+  fn output_only_process_request(argv: Vec<String>) -> ExecuteProcessRequest {
+    ExecuteProcessRequest {
+      argv,
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "write some output".to_string(),
+      jdk_home: None,
+    }
+  }
+
+  fn cache_in_dir(
+    store_dir: &Path,
+    work_dir: &Path,
+  ) -> (fs::Store, crate::local::CommandRunner, ActionCache) {
+    let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
+    let store = fs::Store::local_only(store_dir, pool.clone()).unwrap();
+    let action_cache = ActionCache::new(store.clone());
+    let base_runner =
+      crate::local::CommandRunner::new(store.clone(), pool, work_dir.to_path_buf(), true);
+    (store, base_runner, action_cache)
+  }
+
+  fn make_caching_runner(
+    base_runner: crate::local::CommandRunner,
+    action_cache: ActionCache,
+    cache_key_gen_version: Option<String>,
+  ) -> CachingCommandRunner {
+    CachingCommandRunner::new(
+      Box::new(base_runner) as Box<dyn CommandRunner>,
+      Box::new(action_cache)
+        as Box<
+          dyn ImmediateExecutionCache<
+            CacheableExecuteProcessRequest,
+            CacheableExecuteProcessResult,
+          >,
+        >,
+      cache_key_gen_version,
+    )
   }
 }

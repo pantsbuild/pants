@@ -882,9 +882,11 @@ mod tests {
 
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{
-    CommandRunner, ExecuteProcessRequest, ExecutionError, ExecutionHistory,
-    FallibleExecuteProcessResult,
+    BazelProcessExecutionRequestV2, BazelProtosProcessExecutionCodec,
+    BazelProtosProcessExecutionCodecV2, CacheableExecuteProcessRequest, CommandRunner,
+    ExecuteProcessRequest, ExecutionError, ExecutionHistory, FallibleExecuteProcessResult,
   };
+  use crate::cached_execution::SerializableProcessExecutionCodec;
   use mock::execution_server::MockOperation;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
@@ -906,7 +908,7 @@ mod tests {
   }
 
   #[test]
-  fn make_execute_request() {
+  fn test_make_execute_request() {
     let input_directory = TestDirectory::containing_roland();
     let req = ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "yo"]),
@@ -975,7 +977,7 @@ mod tests {
     };
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &None),
+      make_execute_request(&req, &None, &None),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1064,7 +1066,7 @@ mod tests {
     };
 
     assert_eq!(
-      super::make_execute_request(&req, &Some("dark-tower".to_owned()), &None),
+      make_execute_request(&req, &Some("dark-tower".to_owned()), &None),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1103,7 +1105,7 @@ mod tests {
     });
     want_command.mut_environment_variables().push({
       let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-      env.set_name(super::CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_owned());
+      env.set_name(crate::cached_execution::CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_owned());
       env.set_value("meep".to_owned());
       env
     });
@@ -1145,7 +1147,7 @@ mod tests {
     };
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &Some("meep".to_owned())),
+      make_execute_request(&req, &None, &Some("meep".to_owned())),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1202,7 +1204,7 @@ mod tests {
     };
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &None),
+      make_execute_request(&req, &None, &None),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1214,7 +1216,7 @@ mod tests {
     let mock_server = {
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         "wrong-command".to_string(),
-        super::make_execute_request(
+        make_execute_request(
           &ExecuteProcessRequest {
             argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
             env: BTreeMap::new(),
@@ -1250,7 +1252,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1347,7 +1349,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&echo_roland_request(), &None, &None)
+        make_execute_request(&echo_roland_request(), &None, &None)
           .unwrap()
           .2,
         vec![make_successful_operation(
@@ -1436,7 +1438,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         Vec::from_iter(
@@ -1487,7 +1489,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1512,7 +1514,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1551,7 +1553,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1585,7 +1587,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![MockOperation::new(
@@ -1619,7 +1621,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1654,7 +1656,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![MockOperation::new(
@@ -1682,7 +1684,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        make_execute_request(&execute_request, &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1711,7 +1713,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None)
+        make_execute_request(&cat_roland_request(), &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1804,7 +1806,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None)
+        make_execute_request(&cat_roland_request(), &None, &None)
           .unwrap()
           .2,
         vec![
@@ -1886,7 +1888,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None)
+        make_execute_request(&cat_roland_request(), &None, &None)
           .unwrap()
           .2,
         // We won't get as far as trying to run the operation, so don't expect any requests whose
@@ -2145,7 +2147,7 @@ mod tests {
     env2.set_value("b".to_string());
     command.mut_environment_variables().push(env2);
 
-    let digest = super::digest(&command).unwrap();
+    let digest = BazelProtosProcessExecutionCodec::digest_message(&command).unwrap();
 
     assert_eq!(
       &digest.0.to_hex(),
@@ -2163,7 +2165,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, &None, &None)
+          make_execute_request(&execute_request, &None, &None)
             .unwrap()
             .2,
           vec![
@@ -2201,7 +2203,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, &None, &None)
+          make_execute_request(&execute_request, &None, &None)
             .unwrap()
             .2,
           vec![
@@ -2508,14 +2510,18 @@ mod tests {
     result
   }
 
-  fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
+  fn create_command_runner_with_store(
+    address: String,
+    cas: &mock::StubCAS,
+    instance_name: Option<String>,
+  ) -> (fs::Store, CommandRunner) {
     let store_dir = TempDir::new().unwrap();
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
       Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
-      None,
+      instance_name,
       &None,
       None,
       1,
@@ -2527,8 +2533,15 @@ mod tests {
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, store, timer_thread)
-      .expect("Failed to make command runner")
+    let command_runner =
+      CommandRunner::new(&address, None, None, None, store.clone(), timer_thread)
+        .expect("Failed to make command runner");
+
+    (store, command_runner)
+  }
+
+  fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
+    create_command_runner_with_store(address, cas, None).1
   }
 
   fn timer_thread() -> resettable::Resettable<futures_timer::HelperThread> {
@@ -2561,11 +2574,15 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
 
+    let (store, _) = create_command_runner_with_store("127.0.0.1:0".to_owned(), &cas, None);
+    let codec = codec_from_store(store, None);
+
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    let command_runner = create_command_runner("127.0.0.1:0".to_owned(), &cas);
-    let result = runtime.block_on(command_runner.extract_output_files(result));
+    let result = runtime.block_on(codec.extract_response(result.clone()));
     runtime.shutdown_now().wait().unwrap();
     result
+      .map(|res| res.output_directory)
+      .map_err(|e| ExecutionError::Fatal(e))
   }
 
   fn make_any_prost_executeresponse(
@@ -2629,5 +2646,59 @@ mod tests {
       description: "unleash a roaring meow".to_string(),
       jdk_home: None,
     }
+  }
+
+  fn codec_from_store(
+    store: fs::Store,
+    instance_name: Option<String>,
+  ) -> BazelProtosProcessExecutionCodecV2 {
+    BazelProtosProcessExecutionCodecV2::new(store, instance_name)
+  }
+
+  fn codec(dir: PathBuf, instance_name: Option<String>) -> BazelProtosProcessExecutionCodecV2 {
+    let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
+    let store = fs::Store::local_only(dir, pool.clone()).unwrap();
+    codec_from_store(store, instance_name)
+  }
+
+  fn codec_convert_execute_request(
+    dir: PathBuf,
+    req: ExecuteProcessRequest,
+    instance_name: Option<String>,
+    cache_key_gen_version: Option<String>,
+  ) -> Result<BazelProcessExecutionRequestV2, String> {
+    let codec = codec(dir, instance_name);
+    codec.convert_request(CacheableExecuteProcessRequest::new(
+      req,
+      cache_key_gen_version,
+    ))
+  }
+
+  fn make_execute_request(
+    req: &ExecuteProcessRequest,
+    instance_name: &Option<String>,
+    cache_key_gen_version: &Option<String>,
+  ) -> Result<
+    (
+      bazel_protos::remote_execution::Action,
+      bazel_protos::remote_execution::Command,
+      bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest,
+    ),
+    String,
+  > {
+    let store_dir = TempDir::new().unwrap();
+    codec_convert_execute_request(
+      store_dir.path().to_path_buf(),
+      req.clone(),
+      instance_name.clone(),
+      cache_key_gen_version.clone(),
+    )
+    .map(
+      |BazelProcessExecutionRequestV2 {
+         action,
+         command,
+         execute_request,
+       }| { (action, command, execute_request) },
+    )
   }
 }

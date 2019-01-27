@@ -2572,14 +2572,12 @@ mod tests {
   use crate::pool::ResettablePool;
   use bazel_protos;
   use bytes::Bytes;
-  use digest::{Digest as DigestTrait, FixedOutput};
   use futures::Future;
   use futures_timer::TimerHandle;
   use hashing::{Digest, Fingerprint};
   use mock::StubCAS;
   use protobuf::Message;
   use serverset::BackoffConfig;
-  use sha2::Sha256;
   use std;
   use std::collections::HashMap;
   use std::fs::File;
