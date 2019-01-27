@@ -490,7 +490,22 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       lambda tgt: tgt.concurrency,
       lambda tgt: tgt.threads)
 
-    for properties, tests in sorted(tests_by_properties.items()):
+    # N.B. Python 3 does not allow comparisons between None and other types like str. Several
+    # of the properties, which act as dictionary keys, may have None values, whereras another
+    # may have a non-None value for the same property, so comparison when sorting would fail.
+    # We provide this custom key function to avoid such invalid comparisons, while still
+    # allowing us to use None to represent non-present properties.
+    def _sort_properties(properties_with_tests):
+      workdir, platform, extra_jvm_options, extra_env_vars, concurrency, threads = properties_with_tests[0]
+      return (
+        workdir or '',
+        platform,
+        extra_jvm_options or [],
+        extra_env_vars or {},
+        concurrency or "",
+        threads or 0)
+
+    for properties, tests in sorted(tests_by_properties.items(), key=_sort_properties):
       sorted_tests = sorted(tests)
       stride = min(self._batch_size, len(sorted_tests))
       for i in range(0, len(sorted_tests), stride):

@@ -73,7 +73,7 @@ class GoTask(Task):
                                     goarch=self._lookup_go_env_var('GOARCH'))
 
   def _lookup_go_env_var(self, var):
-    return self.go_dist.create_go_cmd('env', args=[var]).check_output().strip()
+    return self.go_dist.create_go_cmd('env', args=[var]).check_output().decode('utf-8').strip()
 
 
 class ImportOracle(object):

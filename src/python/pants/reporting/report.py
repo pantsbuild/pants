@@ -130,7 +130,12 @@ class Report(object):
     # than the current one, if work is happening in parallel.
     # Assumes self._lock is held by the caller.
     for workunit in self._workunits.values():
-      for label, output in workunit.outputs().items():
+      # N.B. Wrap .items() call with list() due to issues with workunit.outputs()
+      # changing its size during iteration, which causes an error in Python 3.
+      # We did not catch this issue in Python 2, because .items() returns a new list
+      # in Python 2. It is not clear why the dictionary size is changing, and this may
+      # be a potential source of issues.
+      for label, output in list(workunit.outputs().items()):
         s = output.read().decode('utf-8')
         if len(s) > 0:
           for reporter in self._reporters.values():
