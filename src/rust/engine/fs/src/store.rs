@@ -145,6 +145,7 @@ impl Store {
   ///
   /// Store a file locally.
   ///
+  // TODO: use an enum instead of a bool, and describe in that struct what `initial_lease` means!
   pub fn store_file_bytes(&self, bytes: Bytes, initial_lease: bool) -> BoxFuture<Digest, String> {
     self
       .local

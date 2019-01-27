@@ -30,9 +30,8 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use boxfuture::{BoxFuture, Boxable};
+use boxfuture::BoxFuture;
 use bytes::Bytes;
-use futures::future::{self, Future};
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::AddAssign;
 use std::path::PathBuf;
@@ -45,7 +44,8 @@ pub mod cached_execution;
 pub mod local;
 pub mod remote;
 pub use crate::cached_execution::{
-  ActionCache, BazelProtosProcessExecutionCodec, ImmediateExecutionCache,
+  ActionCache, BazelProtosProcessExecutionCodec, CacheableExecuteProcessRequest,
+  CacheableExecuteProcessResult, CachingCommandRunner, ImmediateExecutionCache,
   SerializableProcessExecutionCodec,
 };
 
@@ -92,23 +92,6 @@ pub struct ExecuteProcessRequest {
   pub jdk_home: Option<PathBuf>,
 }
 
-/// ???/DON'T LET THE `cache_key_gen_version` BECOME A KITCHEN SINK!!!
-#[derive(Clone)]
-pub struct CacheableExecuteProcessRequest {
-  req: ExecuteProcessRequest,
-  // TODO: give this a better type than Option<String> (everywhere)!
-  cache_key_gen_version: Option<String>,
-}
-
-impl CacheableExecuteProcessRequest {
-  fn new(req: ExecuteProcessRequest, cache_key_gen_version: Option<String>) -> Self {
-    CacheableExecuteProcessRequest {
-      req,
-      cache_key_gen_version,
-    }
-  }
-}
-
 ///
 /// The result of running a process.
 ///
@@ -126,35 +109,12 @@ pub struct FallibleExecuteProcessResult {
 }
 
 impl FallibleExecuteProcessResult {
-  fn without_execution_attempts(&self) -> CacheableExecuteProcessResult {
+  pub fn without_execution_attempts(&self) -> CacheableExecuteProcessResult {
     CacheableExecuteProcessResult {
       stdout: self.stdout.clone(),
       stderr: self.stderr.clone(),
       exit_code: self.exit_code,
       output_directory: self.output_directory,
-    }
-  }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CacheableExecuteProcessResult {
-  pub stdout: Bytes,
-  pub stderr: Bytes,
-  pub exit_code: i32,
-  pub output_directory: hashing::Digest,
-}
-
-impl CacheableExecuteProcessResult {
-  fn with_execution_attempts(
-    &self,
-    execution_attempts: Vec<ExecutionStats>,
-  ) -> FallibleExecuteProcessResult {
-    FallibleExecuteProcessResult {
-      stdout: self.stdout.clone(),
-      stderr: self.stderr.clone(),
-      exit_code: self.exit_code,
-      output_directory: self.output_directory,
-      execution_attempts,
     }
   }
 }
@@ -212,75 +172,5 @@ impl CommandRunner for BoundedCommandRunner {
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let inner = self.inner.clone();
     self.inner.1.with_acquired(move || inner.0.run(req))
-  }
-}
-
-///
-/// A CommandRunner wrapper that attempts to cache process executions.
-///
-#[derive(Clone)]
-pub struct CachingCommandRunner {
-  inner: Arc<Box<dyn CommandRunner>>,
-  cache: Arc<
-    Box<dyn ImmediateExecutionCache<CacheableExecuteProcessRequest, CacheableExecuteProcessResult>>,
-  >,
-  cache_key_gen_version: Option<String>,
-}
-
-impl CachingCommandRunner {
-  pub fn from_store(
-    inner: Box<dyn CommandRunner>,
-    store: fs::Store,
-    cache_key_gen_version: Option<String>,
-  ) -> Self {
-    let action_cache = ActionCache::new(store);
-    let boxed_cache = Box::new(action_cache)
-      as Box<
-        dyn ImmediateExecutionCache<CacheableExecuteProcessRequest, CacheableExecuteProcessResult>,
-      >;
-    Self::new(inner, boxed_cache, cache_key_gen_version)
-  }
-
-  pub fn new(
-    inner: Box<dyn CommandRunner>,
-    cache: Box<
-      dyn ImmediateExecutionCache<CacheableExecuteProcessRequest, CacheableExecuteProcessResult>,
-    >,
-    cache_key_gen_version: Option<String>,
-  ) -> Self {
-    CachingCommandRunner {
-      inner: Arc::new(inner),
-      cache: Arc::new(cache),
-      cache_key_gen_version,
-    }
-  }
-}
-
-impl CommandRunner for CachingCommandRunner {
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let cacheable_request =
-      CacheableExecuteProcessRequest::new(req.clone(), self.cache_key_gen_version.clone());
-    let cache = self.cache.clone();
-    let inner = self.inner.clone();
-    cache
-      .load_process_result(cacheable_request.clone())
-      .and_then(move |cache_fetch| match cache_fetch {
-        // We have a cache hit!
-        Some(cached_execution_result) => future::result(Ok(cached_execution_result)).to_boxed(),
-        // We have to actually run the process now.
-        None => inner
-          .run(req)
-          .and_then(move |res| {
-            let cacheable_process_result = res.without_execution_attempts();
-            cache
-              .record_process_result(cacheable_request, cacheable_process_result.clone())
-              .map(|()| cacheable_process_result)
-          })
-          .to_boxed(),
-      })
-      // NB: We clear metadata about execution attempts when returning a cacheable process execution
-      // request.
-      .map(|cacheable_process_result| cacheable_process_result.with_execution_attempts(vec![]))
-      .to_boxed()
   }
 }

@@ -171,6 +171,73 @@ impl BazelProtosProcessExecutionCodecV2 {
     resulting_output_dir
   }
 
+  fn convert_timestamp(timestamp: prost_types::Timestamp) -> protobuf::well_known_types::Timestamp {
+    let mut resulting_timestamp = protobuf::well_known_types::Timestamp::new();
+    resulting_timestamp.set_seconds(timestamp.seconds);
+    resulting_timestamp.set_nanos(timestamp.nanos);
+    resulting_timestamp
+  }
+
+  fn convert_execution_metadata(
+    exec_metadata: bazel_protos::build::bazel::remote::execution::v2::ExecutedActionMetadata,
+  ) -> bazel_protos::remote_execution::ExecutedActionMetadata {
+    let mut resulting_exec_metadata = bazel_protos::remote_execution::ExecutedActionMetadata::new();
+    resulting_exec_metadata.set_worker(exec_metadata.worker);
+    if let Some(queued_timestamp) = exec_metadata.queued_timestamp.map(Self::convert_timestamp) {
+      resulting_exec_metadata.set_queued_timestamp(queued_timestamp);
+    }
+    if let Some(worker_start_timestamp) = exec_metadata
+      .worker_start_timestamp
+      .map(Self::convert_timestamp)
+    {
+      resulting_exec_metadata.set_worker_start_timestamp(worker_start_timestamp);
+    }
+    if let Some(worker_completed_timestamp) = exec_metadata
+      .worker_completed_timestamp
+      .map(Self::convert_timestamp)
+    {
+      resulting_exec_metadata.set_worker_completed_timestamp(worker_completed_timestamp);
+    }
+    if let Some(input_fetch_start_timestamp) = exec_metadata
+      .input_fetch_start_timestamp
+      .map(Self::convert_timestamp)
+    {
+      resulting_exec_metadata.set_input_fetch_start_timestamp(input_fetch_start_timestamp);
+    }
+    if let Some(input_fetch_completed_timestamp) = exec_metadata
+      .input_fetch_completed_timestamp
+      .map(Self::convert_timestamp)
+    {
+      resulting_exec_metadata.set_input_fetch_completed_timestamp(input_fetch_completed_timestamp);
+    }
+    if let Some(execution_start_timestamp) = exec_metadata
+      .execution_start_timestamp
+      .map(Self::convert_timestamp)
+    {
+      resulting_exec_metadata.set_execution_start_timestamp(execution_start_timestamp);
+    }
+    if let Some(execution_completed_timestamp) = exec_metadata
+      .execution_completed_timestamp
+      .map(Self::convert_timestamp)
+    {
+      resulting_exec_metadata.set_execution_completed_timestamp(execution_completed_timestamp);
+    }
+    if let Some(output_upload_start_timestamp) = exec_metadata
+      .output_upload_start_timestamp
+      .map(Self::convert_timestamp)
+    {
+      resulting_exec_metadata.set_output_upload_start_timestamp(output_upload_start_timestamp);
+    }
+    if let Some(output_upload_completed_timestamp) = exec_metadata
+      .output_upload_completed_timestamp
+      .map(Self::convert_timestamp)
+    {
+      resulting_exec_metadata
+        .set_output_upload_completed_timestamp(output_upload_completed_timestamp);
+    }
+    resulting_exec_metadata
+  }
+
   fn convert_action_result(
     action_result: bazel_protos::build::bazel::remote::execution::v2::ActionResult,
   ) -> bazel_protos::remote_execution::ActionResult {
@@ -181,7 +248,7 @@ impl BazelProtosProcessExecutionCodecV2 {
         .iter()
         .cloned()
         .map(Self::convert_output_file)
-        .collect::<Vec<_>>(),
+        .collect(),
     ));
     resulting_action_result.set_output_directories(protobuf::RepeatedField::from_vec(
       action_result
@@ -200,7 +267,12 @@ impl BazelProtosProcessExecutionCodecV2 {
     if let Some(digest) = action_result.stderr_digest.map(Self::convert_digest) {
       resulting_action_result.set_stderr_digest(digest);
     }
-    // TODO: resulting_action_result.set_execution_metadata();
+    if let Some(execution_metadata) = action_result
+      .execution_metadata
+      .map(Self::convert_execution_metadata)
+    {
+      resulting_action_result.set_execution_metadata(execution_metadata);
+    }
     resulting_action_result
   }
 }
