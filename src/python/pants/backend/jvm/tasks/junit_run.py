@@ -496,15 +496,14 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     # We provide this custom key function to avoid such invalid comparisons, while still allowing us
     # to use None to represent non-present properties.
     def _sort_properties(properties_with_tests):
-      properties = properties_with_tests[0]
+      workdir, platform, extra_jvm_options, extra_env_vars, concurrency, threads = properties_with_tests[0]
       return (
-        properties[0] or '',  # cwd
-        properties[1],  # platform
-        properties[2] or [],  # extra_jvm_options
-        properties[3] or {},  # extra_env_vars
-        properties[4] or "",  # concurrency
-        properties[5] or 0  # threads
-      )
+        workdir or '',
+        platform,
+        extra_jvm_options or [],
+        extra_env_vars or {},
+        concurrency or "",
+        threads or 0)
 
     for properties, tests in sorted(tests_by_properties.items(), key=_sort_properties):
       sorted_tests = sorted(tests)
