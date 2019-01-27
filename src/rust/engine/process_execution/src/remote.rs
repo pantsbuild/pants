@@ -1,12 +1,9 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
-use digest::{Digest as DigestTrait, FixedOutput};
-use fs::{self, File, PathStat, Store};
+use fs::{self, Store};
 use futures::{future, Future, Stream};
 use futures_timer::Delay;
 use hashing::{Digest, Fingerprint};
@@ -14,10 +11,13 @@ use log::{debug, trace, warn};
 use parking_lot::Mutex;
 use prost::Message;
 use protobuf::{self, Message as GrpcioMessage, ProtobufEnum};
-use sha2::Sha256;
 use time;
 
-use super::{ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult};
+use super::{
+  BazelProtosProcessExecutionCodec, CacheableExecuteProcessRequest, CacheableExecuteProcessResult,
+  ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult,
+  SerializableProcessExecutionCodec,
+};
 use std;
 use std::cmp::min;
 
@@ -28,11 +28,6 @@ use tokio::net::tcp::{ConnectFuture, TcpStream};
 use tower_grpc::Request;
 use tower_h2::client;
 use tower_util::MakeService;
-
-// Environment variable which is exclusively used for cache key invalidation.
-// This may be not specified in an ExecuteProcessRequest, and may be populated only by the
-// CommandRunner.
-const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
 #[derive(Debug)]
 enum OperationOrStatus {
@@ -59,6 +54,7 @@ pub struct CommandRunner {
   clients: futures::future::Shared<BoxFuture<Clients, String>>,
   store: Store,
   futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
+  process_execution_codec: BazelProtosProcessExecutionCodecV2,
 }
 
 #[derive(Debug, PartialEq)]
@@ -121,6 +117,138 @@ impl CommandRunner {
   }
 }
 
+#[derive(Clone)]
+pub struct BazelProcessExecutionRequestV2 {
+  action: bazel_protos::remote_execution::Action,
+  command: bazel_protos::remote_execution::Command,
+  execute_request: bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest,
+}
+
+#[derive(Clone)]
+pub struct BazelProtosProcessExecutionCodecV2 {
+  inner: BazelProtosProcessExecutionCodec,
+  instance_name: Option<String>,
+}
+
+impl BazelProtosProcessExecutionCodecV2 {
+  fn new(store: fs::Store, instance_name: Option<String>) -> Self {
+    let inner = BazelProtosProcessExecutionCodec::new(store);
+    BazelProtosProcessExecutionCodecV2 {
+      inner,
+      instance_name,
+    }
+  }
+
+  fn convert_digest(
+    digest: bazel_protos::build::bazel::remote::execution::v2::Digest,
+  ) -> bazel_protos::remote_execution::Digest {
+    let mut resulting_digest = bazel_protos::remote_execution::Digest::new();
+    resulting_digest.set_hash(digest.hash);
+    resulting_digest.set_size_bytes(digest.size_bytes);
+    resulting_digest
+  }
+
+  fn convert_output_file(
+    output_file: bazel_protos::build::bazel::remote::execution::v2::OutputFile,
+  ) -> bazel_protos::remote_execution::OutputFile {
+    let mut resulting_output_file = bazel_protos::remote_execution::OutputFile::new();
+    resulting_output_file.set_path(output_file.path);
+    if let Some(digest) = output_file.digest.map(Self::convert_digest) {
+      resulting_output_file.set_digest(digest);
+    }
+    resulting_output_file.set_is_executable(output_file.is_executable);
+    resulting_output_file
+  }
+
+  fn convert_output_directory(
+    output_dir: bazel_protos::build::bazel::remote::execution::v2::OutputDirectory,
+  ) -> bazel_protos::remote_execution::OutputDirectory {
+    let mut resulting_output_dir = bazel_protos::remote_execution::OutputDirectory::new();
+    resulting_output_dir.set_path(output_dir.path);
+    if let Some(digest) = output_dir.tree_digest.map(Self::convert_digest) {
+      resulting_output_dir.set_tree_digest(digest);
+    }
+    resulting_output_dir
+  }
+
+  fn convert_action_result(
+    action_result: bazel_protos::build::bazel::remote::execution::v2::ActionResult,
+  ) -> bazel_protos::remote_execution::ActionResult {
+    let mut resulting_action_result = bazel_protos::remote_execution::ActionResult::new();
+    resulting_action_result.set_output_files(protobuf::RepeatedField::from_vec(
+      action_result
+        .output_files
+        .iter()
+        .cloned()
+        .map(Self::convert_output_file)
+        .collect::<Vec<_>>(),
+    ));
+    resulting_action_result.set_output_directories(protobuf::RepeatedField::from_vec(
+      action_result
+        .output_directories
+        .iter()
+        .cloned()
+        .map(Self::convert_output_directory)
+        .collect(),
+    ));
+    resulting_action_result.set_exit_code(action_result.exit_code);
+    resulting_action_result.set_stdout_raw(Bytes::from(action_result.stdout_raw));
+    if let Some(digest) = action_result.stdout_digest.map(Self::convert_digest) {
+      resulting_action_result.set_stdout_digest(digest);
+    }
+    resulting_action_result.set_stderr_raw(Bytes::from(action_result.stderr_raw));
+    if let Some(digest) = action_result.stderr_digest.map(Self::convert_digest) {
+      resulting_action_result.set_stderr_digest(digest);
+    }
+    // TODO: resulting_action_result.set_execution_metadata();
+    resulting_action_result
+  }
+}
+
+impl
+  SerializableProcessExecutionCodec<
+    CacheableExecuteProcessRequest,
+    BazelProcessExecutionRequestV2,
+    CacheableExecuteProcessResult,
+    bazel_protos::build::bazel::remote::execution::v2::ActionResult,
+    String,
+  > for BazelProtosProcessExecutionCodecV2
+{
+  fn convert_request(
+    &self,
+    req: CacheableExecuteProcessRequest,
+  ) -> Result<BazelProcessExecutionRequestV2, String> {
+    let (action, command) = BazelProtosProcessExecutionCodec::make_action_with_command(req)?;
+    let execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
+      action_digest: Some((&BazelProtosProcessExecutionCodec::digest_message(&action)?).into()),
+      skip_cache_lookup: false,
+      instance_name: self.instance_name.clone().unwrap_or_default(),
+      execution_policy: None,
+      results_cache_policy: None,
+    };
+    Ok(BazelProcessExecutionRequestV2 {
+      action,
+      command,
+      execute_request,
+    })
+  }
+
+  fn convert_response(
+    &self,
+    _res: CacheableExecuteProcessResult,
+  ) -> Result<bazel_protos::build::bazel::remote::execution::v2::ActionResult, String> {
+    panic!("converting from a cacheable process request to a v2 ActionResult is not yet supported");
+  }
+
+  fn extract_response(
+    &self,
+    serializable_response: bazel_protos::build::bazel::remote::execution::v2::ActionResult,
+  ) -> BoxFuture<CacheableExecuteProcessResult, String> {
+    let action_result_v1 = Self::convert_action_result(serializable_response);
+    self.inner.extract_response(action_result_v1)
+  }
+}
+
 impl super::CommandRunner for CommandRunner {
   ///
   /// Runs a command via a gRPC service implementing the Bazel Remote Execution API
@@ -145,8 +273,11 @@ impl super::CommandRunner for CommandRunner {
     let clients = self.clients.clone();
 
     let store = self.store.clone();
-    let execute_request_result =
-      make_execute_request(&req, &self.instance_name, &self.cache_key_gen_version);
+    let cacheable_execute_process_request =
+      CacheableExecuteProcessRequest::new(req.clone(), self.cache_key_gen_version.clone());
+    let execute_request_result = self
+      .process_execution_codec
+      .convert_request(cacheable_execute_process_request);
 
     let ExecuteProcessRequest {
       description,
@@ -158,7 +289,11 @@ impl super::CommandRunner for CommandRunner {
     let description2 = description.clone();
 
     match execute_request_result {
-      Ok((action, command, execute_request)) => {
+      Ok(BazelProcessExecutionRequestV2 {
+        action,
+        command,
+        execute_request,
+      }) => {
         let command_runner = self.clone();
         let command_runner2 = self.clone();
         let execute_request2 = execute_request.clone();
@@ -385,11 +520,13 @@ impl CommandRunner {
       .shared();
     Ok(CommandRunner {
       cache_key_gen_version,
-      instance_name,
+      // TODO: this may be able to be removed!
+      instance_name: instance_name.clone(),
       authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
       clients,
-      store,
+      store: store.clone(),
       futures_timer_thread,
+      process_execution_codec: BazelProtosProcessExecutionCodecV2::new(store, instance_name),
     })
   }
 
@@ -497,17 +634,14 @@ impl CommandRunner {
         if status.code == bazel_protos::google::rpc::Code::Ok.into() {
           if let Some(result) = maybe_result {
             return self
-              .extract_stdout(&result)
-              .join(self.extract_stderr(&result))
-              .join(self.extract_output_files(&result))
-              .and_then(move |((stdout, stderr), output_directory)| {
-                Ok(FallibleExecuteProcessResult {
-                  stdout: stdout,
-                  stderr: stderr,
-                  exit_code: result.exit_code,
-                  output_directory: output_directory,
-                  execution_attempts: execution_attempts,
-                })
+              .process_execution_codec
+              .extract_response(result.clone())
+              .map(|cacheable_result| cacheable_result.with_execution_attempts(execution_attempts))
+              .map_err(move |err| {
+                ExecutionError::Fatal(format!(
+                  "error deocding process result {:?}: {:?}",
+                  result, err
+                ))
               })
               .to_boxed();
           } else {
@@ -602,281 +736,6 @@ impl CommandRunner {
     }
     .to_boxed()
   }
-
-  fn extract_stdout(
-    &self,
-    result: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
-  ) -> BoxFuture<Bytes, ExecutionError> {
-    if let Some(ref stdout_digest) = result.stdout_digest {
-      let stdout_digest_result: Result<Digest, String> = stdout_digest.into();
-      let stdout_digest = try_future!(stdout_digest_result
-        .map_err(|err| ExecutionError::Fatal(format!("Error extracting stdout: {}", err))));
-      self
-        .store
-        .load_file_bytes_with(stdout_digest, |v| v)
-        .map_err(move |error| {
-          ExecutionError::Fatal(format!(
-            "Error fetching stdout digest ({:?}): {:?}",
-            stdout_digest, error
-          ))
-        })
-        .and_then(move |maybe_value| {
-          maybe_value.ok_or_else(|| {
-            ExecutionError::Fatal(format!(
-              "Couldn't find stdout digest ({:?}), when fetching.",
-              stdout_digest
-            ))
-          })
-        })
-        .to_boxed()
-    } else {
-      let stdout_raw = Bytes::from(result.stdout_raw.as_slice());
-      let stdout_copy = stdout_raw.clone();
-      self
-        .store
-        .store_file_bytes(stdout_raw, true)
-        .map_err(move |error| {
-          ExecutionError::Fatal(format!("Error storing raw stdout: {:?}", error))
-        })
-        .map(|_| stdout_copy)
-        .to_boxed()
-    }
-  }
-
-  fn extract_stderr(
-    &self,
-    result: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
-  ) -> BoxFuture<Bytes, ExecutionError> {
-    if let Some(ref stderr_digest) = result.stderr_digest {
-      let stderr_digest_result: Result<Digest, String> = stderr_digest.into();
-      let stderr_digest = try_future!(stderr_digest_result
-        .map_err(|err| ExecutionError::Fatal(format!("Error extracting stderr: {}", err))));
-      self
-        .store
-        .load_file_bytes_with(stderr_digest, |v| v)
-        .map_err(move |error| {
-          ExecutionError::Fatal(format!(
-            "Error fetching stderr digest ({:?}): {:?}",
-            stderr_digest, error
-          ))
-        })
-        .and_then(move |maybe_value| {
-          maybe_value.ok_or_else(|| {
-            ExecutionError::Fatal(format!(
-              "Couldn't find stderr digest ({:?}), when fetching.",
-              stderr_digest
-            ))
-          })
-        })
-        .to_boxed()
-    } else {
-      let stderr_raw = Bytes::from(result.stderr_raw.as_slice());
-      let stderr_copy = stderr_raw.clone();
-      self
-        .store
-        .store_file_bytes(stderr_raw, true)
-        .map_err(move |error| {
-          ExecutionError::Fatal(format!("Error storing raw stderr: {:?}", error))
-        })
-        .map(|_| stderr_copy)
-        .to_boxed()
-    }
-  }
-
-  fn extract_output_files(
-    &self,
-    result: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
-  ) -> BoxFuture<Digest, ExecutionError> {
-    // Get Digests of output Directories.
-    // Then we'll make a Directory for the output files, and merge them.
-    let output_directories = result.output_directories.clone();
-    let mut directory_digests = Vec::with_capacity(output_directories.len() + 1);
-    for dir in output_directories {
-      let digest_result: Result<Digest, String> = (&dir.tree_digest.unwrap()).into();
-      let mut digest = future::done(digest_result).to_boxed();
-      for component in dir.path.rsplit('/') {
-        let component = component.to_owned();
-        let store = self.store.clone();
-        digest = digest
-          .and_then(move |digest| {
-            let mut directory = bazel_protos::remote_execution::Directory::new();
-            directory.mut_directories().push({
-              let mut node = bazel_protos::remote_execution::DirectoryNode::new();
-              node.set_name(component);
-              node.set_digest((&digest).into());
-              node
-            });
-            store.record_directory(&directory, true)
-          })
-          .to_boxed();
-      }
-      directory_digests.push(digest.map_err(|err| {
-        ExecutionError::Fatal(format!("Error saving remote output directory: {}", err))
-      }));
-    }
-
-    // Make a directory for the files
-    let mut path_map = HashMap::new();
-    let output_files = result.output_files.clone();
-    let path_stats_result: Result<Vec<PathStat>, String> = output_files
-      .into_iter()
-      .map(|output_file| {
-        let output_file_path_buf = PathBuf::from(output_file.path);
-        let digest = output_file
-          .digest
-          .ok_or_else(|| "No digest on remote execution output file".to_string())?;
-        let digest: Result<Digest, String> = (&digest).into();
-        path_map.insert(output_file_path_buf.clone(), digest?);
-        Ok(PathStat::file(
-          output_file_path_buf.clone(),
-          File {
-            path: output_file_path_buf,
-            is_executable: output_file.is_executable,
-          },
-        ))
-      })
-      .collect();
-
-    let path_stats = try_future!(path_stats_result.map_err(ExecutionError::Fatal));
-
-    #[derive(Clone)]
-    struct StoreOneOffRemoteDigest {
-      map_of_paths_to_digests: HashMap<PathBuf, Digest>,
-    }
-
-    impl StoreOneOffRemoteDigest {
-      fn new(map: HashMap<PathBuf, Digest>) -> StoreOneOffRemoteDigest {
-        StoreOneOffRemoteDigest {
-          map_of_paths_to_digests: map,
-        }
-      }
-    }
-
-    impl fs::StoreFileByDigest<String> for StoreOneOffRemoteDigest {
-      fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
-        match self.map_of_paths_to_digests.get(&file.path) {
-          Some(digest) => future::ok(*digest),
-          None => future::err(format!(
-            "Didn't know digest for path in remote execution response: {:?}",
-            file.path
-          )),
-        }
-        .to_boxed()
-      }
-    }
-
-    let store = self.store.clone();
-    fs::Snapshot::digest_from_path_stats(
-      self.store.clone(),
-      &StoreOneOffRemoteDigest::new(path_map),
-      &path_stats,
-    )
-    .map_err(move |error| {
-      ExecutionError::Fatal(format!(
-        "Error when storing the output file directory info in the remote CAS: {:?}",
-        error
-      ))
-    })
-    .join(future::join_all(directory_digests))
-    .and_then(|(files_digest, mut directory_digests)| {
-      directory_digests.push(files_digest);
-      fs::Snapshot::merge_directories(store, directory_digests).map_err(|err| {
-        ExecutionError::Fatal(format!(
-          "Error when merging output files and directories: {}",
-          err
-        ))
-      })
-    })
-    .to_boxed()
-  }
-}
-
-fn make_execute_request(
-  req: &ExecuteProcessRequest,
-  instance_name: &Option<String>,
-  cache_key_gen_version: &Option<String>,
-) -> Result<
-  (
-    bazel_protos::remote_execution::Action,
-    bazel_protos::remote_execution::Command,
-    bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest,
-  ),
-  String,
-> {
-  let mut command = bazel_protos::remote_execution::Command::new();
-  command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
-  for (ref name, ref value) in &req.env {
-    if name.as_str() == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME {
-      return Err(format!(
-        "Cannot set env var with name {} as that is reserved for internal use by pants",
-        CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
-      ));
-    }
-    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(name.to_string());
-    env.set_value(value.to_string());
-    command.mut_environment_variables().push(env);
-  }
-  if let Some(cache_key_gen_version) = cache_key_gen_version {
-    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_string());
-    env.set_value(cache_key_gen_version.to_string());
-    command.mut_environment_variables().push(env);
-  }
-  let mut output_files = req
-    .output_files
-    .iter()
-    .map(|p| {
-      p.to_str()
-        .map(|s| s.to_owned())
-        .ok_or_else(|| format!("Non-UTF8 output file path: {:?}", p))
-    })
-    .collect::<Result<Vec<String>, String>>()?;
-  output_files.sort();
-  command.set_output_files(protobuf::RepeatedField::from_vec(output_files));
-
-  let mut output_directories = req
-    .output_directories
-    .iter()
-    .map(|p| {
-      p.to_str()
-        .map(|s| s.to_owned())
-        .ok_or_else(|| format!("Non-UTF8 output directory path: {:?}", p))
-    })
-    .collect::<Result<Vec<String>, String>>()?;
-  output_directories.sort();
-  command.set_output_directories(protobuf::RepeatedField::from_vec(output_directories));
-
-  // Ideally, the JDK would be brought along as part of the input directory, but we don't currently
-  // have support for that. The platform with which we're experimenting for remote execution
-  // supports this property, and will symlink .jdk to a system-installed JDK:
-  // https://github.com/twitter/scoot/pull/391
-  if req.jdk_home.is_some() {
-    command.set_platform({
-      let mut platform = bazel_protos::remote_execution::Platform::new();
-      platform.mut_properties().push({
-        let mut property = bazel_protos::remote_execution::Platform_Property::new();
-        property.set_name("JDK_SYMLINK".to_owned());
-        property.set_value(".jdk".to_owned());
-        property
-      });
-      platform
-    });
-  }
-
-  let mut action = bazel_protos::remote_execution::Action::new();
-  action.set_command_digest((&digest(&command)?).into());
-  action.set_input_root_digest((&req.input_files).into());
-
-  let execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
-    action_digest: Some((&digest(&action)?).into()),
-    skip_cache_lookup: false,
-    instance_name: instance_name.clone().unwrap_or_default(),
-    execution_policy: None,
-    results_cache_policy: None,
-  };
-
-  Ok((action, command, execute_request))
 }
 
 fn format_error(error: &bazel_protos::google::rpc::Status) -> String {
@@ -924,18 +783,6 @@ fn towergrpcerror_to_string<T: std::fmt::Debug>(error: tower_grpc::Error<T>) -> 
     }
     tower_grpc::Error::Inner(v) => format!("{:?}", v),
   }
-}
-
-fn digest(message: &dyn GrpcioMessage) -> Result<Digest, String> {
-  let bytes = message.write_to_bytes().map_err(|e| format!("{:?}", e))?;
-
-  let mut hasher = Sha256::default();
-  hasher.input(&bytes);
-
-  Ok(Digest(
-    Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
-    bytes.len(),
-  ))
 }
 
 fn timespec_from(timestamp: &Option<prost_types::Timestamp>) -> time::Timespec {

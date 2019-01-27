@@ -30,6 +30,7 @@ class GlobMatchErrorBehavior(enum('failure_behavior', ['ignore', 'warn', 'error'
 
 
 class ExecutionOptions(datatype([
+  'local_execution_process_cache_namespace',
   'remote_store_server',
   'remote_store_thread_count',
   'remote_execution_server',
@@ -52,6 +53,7 @@ class ExecutionOptions(datatype([
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
     return cls(
+      local_execution_process_cache_namespace=bootstrap_options.local_execution_process_cache_namespace,
       remote_store_server=bootstrap_options.remote_store_server,
       remote_execution_server=bootstrap_options.remote_execution_server,
       remote_store_thread_count=bootstrap_options.remote_store_thread_count,
@@ -68,6 +70,7 @@ class ExecutionOptions(datatype([
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
+    local_execution_process_cache_namespace=None,
     remote_store_server=[],
     remote_store_thread_count=1,
     remote_execution_server=None,
@@ -291,6 +294,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              # This default is also hard-coded into the engine's rust code in
              # fs::Store::default_path
              default=os.path.expanduser('~/.cache/pants/lmdb_store'))
+    register('--local-execution-process-cache-namespace', advanced=True,
+             help="The cache namespace for local process execution. "
+                  "Bump this to invalidate every artifact's local execution. "
+                  "This is the hermetic execution equivalent of the legacy cache-key-gen-version "
+                  "flag.")
     register('--remote-store-server', advanced=True, type=list, default=[],
              help='host:port of grpc server to use as remote execution file store.')
     register('--remote-store-thread-count', type=int, advanced=True,

@@ -5,7 +5,7 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use dirs;
 use futures::{future, Future};
-use hashing::Digest;
+use hashing::{Digest, Fingerprint};
 use protobuf::Message;
 use serde_derive::Serialize;
 use std::collections::HashMap;
@@ -82,6 +82,13 @@ pub enum ShrinkBehavior {
 // This has the nice property that Directories can be trusted to be valid and canonical.
 // We may want to re-visit this if we end up wanting to handle local/remote/merged interchangably.
 impl Store {
+  pub fn fingerprint_from_bytes_unsafe(bytes: &Bytes) -> Fingerprint {
+    use digest::{Digest as DigestTrait, FixedOutput};
+    let mut hasher = sha2::Sha256::default();
+    hasher.input(&bytes);
+    Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
+  }
+
   ///
   /// Make a store which only uses its local storage.
   ///
@@ -230,6 +237,69 @@ impl Store {
         Ok(directory)
       },
     )
+  }
+
+  // TODO: convert every Result<_, String> into a typedef!
+  fn action_fingerprint(
+    action: bazel_protos::remote_execution::Action,
+  ) -> Result<hashing::Fingerprint, String> {
+    action
+      .write_to_bytes()
+      .map_err(|e| format!("Error serializing Action proto {:?}: {:?}", action, e))
+      .map(|bytes| super::Store::fingerprint_from_bytes_unsafe(&Bytes::from(bytes)))
+  }
+
+  /// ???
+  pub fn record_process_result(
+    &self,
+    req: bazel_protos::remote_execution::Action,
+    res: bazel_protos::remote_execution::ActionResult,
+  ) -> BoxFuture<(), String> {
+    let converted_key_value_protos = Self::action_fingerprint(req).and_then(|req| {
+      res
+        .write_to_bytes()
+        .map_err(|e| format!("Error serializing ActionResult proto {:?}: {:?}", res, e))
+        .map(|res| (req, Bytes::from(res)))
+    });
+    let store = self.clone();
+    future::result(converted_key_value_protos)
+      .and_then(move |(action_fingerprint, result_bytes)| {
+        store
+          .local
+          .record_process_result(action_fingerprint, result_bytes)
+      })
+      .to_boxed()
+  }
+
+  fn deserialize_action_result(
+    result_bytes: Bytes,
+  ) -> Result<bazel_protos::remote_execution::ActionResult, String> {
+    let mut action_result = bazel_protos::remote_execution::ActionResult::new();
+    action_result.merge_from_bytes(&result_bytes).map_err(|e| {
+      format!(
+        "LMDB corruption: ActionResult bytes for {:?} were not valid: {:?}",
+        result_bytes, e
+      )
+    })?;
+    Ok(action_result)
+  }
+
+  /// ???
+  pub fn load_process_result(
+    &self,
+    req: bazel_protos::remote_execution::Action,
+  ) -> BoxFuture<Option<bazel_protos::remote_execution::ActionResult>, String> {
+    let store = self.clone();
+    future::result(Self::action_fingerprint(req))
+      .and_then(move |action_fingerprint| store.local.load_process_result(action_fingerprint))
+      .and_then(|maybe_bytes| {
+        let deserialized_result = match maybe_bytes {
+          Some(bytes) => Self::deserialize_action_result(bytes).map(Some),
+          None => Ok(None),
+        };
+        future::result(deserialized_result)
+      })
+      .to_boxed()
   }
 
   ///
@@ -666,8 +736,7 @@ mod local {
 
   use boxfuture::{BoxFuture, Boxable};
   use bytes::Bytes;
-  use digest::{Digest as DigestTrait, FixedOutput};
-  use futures::future;
+  use futures::future::{self, Future};
   use hashing::{Digest, Fingerprint};
   use lmdb::Error::{KeyExist, NotFound};
   use lmdb::{
@@ -675,7 +744,6 @@ mod local {
     RwTransaction, Transaction, WriteFlags,
   };
   use log::{debug, error};
-  use sha2::Sha256;
   use std;
   use std::collections::{BinaryHeap, HashMap};
   use std::fmt;
@@ -693,13 +761,23 @@ mod local {
     inner: Arc<InnerStore>,
   }
 
+  struct DbEnv(Arc<Database>, Arc<Environment>);
+
+  impl DbEnv {
+    fn get(&self) -> (Arc<Database>, Arc<Environment>) {
+      (Arc::clone(&self.0), Arc::clone(&self.1))
+    }
+  }
+
   struct InnerStore {
     pool: Arc<ResettablePool>,
     // Store directories separately from files because:
     //  1. They may have different lifetimes.
     //  2. It's nice to know whether we should be able to parse something as a proto.
+    // TODO: why are these `Result`s?
     file_dbs: Result<Arc<ShardedLmdb>, String>,
     directory_dbs: Result<Arc<ShardedLmdb>, String>,
+    process_execution_db: Result<Arc<DbEnv>, String>,
   }
 
   impl ByteStore {
@@ -707,11 +785,39 @@ mod local {
       let root = path.as_ref();
       let files_root = root.join("files");
       let directories_root = root.join("directories");
+      let process_executions_root = root.join("process_executions");
+      super::super::safe_create_dir_all(&process_executions_root).map_err(|err| {
+        format!(
+          "Error making directory for process execution store at {:?}: {:?}",
+          process_executions_root, err
+        )
+      })?;
+      let process_executions_env = Environment::new()
+        .set_max_dbs(1)
+        .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
+        // TODO: does the Environment need to be opened in a subdirectory of the db dir? see
+        // ShardedLmdb::make_env()!
+        .open(&process_executions_root)
+        .map_err(|err| {
+          format!(
+            "Error making process execution Environment for db at {:?}: {:?}",
+            process_executions_root, err
+          )
+        })?;
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
           pool: pool,
           file_dbs: ShardedLmdb::new(files_root.clone()).map(Arc::new),
           directory_dbs: ShardedLmdb::new(directories_root.clone()).map(Arc::new),
+          process_execution_db: process_executions_env
+            .create_db(Some("process_executions_content"), DatabaseFlags::empty())
+            .map_err(|e| {
+              format!(
+                "Error creating/opening process execution content database at {:?}: {}",
+                process_executions_root, e
+              )
+            })
+            .map(|db| Arc::new(DbEnv(Arc::new(db), Arc::new(process_executions_env)))),
         }),
       })
     }
@@ -933,11 +1039,7 @@ mod local {
         .inner
         .pool
         .spawn_fn(move || {
-          let fingerprint = {
-            let mut hasher = Sha256::default();
-            hasher.input(&bytes);
-            Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-          };
+          let fingerprint = super::Store::fingerprint_from_bytes_unsafe(&bytes);
           let digest = Digest(fingerprint, bytes.len());
 
           let (env, content_database, lease_database) = dbs.clone()?.get(&fingerprint);
@@ -1007,6 +1109,76 @@ mod local {
             Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err,)),
           })
         }).to_boxed()
+    }
+
+    pub fn record_process_result(
+      &self,
+      action_fingerprint: Fingerprint,
+      result_bytes: Bytes,
+    ) -> BoxFuture<(), String> {
+      let db_env = self.inner.process_execution_db.clone();
+      let store = self.clone();
+      future::result(db_env)
+        .and_then(move |db_env| {
+          let (db, env) = db_env.get();
+          store.inner.pool.spawn_fn(move || {
+            let put_res = env.begin_rw_txn().and_then(|mut txn| {
+              txn.put(
+                *db,
+                &action_fingerprint,
+                &result_bytes,
+                // TODO: this was stolen from store_bytes() -- is it still applicable?
+                WriteFlags::NO_OVERWRITE,
+              )?;
+              txn.commit()
+            });
+            match put_res {
+              Ok(()) => Ok(()),
+              Err(KeyExist) => Ok(()),
+              Err(err) => Err(format!(
+                "Error storing process execution action with fingerprint {:?}: {:?}",
+                action_fingerprint, err
+              )),
+            }
+          })
+        })
+        .to_boxed()
+        .to_boxed()
+    }
+
+    pub fn load_process_result(
+      &self,
+      action_fingerprint: Fingerprint,
+    ) -> BoxFuture<Option<Bytes>, String> {
+      let store = self.clone();
+      let db_env = store.inner.process_execution_db.clone();
+      self
+        .inner
+        .pool
+        .spawn_fn(move || {
+          let (db, env) = db_env.clone()?.get();
+          let ro_txn = env
+            .begin_ro_txn()
+            // TODO: is there a reason load_bytes_with() uses {} instead of {:?} here?
+            .map_err(|err| {
+              format!(
+                "Failed to begin read transaction for process result: {}",
+                err
+              )
+            });
+          ro_txn.and_then(|txn| {
+            let db = db.clone();
+            match txn.get(*db, &action_fingerprint) {
+              Ok(bytes) => Ok(Some(Bytes::from(bytes))),
+              Err(NotFound) => Ok(None),
+              Err(err) => Err(format!(
+                "Error loading result for process execution action with fingerprint {:?}: {:?}",
+                action_fingerprint, err
+              )),
+            }
+          })
+        })
+        .to_boxed()
     }
   }
 
@@ -1708,12 +1880,10 @@ mod remote {
   use bazel_protos;
   use boxfuture::{BoxFuture, Boxable};
   use bytes::{Bytes, BytesMut};
-  use digest::{Digest as DigestTrait, FixedOutput};
   use futures::{self, future, Future, IntoFuture, Sink, Stream};
   use grpcio;
-  use hashing::{Digest, Fingerprint};
+  use hashing::Digest;
   use serverset::{Retry, Serverset};
-  use sha2::Sha256;
   use std::cmp::min;
   use std::collections::HashSet;
   use std::sync::Arc;
@@ -1831,9 +2001,7 @@ mod remote {
     }
 
     pub fn store_bytes(&self, bytes: Bytes) -> BoxFuture<Digest, String> {
-      let mut hasher = Sha256::default();
-      hasher.input(&bytes);
-      let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
+      let fingerprint = super::Store::fingerprint_from_bytes_unsafe(&bytes);
       let len = bytes.len();
       let digest = Digest(fingerprint, len);
       let resource_name = format!(
@@ -2739,11 +2907,8 @@ mod tests {
         .write_to_bytes()
         .expect("Error serializing proto"),
     );
-    let non_canonical_directory_fingerprint = {
-      let mut hasher = Sha256::default();
-      hasher.input(&non_canonical_directory_bytes);
-      Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-    };
+    let non_canonical_directory_fingerprint =
+      super::Store::fingerprint_from_bytes_unsafe(&non_canonical_directory_bytes);
     let directory_digest = Digest(
       non_canonical_directory_fingerprint,
       non_canonical_directory_bytes.len(),

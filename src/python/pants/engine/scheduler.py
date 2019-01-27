@@ -88,6 +88,8 @@ class Scheduler(object):
     self._tasks = native.new_tasks()
     self._register_rules(rule_index)
 
+    # TODO: we REALLY need to have a datatype for all of these so that we don't mix up arguments by
+    # order.
     self._scheduler = native.new_scheduler(
       tasks=self._tasks,
       root_subject_types=self._root_subject_types,

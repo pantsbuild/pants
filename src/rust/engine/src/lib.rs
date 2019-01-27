@@ -198,6 +198,7 @@ pub extern "C" fn scheduler_create(
   build_root_buf: Buffer,
   work_dir_buf: Buffer,
   local_store_dir_buf: Buffer,
+  local_execution_process_cache_namespace: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
   remote_store_servers_buf: BufferBuffer,
@@ -245,6 +246,9 @@ pub extern "C" fn scheduler_create(
   };
   let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
   tasks.intrinsics_set(&types);
+  let local_execution_process_cache_namespace_string = local_execution_process_cache_namespace
+    .to_string()
+    .expect("local_execution_process_cache_namespace was not valid UTF8");
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   let remote_store_servers_vec = remote_store_servers_buf
     .to_strings()
@@ -285,6 +289,11 @@ pub extern "C" fn scheduler_create(
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
     PathBuf::from(local_store_dir_buf.to_os_string()),
+    if local_execution_process_cache_namespace_string.is_empty() {
+      None
+    } else {
+      Some(local_execution_process_cache_namespace_string)
+    },
     remote_store_servers_vec,
     if remote_execution_server_string.is_empty() {
       None

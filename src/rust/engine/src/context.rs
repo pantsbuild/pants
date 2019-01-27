@@ -21,10 +21,18 @@ use boxfuture::{BoxFuture, Boxable};
 use fs::{self, safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
 use log::debug;
-use process_execution::{self, BoundedCommandRunner, CommandRunner};
+use process_execution::{self, BoundedCommandRunner, CachingCommandRunner, CommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;
 use resettable::Resettable;
+
+// TODO: better name!!!
+#[derive(Clone)]
+struct StoreAndCommandRunnerAndHttpClient {
+  store: Store,
+  command_runner: Arc<Box<dyn CommandRunner>>,
+  http_client: reqwest::r#async::Client,
+}
 
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -42,8 +50,7 @@ pub struct Core {
   pub fs_pool: Arc<ResettablePool>,
   pub runtime: Resettable<Arc<Runtime>>,
   pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
-  store_and_command_runner_and_http_client:
-    Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
+  store_and_command_runner_and_http_client: Resettable<StoreAndCommandRunnerAndHttpClient>,
   pub vfs: PosixFS,
   pub build_root: PathBuf,
 }
@@ -57,6 +64,8 @@ impl Core {
     ignore_patterns: &[String],
     work_dir: PathBuf,
     local_store_dir: PathBuf,
+    // TODO: REALLY give this a better type than Option<String>!!!
+    local_execution_process_cache_namespace: Option<String>,
     remote_store_servers: Vec<String>,
     remote_execution_server: Option<String>,
     remote_execution_process_cache_namespace: Option<String>,
@@ -129,6 +138,7 @@ impl Core {
         })
         .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
+      // NOTE: This is where the process execution mechanism is selected!
       let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
         Some(ref address) => Box::new(
           process_execution::remote::CommandRunner::new(
@@ -149,12 +159,24 @@ impl Core {
         )) as Box<dyn CommandRunner>,
       };
 
-      let command_runner =
+      let bounded_command_runner =
         BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
+
+      let caching_command_runner = CachingCommandRunner::from_store(
+        Box::new(bounded_command_runner) as Box<dyn CommandRunner>,
+        store.clone(),
+        local_execution_process_cache_namespace.clone(),
+      );
+
+      let command_runner = Arc::new(Box::new(caching_command_runner) as Box<dyn CommandRunner>);
 
       let http_client = reqwest::r#async::Client::new();
 
-      (store, command_runner, http_client)
+      StoreAndCommandRunnerAndHttpClient {
+        store,
+        command_runner,
+        http_client,
+      }
     });
 
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
@@ -211,15 +233,21 @@ impl Core {
   }
 
   pub fn store(&self) -> Store {
-    self.store_and_command_runner_and_http_client.get().0
+    self.store_and_command_runner_and_http_client.get().store
   }
 
-  pub fn command_runner(&self) -> BoundedCommandRunner {
-    self.store_and_command_runner_and_http_client.get().1
+  pub fn command_runner(&self) -> Arc<Box<dyn CommandRunner>> {
+    self
+      .store_and_command_runner_and_http_client
+      .get()
+      .command_runner
   }
 
   pub fn http_client(&self) -> reqwest::r#async::Client {
-    self.store_and_command_runner_and_http_client.get().2
+    self
+      .store_and_command_runner_and_http_client
+      .get()
+      .http_client
   }
 }
 
