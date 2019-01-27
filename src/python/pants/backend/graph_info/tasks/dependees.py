@@ -55,9 +55,13 @@ class ReverseDepmap(ConsoleTask):
       yield json.dumps(deps, indent=4, separators=(',', ': '), sort_keys=True)
     else:
       if self._closed:
+        # N.B. Sorting is necessary because `roots` is a set, and in Python 3 sets
+        # are no longer consistently sorted (even though dictionaries are in 3.6+).
+        # Without this sort, the output of `./pants3 dependees` will vary every run.
         for root in sorted(roots):
           yield root.address.spec
 
+      # N.B. Sorting is necessary here for consistent output in Python 3. See above N.B.
       for dependent in sorted(self.get_dependents(dependees_by_target, roots)):
         yield dependent.address.spec
 
