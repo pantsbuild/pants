@@ -38,7 +38,6 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::future::{self, Future};
 use log::debug;
-use protobuf::{self, Message as GrpcioMessage};
 
 use fs::{File, PathStat};
 use hashing::Digest;
@@ -67,6 +66,7 @@ impl CacheableExecuteProcessRequest {
   }
 }
 
+/// ???/why is this "cacheable"?
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CacheableExecuteProcessResult {
   pub stdout: Bytes,
@@ -90,142 +90,70 @@ impl CacheableExecuteProcessResult {
   }
 }
 
-/// ???/just a neat way to separate logic as this interface evolves, not really necessary right now
-pub trait SerializableProcessExecutionCodec<
-    // TODO: add some constraints to these?
-    ProcessRequest,
-    SerializableRequest,
-    ProcessResult,
-    SerializableResult,
-    ErrorType,
-  >: Send + Sync {
-  fn convert_request(
+/// ???/it's called "immediate" because it's a best-effort thing located locally (???)
+pub trait ImmediateExecutionCache<ProcessRequest, ProcessResult>: Send + Sync {
+  fn record_process_result(
     &self,
-    req: ProcessRequest
-  ) -> Result<SerializableRequest, ErrorType>;
+    req: &ProcessRequest,
+    res: &ProcessResult,
+  ) -> BoxFuture<(), String>;
 
-  fn convert_response(
-    &self,
-    res: ProcessResult,
-  ) -> Result<SerializableResult, ErrorType>;
-
-  fn extract_response(
-    &self,
-    serializable_response: SerializableResult,
-  ) -> BoxFuture<ProcessResult, ErrorType>;
+  fn load_process_result(&self, req: &ProcessRequest) -> BoxFuture<Option<ProcessResult>, String>;
 }
 
+/// ???
 #[derive(Clone)]
-pub struct BazelProtosProcessExecutionCodec {
+pub struct ActionSerializer {
   store: fs::Store,
 }
 
-impl
-  SerializableProcessExecutionCodec<
-    CacheableExecuteProcessRequest,
-    bazel_protos::remote_execution::Action,
-    CacheableExecuteProcessResult,
-    bazel_protos::remote_execution::ActionResult,
-    // TODO: better error type?
-    String,
-  > for BazelProtosProcessExecutionCodec
-{
-  fn convert_request(
-    &self,
-    req: CacheableExecuteProcessRequest,
-  ) -> Result<bazel_protos::remote_execution::Action, String> {
-    let (action, _) = Self::make_action_with_command(req)?;
-    Ok(action)
-  }
-
-  fn convert_response(
-    &self,
-    res: CacheableExecuteProcessResult,
-  ) -> Result<bazel_protos::remote_execution::ActionResult, String> {
-    let mut action_proto = bazel_protos::remote_execution::ActionResult::new();
-    let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
-    let output_directory_digest = Self::convert_digest(res.output_directory);
-    output_directory.set_tree_digest(output_directory_digest);
-    action_proto.set_output_directories(protobuf::RepeatedField::from_vec(vec![output_directory]));
-    action_proto.set_exit_code(res.exit_code);
-    action_proto.set_stdout_raw(res.stdout.clone());
-    action_proto.set_stdout_digest(Self::convert_digest(Self::digest_bytes(&res.stdout)));
-    action_proto.set_stderr_raw(res.stderr.clone());
-    action_proto.set_stderr_digest(Self::convert_digest(Self::digest_bytes(&res.stderr)));
-    Ok(action_proto)
-  }
-
-  fn extract_response(
-    &self,
-    res: bazel_protos::remote_execution::ActionResult,
-  ) -> BoxFuture<CacheableExecuteProcessResult, String> {
-    self
-      .extract_stdout(res.clone())
-      .join(self.extract_stderr(res.clone()))
-      .join(self.extract_output_files(res.clone()))
-      .map(
-        move |((stdout, stderr), output_directory)| CacheableExecuteProcessResult {
-          stdout,
-          stderr,
-          exit_code: res.exit_code,
-          output_directory,
-        },
-      )
-      .to_boxed()
-  }
-}
-
-impl BazelProtosProcessExecutionCodec {
+impl ActionSerializer {
   pub fn new(store: fs::Store) -> Self {
-    BazelProtosProcessExecutionCodec { store }
+    ActionSerializer { store }
   }
 
-  fn digest_bytes(bytes: &Bytes) -> Digest {
-    let fingerprint = fs::Store::fingerprint_from_bytes_unsafe(&bytes);
-    Digest(fingerprint, bytes.len())
-  }
-
-  pub fn digest_message(message: &dyn GrpcioMessage) -> Result<Digest, String> {
-    let bytes = message.write_to_bytes().map_err(|e| format!("{:?}", e))?;
-    Ok(Self::digest_bytes(&Bytes::from(bytes.as_slice())))
-  }
-
-  fn convert_digest(digest: Digest) -> bazel_protos::remote_execution::Digest {
-    let mut digest_proto = bazel_protos::remote_execution::Digest::new();
-    let Digest(fingerprint, bytes_len) = digest;
-    digest_proto.set_hash(fingerprint.to_hex());
-    digest_proto.set_size_bytes(bytes_len as i64);
-    digest_proto
+  pub fn convert_digest(
+    digest: &Digest,
+  ) -> bazel_protos::build::bazel::remote::execution::v2::Digest {
+    let Digest(fingerprint, len) = digest;
+    bazel_protos::build::bazel::remote::execution::v2::Digest {
+      hash: fingerprint.to_hex(),
+      size_bytes: *len as i64,
+    }
   }
 
   fn make_command(
-    req: CacheableExecuteProcessRequest,
-  ) -> Result<bazel_protos::remote_execution::Command, String> {
+    req: &CacheableExecuteProcessRequest,
+  ) -> Result<bazel_protos::build::bazel::remote::execution::v2::Command, String> {
     let CacheableExecuteProcessRequest {
       req,
       cache_key_gen_version,
     } = req;
-    let mut command = bazel_protos::remote_execution::Command::new();
-    command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
+    let arguments = req.argv.clone();
 
-    for (ref name, ref value) in &req.env {
-      if name.as_str() == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME {
-        return Err(format!(
-          "Cannot set env var with name {} as that is reserved for internal use by pants",
-          CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
-        ));
-      }
-      let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-      env.set_name(name.to_string());
-      env.set_value(value.to_string());
-      command.mut_environment_variables().push(env);
+    if req.env.contains_key(CACHE_KEY_GEN_VERSION_ENV_VAR_NAME) {
+      return Err(format!(
+        "Cannot set env var with name {} as that is reserved for internal use by pants",
+        CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
+      ));
     }
+    let mut env_var_pairs: Vec<(String, String)> = req.env.clone().into_iter().collect();
     if let Some(cache_key_gen_version) = cache_key_gen_version {
-      let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-      env.set_name(CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_string());
-      env.set_value(cache_key_gen_version.to_string());
-      command.mut_environment_variables().push(env);
+      env_var_pairs.push((
+        CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_string(),
+        cache_key_gen_version.to_string(),
+      ));
     }
+    let environment_variables: Vec<_> = env_var_pairs
+      .into_iter()
+      .map(|(name, value)| {
+        bazel_protos::build::bazel::remote::execution::v2::command::EnvironmentVariable {
+          name,
+          value,
+        }
+      })
+      .collect();
+
     let mut output_files = req
       .output_files
       .iter()
@@ -236,7 +164,6 @@ impl BazelProtosProcessExecutionCodec {
       })
       .collect::<Result<Vec<String>, String>>()?;
     output_files.sort();
-    command.set_output_files(protobuf::RepeatedField::from_vec(output_files));
 
     let mut output_directories = req
       .output_directories
@@ -248,49 +175,73 @@ impl BazelProtosProcessExecutionCodec {
       })
       .collect::<Result<Vec<String>, String>>()?;
     output_directories.sort();
-    command.set_output_directories(protobuf::RepeatedField::from_vec(output_directories));
 
     // Ideally, the JDK would be brought along as part of the input directory, but we don't currently
     // have support for that. The platform with which we're experimenting for remote execution
     // supports this property, and will symlink .jdk to a system-installed JDK:
     // https://github.com/twitter/scoot/pull/391
-    if req.jdk_home.is_some() {
-      command.set_platform({
-        let mut platform = bazel_protos::remote_execution::Platform::new();
-        platform.mut_properties().push({
-          let mut property = bazel_protos::remote_execution::Platform_Property::new();
-          property.set_name("JDK_SYMLINK".to_owned());
-          property.set_value(".jdk".to_owned());
-          property
-        });
-        platform
-      });
-    }
+    let platform = if req.jdk_home.is_some() {
+      // This really should be req.jdk_home.map(|_| {...}), but that gives "cannot move out of
+      // borrowed content".
+      Some(
+        bazel_protos::build::bazel::remote::execution::v2::Platform {
+          properties: vec![
+            bazel_protos::build::bazel::remote::execution::v2::platform::Property {
+              name: "JDK_SYMLINK".to_owned(),
+              value: ".jdk".to_owned(),
+            },
+          ],
+        },
+      )
+    } else {
+      None
+    };
 
-    Ok(command)
+    Ok(bazel_protos::build::bazel::remote::execution::v2::Command {
+      arguments,
+      environment_variables,
+      output_files,
+      output_directories,
+      platform,
+      working_directory: "".to_owned(),
+    })
   }
 
+  fn encode_command_proto(
+    command: &bazel_protos::build::bazel::remote::execution::v2::Command,
+  ) -> Result<Bytes, String> {
+    fs::Store::encode_proto(command)
+      .map_err(|e| format!("Error serializing Command proto {:?}: {:?}", command, e))
+  }
+
+  /// ???/having the Command is necessary for making an ExecuteRequest proto, which we don't need in
+  /// this file.
   pub fn make_action_with_command(
-    req: CacheableExecuteProcessRequest,
+    req: &CacheableExecuteProcessRequest,
   ) -> Result<
     (
-      bazel_protos::remote_execution::Action,
-      bazel_protos::remote_execution::Command,
+      bazel_protos::build::bazel::remote::execution::v2::Action,
+      bazel_protos::build::bazel::remote::execution::v2::Command,
     ),
     String,
   > {
-    let command = Self::make_command(req.clone())?;
-    let mut action = bazel_protos::remote_execution::Action::new();
-    action.set_command_digest((&Self::digest_message(&command)?).into());
-    action.set_input_root_digest((&req.req.input_files).into());
+    let command = Self::make_command(&req)?;
+    let command_proto_bytes = Self::encode_command_proto(&command)?;
+    let action = bazel_protos::build::bazel::remote::execution::v2::Action {
+      command_digest: Some(Self::convert_digest(&fs::Store::digest_bytes(
+        &command_proto_bytes,
+      ))),
+      input_root_digest: Some(Self::convert_digest(&req.req.input_files)),
+      ..bazel_protos::build::bazel::remote::execution::v2::Action::default()
+    };
     Ok((action, command))
   }
 
   fn extract_stdout(
     &self,
-    result: bazel_protos::remote_execution::ActionResult,
+    result: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
   ) -> BoxFuture<Bytes, String> {
-    if let Some(ref stdout_digest) = result.stdout_digest.into_option() {
+    if let Some(ref stdout_digest) = result.stdout_digest {
       let stdout_digest_result: Result<Digest, String> = stdout_digest.into();
       let stdout_digest = try_future!(
         stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err))
@@ -314,7 +265,7 @@ impl BazelProtosProcessExecutionCodec {
         })
         .to_boxed()
     } else {
-      let stdout_raw = result.stdout_raw;
+      let stdout_raw = Bytes::from(result.stdout_raw.clone());
       let stdout_copy = stdout_raw.clone();
       self
         .store
@@ -327,9 +278,9 @@ impl BazelProtosProcessExecutionCodec {
 
   fn extract_stderr(
     &self,
-    result: bazel_protos::remote_execution::ActionResult,
+    result: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
   ) -> BoxFuture<Bytes, String> {
-    if let Some(ref stderr_digest) = result.stderr_digest.into_option() {
+    if let Some(ref stderr_digest) = result.stderr_digest {
       let stderr_digest_result: Result<Digest, String> = stderr_digest.into();
       let stderr_digest = try_future!(
         stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err))
@@ -353,7 +304,7 @@ impl BazelProtosProcessExecutionCodec {
         })
         .to_boxed()
     } else {
-      let stderr_raw = result.stderr_raw;
+      let stderr_raw = Bytes::from(result.stderr_raw.clone());
       let stderr_copy = stderr_raw.clone();
       self
         .store
@@ -366,7 +317,7 @@ impl BazelProtosProcessExecutionCodec {
 
   fn extract_output_files(
     &self,
-    result: bazel_protos::remote_execution::ActionResult,
+    result: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
   ) -> BoxFuture<Digest, String> {
     // Get Digests of output Directories.
     // Then we'll make a Directory for the output files, and merge them.
@@ -404,7 +355,6 @@ impl BazelProtosProcessExecutionCodec {
         let output_file_path_buf = PathBuf::from(output_file.path);
         let digest = output_file
           .digest
-          .into_option()
           .ok_or_else(|| "No digest on remote execution output file".to_string())?;
         let digest: Result<Digest, String> = (&digest).into();
         path_map.insert(output_file_path_buf.clone(), digest?);
@@ -466,58 +416,79 @@ impl BazelProtosProcessExecutionCodec {
     })
     .to_boxed()
   }
-}
 
-/// ???/it's called "immediate" because it's a best-effort thing located locally (???)
-pub trait ImmediateExecutionCache<ProcessRequest, ProcessResult>: Send + Sync {
-  fn record_process_result(&self, req: ProcessRequest, res: ProcessResult)
-    -> BoxFuture<(), String>;
+  pub fn convert_request_to_action(
+    req: &CacheableExecuteProcessRequest,
+  ) -> Result<bazel_protos::build::bazel::remote::execution::v2::Action, String> {
+    let (action, _) = Self::make_action_with_command(req)?;
+    Ok(action)
+  }
 
-  fn load_process_result(&self, req: ProcessRequest) -> BoxFuture<Option<ProcessResult>, String>;
-}
-
-/// ???
-#[derive(Clone)]
-pub struct ActionCache {
-  store: fs::Store,
-  // NB: This could be an Arc<Box<dyn SerializableProcessExecutionCodec<...>>> if we ever need to
-  // add any further such codecs. This type is static in this struct, because the codec is required
-  // to produce specifically Action and ActionResult, because that is what is currently accepted by
-  // `store.record_process_result()`.
-  process_execution_codec: BazelProtosProcessExecutionCodec,
-}
-
-impl ActionCache {
-  pub fn new(store: fs::Store) -> Self {
-    ActionCache {
-      store: store.clone(),
-      process_execution_codec: BazelProtosProcessExecutionCodec::new(store),
+  pub fn convert_result_to_action_result(
+    res: &CacheableExecuteProcessResult,
+  ) -> bazel_protos::build::bazel::remote::execution::v2::ActionResult {
+    bazel_protos::build::bazel::remote::execution::v2::ActionResult {
+      output_files: vec![],
+      output_directories: vec![
+        bazel_protos::build::bazel::remote::execution::v2::OutputDirectory {
+          path: "".to_string(),
+          tree_digest: Some(Self::convert_digest(&res.output_directory)),
+        },
+      ],
+      exit_code: res.exit_code,
+      stdout_raw: res.stdout.to_vec(),
+      stdout_digest: Some(Self::convert_digest(&fs::Store::digest_bytes(&res.stdout))),
+      stderr_raw: res.stderr.to_vec(),
+      stderr_digest: Some(Self::convert_digest(&fs::Store::digest_bytes(&res.stderr))),
+      execution_metadata: None,
     }
+  }
+
+  pub fn extract_action_result(
+    &self,
+    res: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
+  ) -> BoxFuture<CacheableExecuteProcessResult, String> {
+    let exit_code = res.exit_code;
+    self
+      .extract_stdout(&res)
+      .join(self.extract_stderr(&res))
+      .join(self.extract_output_files(&res))
+      .map(
+        move |((stdout, stderr), output_directory)| CacheableExecuteProcessResult {
+          stdout,
+          stderr,
+          exit_code,
+          output_directory,
+        },
+      )
+      .to_boxed()
   }
 }
 
 impl ImmediateExecutionCache<CacheableExecuteProcessRequest, CacheableExecuteProcessResult>
-  for ActionCache
+  for ActionSerializer
 {
   fn record_process_result(
     &self,
-    req: CacheableExecuteProcessRequest,
-    res: CacheableExecuteProcessResult,
+    req: &CacheableExecuteProcessRequest,
+    res: &CacheableExecuteProcessResult,
   ) -> BoxFuture<(), String> {
-    let codec = self.process_execution_codec.clone();
-    let converted_key_value_protos = codec
-      .convert_request(req)
-      .and_then(|req| codec.convert_response(res.clone()).map(|res| (req, res)));
+    let action_request = Self::convert_request_to_action(&req);
+    let action_result = Self::convert_result_to_action_result(&res);
     let store = self.store.clone();
-    future::result(converted_key_value_protos)
-      .and_then(move |(action_request, action_result)| {
+    // TODO: I wish there was a shorthand syntax to extract multiple fields from a reference to a
+    // struct while cloning them.
+    let stdout = res.stdout.clone();
+    let stderr = res.stderr.clone();
+    future::result(action_request)
+      .and_then(move |action_request| {
         store
-          .store_file_bytes(res.stdout, true)
-          .join(store.store_file_bytes(res.stderr, true))
+          .store_file_bytes(stdout, true)
+          .join(store.store_file_bytes(stderr, true))
           .and_then(move |(_, _)| {
             // NB: We wait until the stdout and stderr digests have been successfully recorded, so
             // that we don't later attempt to read digests in the `action_result` which don't exist.
-            store.record_process_result(action_request, action_result)
+            store.record_process_result(&action_request, &action_result)
           })
           .to_boxed()
       })
@@ -526,14 +497,17 @@ impl ImmediateExecutionCache<CacheableExecuteProcessRequest, CacheableExecutePro
 
   fn load_process_result(
     &self,
-    req: CacheableExecuteProcessRequest,
+    req: &CacheableExecuteProcessRequest,
   ) -> BoxFuture<Option<CacheableExecuteProcessResult>, String> {
-    let codec = self.process_execution_codec.clone();
     let store = self.store.clone();
-    future::result(codec.convert_request(req))
-      .and_then(move |action_proto| store.load_process_result(action_proto))
+    let cache = self.clone();
+    future::result(Self::convert_request_to_action(req))
+      .and_then(move |action_proto| store.load_process_result(&action_proto))
       .and_then(move |maybe_action_result| match maybe_action_result {
-        Some(action_result) => codec.extract_response(action_result).map(Some).to_boxed(),
+        Some(action_result) => cache
+          .extract_action_result(&action_result)
+          .map(Some)
+          .to_boxed(),
         None => future::result(Ok(None)).to_boxed(),
       })
       .to_boxed()
@@ -558,8 +532,8 @@ impl CachingCommandRunner {
     store: fs::Store,
     cache_key_gen_version: Option<String>,
   ) -> Self {
-    let action_cache = ActionCache::new(store);
-    let boxed_cache = Box::new(action_cache)
+    let action_serializer = ActionSerializer::new(store);
+    let boxed_cache = Box::new(action_serializer)
       as Box<
         dyn ImmediateExecutionCache<CacheableExecuteProcessRequest, CacheableExecuteProcessResult>,
       >;
@@ -588,7 +562,7 @@ impl CommandRunner for CachingCommandRunner {
     let cache = self.cache.clone();
     let inner = self.inner.clone();
     cache
-      .load_process_result(cacheable_request.clone())
+      .load_process_result(&cacheable_request)
       .and_then(move |cache_fetch| match cache_fetch {
         // We have a cache hit!
         Some(cached_execution_result) => {
@@ -606,12 +580,11 @@ impl CommandRunner for CachingCommandRunner {
             debug!("uncached execution for request {:?}: {:?}", req, res);
             let cacheable_process_result = res.into_cacheable();
             cache
-              .record_process_result(cacheable_request.clone(), cacheable_process_result.clone())
+              .record_process_result(&cacheable_request, &cacheable_process_result)
               .map(move |()| {
                 debug!(
                   "request {:?} should now be cached as {:?}",
-                  cacheable_request.clone(),
-                  cacheable_process_result.clone()
+                  &cacheable_request, &cacheable_process_result,
                 );
                 cacheable_process_result
               })
@@ -628,7 +601,7 @@ impl CommandRunner for CachingCommandRunner {
 #[cfg(test)]
 mod tests {
   use super::{
-    ActionCache, CacheableExecuteProcessRequest, CacheableExecuteProcessResult,
+    ActionSerializer, CacheableExecuteProcessRequest, CacheableExecuteProcessResult,
     CachingCommandRunner, CommandRunner, ExecuteProcessRequest, ImmediateExecutionCache,
   };
   use futures::future::Future;
@@ -661,25 +634,25 @@ mod tests {
     ]));
     let store_dir = TempDir::new().unwrap();
     let work_dir = TempDir::new().unwrap();
-    let (_, base_runner, action_cache) = cache_in_dir(store_dir.path(), work_dir.path());
+    let (_, base_runner, action_serializer) = cache_in_dir(store_dir.path(), work_dir.path());
     let cacheable_perl = CacheableExecuteProcessRequest {
       req: random_perl.clone(),
       cache_key_gen_version: None,
     };
     assert_eq!(
       Ok(None),
-      action_cache
+      action_serializer
         .load_process_result(cacheable_perl.clone())
         .wait()
     );
-    let caching_runner = make_caching_runner(base_runner.clone(), action_cache.clone(), None);
+    let caching_runner = make_caching_runner(base_runner.clone(), action_serializer.clone(), None);
     let process_result = caching_runner.run(random_perl.clone()).wait().unwrap();
     assert_eq!(0, process_result.exit_code);
     // A "cacheable" process execution result won't have e.g. the number of attempts that the
     // process was tried, for idempotency, but everything else should be the same.
     assert_eq!(
       process_result.clone().into_cacheable(),
-      action_cache
+      action_serializer
         .load_process_result(cacheable_perl)
         .wait()
         .unwrap()
@@ -704,19 +677,22 @@ mod tests {
     };
     assert_eq!(
       Ok(None),
-      action_cache
+      action_serializer
         .load_process_result(new_cacheable_perl.clone())
         .wait()
     );
-    let new_caching_runner =
-      make_caching_runner(base_runner.clone(), action_cache.clone(), Some(new_key));
+    let new_caching_runner = make_caching_runner(
+      base_runner.clone(),
+      action_serializer.clone(),
+      Some(new_key),
+    );
     let new_process_result = new_caching_runner.run(random_perl.clone()).wait().unwrap();
     assert_eq!(0, new_process_result.exit_code);
     // The new `cache_key_gen_version` is propagated to the requests made against the
     // CachingCommandRunner.
     assert_eq!(
       new_process_result.clone().into_cacheable(),
-      action_cache
+      action_serializer
         .load_process_result(new_cacheable_perl)
         .wait()
         .unwrap()
@@ -738,13 +714,13 @@ mod tests {
     };
     assert_eq!(
       Ok(None),
-      action_cache
+      action_serializer
         .load_process_result(second_cache_string_perl.clone())
         .wait()
     );
     let second_string_caching_runner = make_caching_runner(
       base_runner.clone(),
-      action_cache.clone(),
+      action_serializer.clone(),
       Some(second_string_key),
     );
     let second_string_process_result = second_string_caching_runner
@@ -754,7 +730,7 @@ mod tests {
     assert_eq!(0, second_string_process_result.exit_code);
     assert_eq!(
       second_string_process_result.clone().into_cacheable(),
-      action_cache
+      action_serializer
         .load_process_result(second_cache_string_perl)
         .wait()
         .unwrap()
@@ -786,23 +762,23 @@ mod tests {
   fn cache_in_dir(
     store_dir: &Path,
     work_dir: &Path,
-  ) -> (fs::Store, crate::local::CommandRunner, ActionCache) {
+  ) -> (fs::Store, crate::local::CommandRunner, ActionSerializer) {
     let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
     let store = fs::Store::local_only(store_dir, pool.clone()).unwrap();
-    let action_cache = ActionCache::new(store.clone());
+    let action_serializer = ActionSerializer::new(store.clone());
     let base_runner =
       crate::local::CommandRunner::new(store.clone(), pool, work_dir.to_path_buf(), true);
-    (store, base_runner, action_cache)
+    (store, base_runner, action_serializer)
   }
 
   fn make_caching_runner(
     base_runner: crate::local::CommandRunner,
-    action_cache: ActionCache,
+    action_serializer: ActionSerializer,
     cache_key_gen_version: Option<String>,
   ) -> CachingCommandRunner {
     CachingCommandRunner::new(
       Box::new(base_runner) as Box<dyn CommandRunner>,
-      Box::new(action_cache)
+      Box::new(action_serializer)
         as Box<
           dyn ImmediateExecutionCache<
             CacheableExecuteProcessRequest,

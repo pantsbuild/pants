@@ -2,10 +2,11 @@ use crate::{BackoffConfig, FileContent};
 
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use dirs;
 use futures::{future, Future};
 use hashing::{Digest, Fingerprint};
+use prost::{self, Message as ProstMessage};
 use protobuf::Message;
 use serde_derive::Serialize;
 use std::collections::HashMap;
@@ -82,13 +83,6 @@ pub enum ShrinkBehavior {
 // This has the nice property that Directories can be trusted to be valid and canonical.
 // We may want to re-visit this if we end up wanting to handle local/remote/merged interchangably.
 impl Store {
-  pub fn fingerprint_from_bytes_unsafe(bytes: &Bytes) -> Fingerprint {
-    use digest::{Digest as DigestTrait, FixedOutput};
-    let mut hasher = sha2::Sha256::default();
-    hasher.input(&bytes);
-    Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-  }
-
   ///
   /// Make a store which only uses its local storage.
   ///
@@ -240,28 +234,60 @@ impl Store {
     )
   }
 
+  pub fn fingerprint_from_bytes_unsafe(bytes: &Bytes) -> Fingerprint {
+    use digest::{Digest as DigestTrait, FixedOutput};
+    let mut hasher = sha2::Sha256::default();
+    hasher.input(&bytes);
+    Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
+  }
+
+  pub fn digest_bytes(bytes: &Bytes) -> Digest {
+    let fingerprint = Self::fingerprint_from_bytes_unsafe(&bytes);
+    Digest(fingerprint, bytes.len())
+  }
+
+  // TODO: is there an existing way to do this conversion (without explicitly allocating a buf of
+  // the same length)?
+  pub fn encode_proto<P: prost::Message>(proto: &P) -> Result<Bytes, prost::EncodeError> {
+    let mut buf = BytesMut::with_capacity(proto.encoded_len());
+    proto.encode(&mut buf)?;
+    Ok(buf.freeze())
+  }
+
+  pub fn encode_action_proto(
+    action: &bazel_protos::build::bazel::remote::execution::v2::Action,
+  ) -> Result<Bytes, String> {
+    Self::encode_proto(action)
+      .map_err(|e| format!("Error serializing Action proto {:?}: {:?}", action, e))
+  }
+
+  pub fn encode_action_result_proto(
+    action_result: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
+  ) -> Result<Bytes, String> {
+    Self::encode_proto(action_result).map_err(|e| {
+      format!(
+        "Error serializing ActionResult proto {:?}: {:?}",
+        action_result, e
+      )
+    })
+  }
+
   // TODO: convert every Result<_, String> into a typedef!
   fn action_fingerprint(
-    action: bazel_protos::remote_execution::Action,
+    action: &bazel_protos::build::bazel::remote::execution::v2::Action,
   ) -> Result<hashing::Fingerprint, String> {
-    action
-      .write_to_bytes()
-      .map_err(|e| format!("Error serializing Action proto {:?}: {:?}", action, e))
-      .map(|bytes| super::Store::fingerprint_from_bytes_unsafe(&Bytes::from(bytes)))
+    Self::encode_action_proto(&action)
+      .map(|bytes| super::Store::fingerprint_from_bytes_unsafe(&bytes))
   }
 
   /// ???
   pub fn record_process_result(
     &self,
-    req: bazel_protos::remote_execution::Action,
-    res: bazel_protos::remote_execution::ActionResult,
+    req: &bazel_protos::build::bazel::remote::execution::v2::Action,
+    res: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
   ) -> BoxFuture<(), String> {
-    let converted_key_value_protos = Self::action_fingerprint(req).and_then(|req| {
-      res
-        .write_to_bytes()
-        .map_err(|e| format!("Error serializing ActionResult proto {:?}: {:?}", res, e))
-        .map(|res| (req, Bytes::from(res)))
-    });
+    let converted_key_value_protos = Self::action_fingerprint(&req)
+      .and_then(|req| Self::encode_action_result_proto(&res).map(|res| (req, res)));
     let store = self.clone();
     future::result(converted_key_value_protos)
       .and_then(move |(action_fingerprint, result_bytes)| {
@@ -273,29 +299,30 @@ impl Store {
   }
 
   fn deserialize_action_result(
-    result_bytes: Bytes,
-  ) -> Result<bazel_protos::remote_execution::ActionResult, String> {
-    let mut action_result = bazel_protos::remote_execution::ActionResult::new();
-    action_result.merge_from_bytes(&result_bytes).map_err(|e| {
-      format!(
-        "LMDB corruption: ActionResult bytes for {:?} were not valid: {:?}",
-        result_bytes, e
-      )
-    })?;
-    Ok(action_result)
+    result_bytes: &Bytes,
+  ) -> Result<bazel_protos::build::bazel::remote::execution::v2::ActionResult, String> {
+    bazel_protos::build::bazel::remote::execution::v2::ActionResult::decode(result_bytes).map_err(
+      |e| {
+        format!(
+          "LMDB corruption: ActionResult bytes for {:?} were not valid: {:?}",
+          result_bytes, e
+        )
+      },
+    )
   }
 
   /// ???
   pub fn load_process_result(
     &self,
-    req: bazel_protos::remote_execution::Action,
-  ) -> BoxFuture<Option<bazel_protos::remote_execution::ActionResult>, String> {
+    req: &bazel_protos::build::bazel::remote::execution::v2::Action,
+  ) -> BoxFuture<Option<bazel_protos::build::bazel::remote::execution::v2::ActionResult>, String>
+  {
     let store = self.clone();
-    future::result(Self::action_fingerprint(req))
+    future::result(Self::action_fingerprint(&req))
       .and_then(move |action_fingerprint| store.local.load_process_result(action_fingerprint))
       .and_then(|maybe_bytes| {
         let deserialized_result = match maybe_bytes {
-          Some(bytes) => Self::deserialize_action_result(bytes).map(Some),
+          Some(bytes) => Self::deserialize_action_result(&bytes).map(Some),
           None => Ok(None),
         };
         future::result(deserialized_result)

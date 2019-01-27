@@ -44,9 +44,8 @@ pub mod cached_execution;
 pub mod local;
 pub mod remote;
 pub use crate::cached_execution::{
-  ActionCache, BazelProtosProcessExecutionCodec, CacheableExecuteProcessRequest,
-  CacheableExecuteProcessResult, CachingCommandRunner, ImmediateExecutionCache,
-  SerializableProcessExecutionCodec,
+  ActionSerializer, CacheableExecuteProcessRequest, CacheableExecuteProcessResult,
+  CachingCommandRunner, ImmediateExecutionCache,
 };
 
 ///

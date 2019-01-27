@@ -2,21 +2,19 @@ use std::time::{Duration, Instant};
 
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
-use bytes::Bytes;
 use fs::{self, Store};
 use futures::{future, Future, Stream};
 use futures_timer::Delay;
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn};
 use parking_lot::Mutex;
-use prost::Message;
+use prost::{self, Message};
 use protobuf::{self, Message as GrpcioMessage, ProtobufEnum};
 use time;
 
 use super::{
-  BazelProtosProcessExecutionCodec, CacheableExecuteProcessRequest, CacheableExecuteProcessResult,
-  ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult,
-  SerializableProcessExecutionCodec,
+  ActionSerializer, CacheableExecuteProcessRequest, ExecuteProcessRequest, ExecutionStats,
+  FallibleExecuteProcessResult,
 };
 use std;
 use std::cmp::min;
@@ -54,7 +52,7 @@ pub struct CommandRunner {
   clients: futures::future::Shared<BoxFuture<Clients, String>>,
   store: Store,
   futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
-  process_execution_codec: BazelProtosProcessExecutionCodecV2,
+  action_serializer: ActionSerializer,
 }
 
 #[derive(Debug, PartialEq)]
@@ -118,206 +116,33 @@ impl CommandRunner {
 }
 
 #[derive(Clone)]
-pub struct BazelProcessExecutionRequestV2 {
-  action: bazel_protos::remote_execution::Action,
-  command: bazel_protos::remote_execution::Command,
+pub struct BazelProcessExecutionRequest {
+  action: bazel_protos::build::bazel::remote::execution::v2::Action,
+  command: bazel_protos::build::bazel::remote::execution::v2::Command,
   execute_request: bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest,
 }
 
-#[derive(Clone)]
-pub struct BazelProtosProcessExecutionCodecV2 {
-  inner: BazelProtosProcessExecutionCodec,
-  instance_name: Option<String>,
-}
-
-impl BazelProtosProcessExecutionCodecV2 {
-  fn new(store: fs::Store, instance_name: Option<String>) -> Self {
-    let inner = BazelProtosProcessExecutionCodec::new(store);
-    BazelProtosProcessExecutionCodecV2 {
-      inner,
-      instance_name,
-    }
-  }
-
-  fn convert_digest(
-    digest: bazel_protos::build::bazel::remote::execution::v2::Digest,
-  ) -> bazel_protos::remote_execution::Digest {
-    let mut resulting_digest = bazel_protos::remote_execution::Digest::new();
-    resulting_digest.set_hash(digest.hash);
-    resulting_digest.set_size_bytes(digest.size_bytes);
-    resulting_digest
-  }
-
-  fn convert_output_file(
-    output_file: bazel_protos::build::bazel::remote::execution::v2::OutputFile,
-  ) -> bazel_protos::remote_execution::OutputFile {
-    let mut resulting_output_file = bazel_protos::remote_execution::OutputFile::new();
-    resulting_output_file.set_path(output_file.path);
-    if let Some(digest) = output_file.digest.map(Self::convert_digest) {
-      resulting_output_file.set_digest(digest);
-    }
-    resulting_output_file.set_is_executable(output_file.is_executable);
-    resulting_output_file
-  }
-
-  fn convert_output_directory(
-    output_dir: bazel_protos::build::bazel::remote::execution::v2::OutputDirectory,
-  ) -> bazel_protos::remote_execution::OutputDirectory {
-    let mut resulting_output_dir = bazel_protos::remote_execution::OutputDirectory::new();
-    resulting_output_dir.set_path(output_dir.path);
-    if let Some(digest) = output_dir.tree_digest.map(Self::convert_digest) {
-      resulting_output_dir.set_tree_digest(digest);
-    }
-    resulting_output_dir
-  }
-
-  fn convert_timestamp(timestamp: prost_types::Timestamp) -> protobuf::well_known_types::Timestamp {
-    let mut resulting_timestamp = protobuf::well_known_types::Timestamp::new();
-    resulting_timestamp.set_seconds(timestamp.seconds);
-    resulting_timestamp.set_nanos(timestamp.nanos);
-    resulting_timestamp
-  }
-
-  fn convert_execution_metadata(
-    exec_metadata: bazel_protos::build::bazel::remote::execution::v2::ExecutedActionMetadata,
-  ) -> bazel_protos::remote_execution::ExecutedActionMetadata {
-    let mut resulting_exec_metadata = bazel_protos::remote_execution::ExecutedActionMetadata::new();
-    resulting_exec_metadata.set_worker(exec_metadata.worker);
-    if let Some(queued_timestamp) = exec_metadata.queued_timestamp.map(Self::convert_timestamp) {
-      resulting_exec_metadata.set_queued_timestamp(queued_timestamp);
-    }
-    if let Some(worker_start_timestamp) = exec_metadata
-      .worker_start_timestamp
-      .map(Self::convert_timestamp)
-    {
-      resulting_exec_metadata.set_worker_start_timestamp(worker_start_timestamp);
-    }
-    if let Some(worker_completed_timestamp) = exec_metadata
-      .worker_completed_timestamp
-      .map(Self::convert_timestamp)
-    {
-      resulting_exec_metadata.set_worker_completed_timestamp(worker_completed_timestamp);
-    }
-    if let Some(input_fetch_start_timestamp) = exec_metadata
-      .input_fetch_start_timestamp
-      .map(Self::convert_timestamp)
-    {
-      resulting_exec_metadata.set_input_fetch_start_timestamp(input_fetch_start_timestamp);
-    }
-    if let Some(input_fetch_completed_timestamp) = exec_metadata
-      .input_fetch_completed_timestamp
-      .map(Self::convert_timestamp)
-    {
-      resulting_exec_metadata.set_input_fetch_completed_timestamp(input_fetch_completed_timestamp);
-    }
-    if let Some(execution_start_timestamp) = exec_metadata
-      .execution_start_timestamp
-      .map(Self::convert_timestamp)
-    {
-      resulting_exec_metadata.set_execution_start_timestamp(execution_start_timestamp);
-    }
-    if let Some(execution_completed_timestamp) = exec_metadata
-      .execution_completed_timestamp
-      .map(Self::convert_timestamp)
-    {
-      resulting_exec_metadata.set_execution_completed_timestamp(execution_completed_timestamp);
-    }
-    if let Some(output_upload_start_timestamp) = exec_metadata
-      .output_upload_start_timestamp
-      .map(Self::convert_timestamp)
-    {
-      resulting_exec_metadata.set_output_upload_start_timestamp(output_upload_start_timestamp);
-    }
-    if let Some(output_upload_completed_timestamp) = exec_metadata
-      .output_upload_completed_timestamp
-      .map(Self::convert_timestamp)
-    {
-      resulting_exec_metadata
-        .set_output_upload_completed_timestamp(output_upload_completed_timestamp);
-    }
-    resulting_exec_metadata
-  }
-
-  fn convert_action_result(
-    action_result: bazel_protos::build::bazel::remote::execution::v2::ActionResult,
-  ) -> bazel_protos::remote_execution::ActionResult {
-    let mut resulting_action_result = bazel_protos::remote_execution::ActionResult::new();
-    resulting_action_result.set_output_files(protobuf::RepeatedField::from_vec(
-      action_result
-        .output_files
-        .iter()
-        .cloned()
-        .map(Self::convert_output_file)
-        .collect(),
-    ));
-    resulting_action_result.set_output_directories(protobuf::RepeatedField::from_vec(
-      action_result
-        .output_directories
-        .iter()
-        .cloned()
-        .map(Self::convert_output_directory)
-        .collect(),
-    ));
-    resulting_action_result.set_exit_code(action_result.exit_code);
-    resulting_action_result.set_stdout_raw(Bytes::from(action_result.stdout_raw));
-    if let Some(digest) = action_result.stdout_digest.map(Self::convert_digest) {
-      resulting_action_result.set_stdout_digest(digest);
-    }
-    resulting_action_result.set_stderr_raw(Bytes::from(action_result.stderr_raw));
-    if let Some(digest) = action_result.stderr_digest.map(Self::convert_digest) {
-      resulting_action_result.set_stderr_digest(digest);
-    }
-    if let Some(execution_metadata) = action_result
-      .execution_metadata
-      .map(Self::convert_execution_metadata)
-    {
-      resulting_action_result.set_execution_metadata(execution_metadata);
-    }
-    resulting_action_result
-  }
-}
-
-impl
-  SerializableProcessExecutionCodec<
-    CacheableExecuteProcessRequest,
-    BazelProcessExecutionRequestV2,
-    CacheableExecuteProcessResult,
-    bazel_protos::build::bazel::remote::execution::v2::ActionResult,
-    String,
-  > for BazelProtosProcessExecutionCodecV2
-{
-  fn convert_request(
-    &self,
-    req: CacheableExecuteProcessRequest,
-  ) -> Result<BazelProcessExecutionRequestV2, String> {
-    let (action, command) = BazelProtosProcessExecutionCodec::make_action_with_command(req)?;
+impl BazelProcessExecutionRequest {
+  fn convert_execute_request(
+    req: &CacheableExecuteProcessRequest,
+    instance_name: &Option<String>,
+  ) -> Result<Self, String> {
+    let (action, command) = ActionSerializer::make_action_with_command(&req)?;
+    let action_proto_bytes = &fs::Store::encode_action_proto(&action)?;
     let execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
-      action_digest: Some((&BazelProtosProcessExecutionCodec::digest_message(&action)?).into()),
+      action_digest: Some(ActionSerializer::convert_digest(&fs::Store::digest_bytes(
+        &action_proto_bytes,
+      ))),
       skip_cache_lookup: false,
-      instance_name: self.instance_name.clone().unwrap_or_default(),
+      instance_name: instance_name.clone().unwrap_or_default(),
       execution_policy: None,
       results_cache_policy: None,
     };
-    Ok(BazelProcessExecutionRequestV2 {
+    Ok(BazelProcessExecutionRequest {
       action,
       command,
       execute_request,
     })
-  }
-
-  fn convert_response(
-    &self,
-    _res: CacheableExecuteProcessResult,
-  ) -> Result<bazel_protos::build::bazel::remote::execution::v2::ActionResult, String> {
-    panic!("converting from a cacheable process request to a v2 ActionResult is not yet supported");
-  }
-
-  fn extract_response(
-    &self,
-    serializable_response: bazel_protos::build::bazel::remote::execution::v2::ActionResult,
-  ) -> BoxFuture<CacheableExecuteProcessResult, String> {
-    let action_result_v1 = Self::convert_action_result(serializable_response);
-    self.inner.extract_response(action_result_v1)
   }
 }
 
@@ -347,9 +172,10 @@ impl super::CommandRunner for CommandRunner {
     let store = self.store.clone();
     let cacheable_execute_process_request =
       CacheableExecuteProcessRequest::new(req.clone(), self.cache_key_gen_version.clone());
-    let execute_request_result = self
-      .process_execution_codec
-      .convert_request(cacheable_execute_process_request);
+    let execute_request_result = BazelProcessExecutionRequest::convert_execute_request(
+      &cacheable_execute_process_request,
+      &self.instance_name,
+    );
 
     let ExecuteProcessRequest {
       description,
@@ -361,7 +187,7 @@ impl super::CommandRunner for CommandRunner {
     let description2 = description.clone();
 
     match execute_request_result {
-      Ok(BazelProcessExecutionRequestV2 {
+      Ok(BazelProcessExecutionRequest {
         action,
         command,
         execute_request,
@@ -375,8 +201,8 @@ impl super::CommandRunner for CommandRunner {
         let mut history = ExecutionHistory::default();
 
         self
-          .store_proto_locally(&command)
-          .join(self.store_proto_locally(&action))
+          .store_prost_proto_locally(&command)
+          .join(self.store_prost_proto_locally(&action))
           .and_then(move |(command_digest, action_digest)| {
             store2.ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
           })
@@ -598,7 +424,7 @@ impl CommandRunner {
       clients,
       store: store.clone(),
       futures_timer_thread,
-      process_execution_codec: BazelProtosProcessExecutionCodecV2::new(store, instance_name),
+      action_serializer: ActionSerializer::new(store.clone()),
     })
   }
 
@@ -612,17 +438,15 @@ impl CommandRunner {
     request
   }
 
-  fn store_proto_locally<P: protobuf::Message>(
+  fn store_prost_proto_locally<P: prost::Message>(
     &self,
     proto: &P,
   ) -> impl Future<Item = Digest, Error = String> {
     let store = self.store.clone();
     future::done(
-      proto
-        .write_to_bytes()
-        .map_err(|e| format!("Error serializing proto {:?}", e)),
+      fs::Store::encode_proto(proto).map_err(|e| format!("Error serializing proto {:?}", e)),
     )
-    .and_then(move |command_bytes| store.store_file_bytes(Bytes::from(command_bytes), true))
+    .and_then(move |command_bytes| store.store_file_bytes(command_bytes, true))
     .map_err(|e| format!("Error saving proto to local store: {:?}", e))
   }
 
@@ -706,12 +530,12 @@ impl CommandRunner {
         if status.code == bazel_protos::google::rpc::Code::Ok.into() {
           if let Some(result) = maybe_result {
             return self
-              .process_execution_codec
-              .extract_response(result.clone())
+              .action_serializer
+              .extract_action_result(&result)
               .map(|cacheable_result| cacheable_result.with_execution_attempts(execution_attempts))
               .map_err(move |err| {
                 ExecutionError::Fatal(format!(
-                  "error deocding process result {:?}: {:?}",
+                  "error decoding process result {:?}: {:?}",
                   result, err
                 ))
               })
@@ -882,7 +706,7 @@ mod tests {
 
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{
-    BazelProcessExecutionRequestV2, BazelProtosProcessExecutionCodec,
+    BazelProcessExecutionRequest, BazelProtosProcessExecutionCodec,
     BazelProtosProcessExecutionCodecV2, CacheableExecuteProcessRequest, CommandRunner,
     ExecuteProcessRequest, ExecutionError, ExecutionHistory, FallibleExecuteProcessResult,
   };
@@ -930,11 +754,12 @@ mod tests {
       jdk_home: None,
     };
 
-    let mut want_command = bazel_protos::remote_execution::Command::new();
+    let mut want_command = bazel_protos::build::bazel::remote::execution::v2::Command::new();
     want_command.mut_arguments().push("/bin/echo".to_owned());
     want_command.mut_arguments().push("yo".to_owned());
     want_command.mut_environment_variables().push({
-      let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+      let mut env =
+        bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
       env.set_name("SOME".to_owned());
       env.set_value("value".to_owned());
       env
@@ -949,7 +774,7 @@ mod tests {
       .mut_output_directories()
       .push("directory/name".to_owned());
 
-    let mut want_action = bazel_protos::remote_execution::Action::new();
+    let mut want_action = bazel_protos::build::bazel::remote::execution::v2::Action::new();
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
@@ -1005,11 +830,12 @@ mod tests {
       jdk_home: None,
     };
 
-    let mut want_command = bazel_protos::remote_execution::Command::new();
+    let mut want_command = bazel_protos::build::bazel::remote::execution::v2::Command::new();
     want_command.mut_arguments().push("/bin/echo".to_owned());
     want_command.mut_arguments().push("yo".to_owned());
     want_command.mut_environment_variables().push({
-      let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+      let mut env =
+        bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
       env.set_name("SOME".to_owned());
       env.set_value("value".to_owned());
       env
@@ -1024,7 +850,7 @@ mod tests {
       .mut_output_directories()
       .push("directory/name".to_owned());
 
-    let mut want_action = bazel_protos::remote_execution::Action::new();
+    let mut want_action = bazel_protos::build::bazel::remote::execution::v2::Action::new();
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
@@ -1094,17 +920,19 @@ mod tests {
       jdk_home: None,
     };
 
-    let mut want_command = bazel_protos::remote_execution::Command::new();
+    let mut want_command = bazel_protos::build::bazel::remote::execution::v2::Command::new();
     want_command.mut_arguments().push("/bin/echo".to_owned());
     want_command.mut_arguments().push("yo".to_owned());
     want_command.mut_environment_variables().push({
-      let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+      let mut env =
+        bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
       env.set_name("SOME".to_owned());
       env.set_value("value".to_owned());
       env
     });
     want_command.mut_environment_variables().push({
-      let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+      let mut env =
+        bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
       env.set_name(crate::cached_execution::CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_owned());
       env.set_value("meep".to_owned());
       env
@@ -1119,7 +947,7 @@ mod tests {
       .mut_output_directories()
       .push("directory/name".to_owned());
 
-    let mut want_action = bazel_protos::remote_execution::Action::new();
+    let mut want_action = bazel_protos::build::bazel::remote::execution::v2::Action::new();
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
@@ -1166,7 +994,7 @@ mod tests {
       jdk_home: Some(PathBuf::from("/tmp")),
     };
 
-    let mut want_command = bazel_protos::remote_execution::Command::new();
+    let mut want_command = bazel_protos::build::bazel::remote::execution::v2::Command::new();
     want_command.mut_arguments().push("/bin/echo".to_owned());
     want_command.mut_arguments().push("yo".to_owned());
     want_command.mut_platform().mut_properties().push({
@@ -1176,7 +1004,7 @@ mod tests {
       property
     });
 
-    let mut want_action = bazel_protos::remote_execution::Action::new();
+    let mut want_action = bazel_protos::build::bazel::remote::execution::v2::Action::new();
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
@@ -1282,7 +1110,7 @@ mod tests {
   }
 
   #[test]
-  fn extract_response_with_digest_stdout() {
+  fn extract_action_result_with_digest_stdout() {
     let op_name = "gimme-foo".to_string();
     let testdata = TestData::roland();
     let testdata_empty = TestData::empty();
@@ -1311,7 +1139,7 @@ mod tests {
   }
 
   #[test]
-  fn extract_response_with_digest_stderr() {
+  fn extract_action_result_with_digest_stderr() {
     let op_name = "gimme-foo".to_string();
     let testdata = TestData::roland();
     let testdata_empty = TestData::empty();
@@ -2133,21 +1961,23 @@ mod tests {
 
   #[test]
   fn digest_command() {
-    let mut command = bazel_protos::remote_execution::Command::new();
+    let mut command = bazel_protos::build::bazel::remote::execution::v2::Command::new();
     command.mut_arguments().push("/bin/echo".to_string());
     command.mut_arguments().push("foo".to_string());
 
-    let mut env1 = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    let mut env1 =
+      bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
     env1.set_name("A".to_string());
     env1.set_value("a".to_string());
     command.mut_environment_variables().push(env1);
 
-    let mut env2 = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    let mut env2 =
+      bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
     env2.set_name("B".to_string());
     env2.set_value("b".to_string());
     command.mut_environment_variables().push(env2);
 
-    let digest = BazelProtosProcessExecutionCodec::digest_message(&command).unwrap();
+    let digest = ActionSerializer::digest_proto(&command).unwrap();
 
     assert_eq!(
       &digest.0.to_hex(),
@@ -2578,7 +2408,7 @@ mod tests {
     let codec = codec_from_store(store, None);
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = runtime.block_on(codec.extract_response(result.clone()));
+    let result = runtime.block_on(codec.extract_action_result(result.clone()));
     runtime.shutdown_now().wait().unwrap();
     result
       .map(|res| res.output_directory)
@@ -2666,9 +2496,9 @@ mod tests {
     req: ExecuteProcessRequest,
     instance_name: Option<String>,
     cache_key_gen_version: Option<String>,
-  ) -> Result<BazelProcessExecutionRequestV2, String> {
+  ) -> Result<BazelProcessExecutionRequest, String> {
     let codec = codec(dir, instance_name);
-    codec.convert_request(CacheableExecuteProcessRequest::new(
+    codec.convert_request_to_action(CacheableExecuteProcessRequest::new(
       req,
       cache_key_gen_version,
     ))
@@ -2680,8 +2510,8 @@ mod tests {
     cache_key_gen_version: &Option<String>,
   ) -> Result<
     (
-      bazel_protos::remote_execution::Action,
-      bazel_protos::remote_execution::Command,
+      bazel_protos::build::bazel::remote::execution::v2::Action,
+      bazel_protos::build::bazel::remote::execution::v2::Command,
       bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest,
     ),
     String,
@@ -2694,7 +2524,7 @@ mod tests {
       cache_key_gen_version.clone(),
     )
     .map(
-      |BazelProcessExecutionRequestV2 {
+      |BazelProcessExecutionRequest {
          action,
          command,
          execute_request,

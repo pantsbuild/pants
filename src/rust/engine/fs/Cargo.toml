@@ -25,6 +25,7 @@ lazy_static = "1"
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
 log = "0.4"
 parking_lot = "0.6"
+prost = "0.4"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
 serverset = { path = "../serverset" }
 sha2 = "0.8"
