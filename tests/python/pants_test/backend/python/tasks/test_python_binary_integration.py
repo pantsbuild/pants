@@ -15,6 +15,11 @@ from pants.util.contextutil import open_zip, temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
+_LINUX_PLATFORM = "linux-x86_64"
+_LINUX_WHEEL_SUBSTRING = "manylinux"
+_OSX_PLATFORM = "macosx-10.13-x86_64"
+_OSX_WHEEL_SUBSTRING = "macosx"
+
 class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
   @staticmethod
   @contextmanager
@@ -68,9 +73,52 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(build())
       self.assert_pex_attribute(test_pex, 'zip_safe', True)
 
-  def test_platforms(self):
-    """Ensure that changing platforms invalidates the generated pex binaries."""
+  def test_platform_defaults_to_config(self):
+    self.platforms_test_impl(
+      target_platforms=None,
+      config_platforms=[_OSX_PLATFORM],
+      want_present_platforms=[_OSX_WHEEL_SUBSTRING],
+      want_missing_platforms=[_LINUX_PLATFORM],
+    )
 
+  def test_target_platform_without_config(self):
+    self.platforms_test_impl(
+      target_platforms=[_LINUX_PLATFORM],
+      config_platforms=None,
+      want_present_platforms=[_LINUX_WHEEL_SUBSTRING],
+      want_missing_platforms=[_OSX_WHEEL_SUBSTRING],
+    )
+
+  def test_target_platform_overrides_config(self):
+    self.platforms_test_impl(
+      target_platforms=[_LINUX_PLATFORM],
+      config_platforms=[_OSX_WHEEL_SUBSTRING],
+      want_present_platforms=[_LINUX_WHEEL_SUBSTRING],
+      want_missing_platforms=[_OSX_WHEEL_SUBSTRING],
+    )
+
+  def test_target_platform_narrows_config(self):
+    self.platforms_test_impl(
+      target_platforms=[_LINUX_PLATFORM],
+      config_platforms=[_LINUX_WHEEL_SUBSTRING, _OSX_WHEEL_SUBSTRING],
+      want_present_platforms=[_LINUX_WHEEL_SUBSTRING],
+      want_missing_platforms=[_OSX_WHEEL_SUBSTRING],
+    )
+
+  def test_target_platform_expands_config(self):
+    self.platforms_test_impl(
+      target_platforms=[_LINUX_PLATFORM, _OSX_PLATFORM],
+      config_platforms=[_LINUX_WHEEL_SUBSTRING],
+      want_present_platforms=[_LINUX_WHEEL_SUBSTRING, _OSX_WHEEL_SUBSTRING],
+    )
+
+  def platforms_test_impl(
+    self,
+    target_platforms,
+    config_platforms,
+    want_present_platforms,
+    want_missing_platforms=(),
+  ):
     def numpy_deps(deps):
       return [d for d in deps if 'numpy' in d]
     def assertInAny(substring, collection):
@@ -79,6 +127,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
     def assertNotInAny(substring, collection):
       self.assertTrue(all(substring not in d for d in collection),
         'Expected an entry matching "{}" in {}'.format(substring, collection))
+
     test_project = 'testprojects/src/python/cache_fields'
     test_build = os.path.join(test_project, 'BUILD')
     test_src = os.path.join(test_project, 'main.py')
@@ -88,19 +137,16 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       config['python-setup'] = {
         'platforms': None
       }
-      build = functools.partial(
-        self.run_pants_with_workdir,
-        command=['binary', test_project],
-        workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
-        config=config,
-        build_root=buildroot.new_buildroot
-      )
 
       buildroot.write_file(test_src, '')
 
       buildroot.write_file(test_build,
         dedent("""
-        python_binary(source='main.py', dependencies=[':numpy'])
+        python_binary(
+          source='main.py',
+          dependencies=[':numpy'],
+          {target_platforms}
+        )
         python_requirement_library(
           name='numpy',
           requirements=[
@@ -108,26 +154,26 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
           ]
         )
 
-        """)
+        """.format(
+          target_platforms="platforms = [{}],".format(", ".join(["'{}'".format(p) for p in target_platforms])) if target_platforms is not None else "",
+        ))
       )
       # When only the linux platform is requested,
       # only linux wheels should end up in the pex.
-      config['python-setup']['platforms'] = ['linux-x86_64']
-      build()
+      if config_platforms is not None:
+        config['python-setup']['platforms'] = config_platforms
+      result = self.run_pants_with_workdir(
+        command=['binary', test_project],
+        workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
+        config=config,
+        build_root=buildroot.new_buildroot,
+        tee_output=True,
+      )
+      self.assert_success(result)
 
       with open_zip(test_pex) as z:
         deps = numpy_deps(z.namelist())
-        assertInAny('manylinux', deps)
-        assertNotInAny('macosx', deps)
-
-      # When both linux and macosx platforms are requested,
-      # wheels for both should end up in the pex.
-      config['python-setup']['platforms'] = [
-        'linux-x86_64',
-        'macosx-10.13-x86_64']
-      build()
-
-      with open_zip(test_pex) as z:
-        deps = numpy_deps(z.namelist())
-        assertInAny('manylinux', deps)
-        assertInAny('macosx', deps)
+        for platform in want_present_platforms:
+          assertInAny(platform, deps)
+        for platform in want_missing_platforms:
+          assertNotInAny(platform, deps)
