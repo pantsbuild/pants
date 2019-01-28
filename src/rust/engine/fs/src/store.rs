@@ -789,9 +789,37 @@ mod local {
     inner: Arc<InnerStore>,
   }
 
+  ///
+  /// A simple wrapper for an lmdb database with an associated environment.
+  ///
   struct DbEnv(Arc<Database>, Arc<Environment>);
 
   impl DbEnv {
+    fn new(path: &Path, db_name: &str, flags: DatabaseFlags) -> Result<Arc<Self>, String> {
+      super::super::safe_create_dir_all(&path)
+        .map_err(|err| format!("Error making directory for store at {:?}: {:?}", path, err))?;
+      let process_executions_env = Environment::new()
+        .set_max_dbs(1)
+        .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
+        .open(&path)
+        .map_err(|err| {
+          format!(
+            "Error making process execution Environment for db at {:?}: {:?}",
+            path, err
+          )
+        })?;
+      process_executions_env
+        .create_db(Some(db_name), flags)
+        .map_err(|e| {
+          format!(
+            "Error creating/opening database named {:?} at {:?}: {}",
+            db_name, path, e
+          )
+        })
+        .map(|db| Arc::new(DbEnv(Arc::new(db), Arc::new(process_executions_env))))
+    }
+
+    // Arc requires calling a method to extract the constituent fields.
     fn get(&self) -> (Arc<Database>, Arc<Environment>) {
       (Arc::clone(&self.0), Arc::clone(&self.1))
     }
@@ -814,38 +842,17 @@ mod local {
       let files_root = root.join("files");
       let directories_root = root.join("directories");
       let process_executions_root = root.join("process_executions");
-      super::super::safe_create_dir_all(&process_executions_root).map_err(|err| {
-        format!(
-          "Error making directory for process execution store at {:?}: {:?}",
-          process_executions_root, err
-        )
-      })?;
-      let process_executions_env = Environment::new()
-        .set_max_dbs(1)
-        .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
-        // TODO: does the Environment need to be opened in a subdirectory of the db dir? see
-        // ShardedLmdb::make_env()!
-        .open(&process_executions_root)
-        .map_err(|err| {
-          format!(
-            "Error making process execution Environment for db at {:?}: {:?}",
-            process_executions_root, err
-          )
-        })?;
+
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
           pool: pool,
           file_dbs: ShardedLmdb::new(files_root.clone()).map(Arc::new),
           directory_dbs: ShardedLmdb::new(directories_root.clone()).map(Arc::new),
-          process_execution_db: process_executions_env
-            .create_db(Some("process_executions_content"), DatabaseFlags::empty())
-            .map_err(|e| {
-              format!(
-                "Error creating/opening process execution content database at {:?}: {}",
-                process_executions_root, e
-              )
-            })
-            .map(|db| Arc::new(DbEnv(Arc::new(db), Arc::new(process_executions_env)))),
+          process_execution_db: DbEnv::new(
+            &process_executions_root,
+            "process_executions_content",
+            DatabaseFlags::empty(),
+          ),
         }),
       })
     }
