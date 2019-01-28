@@ -1095,13 +1095,12 @@ mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
-      result.without_execution_attempts(),
-      FallibleExecuteProcessResult {
+      result.into_cacheable(),
+      CacheableExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: fs::EMPTY_DIGEST,
-        execution_attempts: vec![],
       }
     );
   }
@@ -1124,8 +1123,8 @@ mod tests {
         .unwrap()
       )
       .unwrap()
-      .without_execution_attempts(),
-      FallibleExecuteProcessResult {
+      .into_cacheable(),
+      CacheableExecuteProcessResult {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
         exit_code: 0,
@@ -1153,8 +1152,8 @@ mod tests {
         .unwrap()
       )
       .unwrap()
-      .without_execution_attempts(),
-      FallibleExecuteProcessResult {
+      .into_cacheable(),
+      CacheableExecuteProcessResult {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
         exit_code: 0,
@@ -1221,8 +1220,8 @@ mod tests {
     let result = rt.block_on(cmd_runner.run(echo_roland_request())).unwrap();
     rt.shutdown_now().wait().unwrap();
     assert_eq!(
-      result.without_execution_attempts(),
-      FallibleExecuteProcessResult {
+      result.into_cacheable(),
+      CacheableExecuteProcessResult {
         stdout: test_stdout.bytes(),
         stderr: test_stderr.bytes(),
         exit_code: 0,
@@ -1282,8 +1281,8 @@ mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
-      result.without_execution_attempts(),
-      FallibleExecuteProcessResult {
+      result.into_cacheable(),
+      CacheableExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -1358,8 +1357,8 @@ mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
 
     assert_eq!(
-      result.without_execution_attempts(),
-      FallibleExecuteProcessResult {
+      result.into_cacheable(),
+      CacheableExecuteProcessResult {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
@@ -1601,8 +1600,8 @@ mod tests {
     );
     rt.shutdown_now().wait().unwrap();
     assert_eq!(
-      result.unwrap().without_execution_attempts(),
-      FallibleExecuteProcessResult {
+      result.unwrap().into_cacheable(),
+      CacheableExecuteProcessResult {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
@@ -1790,12 +1789,11 @@ mod tests {
 
   #[test]
   fn extract_execute_response_success() {
-    let want_result = FallibleExecuteProcessResult {
+    let want_result = CacheableExecuteProcessResult {
       stdout: as_bytes("roland"),
       stderr: Bytes::from("simba"),
       exit_code: 17,
       output_directory: TestDirectory::nested().digest(),
-      execution_attempts: vec![],
     };
 
     let response = bazel_protos::build::bazel::remote::execution::v2::ExecuteResponse {
@@ -1831,7 +1829,7 @@ mod tests {
     assert_eq!(
       extract_execute_response(operation)
         .unwrap()
-        .without_execution_attempts(),
+        .into_cacheable(),
       want_result
     );
   }
