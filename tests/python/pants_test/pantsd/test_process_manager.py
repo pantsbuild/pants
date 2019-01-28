@@ -16,7 +16,7 @@ import psutil
 from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessMetadataManager,
                                           swallow_psutil_exceptions)
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_file_write
+from pants.util.dirutil import safe_file_dump
 from pants.util.process_handler import subprocess
 from pants_test.test_base import TestBase
 
@@ -149,7 +149,7 @@ class TestProcessMetadataManager(TestBase):
   def test_wait_for_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
-      safe_file_write(test_filename, 'test')
+      safe_file_dump(test_filename, 'test')
       self.pmm._wait_for_file(test_filename, timeout=.1)
 
   def test_wait_for_file_timeout(self):

@@ -12,7 +12,7 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_file_write
+from pants.util.dirutil import safe_file_dump
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -37,7 +37,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
   def tmp_scalastyle_config(self):
     with temporary_dir(root_dir=get_buildroot()) as scalastyle_dir:
       path = os.path.join(scalastyle_dir, 'config.xml')
-      safe_file_write(path, '''<scalastyle/>''')
+      safe_file_dump(path, '''<scalastyle/>''', mode='w')
       yield '--lint-scalastyle-config={}'.format(path)
 
   def pants_run(self, options=None):

@@ -20,7 +20,7 @@ from pants.base.build_environment import get_buildroot
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_client import NailgunClient
 from pants.pantsd.process_manager import FingerprintedProcessManager, ProcessGroup
-from pants.util.dirutil import read_file, safe_file_write, safe_open
+from pants.util.dirutil import read_file, safe_file_dump, safe_open
 
 
 logger = logging.getLogger(__name__)
@@ -228,8 +228,8 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
   def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr, stdin):
     """Synchronously spawn a new nailgun server."""
     # Truncate the nailguns stdout & stderr.
-    safe_file_write(self._ng_stdout, b'', mode='wb')
-    safe_file_write(self._ng_stderr, b'', mode='wb')
+    safe_file_dump(self._ng_stdout, b'', mode='wb')
+    safe_file_dump(self._ng_stderr, b'', mode='wb')
 
     jvm_options = jvm_options + [self._PANTS_NG_BUILDROOT_ARG,
                                  self._create_owner_arg(self._workdir),

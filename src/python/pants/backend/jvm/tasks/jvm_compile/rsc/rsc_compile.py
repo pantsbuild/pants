@@ -34,7 +34,7 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import (fast_relpath, fast_relpath_optional, maybe_read_file,
-                                safe_file_write, safe_mkdir)
+                                safe_file_dump, safe_mkdir)
 from pants.util.memo import memoized_property
 
 
@@ -61,7 +61,7 @@ def stdout_contents(wu):
 
 
 def write_digest(output_dir, digest):
-  safe_file_write(
+  safe_file_dump(
     '{}.digest'.format(output_dir),
     mode='w',
     payload='{}:{}'.format(digest.fingerprint, digest.serialized_bytes_length))

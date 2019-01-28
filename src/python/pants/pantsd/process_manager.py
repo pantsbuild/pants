@@ -18,7 +18,7 @@ import psutil
 from pants.base.build_environment import get_buildroot
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.process.subprocess import Subprocess
-from pants.util.dirutil import read_file, rm_rf, safe_file_write, safe_mkdir
+from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 
@@ -191,7 +191,7 @@ class ProcessMetadataManager(object):
     """
     self._maybe_init_metadata_dir_by_name(name)
     file_path = self._metadata_file_path(name, metadata_key)
-    safe_file_write(file_path, metadata_value)
+    safe_file_dump(file_path, metadata_value, mode='w')
 
   def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
     """Block up to a timeout for process metadata to arrive on disk.

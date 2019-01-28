@@ -14,7 +14,7 @@ from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import is_executable, read_file, safe_file_write
+from pants.util.dirutil import is_executable, read_file, safe_file_dump
 from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import name_and_platform
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -130,7 +130,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       orig_wrapped_math_build = read_file(self._wrapped_math_build_file, binary_mode=False)
       without_strict_deps_wrapped_math_build = re.sub(
         'strict_deps=False,', '', orig_wrapped_math_build)
-      safe_file_write(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build)
+      safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build, mode='w')
 
       # This should fail because it does not turn on strict_deps for a target which requires it.
       pants_binary_strict_deps_failure = self.run_pants_with_workdir(

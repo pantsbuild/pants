@@ -13,7 +13,7 @@ import unittest
 from builtins import open, range, zip
 
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import rm_rf, safe_file_write, safe_mkdir, touch
+from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
@@ -358,17 +358,17 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         pantsd_run(['help'])
         checker.assert_started()
 
-        safe_file_write(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))")
+        safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))", mode='w')
         result = pantsd_run(export_cmd)
         checker.assert_running()
         assertNotRegex(self, result.stdout_data, has_source_root_regex)
 
-        safe_file_write(test_build_file, "python_library(sources=globs('*.py'))")
+        safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))", mode='w')
         result = pantsd_run(export_cmd)
         checker.assert_running()
         assertNotRegex(self, result.stdout_data, has_source_root_regex)
 
-        safe_file_write(test_src_file, 'import this\n')
+        safe_file_dump(test_src_file, 'import this\n', mode='w')
         result = pantsd_run(export_cmd)
         checker.assert_running()
         assertRegex(self, result.stdout_data, has_source_root_regex)
@@ -385,7 +385,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     try:
       safe_mkdir(test_path, clean=True)
-      safe_file_write(test_build_file, "{}()".format(invalid_symbol))
+      safe_file_dump(test_build_file, "{}()".format(invalid_symbol), mode='w')
       for _ in range(3):
         with self.pantsd_run_context(success=False) as (pantsd_run, checker, _, _):
           result = pantsd_run(['list', 'testprojects::'])

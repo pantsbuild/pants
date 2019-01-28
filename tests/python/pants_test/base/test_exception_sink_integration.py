@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import read_file, safe_file_write, safe_mkdir, touch
+from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.py2_compat import assertRegex
 
@@ -198,7 +198,7 @@ Current thread [^\n]+ \\(most recent call first\\):
 
     with temporary_dir() as tmpdir:
       some_file = os.path.join(tmpdir, 'some_file')
-      safe_file_write(some_file, b'', mode='wb')
+      safe_file_dump(some_file, b'', mode='wb')
       redirected_pants_run = self.run_pants([
         "--lifecycle-stubs-new-interactive-stream-output-file={}".format(some_file),
       ] + lifecycle_stub_cmdline)

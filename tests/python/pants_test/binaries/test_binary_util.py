@@ -17,7 +17,7 @@ from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, Binary
 from pants.net.http.fetcher import Fetcher
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import is_readable_dir, safe_file_write, safe_open
+from pants.util.dirutil import is_readable_dir, safe_file_dump, safe_open
 from pants_test.test_base import TestBase
 
 
@@ -346,7 +346,7 @@ class BinaryUtilTest(TestBase):
     """Test invoking binary_util.py as a standalone script."""
     with temporary_dir() as tmp_dir:
       config_file_loc = os.path.join(tmp_dir, 'pants.ini')
-      safe_file_write(config_file_loc, """\
+      safe_file_dump(config_file_loc, """\
 [GLOBAL]
 allow_external_binary_tool_downloads: True
 pants_bootstrapdir: {}

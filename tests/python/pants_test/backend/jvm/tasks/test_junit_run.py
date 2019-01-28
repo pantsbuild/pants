@@ -27,7 +27,7 @@ from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import safe_file_write, touch
+from pants.util.dirutil import safe_file_dump, touch
 from pants.util.process_handler import subprocess
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystem
@@ -218,7 +218,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     # Existing files (with and without the method name) should trigger.
     srcfile = os.path.join(self.test_workdir, 'this.is.a.source.file.scala')
-    safe_file_write(srcfile, 'content!')
+    safe_file_dump(srcfile, 'content!', mode='w')
     self.assertTrue(JUnitRun.request_classes_by_source([srcfile]))
     self.assertTrue(JUnitRun.request_classes_by_source(['{}#method'.format(srcfile)]))
 
