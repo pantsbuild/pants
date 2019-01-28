@@ -29,7 +29,9 @@ EOF
   fi
 }
 
-if [[ -z "$NO_PANTS3_CLEAN" ]]; then
+# If we are running at a terminal, run the cleaning process if necessary. This should return false
+# in CI.
+if [[ -t 0 ]]; then
   pants3_maybe_clean
 fi
 
