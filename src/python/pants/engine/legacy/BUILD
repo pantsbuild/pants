@@ -55,6 +55,7 @@ python_library(
     'src/python/pants/engine:nodes',
     'src/python/pants/engine:struct',
     'src/python/pants/source',
+    'src/python/pants/util:collections_abc_backport',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',

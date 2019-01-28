@@ -17,6 +17,7 @@ from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.engine.objects import Locatable
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
+from pants.util.collections_abc_backport import MutableSequence, MutableSet
 from pants.util.contextutil import exception_logging
 from pants.util.meta import AbstractClass
 from pants.util.objects import Exactly, SubclassesOf, datatype
@@ -311,7 +312,7 @@ class BaseGlobs(Locatable, AbstractClass):
       return sources
     elif isinstance(sources, string_types):
       return Files(sources, spec_path=spec_path)
-    elif isinstance(sources, (set, list, tuple)) and \
+    elif isinstance(sources, (MutableSet, MutableSequence, tuple)) and \
          all(isinstance(s, string_types) for s in sources):
       return Files(*sources, spec_path=spec_path)
     else:
