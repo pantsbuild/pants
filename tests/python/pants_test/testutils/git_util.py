@@ -28,7 +28,7 @@ def git_version():
 
 def get_repo_root():
   """Return the absolute path to the root directory of the Pants git repo."""
-  return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip()
+  return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip().decode('utf-8')
 
 
 @contextmanager
@@ -54,6 +54,10 @@ def initialize_repo(worktree, gitdir=None):
   with use_gitdir() as git_dir, environment_as(GIT_DIR=git_dir, GIT_WORK_TREE=worktree):
     subprocess.check_call(['git', 'init'])
     subprocess.check_call(['git', 'config', 'user.email', 'you@example.com'])
+    # TODO: This method inherits the global git settings, so if a developer has gpg signing on, this
+    # will turn that off. We should probably just disable reading from the global config somehow:
+    # https://git-scm.com/docs/git-config.
+    subprocess.check_call(['git', 'config', 'commit.gpgSign', 'false'])
     subprocess.check_call(['git', 'config', 'user.name', 'Your Name'])
     subprocess.check_call(['git', 'add', '.'])
     subprocess.check_call(['git', 'commit', '-am', 'Add project files.'])

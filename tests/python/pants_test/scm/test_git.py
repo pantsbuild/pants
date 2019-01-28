@@ -29,6 +29,7 @@ class GitTest(unittest.TestCase):
     subprocess.check_call(['git', 'init'])
     subprocess.check_call(['git', 'config', 'user.email', 'you@example.com'])
     subprocess.check_call(['git', 'config', 'user.name', 'Your Name'])
+    subprocess.check_call(['git', 'config', 'commit.gpgSign', 'false'])
     subprocess.check_call(['git', 'remote', 'add', remote_name, remote])
 
   def setUp(self):
@@ -401,6 +402,7 @@ class GitTest(unittest.TestCase):
 
         subprocess.check_call(['git', 'config', '--local', '--add', 'i18n.commitencoding',
                                encoding])
+        subprocess.check_call(['git', 'config', '--local', 'commit.gpgSign', 'false'])
         try:
           subprocess.check_call(['git', 'commit', '-m', message.encode(encoding)])
         finally:
