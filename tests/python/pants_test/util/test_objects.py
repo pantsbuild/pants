@@ -548,42 +548,42 @@ class TypedDatatypeTest(TestBase):
   def test_instance_construction_errors(self):
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype(something=3)
-    expected_msg = """\
-error: in constructor of type SomeTypedDatatype: type check error:
-unrecognized arguments: ['something']"""
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n__new__() got an unexpected keyword argument 'something'"
     self.assertEqual(str(cm.exception), expected_msg)
 
     # not providing all the fields
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype()
-    expected_msg = """\
-error: in constructor of type SomeTypedDatatype: type check error:
-missing arguments: [{}'val']""".format('u' if PY2 else '')
+    expected_msg_ending = (
+      "__new__() missing 1 required positional argument: 'val'"
+      if PY3 else
+      "__new__() takes exactly 2 arguments (1 given)"
+    )
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n" + expected_msg_ending
     self.assertEqual(str(cm.exception), expected_msg)
 
     # unrecognized fields
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype(3, 4)
-    expected_msg = """\
-error: in constructor of type SomeTypedDatatype: type check error:
-too many positional arguments: 2 arguments for 1 fields!
-args: (3, 4)
-fields: [{}'val']""".format('u' if PY2 else '')
+    expected_msg_ending = (
+      "__new__() takes 2 positional arguments but 3 were given"
+      if PY3 else
+      "__new__() takes exactly 2 arguments (3 given)"
+    )
+    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n" + expected_msg_ending
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
       CamelCaseWrapper(nonneg_int=3)
-    expected_msg = """\
-error: in constructor of type CamelCaseWrapper: type check error:
-field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(NonNegativeInt)."""
+    expected_msg = (
+      """error: in constructor of type CamelCaseWrapper: type check error:
+field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(NonNegativeInt).""")
     self.assertEqual(str(cm.exception), expected_msg)
 
     # test that kwargs with keywords that aren't field names fail the same way
     with self.assertRaises(TypeError) as cm:
       CamelCaseWrapper(4, a=3)
-    expected_msg = """\
-error: in constructor of type CamelCaseWrapper: type check error:
-unrecognized arguments: ['a']"""
+    expected_msg = "error: in constructor of type CamelCaseWrapper: type check error:\n__new__() got an unexpected keyword argument 'a'"
     self.assertEqual(str(cm.exception), expected_msg)
 
   def test_type_check_errors(self):
@@ -678,9 +678,9 @@ field 'dependencies' was invalid: value [3, {}'asdf'] (with type 'list') must sa
 
     with self.assertRaises(TypeCheckError) as cm:
       obj.copy(nonexistent_field=3)
-    expected_msg = """\
-error: in constructor of type AnotherTypedDatatype: type check error:
-unrecognized arguments: ['nonexistent_field']"""
+    expected_msg = (
+      """error: in constructor of type AnotherTypedDatatype: type check error:
+__new__() got an unexpected keyword argument 'nonexistent_field'""")
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypeCheckError) as cm:
