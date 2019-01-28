@@ -20,6 +20,7 @@ _LINUX_WHEEL_SUBSTRING = "manylinux"
 _OSX_PLATFORM = "macosx-10.13-x86_64"
 _OSX_WHEEL_SUBSTRING = "macosx"
 
+
 class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
   @staticmethod
   @contextmanager
