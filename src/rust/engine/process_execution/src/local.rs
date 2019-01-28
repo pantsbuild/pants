@@ -293,6 +293,7 @@ impl super::CommandRunner for CommandRunner {
             })
             .map(Arc::new)
             .and_then(|posix_fs| {
+              eprintln!("output_file_paths: {:?}", output_file_paths);
               CommandRunner::construct_output_snapshot(
                 store,
                 posix_fs,
@@ -337,13 +338,12 @@ mod tests {
 
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
+  use crate::local::testutils::*;
   use fs;
   use futures::Future;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
-  use std::env;
-  use std::os::unix::fs::PermissionsExt;
-  use std::path::{Path, PathBuf};
+  use std::path::PathBuf;
   use std::sync::Arc;
   use std::time::Duration;
   use tempfile::TempDir;
@@ -883,8 +883,15 @@ mod tests {
     };
     runner.run(req).wait()
   }
+}
 
-  fn find_bash() -> String {
+#[cfg(test)]
+pub mod testutils {
+  use std::env;
+  use std::os::unix::fs::PermissionsExt;
+  use std::path::{Path, PathBuf};
+
+  pub fn find_bash() -> String {
     which("bash")
       .expect("No bash on PATH")
       .to_str()
@@ -892,7 +899,7 @@ mod tests {
       .to_owned()
   }
 
-  fn which(executable: &str) -> Option<PathBuf> {
+  pub fn which(executable: &str) -> Option<PathBuf> {
     if let Some(paths) = env::var_os("PATH") {
       for path in env::split_paths(&paths) {
         let executable_path = path.join(executable);
@@ -904,7 +911,7 @@ mod tests {
     None
   }
 
-  fn is_executable(path: &Path) -> bool {
+  pub fn is_executable(path: &Path) -> bool {
     std::fs::metadata(path)
       .map(|meta| meta.permissions().mode() & 0o100 == 0o100)
       .unwrap_or(false)

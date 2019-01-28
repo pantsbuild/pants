@@ -16,6 +16,7 @@ use super::{
   ActionSerializer, CacheableExecuteProcessRequest, ExecuteProcessRequest, ExecutionStats,
   FallibleExecuteProcessResult,
 };
+use crate::cached_execution::OutputDirWrapping;
 use std;
 use std::cmp::min;
 
@@ -390,7 +391,7 @@ impl CommandRunner {
           if let Some(result) = maybe_result {
             return self
               .action_serializer
-              .extract_action_result(&result)
+              .extract_action_result(&result, OutputDirWrapping::Direct)
               .map(|cacheable_result| cacheable_result.with_execution_attempts(execution_attempts))
               .map_err(move |err| {
                 ExecutionError::Fatal(format!(
@@ -738,6 +739,7 @@ mod tests {
     ActionSerializer, BazelProcessExecutionRequest, CacheableExecuteProcessRequest, CommandRunner,
     ExecuteProcessRequest, ExecutionError, ExecutionHistory, FallibleExecuteProcessResult,
   };
+  use crate::cached_execution::OutputDirWrapping;
   use mock::execution_server::MockOperation;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
@@ -2404,7 +2406,8 @@ mod tests {
     let action_serializer = ActionSerializer::new(store);
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = runtime.block_on(action_serializer.extract_action_result(&result));
+    let result =
+      runtime.block_on(action_serializer.extract_action_result(&result, OutputDirWrapping::Direct));
     runtime.shutdown_now().wait().unwrap();
     result
       .map(|res| res.output_directory)

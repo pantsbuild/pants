@@ -40,7 +40,7 @@ use futures::future::{self, Future};
 use log::debug;
 
 use fs::{File, PathStat};
-use hashing::Digest;
+use hashing::{Digest, Fingerprint};
 
 use super::{CommandRunner, ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult};
 
@@ -90,6 +90,12 @@ impl CacheableExecuteProcessResult {
   }
 }
 
+/// ???
+pub enum OutputDirWrapping {
+  Direct,
+  TopLevelWrapped,
+}
+
 /// ???/it's called "immediate" because it's a best-effort thing located locally (???)
 pub trait ImmediateExecutionCache<ProcessRequest, ProcessResult>: Send + Sync {
   fn record_process_result(
@@ -110,6 +116,13 @@ pub struct ActionSerializer {
 impl ActionSerializer {
   pub fn new(store: fs::Store) -> Self {
     ActionSerializer { store }
+  }
+
+  fn extract_digest(
+    digest: &bazel_protos::build::bazel::remote::execution::v2::Digest,
+  ) -> Result<Digest, String> {
+    let fingerprint = Fingerprint::from_hex_string(&digest.hash)?;
+    Ok(Digest(fingerprint, digest.size_bytes as usize))
   }
 
   pub fn convert_digest(
@@ -315,10 +328,43 @@ impl ActionSerializer {
     }
   }
 
+  fn extract_output_files_with_single_containing_directory(
+    result: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
+  ) -> Result<Digest, String> {
+    let invalid_containing_dir = || {
+      format!("Error: invalid output directory for result {:?}. An process execution extracted as an ActionResult from the process execution cache must will always contain a single top-level directory with the path \"\".",
+              result)
+    };
+
+    if result.output_files.is_empty() && result.output_directories.len() == 1 {
+      // A single directory (with a provided digest), which should be at the path "".
+      let dir = result.output_directories.last().unwrap();
+      if dir.path.is_empty() {
+        let proto_digest = dir.tree_digest.clone().unwrap();
+        Self::extract_digest(&proto_digest)
+      } else {
+        Err(invalid_containing_dir())
+      }
+    } else {
+      Err(invalid_containing_dir())
+    }
+  }
+
   fn extract_output_files(
     &self,
     result: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
+    wrapping: OutputDirWrapping,
   ) -> BoxFuture<Digest, String> {
+    match wrapping {
+      OutputDirWrapping::Direct => (),
+      OutputDirWrapping::TopLevelWrapped => {
+        return future::result(Self::extract_output_files_with_single_containing_directory(
+          result,
+        ))
+        .to_boxed();
+      }
+    }
+
     // Get Digests of output Directories.
     // Then we'll make a Directory for the output files, and merge them.
     let output_directories = result.output_directories.clone();
@@ -447,12 +493,13 @@ impl ActionSerializer {
   pub fn extract_action_result(
     &self,
     res: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
+    wrapping: OutputDirWrapping,
   ) -> BoxFuture<CacheableExecuteProcessResult, String> {
     let exit_code = res.exit_code;
     self
       .extract_stdout(&res)
       .join(self.extract_stderr(&res))
-      .join(self.extract_output_files(&res))
+      .join(self.extract_output_files(&res, wrapping))
       .map(
         move |((stdout, stderr), output_directory)| CacheableExecuteProcessResult {
           stdout,
@@ -505,7 +552,11 @@ impl ImmediateExecutionCache<CacheableExecuteProcessRequest, CacheableExecutePro
       .and_then(move |action_proto| store.load_process_result(&action_proto))
       .and_then(move |maybe_action_result| match maybe_action_result {
         Some(action_result) => cache
-          .extract_action_result(&action_result)
+          // NB: FallibleExecuteProcessResult always wraps everything in a *single* output
+          // directory, which is then converted into an OutputDirectory for the ActionResult proto
+          // at the path "" in convert_result_to_action_result(), so we have to pull the contents
+          // out of that single dir with the path "".
+          .extract_action_result(&action_result, OutputDirWrapping::TopLevelWrapped)
           .map(Some)
           .to_boxed(),
         None => future::result(Ok(None)).to_boxed(),
@@ -602,31 +653,105 @@ impl CommandRunner for CachingCommandRunner {
 mod tests {
   use super::{
     ActionSerializer, CacheableExecuteProcessRequest, CacheableExecuteProcessResult,
-    CachingCommandRunner, CommandRunner, ExecuteProcessRequest, ImmediateExecutionCache,
+    CachingCommandRunner, CommandRunner, ExecuteProcessRequest, FallibleExecuteProcessResult,
+    ImmediateExecutionCache,
   };
+  use crate::local::testutils::find_bash;
   use futures::future::Future;
+  use hashing::{Digest, Fingerprint};
   use std::collections::{BTreeMap, BTreeSet};
   use std::ops::Deref;
   use std::path::Path;
+  use std::path::PathBuf;
   use std::sync::Arc;
   use std::time::Duration;
   use tempfile::TempDir;
+  use testutil::data::{TestData, TestDirectory};
   use testutil::owned_string_vec;
 
-  // // TODO: test codec back and forth
-  // #[test]
-  // fn bazel_proto_process_execution_codec() {
-  //   let req = ExecuteProcessRequest {
-  //     argv: owned_string_vec(&["ls", "-R", "/"]),
-  //     env: BTreeMap::new(),
-  //     input_files: fs::EMPTY_DIGEST,
-  //     output_files:
-  //   }
-  // }
+  #[test]
+  fn encode_action() {
+    let input_directory = TestDirectory::containing_roland();
+    let req = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "yo"]),
+      env: vec![("SOME".to_owned(), "value".to_owned())]
+        .into_iter()
+        .collect(),
+      input_files: input_directory.digest(),
+      // Intentionally poorly sorted:
+      output_files: vec!["path/to/file", "other/file"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
+      output_directories: vec!["directory/name"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
+      timeout: Duration::from_millis(1000),
+      description: "some description".to_owned(),
+      jdk_home: None,
+    };
+
+    let want_action = bazel_protos::build::bazel::remote::execution::v2::Action {
+      command_digest: Some(ActionSerializer::convert_digest(&Digest(
+        Fingerprint::from_hex_string(
+          "cc4ddd3085aaffbe0abce22f53b30edbb59896bb4a4f0d76219e48070cd0afe1",
+        )
+        .unwrap(),
+        72,
+      ))),
+      input_root_digest: Some(ActionSerializer::convert_digest(&input_directory.digest())),
+      ..Default::default()
+    };
+
+    assert_eq!(
+      Ok(want_action),
+      ActionSerializer::convert_request_to_action(&CacheableExecuteProcessRequest::new(req, None))
+    );
+  }
+
+  #[test]
+  fn encode_empty_action_result() {
+    let testdata_empty = TestData::empty();
+
+    let empty_proto_digest = bazel_protos::build::bazel::remote::execution::v2::Digest {
+      hash: fs::EMPTY_DIGEST.0.to_hex(),
+      size_bytes: fs::EMPTY_DIGEST.1 as i64,
+    };
+
+    let want_action_result = bazel_protos::build::bazel::remote::execution::v2::ActionResult {
+      output_files: vec![],
+      output_directories: vec![
+        bazel_protos::build::bazel::remote::execution::v2::OutputDirectory {
+          path: "".to_string(),
+          tree_digest: Some(empty_proto_digest.clone()),
+        },
+      ],
+      exit_code: 0,
+      stdout_raw: vec![],
+      stdout_digest: Some(empty_proto_digest.clone()),
+      stderr_raw: vec![],
+      stderr_digest: Some(empty_proto_digest.clone()),
+      execution_metadata: None,
+    };
+
+    let empty_result = FallibleExecuteProcessResult {
+      stdout: testdata_empty.bytes(),
+      stderr: testdata_empty.bytes(),
+      exit_code: 0,
+      output_directory: fs::EMPTY_DIGEST,
+      execution_attempts: vec![],
+    };
+
+    assert_eq!(
+      want_action_result,
+      ActionSerializer::convert_result_to_action_result(&empty_result.into_cacheable())
+    );
+  }
 
   #[test]
   #[cfg(unix)]
-  fn cached_process_execution() {
+  fn cached_process_execution_stdout() {
     let random_perl = output_only_process_request(owned_string_vec(&[
       "/usr/bin/perl",
       "-e",
@@ -647,6 +772,9 @@ mod tests {
     );
     let caching_runner = make_caching_runner(base_runner.clone(), action_serializer.clone(), None);
     let process_result = caching_runner.run(random_perl.clone()).wait().unwrap();
+    // The process run again without caching is different.
+    let base_process_result = base_runner.run(random_perl.clone()).wait().unwrap();
+    assert!(base_process_result != process_result);
     assert_eq!(0, process_result.exit_code);
     // A "cacheable" process execution result won't have e.g. the number of attempts that the
     // process was tried, for idempotency, but everything else should be the same.
@@ -744,6 +872,54 @@ mod tests {
     // The new result is distinct from all the previously cached invocations.
     assert!(second_string_perl_number != perl_number);
     assert!(second_string_perl_number != new_perl_number);
+  }
+
+  #[test]
+  #[cfg(unix)]
+  fn cached_process_execution_output_files() {
+    let make_file = ExecuteProcessRequest {
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        "/usr/bin/perl -e 'print(rand(10))' > wow.txt".to_string(),
+      ],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: vec!["wow.txt"].into_iter().map(PathBuf::from).collect(),
+      output_directories: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "make a nondeterministic file".to_string(),
+      jdk_home: None,
+    };
+    let store_dir = TempDir::new().unwrap();
+    let work_dir = TempDir::new().unwrap();
+    let (_, base_runner, action_serializer) = cache_in_dir(store_dir.path(), work_dir.path());
+    let cacheable_make_file = CacheableExecuteProcessRequest {
+      req: make_file.clone(),
+      cache_key_gen_version: None,
+    };
+    assert_eq!(
+      Ok(None),
+      action_serializer
+        .load_process_result(&cacheable_make_file)
+        .wait()
+    );
+    let caching_runner = make_caching_runner(base_runner.clone(), action_serializer.clone(), None);
+    let base_process_result = base_runner.run(make_file.clone()).wait().unwrap();
+    let process_result = caching_runner.run(make_file.clone()).wait().unwrap();
+    // The process run again without caching is different.
+    assert!(base_process_result != process_result);
+    assert_eq!(0, process_result.exit_code);
+    assert_eq!(
+      process_result.clone().into_cacheable(),
+      action_serializer
+        .load_process_result(&cacheable_make_file)
+        .wait()
+        .unwrap()
+        .unwrap()
+    );
+    let second_process_result = caching_runner.run(make_file.clone()).wait().unwrap();
+    assert_eq!(second_process_result, process_result);
   }
 
   fn output_only_process_request(argv: Vec<String>) -> ExecuteProcessRequest {
