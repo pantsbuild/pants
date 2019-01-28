@@ -4,13 +4,13 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from future.utils import PY3
-
 import inspect
 import re
 import textwrap
 from builtins import object, range
 from collections import namedtuple
+
+from future.utils import PY3
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
