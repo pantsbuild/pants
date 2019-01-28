@@ -207,7 +207,7 @@ impl ActionSerializer {
     })
   }
 
-  fn encode_command_proto(
+  pub fn encode_command_proto(
     command: &bazel_protos::build::bazel::remote::execution::v2::Command,
   ) -> Result<Bytes, String> {
     fs::Store::encode_proto(command)
@@ -642,7 +642,7 @@ mod tests {
     assert_eq!(
       Ok(None),
       action_serializer
-        .load_process_result(cacheable_perl.clone())
+        .load_process_result(&cacheable_perl)
         .wait()
     );
     let caching_runner = make_caching_runner(base_runner.clone(), action_serializer.clone(), None);
@@ -653,7 +653,7 @@ mod tests {
     assert_eq!(
       process_result.clone().into_cacheable(),
       action_serializer
-        .load_process_result(cacheable_perl)
+        .load_process_result(&cacheable_perl)
         .wait()
         .unwrap()
         .unwrap()
@@ -678,7 +678,7 @@ mod tests {
     assert_eq!(
       Ok(None),
       action_serializer
-        .load_process_result(new_cacheable_perl.clone())
+        .load_process_result(&new_cacheable_perl)
         .wait()
     );
     let new_caching_runner = make_caching_runner(
@@ -693,7 +693,7 @@ mod tests {
     assert_eq!(
       new_process_result.clone().into_cacheable(),
       action_serializer
-        .load_process_result(new_cacheable_perl)
+        .load_process_result(&new_cacheable_perl)
         .wait()
         .unwrap()
         .unwrap()
@@ -715,7 +715,7 @@ mod tests {
     assert_eq!(
       Ok(None),
       action_serializer
-        .load_process_result(second_cache_string_perl.clone())
+        .load_process_result(&second_cache_string_perl)
         .wait()
     );
     let second_string_caching_runner = make_caching_runner(
@@ -731,7 +731,7 @@ mod tests {
     assert_eq!(
       second_string_process_result.clone().into_cacheable(),
       action_serializer
-        .load_process_result(second_cache_string_perl)
+        .load_process_result(&second_cache_string_perl)
         .wait()
         .unwrap()
         .unwrap()

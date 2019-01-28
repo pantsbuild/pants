@@ -115,7 +115,7 @@ impl CommandRunner {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BazelProcessExecutionRequest {
   action: bazel_protos::build::bazel::remote::execution::v2::Action,
   command: bazel_protos::build::bazel::remote::execution::v2::Command,
@@ -123,6 +123,18 @@ pub struct BazelProcessExecutionRequest {
 }
 
 impl BazelProcessExecutionRequest {
+  fn new(
+    action: bazel_protos::build::bazel::remote::execution::v2::Action,
+    command: bazel_protos::build::bazel::remote::execution::v2::Command,
+    execute_request: bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest,
+  ) -> Self {
+    BazelProcessExecutionRequest {
+      action,
+      command,
+      execute_request,
+    }
+  }
+
   fn convert_execute_request(
     req: &CacheableExecuteProcessRequest,
     instance_name: &Option<String>,
@@ -138,13 +150,24 @@ impl BazelProcessExecutionRequest {
       execution_policy: None,
       results_cache_policy: None,
     };
-    Ok(BazelProcessExecutionRequest {
+    Ok(BazelProcessExecutionRequest::new(
       action,
       command,
       execute_request,
-    })
+    ))
   }
 }
+
+#[cfg(test)]
+impl PartialEq for BazelProcessExecutionRequest {
+  fn eq(&self, other: &Self) -> bool {
+    (&self.action, &self.command, &self.execute_request)
+      == (&other.action, &other.command, &other.execute_request)
+  }
+}
+
+#[cfg(test)]
+impl Eq for BazelProcessExecutionRequest {}
 
 impl super::CommandRunner for CommandRunner {
   ///
@@ -167,184 +190,20 @@ impl super::CommandRunner for CommandRunner {
   /// TODO: Request jdk_home be created if set.
   ///
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let clients = self.clients.clone();
-
-    let store = self.store.clone();
-    let cacheable_execute_process_request =
+    let cacheable_input_request =
       CacheableExecuteProcessRequest::new(req.clone(), self.cache_key_gen_version.clone());
-    let execute_request_result = BazelProcessExecutionRequest::convert_execute_request(
-      &cacheable_execute_process_request,
+    let converted_request_protos = BazelProcessExecutionRequest::convert_execute_request(
+      &cacheable_input_request,
       &self.instance_name,
     );
-
-    let ExecuteProcessRequest {
-      description,
-      timeout,
-      input_files,
-      ..
-    } = req;
-
-    let description2 = description.clone();
-
-    match execute_request_result {
-      Ok(BazelProcessExecutionRequest {
-        action,
-        command,
-        execute_request,
-      }) => {
-        let command_runner = self.clone();
-        let command_runner2 = self.clone();
-        let execute_request2 = execute_request.clone();
-        let futures_timer_thread = self.futures_timer_thread.clone();
-
-        let store2 = store.clone();
-        let mut history = ExecutionHistory::default();
-
-        self
-          .store_prost_proto_locally(&command)
-          .join(self.store_prost_proto_locally(&action))
-          .and_then(move |(command_digest, action_digest)| {
-            store2.ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
-          })
-          .and_then(move |summary| {
-            history.current_attempt += summary;
-            trace!(
-              "Executing remotely request: {:?} (command: {:?})",
-              execute_request,
-              command
-            );
-            command_runner
-              .oneshot_execute(execute_request)
-              .join(future::ok(history))
-          })
-          .and_then(move |(operation, history)| {
-            let start_time = Instant::now();
-
-            future::loop_fn(
-              (history, operation, 0),
-              move |(mut history, operation, iter_num)| {
-                let description = description.clone();
-
-                let execute_request2 = execute_request2.clone();
-                let store = store.clone();
-                let clients = clients.clone();
-                let command_runner2 = command_runner2.clone();
-                let command_runner3 = command_runner2.clone();
-                let futures_timer_thread = futures_timer_thread.clone();
-                let f = command_runner2.extract_execute_response(operation, &mut history);
-                f.map(future::Loop::Break).or_else(move |value| {
-                  match value {
-                    ExecutionError::Fatal(err) => future::err(err).to_boxed(),
-                    ExecutionError::MissingDigests(missing_digests) => {
-                      let ExecutionHistory {
-                        mut attempts,
-                        current_attempt,
-                      } = history;
-
-                      trace!(
-                        "Server reported missing digests ({:?}); trying to upload: {:?}",
-                        current_attempt,
-                        missing_digests,
-                      );
-
-                      attempts.push(current_attempt);
-                      let history = ExecutionHistory {
-                        attempts,
-                        current_attempt: ExecutionStats::default(),
-                      };
-
-                      let execute_request = execute_request2.clone();
-                      store
-                        .ensure_remote_has_recursive(missing_digests)
-                        .and_then(move |summary| {
-                          let mut history = history;
-                          history.current_attempt += summary;
-                          command_runner2
-                            .oneshot_execute(execute_request)
-                            .join(future::ok(history))
-                        })
-                        // Reset `iter_num` on `MissingDigests`
-                        .map(|(operation, history)| future::Loop::Continue((history, operation, 0)))
-                        .to_boxed()
-                    }
-                    ExecutionError::NotFinished(operation_name) => {
-                      let operation_name2 = operation_name.clone();
-                      let operation_request =
-                        bazel_protos::google::longrunning::GetOperationRequest {
-                          name: operation_name.clone(),
-                        };
-
-                      let backoff_period = min(
-                        CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                        (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
-                      );
-
-                      // take the grpc result and cancel the op if too much time has passed.
-                      let elapsed = start_time.elapsed();
-
-                      if elapsed > timeout {
-                        future::err(format!(
-                          "Exceeded time out of {:?} with {:?} for operation {}, {}",
-                          timeout, elapsed, operation_name, description
-                        ))
-                        .to_boxed()
-                      } else {
-                        // maybe the delay here should be the min of remaining time and the backoff period
-                        Delay::new_handle(
-                          Instant::now() + Duration::from_millis(backoff_period),
-                          futures_timer_thread.with(|thread| thread.handle()),
-                        )
-                        .map_err(move |e| {
-                          format!(
-                            "Future-Delay errored at operation result polling for {}, {}: {}",
-                            operation_name, description, e
-                          )
-                        })
-                        .and_then(move |_| {
-                          clients
-                            .map_err(|err| format!("{}", err))
-                            .and_then(move |clients| {
-                              clients
-                                .operations_client
-                                .lock()
-                                .get_operation(command_runner3.make_request(operation_request))
-                                .map(|r| r.into_inner())
-                                .or_else(move |err| {
-                                  rpcerror_recover_cancelled(operation_name2, err)
-                                })
-                                .map_err(towergrpcerror_to_string)
-                            })
-                            .map(OperationOrStatus::Operation)
-                            .map(move |operation| {
-                              future::Loop::Continue((history, operation, iter_num + 1))
-                            })
-                            .to_boxed()
-                        })
-                        .to_boxed()
-                      }
-                    }
-                  }
-                })
-              },
-            )
-          })
-          .map(move |resp| {
-            let mut attempts = String::new();
-            for (i, attempt) in resp.execution_attempts.iter().enumerate() {
-              attempts += &format!("\nAttempt {}: {:?}", i, attempt);
-            }
-            debug!(
-              "Finished remote exceution of {} after {} attempts: Stats: {}",
-              description2,
-              resp.execution_attempts.len(),
-              attempts
-            );
-            resp
-          })
+    let command_runner = self.clone();
+    future::result(converted_request_protos)
+      .and_then(move |action_request| {
+        command_runner
+          .execute_request(req, action_request.clone())
           .to_boxed()
-      }
-      Err(err) => future::err(err).to_boxed(),
-    }
+      })
+      .to_boxed()
   }
 }
 
@@ -438,7 +297,7 @@ impl CommandRunner {
     request
   }
 
-  fn store_prost_proto_locally<P: prost::Message>(
+  fn store_proto_locally<P: prost::Message>(
     &self,
     proto: &P,
   ) -> impl Future<Item = Digest, Error = String> {
@@ -632,6 +491,176 @@ impl CommandRunner {
     }
     .to_boxed()
   }
+
+  fn execute_request(
+    &self,
+    input_execution_request: ExecuteProcessRequest,
+    serializable_proto_request: BazelProcessExecutionRequest,
+  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+    let ExecuteProcessRequest {
+      input_files,
+      description,
+      timeout,
+      ..
+    } = input_execution_request;
+    let BazelProcessExecutionRequest {
+      action,
+      command,
+      execute_request,
+    } = serializable_proto_request;
+
+    let command_runner = self.clone();
+    let command_runner2 = self.clone();
+    let execute_request2 = execute_request.clone();
+    let description2 = description.clone();
+    let futures_timer_thread = self.futures_timer_thread.clone();
+
+    let store = self.store.clone();
+    let store2 = self.store.clone();
+    let clients = self.clients.clone();
+
+    let mut history = ExecutionHistory::default();
+
+    self
+      .store_proto_locally(&command)
+      .join(self.store_proto_locally(&action))
+      .and_then(move |(command_digest, action_digest)| {
+        store.ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
+      })
+      .and_then(move |summary| {
+        history.current_attempt += summary;
+        trace!(
+          "Executing remotely request: {:?} (command: {:?})",
+          execute_request,
+          command
+        );
+        command_runner
+          .oneshot_execute(execute_request)
+          .join(future::ok(history))
+      })
+      .and_then(move |(operation, history)| {
+        let start_time = Instant::now();
+
+        future::loop_fn(
+          (history, operation, 0),
+          move |(mut history, operation, iter_num)| {
+            let description = description2.clone();
+
+            let execute_request2 = execute_request2.clone();
+            let store = store2.clone();
+            let clients = clients.clone();
+            let command_runner2 = command_runner2.clone();
+            let command_runner3 = command_runner2.clone();
+            let futures_timer_thread = futures_timer_thread.clone();
+            let f = command_runner2.extract_execute_response(operation, &mut history);
+            f.map(future::Loop::Break).or_else(move |value| {
+              match value {
+                ExecutionError::Fatal(err) => future::err(err).to_boxed(),
+                ExecutionError::MissingDigests(missing_digests) => {
+                  let ExecutionHistory {
+                    mut attempts,
+                    current_attempt,
+                  } = history;
+
+                  trace!(
+                    "Server reported missing digests ({:?}); trying to upload: {:?}",
+                    current_attempt,
+                    missing_digests,
+                  );
+
+                  attempts.push(current_attempt);
+                  let history = ExecutionHistory {
+                    attempts,
+                    current_attempt: ExecutionStats::default(),
+                  };
+
+                  let execute_request = execute_request2.clone();
+                  store
+                    .ensure_remote_has_recursive(missing_digests)
+                    .and_then(move |summary| {
+                      let mut history = history;
+                      history.current_attempt += summary;
+                      command_runner2
+                        .oneshot_execute(execute_request)
+                        .join(future::ok(history))
+                    })
+                    // Reset `iter_num` on `MissingDigests`
+                    .map(|(operation, history)| future::Loop::Continue((history, operation, 0)))
+                    .to_boxed()
+                }
+                ExecutionError::NotFinished(operation_name) => {
+                  let operation_name2 = operation_name.clone();
+                  let operation_request = bazel_protos::google::longrunning::GetOperationRequest {
+                    name: operation_name.clone(),
+                  };
+
+                  let backoff_period = min(
+                    CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                    (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
+                  );
+
+                  // take the grpc result and cancel the op if too much time has passed.
+                  let elapsed = start_time.elapsed();
+
+                  if elapsed > timeout {
+                    future::err(format!(
+                      "Exceeded time out of {:?} with {:?} for operation {}, {}",
+                      timeout, elapsed, operation_name, description
+                    ))
+                    .to_boxed()
+                  } else {
+                    // maybe the delay here should be the min of remaining time and the backoff period
+                    Delay::new_handle(
+                      Instant::now() + Duration::from_millis(backoff_period),
+                      futures_timer_thread.with(|thread| thread.handle()),
+                    )
+                    .map_err(move |e| {
+                      format!(
+                        "Future-Delay errored at operation result polling for {}, {}: {}",
+                        operation_name, description, e
+                      )
+                    })
+                    .and_then(move |_| {
+                      clients
+                        .map_err(|err| format!("{}", err))
+                        .and_then(move |clients| {
+                          clients
+                            .operations_client
+                            .lock()
+                            .get_operation(command_runner3.make_request(operation_request))
+                            .map(|r| r.into_inner())
+                            .or_else(move |err| rpcerror_recover_cancelled(operation_name2, err))
+                            .map_err(towergrpcerror_to_string)
+                        })
+                        .map(OperationOrStatus::Operation)
+                        .map(move |operation| {
+                          future::Loop::Continue((history, operation, iter_num + 1))
+                        })
+                        .to_boxed()
+                    })
+                    .to_boxed()
+                  }
+                }
+              }
+            })
+          },
+        )
+      })
+      .map(move |resp| {
+        let mut attempts = String::new();
+        for (i, attempt) in resp.execution_attempts.iter().enumerate() {
+          attempts += &format!("\nAttempt {}: {:?}", i, attempt);
+        }
+        debug!(
+          "Finished remote exceution of {} after {} attempts: Stats: {}",
+          description,
+          resp.execution_attempts.len(),
+          attempts
+        );
+        resp
+      })
+      .to_boxed()
+  }
 }
 
 fn format_error(error: &bazel_protos::google::rpc::Status) -> String {
@@ -706,11 +735,9 @@ mod tests {
 
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{
-    BazelProcessExecutionRequest, BazelProtosProcessExecutionCodec,
-    BazelProtosProcessExecutionCodecV2, CacheableExecuteProcessRequest, CommandRunner,
+    ActionSerializer, BazelProcessExecutionRequest, CacheableExecuteProcessRequest, CommandRunner,
     ExecuteProcessRequest, ExecutionError, ExecutionHistory, FallibleExecuteProcessResult,
   };
-  use crate::cached_execution::SerializableProcessExecutionCodec;
   use mock::execution_server::MockOperation;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
@@ -754,56 +781,49 @@ mod tests {
       jdk_home: None,
     };
 
-    let mut want_command = bazel_protos::build::bazel::remote::execution::v2::Command::new();
-    want_command.mut_arguments().push("/bin/echo".to_owned());
-    want_command.mut_arguments().push("yo".to_owned());
-    want_command.mut_environment_variables().push({
-      let mut env =
-        bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
-      env.set_name("SOME".to_owned());
-      env.set_value("value".to_owned());
-      env
-    });
-    want_command
-      .mut_output_files()
-      .push("other/file".to_owned());
-    want_command
-      .mut_output_files()
-      .push("path/to/file".to_owned());
-    want_command
-      .mut_output_directories()
-      .push("directory/name".to_owned());
+    let want_command = bazel_protos::build::bazel::remote::execution::v2::Command {
+      arguments: owned_string_vec(&["/bin/echo", "yo"]),
+      environment_variables: vec![
+        bazel_protos::build::bazel::remote::execution::v2::command::EnvironmentVariable {
+          name: "SOME".to_owned(),
+          value: "value".to_owned(),
+        },
+      ],
+      output_files: owned_string_vec(&["other/file", "path/to/file"]),
+      output_directories: owned_string_vec(&["directory/name"]),
+      ..Default::default()
+    };
 
-    let mut want_action = bazel_protos::build::bazel::remote::execution::v2::Action::new();
-    want_action.set_command_digest(
-      (&Digest(
+    let want_action = bazel_protos::build::bazel::remote::execution::v2::Action {
+      command_digest: Some(ActionSerializer::convert_digest(&Digest(
         Fingerprint::from_hex_string(
           "cc4ddd3085aaffbe0abce22f53b30edbb59896bb4a4f0d76219e48070cd0afe1",
         )
         .unwrap(),
         72,
-      ))
-        .into(),
-    );
-    want_action.set_input_root_digest((&input_directory.digest()).into());
+      ))),
+      input_root_digest: Some(ActionSerializer::convert_digest(&input_directory.digest())),
+      ..Default::default()
+    };
 
     let want_execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
-      action_digest: Some(
-        (&Digest(
-          Fingerprint::from_hex_string(
-            "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
-          )
-          .unwrap(),
-          140,
-        ))
-          .into(),
-      ),
+      action_digest: Some(ActionSerializer::convert_digest(&Digest(
+        Fingerprint::from_hex_string(
+          "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
+        )
+        .unwrap(),
+        140,
+      ))),
       ..Default::default()
     };
 
     assert_eq!(
       make_execute_request(&req, &None, &None),
-      Ok((want_action, want_command, want_execute_request))
+      Ok(BazelProcessExecutionRequest::new(
+        want_action,
+        want_command,
+        want_execute_request
+      )),
     );
   }
 
@@ -830,70 +850,50 @@ mod tests {
       jdk_home: None,
     };
 
-    let mut want_command = bazel_protos::build::bazel::remote::execution::v2::Command::new();
-    want_command.mut_arguments().push("/bin/echo".to_owned());
-    want_command.mut_arguments().push("yo".to_owned());
-    want_command.mut_environment_variables().push({
-      let mut env =
-        bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
-      env.set_name("SOME".to_owned());
-      env.set_value("value".to_owned());
-      env
-    });
-    want_command
-      .mut_output_files()
-      .push("other/file".to_owned());
-    want_command
-      .mut_output_files()
-      .push("path/to/file".to_owned());
-    want_command
-      .mut_output_directories()
-      .push("directory/name".to_owned());
+    let want_command = bazel_protos::build::bazel::remote::execution::v2::Command {
+      arguments: owned_string_vec(&["/bin/echo", "yo"]),
+      environment_variables: vec![
+        bazel_protos::build::bazel::remote::execution::v2::command::EnvironmentVariable {
+          name: "SOME".to_owned(),
+          value: "value".to_owned(),
+        },
+      ],
+      output_files: owned_string_vec(&["other/file", "path/to/file"]),
+      output_directories: owned_string_vec(&["directory/name"]),
+      ..Default::default()
+    };
 
-    let mut want_action = bazel_protos::build::bazel::remote::execution::v2::Action::new();
-    want_action.set_command_digest(
-      (&Digest(
+    let want_action = bazel_protos::build::bazel::remote::execution::v2::Action {
+      command_digest: Some(ActionSerializer::convert_digest(&Digest(
         Fingerprint::from_hex_string(
           "cc4ddd3085aaffbe0abce22f53b30edbb59896bb4a4f0d76219e48070cd0afe1",
         )
         .unwrap(),
         72,
-      ))
-        .into(),
-    );
-    want_action.set_input_root_digest((&input_directory.digest()).into());
+      ))),
+      input_root_digest: Some(ActionSerializer::convert_digest(&input_directory.digest())),
+      ..Default::default()
+    };
 
-    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
-    want_execute_request.set_instance_name("dark-tower".to_owned());
-    want_execute_request.set_action_digest(
-      (&Digest(
+    let want_execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
+      action_digest: Some(ActionSerializer::convert_digest(&Digest(
         Fingerprint::from_hex_string(
           "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
         )
         .unwrap(),
         140,
-      ))
-        .into(),
-    );
-
-    let want_execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
-      action_digest: Some(
-        (&Digest(
-          Fingerprint::from_hex_string(
-            "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
-          )
-          .unwrap(),
-          140,
-        ))
-          .into(),
-      ),
+      ))),
       instance_name: "dark-tower".to_owned(),
       ..Default::default()
     };
 
     assert_eq!(
       make_execute_request(&req, &Some("dark-tower".to_owned()), &None),
-      Ok((want_action, want_command, want_execute_request))
+      Ok(BazelProcessExecutionRequest::new(
+        want_action,
+        want_command,
+        want_execute_request
+      )),
     );
   }
 
@@ -920,63 +920,53 @@ mod tests {
       jdk_home: None,
     };
 
-    let mut want_command = bazel_protos::build::bazel::remote::execution::v2::Command::new();
-    want_command.mut_arguments().push("/bin/echo".to_owned());
-    want_command.mut_arguments().push("yo".to_owned());
-    want_command.mut_environment_variables().push({
-      let mut env =
-        bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
-      env.set_name("SOME".to_owned());
-      env.set_value("value".to_owned());
-      env
-    });
-    want_command.mut_environment_variables().push({
-      let mut env =
-        bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
-      env.set_name(crate::cached_execution::CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_owned());
-      env.set_value("meep".to_owned());
-      env
-    });
-    want_command
-      .mut_output_files()
-      .push("other/file".to_owned());
-    want_command
-      .mut_output_files()
-      .push("path/to/file".to_owned());
-    want_command
-      .mut_output_directories()
-      .push("directory/name".to_owned());
+    let want_command = bazel_protos::build::bazel::remote::execution::v2::Command {
+      arguments: owned_string_vec(&["/bin/echo", "yo"]),
+      environment_variables: vec![
+        bazel_protos::build::bazel::remote::execution::v2::command::EnvironmentVariable {
+          name: "SOME".to_owned(),
+          value: "value".to_owned(),
+        },
+        bazel_protos::build::bazel::remote::execution::v2::command::EnvironmentVariable {
+          name: crate::cached_execution::CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_owned(),
+          value: "meep".to_owned(),
+        },
+      ],
+      output_files: owned_string_vec(&["other/file", "path/to/file"]),
+      output_directories: owned_string_vec(&["directory/name"]),
+      ..Default::default()
+    };
 
-    let mut want_action = bazel_protos::build::bazel::remote::execution::v2::Action::new();
-    want_action.set_command_digest(
-      (&Digest(
+    let want_action = bazel_protos::build::bazel::remote::execution::v2::Action {
+      command_digest: Some(ActionSerializer::convert_digest(&Digest(
         Fingerprint::from_hex_string(
           "1a95e3482dd235593df73dc12b808ec7d922733a40d97d8233c1a32c8610a56d",
         )
         .unwrap(),
         109,
-      ))
-        .into(),
-    );
-    want_action.set_input_root_digest((&input_directory.digest()).into());
+      ))),
+      input_root_digest: Some(ActionSerializer::convert_digest(&input_directory.digest())),
+      ..Default::default()
+    };
 
     let want_execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
-      action_digest: Some(
-        (&Digest(
-          Fingerprint::from_hex_string(
-            "0ee5d4c8ac12513a87c8d949c6883ac533a264d30215126af71a9028c4ab6edf",
-          )
-          .unwrap(),
-          140,
-        ))
-          .into(),
-      ),
+      action_digest: Some(ActionSerializer::convert_digest(&Digest(
+        Fingerprint::from_hex_string(
+          "0ee5d4c8ac12513a87c8d949c6883ac533a264d30215126af71a9028c4ab6edf",
+        )
+        .unwrap(),
+        140,
+      ))),
       ..Default::default()
     };
 
     assert_eq!(
       make_execute_request(&req, &None, &Some("meep".to_owned())),
-      Ok((want_action, want_command, want_execute_request))
+      Ok(BazelProcessExecutionRequest::new(
+        want_action,
+        want_command,
+        want_execute_request
+      )),
     );
   }
 
@@ -994,46 +984,51 @@ mod tests {
       jdk_home: Some(PathBuf::from("/tmp")),
     };
 
-    let mut want_command = bazel_protos::build::bazel::remote::execution::v2::Command::new();
-    want_command.mut_arguments().push("/bin/echo".to_owned());
-    want_command.mut_arguments().push("yo".to_owned());
-    want_command.mut_platform().mut_properties().push({
-      let mut property = bazel_protos::remote_execution::Platform_Property::new();
-      property.set_name("JDK_SYMLINK".to_owned());
-      property.set_value(".jdk".to_owned());
-      property
-    });
+    let want_command = bazel_protos::build::bazel::remote::execution::v2::Command {
+      arguments: owned_string_vec(&["/bin/echo", "yo"]),
+      platform: Some(
+        bazel_protos::build::bazel::remote::execution::v2::Platform {
+          properties: vec![
+            bazel_protos::build::bazel::remote::execution::v2::platform::Property {
+              name: "JDK_SYMLINK".to_owned(),
+              value: ".jdk".to_owned(),
+            },
+          ],
+        },
+      ),
+      ..Default::default()
+    };
 
-    let mut want_action = bazel_protos::build::bazel::remote::execution::v2::Action::new();
-    want_action.set_command_digest(
-      (&Digest(
+    let want_action = bazel_protos::build::bazel::remote::execution::v2::Action {
+      command_digest: Some(ActionSerializer::convert_digest(&Digest(
         Fingerprint::from_hex_string(
           "f373f421b328ddeedfba63542845c0423d7730f428dd8e916ec6a38243c98448",
         )
         .unwrap(),
         38,
-      ))
-        .into(),
-    );
-    want_action.set_input_root_digest((&input_directory.digest()).into());
+      ))),
+      input_root_digest: Some(ActionSerializer::convert_digest(&input_directory.digest())),
+      ..Default::default()
+    };
 
     let want_execute_request = bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest {
-      action_digest: Some(
-        (&Digest(
-          Fingerprint::from_hex_string(
-            "b1fb7179ce496995a4e3636544ec000dca1b951f1f6216493f6c7608dc4dd910",
-          )
-          .unwrap(),
-          140,
-        ))
-          .into(),
-      ),
+      action_digest: Some(ActionSerializer::convert_digest(&Digest(
+        Fingerprint::from_hex_string(
+          "b1fb7179ce496995a4e3636544ec000dca1b951f1f6216493f6c7608dc4dd910",
+        )
+        .unwrap(),
+        140,
+      ))),
       ..Default::default()
     };
 
     assert_eq!(
       make_execute_request(&req, &None, &None),
-      Ok((want_action, want_command, want_execute_request))
+      Ok(BazelProcessExecutionRequest::new(
+        want_action,
+        want_command,
+        want_execute_request
+      )),
     );
   }
 
@@ -1059,7 +1054,7 @@ mod tests {
           &None,
         )
         .unwrap()
-        .2,
+        .execute_request,
         vec![],
       ))
     };
@@ -1082,7 +1077,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&execute_request, &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![
           make_incomplete_operation(&op_name),
           make_successful_operation(
@@ -1179,7 +1174,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&echo_roland_request(), &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![make_successful_operation(
           &op_name.clone(),
           StdoutType::Raw(test_stdout.string()),
@@ -1268,7 +1263,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&execute_request, &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         Vec::from_iter(
           iter::repeat(make_incomplete_operation(&op_name))
             .take(4)
@@ -1319,7 +1314,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&execute_request, &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![
           make_incomplete_operation(&op_name),
           make_delayed_incomplete_operation(&op_name, delayed_operation_time),
@@ -1344,7 +1339,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&execute_request, &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![
           make_incomplete_operation(&op_name),
           make_canceled_operation(Some(Duration::from_millis(100))),
@@ -1383,7 +1378,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&execute_request, &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![
           make_incomplete_operation(&op_name),
           MockOperation::new({
@@ -1417,7 +1412,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&execute_request, &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![MockOperation::new(
           bazel_protos::google::longrunning::Operation {
             name: op_name.clone(),
@@ -1451,7 +1446,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&execute_request, &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![
           make_incomplete_operation(&op_name),
           MockOperation::new(bazel_protos::google::longrunning::Operation {
@@ -1486,7 +1481,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&execute_request, &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![MockOperation::new(
           bazel_protos::google::longrunning::Operation {
             name: op_name.clone(),
@@ -1514,7 +1509,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&execute_request, &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![
           make_incomplete_operation(&op_name),
           MockOperation::new(bazel_protos::google::longrunning::Operation {
@@ -1543,7 +1538,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&cat_roland_request(), &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![
           make_incomplete_operation(&op_name),
           make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
@@ -1636,7 +1631,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&cat_roland_request(), &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         vec![
           //make_incomplete_operation(&op_name),
           MockOperation {
@@ -1718,7 +1713,7 @@ mod tests {
         op_name.clone(),
         make_execute_request(&cat_roland_request(), &None, &None)
           .unwrap()
-          .2,
+          .execute_request,
         // We won't get as far as trying to run the operation, so don't expect any requests whose
         // responses we would need to stub.
         vec![],
@@ -1961,23 +1956,24 @@ mod tests {
 
   #[test]
   fn digest_command() {
-    let mut command = bazel_protos::build::bazel::remote::execution::v2::Command::new();
-    command.mut_arguments().push("/bin/echo".to_string());
-    command.mut_arguments().push("foo".to_string());
+    let env1 = bazel_protos::build::bazel::remote::execution::v2::command::EnvironmentVariable {
+      name: "A".to_string(),
+      value: "a".to_string(),
+    };
 
-    let mut env1 =
-      bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
-    env1.set_name("A".to_string());
-    env1.set_value("a".to_string());
-    command.mut_environment_variables().push(env1);
+    let env2 = bazel_protos::build::bazel::remote::execution::v2::command::EnvironmentVariable {
+      name: "B".to_string(),
+      value: "b".to_string(),
+    };
 
-    let mut env2 =
-      bazel_protos::build::bazel::remote::execution::v2::Command_EnvironmentVariable::new();
-    env2.set_name("B".to_string());
-    env2.set_value("b".to_string());
-    command.mut_environment_variables().push(env2);
+    let command = bazel_protos::build::bazel::remote::execution::v2::Command {
+      arguments: owned_string_vec(&["/bin/echo", "foo"]),
+      environment_variables: vec![env1, env2],
+      ..Default::default()
+    };
 
-    let digest = ActionSerializer::digest_proto(&command).unwrap();
+    let digest =
+      fs::Store::digest_bytes(&ActionSerializer::encode_command_proto(&command).unwrap());
 
     assert_eq!(
       &digest.0.to_hex(),
@@ -1997,7 +1993,7 @@ mod tests {
           op_name.clone(),
           make_execute_request(&execute_request, &None, &None)
             .unwrap()
-            .2,
+            .execute_request,
           vec![
             make_incomplete_operation(&op_name),
             make_successful_operation(
@@ -2035,7 +2031,7 @@ mod tests {
           op_name.clone(),
           make_execute_request(&execute_request, &None, &None)
             .unwrap()
-            .2,
+            .execute_request,
           vec![
             make_incomplete_operation(&op_name),
             make_incomplete_operation(&op_name),
@@ -2405,10 +2401,10 @@ mod tests {
       .build();
 
     let (store, _) = create_command_runner_with_store("127.0.0.1:0".to_owned(), &cas, None);
-    let codec = codec_from_store(store, None);
+    let action_serializer = ActionSerializer::new(store);
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    let result = runtime.block_on(codec.extract_action_result(result.clone()));
+    let result = runtime.block_on(action_serializer.extract_action_result(&result));
     runtime.shutdown_now().wait().unwrap();
     result
       .map(|res| res.output_directory)
@@ -2478,57 +2474,26 @@ mod tests {
     }
   }
 
-  fn codec_from_store(
-    store: fs::Store,
-    instance_name: Option<String>,
-  ) -> BazelProtosProcessExecutionCodecV2 {
-    BazelProtosProcessExecutionCodecV2::new(store, instance_name)
-  }
-
-  fn codec(dir: PathBuf, instance_name: Option<String>) -> BazelProtosProcessExecutionCodecV2 {
-    let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
-    let store = fs::Store::local_only(dir, pool.clone()).unwrap();
-    codec_from_store(store, instance_name)
-  }
-
-  fn codec_convert_execute_request(
-    dir: PathBuf,
+  fn serializer_convert_execute_request(
     req: ExecuteProcessRequest,
     instance_name: Option<String>,
     cache_key_gen_version: Option<String>,
   ) -> Result<BazelProcessExecutionRequest, String> {
-    let codec = codec(dir, instance_name);
-    codec.convert_request_to_action(CacheableExecuteProcessRequest::new(
-      req,
-      cache_key_gen_version,
-    ))
+    BazelProcessExecutionRequest::convert_execute_request(
+      &CacheableExecuteProcessRequest::new(req, cache_key_gen_version),
+      &instance_name,
+    )
   }
 
   fn make_execute_request(
     req: &ExecuteProcessRequest,
     instance_name: &Option<String>,
     cache_key_gen_version: &Option<String>,
-  ) -> Result<
-    (
-      bazel_protos::build::bazel::remote::execution::v2::Action,
-      bazel_protos::build::bazel::remote::execution::v2::Command,
-      bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest,
-    ),
-    String,
-  > {
-    let store_dir = TempDir::new().unwrap();
-    codec_convert_execute_request(
-      store_dir.path().to_path_buf(),
+  ) -> Result<BazelProcessExecutionRequest, String> {
+    serializer_convert_execute_request(
       req.clone(),
       instance_name.clone(),
       cache_key_gen_version.clone(),
-    )
-    .map(
-      |BazelProcessExecutionRequest {
-         action,
-         command,
-         execute_request,
-       }| { (action, command, execute_request) },
     )
   }
 }
