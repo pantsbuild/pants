@@ -171,11 +171,8 @@ class Collection(object):
       type_name = type_name.encode('utf-8')
     type_checked_collection_class = datatype([
       # Create a datatype with a single field 'dependencies' which is type-checked on construction
-      # to be a collection containing elements of only the exact `element_types` specified, and
-      # which is converted into a tuple upon construction. A tuple `wrapper_type` is required for
-      # the resulting datatype to be hashable, so we set it explicitly here although it is the
-      # default.
-      ('dependencies', TypedCollection(Exactly(*element_types), wrapper_type=tuple))
+      # to be a collection containing elements of only the exact `element_types` specified.
+      ('dependencies', TypedCollection(Exactly(*element_types)))
     ], superclass_name=cls.__name__)
     supertypes = (cls, type_checked_collection_class)
     properties = {'element_types': element_types}

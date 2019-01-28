@@ -276,7 +276,7 @@ class TypeConstraint(AbstractClass):
   :class:`SubclassesOf`.
   """
 
-  def __init__(self, variance_symbol, wrapper_type, description):
+  def __init__(self, variance_symbol, description):
     """Creates a type constraint centered around the given types.
 
     The type constraint is satisfied as a whole if satisfied for at least one of the given types.
@@ -285,12 +285,7 @@ class TypeConstraint(AbstractClass):
     :param str description: A description for this constraint if the list of types is too long.
     """
     assert(variance_symbol)
-    if wrapper_type is not None:
-      if not isinstance(wrapper_type, type):
-        raise TypeError("wrapper_type must be a type! was: {} (type '{}')"
-                        .format(wrapper_type, type(wrapper_type).__name__))
     self._variance_symbol = variance_symbol
-    self._wrapper_type = wrapper_type
     self._description = description
 
   @abstractmethod
@@ -309,8 +304,6 @@ class TypeConstraint(AbstractClass):
     """
 
     if self.satisfied_by(obj):
-      if self._wrapper_type:
-        return self._wrapper_type(obj)
       return obj
 
     raise TypeConstraintError(
@@ -355,7 +348,6 @@ class BasicTypeConstraint(TypeConstraint):
 
     super(BasicTypeConstraint, self).__init__(
       variance_symbol=self._variance_symbol,
-      wrapper_type=None,
       description=constrained_type)
 
     # NB: This is made into a tuple so that we can use self._types in issubclass() and others!
@@ -430,14 +422,12 @@ class TypedCollection(TypeConstraint):
   def _generate_variance_symbol(cls, constraint):
     return '[{}]'.format(constraint._variance_symbol)
 
-  def __init__(self, constraint, wrapper_type=tuple):
+  def __init__(self, constraint):
     """Create a TypeConstraint which validates each member of a collection with `constraint`.
 
     :param BasicTypeConstraint constraint: the TypeConstraint to apply to each element. This is
                                            currently required to be a BasicTypeConstraint to avoid
                                            complex prototypal type relationships.
-    :param type wrapper_type: the type of the returned collection when invoking
-                              validate_satisfied_by().
     """
 
     if not isinstance(constraint, BasicTypeConstraint):
@@ -447,7 +437,6 @@ class TypedCollection(TypeConstraint):
 
     super(TypedCollection, self).__init__(
       variance_symbol=self._generate_variance_symbol(constraint),
-      wrapper_type=wrapper_type,
       description=constraint._description)
 
   def satisfied_by(self, obj):
@@ -456,13 +445,12 @@ class TypedCollection(TypeConstraint):
     return False
 
   def __hash__(self):
-    return hash((type(self), self._constraint, self._wrapper_type))
+    return hash((type(self), self._constraint))
 
   def __eq__(self, other):
     return type(self) == type(other) and self._constraint == other._constraint
 
   def __repr__(self):
-    return ('{type_constraint_type}({constraint!r}, wrapper_type={wrapper_type})'
+    return ('{type_constraint_type}({constraint!r})'
             .format(type_constraint_type=type(self).__name__,
-                    constraint=self._constraint,
-                    wrapper_type=self._wrapper_type.__name__))
+                    constraint=self._constraint))

@@ -130,21 +130,16 @@ class SubclassesOfTest(TypeConstraintTestBase):
 
 
 class TypedCollectionTest(TypeConstraintTestBase):
-  def test_construction_errors(self):
-    with self.assertRaisesRegexp(TypeError, re.escape(
-        "wrapper_type must be a type! was: 3 (type 'int')")):
-      TypedCollection(Exactly(self.B), wrapper_type=3)
-
   def test_str_and_repr(self):
     collection_of_exactly_b = TypedCollection(Exactly(self.B))
     self.assertEqual("[=]B", str(collection_of_exactly_b))
-    self.assertEqual("TypedCollection(Exactly(B), wrapper_type=tuple)",
+    self.assertEqual("TypedCollection(Exactly(B))",
                      repr(collection_of_exactly_b))
 
     collection_of_multiple_subclasses = TypedCollection(
-      SubclassesOf(self.A, self.B), wrapper_type=list)
+      SubclassesOf(self.A, self.B))
     self.assertEqual("[+](A, B)", str(collection_of_multiple_subclasses))
-    self.assertEqual("TypedCollection(SubclassesOf(A, B), wrapper_type=list)",
+    self.assertEqual("TypedCollection(SubclassesOf(A, B))",
                      repr(collection_of_multiple_subclasses))
 
   def test_collection_single(self):
@@ -158,28 +153,15 @@ class TypedCollectionTest(TypeConstraintTestBase):
     self.assertTrue(collection_constraint.satisfied_by([self.B(), self.C(), self.BPrime()]))
     self.assertFalse(collection_constraint.satisfied_by([self.B(), self.A()]))
 
-  def test_collection_converts_wrapper_type(self):
-    collection_constraint = TypedCollection(Exactly(self.A, self.C))
-    self.assertEquals(
-      # Defaults to converting to tuple.
-      (self.A(), self.C(), self.A()),
-      collection_constraint.validate_satisfied_by([self.A(), self.C(), self.A()]))
-
     def collection_generator():
       yield self.A()
       yield self.C()
       yield self.A()
 
-    # Test conversion to a different wrapper type.
-    collection_constraint = TypedCollection(Exactly(self.A, self.C), wrapper_type=list)
+    collection_constraint = TypedCollection(Exactly(self.A, self.C))
     self.assertEquals(
-      [self.A(), self.C(), self.A()],
+      (self.A(), self.C(), self.A()),
       collection_constraint.validate_satisfied_by(tuple(collection_generator())))
-    # NB: For now, passing a generator without wrapping it in a concrete collection means it gets
-    # consumed. This makes sense (how else would you type check all its elements?).
-    self.assertEquals(
-      [],
-      collection_constraint.validate_satisfied_by(collection_generator()))
 
   def test_construction(self):
     with self.assertRaisesRegexp(TypeError, re.escape(
@@ -539,10 +521,11 @@ class TypedDatatypeTest(TestBase):
     self.assertEqual(obj_with_mixin.stripped(), 'asdf')
 
   def test_instance_with_collection_construction_str_repr(self):
+    # TODO: convert the type of the input collection using a `wrapper_type` argument!
     obj_with_collection = WithCollectionTypeConstraint([3])
-    self.assertEqual("WithCollectionTypeConstraint(dependencies<[=]int>=(3,))",
+    self.assertEqual("WithCollectionTypeConstraint(dependencies<[=]int>=[3])",
                      str(obj_with_collection))
-    self.assertEqual("WithCollectionTypeConstraint(dependencies=(3,))",
+    self.assertEqual("WithCollectionTypeConstraint(dependencies=[3])",
                      repr(obj_with_collection))
 
   def test_instance_construction_errors(self):
@@ -655,14 +638,14 @@ field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type
       WithCollectionTypeConstraint(3)
     expected_msg = """\
 error: in constructor of type WithCollectionTypeConstraint: type check error:
-field 'dependencies' was invalid: value 3 (with type 'int') must satisfy this type constraint: TypedCollection(Exactly(int), wrapper_type=tuple)."""
+field 'dependencies' was invalid: value 3 (with type 'int') must satisfy this type constraint: TypedCollection(Exactly(int))."""
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypeCheckError) as cm:
       WithCollectionTypeConstraint([3, "asdf"])
     expected_msg = """\
 error: in constructor of type WithCollectionTypeConstraint: type check error:
-field 'dependencies' was invalid: value [3, {}'asdf'] (with type 'list') must satisfy this type constraint: TypedCollection(Exactly(int), wrapper_type=tuple).""".format('u' if PY2 else '')
+field 'dependencies' was invalid: value [3, {}'asdf'] (with type 'list') must satisfy this type constraint: TypedCollection(Exactly(int)).""".format('u' if PY2 else '')
     self.assertEqual(str(cm.exception), expected_msg)
 
   def test_copy(self):
