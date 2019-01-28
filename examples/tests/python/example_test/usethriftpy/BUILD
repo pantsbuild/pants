@@ -6,6 +6,7 @@
 python_tests(name='usethrift',
   sources=['use_thrift_test.py',],
   dependencies=[
+    'examples/3rdparty/python:thrift',
     'examples/src/thrift/org/pantsbuild/example/distance:distance-python',
     'examples/src/thrift/org/pantsbuild/example/precipitation:precipitation-python',
   ],
