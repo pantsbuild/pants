@@ -354,7 +354,7 @@ Signal {signum} was raised. Exiting with failure.{formatted_traceback}
     """
     if signum in cls.KEYBOARD_INTERRUPT_SIGNALS:
       raise KeyboardInterrupt('User interrupted execution with control-c!')
-    tb = frame.f_exc_traceback or sys.exc_info()[2]
+    tb = sys.exc_info()[2]
 
     # Format an entry to be written to the exception log.
     formatted_traceback = cls._format_traceback(tb, should_print_backtrace=bool(tb))
