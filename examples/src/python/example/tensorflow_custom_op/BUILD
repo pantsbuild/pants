@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# TODO(#7059): add a page() for the README once it is easier to extend the docsite!
+
 # See https://www.tensorflow.org/guide/extend/op!
 
 python_library(
