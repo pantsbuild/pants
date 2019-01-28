@@ -44,7 +44,6 @@ Bugfixes
 
 * Add Python 3 support to Pytest with V2 engine (#7153)
   `PR #7153 <https://github.com/pantsbuild/pants/pull/7153>`_
-  `PR #6098 <https://github.com/pantsbuild/pants/pull/6098>`_
 
 * Fix Py2 regression with rjust argument (#7132)
   `PR #7132 <https://github.com/pantsbuild/pants/pull/7132>`_
@@ -57,18 +56,14 @@ Refactoring, Improvements, and Tooling
 
 * Fixes to get contrib, lint, JVM tests, and platform-specific tests working with ./pants3 (#7067)
   `PR #7067 <https://github.com/pantsbuild/pants/pull/7067>`_
-  `PR #40b3dff56ff25c0c6f336fa78f1bb6f461e79898 <https://github.com/pantsbuild/pants/pull/7067/commits/40b3dff56ff25c0c6f336fa78f1bb6f461e79898>`_
 
 * Properly handle unicode and byte streams with pantsd for Python 3 (#7130)
-  `Issue #7160 <https://github.com/pantsbuild/pants/issues/7160>`_
   `PR #7130 <https://github.com/pantsbuild/pants/pull/7130>`_
-  `PR #7073 <https://github.com/pantsbuild/pants/pull/7073>`_
 
 * populate parent directories of process outputs locally to match remote execution api (#7133)
   `PR #7133 <https://github.com/pantsbuild/pants/pull/7133>`_
 
 * Fix test_jvm_platform_analysis_integration.py using unknown platforms (#7140)
-  `Issue #7139 <https://github.com/pantsbuild/pants/issues/7139>`_
   `Issue #7139 <https://github.com/pantsbuild/pants/issues/7139>`_
   `PR #7140 <https://github.com/pantsbuild/pants/pull/7140>`_
 
@@ -77,6 +72,7 @@ Refactoring, Improvements, and Tooling
 
 * Fix Idea plugin unicode issues with Python 3 (#7141)
   `PR #7141 <https://github.com/pantsbuild/pants/pull/7141>`_
+  `PR #7157 <https://github.com/pantsbuild/pants/pull/7157>`_
 
 * Fix legacy graph test Python 3 issue with rendering unicode literals (#7143)
   `PR #7143 <https://github.com/pantsbuild/pants/pull/7143>`_
