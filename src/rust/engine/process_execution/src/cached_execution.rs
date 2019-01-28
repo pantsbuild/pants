@@ -353,18 +353,7 @@ impl ActionSerializer {
   fn extract_output_files(
     &self,
     result: &bazel_protos::build::bazel::remote::execution::v2::ActionResult,
-    wrapping: OutputDirWrapping,
   ) -> BoxFuture<Digest, String> {
-    match wrapping {
-      OutputDirWrapping::Direct => (),
-      OutputDirWrapping::TopLevelWrapped => {
-        return future::result(Self::extract_output_files_with_single_containing_directory(
-          result,
-        ))
-        .to_boxed();
-      }
-    }
-
     // Get Digests of output Directories.
     // Then we'll make a Directory for the output files, and merge them.
     let output_directories = result.output_directories.clone();
@@ -496,10 +485,17 @@ impl ActionSerializer {
     wrapping: OutputDirWrapping,
   ) -> BoxFuture<CacheableExecuteProcessResult, String> {
     let exit_code = res.exit_code;
+    let extracted_output_files = match wrapping {
+      OutputDirWrapping::Direct => self.extract_output_files(&res),
+      OutputDirWrapping::TopLevelWrapped => future::result(
+        Self::extract_output_files_with_single_containing_directory(&res),
+      )
+      .to_boxed(),
+    };
     self
       .extract_stdout(&res)
       .join(self.extract_stderr(&res))
-      .join(self.extract_output_files(&res, wrapping))
+      .join(extracted_output_files)
       .map(
         move |((stdout, stderr), output_directory)| CacheableExecuteProcessResult {
           stdout,
