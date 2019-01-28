@@ -198,6 +198,7 @@ pub extern "C" fn scheduler_create(
   build_root_buf: Buffer,
   work_dir_buf: Buffer,
   local_store_dir_buf: Buffer,
+  // TODO: need some testing modifying this variable!
   local_execution_process_cache_namespace: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
