@@ -191,11 +191,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       trace_id = "0123456789abcdef"
-      parent_span_id = "0123456789abcdef"
+      parent_span_id = "123456789abcdef0"
       command = [
         '--reporting-zipkin-endpoint={}'.format(endpoint),
-        '--reporting-trace-id={}'.format(trace_id),
-        '--reporting-parent-id={}'.format(parent_span_id),
+        '--reporting-zipkin-trace-id={}'.format(trace_id),
+        '--reporting-zipkin-parent-id={}'.format(parent_span_id),
         'cloc',
         'src/python/pants:version'
       ]
@@ -209,6 +209,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       trace = ZipkinHandler.traces[-1]
       main_span = self.find_spans_by_name(trace, 'main')
       self.assertEqual(len(main_span), 1)
+
+      main_span_trace_id = main_span[0]['traceId']
+      self.assertEqual(main_span_trace_id, trace_id)
+      main_span_parent_id = main_span[0]['parentId']
+      self.assertEqual(main_span_parent_id, parent_span_id)
 
       parent_id = main_span[0]['id']
       main_children = self.find_spans_by_parentId(trace, parent_id)

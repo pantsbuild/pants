@@ -50,13 +50,16 @@ class Reporting(Subsystem):
     register('--zipkin-endpoint', advanced=True, default=None,
               help='The full HTTP URL of a zipkin server to which traces should be posted.'
                    'No traces will be made if this is not set.')
-    register('--trace-id', advanced=True, default=None,
+    register('--zipkin-trace-id', advanced=True, default=None,
               help='The overall 64 or 128-bit ID of the trace.'
                    'Set if Pants trace should be a part of larger trace'
-                   'for systems that invoke Pants.')
-    register('--parent-id', advanced=True, default=None,
+                   'for systems that invoke Pants. If zipkin-trace-id'
+                   'and zipkin-parent-id are no set, a trace_id value is randomly generated for a'
+                   'Zipkin trace')
+    register('--zipkin-parent-id', advanced=True, default=None,
               help='The 64-bit ID for a parent span that invokes Pants.'
-                   'trace-id and parent-id should be both present or absent when run Pants command')
+                   'zipkin-trace-id and zipkin-parent-id must both either be set or not set '
+                   'when run Pants command')
 
   def initialize(self, run_tracker, all_options, start_time=None):
     """Initialize with the given RunTracker.
@@ -95,18 +98,18 @@ class Reporting(Subsystem):
 
     # Set up Zipkin reporting.
     zipkin_endpoint = self.get_options().zipkin_endpoint
-    trace_id = self.get_options().trace_id
-    parent_id = self.get_options().parent_id
-    if all((trace_id, parent_id)) and zipkin_endpoint is None:
-      raise ValueError("The zipkin_endpoint flag must be set if trace_id and parent_id are given.")
-    elif zipkin_endpoint is not None:
+    trace_id = self.get_options().zipkin_trace_id
+    parent_id = self.get_options().zipkin_parent_id
+    if zipkin_endpoint is not None:
       if trace_id is None and parent_id is not None or parent_id is None and trace_id is not None:
-        raise ValueError("Trace_id and parent_id flags must be both set.")
-    elif zipkin_endpoint is None:
-      if trace_id is None and parent_id is not None:
-        raise ValueError("Trace_id and zipkin_endpoint flags must be set if parent_id is given.")
-      if parent_id is None and trace_id is not None:
-        raise ValueError("Parent_id and zipkin_endpoint flags must be set if trace_id is given.")
+        raise ValueError("Flags trace_id and parent_id must both either be set or not set.")
+    else:
+      if trace_id is not None and parent_id is not None:
+        raise ValueError("The zipkin_endpoint flag must be set if trace_id and parent_id are given.")
+      elif trace_id is None and parent_id is not None:
+        raise ValueError("Flags trace_id and zipkin_endpoint must be set if parent_id is given.")
+      elif parent_id is None and trace_id is not None:
+        raise ValueError("Flags parent_id and zipkin_endpoint must be set if trace_id is given.")
 
     if zipkin_endpoint is not None:
       zipkin_reporter_settings = ZipkinReporter.Settings(log_level=Report.INFO)

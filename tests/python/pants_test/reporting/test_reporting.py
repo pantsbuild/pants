@@ -13,19 +13,18 @@ class ReportingTest(TestBase):
 
   # Options for Zipkin tracing
   trace_id = "0123456789abcdef"
-  parent_id = "0123456789abcdef"
+  parent_id = "123456789abcdef0"
   zipkin_endpoint = 'http://localhost:9411/api/v1/spans'
 
   def test_raise_no_zipkin_endpoint_set(self):
 
-    options = {'reporting': {'trace_id': self.trace_id, 'parent_id': self.parent_id}}
-    self.context(for_subsystems=[RunTracker, Reporting], options=options)
-
+    options = {'reporting': {'zipkin_trace_id': self.trace_id, 'zipkin_parent_id': self.parent_id}}
+    context = self.context(for_subsystems=[RunTracker, Reporting], options=options)
     run_tracker = RunTracker.global_instance()
     reporting = Reporting.global_instance()
 
     with self.assertRaises(ValueError) as result:
-      reporting.initialize(run_tracker)
+      reporting.initialize(run_tracker, context.options)
 
     self.assertTrue(
       "The zipkin_endpoint flag must be set if trace_id and parent_id are given." in str(result.exception)
@@ -33,60 +32,60 @@ class ReportingTest(TestBase):
 
   def test_raise_no_parent_id_set(self):
 
-    options = {'reporting': {'trace_id': self.trace_id, 'zipkin_endpoint': self.zipkin_endpoint}}
-    self.context(for_subsystems=[RunTracker, Reporting], options=options)
+    options = {'reporting': {'zipkin_trace_id': self.trace_id, 'zipkin_endpoint': self.zipkin_endpoint}}
+    context = self.context(for_subsystems=[RunTracker, Reporting], options=options)
 
     run_tracker = RunTracker.global_instance()
     reporting = Reporting.global_instance()
 
     with self.assertRaises(ValueError) as result:
-      reporting.initialize(run_tracker)
+      reporting.initialize(run_tracker, context.options)
 
     self.assertTrue(
-      "Trace_id and parent_id flags must be both set." in str(result.exception)
+      "Flags trace_id and parent_id must both either be set or not set." in str(result.exception)
     )
 
   def test_raise_no_trace_id_set(self):
 
-    options = {'reporting': {'parent_id': self.parent_id, 'zipkin_endpoint': self.zipkin_endpoint}}
-    self.context(for_subsystems=[RunTracker, Reporting], options=options)
+    options = {'reporting': {'zipkin_parent_id': self.parent_id, 'zipkin_endpoint': self.zipkin_endpoint}}
+    context = self.context(for_subsystems=[RunTracker, Reporting], options=options)
 
     run_tracker = RunTracker.global_instance()
     reporting = Reporting.global_instance()
 
     with self.assertRaises(ValueError) as result:
-      reporting.initialize(run_tracker)
+      reporting.initialize(run_tracker, context.options)
 
     self.assertTrue(
-      "Trace_id and parent_id flags must be both set." in str(result.exception)
+      "Flags trace_id and parent_id must both either be set or not set." in str(result.exception)
     )
 
   def test_raise_no_trace_id_and_zipkin_endpoint_set(self):
 
-    options = {'reporting': {'parent_id': self.parent_id}}
-    self.context(for_subsystems=[RunTracker, Reporting], options=options)
+    options = {'reporting': {'zipkin_parent_id': self.parent_id}}
+    context = self.context(for_subsystems=[RunTracker, Reporting], options=options)
 
     run_tracker = RunTracker.global_instance()
     reporting = Reporting.global_instance()
 
     with self.assertRaises(ValueError) as result:
-      reporting.initialize(run_tracker)
+      reporting.initialize(run_tracker, context.options)
 
     self.assertTrue(
-      "Trace_id and zipkin_endpoint flags must be set if parent_id is given." in str(result.exception)
+      "Flags trace_id and zipkin_endpoint must be set if parent_id is given." in str(result.exception)
     )
 
   def test_raise_no_parent_id_and_zipkin_endpoint_set(self):
 
-    options = {'reporting': {'trace_id': self.trace_id}}
-    self.context(for_subsystems=[RunTracker, Reporting], options=options)
+    options = {'reporting': {'zipkin_trace_id': self.trace_id}}
+    context = self.context(for_subsystems=[RunTracker, Reporting], options=options)
 
     run_tracker = RunTracker.global_instance()
     reporting = Reporting.global_instance()
 
     with self.assertRaises(ValueError) as result:
-      reporting.initialize(run_tracker)
+      reporting.initialize(run_tracker, context.options)
 
     self.assertTrue(
-      "Parent_id and zipkin_endpoint flags must be set if trace_id is given." in str(result.exception)
+      "Flags parent_id and zipkin_endpoint must be set if trace_id is given." in str(result.exception)
     )
