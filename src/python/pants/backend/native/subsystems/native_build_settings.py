@@ -40,7 +40,3 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
 
   def get_strict_deps_value_for_target(self, target):
     return self.get_target_mirrored_option('strict_deps', target)
-
-  @memoized_property
-  def toolchain_variant(self):
-    return ToolchainVariant.create(self.get_options().toolchain_variant)

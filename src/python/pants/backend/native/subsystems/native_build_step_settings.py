@@ -40,6 +40,10 @@ class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin
   def get_compiler_option_sets_for_target(self, target):
     return self.get_target_mirrored_option('compiler_option_sets', target)
 
+  @property
+  def toolchain_variant(self):
+    return ToolchainVariant.create(self.get_options().toolchain_variant)
+
   @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):
     return {"fatal_warnings": ["-Werror"]}
