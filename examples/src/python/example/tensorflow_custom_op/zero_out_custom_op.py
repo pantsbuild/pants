@@ -13,4 +13,4 @@ from wrap_lib.wrap_zero_out_op import zero_out_op_lib_path
 
 # We make this a function in order to lazily load the op library.
 def zero_out_module():
-  return tf.load_op_library(binary_type(zero_out_op_lib_path.decode('utf-8')))
+  return tf.load_op_library(binary_type(zero_out_op_lib_path.encode()))
