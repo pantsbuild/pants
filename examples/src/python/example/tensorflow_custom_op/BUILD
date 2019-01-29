@@ -8,6 +8,7 @@
 python_library(
   sources=['zero_out_custom_op.py'],
   dependencies=[
+    '3rdparty/python:future',
     'examples/3rdparty/python:tensorflow',
     ':tensorflow-zero-out-op-wrapper',
   ],
