@@ -37,11 +37,6 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
                   "are used when compiling and linking native code. C and C++ targets may override "
                   "this behavior with the strict_deps keyword argument as well.")
 
-    register('--toolchain-variant', type=str, fingerprint=True, advanced=True,
-             choices=ToolchainVariant.allowed_values,
-             default=ToolchainVariant.default_value,
-             help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
-                  "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 
   def get_strict_deps_value_for_target(self, target):
     return self.get_target_mirrored_option('strict_deps', target)

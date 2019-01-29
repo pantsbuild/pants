@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from pants.backend.native.subsystems.native_build_settings import ToolchainVariant
 from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
   MirroredTargetOptionMixin
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
@@ -29,6 +30,12 @@ class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin
              fingerprint=True,
              help='The default for the "compiler_option_sets" argument '
                   'for targets of this language.')
+
+    register('--toolchain-variant', type=str, fingerprint=True, advanced=True,
+             choices=ToolchainVariant.allowed_values,
+             default=ToolchainVariant.default_value,
+             help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
+                  "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 
   def get_compiler_option_sets_for_target(self, target):
     return self.get_target_mirrored_option('compiler_option_sets', target)
