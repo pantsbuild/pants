@@ -20,6 +20,7 @@ class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin
 
   mirrored_option_to_kwarg_map = {
     'compiler_option_sets': 'compiler_option_sets',
+    'toolchain_variant': 'toolchain_variant'
   }
 
   @classmethod

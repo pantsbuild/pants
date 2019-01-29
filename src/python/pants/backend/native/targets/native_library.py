@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from pants.backend.native.subsystems.native_build_settings import ToolchainVariant
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
@@ -34,7 +35,7 @@ class NativeLibrary(Target, AbstractClass):
       'strict_deps': PrimitiveField(strict_deps),
       'fatal_warnings': PrimitiveField(fatal_warnings),
       'compiler_option_sets': PrimitivesSetField(compiler_option_sets),
-      'toolchain_variant': PrimitivesSetField(toolchain_variant)
+      'toolchain_variant': PrimitiveField(toolchain_variant)
     })
 
     if ctypes_native_library and not isinstance(ctypes_native_library, NativeArtifact):
@@ -47,7 +48,10 @@ class NativeLibrary(Target, AbstractClass):
 
   @property
   def toolchain_variant(self):
-    return self.payload.toolchain_variant
+    if not self.payload.toolchain_variant:
+      return None
+
+    return ToolchainVariant.create(self.payload.toolchain_variant)
 
   @property
   def strict_deps(self):

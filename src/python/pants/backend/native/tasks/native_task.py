@@ -81,17 +81,24 @@ class NativeTask(Task):
   def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
 
-  @memoized_property
-  def _toolchain_variant_request(self):
+  def _toolchain_variant_request(self, variant):
     return ToolchainVariantRequest(
       toolchain=self._native_toolchain,
-      variant=self._native_build_step_settings.toolchain_variant)
+      variant=variant)
 
   def get_c_toolchain_variant(self, native_library_target):
-    return self._request_single(CToolchain, self._toolchain_variant_request)
+    return self._get_toolchain_variant(CToolchain, native_library_target)
 
   def get_cpp_toolchain_variant(self, native_library_target):
-    return self._request_single(CppToolchain, self._toolchain_variant_request)
+    return self._get_toolchain_variant(CppToolchain, native_library_target)
+
+  def _get_toolchain_variant(self, toolchain_type, native_library_target):
+    if native_library_target.toolchain_variant is not None:
+      return self._request_single(toolchain_type, self._toolchain_variant_request(
+        native_library_target.toolchain_variant))
+    else:
+      return self._request_single(toolchain_type, self._toolchain_variant_request(
+        self._native_build_step_settings.toolchain_variant))
 
   @memoized_method
   def native_deps(self, target):
