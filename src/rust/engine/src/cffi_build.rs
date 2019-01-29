@@ -114,7 +114,9 @@ fn main() -> Result<(), CffiBuildError> {
   // When built with Python 2, it works with both Python 2 and Python 3.
   // So, we check to see if the under-the-hood interpreter has changed and rebuild the native engine
   // when needed.
-  println!("cargo:rerun-if-env-changed=PANTS_USE_PYTHON3");
+  println!("cargo:rerun-if-env-changed=PANTS_USE_PYTHON36");
+  println!("cargo:rerun-if-env-changed=PANTS_USE_PYTHON37");
+  println!("cargo:rerun-if-env-changed=PANTS_USE_PYTHON3_UNCONSTRAINED");
 
   if cfg!(target_os = "linux") {
     println!("cargo:rustc-link-lib=static=stdc++");

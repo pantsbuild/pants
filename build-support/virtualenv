@@ -9,8 +9,21 @@ VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.io/packa
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && git rev-parse --show-toplevel)
 source ${REPO_ROOT}/build-support/common.sh
 
+function determine_python_bin_name() {
+  if [ "${PANTS_USE_PYTHON3_UNCONSTRAINED}" = true ]; then
+    py_version="3"
+  elif [ "${PANTS_USE_PYTHON36}" = true ]; then
+    py_version="3.6"
+  elif [ "${PANTS_USE_PYTHON37}" = true ]; then
+    py_version="3.7"
+  else
+    py_version="2.7"
+  fi
+  echo "python${py_version}"
+}
+
 if [[ -z "${PY}" ]]; then
-  python_bin_name="python2.7"; [ "${PANTS_USE_PYTHON3}" = true ] && python_bin_name="python3"
+  python_bin_name="$(determine_python_bin_name)"
   if which "${python_bin_name}" >/dev/null; then
     PY=`which ${python_bin_name}`
   else

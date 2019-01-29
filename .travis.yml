@@ -54,8 +54,9 @@ native_engine_cache_config: &native_engine_cache_config
     timeout: 500
     directories:
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py2.venv
-      - build-support/pants_dev_deps.py3.venv
+      - build-support/pants_dev_deps.py27.venv
+      - build-support/pants_dev_deps.py36.venv
+      - build-support/pants_dev_deps.py37.venv
       - src/rust/engine/target
 
 # Travis cache config for jobs that run a bootstrapped pants.pex.

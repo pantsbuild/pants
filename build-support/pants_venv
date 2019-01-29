@@ -11,26 +11,57 @@ REQUIREMENTS=(
   ${REPO_ROOT}/pants-plugins/3rdparty/python/requirements.txt
 )
 
+venv_dir_prefix="${REPO_ROOT}/build-support/pants_dev_deps"
+
+# N.B. this function would better belong in `virutalenv`, which focuses on discovering which Python
+# binary to use and thus is a natural fit for this function. However, this must be defined here
+# to avoid a circular dependency, as `pants_venv` calls `virtualenv` so cannot rely on a function
+# defined within `virtualenv`. This function will resolve to the same Python binary that
+# `virtualenv` resolves to because both will use the same command `python3` when
+# PANTS_USE_PYTHON3_UNCONSTRAINED is true.
+function determine_specific_py3_version() {
+  version_number="$(python3 -c 'import sys; print(sys.version_info[1])')"
+  case "${version_number}" in
+    6) echo "36" ;;
+    7) echo "37" ;;
+    *) die "Pants cannot run with Python 3.${version_number}. You must use either Python 2.7, 3.6, or 3.7." ;;
+  esac
+}
+
 function venv_dir() {
-  py_version="py2"; [ "${PANTS_USE_PYTHON3}" = true ] && py_version="py3"
-  echo ${REPO_ROOT}/build-support/pants_dev_deps.${py_version}.venv
+  if [ "${PANTS_USE_PYTHON3_UNCONSTRAINED}" = true ]; then
+    py_venv_version="$(determine_specific_py3_version)"
+  elif [ "${PANTS_USE_PYTHON36}" = true ]; then
+    py_venv_version="36"
+  elif [ "${PANTS_USE_PYTHON37}" = true ]; then
+    py_venv_version="37"
+  else
+    py_venv_version="27"
+  fi
+  echo "${venv_dir_prefix}.py${py_venv_version}.venv"
 }
 
 function activate_venv() {
   source "$(venv_dir)/bin/activate"
 }
 
-function create_venv() {
+function remove_venv() {
   rm -rf "$(venv_dir)"
-  # If `pants_dev_deps.venv` still exists, delete both its legacy folder and the cached
-  # Python interpreter folder, which contains problematic symlinks.
+  # If `pants_dev_deps.venv` or `pants_dev_deps.py{2,3}.venv` still exist, delete both the legacy folders
+  # and the cached Python interpreter folder, which contains problematic symlinks.
   # Note we only perform these removals for the first time, to avoid continually deleting
-  # the cache when switching between using `pants_dev_deps.py2.venv` and `pants_dev_deps.py3.venv`.
-  legacy_venv_dir="${REPO_ROOT}/build-support/pants_dev_deps.venv"
-  if [ -d "${legacy_venv_dir}" ]; then
-    rm -rf "${legacy_venv_dir}"
-    rm -rf "${HOME}/.cache/pants/python_cache/interpreters"
-  fi
+  # the cache when switching between using `pants_dev_deps.py{27,36,37}.venv`.
+  legacy_venv_dirs=("${venv_dir_prefix}.venv" "${venv_dir_prefix}.py2.venv" "${venv_dir_prefix}.py3.venv")
+  for legacy_venv_dir in "${legacy_venv_dirs[@]}"; do
+    if [ -d "${legacy_venv_dir}" ]; then
+      rm -rf "${legacy_venv_dirs[@]}"
+      rm -rf "${HOME}/.cache/pants/python_cache/interpreters"
+    fi
+  done
+}
+
+function create_venv() {
+  remove_venv
   "${REPO_ROOT}/build-support/virtualenv" "$(venv_dir)"
 }
 
