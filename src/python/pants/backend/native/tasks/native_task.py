@@ -82,12 +82,10 @@ class NativeTask(Task):
       toolchain=self._native_toolchain,
       variant=self._native_build_settings.toolchain_variant)
 
-  @memoized_method
-  def get_c_toolchain_variant(self):
+  def get_c_toolchain_variant(self, native_library_target):
     return self._request_single(CToolchain, self._toolchain_variant_request)
 
-  @memoized_method
-  def get_cpp_toolchain_variant(self):
+  def get_cpp_toolchain_variant(self, native_library_target):
     return self._request_single(CppToolchain, self._toolchain_variant_request)
 
   @memoized_method

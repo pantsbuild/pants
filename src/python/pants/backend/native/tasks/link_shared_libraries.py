@@ -56,11 +56,10 @@ class LinkSharedLibraries(NativeTask):
 
   class LinkSharedLibrariesError(TaskError): pass
 
-  @memoized_property
-  def linker(self):
+  def linker(self, native_library_target):
     # NB: we are using the C++ toolchain here for linking every type of input, including compiled C
     # source files.
-    return self.get_cpp_toolchain_variant().cpp_linker
+    return self.get_cpp_toolchain_variant(native_library_target).cpp_linker
 
   @memoized_property
   def platform(self):
@@ -132,7 +131,7 @@ class LinkSharedLibraries(NativeTask):
       external_lib_names.extend(ext_dep.native_lib_names)
 
     link_request = LinkSharedLibraryRequest(
-      linker=self.linker,
+      linker=self.linker(vt.target),
       object_files=tuple(all_compiled_object_files),
       native_artifact=vt.target.ctypes_native_library,
       output_dir=vt.results_dir,
