@@ -5,13 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
+import io
 import itertools
 import os
 import re
 import textwrap
 import tokenize
-from builtins import object, open
-from io import StringIO
 
 import six
 
@@ -139,7 +138,7 @@ class PythonFile(object):
     else:
       full_filename = filename
 
-    with open(full_filename, 'rb') as fp:
+    with io.open(full_filename, 'rb') as fp:
       blob = fp.read()
 
     tree = cls._parse(blob, filename)
@@ -165,7 +164,7 @@ class PythonFile(object):
     :param blob: Input string with python file contents
     :return: token iterator
     """
-    readline_func = StringIO(blob.decode('utf-8')).readline
+    readline_func = io.StringIO(blob.decode('utf-8')).readline
     return tokenize.generate_tokens(readline_func)
 
   @property
