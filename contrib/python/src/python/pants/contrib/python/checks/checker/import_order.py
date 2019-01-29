@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import ast
 import os
-from builtins import object
 from distutils import sysconfig
 
 from pants.contrib.python.checks.checker.common import CheckstylePlugin
