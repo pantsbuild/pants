@@ -181,7 +181,7 @@ class ExistingDirError(ValueError):
   """Indicates a copy operation would over-write a directory with a file."""
 
 
-def mergetree(src, dst, symlinks=False, ignore=None):
+def mergetree(src, dst, symlinks=False, ignore=None, file_filter=None):
   """Just like `shutil.copytree`, except the `dst` dir may exist.
 
   The `src` directory will be walked and its contents copied into `dst`. If `dst` already exists the
@@ -190,6 +190,9 @@ def mergetree(src, dst, symlinks=False, ignore=None):
   """
   safe_mkdir(dst)
 
+  if not file_filter:
+    file_filter = lambda _: True
+
   for src_path, dirnames, filenames in safe_walk(src, topdown=True, followlinks=True):
     ignorenames = ()
     if ignore:
@@ -197,7 +200,8 @@ def mergetree(src, dst, symlinks=False, ignore=None):
       if to_ignore:
         ignorenames = frozenset(to_ignore)
 
-    dst_path = os.path.join(dst, os.path.relpath(src_path, src))
+    src_relpath = os.path.relpath(src_path, src)
+    dst_path = os.path.join(dst, src_relpath)
 
     visit_dirs = []
     for dirname in dirnames:
@@ -226,6 +230,9 @@ def mergetree(src, dst, symlinks=False, ignore=None):
 
     for filename in filenames:
       if filename in ignorenames:
+        continue
+      src_file_relpath = os.path.join(src_relpath, filename)
+      if not file_filter(src_file_relpath):
         continue
 
       dst_filename = os.path.join(dst_path, filename)
