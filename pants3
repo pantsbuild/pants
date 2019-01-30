@@ -19,18 +19,19 @@ fi
 # Determine Py3 version
 if [ "${python_three_six}" = true ]; then
   export PANTS_USE_PYTHON36=true
-  py_version_number="3.6"
+  py_lower_bound="3.6"
+  py_upper_bound="3.7"
 elif [ "${python_three_seven}" = true ]; then
   export PANTS_USE_PYTHON37=true
-  py_version_number="3.7"
+  py_lower_bound="3.7"
+  py_upper_bound="3.8"
 else
   export PANTS_USE_PYTHON3_UNCONSTRAINED=true
-  # This only sets a lower bounds on acceptable Python 3 interpreters.
-  # The actual interpreter and venv to be used will be set by `pants_venv` and `virtualenv`.
-  py_version_number="3.6"
+  py_lower_bound="3.6"
+  py_upper_bound="4"
 fi
 
 # Use Py3 for subprocesses
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=${py_version_number},<4']"
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=${py_lower_bound},<${py_upper_bound}']"
 
 ./pants "$@"
