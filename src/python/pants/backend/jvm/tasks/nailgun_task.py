@@ -24,8 +24,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   NAILGUN = 'nailgun'
   SUBPROCESS = 'subprocess'
   HERMETIC = 'hermetic'
+  HERMETIC_WITH_NAILGUN = 'hermetic-with-nailgun'
 
-  class ExecutionStrategy(enum([NAILGUN, SUBPROCESS, HERMETIC])): pass
+  class ExecutionStrategy(enum([NAILGUN, SUBPROCESS, HERMETIC, HERMETIC_WITH_NAILGUN])): pass
 
   @classmethod
   def register_options(cls, register):
