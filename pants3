@@ -9,30 +9,13 @@
 # Default to using Python 3 if not otherwise specified.
 export PY="${PY:-python3}"
 
-# Determine interpreter constraints. Note that $PY only impacts which virtualenv we use
-# for the parent Pants process; we must also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS
-# to constrain spawned subprocesses such as tests. Without any interpreter constraints, we get
-# the _Py_Dealloc exception (#6985) as Pants will try to use Python 2 for subprocesses. Without
-# the tightened constraints when the user defines $PY, we may end up using a different Python 3
-# version for subprocesses than we do for Pants.
-case "${PY}" in
-  'python3')
-    py_lower_bound="3.6"
-    py_upper_bound="4"
-    ;;
-  'python3.6')
-    py_lower_bound="3.6"
-    py_upper_bound="3.7"
-    ;;
-  'python3.7')
-    py_lower_bound="3.6"
-    py_upper_bound="3.8"
-    ;;
-  'python3.8')
-    py_lower_bound="3.8"
-    py_upper_bound="3.9"
-    ;;
-esac
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=${py_lower_bound},<${py_upper_bound}']"
+# Set interpreter constraints to exactly match the interpreter used for the venv.
+# Note that $PY only impacts which virtualenv we use for the parent Pants process; we must also set
+# PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS to constrain spawned subprocesses such as tests. Without
+# any interpreter constraints, we get the _Py_Dealloc exception (#6985) as Pants will try to use Python 2
+# for subprocesses. Without the exact constraints we set, we could end up using a different Python 3
+# minor version for subprocesses than we do for Pants.
+py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${py_major_minor}.*']"
 
 ./pants "$@"
