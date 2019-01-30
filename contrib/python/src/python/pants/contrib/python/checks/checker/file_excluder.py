@@ -4,9 +4,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import io
 import os
 import re
-from builtins import object, open
 
 
 class FileExcluder(object):
@@ -15,7 +15,7 @@ class FileExcluder(object):
     if excludes_path:
       if not os.path.exists(excludes_path):
         raise ValueError('Excludes file does not exist: {0}'.format(excludes_path))
-      with open(excludes_path, 'r') as fh:
+      with io.open(excludes_path, 'r') as fh:
         for line in fh.readlines():
           if line and not line.startswith('#') and '::' in line:
             pattern, plugins = line.strip().split('::', 2)

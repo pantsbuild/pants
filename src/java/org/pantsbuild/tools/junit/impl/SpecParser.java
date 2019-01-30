@@ -75,16 +75,20 @@ class SpecParser {
    * @throws SpecException if the method passed in is not an executable test method
    */
   private Optional<Spec> getOrCreateSpec(String className, String specString) throws SpecException {
-    try {
-      Class<?> clazz = getClass().getClassLoader().loadClass(className);
-      if (Util.isTestClass(clazz)) {
-        if (!specs.containsKey(clazz)) {
-          Spec newSpec = new Spec(clazz);
-          specs.put(clazz, newSpec);
-        }
-        return Optional.of(specs.get(clazz));
+    Class<?> clazz = loadClassOrThrow(className, specString);
+    if (Util.isTestClass(clazz)) {
+      if (!specs.containsKey(clazz)) {
+        Spec newSpec = new Spec(clazz);
+        specs.put(clazz, newSpec);
       }
-      return Optional.absent();
+      return Optional.of(specs.get(clazz));
+    }
+    return Optional.absent();
+  }
+
+  private Class<?> loadClassOrThrow(final String className, String specString) {
+    try {
+      return getClass().getClassLoader().loadClass(className);
     } catch (ClassNotFoundException | NoClassDefFoundError e) {
       throw new SpecException(specString,
           String.format("Class %s not found in classpath.", className), e);
@@ -94,9 +98,10 @@ class SpecParser {
       throw new SpecException(specString,
           String.format("Error linking %s.", className), e);
       // See the comment below for justification.
-    } catch (RuntimeException e) {
+    } catch (Exception e) {
       // The class may fail with some variant of RTE in its static initializers, trap these
-      // and dump the bad spec in question to help narrow down issue.
+      // and dump the bad spec in question along with the underlying error message to help
+      // narrow down issue.
       throw new SpecException(specString,
           String.format("Error initializing %s.",className), e);
     }

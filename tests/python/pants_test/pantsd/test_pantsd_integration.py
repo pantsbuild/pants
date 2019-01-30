@@ -216,8 +216,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_started()
 
     for cmd, run in zip(cmds, daemon_runs):
-      stderr_output = run.stderr_data.strip()
-      self.assertEqual(stderr_output, '', 'Non-empty stderr for {}: {}'.format(cmd, stderr_output))
       self.assertNotEqual(run.stdout_data, '', 'Empty stdout for {}'.format(cmd))
 
     for run_pairs in zip(non_daemon_runs, daemon_runs):
