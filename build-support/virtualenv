@@ -9,12 +9,6 @@ VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.io/packa
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && git rev-parse --show-toplevel)
 source ${REPO_ROOT}/build-support/common.sh
 
-# Note the caller may set $PY to whichever Python version
-# they want. If not set, we default to Python 2.7.
-if [[ -z "${PY}" ]]; then
-  PY="python2.7"
-fi
-
 # Locate the binary's path to log to user or die gracefully if not found.
 if which "${PY}" >/dev/null; then
   PY=`which ${PY}`

@@ -14,7 +14,7 @@ REQUIREMENTS=(
 venv_dir_prefix="${REPO_ROOT}/build-support/pants_dev_deps"
 
 function venv_dir() {
-  py_venv_version=$(${PY:-python2.7} -c 'import sys; print("".join(map(str, sys.version_info[0:2])))')
+  py_venv_version=$(${PY} -c 'import sys; print("".join(map(str, sys.version_info[0:2])))')
   echo "${venv_dir_prefix}.py${py_venv_version}.venv"
 }
 

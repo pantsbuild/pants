@@ -6,12 +6,8 @@
 #
 # To constrain to a specific Python 3 version, such as 3.7, prefix the script with `PY=python3.7`.
 
-# Default to using Python 3 if user did not specify otherwise.
-if [[ -z "${PY}" ]]; then
-  export PY="python3"
-  py_lower_bound="3.6"
-  py_upper_bound="4"
-fi
+# Default to using Python 3 if not otherwise specified.
+export PY="${PY:-python3}"
 
 # Determine interpreter constraints. Note that $PY only impacts which virtualenv we use
 # for the parent Pants process; we must also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS
