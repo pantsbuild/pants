@@ -73,6 +73,7 @@ class NativeTask(Task):
   def _native_build_settings(self):
     return NativeBuildSettings.global_instance()
 
+  # TODO(#7183): remove this global subsystem dependency!
   @memoized_property
   def _native_build_step_settings(self):
     return NativeBuildStepSettings.global_instance()
@@ -93,12 +94,9 @@ class NativeTask(Task):
     return self._get_toolchain_variant(CppToolchain, native_library_target)
 
   def _get_toolchain_variant(self, toolchain_type, native_library_target):
-    if native_library_target.toolchain_variant is not None:
-      return self._request_single(toolchain_type, self._toolchain_variant_request(
-        native_library_target.toolchain_variant))
-    else:
-      return self._request_single(toolchain_type, self._toolchain_variant_request(
-        self._native_build_step_settings.toolchain_variant))
+    selected_variant = self._native_build_step_settings.get_toolchain_variant_for_target(
+      native_library_target)
+    return self._request_single(toolchain_type, self._toolchain_variant_request(selected_variant))
 
   @memoized_method
   def native_deps(self, target):

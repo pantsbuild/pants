@@ -41,9 +41,8 @@ class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin
   def get_compiler_option_sets_for_target(self, target):
     return self.get_target_mirrored_option('compiler_option_sets', target)
 
-  @property
-  def toolchain_variant(self):
-    return ToolchainVariant.create(self.get_options().toolchain_variant)
+  def get_toolchain_variant_for_target(self, target):
+    return ToolchainVariant.create(self.get_target_mirrored_option('toolchain_variant', target))
 
   @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):
