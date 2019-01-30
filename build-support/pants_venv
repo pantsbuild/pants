@@ -13,25 +13,8 @@ REQUIREMENTS=(
 
 venv_dir_prefix="${REPO_ROOT}/build-support/pants_dev_deps"
 
-function determine_specific_py3_version() {
-  version_number="$(${PY} -c 'import sys; print(sys.version_info[1])')"
-  case "${version_number}" in
-    6) echo "36" ;;
-    7) echo "37" ;;
-    8) echo "38" ;;
-    *) die "Pants cannot run with Python 3.${version_number}." ;;
-  esac
-}
-
 function venv_dir() {
-  case "${PY}" in
-    'python3') py_venv_version="$(determine_specific_py3_version)" ;;
-    'python3.6') py_venv_version="36" ;;
-    'python3.7') py_venv_version="37" ;;
-    'python3.8') py_venv_version="38" ;;
-    # If $PY not pre-set by caller, default to Python 2.7
-    *) py_venv_version="27"
-  esac
+  py_venv_version=$(${PY:-python2.7} -c 'import sys; print("".join(map(str, sys.version_info[0:2])))')
   echo "${venv_dir_prefix}.py${py_venv_version}.venv"
 }
 
@@ -42,9 +25,9 @@ function activate_venv() {
 function remove_venv() {
   rm -rf "$(venv_dir)"
   # If `pants_dev_deps.venv` or `pants_dev_deps.py{2,3}.venv` still exist, delete both the legacy folders
-  # and the cached Python interpreter folder, which contains problematic symlinks.
-  # Note we only perform these removals for the first time, to avoid continually deleting
-  # the cache when switching between using `pants_dev_deps.py{27,36,37}.venv`.
+  # and the cached Python interpreter folder, which contains problematic symlinks. Note we only perform
+  # these removals for the first time, to avoid continually deleting the cache when switching
+  # between valid venvs.
   legacy_venv_dirs=("${venv_dir_prefix}.venv" "${venv_dir_prefix}.py2.venv" "${venv_dir_prefix}.py3.venv")
   for legacy_venv_dir in "${legacy_venv_dirs[@]}"; do
     if [ -d "${legacy_venv_dir}" ]; then

@@ -37,8 +37,6 @@ case "${PY}" in
     py_upper_bound="3.9"
     ;;
 esac
-
-# Use Py3 for subprocesses
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=${py_lower_bound},<${py_upper_bound}']"
 
 ./pants "$@"
