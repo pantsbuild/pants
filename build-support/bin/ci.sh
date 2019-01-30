@@ -104,9 +104,10 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
-# Determine which Python interpreter to use for bootstrapping pex and for executing subprocesses.
-# Order matters here. We must constrain subprocesses before running the bootstrap stage,
-# or we will encounter the _Py_Dealloc error when bootstrapping a Python 3 PEX (#6985).
+# Note that we still must set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS for Python 3, even though
+# ./pants3 does this already, because the constraints are only set when first bootstrapping the shard,
+# and will not apply for new shards. Without setting PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS, we
+# would be using a Python 3 PEX with Python 2 subprocesses, which results in the _Py_Dealloc error (#6985).
 if [[ "${python_two:-false}" == "false" ]]; then
   py_version_number="3.6"
   bootstrap_pants_script="./pants3"
