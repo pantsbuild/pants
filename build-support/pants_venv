@@ -56,6 +56,7 @@ function remove_venv() {
     if [ -d "${legacy_venv_dir}" ]; then
       rm -rf "${legacy_venv_dirs[@]}"
       rm -rf "${HOME}/.cache/pants/python_cache/interpreters"
+      break
     fi
   done
 }
