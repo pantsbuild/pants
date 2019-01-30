@@ -4,8 +4,7 @@
 
 # This bootstrap script invokes Pants using a Python 3 interpreter.
 #
-# To constrain to a specific Python 3 version, such as 3.7,
-# prefix the script with `PY=python3.7`.
+# To constrain to a specific Python 3 version, such as 3.7, prefix the script with `PY=python3.7`.
 
 # Default to using Python 3 if user did not specify otherwise.
 if [[ -z "${PY}" ]]; then
@@ -14,13 +13,12 @@ if [[ -z "${PY}" ]]; then
   py_upper_bound="4"
 fi
 
-# Determine interpreter constraints. Note that $PY only impacts which
-# virtualenv we use for the parent Pants process; we must also set
-# PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS to constrain spawned subprocesses
-# such as tests. Without any interpreter constraints, we get the
-# _Py_Dealloc exception (#6985) as Pants will try to use Python 2 for subprocesses.
-# Without the tightened constraints when the user defines $PY, we may end up using
-# a different Python 3 version for subprocess than we do for Pants.
+# Determine interpreter constraints. Note that $PY only impacts which virtualenv we use
+# for the parent Pants process; we must also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS
+# to constrain spawned subprocesses such as tests. Without any interpreter constraints, we get
+# the _Py_Dealloc exception (#6985) as Pants will try to use Python 2 for subprocesses. Without
+# the tightened constraints when the user defines $PY, we may end up using a different Python 3
+# version for subprocesses than we do for Pants.
 case "${PY}" in
   'python3')
     py_lower_bound="3.6"
