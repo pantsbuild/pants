@@ -53,7 +53,10 @@ class Exiter(object):
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
     if msg:
-      out = out or (sys.stderr.buffer if PY3 else sys.stderr)
+      out = out or sys.stderr
+      if PY3 and hasattr(out, 'buffer'):
+        out = out.buffer
+
       msg = ensure_binary(msg)
       try:
         out.write(msg)
