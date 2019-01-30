@@ -9,26 +9,18 @@ VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.io/packa
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && git rev-parse --show-toplevel)
 source ${REPO_ROOT}/build-support/common.sh
 
-function determine_python_bin_name() {
-  if [ "${PANTS_USE_PYTHON3_UNCONSTRAINED}" = true ]; then
-    py_version="3"
-  elif [ "${PANTS_USE_PYTHON36}" = true ]; then
-    py_version="3.6"
-  elif [ "${PANTS_USE_PYTHON37}" = true ]; then
-    py_version="3.7"
-  else
-    py_version="2.7"
-  fi
-  echo "python${py_version}"
-}
-
+# Note the caller may set $PY to whichever Python version
+# they want. If not set, we default to Python 2.7.
 if [[ -z "${PY}" ]]; then
-  python_bin_name="$(determine_python_bin_name)"
-  if which "${python_bin_name}" >/dev/null; then
-    PY=`which ${python_bin_name}`
-  else
-    die "No ${python_bin_name} interpreter found on the path. Python will not work!"
-  fi
+  PY="python2.7"
+fi
+
+# Locate the binary's path to log to user or
+# die gracefully if not found.
+if which "${PY}" >/dev/null; then
+  PY=`which ${PY}`
+else
+  die "No ${PY} interpreter found on the path. Python will not work!"
 fi
 
 log "Using python at ${PY}"

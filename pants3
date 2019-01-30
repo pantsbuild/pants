@@ -3,33 +3,42 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 # This bootstrap script invokes Pants using a Python 3 interpreter.
+#
+# To constrain to a specific Python 3 version, such as 3.7,
+# prefix the script with `PY=python3.7`.
 
-# Defaults to allowing either Python 3.6 or 3.7, and allows the user to further constrain to a specific version
-# by passing `-6` or `-7`.
-
-# Check for -6 and -7 flags.
-if [[ "$1" == "-6" ]]; then
-  python_three_six=true
-  shift
-elif [[ "$1" == "-7" ]]; then
-  python_three_seven=true
-  shift
-fi
-
-# Determine Py3 version
-if [ "${python_three_six}" = true ]; then
-  export PANTS_USE_PYTHON36=true
-  py_lower_bound="3.6"
-  py_upper_bound="3.7"
-elif [ "${python_three_seven}" = true ]; then
-  export PANTS_USE_PYTHON37=true
-  py_lower_bound="3.7"
-  py_upper_bound="3.8"
-else
-  export PANTS_USE_PYTHON3_UNCONSTRAINED=true
+# Default to using Python 3 if user did not specify otherwise.
+if [[ -z "${PY}" ]]; then
+  export PY="python3"
   py_lower_bound="3.6"
   py_upper_bound="4"
 fi
+
+# Determine interpreter constraints. Note that $PY only impacts which
+# virtualenv we use for the parent Pants process; we must also set
+# PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS to constrain spawned subprocesses
+# such as tests. Without any interpreter constraints, we get the
+# _Py_Dealloc exception (#6985) as Pants will try to use Python 2 for subprocesses.
+# Without the tightened constraints when the user defines $PY, we may end up using
+# a different Python 3 version for subprocess than we do for Pants.
+case "${PY}" in
+  'python3')
+    py_lower_bound="3.6"
+    py_upper_bound="4"
+    ;;
+  'python3.6')
+    py_lower_bound="3.6"
+    py_upper_bound="3.7"
+    ;;
+  'python3.7')
+    py_lower_bound="3.6"
+    py_upper_bound="3.8"
+    ;;
+  'python3.8')
+    py_lower_bound="3.8"
+    py_upper_bound="3.9"
+    ;;
+esac
 
 # Use Py3 for subprocesses
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=${py_lower_bound},<${py_upper_bound}']"

@@ -13,31 +13,25 @@ REQUIREMENTS=(
 
 venv_dir_prefix="${REPO_ROOT}/build-support/pants_dev_deps"
 
-# N.B. this function would better belong in `virutalenv`, which focuses on discovering which Python
-# binary to use and thus is a natural fit for this function. However, this must be defined here
-# to avoid a circular dependency, as `pants_venv` calls `virtualenv` so cannot rely on a function
-# defined within `virtualenv`. This function will resolve to the same Python binary that
-# `virtualenv` resolves to because both will use the same command `python3` when
-# PANTS_USE_PYTHON3_UNCONSTRAINED is true.
 function determine_specific_py3_version() {
-  version_number="$(python3 -c 'import sys; print(sys.version_info[1])')"
+  version_number="$(${PY} -c 'import sys; print(sys.version_info[1])')"
   case "${version_number}" in
     6) echo "36" ;;
     7) echo "37" ;;
-    *) die "Pants cannot run with Python 3.${version_number}. You must use either Python 2.7, 3.6, or 3.7." ;;
+    8) echo "38" ;;
+    *) die "Pants cannot run with Python 3.${version_number}." ;;
   esac
 }
 
 function venv_dir() {
-  if [ "${PANTS_USE_PYTHON3_UNCONSTRAINED}" = true ]; then
-    py_venv_version="$(determine_specific_py3_version)"
-  elif [ "${PANTS_USE_PYTHON36}" = true ]; then
-    py_venv_version="36"
-  elif [ "${PANTS_USE_PYTHON37}" = true ]; then
-    py_venv_version="37"
-  else
-    py_venv_version="27"
-  fi
+  case "${PY}" in
+    'python3') py_venv_version="$(determine_specific_py3_version)" ;;
+    'python3.6') py_venv_version="36" ;;
+    'python3.7') py_venv_version="37" ;;
+    'python3.8') py_venv_version="38" ;;
+    # If $PY not pre-set by caller, default to Python 2.7
+    *) py_venv_version="27"
+  esac
   echo "${venv_dir_prefix}.py${py_venv_version}.venv"
 }
 
