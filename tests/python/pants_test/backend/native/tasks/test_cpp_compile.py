@@ -61,6 +61,7 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
     cpp_compile.execute()
 
   def test_target_level_toolchain_variant_llvm(self):
+    self.set_options_for_scope('native-build-step', toolchain_variant='gnu')
     cpp_lib_target = self.make_target(
       '//:cpp_library',
       NativeLibrary,
@@ -71,7 +72,19 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
     compiler = task.get_compiler(cpp_lib_target)
     self.assertIn('llvm', compiler.path_entries[0])
 
-  def test_target_level_toolchain_variant_default(self):
+  def test_target_level_toolchain_variant_default_llvm(self):
+    self.set_options_for_scope('native-build-step', toolchain_variant='llvm')
+    cpp_lib_target = self.make_target(
+      '//:cpp_library',
+      NativeLibrary,
+    )
+
+    task = self.create_task(self.context(target_roots=[cpp_lib_target]))
+    compiler = task.get_compiler(cpp_lib_target)
+    self.assertIn('llvm', compiler.path_entries[0])
+
+  def test_target_level_toolchain_variant_default_gnu(self):
+    self.set_options_for_scope('native-build-step', toolchain_variant='gnu')
     cpp_lib_target = self.make_target(
       '//:cpp_library',
       NativeLibrary,
