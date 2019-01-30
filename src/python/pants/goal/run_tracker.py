@@ -34,7 +34,6 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
 
-
 class RunTracker(Subsystem):
   """Tracks and times the execution of a pants run.
 
@@ -524,7 +523,6 @@ class RunTracker(Subsystem):
         add_to_timings(goal, dep)
 
     return critical_path_timings
-
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
