@@ -137,9 +137,11 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         command=['binary', self._binary_target_with_interop],
         # Explicitly set to True (although this is the default).
         config={
-          # TODO(#6848): don't make it possible to forget to add the toolchain_variant option!
           'native-build-step': {
             'toolchain_variant': toolchain_variant,
+          },
+          # TODO(#6848): don't make it possible to forget to add the toolchain_variant option!
+          'native-build-settings': {
             'strict_deps': True,
           },
         },
@@ -159,7 +161,9 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       pants_run_interop = self.run_pants(['-q', 'run', self._binary_target_with_interop], config={
         'native-build-step': {
           'toolchain_variant': toolchain_variant,
-          'strict_deps': False,
+        },
+        'native-build-settings': {
+          'strict_deps': True,
         },
       })
       self.assert_success(pants_run_interop)
@@ -206,7 +210,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     # TODO(#6848): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
     # DYLD_LIBRARY_PATH during the 'run' goal somehow.
     pants_run = self.run_pants(command=command, config={
-      'native-build-settings': {
+      'native-build-step': {
         'toolchain_variant': 'llvm',
       },
       'python-setup': {
