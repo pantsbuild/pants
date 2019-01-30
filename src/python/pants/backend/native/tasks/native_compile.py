@@ -14,7 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass, classproperty
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.objects import datatype
 from pants.util.process_handler import subprocess
 
 
