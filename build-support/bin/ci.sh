@@ -109,7 +109,8 @@ export PANTS_DEV=1
 # or we will encounter the _Py_Dealloc error when bootstrapping a Python 3 PEX (#6985).
 if [[ "${python_two:-false}" == "false" ]]; then
   py_version_number="3.6"
-  bootstrap_pants_script="PY=python3.6 ./pants3"
+  bootstrap_pants_script="./pants3"
+  export PY="python3.6"
   export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython==3.6.*"]'
 else
   py_version_number="2.7"
