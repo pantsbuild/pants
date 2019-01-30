@@ -15,6 +15,7 @@ from pants.backend.native.targets.external_native_library import (ConanRequireme
                                                                   ExternalNativeLibrary)
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import CLibrary, CppLibrary
+from pants.backend.native.targets.packaged_native_library import PackagedNativeLibrary
 from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.conan_fetch import ConanFetch
 from pants.backend.native.tasks.conan_prep import ConanPrep
@@ -30,6 +31,7 @@ def build_file_aliases():
       CLibrary.alias(): CLibrary,
       CppLibrary.alias(): CppLibrary,
       ExternalNativeLibrary.alias(): ExternalNativeLibrary,
+      PackagedNativeLibrary.alias(): PackagedNativeLibrary,
     },
     objects={
       ConanRequirement.alias(): ConanRequirement,

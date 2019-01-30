@@ -54,10 +54,6 @@ class NativeCompile(NativeTask, AbstractClass):
   def product_types(cls):
     return [ObjectFiles]
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(NativeCompile, cls).prepare(options, round_manager)
-
   @property
   def cache_target_dirs(self):
     return True
@@ -151,13 +147,19 @@ class NativeCompile(NativeTask, AbstractClass):
   def _make_compile_request(self, versioned_target):
     target = versioned_target.target
 
-    include_dirs = [
-      os.path.join(get_buildroot(), dep.address.spec_path)
-      for dep in self.native_deps(target)
-    ] + [
-      os.path.join(get_buildroot(), ext_dep.address.spec_path, ext_dep.include_relpath)
-      for ext_dep in self.packaged_native_deps(target)
-    ]
+    include_dirs = []
+    for dep in self.native_deps(target):
+      source_lib_base_dir = os.path.join(get_buildroot(),
+                                         dep._sources_field.rel_path)
+      include_dirs.append(source_lib_base_dir)
+    for ext_dep in self.packaged_native_deps(target):
+      external_lib_include_dir = os.path.join(get_buildroot(),
+                                              ext_dep._sources_field.rel_path,
+                                              ext_dep.include_relpath)
+      self.context.log.debug('ext_dep: {}, external_lib_include_dir: {}'
+                             .format(ext_dep, external_lib_include_dir))
+      include_dirs.append(external_lib_include_dir)
+
     sources_and_headers = self.get_sources_headers_for_target(target)
     compiler_option_sets = (self._compile_settings.native_build_step_settings
                                 .get_compiler_option_sets_for_target(target))

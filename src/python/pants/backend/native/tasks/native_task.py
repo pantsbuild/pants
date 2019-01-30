@@ -66,6 +66,12 @@ class NativeTask(Task):
     )
 
   @classmethod
+  def prepare(cls, options, round_manager):
+    super(NativeTask, cls).prepare(options, round_manager)
+    # Allow the deferred_sources_mapping to take place first
+    round_manager.optional_data('deferred_sources')
+
+  @classmethod
   def implementation_version(cls):
     return super(NativeTask, cls).implementation_version() + [('NativeTask', 0)]
 

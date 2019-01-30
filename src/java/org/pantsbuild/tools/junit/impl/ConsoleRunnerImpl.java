@@ -40,6 +40,7 @@ import org.junit.runner.notification.Failure;
 import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.model.InitializationError;
+import org.junit.runners.model.RunnerBuilder;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -518,8 +519,7 @@ public class ConsoleRunnerImpl {
       throws InitializationError {
     Computer junitComputer = new ConcurrentComputer(concurrency, parallelThreads);
     Class<?>[] classes = specSet.extract(concurrency).classes();
-    CustomAnnotationBuilder builder =
-        new CustomAnnotationBuilder(numRetries, swappableErr.getOriginal());
+    RunnerBuilder builder = createCustomBuilder(swappableErr.getOriginal());
     Runner suite = junitComputer.getSuite(builder, classes);
     return core.run(Request.runner(suite)).getFailureCount();
   }
@@ -533,24 +533,30 @@ public class ConsoleRunnerImpl {
     if (this.parallelThreads > 1) {
       ConcurrentCompositeRequestRunner concurrentRunner = new ConcurrentCompositeRequestRunner(
           requests, this.defaultConcurrency, this.parallelThreads);
-      if (failFast) {
-        return core.run(new FailFastRunner(concurrentRunner)).getFailureCount();
-      } else {
-        return core.run(concurrentRunner).getFailureCount();
-      }
+      Runner runner = maybeWithFailFastRunner(concurrentRunner);
+      return core.run(runner).getFailureCount();
     }
 
     int failures = 0;
     Result result;
     for (Request request : requests) {
-      if (failFast) {
-        result = core.run(new FailFastRunner(request.getRunner()));
-      } else {
-        result = core.run(request);
-      }
+      result = core.run(runnerFor(request));
       failures += result.getFailureCount();
     }
     return failures;
+  }
+
+  private Runner runnerFor(Request request) {
+    Runner reqRunner = request.getRunner();
+    return maybeWithFailFastRunner(reqRunner);
+  }
+
+  private Runner maybeWithFailFastRunner(Runner runner) {
+    if (failFast) {
+      return new FailFastRunner(runner);
+    } else {
+      return runner;
+    }
   }
 
   private List<Request> legacyParseRequests(PrintStream err, Collection<Spec> specs) {
@@ -570,15 +576,11 @@ public class ConsoleRunnerImpl {
     if (!classes.isEmpty()) {
       if (this.perTestTimer || this.parallelThreads > 1) {
         for (Class<?> clazz : classes) {
-          if (legacyShouldRunParallelMethods(clazz)) {
-            if (ScalaTestUtil.isScalaTestTest(clazz)) {
-              // legacy and scala doesn't work easily.  just adding the class
-              requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
-            } else {
-              testMethods.addAll(TestMethod.fromClass(clazz));
-            }
+          // legacy doesn't support scala test tests, so those are run as classes.
+          if (legacyShouldRunParallelMethods(clazz) && !ScalaTestUtil.isScalaTestTest(clazz)) {
+            testMethods.addAll(TestMethod.fromClass(clazz));
           } else {
-            requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
+            requests.add(createAnnotatedClassRequest(err, clazz));
           }
         }
       } else {
@@ -586,8 +588,7 @@ public class ConsoleRunnerImpl {
         // requests.add(Request.classes(classes.toArray(new Class<?>[classes.size()])));
         // does, except that it instantiates our own builder, needed to support retries.
         try {
-          CustomAnnotationBuilder builder =
-              new CustomAnnotationBuilder(numRetries, err);
+          RunnerBuilder builder = createCustomBuilder(err);
           Runner suite = new Computer().getSuite(
               builder, classes.toArray(new Class<?>[classes.size()]));
           requests.add(Request.runner(suite));
@@ -598,10 +599,18 @@ public class ConsoleRunnerImpl {
       }
     }
     for (TestMethod testMethod : testMethods) {
-      requests.add(new AnnotatedClassRequest(testMethod.clazz, numRetries, err)
+      requests.add(createAnnotatedClassRequest(err, testMethod.clazz)
           .filterWith(Description.createTestDescription(testMethod.clazz, testMethod.name)));
     }
     return requests;
+  }
+
+  private AnnotatedClassRequest createAnnotatedClassRequest(PrintStream err, Class<?> clazz) {
+    return new AnnotatedClassRequest(clazz, numRetries, err);
+  }
+
+  private RunnerBuilder createCustomBuilder(PrintStream original) {
+    return new CustomAnnotationBuilder(numRetries, original);
   }
 
   private boolean legacyShouldRunParallelMethods(Class<?> clazz) {
@@ -799,10 +808,7 @@ public class ConsoleRunnerImpl {
     CmdLineParser parser = new CmdLineParser(options);
     try {
       parser.parseArgument(args);
-    } catch (CmdLineException e) {
-      parser.printUsage(System.err);
-      exit(1);
-    } catch (InvalidCmdLineArgumentException e) {
+    } catch (CmdLineException | InvalidCmdLineArgumentException e) {
       parser.printUsage(System.err);
       exit(1);
     }

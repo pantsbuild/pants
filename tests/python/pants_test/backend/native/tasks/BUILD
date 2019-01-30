@@ -13,6 +13,7 @@ python_library(
   dependencies=[
     'src/python/pants/backend/native',
     'src/python/pants/backend/native/targets',
+    'src/python/pants/backend/python/tasks',
     'tests/python/pants_test:task_test_base',
   ],
 )

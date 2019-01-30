@@ -203,7 +203,12 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       'run',
       'testprojects/src/python/python_distribution/ctypes:bin'
     ]
+    # TODO(#6848): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
+    # DYLD_LIBRARY_PATH during the 'run' goal somehow.
     pants_run = self.run_pants(command=command, config={
+      'native-build-settings': {
+        'toolchain_variant': 'llvm',
+      },
       'python-setup': {
         'platforms': ['current', 'this-platform-does_not-exist']
       },

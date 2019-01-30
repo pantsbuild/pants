@@ -2,15 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources = [
-    'python_app.py',
-    'python_binary.py',
-    'python_distribution.py',
-    'python_library.py',
-    'python_requirement_library.py',
-    'python_target.py',
-    'python_tests.py',
-  ],
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python:pex',
