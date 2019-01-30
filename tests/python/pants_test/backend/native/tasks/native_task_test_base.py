@@ -10,6 +10,7 @@ from textwrap import dedent
 from pants.backend.native import register
 from pants.backend.native.targets.native_library import CppLibrary
 from pants.backend.native.tasks.conan_fetch import ConanFetch
+from pants.backend.python.tasks.unpack_wheels import UnpackWheels
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -59,14 +60,21 @@ class NativeCompileTestMixin(object):
                             **kwargs)
 
   def prepare_context_for_compile(self, target_roots, for_task_types=None, **kwargs):
-    native_elf_fetch_task_type = self.synthesize_task_subtype(ConanFetch,
-                                                              'native_elf_fetch_scope')
-
-    for_task_types = list(for_task_types or ()) + [native_elf_fetch_task_type]
+    extract_python_wheels_task_type = self.synthesize_task_subtype(UnpackWheels,
+                                                                   'extract_python_wheels_scope')
+    conan_fetch_task_type = self.synthesize_task_subtype(ConanFetch,
+                                                         'conan_fetch_scope')
+    for_task_types = list(for_task_types or ()) + [
+      extract_python_wheels_task_type,
+      conan_fetch_task_type,
+    ]
     context = self.context(target_roots=target_roots, for_task_types=for_task_types, **kwargs)
 
-    native_elf_fetch = native_elf_fetch_task_type(context,
-                                                  os.path.join(self.pants_workdir,
-                                                               'native_elf_fetch'))
-    native_elf_fetch.execute()
+    extract_python_wheels = extract_python_wheels_task_type(context,
+                                                            os.path.join(self.pants_workdir,
+                                                                        'extract_python_wheels'))
+    conan_fetch = conan_fetch_task_type(context, os.path.join(self.pants_workdir, 'conan_fetch'))
+
+    extract_python_wheels.execute()
+    conan_fetch.execute()
     return context
