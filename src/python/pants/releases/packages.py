@@ -34,9 +34,7 @@ class Package(object):
   def __init__(self, name, target, bdist_wheel_flags=None):
     self.name = name
     self.target = target
-    # Update the --python-tag default in lockstep with other changes as described in
-    #   https://github.com/pantsbuild/pants/issues/6450
-    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py27")
+    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py27.py36.py37")
 
   def __lt__(self, other):
     return self.name < other.name
@@ -93,7 +91,7 @@ core_packages = {
   Package(
     "pantsbuild.pants",
     "//src/python/pants:pants-packaged",
-    bdist_wheel_flags=("--python-tag", "cp27", "--plat-name", find_platform_name()),
+    bdist_wheel_flags=("--python-tag", "cp27.cp36.cp37", "--plat-name", find_platform_name()),
   ),
   Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
 }
