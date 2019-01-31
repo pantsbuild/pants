@@ -25,6 +25,7 @@ from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary,
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
 from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
                                                                 ManagedJarLibraries)
+from pants.backend.jvm.targets.scala_exclude import ScalaExclude
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
@@ -118,6 +119,7 @@ def build_file_aliases():
       'Duplicate': Duplicate,
       'exclude': Exclude,
       'scala_jar': ScalaJarDependency,
+      'scala_exclude': ScalaExclude,
       'jar_rules': JarRules,
       'repository': repo,
       'Skip': Skip,

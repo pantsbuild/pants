@@ -6,10 +6,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import unittest
 
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.targets.scala_exclude import ScalaExclude
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.base.build_environment import get_buildroot
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class JarDependencyTest(unittest.TestCase):
@@ -24,6 +27,17 @@ class JarDependencyTest(unittest.TestCase):
 
   def test_scala_jar_dependency_copy(self):
     self._test_copy(self._mkjardep(tpe=ScalaJarDependency))
+
+  def test_scala_exclude(self):
+    init_subsystem(ScalaPlatform)
+
+    name = 'foo_lib'
+    suffixed_name = ScalaPlatform.global_instance().suffix_version(name)
+
+    self.assertEqual(
+        suffixed_name,
+        ScalaExclude(org='example.com', name=name).name
+      )
 
   def test_get_url(self):
     """Test using relative url and absolute url are equivalent."""
