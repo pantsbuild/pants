@@ -7,12 +7,64 @@ set -e
 ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 source ${ROOT}/build-support/common.sh
 
-PY=$(which python2.7 || exit 0)
-[[ -n "${PY}" ]] || die "You must have python2.7 installed and on the path to release."
+# Note we define all options here, but only parse some at the top of the script and parse the rest
+# at the bottom of the script. This is due to execution order. If the option must be used right away,
+# we parse at the top of the script, whereas if it depends on functions defined later in the script,
+# we parse at the end.
+_OPTS="hdnftcloepqw3"
+function usage() {
+  echo "With no options all packages are built, smoke tested and published to"
+  echo "PyPi.  Credentials are needed for this as described in the"
+  echo "release docs: http://pantsbuild.org/release.html"
+  echo
+  echo "Usage: $0 [-d] [-c] [-3] (-h|-n|-f|-t|-l|-o|-e|-p)"
+  echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
+  echo " -h  Prints out this help message."
+  echo " -3  Release any non-universal wheels (i.e. pantsbuild.pants) as Python 3. Defaults to Python 2."
+  echo " -n  Performs a release dry run."
+  echo "       All package distributions will be built, installed locally in"
+  echo "       an ephemeral virtualenv and exercised to validate basic"
+  echo "       functioning."
+  echo " -f  Build the fs_util binary."
+  echo " -t  Tests a live release."
+  echo "       Ensures the latest packages have been propagated to PyPi"
+  echo "       and can be installed in an ephemeral virtualenv."
+  echo " -l  Lists all pantsbuild packages that this script releases."
+  echo " -o  Lists all pantsbuild package owners."
+  echo " -e  Check that wheels are prebuilt for this release."
+  echo " -p  Build a pex from prebuilt wheels for this release."
+  echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
+  echo
+  echo "All options (except for '-d') are mutually exclusive."
+
+  if (( $# > 0 )); then
+    die "$@"
+  else
+    exit 0
+  fi
+}
+
+while getopts "${_OPTS}"  opt; do
+  case ${opt} in
+    3) python_three="true" ;;
+    *) ;;  # skip over other args to be parsed later
+  esac
+done
+
+py_version_number="2.7"
+if [[ "${python_three}" == "true" ]]; then
+  py_version_number="3.6"
+fi
+PY=$(which "python${py_version_number}" || exit 0)
+[[ -n "${PY}" ]] || die "You must have python2.7 or python3.6 installed and on the path to release."
 export PY
 
 function run_local_pants() {
-  ${ROOT}/pants "$@"
+  pants_script="${ROOT}/pants"
+  if [[ "${python_three}" == "true" ]]; then
+    pants_script="${ROOT}/pants3"
+  fi
+  ${pants_script} "$@"
 }
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
@@ -42,11 +94,16 @@ function requirement() {
   grep "^${package}[^A-Za-z0-9]" "${ROOT}/3rdparty/python/requirements.txt" || die "Could not find requirement for ${package}"
 }
 
-function run_pex27() {
+function run_pex() {
   # TODO: Cache this in case we run pex multiple times
   (
     PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
     PEX_PEX=pex27
+    if [[ "${python_three}" == "true" ]]; then
+      # TODO(pex#654). Once PEX is released more flexibly, set this to `pex3` or `pex` (depending
+      # on what we end up releasing).
+      PEX_PEX=pex37
+    fi
 
     pexdir="$(mktemp -d -t build_pex.XXXXX)"
     trap "rm -rf ${pexdir}" EXIT
@@ -62,7 +119,14 @@ function run_pex27() {
 function run_packages_script() {
   (
     cd "${ROOT}"
-    run_pex27 "$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)" -- "${ROOT}/src/python/pants/releases/packages.py" "$@"
+    requirements=("$(requirement future)" "$(requirement beautifulsoup4)")
+    args=("$@")
+    if [[ "${python_three}" == "true" ]]; then
+      args=("--py3" ${args[@]})
+    else
+      requirements+=("$(requirement configparser)" "$(requirement subprocess32)")
+    fi
+    run_pex "${requirements[@]}" -- "${ROOT}/src/python/pants/releases/packages.py" "${args[@]}"
   )
 }
 
@@ -407,12 +471,16 @@ from __future__ import print_function
 import sys
 import urllib
 import xml.etree.ElementTree as ET
+try:
+  from urllib.parse import quote_plus
+except ImportError:
+  from urllib import quote_plus
 root = ET.parse("${wheel_listing}")
 ns = {'s3': 'http://s3.amazonaws.com/doc/2006-03-01/'}
 for key in root.findall('s3:Contents/s3:Key', ns):
   # Because filenames may contain characters that have different meanings
   # in URLs (namely '+'), # print the key both as url-encoded and as a file path.
-  print('{}\t{}'.format(key.text, urllib.quote_plus(key.text)))
+  print('{}\t{}'.format(key.text, quote_plus(key.text)))
 EOF
  done
 }
@@ -508,7 +576,7 @@ function activate_twine() {
 }
 
 function execute_pex() {
-  run_pex27 \
+  run_pex \
       --no-build \
       --no-pypi \
       --disable-cache \
@@ -614,38 +682,9 @@ function publish_packages() {
   end_travis_section
 }
 
-function usage() {
-  echo "With no options all packages are built, smoke tested and published to"
-  echo "PyPi.  Credentials are needed for this as described in the"
-  echo "release docs: http://pantsbuild.org/release.html"
-  echo
-  echo "Usage: $0 [-d] [-c] (-h|-n|-f|-t|-l|-o|-e|-p)"
-  echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
-  echo " -h  Prints out this help message."
-  echo " -n  Performs a release dry run."
-  echo "       All package distributions will be built, installed locally in"
-  echo "       an ephemeral virtualenv and exercised to validate basic"
-  echo "       functioning."
-  echo " -f  Build the fs_util binary."
-  echo " -t  Tests a live release."
-  echo "       Ensures the latest packages have been propagated to PyPi"
-  echo "       and can be installed in an ephemeral virtualenv."
-  echo " -l  Lists all pantsbuild packages that this script releases."
-  echo " -o  Lists all pantsbuild package owners."
-  echo " -e  Check that wheels are prebuilt for this release."
-  echo " -p  Build a pex from prebuilt wheels for this release."
-  echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
-  echo
-  echo "All options (except for '-d') are mutually exclusive."
-
-  if (( $# > 0 )); then
-    die "$@"
-  else
-    exit 0
-  fi
-}
-
-while getopts "hdnftcloepqw" opt; do
+# Reset opt parsing's position to start
+OPTIND=0
+while getopts "${_OPTS}" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
@@ -658,6 +697,7 @@ while getopts "hdnftcloepqw" opt; do
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;
     w) list_prebuilt_wheels ; exit $? ;;
+    3) ;;  # already parsed at top of file
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
