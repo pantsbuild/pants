@@ -190,8 +190,8 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     ZipkinHandler = zipkin_handler()
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
-      trace_id = "0123456789abcdef"
-      parent_span_id = "123456789abcdef0"
+      trace_id = "aaaaaaaaaaaaaaaa"
+      parent_span_id = "ffffffffffffffff"
       command = [
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         '--reporting-zipkin-trace-id={}'.format(trace_id),
