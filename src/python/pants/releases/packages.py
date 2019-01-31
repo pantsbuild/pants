@@ -242,19 +242,23 @@ def check_ownership(users, minimum_owner_count=3):
     sys.exit(1)
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("command", choices=["list", "list-owners", "check-my-ownership", "build_and_print"])
-parser.add_argument("--with-packages", action="store_true")
-parser.add_argument("version", nargs="?", default=None)
+def _create_parser():
+  parser = argparse.ArgumentParser()
+  subparsers = parser.add_subparsers(dest="command")
+  # list
+  parser_list = subparsers.add_parser('list')
+  parser_list.add_argument("--with-packages", action="store_true")
+  # list-owners
+  subparsers.add_parser("list-owners")
+  # check-ownership
+  subparsers.add_parser("check-ownership")
+  # build_and_print
+  parser_build_and_print = subparsers.add_parser("build_and_print")
+  parser_build_and_print.add_argument("version")
+  return parser
 
-args = parser.parse_args()
 
-if args.with_packages and args.command != "list":
-  raise argparse.ArgumentError("--with-packages may only be used with the 'list' command.")
-if args.command == "build_and_print" and args.version is None:
-  raise argparse.ArgumentError("When running 'build_and_print', you must supply a version.")
-if args.command != "build_and_print" and args.version is not None:
-  raise argparse.ArgumentParser("version may only be used with 'build_and_print' command.")
+args = _create_parser().parse_args()
 
 if args.command == "list":
   if args.with_packages:
