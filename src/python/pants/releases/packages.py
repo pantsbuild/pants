@@ -253,6 +253,8 @@ if args.with_packages and args.command != "list":
   raise argparse.ArgumentError("--with-packages may only be used with the 'list' command.")
 if args.command == "build_and_print" and args.version is None:
   raise argparse.ArgumentError("When running 'build_and_print', you must supply a version.")
+if args.command != "build_and_print" and args.version is not None:
+  raise argparse.ArgumentParser("version may only be used with 'build_and_print' command.")
 
 if args.command == "list":
   if args.with_packages:
