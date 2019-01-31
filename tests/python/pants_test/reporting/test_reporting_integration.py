@@ -162,6 +162,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     self.assertNotIn('Cumulative Timings', pants_run.stdout_data)
 
   def test_zipkin_reporter(self):
+    ZipkinHandler = zipkin_handler()
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
@@ -185,6 +186,40 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assertTrue(main_children)
       self.assertTrue(any(span['name'] == 'cloc' for span in main_children))
 
+  def test_zipkin_reporter_with_given_trace_id_parent_id(self):
+    ZipkinHandler = zipkin_handler()
+    with http_server(ZipkinHandler) as port:
+      endpoint = "http://localhost:{}".format(port)
+      trace_id = "aaaaaaaaaaaaaaaa"
+      parent_span_id = "ffffffffffffffff"
+      command = [
+        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        '--reporting-zipkin-trace-id={}'.format(trace_id),
+        '--reporting-zipkin-parent-id={}'.format(parent_span_id),
+        'cloc',
+        'src/python/pants:version'
+      ]
+
+      pants_run = self.run_pants(command)
+      self.assert_success(pants_run)
+
+      num_of_traces = len(ZipkinHandler.traces)
+      self.assertEqual(num_of_traces, 1)
+
+      trace = ZipkinHandler.traces[-1]
+      main_span = self.find_spans_by_name(trace, 'main')
+      self.assertEqual(len(main_span), 1)
+
+      main_span_trace_id = main_span[0]['traceId']
+      self.assertEqual(main_span_trace_id, trace_id)
+      main_span_parent_id = main_span[0]['parentId']
+      self.assertEqual(main_span_parent_id, parent_span_id)
+
+      parent_id = main_span[0]['id']
+      main_children = self.find_spans_by_parentId(trace, parent_id)
+      self.assertTrue(main_children)
+      self.assertTrue(any(span['name'] == 'cloc' for span in main_children))
+
   @staticmethod
   def find_spans_by_name(trace, name):
     return [span for span in trace if span['name'] == name]
@@ -194,13 +229,15 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     return [span for span in trace if span.get('parentId') == parent_id]
 
 
-class ZipkinHandler(BaseHTTPRequestHandler):
-  traces = []
+def zipkin_handler():
+  class ZipkinHandler(BaseHTTPRequestHandler):
+    traces = []
 
-  def do_POST(self):
-    content_length = self.headers.get('content-length') if PY3 else self.headers.getheader('content-length')
-    thrift_trace = self.rfile.read(int(content_length))
-    json_trace = convert_spans(thrift_trace, Encoding.V1_JSON, Encoding.V1_THRIFT)
-    trace = json.loads(json_trace)
-    self.__class__.traces.append(trace)
-    self.send_response(200)
+    def do_POST(self):
+      content_length = self.headers.get('content-length') if PY3 else self.headers.getheader('content-length')
+      thrift_trace = self.rfile.read(int(content_length))
+      json_trace = convert_spans(thrift_trace, Encoding.V1_JSON, Encoding.V1_THRIFT)
+      trace = json.loads(json_trace)
+      self.__class__.traces.append(trace)
+      self.send_response(200)
+  return ZipkinHandler

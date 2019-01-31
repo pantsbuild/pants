@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name = 'linkify',
   sources = ['test_linkify.py'],
   dependencies = [
     '3rdparty/python:future',
@@ -18,8 +19,18 @@ python_tests(
     '3rdparty/python:parameterized',
     '3rdparty/python:py-zipkin',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test'
+    'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
   timeout = 240,
+)
+
+python_tests(
+  name = 'reporting',
+  sources = ['test_reporting.py'],
+  dependencies = [
+    'src/python/pants/goal:run_tracker',
+    'src/python/pants/reporting',
+    'tests/python/pants_test:test_base',
+  ],
 )

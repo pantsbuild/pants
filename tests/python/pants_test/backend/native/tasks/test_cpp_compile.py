@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from textwrap import dedent
 
-from pants.backend.native.targets.native_library import CppLibrary
+from pants.backend.native.targets.native_library import CppLibrary, NativeLibrary
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.native_compile import ObjectFiles
 from pants_test.backend.native.tasks.native_task_test_base import (NativeCompileTestMixin,
@@ -59,3 +59,37 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
     # TODO: what is this testing?
     cpp_compile.execute()
     cpp_compile.execute()
+
+  def test_target_level_toolchain_variant_llvm(self):
+    self.set_options_for_scope('native-build-step', toolchain_variant='gnu')
+    cpp_lib_target = self.make_target(
+      '//:cpp_library',
+      NativeLibrary,
+      toolchain_variant='llvm'
+    )
+
+    task = self.create_task(self.context(target_roots=[cpp_lib_target]))
+    compiler = task.get_compiler(cpp_lib_target)
+    self.assertIn('llvm', compiler.path_entries[0])
+
+  def test_target_level_toolchain_variant_default_llvm(self):
+    self.set_options_for_scope('native-build-step', toolchain_variant='llvm')
+    cpp_lib_target = self.make_target(
+      '//:cpp_library',
+      NativeLibrary,
+    )
+
+    task = self.create_task(self.context(target_roots=[cpp_lib_target]))
+    compiler = task.get_compiler(cpp_lib_target)
+    self.assertIn('llvm', compiler.path_entries[0])
+
+  def test_target_level_toolchain_variant_default_gnu(self):
+    self.set_options_for_scope('native-build-step', toolchain_variant='gnu')
+    cpp_lib_target = self.make_target(
+      '//:cpp_library',
+      NativeLibrary,
+    )
+
+    task = self.create_task(self.context(target_roots=[cpp_lib_target]))
+    compiler = task.get_compiler(cpp_lib_target)
+    self.assertIn('gcc', compiler.path_entries[0])
