@@ -23,9 +23,6 @@ from pants.util.memo import memoized_property
 
 class ConanFetch(SimpleCodegenTask):
 
-  deprecated_options_scope = 'native-third-party-fetch'
-  deprecated_options_scope_removal_version = '1.16.0.dev0'
-
   gentarget_type = ExternalNativeLibrary
 
   sources_globs = ('include/**/*', 'lib/*',)
@@ -168,8 +165,9 @@ class ConanFetch(SimpleCodegenTask):
         labels=[WorkUnitLabel.TOOL])
       # CONAN_USER_HOME is somewhat documented at
       # https://docs.conan.io/en/latest/mastering/sharing_settings_and_config.html.
+      user_home = self._conan_user_home(conan)
       env = {
-        'CONAN_USER_HOME': self._conan_user_home(conan),
+        'CONAN_USER_HOME': user_home,
       }
 
       with conan.run_with(workunit_factory, argv, env=env) as (cmdline, exit_code, workunit):
@@ -185,7 +183,7 @@ class ConanFetch(SimpleCodegenTask):
         pkg_sha = conan_requirement.parse_conan_stdout_for_pkg_sha(conan_install_stdout)
 
       installed_data_dir = os.path.join(
-        self._conan_user_home,
+        user_home,
         '.conan', 'data',
         conan_requirement.directory_path,
         'package',
