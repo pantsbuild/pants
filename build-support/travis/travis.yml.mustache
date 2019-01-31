@@ -434,7 +434,10 @@ osx_rust_tests: &osx_rust_tests
       casks:
       - osxfuse
   script:
-    - ./build-support/bin/travis-ci.sh -e
+  # N.B. We run this with Python 2 because this osx_image does not have
+  # Python 3.6 in its environment. We do not care which Python version
+  # we use and do not want to incur the cost of using pyenv to get 3.6.
+    - ./build-support/bin/travis-ci.sh -e2
 
 # -------------------------------------------------------------------------
 # OSX sanity checks
