@@ -87,14 +87,21 @@ def find_platform_name():
   return get_platform().replace("-", "_").replace(".", "_")
 
 
-core_packages = {
-  Package(
-    "pantsbuild.pants",
-    "//src/python/pants:pants-packaged",
-    bdist_wheel_flags=("--python-tag", "cp27.cp36.cp37", "--plat-name", find_platform_name()),
-  ),
-  Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
-}
+def core_packages(py3):
+  # N.B. When releasing with Python 3, we allow pantsbuild.pants to work with any Python 3 version.
+  # This is because if we were to hardcode the minor versions, such as `cp36.cp37`, we would prevent
+  # releases that were shipped with this explicit list from every being able to run with a different
+  # Python version, such as 3.8. Instead, we enforce interpreter constraints in `pants_loader.py` as
+  # a runtime check.
+  interpreter_flag = "cp3" if py3 else "cp27"
+  return {
+    Package(
+      "pantsbuild.pants",
+      "//src/python/pants:pants-packaged",
+      bdist_wheel_flags=("--python-tag", interpreter_flag, "--plat-name", find_platform_name()),
+    ),
+    Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
+  }
 
 
 def contrib_packages():
@@ -171,13 +178,13 @@ def contrib_packages():
   }
 
 
-def all_packages():
-  return core_packages.union(contrib_packages())
+def all_packages(py3):
+  return core_packages(py3).union(contrib_packages())
 
 
-def build_and_print_packages(version):
+def build_and_print_packages(version, py3=False):
   packages_by_flags = defaultdict(list)
-  for package in sorted(all_packages()):
+  for package in sorted(all_packages(py3)):
     packages_by_flags[package.bdist_wheel_flags].append(package)
 
   for (flags, packages) in packages_by_flags.items():
@@ -204,9 +211,9 @@ def get_pypi_config(section, option):
   return config.get(section, option)
 
 
-def check_ownership(users, minimum_owner_count=3):
+def check_ownership(users, minimum_owner_count=3, py3=False):
   minimum_owner_count = max(len(users), minimum_owner_count)
-  packages = sorted(all_packages())
+  packages = sorted(all_packages(py3))
   banner("Checking package ownership for {} packages".format(len(packages)))
   users = {user.lower() for user in users}
   insufficient = set()
@@ -242,6 +249,8 @@ def check_ownership(users, minimum_owner_count=3):
 
 def _create_parser():
   parser = argparse.ArgumentParser()
+  # Note --py3 flag must be passed as first arg
+  parser.add_argument("-3", "--py3", action="store_true", default=False, help="Release any non-universal packages as Python 3.")
   subparsers = parser.add_subparsers(dest="command")
   # list
   parser_list = subparsers.add_parser('list')
@@ -262,11 +271,11 @@ if args.command == "list":
   if args.with_packages:
     print('\n'.join(
       '{} {} {}'.format(package.name, package.target, " ".join(package.bdist_wheel_flags))
-      for package in sorted(all_packages())))
+      for package in sorted(all_packages(args.py3))))
   else:
-    print('\n'.join(package.name for package in sorted(all_packages())))
+    print('\n'.join(package.name for package in sorted(all_packages(args.py3))))
 elif args.command == "list-owners":
-  for package in sorted(all_packages()):
+  for package in sorted(all_packages(args.py3)):
     if not package.exists():
       print("The {} package is new!  There are no owners yet.".format(package.name), file=sys.stderr)
       continue
@@ -275,8 +284,8 @@ elif args.command == "list-owners":
       print("{}".format(owner))
 elif args.command == "check-my-ownership":
   me = get_pypi_config('server-login', 'username')
-  check_ownership({me})
+  check_ownership({me}, py3=args.py3)
 elif args.command == "build_and_print":
-  build_and_print_packages(args.version)
+  build_and_print_packages(args.version, py3=args.py3)
 else:
   raise argparse.ArgumentError("Didn't recognise arguments {}".format(args))
