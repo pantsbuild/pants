@@ -16,6 +16,7 @@ from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.base.workunit import WorkUnitLabel
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
+from pants.util.process_handler import subprocess
 from pants.util.strutil import safe_shlex_join
 
 
@@ -26,6 +27,17 @@ class PythonToolInstance(object):
   @property
   def pex(self):
     return self._pex
+
+  def output(self, args, input=None, **kwargs):
+    cmdline = safe_shlex_join(self._pex.cmdline(args))
+    process = self._pex.run(args,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            with_chroot=False,
+                            blocking=False,
+                            **kwargs)
+    (stdout, stderr) = process.communicate(input=input)
+    return (stdout, stderr, process.returncode, cmdline)
 
   @contextmanager
   def run_with(self, workunit_factory, args, **kwargs):

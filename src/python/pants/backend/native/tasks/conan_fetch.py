@@ -18,10 +18,13 @@ from pants.base.workunit import WorkUnitLabel
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import mergetree, safe_file_dump, safe_mkdir
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_property
 
 
 class ConanFetch(SimpleCodegenTask):
+
+  deprecated_options_scope = 'native-third-party-fetch'
+  deprecated_options_scope_removal_version = '1.16.0.dev0'
 
   gentarget_type = ExternalNativeLibrary
 
@@ -68,14 +71,18 @@ class ConanFetch(SimpleCodegenTask):
         is_ssl=re.match(r'^https://', url) is not None)
         for name, url in self.get_options().conan_remotes.items()))
 
-  @memoized_method
-  def _conan_user_home(self, conan_pex):
+  def _conan_user_home(self, conan, in_workdir=False):
     """Create the CONAN_USER_HOME for this task fingerprint and initialize the Conan remotes.
 
     See https://docs.conan.io/en/latest/reference/commands/consumer/config.html#conan-config-install
     for docs on configuring remotes.
     """
-    user_home_base = os.path.join(get_pants_cachedir(), 'conan-support', 'conan-user-home')
+    # This argument is exposed so tests don't leak out of the workdir.
+    if in_workdir:
+      base_cache_dir = self.workdir
+    else:
+      base_cache_dir = get_pants_cachedir()
+    user_home_base = os.path.join(base_cache_dir, 'conan-support', 'conan-user-home')
     # Locate the subdirectory of the pants shared cachedir specific to this task's option values.
     user_home = os.path.join(user_home_base, self.fingerprint)
     conan_install_base = os.path.join(user_home, '.conan')
@@ -93,7 +100,7 @@ class ConanFetch(SimpleCodegenTask):
       with temporary_dir() as remotes_install_dir:
         # Create an artificial conan configuration dir containing just remotes.txt.
         remotes_txt_for_install = os.path.join(remotes_install_dir, 'remotes.txt')
-        safe_file_dump(remotes_txt_for_install, self._remotes_txt_content, binary_mode=False)
+        safe_file_dump(remotes_txt_for_install, self._remotes_txt_content, mode='w')
         # Configure the desired user home from this artificial config dir.
         argv = ['config', 'install', remotes_install_dir]
         workunit_factory = functools.partial(
@@ -103,7 +110,7 @@ class ConanFetch(SimpleCodegenTask):
         env = {
           'CONAN_USER_HOME': user_home,
         }
-        cmdline, exit_code = conan_pex.run(workunit_factory, argv, env=env)
+        cmdline, exit_code = conan.run(workunit_factory, argv, env=env)
         if exit_code != 0:
           raise self.ConanConfigError(
             'Error configuring conan with argv {} and environment {}: exited non-zero ({}).'
@@ -111,7 +118,7 @@ class ConanFetch(SimpleCodegenTask):
             exit_code=exit_code)
       # Generate the sentinel file so that we know the remotes have been successfully configured for
       # this particular task fingerprint in successive pants runs.
-      safe_file_dump(remotes_txt_sentinel)
+      safe_file_dump(remotes_txt_sentinel, self._remotes_txt_content, mode='w')
 
     return user_home
 
