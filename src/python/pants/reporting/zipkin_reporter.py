@@ -9,7 +9,8 @@ import logging
 import requests
 from py_zipkin import Encoding
 from py_zipkin.transport import BaseTransportHandler
-from py_zipkin.zipkin import zipkin_span
+from py_zipkin.util import generate_random_64bit_string
+from py_zipkin.zipkin import ZipkinAttrs, zipkin_span
 
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.reporter import Reporter
@@ -37,15 +38,29 @@ class HTTPTransportHandler(BaseTransportHandler):
 
 
 class ZipkinReporter(Reporter):
-  """Reporter that implements Zipkin tracing .
+  """
+    Reporter that implements Zipkin tracing.
   """
 
-  def __init__(self, run_tracker, settings, endpoint):
+  def __init__(self, run_tracker, settings, endpoint, trace_id, parent_id):
+    """
+    When trace_id and parent_id are set a Zipkin trace will be created with given trace_id
+    and parent_id. If trace_id and parent_id are set to None, a trace_id will be randomly
+    generated for a Zipkin trace. trace-id and parent-id must both either be set or not set.
+
+    :param RunTracker run_tracker: Tracks and times the execution of a pants run.
+    :param Settings settings: Generic reporting settings.
+    :param string endpoint: The full HTTP URL of a zipkin server to which traces should be posted.
+    :param string trace_id: The overall 64 or 128-bit ID of the trace. May be None.
+    :param string parent_id: The 64-bit ID for a parent span that invokes Pants. May be None.
+    """
     super(ZipkinReporter, self).__init__(run_tracker, settings)
     # We keep track of connection between workunits and spans
     self._workunits_to_spans = {}
     # Create a transport handler
     self.handler = HTTPTransportHandler(endpoint)
+    self.trace_id = trace_id
+    self.parent_id = parent_id
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -59,12 +74,25 @@ class ZipkinReporter(Reporter):
     # Check if it is the first workunit
     first_span = not self._workunits_to_spans
     if first_span:
+      # If trace_id and parent_id are given create zipkin_attrs
+      if self.trace_id is not None:
+        zipkin_attrs = ZipkinAttrs(
+          trace_id=self.trace_id,
+          span_id=generate_random_64bit_string(),
+          parent_span_id=self.parent_id,
+          flags='0', # flags: stores flags header. Currently unused
+          is_sampled=True,
+        )
+      else:
+        zipkin_attrs = None
+
       span = zipkin_span(
         service_name=service_name,
         span_name=workunit.name,
         transport_handler=self.handler,
         sample_rate=100.0, # Value between 0.0 and 100.0
-        encoding=Encoding.V1_THRIFT
+        encoding=Encoding.V1_THRIFT,
+        zipkin_attrs=zipkin_attrs
       )
     else:
       span = zipkin_span(
