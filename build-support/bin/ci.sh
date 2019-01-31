@@ -116,6 +116,7 @@ if [[ "${python_two:-false}" == "false" ]]; then
 else
   py_version_number="2.7"
   bootstrap_pants_script="./pants"
+  export PY="python2.7"
 fi
 banner "Using Python ${py_version_number} to execute spawned subprocesses (e.g. tests)"
 
