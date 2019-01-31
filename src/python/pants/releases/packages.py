@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import argparse
 import json
 import os
 import sys
@@ -241,22 +242,37 @@ def check_ownership(users, minimum_owner_count=3):
     sys.exit(1)
 
 
-if sys.argv[1:] == ["list"]:
-  print('\n'.join(package.name for package in sorted(all_packages())))
-elif sys.argv[1:] == ["list", "--with-packages"]:
-  print('\n'.join('{} {} {}'.format(package.name, package.target, " ".join(package.bdist_wheel_flags)) for package in sorted(all_packages())))
-elif sys.argv[1:] == ["list-owners"]:
+parser = argparse.ArgumentParser()
+parser.add_argument("command", choices=["list", "list-owners", "check-my-ownership", "build_and_print"])
+parser.add_argument("--with-packages", action="store_true")
+parser.add_argument("version", nargs="?", default=None)
+
+args = parser.parse_args()
+
+if args.with_packages and args.command != "list":
+  raise argparse.ArgumentError("--with-packages may only be used with the 'list' command.")
+if args.command == "build_and_print" and args.version is None:
+  raise argparse.ArgumentError("When running 'build_and_print', you must supply a version.")
+
+if args.command == "list":
+  if args.with_packages:
+    print('\n'.join(
+      '{} {} {}'.format(package.name, package.target, " ".join(package.bdist_wheel_flags))
+      for package in sorted(all_packages())))
+  else:
+    print('\n'.join(package.name for package in sorted(all_packages())))
+elif args.command == "list-owners":
   for package in sorted(all_packages()):
     if not package.exists():
-      print("The {} package is new!  There are no owners yet.".format(package.name), file=sys.stderr)
+      sys.stderr.write("The {} package is new! There are no owners yet.".format(package.name))
       continue
     print("Owners of {}:".format(package.name))
     for owner in sorted(package.owners()):
       print("{}".format(owner))
-elif sys.argv[1:] == ["check-my-ownership"]:
+elif args.command == "check-my-ownership":
   me = get_pypi_config('server-login', 'username')
   check_ownership({me})
-elif len(sys.argv) == 3 and sys.argv[1] == "build_and_print":
-  build_and_print_packages(sys.argv[2])
+elif args.command == "build_and_print":
+  build_and_print_packages(args.version)
 else:
-  raise Exception("Didn't recognise arguments {}".format(sys.argv[1:]))
+  raise argparse.ArgumentError("Didn't recognise arguments {}".format(args))
