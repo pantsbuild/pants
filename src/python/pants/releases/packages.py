@@ -270,7 +270,7 @@ if args.command == "list":
 elif args.command == "list-owners":
   for package in sorted(all_packages()):
     if not package.exists():
-      sys.stderr.write("The {} package is new! There are no owners yet.".format(package.name))
+      print("The {} package is new!  There are no owners yet.".format(package.name), file=sys.stderr)
       continue
     print("Owners of {}:".format(package.name))
     for owner in sorted(package.owners()):
