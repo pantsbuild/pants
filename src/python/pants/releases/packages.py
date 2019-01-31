@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import argparse
 import json
 import os
 import sys
@@ -241,11 +242,32 @@ def check_ownership(users, minimum_owner_count=3):
     sys.exit(1)
 
 
-if sys.argv[1:] == ["list"]:
-  print('\n'.join(package.name for package in sorted(all_packages())))
-elif sys.argv[1:] == ["list", "--with-packages"]:
-  print('\n'.join('{} {} {}'.format(package.name, package.target, " ".join(package.bdist_wheel_flags)) for package in sorted(all_packages())))
-elif sys.argv[1:] == ["list-owners"]:
+def _create_parser():
+  parser = argparse.ArgumentParser()
+  subparsers = parser.add_subparsers(dest="command")
+  # list
+  parser_list = subparsers.add_parser('list')
+  parser_list.add_argument("--with-packages", action="store_true")
+  # list-owners
+  subparsers.add_parser("list-owners")
+  # check-ownership
+  subparsers.add_parser("check-ownership")
+  # build_and_print
+  parser_build_and_print = subparsers.add_parser("build_and_print")
+  parser_build_and_print.add_argument("version")
+  return parser
+
+
+args = _create_parser().parse_args()
+
+if args.command == "list":
+  if args.with_packages:
+    print('\n'.join(
+      '{} {} {}'.format(package.name, package.target, " ".join(package.bdist_wheel_flags))
+      for package in sorted(all_packages())))
+  else:
+    print('\n'.join(package.name for package in sorted(all_packages())))
+elif args.command == "list-owners":
   for package in sorted(all_packages()):
     if not package.exists():
       print("The {} package is new!  There are no owners yet.".format(package.name), file=sys.stderr)
@@ -253,10 +275,10 @@ elif sys.argv[1:] == ["list-owners"]:
     print("Owners of {}:".format(package.name))
     for owner in sorted(package.owners()):
       print("{}".format(owner))
-elif sys.argv[1:] == ["check-my-ownership"]:
+elif args.command == "check-my-ownership":
   me = get_pypi_config('server-login', 'username')
   check_ownership({me})
-elif len(sys.argv) == 3 and sys.argv[1] == "build_and_print":
-  build_and_print_packages(sys.argv[2])
+elif args.command == "build_and_print":
+  build_and_print_packages(args.version)
 else:
-  raise Exception("Didn't recognise arguments {}".format(sys.argv[1:]))
+  raise argparse.ArgumentError("Didn't recognise arguments {}".format(args))
