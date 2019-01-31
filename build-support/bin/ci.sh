@@ -15,7 +15,7 @@ Runs commons tests for local or hosted CI.
 
 Usage: $0 (-h|-2fxbkmrjlpuneycitzsw)
  -h           print out this help message
- -2           Run using Python 2 (defaults to using Python 3).
+ -2           Run using Python 2.7 (defaults to using Python 3.6).
  -f           run python code formatting checks
  -x           run bootstrap clean-all (assume bootstrapping from a
               fresh clone)
@@ -58,7 +58,6 @@ EOF
 python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
-python_two="false"
 
 while getopts "h2fxbmrjlpeasu:ny:ci:tzw" opt; do
   case ${opt} in
@@ -105,17 +104,22 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
-# Determine which Python interpreter to use for bootstrapping pex and for executing subprocesses.
-# Order matters here. We must constrain subprocesses before running the bootstrap stage,
-# or we will encounter the _Py_Dealloc error when bootstrapping a Python 3 PEX.
+# Note that we set PY, and when running with Python 3, also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS.
+# This would usually not be necessary when developing locally, because the `./pants` and `./pants3`
+# scripts set these constraints for us already. However, we must set the values here because in non-bootstrap shards
+# we run CI using `./pants.pex` instead of the scripts `./pants` and `./pants3`, so those scripts cannot set
+# the relevant environment variables. Without setting these environment variables, the Python 3 shards will try to
+# execute subprocesses using Python 2, which results in the _Py_Dealloc error (#6985), and shards that do not
+# pull down `./pants.pex` but still use a virtualenv (such as Rust Tests) will fail to execute.
 if [[ "${python_two:-false}" == "false" ]]; then
-  py_version_number="3"
+  py_version_number="3.6"
   bootstrap_pants_script="./pants3"
-  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${py_version_number}.*']"
 else
-  py_version_number="2"
+  py_version_number="2.7"
   bootstrap_pants_script="./pants"
 fi
+export PY="python${py_version_number}"
 banner "Using Python ${py_version_number} to execute spawned subprocesses (e.g. tests)"
 
 if [[ "${run_bootstrap:-false}" == "true" ]]; then
