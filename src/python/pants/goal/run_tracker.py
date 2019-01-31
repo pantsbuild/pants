@@ -23,7 +23,7 @@ from pants.auth.cookies import Cookies
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.goal.pantsd_stats import PantsDaemonStats
@@ -491,25 +491,38 @@ class RunTracker(Subsystem):
     """
     Get the cumulative timings of each goal and all of the goals it (transitively) depended on.
     """
+    setup_workunit = WorkUnitLabel.SETUP.lower()
     transitive_dependencies = dict()
     for goal_info in self._sorted_goal_infos:
       deps = transitive_dependencies.setdefault(goal_info.goal.name, set())
       for dep in goal_info.goal_dependencies:
         deps.add(dep.name)
         deps.update(transitive_dependencies.get(dep.name))
-
+      # Add setup workunit as a dep manually, as its unaccounted for, otherwise.
+      deps.add(setup_workunit)
     raw_timings = dict()
     for entry in self.cumulative_timings.get_all():
       raw_timings[entry["label"]] = entry["timing"]
 
-    timings = AggregatedTimings()
+    critical_path_timings = AggregatedTimings()
+
+    def add_to_timings(goal, dep):
+      tracking_label = get_label(goal)
+      timing_label = get_label(dep)
+      critical_path_timings.add_timing(tracking_label, raw_timings.get(timing_label, 0.0))
+
+    def get_label(dep):
+      return "{}:{}".format(RunTracker.DEFAULT_ROOT_NAME, dep)
+
+    # Add setup workunit to critical_path_timings manually, as its unaccounted for, otherwise.
+    add_to_timings(setup_workunit, setup_workunit)
+
     for goal, deps in transitive_dependencies.items():
-      label = "{}:{}".format(RunTracker.DEFAULT_ROOT_NAME, goal)
-      timings.add_timing(label, raw_timings.get(label, 0.0))
+      add_to_timings(goal, goal)
       for dep in deps:
-        dep_label = "{}:{}".format(RunTracker.DEFAULT_ROOT_NAME, dep)
-        timings.add_timing(label, raw_timings.get(dep_label, 0.0))
-    return timings
+        add_to_timings(goal, dep)
+
+    return critical_path_timings
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
