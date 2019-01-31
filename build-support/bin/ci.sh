@@ -111,13 +111,12 @@ export PANTS_DEV=1
 if [[ "${python_two:-false}" == "false" ]]; then
   py_version_number="3.6"
   bootstrap_pants_script="./pants3"
-  export PY="python3.6"
-  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython==3.6.*"]'
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${py_version_number}.*]'"
 else
   py_version_number="2.7"
   bootstrap_pants_script="./pants"
-  export PY="python2.7"
 fi
+export PY="python${py_version_number}"
 banner "Using Python ${py_version_number} to execute spawned subprocesses (e.g. tests)"
 
 if [[ "${run_bootstrap:-false}" == "true" ]]; then
