@@ -8,7 +8,7 @@ from builtins import filter
 
 from pants.backend.native.config.environment import CppToolchain, CToolchain
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
-from pants.backend.native.subsystems.native_build_step_settings import NativeBuildStepSettings
+from pants.backend.native.subsystems.native_build_step import NativeBuildStep
 from pants.backend.native.subsystems.native_toolchain import (NativeToolchain,
                                                               ToolchainVariantRequest)
 from pants.backend.native.targets.native_library import NativeLibrary
@@ -81,8 +81,8 @@ class NativeTask(Task):
 
   # TODO(#7183): remove this global subsystem dependency!
   @memoized_property
-  def _native_build_step_settings(self):
-    return NativeBuildStepSettings.global_instance()
+  def _native_build_step(self):
+    return NativeBuildStep.global_instance()
 
   @memoized_property
   def _native_toolchain(self):
@@ -100,7 +100,7 @@ class NativeTask(Task):
     return self._get_toolchain_variant(CppToolchain, native_library_target)
 
   def _get_toolchain_variant(self, toolchain_type, native_library_target):
-    selected_variant = self._native_build_step_settings.get_toolchain_variant_for_target(
+    selected_variant = self._native_build_step.get_toolchain_variant_for_target(
       native_library_target)
     return self._request_single(toolchain_type, self._toolchain_variant_request(selected_variant))
 

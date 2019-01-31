@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.subsystems.native_build_settings import ToolchainVariant
+from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload

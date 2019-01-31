@@ -11,7 +11,7 @@ This directory implements the `ZeroOut` custom TensorFlow operator described in 
 Note that due to a current limitation (see [#6848](https://github.com/pantsbuild/pants/issues/6848)), this can only be run with the LLVM toolchain on OSX, which can be done with:
 
 ``` bash
-./pants --native-build-settings-toolchain-variant=llvm test examples/tests/python/example_test/tensorflow_custom_op:: -- -vs
+./pants --native-build-step-toolchain-variant=llvm test examples/tests/python/example_test/tensorflow_custom_op:: -- -vs
 ```
 
 or by setting the toolchain variant [option in `pants.ini`](https://www.pantsbuild.org/options.html).

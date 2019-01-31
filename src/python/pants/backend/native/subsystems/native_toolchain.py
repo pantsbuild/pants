@@ -10,7 +10,7 @@ from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM
 from pants.backend.native.subsystems.libc_dev import LibcDev
-from pants.backend.native.subsystems.native_build_settings import ToolchainVariant
+from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
