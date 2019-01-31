@@ -40,7 +40,7 @@ class PythonToolInstance(object):
                             **kwargs)
     if stdin_payload is not None:
       stdin_payload = ensure_binary(stdin_payload)
-    (stdout, stderr) = process.communicate(stdin_payload=stdin_payload)
+    (stdout, stderr) = process.communicate(input=stdin_payload)
     if not binary_mode:
       stdout = stdout.decode('utf-8')
       stderr = stderr.decode('utf-8')

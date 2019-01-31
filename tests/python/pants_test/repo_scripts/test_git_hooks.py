@@ -53,7 +53,7 @@ class PreCommitHookTest(unittest.TestCase):
       stdout=subprocess.PIPE,
       stderr=subprocess.PIPE,
     )
-    (stdout_data, stderr_data) = proc.communicate(stdin_payload=ensure_binary(stdin_payload))
+    (stdout_data, stderr_data) = proc.communicate(input=ensure_binary(stdin_payload))
     # Attempting to call '{}\n{}'.format(...) on bytes in python 3 gives you the string:
     #   "b'<the first string>'\nb'<the second string>'"
     # So we explicitly decode both stdout and stderr here.
