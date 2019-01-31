@@ -6,8 +6,8 @@ jar_library(
   jars=[
     scala_jar(org='org.scala-sbt', name='zinc', rev='1.1.7',
               excludes=[
-                exclude(org='org.scala-sbt', name='io_2.12'),
-                exclude(org='org.scala-sbt', name='util-logging_2.12'),
+                scala_exclude(org='org.scala-sbt', name='io'),
+                scala_exclude(org='org.scala-sbt', name='util-logging'),
               ]),
   ],
   dependencies=[

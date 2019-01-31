@@ -74,6 +74,7 @@ python_library(
     'scala_library.py',
     'scalac_plugin.py',
     'scala_jar_dependency.py',
+    'scala_exclude.py',
   ],
   dependencies = [
     ':jvm',

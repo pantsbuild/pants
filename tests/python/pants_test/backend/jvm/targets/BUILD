@@ -14,8 +14,9 @@ python_tests(
   name='jar_dependency',
   sources=['test_jar_dependency.py'],
   dependencies=[
-    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/java/jar',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
