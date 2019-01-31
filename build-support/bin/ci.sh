@@ -104,10 +104,13 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
-# Note that we still must set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS for Python 3, even though
-# ./pants3 does this already, because the constraints are only set when first bootstrapping the shard,
-# and will not apply for new shards. Without setting PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS, we
-# would be using a Python 3 PEX with Python 2 subprocesses, which results in the _Py_Dealloc error (#6985).
+# Note that we set PY, and when running with Python 3, also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS.
+# This would usually not be necessary when developing locally, because the `./pants` and `./pants3`
+# scripts set these constraints for us already. However, we must set the values here because in non-bootstrap shards
+# we run CI using `./pants.pex` instead of the scripts `./pants` and `./pants3`, so those scripts cannot set
+# the relevant environment variables. Without setting these environment variables, the Python 3 shards will try to
+# execute subprocesses using Python 2, which results in the _Py_Dealloc error (#6985), and shards that do not
+# pull down `./pants.pex` but still use a virtualenv (such as Rust Tests) will fail to execute.
 if [[ "${python_two:-false}" == "false" ]]; then
   py_version_number="3.6"
   bootstrap_pants_script="./pants3"
