@@ -10,7 +10,7 @@ from builtins import object
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.python.rules.python_test_runner import run_python_test
+from pants.backend.python.rules import python_test_runner
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -356,7 +356,7 @@ class EngineInitializer(object):
       create_graph_rules(address_mapper) +
       create_options_parsing_rules() +
       # TODO: This should happen automatically, but most tests (e.g. tests/python/pants_test/auth) fail if it's not here:
-      [run_python_test] +
+      python_test_runner.rules() +
       rules
     )
 
