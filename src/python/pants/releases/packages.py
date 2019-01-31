@@ -14,11 +14,15 @@ from configparser import ConfigParser
 from distutils.util import get_platform
 from functools import total_ordering
 
-import subprocess32 as subprocess
 from bs4 import BeautifulSoup
 from future.moves.urllib.error import HTTPError
 from future.moves.urllib.request import Request, urlopen
+from future.utils import PY2
 
+if PY2:
+  import subprocess32 as subprocess
+else:
+  import subprocess
 
 COLOR_BLUE = "\x1b[34m"
 COLOR_RESET = "\x1b[0m"
