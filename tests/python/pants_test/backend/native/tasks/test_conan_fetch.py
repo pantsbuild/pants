@@ -32,6 +32,5 @@ class ConanFetchTest(TaskTestBase):
       'CONAN_USER_HOME': user_home,
     })
     self.assertEqual(0, exit_code)
-    self.assertEqual(b'', stderr)
-    self.assertEqual(stdout.decode('utf-8'),
-                     'pants-conan: https://conan.bintray.com [Verify SSL: True]\n')
+    self.assertEqual('', stderr)
+    self.assertEqual(stdout, 'pants-conan: https://conan.bintray.com [Verify SSL: True]\n')
