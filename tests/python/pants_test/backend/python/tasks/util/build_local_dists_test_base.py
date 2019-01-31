@@ -149,7 +149,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, SchedulerTestBas
       for_subsystems=[PythonRepos, LibcDev],
       # TODO(#6848): we should be testing all of these with both of our toolchains.
       options={
-        'native-build-settings': {
+        'native-build-step': {
           'toolchain_variant': 'llvm',
         },
       })

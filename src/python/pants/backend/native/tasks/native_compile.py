@@ -133,7 +133,7 @@ class NativeCompile(NativeTask, AbstractClass):
     return self.get_compile_settings()
 
   @abstractmethod
-  def get_compiler(self):
+  def get_compiler(self, native_library_target):
     """An instance of `Executable` which can be invoked to compile files.
 
     NB: Subclasses will be queried for the compiler instance once and the result cached.
@@ -141,9 +141,8 @@ class NativeCompile(NativeTask, AbstractClass):
     :return: :class:`pants.backend.native.config.environment.Executable`
     """
 
-  @memoized_property
-  def _compiler(self):
-    return self.get_compiler()
+  def _compiler(self, native_library_target):
+    return self.get_compiler(native_library_target)
 
   def _make_compile_request(self, versioned_target):
     target = versioned_target.target
@@ -166,7 +165,7 @@ class NativeCompile(NativeTask, AbstractClass):
                                 .get_compiler_option_sets_for_target(target))
 
     compile_request = NativeCompileRequest(
-      compiler=self._compiler,
+      compiler=self._compiler(target),
       include_dirs=include_dirs,
       sources=sources_and_headers,
       compiler_options=(self._compile_settings

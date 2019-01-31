@@ -8,6 +8,7 @@ from builtins import filter
 
 from pants.backend.native.config.environment import CppToolchain, CToolchain
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
+from pants.backend.native.subsystems.native_build_step_settings import NativeBuildStepSettings
 from pants.backend.native.subsystems.native_toolchain import (NativeToolchain,
                                                               ToolchainVariantRequest)
 from pants.backend.native.targets.native_library import NativeLibrary
@@ -78,23 +79,30 @@ class NativeTask(Task):
   def _native_build_settings(self):
     return NativeBuildSettings.global_instance()
 
+  # TODO(#7183): remove this global subsystem dependency!
+  @memoized_property
+  def _native_build_step_settings(self):
+    return NativeBuildStepSettings.global_instance()
+
   @memoized_property
   def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
 
-  @memoized_property
-  def _toolchain_variant_request(self):
+  def _toolchain_variant_request(self, variant):
     return ToolchainVariantRequest(
       toolchain=self._native_toolchain,
-      variant=self._native_build_settings.toolchain_variant)
+      variant=variant)
 
-  @memoized_method
-  def get_c_toolchain_variant(self):
-    return self._request_single(CToolchain, self._toolchain_variant_request)
+  def get_c_toolchain_variant(self, native_library_target):
+    return self._get_toolchain_variant(CToolchain, native_library_target)
 
-  @memoized_method
-  def get_cpp_toolchain_variant(self):
-    return self._request_single(CppToolchain, self._toolchain_variant_request)
+  def get_cpp_toolchain_variant(self, native_library_target):
+    return self._get_toolchain_variant(CppToolchain, native_library_target)
+
+  def _get_toolchain_variant(self, toolchain_type, native_library_target):
+    selected_variant = self._native_build_step_settings.get_toolchain_variant_for_target(
+      native_library_target)
+    return self._request_single(toolchain_type, self._toolchain_variant_request(selected_variant))
 
   @memoized_method
   def native_deps(self, target):
