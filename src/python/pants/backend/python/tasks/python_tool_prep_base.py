@@ -31,16 +31,16 @@ class PythonToolInstance(object):
   def _pretty_cmdline(self, args):
     return safe_shlex_join(self._pex.cmdline(args))
 
-  def output(self, args, input=None, binary_mode=False, **kwargs):
+  def output(self, args, stdin_payload=None, binary_mode=False, **kwargs):
     process = self._pex.run(args,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             with_chroot=False,
                             blocking=False,
                             **kwargs)
-    if input is not None:
-      input = ensure_binary(input)
-    (stdout, stderr) = process.communicate(input=input)
+    if stdin_payload is not None:
+      stdin_payload = ensure_binary(stdin_payload)
+    (stdout, stderr) = process.communicate(stdin_payload=stdin_payload)
     if not binary_mode:
       stdout = stdout.decode('utf-8')
       stderr = stderr.decode('utf-8')

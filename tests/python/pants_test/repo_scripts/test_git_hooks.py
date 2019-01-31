@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, touch
 from pants.util.process_handler import subprocess
+from pants.util.strutil import ensure_binary
 from pants_test.testutils.git_util import get_repo_root, initialize_repo
 
 
@@ -44,7 +45,7 @@ class PreCommitHookTest(unittest.TestCase):
     output = subprocess.check_output(cmd, cwd=worktree)
     self.assertEqual(full_expected_output, output.decode('utf-8'))
 
-  def _assert_subprocess_error_with_input(self, worktree, cmd, input, expected_excerpt):
+  def _assert_subprocess_error_with_input(self, worktree, cmd, stdin_payload, expected_excerpt):
     proc = subprocess.Popen(
       cmd,
       cwd=worktree,
@@ -52,7 +53,7 @@ class PreCommitHookTest(unittest.TestCase):
       stdout=subprocess.PIPE,
       stderr=subprocess.PIPE,
     )
-    (stdout_data, stderr_data) = proc.communicate(input=input.encode())
+    (stdout_data, stderr_data) = proc.communicate(stdin_payload=ensure_binary(stdin_payload))
     # Attempting to call '{}\n{}'.format(...) on bytes in python 3 gives you the string:
     #   "b'<the first string>'\nb'<the second string>'"
     # So we explicitly decode both stdout and stderr here.
@@ -117,7 +118,7 @@ subdir/__init__.py
           worktree, [header_check_script, 'subdir'],
           # The python process reads from stdin, so we have to explicitly pass an empty string in
           # order to close it.
-          input='{}\n'.format(added_files_process_input) if added_files_process_input else '',
+          stdin_payload='{}\n'.format(added_files_process_input) if added_files_process_input else '',
           expected_excerpt=expected_excerpt)
 
       # Check that a file with an empty header fails.
