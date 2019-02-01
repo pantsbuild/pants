@@ -92,18 +92,17 @@ def find_platform_name():
 
 
 def core_packages(py3):
-  # N.B. When releasing with Python 3, we allow pantsbuild.pants to work with any Python 3 version.
-  # This is because if we were to hardcode the minor versions, such as `cp36.cp37`, we would prevent
-  # releases that were shipped with this explicit list from every being able to run with a different
-  # Python version, such as 3.8. Instead, we enforce interpreter constraints in `pants_loader.py` as
-  # a runtime check.
-  interpreter_flag = "cp3" if py3 else "cp27"
+  # N.B. When releasing with Python 3, we allow pantsbuild.pants to work with any Python 3 version
+  # >= 3.6. We are able to get this future compatibility by specifing
+  # `abi3` because in `src/rust/engine/src/cffi/native_engine.c` we set up `Py_LIMITED_API` and when
+  # used in conjunction with the `abi3` tag the binary will be compatible with any future Python 3 version.
+  # See https://docs.python.org/3/c-api/stable.html for documentation.
+  interpreter_flag = "cp36" if py3 else "cp27"
+  bdist_wheel_flags = ("--python-tag", interpreter_flag, "--plat-name", find_platform_name())
+  if py3:
+    bdist_wheel_flags = bdist_wheel_flags + ("--py-limited-api", "cp36")
   return {
-    Package(
-      "pantsbuild.pants",
-      "//src/python/pants:pants-packaged",
-      bdist_wheel_flags=("--python-tag", interpreter_flag, "--plat-name", find_platform_name()),
-    ),
+    Package("pantsbuild.pants", "//src/python/pants:pants-packaged", bdist_wheel_flags=bdist_wheel_flags),
     Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
   }
 
