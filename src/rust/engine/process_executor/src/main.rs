@@ -156,6 +156,29 @@ fn main() {
         .last(true)
         .required(true),
     )
+    .arg(
+        Arg::with_name("output-file-path")
+            .long("output-file-path")
+            .takes_value(true)
+            .multiple(true)
+            .required(false)
+            .help("Path to file that is considered to be output"),
+    )
+    .arg(
+      Arg::with_name("output-directory-path")
+          .long("output-directory-path")
+          .takes_value(true)
+          .multiple(true)
+          .required(false)
+          .help("Path to directory that is considered to be output"),
+    )
+    .arg(
+      Arg::with_name("materialize-output-to")
+          .long("materialize-output-to")
+          .takes_value(true)
+          .required(false)
+          .help("The name of a directory (which may or may not exist), and will copy the output tree there")
+    )
     .get_matches();
 
   let argv: Vec<String> = args
@@ -187,6 +210,16 @@ fn main() {
   let timer_thread = resettable::Resettable::new(|| futures_timer::HelperThread::new().unwrap());
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
+  let output_file_path = if let Some(values) = args.values_of("output-file-path") {
+    values.map(PathBuf::from).collect()
+  } else {
+    BTreeSet::new()
+  };
+  let output_directory_path = if let Some(values) = args.values_of("output-directory-path") {
+    values.map(PathBuf::from).collect()
+  } else {
+    BTreeSet::new()
+  };
 
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {
@@ -241,8 +274,8 @@ fn main() {
     argv,
     env,
     input_files,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
+    output_files: output_file_path,
+    output_directories: output_directory_path,
     timeout: Duration::new(15 * 60, 0),
     description: "process_executor".to_string(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
@@ -263,18 +296,26 @@ fn main() {
           args.value_of("cache-key-gen-version").map(str::to_owned),
           remote_instance_arg,
           oauth_bearer_token,
-          store,
+          store.clone(),
           timer_thread,
         )
         .expect("Could not initialize remote execution client"),
       ) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
-      store, pool, work_dir, true,
+      store.clone(),
+      pool,
+      work_dir,
+      true,
     )) as Box<dyn process_execution::CommandRunner>,
   };
   let mut rt = tokio::runtime::Runtime::new().unwrap();
   let result = rt.block_on(runner.run(request)).unwrap();
+
+  if let Some(materialize_directory) = args.value_of("materialize-output-to").map(PathBuf::from) {
+    rt.block_on(store.materialize_directory(materialize_directory, result.output_directory))
+      .unwrap();
+  };
 
   print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
   eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
