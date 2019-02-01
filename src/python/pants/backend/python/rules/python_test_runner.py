@@ -8,11 +8,12 @@ import os.path
 import sys
 from builtins import str
 
+from pants.backend.python.subsystems.pytest import PyTest
 from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import TransitiveHydratedTarget
-from pants.engine.rules import rule
+from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get, Select
 from pants.rules.core.core_test_model import Status, TestResult
 
@@ -26,8 +27,8 @@ class PyTestResult(TestResult):
 
 # TODO: Support deps
 # TODO: Support resources
-@rule(PyTestResult, [Select(TransitiveHydratedTarget)])
-def run_python_test(transitive_hydrated_target):
+@rule(PyTestResult, [Select(TransitiveHydratedTarget), Select(PyTest)])
+def run_python_test(transitive_hydrated_target, pytest):
   target_root = transitive_hydrated_target.root
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
@@ -59,17 +60,16 @@ def run_python_test(transitive_hydrated_target):
   # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
   python_binary = sys.executable
 
+  # TODO: This is non-hermetic because the requirements will be resolved on the fly by
+  # pex27, where it should be hermetically provided in some way.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   requirements_pex_argv = [
     './{}'.format(pex_snapshot.files[0].path),
     '--python', python_binary,
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
-    # TODO: This is non-hermetic because pytest will be resolved on the fly by pex27, where it should be hermetically provided in some way.
-    # We should probably also specify a specific version.
-    'pytest',
-    # Sort all the requirement strings to increase the chance of cache hits across invocations.
-  ] + sorted(all_requirements)
+    # Sort all user requirement strings to increase the chance of cache hits across invocations.
+  ] + list(pytest.get_requirement_strings()) + sorted(all_requirements)
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
     input_files=pex_snapshot.directory_digest,
@@ -112,3 +112,10 @@ def run_python_test(transitive_hydrated_target):
   status = Status.SUCCESS if result.exit_code == 0 else Status.FAILURE
 
   yield PyTestResult(status=status, stdout=result.stdout.decode('utf-8'))
+
+
+def rules():
+  return [
+      run_python_test,
+      optionable_rule(PyTest),
+    ]
