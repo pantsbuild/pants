@@ -50,8 +50,7 @@ class PantsRequirement(object):
                                       msg='The {} target only works for pantsbuild.pants '
                                           'distributions, given {}'.format(self.alias, dist))
 
-    requirement = PythonRequirement(requirement="{key}=={version} ; {env_marker}"
-                                    .format(key=dist, version=pants_version()))
+    requirement = PythonRequirement(requirement="{key}=={version}".format(key=dist, version=pants_version()))
 
     self._parse_context.create_object('python_requirement_library',
                                       name=name,
