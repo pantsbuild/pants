@@ -25,3 +25,22 @@ scala_library(
   strict_deps=True,
   platform='java8',
 )
+
+jvm_binary(
+    name = "rsc-and-zinc",
+    dependencies = [
+        ":rsc",
+        ":compiler",
+    ],
+)
+
+jar_library(
+    name = "rsc",
+    jars = [
+        jar(
+            org = "com.twitter",
+            name = "rsc_2.11",
+            rev = "0.0.0-665-31f0e61a",
+        ),
+    ],
+)
