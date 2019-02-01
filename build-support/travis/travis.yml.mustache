@@ -377,7 +377,7 @@ base_linux_build_wheels: &base_linux_build_wheels
       travis_ci:latest
       sh -c "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh ${RELEASE_ARGS} -n"
 
-py27_linux_build_wheels: &py2_linux_build_wheels
+py27_linux_build_wheels: &py27_linux_build_wheels
   <<: *py27_linux_test_config
   <<: *base_linux_build_wheels
   name: "Build Linux wheels (Py2.7 PEX)"
@@ -387,7 +387,7 @@ py27_linux_build_wheels: &py2_linux_build_wheels
     - RELEASE_ARGS=''
     - CACHE_NAME=linuxwheelsbuild.py27
 
-py36_linux_build_wheels: &py3_linux_build_wheels
+py36_linux_build_wheels: &py36_linux_build_wheels
   <<: *py36_linux_test_config
   <<: *base_linux_build_wheels
   name: "Build Linux wheels (Py3.6 PEX)"
@@ -403,7 +403,7 @@ base_osx_build_wheels: &base_osx_build_wheels
   script:
     - ./build-support/bin/release.sh ${RELEASE_ARGS} -n
 
-py27_osx_build_wheels: &py2_osx_build_wheels
+py27_osx_build_wheels: &py27_osx_build_wheels
   <<: *py27_osx_test_config
   <<: *base_osx_build_wheels
   name: "Build OSX wheels (Py2.7 PEX)"
@@ -413,7 +413,7 @@ py27_osx_build_wheels: &py2_osx_build_wheels
     - RELEASE_ARGS=''
     - CACHE_NAME=osxwheelsbuild.py27
 
-py36_osx_build_wheels: &py3_osx_build_wheels
+py36_osx_build_wheels: &py36_osx_build_wheels
   <<: *py36_osx_test_config
   <<: *base_osx_build_wheels
   name: "Build OSX wheels (Py3.6 PEX)"
