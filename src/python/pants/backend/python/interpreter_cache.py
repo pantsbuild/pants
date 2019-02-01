@@ -119,6 +119,8 @@ class PythonInterpreterCache(Subsystem):
     try:
       executable = os.readlink(os.path.join(path, 'python'))
     except OSError:
+      if os.path.dirname(path) == self._cache_dir:
+        self._purge_interpreter(path)
       return None
     interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
     if self._matches(interpreter, filters=filters):
@@ -251,3 +253,14 @@ class PythonInterpreterCache(Subsystem):
     _safe_link(target_location, target_link)
     logger.debug('    installed {}'.format(target_location))
     return Package.from_href(target_location)
+
+  def _purge_interpreter(self, interpreter_dir):
+    try:
+      logger.info('Detected stale interpreter `{}` in the interpreter cache, purging.'
+                  .format(interpreter_dir))
+      shutil.rmtree(interpreter_dir, ignore_errors=True)
+    except Exception as e:
+      logger.warn(
+        'Caught exception {!r} during interpreter purge. Please run `./pants clean-all`!'
+        .format(e)
+      )

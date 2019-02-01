@@ -78,6 +78,9 @@ class SelectInterpreter(Task):
       interpreter_path_file = self._interpreter_path_file(target_set_id)
       if not os.path.exists(interpreter_path_file):
         self._create_interpreter_path_file(interpreter_path_file, python_tgts)
+      else:
+        if _detect_and_purge_invalid_interpreter(interpreter_path_file):
+          self._create_interpreter_path_file(interpreter_path_file, python_tgts)
 
     interpreter = self._get_interpreter(interpreter_path_file)
     self.context.products.register_data(PythonInterpreter, interpreter)
@@ -105,3 +108,15 @@ class SelectInterpreter(Task):
         dist_name, dist_version, location = line.strip().split('\t')
         interpreter = interpreter.with_extra(dist_name, dist_version, location)
       return interpreter
+
+  @staticmethod
+  def _detect_and_purge_invalid_interpreter(interpreter_path_file):
+    with open(interpreter_path_file, 'r') as infile:
+      lines = infile.readlines()
+    binary = lines[0].strip()
+    if not os.path.exists(binary):
+      self.context.log.info('Stale interpreter reference detected, removing reference and '
+                            'selecting a new interpreter.')
+      os.remove(interpreter_path_file)
+      return True
+    return False
