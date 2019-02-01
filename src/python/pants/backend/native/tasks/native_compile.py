@@ -123,7 +123,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   @abstractmethod
   def get_compile_settings(self):
-    """Return an instance of NativeBuildStepSettings.
+    """Return an instance of NativeBuildStep.
 
     NB: Subclasses will be queried for the compile settings once and the result cached.
     """
@@ -161,7 +161,7 @@ class NativeCompile(NativeTask, AbstractClass):
       include_dirs.append(external_lib_include_dir)
 
     sources_and_headers = self.get_sources_headers_for_target(target)
-    compiler_option_sets = (self._compile_settings.native_build_step_settings
+    compiler_option_sets = (self._compile_settings.native_build_step
                                 .get_compiler_option_sets_for_target(target))
 
     compile_request = NativeCompileRequest(
@@ -169,7 +169,7 @@ class NativeCompile(NativeTask, AbstractClass):
       include_dirs=include_dirs,
       sources=sources_and_headers,
       compiler_options=(self._compile_settings
-                            .native_build_step_settings
+                            .native_build_step
                             .get_merged_args_for_compiler_option_sets(compiler_option_sets)),
       output_dir=versioned_target.results_dir,
       header_file_extensions=self._compile_settings.header_file_extensions)

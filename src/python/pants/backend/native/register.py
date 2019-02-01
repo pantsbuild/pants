@@ -48,7 +48,7 @@ def register_goals():
   # TODO(#5962): register these under the 'compile' goal when we eliminate the product transitive
   # dependency from export -> compile.
   task(name='conan-prep', action=ConanPrep).install('native-compile')
-  task(name='native-third-party-fetch', action=ConanFetch).install('native-compile')
+  task(name='conan-fetch', action=ConanFetch).install('native-compile')
   task(name='c-for-ctypes', action=CCompile).install('native-compile')
   task(name='cpp-for-ctypes', action=CppCompile).install('native-compile')
   task(name='shared-libraries', action=LinkSharedLibraries).install('link')

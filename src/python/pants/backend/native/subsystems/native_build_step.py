@@ -4,16 +4,23 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.subsystems.native_build_settings import ToolchainVariant
 from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
   MirroredTargetOptionMixin
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
+from pants.util.objects import enum
 
 
-class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsystem):
+class ToolchainVariant(enum('descriptor', ['gnu', 'llvm'])):
+
+  @property
+  def is_gnu(self):
+    return self.descriptor == 'gnu'
+
+
+class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsystem):
   """Settings which are specific to a target and do not need to be the same for compile and link."""
 
   options_scope = 'native-build-step'
@@ -25,7 +32,7 @@ class NativeBuildStepSettings(CompilerOptionSetsMixin, MirroredTargetOptionMixin
 
   @classmethod
   def register_options(cls, register):
-    super(NativeBuildStepSettings, cls).register_options(register)
+    super(NativeBuildStep, cls).register_options(register)
 
     register('--compiler-option-sets', advanced=True, default=(), type=list,
              fingerprint=True,
@@ -54,7 +61,7 @@ class CompileSettingsBase(Subsystem):
   @classmethod
   def subsystem_dependencies(cls):
     return super(CompileSettingsBase, cls).subsystem_dependencies() + (
-      NativeBuildStepSettings.scoped(cls),
+      NativeBuildStep.scoped(cls),
     )
 
   @classproperty
@@ -69,8 +76,8 @@ class CompileSettingsBase(Subsystem):
              help="The file extensions which should not be provided to the compiler command line.")
 
   @memoized_property
-  def native_build_step_settings(self):
-    return NativeBuildStepSettings.scoped_instance(self)
+  def native_build_step(self):
+    return NativeBuildStep.scoped_instance(self)
 
   @memoized_property
   def header_file_extensions(self):
@@ -90,5 +97,5 @@ class CppCompileSettings(CompileSettingsBase):
 
 
 # TODO: add a fatal_warnings kwarg to NativeArtifact and make a LinkSharedLibrariesSettings subclass
-# of NativeBuildStepSettings here! The method should work even though NativeArtifact is not a
+# of NativeBuildStep here! The method should work even though NativeArtifact is not a
 # Target.

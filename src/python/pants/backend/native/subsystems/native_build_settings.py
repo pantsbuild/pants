@@ -7,14 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
   MirroredTargetOptionMixin
 from pants.subsystem.subsystem import Subsystem
-from pants.util.objects import enum
-
-
-class ToolchainVariant(enum('descriptor', ['gnu', 'llvm'])):
-
-  @property
-  def is_gnu(self):
-    return self.descriptor == 'gnu'
 
 
 class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):

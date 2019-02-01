@@ -10,7 +10,7 @@ import re
 from zipfile import ZipFile
 
 from pants.backend.native.config.environment import Platform
-from pants.backend.native.subsystems.native_build_settings import ToolchainVariant
+from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
@@ -238,7 +238,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       'native-build-step': {
         'toolchain_variant': toolchain_variant,
       },
-      'native-build-settings.cpp-compile-settings': {
+      'native-build-step.cpp-compile-settings': {
         'compiler_option_sets_enabled_args': {
           'asdf': ['-D_ASDF=1'],
         },
