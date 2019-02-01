@@ -252,7 +252,8 @@ def check_ownership(users, minimum_owner_count=3, py3=False):
 
 def _create_parser():
   parser = argparse.ArgumentParser()
-  # Note --py3 flag must be passed as first arg
+  # Note because of how argparse handles subparsers, the --py3 flag must be passed before any of the subparser
+  # flags to resolve properly.
   parser.add_argument("-3", "--py3", action="store_true", default=False, help="Release any non-universal packages as Python 3.")
   subparsers = parser.add_subparsers(dest="command")
   # list
