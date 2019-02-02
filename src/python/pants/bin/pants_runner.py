@@ -9,12 +9,26 @@ import os
 import sys
 from builtins import object
 
+from future.utils import PY3
+
+from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
+from pants.base.exiter import Exiter
 from pants.bin.remote_pants_runner import RemotePantsRunner
+from pants.fs.archive import TarArchiver
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 logger = logging.getLogger(__name__)
+
+
+class FuzzerExiter(Exiter):
+  """Override the normal Exiter behavior to just die faster for faster fuzzing iteration."""
+
+  def __init__(self):
+    # os._exit() can be faster for fuzzing, see:
+    # https://barro.github.io/2018/01/taking-a-look-at-python-afl/
+    super(FuzzerExiter, self).__init__(exiter=os._exit)
 
 
 class PantsRunner(object):
@@ -26,7 +40,8 @@ class PantsRunner(object):
     :param list args: The arguments (sys.argv) for this run. (Optional, default: sys.argv)
     :param dict env: The environment for this run. (Optional, default: os.environ)
     """
-    self._exiter = exiter
+    logger.info('dropping normal exiter {!r} to use {}...'.format(exiter, FuzzerExiter.__name__))
+    self._exiter = FuzzerExiter()
     self._args = args or sys.argv
     self._env = env or os.environ
     self._start_time = start_time
@@ -43,6 +58,20 @@ class PantsRunner(object):
     ExceptionSink.reset_should_print_backtrace_to_terminal(global_bootstrap_options.print_exception_stacktrace)
     ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
 
+    if global_bootstrap_options.afl_fuzz_untar_stdin:
+      # Initialize python-afl.
+      import afl
+      afl.init()
+      # NB: read the tar file from stdin, extract it into the current directory, then run pants!
+      tar_archiver = TarArchiver('r:', 'tar')
+      in_stream = sys.stdin.buffer if PY3 else sys.stdin
+      tar_archiver.extract(in_stream, get_buildroot())
+      try:
+        in_stream.close()
+      except ValueError as e:
+        logger.exception(e)
+
+    # TODO: use LocalPantsRunner if the goal is kill-pantsd or clean-all!
     if global_bootstrap_options.enable_pantsd:
       try:
         return RemotePantsRunner(self._exiter, self._args, self._env, options_bootstrapper).run()

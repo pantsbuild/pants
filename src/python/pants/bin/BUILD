@@ -3,6 +3,7 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:python-afl',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
     '3rdparty/python:setproctitle',

@@ -333,6 +333,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')
 
+    register('--afl-fuzz-untar-stdin', advanced=True, type=bool, default=False,
+             help='Unpack a tar file from stdin into the buildroot and run python-afl fuzzing!')
+
   @classmethod
   def register_options(cls, register):
     """Register options not tied to any particular task or subsystem."""
