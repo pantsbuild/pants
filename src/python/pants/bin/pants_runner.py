@@ -65,6 +65,9 @@ class PantsRunner(object):
       # NB: read the tar file from stdin, extract it into the current directory, then run pants!
       tar_archiver = TarArchiver('r:', 'tar')
       in_stream = sys.stdin.buffer if PY3 else sys.stdin
+      # TODO: if there is an error extracting the tar archive, simply exit with 0! We don't want to
+      # try to fuzz python tar extraction, so if we quickly succeed we can (hopefully) get afl to
+      # find more interesting cases!
       tar_archiver.extract(in_stream, get_buildroot())
       try:
         in_stream.close()
