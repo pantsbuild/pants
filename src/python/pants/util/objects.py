@@ -295,7 +295,7 @@ class TypeConstraint(AbstractClass):
 
   def make_type_constraint_error(self, obj, constraint):
     return TypeConstraintError(
-      "value {!r} (with type {!r}) must satisfy this type constraint: {!r}."
+      "value {!r} (with type {!r}) must satisfy this type constraint: {}."
       .format(obj, type(obj).__name__, constraint))
 
   # TODO: disallow overriding this method with some form of mixin/decorator along with datatype
@@ -447,7 +447,7 @@ class TypedCollection(TypeConstraint):
 
   def make_collection_type_constraint_error(self, base_obj, el):
     base_error = self.make_type_constraint_error(el, self._constraint)
-    return TypeConstraintError("in wrapped constraint {!r} matching iterable object {!r}: {}"
+    return TypeConstraintError("in wrapped constraint {} matching iterable object {}: {}"
                                .format(self, base_obj, base_error))
 
   def validate_satisfied_by(self, obj):
@@ -459,7 +459,7 @@ class TypedCollection(TypeConstraint):
 
     base_iterable_error = self.make_type_constraint_error(obj, self._iterable_constraint)
     raise TypeConstraintError(
-      "in wrapped constraint {!r}: {}".format(self, base_iterable_error))
+      "in wrapped constraint {}: {}".format(self, base_iterable_error))
 
   def __hash__(self):
     return hash((type(self), self._constraint))

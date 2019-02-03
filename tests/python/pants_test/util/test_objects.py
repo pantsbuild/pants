@@ -13,13 +13,19 @@ from builtins import object, str
 from future.utils import PY2, PY3, text_type
 
 from pants.util.objects import (Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
-                                TypedCollection, TypedDatatypeInstanceConstructionError, datatype,
-                                enum)
+                                TypeConstraintError, TypedCollection,
+                                TypedDatatypeInstanceConstructionError, datatype, enum)
 from pants_test.test_base import TestBase
 
 
 class TypeConstraintTestBase(TestBase):
   class A(object):
+
+    def __repr__(self):
+      return '{}()'.format(type(self).__name__)
+
+    def __str__(self):
+      return '(str form): {}'.format(repr(self))
 
     def __eq__(self, other):
       return type(self) == type(other)
@@ -62,6 +68,14 @@ class SuperclassesOfTest(TypeConstraintTestBase):
     self.assertFalse(superclasses_of_a_or_b.satisfied_by(self.BPrime()))
     self.assertFalse(superclasses_of_a_or_b.satisfied_by(self.C()))
 
+  def test_validate(self):
+    superclasses_of_a_or_b = SuperclassesOf(self.A, self.B)
+    self.assertEqual(self.A(), superclasses_of_a_or_b.validate_satisfied_by(self.A()))
+    self.assertEqual(self.B(), superclasses_of_a_or_b.validate_satisfied_by(self.B()))
+    with self.assertRaisesRegexp(TypeConstraintError,
+                                 re.escape("value C() (with type 'C') must satisfy this type constraint: SuperclassesOf(A or B).")):
+      superclasses_of_a_or_b.validate_satisfied_by(self.C())
+
 
 class ExactlyTest(TypeConstraintTestBase):
   def test_none(self):
@@ -99,6 +113,14 @@ class ExactlyTest(TypeConstraintTestBase):
     self.assertTrue(Exactly(self.B).satisfied_by_type(self.B))
     self.assertFalse(Exactly(self.B).satisfied_by_type(self.C))
 
+  def test_validate(self):
+    exactly_a_or_b = Exactly(self.A, self.B)
+    self.assertEqual(self.A(), exactly_a_or_b.validate_satisfied_by(self.A()))
+    self.assertEqual(self.B(), exactly_a_or_b.validate_satisfied_by(self.B()))
+    with self.assertRaisesRegexp(TypeConstraintError,
+                                 re.escape("value C() (with type 'C') must satisfy this type constraint: Exactly(A or B).")):
+      exactly_a_or_b.validate_satisfied_by(self.C())
+
 
 class SubclassesOfTest(TypeConstraintTestBase):
   def test_none(self):
@@ -127,6 +149,15 @@ class SubclassesOfTest(TypeConstraintTestBase):
     self.assertTrue(subclasses_of_b_or_c.satisfied_by(self.C()))
     self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.BPrime()))
     self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.A()))
+
+  def test_validate(self):
+    subclasses_of_a_or_b = SubclassesOf(self.A, self.B)
+    self.assertEqual(self.A(), subclasses_of_a_or_b.validate_satisfied_by(self.A()))
+    self.assertEqual(self.B(), subclasses_of_a_or_b.validate_satisfied_by(self.B()))
+    self.assertEqual(self.C(), subclasses_of_a_or_b.validate_satisfied_by(self.C()))
+    with self.assertRaisesRegexp(TypeConstraintError,
+                                 re.escape("value 1 (with type 'int') must satisfy this type constraint: SubclassesOf(A or B).")):
+      subclasses_of_a_or_b.validate_satisfied_by(1)
 
 
 class TypedCollectionTest(TypeConstraintTestBase):
@@ -158,6 +189,17 @@ class TypedCollectionTest(TypeConstraintTestBase):
     with self.assertRaisesRegexp(TypeError, re.escape(
         "constraint for collection must be a TypeOnlyConstraint! was: {}".format(sub_collection))):
       TypedCollection(sub_collection)
+
+  def test_validate(self):
+    collection_exactly_a_or_b = TypedCollection(Exactly(self.A, self.B))
+    self.assertEqual([self.A()], collection_exactly_a_or_b.validate_satisfied_by([self.A()]))
+    self.assertEqual([self.B()], collection_exactly_a_or_b.validate_satisfied_by([self.B()]))
+    with self.assertRaisesRegexp(TypeConstraintError,
+                                 re.escape("in wrapped constraint TypedCollection(Exactly(A or B)): value A() (with type 'A') must satisfy this type constraint: SubclassesOf(Iterable).")):
+      collection_exactly_a_or_b.validate_satisfied_by(self.A())
+    with self.assertRaisesRegexp(TypeConstraintError,
+                                 re.escape("in wrapped constraint TypedCollection(Exactly(A or B)) matching iterable object [C()]: value C() (with type 'C') must satisfy this type constraint: Exactly(A or B).")):
+      collection_exactly_a_or_b.validate_satisfied_by([self.C()])
 
 
 class ExportedDatatype(datatype(['val'])):
