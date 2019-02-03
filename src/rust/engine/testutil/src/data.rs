@@ -74,6 +74,20 @@ impl TestDirectory {
 
   // Directory structure:
   //
+  // /dogs/
+  pub fn containing_cats_dir() -> TestDirectory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_directories().push({
+      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
+      subdir.set_name("dogs".to_string());
+      subdir.set_digest((&TestDirectory::empty().digest()).into());
+      subdir
+    });
+    TestDirectory { directory }
+  }
+
+  // Directory structure:
+  //
   // /roland
   pub fn containing_roland() -> TestDirectory {
     let mut directory = bazel_protos::remote_execution::Directory::new();

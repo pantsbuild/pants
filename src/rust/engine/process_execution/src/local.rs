@@ -51,10 +51,11 @@ impl CommandRunner {
   ) -> BoxFuture<Snapshot, String> {
     let output_paths: Result<Vec<String>, String> = output_dir_paths
       .into_iter()
-      .map(|p| {
+      .flat_map(|p| {
         let mut s = p.into_os_string();
+        let s_dir = s.clone();
         s.push("/**");
-        s
+        vec![s_dir, s]
       })
       .chain(output_file_paths.into_iter().map(|p| p.into_os_string()))
       .map(|s| {
@@ -847,6 +848,31 @@ mod tests {
         stderr: as_bytes(""),
         exit_code: 0,
         output_directory: TestDirectory::nested().digest(),
+        execution_attempts: vec![],
+      }
+    )
+  }
+
+  #[test]
+  fn output_empty_dir() {
+    let result = run_command_locally(ExecuteProcessRequest {
+      argv: vec![find_bash(), "-c".to_owned(), "/bin/mkdir dogs".to_string()],
+      env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      output_directories: vec![PathBuf::from("dogs")].into_iter().collect(),
+      timeout: Duration::from_millis(1000),
+      description: "bash".to_string(),
+      jdk_home: None,
+    });
+
+    assert_eq!(
+      result.unwrap(),
+      FallibleExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: TestDirectory::containing_cats_dir().digest(),
         execution_attempts: vec![],
       }
     )
