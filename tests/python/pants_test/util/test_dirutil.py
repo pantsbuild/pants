@@ -393,12 +393,12 @@ class DirutilTest(unittest.TestCase):
       touch(file_name)
       rm_rf(file_name)
 
-  def assert_dump_and_read(self, test_content, write_kwargs, read_kwargs):
+  def assert_dump_and_read(self, test_content, dump_kwargs, read_kwargs):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
       # TODO: remove all deprecated usages of `binary_mode` and `mode` arguments to safe_file_dump()
       # in this file when the deprecation period is over!
-      safe_file_dump(test_filename, test_content, **write_kwargs)
+      safe_file_dump(test_filename, test_content, **dump_kwargs)
       self.assertEqual(read_file(test_filename, **read_kwargs), test_content)
 
   def test_readwrite_file_binary(self):
