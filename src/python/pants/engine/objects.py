@@ -161,6 +161,8 @@ class Collection(object):
   which may be consumed e.g. over FFI from the engine.
 
   Python consumers of a Collection should prefer to use its standard iteration API.
+
+  Note that elements of a Collection are type-checked upon construction.
   """
 
   @memoized_classmethod

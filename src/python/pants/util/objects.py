@@ -276,16 +276,14 @@ class TypeConstraint(AbstractClass):
   :class:`SubclassesOf`.
   """
 
-  def __init__(self, variance_symbol, description):
+  def __init__(self, description):
     """Creates a type constraint centered around the given types.
 
     The type constraint is satisfied as a whole if satisfied for at least one of the given types.
 
-    :param type *types: The focus of this type constraint.
-    :param str description: A description for this constraint if the list of types is too long.
+    :param str description: A concise, readable description of what the type constraint represents.
+                            Used directly as the __str__ implementation.
     """
-    assert(variance_symbol)
-    self._variance_symbol = variance_symbol
     self._description = description
 
   @abstractmethod
@@ -295,10 +293,15 @@ class TypeConstraint(AbstractClass):
     :rtype: bool
     """
 
-  def validate_satisfied_by(self, obj):
-    """Return some version of `obj` if the object satisfies this type constraint, or raise.
+  def make_type_constraint_error(self, obj, constraint):
+    return TypeConstraintError(
+      "value {!r} (with type {!r}) must satisfy this type constraint: {!r}."
+      .format(obj, type(obj).__name__, constraint))
 
-    # TODO: consider disallowing overriding this too?
+  # TODO: disallow overriding this method with some form of mixin/decorator along with datatype
+  # __eq__!
+  def validate_satisfied_by(self, obj):
+    """Return `obj` if the object satisfies this type constraint, or raise.
 
     :raises: `TypeConstraintError` if `obj` does not satisfy the constraint.
     """
@@ -306,19 +309,23 @@ class TypeConstraint(AbstractClass):
     if self.satisfied_by(obj):
       return obj
 
-    raise TypeConstraintError(
-      "value {!r} (with type {!r}) must satisfy this type constraint: {!r}."
-      .format(obj, type(obj).__name__, self))
+    raise self.make_type_constraint_error(obj, self)
 
   def __ne__(self, other):
     return not (self == other)
 
   def __str__(self):
-    return '{}{}'.format(self._variance_symbol, self._description)
+    return self._description
 
 
-class BasicTypeConstraint(TypeConstraint):
-  """A `TypeConstraint` predicated only on the object's type."""
+class TypeOnlyConstraint(TypeConstraint):
+  """A `TypeConstraint` predicated only on the object's type.
+
+  `TypeConstraint` subclasses may override `.satisfied_by()` to perform arbitrary validation on the
+  object itself -- however, this class implements `.satisfied_by()` with a guarantee that it will
+  only act on the object's `type` via `.satisfied_by_type()`. This kind of type checking is faster
+  and easier to understand than the more complex validation allowed by `.satisfied_by()`.
+  """
 
   # TODO: make an @abstract_classproperty decorator to do this boilerplate!
   @classproperty
@@ -328,12 +335,12 @@ class BasicTypeConstraint(TypeConstraint):
                               .format(cls.__name__))
 
   def __init__(self, *types):
-    """Creates a type constraint centered around the given types.
+    """Creates a type constraint based on some logic to match the given types.
 
-    The type constraint is satisfied as a whole if satisfied for at least one of the given types.
+    NB: A `TypeOnlyConstraint` implementation should ensure that the type constraint is satisfied as
+    a whole if satisfied for at least one of the given `types`.
 
-    :param type *types: The focus of this type constraint.
-    :param str description: A description for this constraint if the list of types is too long.
+    :param type *types: The types this constraint will match in some way.
     """
 
     if not types:
@@ -342,13 +349,12 @@ class BasicTypeConstraint(TypeConstraint):
       raise TypeError('Supplied types must be types. {!r}'.format(types))
 
     if len(types) == 1:
-      constrained_type = types[0].__name__
+      type_list = types[0].__name__
     else:
-      constrained_type = '({})'.format(', '.join(t.__name__ for t in types))
+      type_list = ' or '.join(t.__name__ for t in types)
+    description = '{}({})'.format(type(self).__name__, type_list)
 
-    super(BasicTypeConstraint, self).__init__(
-      variance_symbol=self._variance_symbol,
-      description=constrained_type)
+    super(TypeOnlyConstraint, self).__init__(description=description)
 
     # NB: This is made into a tuple so that we can use self._types in issubclass() and others!
     self._types = tuple(types)
@@ -382,19 +388,15 @@ class BasicTypeConstraint(TypeConstraint):
               constrained_type=constrained_type))
 
 
-class SuperclassesOf(BasicTypeConstraint):
+class SuperclassesOf(TypeOnlyConstraint):
   """Objects of the exact type as well as any super-types are allowed."""
-
-  _variance_symbol = '-'
 
   def satisfied_by_type(self, obj_type):
     return any(issubclass(t, obj_type) for t in self._types)
 
 
-class Exactly(BasicTypeConstraint):
+class Exactly(TypeOnlyConstraint):
   """Only objects of the exact type are allowed."""
-
-  _variance_symbol = '='
 
   def satisfied_by_type(self, obj_type):
     return obj_type in self._types
@@ -406,43 +408,58 @@ class Exactly(BasicTypeConstraint):
       return repr(self)
 
 
-class SubclassesOf(BasicTypeConstraint):
+class SubclassesOf(TypeOnlyConstraint):
   """Objects of the exact type as well as any sub-types are allowed."""
-
-  _variance_symbol = '+'
 
   def satisfied_by_type(self, obj_type):
     return issubclass(obj_type, self._types)
 
 
 class TypedCollection(TypeConstraint):
-  """A `TypeConstraint` which accepts a BasicTypeConstraint and validates a collection."""
+  """A `TypeConstraint` which accepts a TypeOnlyConstraint and validates a collection."""
 
-  @classmethod
-  def _generate_variance_symbol(cls, constraint):
-    return '[{}]'.format(constraint._variance_symbol)
+  _iterable_constraint = SubclassesOf(Iterable)
 
   def __init__(self, constraint):
-    """Create a TypeConstraint which validates each member of a collection with `constraint`.
+    """Create a `TypeConstraint` which validates each member of a collection with `constraint`.
 
-    :param BasicTypeConstraint constraint: the TypeConstraint to apply to each element. This is
-                                           currently required to be a BasicTypeConstraint to avoid
-                                           complex prototypal type relationships.
+    :param TypeOnlyConstraint constraint: the `TypeConstraint` to apply to each element. This is
+                                          currently required to be a `TypeOnlyConstraint` to avoid
+                                          complex prototypal type relationships.
     """
 
-    if not isinstance(constraint, BasicTypeConstraint):
+    if not isinstance(constraint, TypeOnlyConstraint):
       raise TypeError("constraint for collection must be a {}! was: {}"
-                      .format(BasicTypeConstraint.__name__, constraint))
+                      .format(TypeOnlyConstraint.__name__, constraint))
+
+    description = '{}({})'.format(type(self).__name__, constraint)
+
     self._constraint = constraint
 
-    super(TypedCollection, self).__init__(
-      variance_symbol=self._generate_variance_symbol(constraint),
-      description=constraint._description)
+    super(TypedCollection, self).__init__(description=description)
 
+  # TODO: consider making this a private method of TypeConstraint, as it now duplicates the logic in
+  # self.validate_satisfied_by()!
   def satisfied_by(self, obj):
-    if isinstance(obj, Iterable):
+    if self._iterable_constraint.satisfied_by(obj):
       return all(self._constraint.satisfied_by(el) for el in obj)
     return False
+
+  def make_collection_type_constraint_error(self, base_obj, el):
+    base_error = self.make_type_constraint_error(el, self._constraint)
+    return TypeConstraintError("in wrapped constraint {!r} matching iterable object {!r}: {}"
+                               .format(self, base_obj, base_error))
+
+  def validate_satisfied_by(self, obj):
+    if self._iterable_constraint.satisfied_by(obj):
+      for el in obj:
+        if not self._constraint.satisfied_by(el):
+          raise self.make_collection_type_constraint_error(obj, el)
+      return obj
+
+    base_iterable_error = self.make_type_constraint_error(obj, self._iterable_constraint)
+    raise TypeConstraintError(
+      "in wrapped constraint {!r}: {}".format(self, base_iterable_error))
 
   def __hash__(self):
     return hash((type(self), self._constraint))

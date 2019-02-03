@@ -41,11 +41,11 @@ class SuperclassesOfTest(TypeConstraintTestBase):
 
   def test_str_and_repr(self):
     superclasses_of_b = SuperclassesOf(self.B)
-    self.assertEqual("-B", str(superclasses_of_b))
+    self.assertEqual("SuperclassesOf(B)", str(superclasses_of_b))
     self.assertEqual("SuperclassesOf(B)", repr(superclasses_of_b))
 
     superclasses_of_multiple = SuperclassesOf(self.A, self.B)
-    self.assertEqual("-(A, B)", str(superclasses_of_multiple))
+    self.assertEqual("SuperclassesOf(A or B)", str(superclasses_of_multiple))
     self.assertEqual("SuperclassesOf(A, B)", repr(superclasses_of_multiple))
 
   def test_single(self):
@@ -88,11 +88,11 @@ class ExactlyTest(TypeConstraintTestBase):
 
   def test_str_and_repr(self):
     exactly_b = Exactly(self.B)
-    self.assertEqual("=B", str(exactly_b))
+    self.assertEqual("Exactly(B)", str(exactly_b))
     self.assertEqual("Exactly(B)", repr(exactly_b))
 
     exactly_multiple = Exactly(self.A, self.B)
-    self.assertEqual("=(A, B)", str(exactly_multiple))
+    self.assertEqual("Exactly(A or B)", str(exactly_multiple))
     self.assertEqual("Exactly(A, B)", repr(exactly_multiple))
 
   def test_checking_via_bare_type(self):
@@ -107,11 +107,11 @@ class SubclassesOfTest(TypeConstraintTestBase):
 
   def test_str_and_repr(self):
     subclasses_of_b = SubclassesOf(self.B)
-    self.assertEqual("+B", str(subclasses_of_b))
+    self.assertEqual("SubclassesOf(B)", str(subclasses_of_b))
     self.assertEqual("SubclassesOf(B)", repr(subclasses_of_b))
 
     subclasses_of_multiple = SubclassesOf(self.A, self.B)
-    self.assertEqual("+(A, B)", str(subclasses_of_multiple))
+    self.assertEqual("SubclassesOf(A or B)", str(subclasses_of_multiple))
     self.assertEqual("SubclassesOf(A, B)", repr(subclasses_of_multiple))
 
   def test_single(self):
@@ -132,13 +132,13 @@ class SubclassesOfTest(TypeConstraintTestBase):
 class TypedCollectionTest(TypeConstraintTestBase):
   def test_str_and_repr(self):
     collection_of_exactly_b = TypedCollection(Exactly(self.B))
-    self.assertEqual("[=]B", str(collection_of_exactly_b))
-    self.assertEqual("TypedCollection(Exactly(B))",
-                     repr(collection_of_exactly_b))
+    self.assertEqual("TypedCollection(Exactly(B))", str(collection_of_exactly_b))
+    self.assertEqual("TypedCollection(Exactly(B))", repr(collection_of_exactly_b))
 
     collection_of_multiple_subclasses = TypedCollection(
       SubclassesOf(self.A, self.B))
-    self.assertEqual("[+](A, B)", str(collection_of_multiple_subclasses))
+    self.assertEqual("TypedCollection(SubclassesOf(A or B))",
+                     str(collection_of_multiple_subclasses))
     self.assertEqual("TypedCollection(SubclassesOf(A, B))",
                      repr(collection_of_multiple_subclasses))
 
@@ -153,20 +153,11 @@ class TypedCollectionTest(TypeConstraintTestBase):
     self.assertTrue(collection_constraint.satisfied_by([self.B(), self.C(), self.BPrime()]))
     self.assertFalse(collection_constraint.satisfied_by([self.B(), self.A()]))
 
-    def collection_generator():
-      yield self.A()
-      yield self.C()
-      yield self.A()
-
-    collection_constraint = TypedCollection(Exactly(self.A, self.C))
-    self.assertEquals(
-      (self.A(), self.C(), self.A()),
-      collection_constraint.validate_satisfied_by(tuple(collection_generator())))
-
-  def test_construction(self):
+  def test_no_complex_sub_constraint(self):
+    sub_collection = TypedCollection(Exactly(self.A))
     with self.assertRaisesRegexp(TypeError, re.escape(
-        "constraint for collection must be a BasicTypeConstraint! was: {}".format(self.A))):
-      TypedCollection(self.A)
+        "constraint for collection must be a TypeOnlyConstraint! was: {}".format(sub_collection))):
+      TypedCollection(sub_collection)
 
 
 class ExportedDatatype(datatype(['val'])):
@@ -444,7 +435,7 @@ class TypedDatatypeTest(TestBase):
     some_val = SomeTypedDatatype(3)
     self.assertEqual(3, some_val.val)
     self.assertEqual(repr(some_val), "SomeTypedDatatype(val=3)")
-    self.assertEqual(str(some_val), "SomeTypedDatatype(val<=int>=3)")
+    self.assertEqual(str(some_val), "SomeTypedDatatype(val<Exactly(int)>=3)")
 
     some_object = WithExplicitTypeConstraint(text_type('asdf'), 45)
     self.assertEqual(some_object.a_string, 'asdf')
@@ -454,7 +445,7 @@ class TypedDatatypeTest(TestBase):
         .format(unicode_literal='u' if include_unicode else '')
       self.assertEqual(repr(some_object), expected_message)
     def compare_str(unicode_type_name):
-      expected_message = "WithExplicitTypeConstraint(a_string<={}>=asdf, an_int<=int>=45)".format(unicode_type_name)
+      expected_message = "WithExplicitTypeConstraint(a_string<Exactly({})>=asdf, an_int<Exactly(int)>=45)".format(unicode_type_name)
       self.assertEqual(str(some_object), expected_message)
     if PY2:
       compare_str('unicode')
@@ -466,7 +457,7 @@ class TypedDatatypeTest(TestBase):
     some_nonneg_int = NonNegativeInt(an_int=3)
     self.assertEqual(3, some_nonneg_int.an_int)
     self.assertEqual(repr(some_nonneg_int), "NonNegativeInt(an_int=3)")
-    self.assertEqual(str(some_nonneg_int), "NonNegativeInt(an_int<=int>=3)")
+    self.assertEqual(str(some_nonneg_int), "NonNegativeInt(an_int<Exactly(int)>=3)")
 
     wrapped_nonneg_int = CamelCaseWrapper(NonNegativeInt(45))
     # test attribute naming for camel-cased types
@@ -476,7 +467,7 @@ class TypedDatatypeTest(TestBase):
                      "CamelCaseWrapper(nonneg_int=NonNegativeInt(an_int=45))")
     self.assertEqual(
       str(wrapped_nonneg_int),
-      "CamelCaseWrapper(nonneg_int<=NonNegativeInt>=NonNegativeInt(an_int<=int>=45))")
+      "CamelCaseWrapper(nonneg_int<Exactly(NonNegativeInt)>=NonNegativeInt(an_int<Exactly(int)>=45))")
 
     mixed_type_obj = MixedTyping(value=3, name=text_type('asdf'))
     self.assertEqual(3, mixed_type_obj.value)
@@ -485,7 +476,7 @@ class TypedDatatypeTest(TestBase):
         .format(unicode_literal='u' if include_unicode else '')
       self.assertEqual(repr(mixed_type_obj), expected_message)
     def compare_str(unicode_type_name):
-      expected_message = "MixedTyping(value=3, name<={}>=asdf)".format(unicode_type_name)
+      expected_message = "MixedTyping(value=3, name<Exactly({})>=asdf)".format(unicode_type_name)
       self.assertEqual(str(mixed_type_obj), expected_message)
     if PY2:
       compare_str('unicode')
@@ -500,7 +491,7 @@ class TypedDatatypeTest(TestBase):
                      "WithSubclassTypeConstraint(some_value=SomeDatatypeClass())")
     self.assertEqual(
       str(subclass_constraint_obj),
-      "WithSubclassTypeConstraint(some_value<+SomeBaseClass>=SomeDatatypeClass())")
+      "WithSubclassTypeConstraint(some_value<SubclassesOf(SomeBaseClass)>=SomeDatatypeClass())")
 
   def test_mixin_type_construction(self):
     obj_with_mixin = TypedWithMixin(text_type(' asdf '))
@@ -509,7 +500,7 @@ class TypedDatatypeTest(TestBase):
         .format(unicode_literal='u' if include_unicode else '')
       self.assertEqual(repr(obj_with_mixin), expected_message)
     def compare_str(unicode_type_name):
-      expected_message = "TypedWithMixin(val<={}>= asdf )".format(unicode_type_name)
+      expected_message = "TypedWithMixin(val<Exactly({})>= asdf )".format(unicode_type_name)
       self.assertEqual(str(obj_with_mixin), expected_message)
     if PY2:
       compare_str('unicode')
@@ -523,7 +514,7 @@ class TypedDatatypeTest(TestBase):
   def test_instance_with_collection_construction_str_repr(self):
     # TODO: convert the type of the input collection using a `wrapper_type` argument!
     obj_with_collection = WithCollectionTypeConstraint([3])
-    self.assertEqual("WithCollectionTypeConstraint(dependencies<[=]int>=[3])",
+    self.assertEqual("WithCollectionTypeConstraint(dependencies<TypedCollection(Exactly(int))>=[3])",
                      str(obj_with_collection))
     self.assertEqual("WithCollectionTypeConstraint(dependencies=[3])",
                      repr(obj_with_collection))
@@ -638,14 +629,14 @@ field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type
       WithCollectionTypeConstraint(3)
     expected_msg = """\
 error: in constructor of type WithCollectionTypeConstraint: type check error:
-field 'dependencies' was invalid: value 3 (with type 'int') must satisfy this type constraint: TypedCollection(Exactly(int))."""
+field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)): value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(Iterable)."""
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypeCheckError) as cm:
       WithCollectionTypeConstraint([3, "asdf"])
     expected_msg = """\
 error: in constructor of type WithCollectionTypeConstraint: type check error:
-field 'dependencies' was invalid: value [3, {}'asdf'] (with type 'list') must satisfy this type constraint: TypedCollection(Exactly(int)).""".format('u' if PY2 else '')
+field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)) matching iterable object [3, {u}'asdf']: value {u}'asdf' (with type 'unicode') must satisfy this type constraint: Exactly(int).""".format(u='u' if PY2 else '')
     self.assertEqual(str(cm.exception), expected_msg)
 
   def test_copy(self):
