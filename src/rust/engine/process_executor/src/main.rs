@@ -162,7 +162,7 @@ fn main() {
             .takes_value(true)
             .multiple(true)
             .required(false)
-            .help("Path to file that is considered to be output"),
+            .help("Path to file that is considered to be output."),
     )
     .arg(
       Arg::with_name("output-directory-path")
@@ -170,14 +170,14 @@ fn main() {
           .takes_value(true)
           .multiple(true)
           .required(false)
-          .help("Path to directory that is considered to be output"),
+          .help("Path to directory that is considered to be output."),
     )
     .arg(
       Arg::with_name("materialize-output-to")
           .long("materialize-output-to")
           .takes_value(true)
           .required(false)
-          .help("The name of a directory (which may or may not exist), and will copy the output tree there")
+          .help("The name of a directory (which may or may not exist), where the output tree will be materialized.")
     )
     .get_matches();
 
@@ -210,12 +210,12 @@ fn main() {
   let timer_thread = resettable::Resettable::new(|| futures_timer::HelperThread::new().unwrap());
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
-  let output_file_path = if let Some(values) = args.values_of("output-file-path") {
+  let output_files = if let Some(values) = args.values_of("output-file-path") {
     values.map(PathBuf::from).collect()
   } else {
     BTreeSet::new()
   };
-  let output_directory_path = if let Some(values) = args.values_of("output-directory-path") {
+  let output_directories = if let Some(values) = args.values_of("output-directory-path") {
     values.map(PathBuf::from).collect()
   } else {
     BTreeSet::new()
@@ -274,8 +274,8 @@ fn main() {
     argv,
     env,
     input_files,
-    output_files: output_file_path,
-    output_directories: output_directory_path,
+    output_files,
+    output_directories,
     timeout: Duration::new(15 * 60, 0),
     description: "process_executor".to_string(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
@@ -312,8 +312,8 @@ fn main() {
   let mut rt = tokio::runtime::Runtime::new().unwrap();
   let result = rt.block_on(runner.run(request)).unwrap();
 
-  if let Some(materialize_directory) = args.value_of("materialize-output-to").map(PathBuf::from) {
-    rt.block_on(store.materialize_directory(materialize_directory, result.output_directory))
+  if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
+    rt.block_on(store.materialize_directory(output, result.output_directory))
       .unwrap();
   };
 
