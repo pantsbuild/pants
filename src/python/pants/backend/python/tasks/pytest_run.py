@@ -517,10 +517,10 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       with self.context.new_workunit(name='run',
                                      cmd=' '.join(pex.cmdline(args)),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
-        rc = self.spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
+        rc = self._spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
         return PytestResult.rc(rc)
     except ErrorWhileTesting:
-      # spawn_and_wait wraps the test runner in a timeout, so it could
+      # _spawn_and_wait wraps the test runner in a timeout, so it could
       # fail with a ErrorWhileTesting. We can't just set PythonTestResult
       # to a failure because the resultslog doesn't have all the failures
       # when tests are killed with a timeout. Therefore we need to re-raise
