@@ -1,1 +1,11 @@
-python_library()
+python_library(
+  dependencies=[
+    'src/python/pants/backend/python/subsystems',
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:isolated_process',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/rules/core',
+  ],
+)

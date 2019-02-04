@@ -1,9 +1,180 @@
 Master Pre-Releases
 ===================
 
-This document describes ``dev`` releases which occur weekly from master, and which do
-not undergo the vetting associated with ``stable`` releases.
+This document describes development releases which occur weekly from master, and which have
+not undergone the vetting associated with ``stable`` releases.
 
+
+1.14.0rc0 (2/01/2019)
+---------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for trace propagation from Pants callers (#7177)
+  `PR #7177 <https://github.com/pantsbuild/pants/pull/7177>`_
+
+* Add scala_exclude to append the Scala major version in BUILD files. (#7189)
+  `PR #7189 <https://github.com/pantsbuild/pants/pull/7189>`_
+
+* fetch native libraries from python requirements, e.g. tensorflow to define custom operators (#7046)
+  `PR #7046 <https://github.com/pantsbuild/pants/pull/7046>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Add toolchain_variant on native target level (#7179)
+  `PR #7179 <https://github.com/pantsbuild/pants/pull/7179>`_
+
+* Bump to future==0.17.1 (#7159)
+  `PR #7159 <https://github.com/pantsbuild/pants/pull/7159>`_
+
+* Move dependencies that are only consumed by examples/testprojects out of core pants. (#7174)
+  `PR #7174 <https://github.com/pantsbuild/pants/pull/7174>`_
+
+* Loosen glob type bounds so that OrderedSet is fine (#7166)
+  `PR #7166 <https://github.com/pantsbuild/pants/pull/7166>`_
+
+Bugfixes
+~~~~~~~~
+
+* Set default PY in cargo wrapper (#7195)
+  `PR #7195 <https://github.com/pantsbuild/pants/pull/7195>`_
+
+* Consume the PyTest Subsystem to stabilize the pytest version. (#7193)
+  `PR #7193 <https://github.com/pantsbuild/pants/pull/7193>`_
+
+* Fix setting conan remotes (#7191)
+  `PR #7191 <https://github.com/pantsbuild/pants/pull/7191>`_
+
+* Add setup workunit to critical_path_timings for all main workunits (#7184)
+  `PR #7184 <https://github.com/pantsbuild/pants/pull/7184>`_
+
+* Fix test_pantsd_integration (#7175)
+  `PR #7175 <https://github.com/pantsbuild/pants/pull/7175>`_
+
+* Work around multi-python pex issues for checker. (#7178)
+  `PR #7178 <https://github.com/pantsbuild/pants/pull/7178>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove unused operation wrapper (#7194)
+  `PR #7194 <https://github.com/pantsbuild/pants/pull/7194>`_
+
+* Refactor packages.py in preparation for adding Python 3 support (#7190)
+  `PR #7190 <https://github.com/pantsbuild/pants/pull/7190>`_
+
+* Add ability to specify Python minor version when running `./pants` (#7187)
+  `PR #7187 <https://github.com/pantsbuild/pants/pull/7187>`_
+
+* [junit-runner] extracted refactoring from sec mgr change (#6860)
+  `PR #6860 <https://github.com/pantsbuild/pants/pull/6860>`_
+
+* virtualenv always finds git root (#7173)
+  `PR #7173 <https://github.com/pantsbuild/pants/pull/7173>`_
+
+* Don't re-panic in mock execution server (#7167)
+  `PR #7167 <https://github.com/pantsbuild/pants/pull/7167>`_
+
+* Engine can store python OrderedSets (#7165)
+  `PR #7165 <https://github.com/pantsbuild/pants/pull/7165>`_
+
+* Error on all rust warnings (#7154)
+  `PR #7154 <https://github.com/pantsbuild/pants/pull/7154>`_
+
+* Start testing pre commit hooks (#7118)
+  `PR #7118 <https://github.com/pantsbuild/pants/pull/7118>`_
+
+* Remove scala_repl_integration and testprojects_integration from Python 3 blacklist (#7169)
+  `PR #7169 <https://github.com/pantsbuild/pants/pull/7169>`_
+
+1.14.0.dev3 (1/27/2019)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* make GoTest subclass PartitionedTestRunnerTaskMixin to test transitively (#7145)
+  `PR #7145 <https://github.com/pantsbuild/pants/pull/7145>`_
+
+* Take deploy_jar_rules into account when detecting duplicates (#7113)
+  `PR #7113 <https://github.com/pantsbuild/pants/pull/7113>`_
+
+* Add Zipkin tracing to pants v1 (#7125)
+  `PR #7125 <https://github.com/pantsbuild/pants/pull/7125>`_
+
+* Allow options to be logged to stats server (#7119)
+  `PR #7119 <https://github.com/pantsbuild/pants/pull/7119>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Bump pyzipkin to 0.17.0 (#7161)
+  `PR #7161 <https://github.com/pantsbuild/pants/pull/7161>`_
+
+* remove support for using the pants native toolchain with distutils Extensions in setup.py (#7126)
+  `PR #7126 <https://github.com/pantsbuild/pants/pull/7126>`_
+
+* Bump cucumber version to get jar with correct unicode encoding  (#7134)
+  `Issue #7123. <https://github.com/pantsbuild/pants/issues/7123.>`_
+  `PR #7134 <https://github.com/pantsbuild/pants/pull/7134>`_
+
+Bugfixes
+~~~~~~~~
+
+* blacklist idea plugin gen from faulty earlier edit (#7157)
+  `PR #7157 <https://github.com/pantsbuild/pants/pull/7157>`_
+
+* Add Python 3 support to Pytest with V2 engine (#7153)
+  `PR #7153 <https://github.com/pantsbuild/pants/pull/7153>`_
+
+* Fix Py2 regression with rjust argument (#7132)
+  `PR #7132 <https://github.com/pantsbuild/pants/pull/7132>`_
+
+* v2 python test execution fails if resolve process fails (#7135)
+  `PR #7135 <https://github.com/pantsbuild/pants/pull/7135>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fixes to get contrib, lint, JVM tests, and platform-specific tests working with ./pants3 (#7067)
+  `PR #7067 <https://github.com/pantsbuild/pants/pull/7067>`_
+
+* Properly handle unicode and byte streams with pantsd for Python 3 (#7130)
+  `PR #7130 <https://github.com/pantsbuild/pants/pull/7130>`_
+
+* populate parent directories of process outputs locally to match remote execution api (#7133)
+  `PR #7133 <https://github.com/pantsbuild/pants/pull/7133>`_
+
+* Fix test_jvm_platform_analysis_integration.py using unknown platforms (#7140)
+  `Issue #7139 <https://github.com/pantsbuild/pants/issues/7139>`_
+  `PR #7140 <https://github.com/pantsbuild/pants/pull/7140>`_
+
+* Remove option integration test from Python 3 blacklist (#7142)
+  `PR #7142 <https://github.com/pantsbuild/pants/pull/7142>`_
+
+* Fix Idea plugin unicode issues with Python 3 (#7141)
+  `PR #7141 <https://github.com/pantsbuild/pants/pull/7141>`_
+  `PR #7157 <https://github.com/pantsbuild/pants/pull/7157>`_
+
+* Fix legacy graph test Python 3 issue with rendering unicode literals (#7143)
+  `PR #7143 <https://github.com/pantsbuild/pants/pull/7143>`_
+
+* Fix setup_py.py unicode issue with Python 3 (#7144)
+  `PR #7144 <https://github.com/pantsbuild/pants/pull/7144>`_
+
+* Fix various backend/jvm/task Python 3 and unicode issues (#7124)
+  `PR #7124 <https://github.com/pantsbuild/pants/pull/7124>`_
+
+* refactor ImportJarsMixin into ImportRemoteSourcesMixin for extensibility (same with tasks) (#7061)
+  `PR #7061 <https://github.com/pantsbuild/pants/pull/7061>`_
+
+* Ignore 3rd party deprecation warnings for unmaintained libraries (#7110)
+  `PR #7110 <https://github.com/pantsbuild/pants/pull/7110>`_
+
+* Update to rust 1.32.0 (#7094)
+  `PR #7094 <https://github.com/pantsbuild/pants/pull/7094>`_
 
 1.14.0.dev2 (1/19/2019)
 -----------------------

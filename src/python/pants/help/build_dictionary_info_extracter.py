@@ -10,6 +10,8 @@ import textwrap
 from builtins import object, range
 from collections import namedtuple
 
+from future.utils import PY3
+
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.util.collections_abc_backport import OrderedDict
@@ -175,7 +177,7 @@ class BuildDictionaryInfoExtracter(object):
   @classmethod
   def _get_function_args(cls, func):
     arg_descriptions = cls.get_arg_descriptions_from_docstring(func)
-    argspec = inspect.getargspec(func)
+    argspec = inspect.getfullargspec(func) if PY3 else inspect.getargspec(func)
     arg_names = argspec.args
     if arg_names and arg_names[0] in {'self', 'cls'}:
       arg_names = arg_names[1:]
@@ -190,7 +192,8 @@ class BuildDictionaryInfoExtracter(object):
       yield FunctionArg('*{}'.format(argspec.varargs), arg_descriptions.pop(argspec.varargs, None),
                         False, None)
 
-    if argspec.keywords:
+    kw = argspec.varkw if PY3 else argspec.keywords
+    if kw:
       # Any remaining arg_descriptions are for kwargs.
       for arg_name, descr in arg_descriptions.items():
         # Get the default value out of the description, if present.

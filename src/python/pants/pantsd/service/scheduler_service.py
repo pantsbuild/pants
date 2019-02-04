@@ -11,6 +11,7 @@ import sys
 import threading
 from builtins import open
 
+from future.utils import PY3
 from twitter.common.dirutil import Fileset
 
 from pants.init.target_roots_calculator import TargetRootsCalculator
@@ -135,7 +136,7 @@ class SchedulerService(PantsService):
     try:
       subscription, is_initial_event, files = (event['subscription'],
                                                event['is_fresh_instance'],
-                                               [f.decode('utf-8') for f in event['files']])
+                                               event['files'] if PY3 else [f.decode('utf-8') for f in event['files']])
     except (KeyError, UnicodeDecodeError) as e:
       self._logger.warn('%r raised by invalid watchman event: %s', e, event)
       return

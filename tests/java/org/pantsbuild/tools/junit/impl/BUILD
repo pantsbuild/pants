@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 junit_tests(
-  name='junit',
   dependencies=[
     '3rdparty:guava',
     '3rdparty:junit',

@@ -16,7 +16,8 @@ from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.base.workunit import WorkUnitLabel
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
-from pants.util.strutil import safe_shlex_join
+from pants.util.process_handler import subprocess
+from pants.util.strutil import ensure_binary, safe_shlex_join
 
 
 class PythonToolInstance(object):
@@ -27,9 +28,27 @@ class PythonToolInstance(object):
   def pex(self):
     return self._pex
 
+  def _pretty_cmdline(self, args):
+    return safe_shlex_join(self._pex.cmdline(args))
+
+  def output(self, args, stdin_payload=None, binary_mode=False, **kwargs):
+    process = self._pex.run(args,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            with_chroot=False,
+                            blocking=False,
+                            **kwargs)
+    if stdin_payload is not None:
+      stdin_payload = ensure_binary(stdin_payload)
+    (stdout, stderr) = process.communicate(input=stdin_payload)
+    if not binary_mode:
+      stdout = stdout.decode('utf-8')
+      stderr = stderr.decode('utf-8')
+    return (stdout, stderr, process.returncode, self._pretty_cmdline(args))
+
   @contextmanager
   def run_with(self, workunit_factory, args, **kwargs):
-    cmdline = safe_shlex_join(self._pex.cmdline(args))
+    cmdline = self._pretty_cmdline(args)
     with workunit_factory(cmd=cmdline) as workunit:
       exit_code = self._pex.run(args,
                                 stdout=workunit.output('stdout'),

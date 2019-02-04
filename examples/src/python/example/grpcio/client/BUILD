@@ -4,8 +4,7 @@
 python_binary(
   name='service',
   dependencies=[
-    '3rdparty/python:grpcio',
-
+    'examples/3rdparty/python:grpcio',
     'examples/src/protobuf/org/pantsbuild/example/grpcio/service',
   ],
   source='service_client.py',
@@ -14,8 +13,7 @@ python_binary(
 python_binary(
   name='imports',
   dependencies=[
-    '3rdparty/python:grpcio',
-
+    'examples/3rdparty/python:grpcio',
     'examples/src/protobuf/org/pantsbuild/example/grpcio/imports',
   ],
   source='imports_client.py',

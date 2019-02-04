@@ -21,7 +21,11 @@ class Exclude(object):
       everything if unspecified.
     """
     self.org = org
-    self.name = name
+    self._name = name
+
+  @property
+  def name(self):
+    return self._name
 
   def __eq__(self, other):
     return all([other,

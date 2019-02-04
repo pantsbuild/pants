@@ -3,11 +3,19 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 # This bootstrap script invokes Pants using a Python 3 interpreter.
+#
+# To constrain to a specific Python 3 version, such as 3.7, prefix the script with `PY=python3.7`.
 
-# Use Py3 under-the-hood
-export PANTS_USE_PYTHON3=true
+# Default to using Python 3 if not otherwise specified.
+export PY="${PY:-python3}"
 
-# Use Py3 for subprocesses
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS='["CPython>=3.6,<4"]'
+# Set interpreter constraints to exactly match the interpreter used for the venv.
+# Note that $PY only impacts which virtualenv we use for the parent Pants process; we must also set
+# PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS to constrain spawned subprocesses such as tests. Without
+# any interpreter constraints, we get the _Py_Dealloc exception (#6985) as Pants will try to use Python 2
+# for subprocesses. Without the exact constraints we set, we could end up using a different Python 3
+# minor version for subprocesses than we do for Pants.
+py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${py_major_minor}.*']"
 
 ./pants "$@"

@@ -71,6 +71,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
 ============================= test session starts ==============================
 platform SOME_TEXT
 rootdir: SOME_TEXT
+plugins: SOME_TEXT
 collected 1 item
 
 testprojects/tests/python/pants/dummies/test_pass.py .                   [100%]
@@ -90,6 +91,7 @@ testprojects/tests/python/pants/dummies:passing_target                          
 ============================= test session starts ==============================
 platform SOME_TEXT
 rootdir: SOME_TEXT
+plugins: SOME_TEXT
 collected 1 item
 
 testprojects/tests/python/pants/dummies/test_fail.py F                   [100%]
@@ -117,6 +119,7 @@ testprojects/tests/python/pants/dummies:failing_target                          
 ============================= test session starts ==============================
 platform SOME_TEXT
 rootdir: SOME_TEXT
+plugins: SOME_TEXT
 collected 1 item
 
 testprojects/tests/python/pants/dummies/test_with_source_dep.py .        [100%]
@@ -135,6 +138,7 @@ testprojects/tests/python/pants/dummies:target_with_source_dep                  
 ============================= test session starts ==============================
 platform SOME_TEXT
 rootdir: SOME_TEXT
+plugins: SOME_TEXT
 collected 1 item
 
 testprojects/tests/python/pants/dummies/test_with_thirdparty_dep.py .    [100%]
@@ -155,6 +159,7 @@ testprojects/tests/python/pants/dummies:target_with_thirdparty_dep              
 ============================= test session starts ==============================
 platform SOME_TEXT
 rootdir: SOME_TEXT
+plugins: SOME_TEXT
 collected 1 item
 
 testprojects/tests/python/pants/dummies/test_fail.py F                   [100%]
@@ -171,6 +176,7 @@ testprojects/tests/python/pants/dummies/test_fail.py:2: AssertionError
 ============================= test session starts ==============================
 platform SOME_TEXT
 rootdir: SOME_TEXT
+plugins: SOME_TEXT
 collected 1 item
 
 testprojects/tests/python/pants/dummies/test_pass.py .                   [100%]

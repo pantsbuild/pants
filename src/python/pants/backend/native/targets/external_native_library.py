@@ -107,7 +107,7 @@ class ExternalNativeLibrary(Target):
       warn_or_error('1.16.0.dev1',
                     'Raw strings as conan package descriptors',
                     hint='Use conan_requirement(...) instead! Error was: {}'.format(str(e)),
-                    stacklevel=2)
+                    stacklevel=2, context=0)
       packages = [ConanRequirement(s) if not isinstance(s, ConanRequirement) else s
                   for s in packages]
 

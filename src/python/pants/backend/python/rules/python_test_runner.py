@@ -8,11 +8,12 @@ import os.path
 import sys
 from builtins import str
 
+from pants.backend.python.subsystems.pytest import PyTest
 from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import TransitiveHydratedTarget
-from pants.engine.rules import rule
+from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get, Select
 from pants.rules.core.core_test_model import Status, TestResult
 
@@ -26,13 +27,22 @@ class PyTestResult(TestResult):
 
 # TODO: Support deps
 # TODO: Support resources
-@rule(PyTestResult, [Select(TransitiveHydratedTarget)])
-def run_python_test(transitive_hydrated_target):
+@rule(PyTestResult, [Select(TransitiveHydratedTarget), Select(PyTest)])
+def run_python_test(transitive_hydrated_target, pytest):
   target_root = transitive_hydrated_target.root
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
-  pex_snapshot = yield Get(Snapshot, UrlToFetch("https://github.com/pantsbuild/pex/releases/download/v1.5.2/pex27",
-                                                Digest('8053a79a5e9c2e6e9ace3999666c9df910d6289555853210c1bbbfa799c3ecda', 1757011)))
+  interpreter_major, interpreter_minor = sys.version_info[0:2]
+  pex_name, digest = {
+    (2, 7): ("pex27", Digest('0ecbf48e3e240a413189194a9f829aec10446705c84db310affe36e23e741dbc', 1812737)),
+    (3, 6): ("pex36", Digest('ba865e7ce7a840070d58b7ba24e7a67aff058435cfa34202abdd878e7b5d351d', 1812158)),
+    (3, 7): ("pex37", Digest('51bf8e84d5290fe5ff43d45be78d58eaf88cf2a5e995101c8ff9e6a73a73343d', 1813189))
+  }.get((interpreter_major, interpreter_minor), (None, None))
+  if pex_name is None:
+    raise ValueError("Current interpreter {}.{} is not supported, as there is no corresponding PEX to download.".format(interpreter_major, interpreter_minor))
+
+  pex_snapshot = yield Get(Snapshot,
+    UrlToFetch("https://github.com/pantsbuild/pex/releases/download/v1.6.1/{}".format(pex_name), digest))
 
   all_targets = [target_root] + [dep.root for dep in transitive_hydrated_target.dependencies]
 
@@ -50,17 +60,16 @@ def run_python_test(transitive_hydrated_target):
   # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
   python_binary = sys.executable
 
+  # TODO: This is non-hermetic because the requirements will be resolved on the fly by
+  # pex27, where it should be hermetically provided in some way.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   requirements_pex_argv = [
     './{}'.format(pex_snapshot.files[0].path),
     '--python', python_binary,
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
-    # TODO: This is non-hermetic because pytest will be resolved on the fly by pex27, where it should be hermetically provided in some way.
-    # We should probably also specify a specific version.
-    'pytest',
-    # Sort all the requirement strings to increase the chance of cache hits across invocations.
-  ] + sorted(all_requirements)
+    # Sort all user requirement strings to increase the chance of cache hits across invocations.
+  ] + list(pytest.get_requirement_strings()) + sorted(all_requirements)
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
     input_files=pex_snapshot.directory_digest,
@@ -102,4 +111,11 @@ def run_python_test(transitive_hydrated_target):
   # TODO: Do something with stderr?
   status = Status.SUCCESS if result.exit_code == 0 else Status.FAILURE
 
-  yield PyTestResult(status=status, stdout=str(result.stdout))
+  yield PyTestResult(status=status, stdout=result.stdout.decode('utf-8'))
+
+
+def rules():
+  return [
+      run_python_test,
+      optionable_rule(PyTest),
+    ]

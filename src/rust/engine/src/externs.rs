@@ -70,6 +70,12 @@ pub fn store_tuple(values: &[Value]) -> Value {
   with_externs(|e| (e.store_tuple)(e.context, handles.as_ptr(), handles.len() as u64).into())
 }
 
+#[allow(dead_code)]
+pub fn store_set<I: Iterator<Item = Value>>(values: I) -> Value {
+  let handles: Vec<_> = values.map(|v| &v as &Handle as *const Handle).collect();
+  with_externs(|e| (e.store_set)(e.context, handles.as_ptr(), handles.len() as u64).into())
+}
+
 ///
 /// Store a dict of values, which are stored in a slice alternating interleaved keys and values,
 /// i.e. stored (key0, value0, key1, value1, ...)
@@ -333,6 +339,7 @@ pub struct Externs {
   pub satisfied_by: SatisfiedByExtern,
   pub satisfied_by_type: SatisfiedByTypeExtern,
   pub store_tuple: StoreTupleExtern,
+  pub store_set: StoreTupleExtern,
   pub store_dict: StoreTupleExtern,
   pub store_bytes: StoreBytesExtern,
   pub store_utf8: StoreUtf8Extern,

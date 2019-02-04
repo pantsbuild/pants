@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.subsystems.native_build_step_settings import CppCompileSettings
+from pants.backend.native.subsystems.native_build_step import CppCompileSettings
 from pants.backend.native.targets.native_library import CppLibrary
 from pants.backend.native.tasks.native_compile import NativeCompile
 from pants.util.objects import SubclassesOf
@@ -30,5 +30,5 @@ class CppCompile(NativeCompile):
   def get_compile_settings(self):
     return CppCompileSettings.scoped_instance(self)
 
-  def get_compiler(self):
-    return self.get_cpp_toolchain_variant().cpp_compiler
+  def get_compiler(self, native_library_target):
+    return self.get_cpp_toolchain_variant(native_library_target).cpp_compiler

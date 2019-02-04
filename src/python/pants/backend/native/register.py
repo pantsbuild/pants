@@ -15,6 +15,7 @@ from pants.backend.native.targets.external_native_library import (ConanRequireme
                                                                   ExternalNativeLibrary)
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import CLibrary, CppLibrary
+from pants.backend.native.targets.packaged_native_library import PackagedNativeLibrary
 from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.conan_fetch import ConanFetch
 from pants.backend.native.tasks.conan_prep import ConanPrep
@@ -30,6 +31,7 @@ def build_file_aliases():
       CLibrary.alias(): CLibrary,
       CppLibrary.alias(): CppLibrary,
       ExternalNativeLibrary.alias(): ExternalNativeLibrary,
+      PackagedNativeLibrary.alias(): PackagedNativeLibrary,
     },
     objects={
       ConanRequirement.alias(): ConanRequirement,
@@ -46,7 +48,7 @@ def register_goals():
   # TODO(#5962): register these under the 'compile' goal when we eliminate the product transitive
   # dependency from export -> compile.
   task(name='conan-prep', action=ConanPrep).install('native-compile')
-  task(name='native-third-party-fetch', action=ConanFetch).install('native-compile')
+  task(name='conan-fetch', action=ConanFetch).install('native-compile')
   task(name='c-for-ctypes', action=CCompile).install('native-compile')
   task(name='cpp-for-ctypes', action=CppCompile).install('native-compile')
   task(name='shared-libraries', action=LinkSharedLibraries).install('link')

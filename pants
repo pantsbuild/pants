@@ -53,6 +53,9 @@ source ${HERE}/build-support/pants_venv
 # + bootstrap_native_code: Builds target-specific native engine binaries.
 source ${HERE}/build-support/bin/native/bootstrap_code.sh
 
+# Default to using Python 2.7 if not otherwise specified.
+export PY="${PY:-python2.7}"
+
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 
 if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then

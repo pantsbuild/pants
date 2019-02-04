@@ -8,8 +8,8 @@ import pkg_resources
 import pystache
 
 
-num_py3_integration_shards = 15
-num_py2_blacklist_integration_shards = 5
+num_py3_integration_shards = 19
+num_py2_blacklist_integration_shards = 1
 num_cron_integration_shards = 20
 
 

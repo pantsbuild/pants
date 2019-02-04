@@ -54,10 +54,6 @@ class NativeCompile(NativeTask, AbstractClass):
   def product_types(cls):
     return [ObjectFiles]
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(NativeCompile, cls).prepare(options, round_manager)
-
   @property
   def cache_target_dirs(self):
     return True
@@ -127,7 +123,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   @abstractmethod
   def get_compile_settings(self):
-    """Return an instance of NativeBuildStepSettings.
+    """Return an instance of NativeBuildStep.
 
     NB: Subclasses will be queried for the compile settings once and the result cached.
     """
@@ -137,7 +133,7 @@ class NativeCompile(NativeTask, AbstractClass):
     return self.get_compile_settings()
 
   @abstractmethod
-  def get_compiler(self):
+  def get_compiler(self, native_library_target):
     """An instance of `Executable` which can be invoked to compile files.
 
     NB: Subclasses will be queried for the compiler instance once and the result cached.
@@ -145,30 +141,35 @@ class NativeCompile(NativeTask, AbstractClass):
     :return: :class:`pants.backend.native.config.environment.Executable`
     """
 
-  @memoized_property
-  def _compiler(self):
-    return self.get_compiler()
+  def _compiler(self, native_library_target):
+    return self.get_compiler(native_library_target)
 
   def _make_compile_request(self, versioned_target):
     target = versioned_target.target
 
-    include_dirs = [
-      os.path.join(get_buildroot(), dep.address.spec_path)
-      for dep in self.native_deps(target)
-    ] + [
-      os.path.join(get_buildroot(), ext_dep.address.spec_path, ext_dep.include_relpath)
-      for ext_dep in self.packaged_native_deps(target)
-    ]
+    include_dirs = []
+    for dep in self.native_deps(target):
+      source_lib_base_dir = os.path.join(get_buildroot(),
+                                         dep._sources_field.rel_path)
+      include_dirs.append(source_lib_base_dir)
+    for ext_dep in self.packaged_native_deps(target):
+      external_lib_include_dir = os.path.join(get_buildroot(),
+                                              ext_dep._sources_field.rel_path,
+                                              ext_dep.include_relpath)
+      self.context.log.debug('ext_dep: {}, external_lib_include_dir: {}'
+                             .format(ext_dep, external_lib_include_dir))
+      include_dirs.append(external_lib_include_dir)
+
     sources_and_headers = self.get_sources_headers_for_target(target)
-    compiler_option_sets = (self._compile_settings.native_build_step_settings
+    compiler_option_sets = (self._compile_settings.native_build_step
                                 .get_compiler_option_sets_for_target(target))
 
     compile_request = NativeCompileRequest(
-      compiler=self._compiler,
+      compiler=self._compiler(target),
       include_dirs=include_dirs,
       sources=sources_and_headers,
       compiler_options=(self._compile_settings
-                            .native_build_step_settings
+                            .native_build_step
                             .get_merged_args_for_compiler_option_sets(compiler_option_sets)),
       output_dir=versioned_target.results_dir,
       header_file_extensions=self._compile_settings.header_file_extensions)

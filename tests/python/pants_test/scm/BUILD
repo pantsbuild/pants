@@ -3,7 +3,6 @@
 
 python_tests(
   name = 'test_git',
-  sources = ['test_git.py'],
   dependencies = [
     '3rdparty/python:future',
     'src/python/pants/scm',

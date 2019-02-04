@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(unused_must_use)]
+#![deny(warnings)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
 #![deny(
   clippy::all,
@@ -114,7 +114,7 @@ fn main() -> Result<(), CffiBuildError> {
   // When built with Python 2, it works with both Python 2 and Python 3.
   // So, we check to see if the under-the-hood interpreter has changed and rebuild the native engine
   // when needed.
-  println!("cargo:rerun-if-env-changed=PANTS_USE_PYTHON3");
+  println!("cargo:rerun-if-env-changed=PY");
 
   if cfg!(target_os = "linux") {
     println!("cargo:rustc-link-lib=static=stdc++");

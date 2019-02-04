@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(unused_must_use)]
+#![deny(warnings)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
 #![deny(
   clippy::all,
@@ -114,6 +114,7 @@ pub extern "C" fn externs_set(
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
   store_tuple: StoreTupleExtern,
+  store_set: StoreTupleExtern,
   store_dict: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
   store_utf8: StoreUtf8Extern,
@@ -140,6 +141,7 @@ pub extern "C" fn externs_set(
     satisfied_by,
     satisfied_by_type,
     store_tuple,
+    store_set,
     store_dict,
     store_bytes,
     store_utf8,

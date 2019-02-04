@@ -5,7 +5,7 @@
 python_grpcio_library(
   sources=['imports.proto'],
   dependencies=[
-    '3rdparty/python:protobuf',
+    'examples/3rdparty/python:protobuf',
     'examples/src/protobuf/org/pantsbuild/example/grpcio/service'
   ]
 )

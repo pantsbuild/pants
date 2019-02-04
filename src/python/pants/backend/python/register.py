@@ -8,13 +8,14 @@ from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
-from pants.backend.python.rules.python_test_runner import run_python_test
+from pants.backend.python.rules import python_test_runner
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
+from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -31,6 +32,7 @@ from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.backend.python.tasks.setup_py import SetupPy
+from pants.backend.python.tasks.unpack_wheels import UnpackWheels
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -46,6 +48,7 @@ def build_file_aliases():
       PythonDistribution.alias(): PythonDistribution,
       'python_requirement_library': PythonRequirementLibrary,
       Resources.alias(): Resources,
+      UnpackedWheels.alias(): UnpackedWheels,
     },
     objects={
       'python_requirement': PythonRequirement,
@@ -74,7 +77,8 @@ def register_goals():
   task(name='isort-prep', action=IsortPrep).install('fmt')
   task(name='isort', action=IsortRun).install('fmt')
   task(name='py', action=PythonBundle).install('bundle')
+  task(name='unpack-wheels', action=UnpackWheels).install()
 
 
 def rules():
-  return (run_python_test,)
+  return tuple(python_test_runner.rules())
