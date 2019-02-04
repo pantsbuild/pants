@@ -52,10 +52,10 @@ impl CommandRunner {
     let output_paths: Result<Vec<String>, String> = output_dir_paths
       .into_iter()
       .flat_map(|p| {
-        let mut s = p.into_os_string();
-        let s_dir = s.clone();
-        s.push("/**");
-        vec![s_dir, s]
+        let mut dir = p.into_os_string();
+        let dir_glob = dir.clone();
+        dir.push("/**");
+        vec![dir_glob, dir]
       })
       .chain(output_file_paths.into_iter().map(|p| p.into_os_string()))
       .map(|s| {
@@ -847,7 +847,7 @@ mod tests {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: TestDirectory::nested().digest(),
+        output_directory: TestDirectory::nested_dir_and_file().digest(),
         execution_attempts: vec![],
       }
     )
@@ -856,11 +856,15 @@ mod tests {
   #[test]
   fn output_empty_dir() {
     let result = run_command_locally(ExecuteProcessRequest {
-      argv: vec![find_bash(), "-c".to_owned(), "/bin/mkdir dogs".to_string()],
+      argv: vec![
+        find_bash(),
+        "-c".to_owned(),
+        "/bin/mkdir falcons".to_string(),
+      ],
       env: BTreeMap::new(),
       input_files: fs::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
-      output_directories: vec![PathBuf::from("dogs")].into_iter().collect(),
+      output_directories: vec![PathBuf::from("falcons")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
@@ -872,7 +876,7 @@ mod tests {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: TestDirectory::containing_cats_dir().digest(),
+        output_directory: TestDirectory::containing_falcons_dir().digest(),
         execution_attempts: vec![],
       }
     )
