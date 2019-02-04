@@ -1,10 +1,10 @@
 # Python gRPC + protobufs
 
 ## Problem
-I would like to have a task, to generate python code from protobufs and grpc services.
+You have `.proto` files defining protobufs and grpc services and you want Pants to generate Python code from them that you can use from a Python application.
 
 ## Solution
-There is a new codegen task grpcio-run, to execute python's grpcio library https://grpc.io/ and generate python code from .proto files.
+Create `python_grpc_library` targets and use the gen goal to generate code from the `.proto` files. There is a codegen task grpcio-run, that uses Python's grpcio library https://grpc.io/ and generates python code from .proto files.
 
 ## Usage
 
@@ -19,7 +19,7 @@ python_grpcio_library(
 )
 ```
 
-Then, you can relay on this target in your python code `BUILD` file `dependencies` section:
+Then, you can add a dependency on this target in your python binary's `BUILD` file `dependencies` section:
 
 ```build
 python_binary(
@@ -32,7 +32,7 @@ python_binary(
 ```
 
 ## Example:
-Respectful examples can be found in /examples/src/python/example/grpcio
+An example Python grpc client/server can be found in /examples/src/python/example/grpcio
 
 to create a gRPC server execute
 ```bash
