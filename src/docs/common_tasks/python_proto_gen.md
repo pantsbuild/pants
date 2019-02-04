@@ -32,7 +32,7 @@ python_binary(
 ```
 
 ## Example:
-An example Python grpc client/server can be found in /examples/src/python/example/grpcio
+An example Python grpc client/server can be found in [/examples/src/python/example/grpcio](https://github.com/pantsbuild/pants/tree/master/examples/src/python/example/grpcio)
 
 to create a gRPC server execute
 ```bash

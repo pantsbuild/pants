@@ -14,7 +14,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 def build_file_aliases():
   return BuildFileAliases(
     targets={
-      PythonGrpcioLibrary.alias(): PythonGrpcioLibrary,
+      'python_grpcio_library': PythonGrpcioLibrary,
     }
   )
 
