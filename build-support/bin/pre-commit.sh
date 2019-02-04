@@ -9,6 +9,14 @@ then
     export GIT_HOOK=1
 fi
 
+# Commit hooks set $GIT_DIR by default to .git
+# This causes git commands (notably, git rev-parse --show-toplevel) to fail if the script isn't
+# running in the git root, as it looks for a .git directory relative to the working directory.
+# Explicitly absolute-ify the $GIT_DIR variable so that this doesn't happen.
+if [[ -n "${GIT_DIR}" && "${GIT_DIR}" != /* ]]; then
+  export GIR_DIR="$(pwd)/${GIT_DIR}"
+fi
+
 DIRS_TO_CHECK=(
   src
   tests
