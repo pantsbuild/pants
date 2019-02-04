@@ -52,10 +52,10 @@ impl CommandRunner {
     let output_paths: Result<Vec<String>, String> = output_dir_paths
       .into_iter()
       .flat_map(|p| {
-        let mut dir = p.into_os_string();
-        let dir_glob = dir.clone();
-        dir.push("/**");
-        vec![dir_glob, dir]
+        let mut dir_glob = p.into_os_string();
+        let dir = dir_glob.clone();
+        dir_glob.push("/**");
+        vec![dir, dir_glob]
       })
       .chain(output_file_paths.into_iter().map(|p| p.into_os_string()))
       .map(|s| {
