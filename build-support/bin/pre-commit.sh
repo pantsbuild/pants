@@ -55,8 +55,7 @@ echo "* Checking for bad shell patterns" && ./build-support/bin/check_shell.sh |
 
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
-master_present=$(git rev-parse --verify master > /dev/null 2>&1 || echo "Nope!")
-if [[ "$master_present" != "Nope!" ]]; then
+if git rev-parse --verify "master" &>/dev/null; then
   echo "* Checking imports" && ./build-support/bin/isort.sh || \
     die "To fix import sort order, run \`\"$(pwd)/build-support/bin/isort.sh\" -f\`"
 
