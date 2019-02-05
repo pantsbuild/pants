@@ -54,6 +54,8 @@ done
 py_version_number="2.7"
 if [[ "${python_three}" == "true" ]]; then
   py_version_number="3.6"
+  # N.B. We must set this to constrain spawned subprocesses to also use Python 3.
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6','CPython<4']"
 fi
 PY=$(which "python${py_version_number}" || exit 0)
 [[ -n "${PY}" ]] || die "You must have python2.7 or python3.6 installed and on the path to release."
