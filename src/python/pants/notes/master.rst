@@ -1,9 +1,93 @@
 Master Pre-Releases
 ===================
 
-This document describes ``dev`` releases which occur weekly from master, and which do
-not undergo the vetting associated with ``stable`` releases.
+This document describes development releases which occur weekly from master, and which have
+not undergone the vetting associated with ``stable`` releases.
 
+
+1.14.0rc0 (2/01/2019)
+---------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for trace propagation from Pants callers (#7177)
+  `PR #7177 <https://github.com/pantsbuild/pants/pull/7177>`_
+
+* Add scala_exclude to append the Scala major version in BUILD files. (#7189)
+  `PR #7189 <https://github.com/pantsbuild/pants/pull/7189>`_
+
+* fetch native libraries from python requirements, e.g. tensorflow to define custom operators (#7046)
+  `PR #7046 <https://github.com/pantsbuild/pants/pull/7046>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Add toolchain_variant on native target level (#7179)
+  `PR #7179 <https://github.com/pantsbuild/pants/pull/7179>`_
+
+* Bump to future==0.17.1 (#7159)
+  `PR #7159 <https://github.com/pantsbuild/pants/pull/7159>`_
+
+* Move dependencies that are only consumed by examples/testprojects out of core pants. (#7174)
+  `PR #7174 <https://github.com/pantsbuild/pants/pull/7174>`_
+
+* Loosen glob type bounds so that OrderedSet is fine (#7166)
+  `PR #7166 <https://github.com/pantsbuild/pants/pull/7166>`_
+
+Bugfixes
+~~~~~~~~
+
+* Set default PY in cargo wrapper (#7195)
+  `PR #7195 <https://github.com/pantsbuild/pants/pull/7195>`_
+
+* Consume the PyTest Subsystem to stabilize the pytest version. (#7193)
+  `PR #7193 <https://github.com/pantsbuild/pants/pull/7193>`_
+
+* Fix setting conan remotes (#7191)
+  `PR #7191 <https://github.com/pantsbuild/pants/pull/7191>`_
+
+* Add setup workunit to critical_path_timings for all main workunits (#7184)
+  `PR #7184 <https://github.com/pantsbuild/pants/pull/7184>`_
+
+* Fix test_pantsd_integration (#7175)
+  `PR #7175 <https://github.com/pantsbuild/pants/pull/7175>`_
+
+* Work around multi-python pex issues for checker. (#7178)
+  `PR #7178 <https://github.com/pantsbuild/pants/pull/7178>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove unused operation wrapper (#7194)
+  `PR #7194 <https://github.com/pantsbuild/pants/pull/7194>`_
+
+* Refactor packages.py in preparation for adding Python 3 support (#7190)
+  `PR #7190 <https://github.com/pantsbuild/pants/pull/7190>`_
+
+* Add ability to specify Python minor version when running `./pants` (#7187)
+  `PR #7187 <https://github.com/pantsbuild/pants/pull/7187>`_
+
+* [junit-runner] extracted refactoring from sec mgr change (#6860)
+  `PR #6860 <https://github.com/pantsbuild/pants/pull/6860>`_
+
+* virtualenv always finds git root (#7173)
+  `PR #7173 <https://github.com/pantsbuild/pants/pull/7173>`_
+
+* Don't re-panic in mock execution server (#7167)
+  `PR #7167 <https://github.com/pantsbuild/pants/pull/7167>`_
+
+* Engine can store python OrderedSets (#7165)
+  `PR #7165 <https://github.com/pantsbuild/pants/pull/7165>`_
+
+* Error on all rust warnings (#7154)
+  `PR #7154 <https://github.com/pantsbuild/pants/pull/7154>`_
+
+* Start testing pre commit hooks (#7118)
+  `PR #7118 <https://github.com/pantsbuild/pants/pull/7118>`_
+
+* Remove scala_repl_integration and testprojects_integration from Python 3 blacklist (#7169)
+  `PR #7169 <https://github.com/pantsbuild/pants/pull/7169>`_
 
 1.14.0.dev3 (1/27/2019)
 -----------------------

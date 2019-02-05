@@ -74,6 +74,41 @@ impl TestDirectory {
 
   // Directory structure:
   //
+  // /falcons/
+  pub fn containing_falcons_dir() -> TestDirectory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_directories().push({
+      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
+      subdir.set_name("falcons".to_string());
+      subdir.set_digest((&TestDirectory::empty().digest()).into());
+      subdir
+    });
+    TestDirectory { directory }
+  }
+
+  // Directory structure:
+  //
+  // birds/falcons/
+  // cats/roland
+  pub fn nested_dir_and_file() -> TestDirectory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_directories().push({
+      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
+      subdir.set_name("birds".to_string());
+      subdir.set_digest((&TestDirectory::containing_falcons_dir().digest()).into());
+      subdir
+    });
+    directory.mut_directories().push({
+      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
+      subdir.set_name("cats".to_string());
+      subdir.set_digest((&TestDirectory::containing_roland().digest()).into());
+      subdir
+    });
+    TestDirectory { directory }
+  }
+
+  // Directory structure:
+  //
   // /roland
   pub fn containing_roland() -> TestDirectory {
     let mut directory = bazel_protos::remote_execution::Directory::new();

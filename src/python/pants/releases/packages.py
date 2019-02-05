@@ -261,8 +261,8 @@ def _create_parser():
   parser_list.add_argument("--with-packages", action="store_true")
   # list-owners
   subparsers.add_parser("list-owners")
-  # check-ownership
-  subparsers.add_parser("check-ownership")
+  # check-my-ownership
+  subparsers.add_parser("check-my-ownership")
   # build_and_print
   parser_build_and_print = subparsers.add_parser("build_and_print")
   parser_build_and_print.add_argument("version")
