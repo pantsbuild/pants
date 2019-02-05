@@ -24,7 +24,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import \
   JavaThriftLibraryFingerprintStrategy
-from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
+from pants.contrib.scrooge.tasks.thrift_util import calculate_include_paths
 
 
 class ScroogeGen(SimpleCodegenTask, NailgunTask):
@@ -148,7 +148,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     self.gen(partial_cmd, target, target_workdir)
 
   def gen(self, partial_cmd, target, target_workdir):
-    import_paths, _ = calculate_compile_sources([target], self.is_gentarget)
+    import_paths = calculate_include_paths([target], self.is_gentarget)
 
     args = list(partial_cmd.compiler_args)
 
