@@ -92,15 +92,14 @@ def find_platform_name():
 
 
 def core_packages(py3):
-  # N.B. When releasing with Python 3, we allow pantsbuild.pants to work with any Python 3 version
-  # >= 3.6. We are able to get this future compatibility by specifing
-  # `abi3` because in `src/rust/engine/src/cffi/native_engine.c` we set up `Py_LIMITED_API` and when
-  # used in conjunction with the `abi3` tag the binary will be compatible with any future Python 3 version.
-  # See https://docs.python.org/3/c-api/stable.html for documentation.
-  interpreter_flag = "cp36" if py3 else "cp27"
-  bdist_wheel_flags = ("--python-tag", interpreter_flag, "--plat-name", find_platform_name())
-  if py3:
-    bdist_wheel_flags = bdist_wheel_flags + ("--py-limited-api", "cp36")
+  # N.B. When releasing with Python 3, we constrain the ABI (Application Binary Interface) to cp36 to allow
+  # pantsbuild.pants to work with any Python 3 version>= 3.6. We are able to get this future compatibility by
+  # specifing `abi3`, which signifies any version >= 3.6 must work. This is possible to set because in
+  # `src/rust/engine/src/cffi/native_engine.c` we set up `Py_LIMITED_API` and in `src/python/pants/BUILD` we
+  # set ext_modules, which together allows us to mark the abi tag. See https://docs.python.org/3/c-api/stable.html
+  # for documentation and https://bitbucket.org/pypa/wheel/commits/1f63b534d74b00e8c2e8809f07914f6da4502490?at=default#Ldocs/index.rstT121
+  # for how to mark the ABI through the wheel program.
+  bdist_wheel_flags = ("--py-limited-api", "cp36") if py3 else ("--python-tag", "cp27", "--plat-name", find_platform_name())
   return {
     Package("pantsbuild.pants", "//src/python/pants:pants-packaged", bdist_wheel_flags=bdist_wheel_flags),
     Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
