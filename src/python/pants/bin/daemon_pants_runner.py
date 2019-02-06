@@ -231,6 +231,7 @@ class DaemonPantsRunner(ProcessManager):
       ) as finalizer:
         yield finalizer
 
+  # TODO: there's no testing for this method, and this caused a user-visible failure -- see #7008!
   def _raise_deferred_exc(self):
     """Raises deferred exceptions from the daemon's synchronous path in the post-fork client."""
     if self._deferred_exception:
