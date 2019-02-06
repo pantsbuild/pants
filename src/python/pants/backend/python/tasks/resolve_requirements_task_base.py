@@ -13,8 +13,10 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.subsystems import pex_build_util
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -36,11 +38,16 @@ class ResolveRequirementsTaskBase(Task):
     return super(ResolveRequirementsTaskBase, cls).subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonNativeCode.scoped(cls),
+      PythonSetup.scoped(cls),
     )
 
   @memoized_property
   def _python_native_code_settings(self):
     return PythonNativeCode.scoped_instance(self)
+
+  @memoized_property
+  def _python_setup(self):
+    return PythonSetup.global_instance()
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -70,11 +77,11 @@ class ResolveRequirementsTaskBase(Task):
 
       # We need to ensure that we are resolving for only the current platform if we are
       # including local python dist targets that have native extensions.
-      tgts = self.context.targets()
-      if self._python_native_code_settings.check_build_for_current_platform_only(tgts):
-        maybe_platforms = ['current']
+      targets_by_platform = pex_build_util.targets_by_platform(self.context.targets(), self._python_setup)
+      if self._python_native_code_settings.check_build_for_current_platform_only(targets_by_platform):
+        platforms = ['current']
       else:
-        maybe_platforms = None
+        platforms = list(sorted(targets_by_platform.keys()))
 
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
       # Note that we check for the existence of the directory, instead of for invalid_vts,
@@ -84,7 +91,7 @@ class ResolveRequirementsTaskBase(Task):
           pex_builder = PexBuilderWrapper.Factory.create(
             builder=PEXBuilder(path=safe_path, interpreter=interpreter, copy=True),
             log=self.context.log)
-          pex_builder.add_requirement_libs_from(req_libs, platforms=maybe_platforms)
+          pex_builder.add_requirement_libs_from(req_libs, platforms=platforms)
           pex_builder.freeze()
     return PEX(path, interpreter=interpreter)
 

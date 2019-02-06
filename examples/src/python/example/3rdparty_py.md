@@ -80,6 +80,9 @@ with which your binary is intended to be compatible in the `platforms` field of 
 <a href="https://pip.pypa.io/en/stable/reference/pip_wheel/">wheel</a> files for each package
 and platform available at build time.
 
+Pants will use the explicitly specified `platforms` field of your <a pantsref="bdict_python_binary">`python_binary`</a>
+target if set for both itself and its dependencies, or will otherwise fall back to the `python-setup.platforms` option value.
+
 Pants will look for those files in the location specified in the
 [[`python-repos`|pants('src/docs:setup_repo')#redirecting-python-requirements-to-other-servers]] field
 in pants.ini. It can understand either a simple local directory of .whl files or a "find links"-friendly
