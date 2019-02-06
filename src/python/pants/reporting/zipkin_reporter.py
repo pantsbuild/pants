@@ -10,7 +10,7 @@ import requests
 from py_zipkin import Encoding
 from py_zipkin.transport import BaseTransportHandler
 from py_zipkin.util import generate_random_64bit_string
-from py_zipkin.zipkin import ZipkinAttrs, zipkin_span
+from py_zipkin.zipkin import ZipkinAttrs, create_attrs_for_span, zipkin_span
 
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.reporter import Reporter
@@ -42,7 +42,7 @@ class ZipkinReporter(Reporter):
     Reporter that implements Zipkin tracing.
   """
 
-  def __init__(self, run_tracker, settings, endpoint, trace_id, parent_id):
+  def __init__(self, run_tracker, settings, endpoint, trace_id, parent_id, sample_rate):
     """
     When trace_id and parent_id are set a Zipkin trace will be created with given trace_id
     and parent_id. If trace_id and parent_id are set to None, a trace_id will be randomly
@@ -53,6 +53,7 @@ class ZipkinReporter(Reporter):
     :param string endpoint: The full HTTP URL of a zipkin server to which traces should be posted.
     :param string trace_id: The overall 64 or 128-bit ID of the trace. May be None.
     :param string parent_id: The 64-bit ID for a parent span that invokes Pants. May be None.
+    :param float sample_rate: Rate at which to sample Zipkin traces. Value 0.0 - 100.0.
     """
     super(ZipkinReporter, self).__init__(run_tracker, settings)
     # We keep track of connection between workunits and spans
@@ -61,6 +62,7 @@ class ZipkinReporter(Reporter):
     self.handler = HTTPTransportHandler(endpoint)
     self.trace_id = trace_id
     self.parent_id = parent_id
+    self.sample_rate = float(sample_rate)
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -84,13 +86,14 @@ class ZipkinReporter(Reporter):
           is_sampled=True,
         )
       else:
-        zipkin_attrs = None
+        zipkin_attrs =  create_attrs_for_span(
+          sample_rate=self.sample_rate, # Value between 0.0 and 100.0
+        )
 
       span = zipkin_span(
         service_name=service_name,
         span_name=workunit.name,
         transport_handler=self.handler,
-        sample_rate=100.0, # Value between 0.0 and 100.0
         encoding=Encoding.V1_THRIFT,
         zipkin_attrs=zipkin_attrs
       )
@@ -104,7 +107,7 @@ class ZipkinReporter(Reporter):
     # Goals and tasks save their start time at the beginning of their run.
     # This start time is passed to workunit, because the workunit may be created much later.
     span.start_timestamp = workunit.start_time
-    if first_span:
+    if first_span and span.zipkin_attrs.is_sampled:
       span.logging_context.start_timestamp = workunit.start_time
 
   def end_workunit(self, workunit):
