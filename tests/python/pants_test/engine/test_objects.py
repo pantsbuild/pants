@@ -27,5 +27,5 @@ field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(
     IntOrStringColl = Collection.of(int, text_type)
     self.assertEqual([3, "hello"], [x for x in IntOrStringColl([3, "hello"])])
     with self.assertRaisesRegexp(TypeCheckError, re.escape("""\
-field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int, unicode)) matching iterable object [{}]: value {} (with type 'dict') must satisfy this type constraint: Exactly(int, unicode).""")):
+field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int, unicode)) matching iterable object [{}]: value {} (with type 'dict') must satisfy this type constraint: Exactly(int or unicode).""")):
       IntOrStringColl([{}])

@@ -61,12 +61,12 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
   _ERR_TARGETS = {
     'testprojects/src/python/sources:some-missing-some-not': [
       "globs('*.txt', '*.rs')",
-      "Snapshot(PathGlobs(include=({unicode_literal}\'testprojects/src/python/sources/*.txt\', {unicode_literal}\'testprojects/src/python/sources/*.rs\'), exclude=(), glob_match_error_behavior<=GlobMatchErrorBehavior>=GlobMatchErrorBehavior(failure_behavior=error), conjunction<=GlobExpansionConjunction>=GlobExpansionConjunction(conjunction=all_match)))".format(unicode_literal='u' if PY2 else ''),
+      "Snapshot(PathGlobs(include=({unicode_literal}\'testprojects/src/python/sources/*.txt\', {unicode_literal}\'testprojects/src/python/sources/*.rs\'), exclude=(), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(failure_behavior=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(conjunction=all_match)))".format(unicode_literal='u' if PY2 else ''),
       "Globs did not match. Excludes were: []. Unmatched globs were: [\"testprojects/src/python/sources/*.rs\"].",
     ],
     'testprojects/src/python/sources:missing-sources': [
       "*.scala",
-      "Snapshot(PathGlobs(include=({unicode_literal}\'testprojects/src/python/sources/*.scala\',), exclude=({unicode_literal}\'testprojects/src/python/sources/*Test.scala\', {unicode_literal}\'testprojects/src/python/sources/*Spec.scala\'), glob_match_error_behavior<=GlobMatchErrorBehavior>=GlobMatchErrorBehavior(failure_behavior=error), conjunction<=GlobExpansionConjunction>=GlobExpansionConjunction(conjunction=any_match)))".format(unicode_literal='u' if PY2 else ''),
+      "Snapshot(PathGlobs(include=({unicode_literal}\'testprojects/src/python/sources/*.scala\',), exclude=({unicode_literal}\'testprojects/src/python/sources/*Test.scala\', {unicode_literal}\'testprojects/src/python/sources/*Spec.scala\'), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(failure_behavior=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(conjunction=any_match)))".format(unicode_literal='u' if PY2 else ''),
       "Globs did not match. Excludes were: [\"testprojects/src/python/sources/*Test.scala\", \"testprojects/src/python/sources/*Spec.scala\"]. Unmatched globs were: [\"testprojects/src/python/sources/*.scala\"].",
     ],
     'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-bundle-fileset': [
@@ -75,7 +75,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
       "Globs('*.aaaa')",
       "ZGlobs('**/*.abab')",
       "['file1.aaaa', 'file2.aaaa']",
-      "Snapshot(PathGlobs(include=({unicode_literal}\'testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa\',), exclude=(), glob_match_error_behavior<=GlobMatchErrorBehavior>=GlobMatchErrorBehavior(failure_behavior=error), conjunction<=GlobExpansionConjunction>=GlobExpansionConjunction(conjunction=all_match)))".format(unicode_literal='u' if PY2 else ''),
+      "Snapshot(PathGlobs(include=({unicode_literal}\'testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa\',), exclude=(), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(failure_behavior=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(conjunction=all_match)))".format(unicode_literal='u' if PY2 else ''),
       "Globs did not match. Excludes were: []. Unmatched globs were: [\"testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa\"].",
     ]
   }
