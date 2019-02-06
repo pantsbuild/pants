@@ -57,22 +57,19 @@ def find_root_thrifts(basedirs, sources, log=None):
   return root_sources
 
 
-def calculate_compile_sources(targets, is_thrift_target):
-  """Calculates the set of thrift source files that need to be compiled.
-  It does not exclude sources that are included in other sources.
-
-  A tuple of (include basedirs, thrift sources) is returned.
+def calculate_include_paths(targets, is_thrift_target):
+  """Calculates the set of import paths for the given targets.
 
   :targets: The targets to examine.
   :is_thrift_target: A predicate to pick out thrift targets for consideration in the analysis.
+
+  :returns: Include basedirs for the target.
   """
 
   basedirs = set()
-  sources = set()
-  def collect_sources(target):
+  def collect_paths(target):
     basedirs.add(target.target_base)
-    sources.update(target.sources_relative_to_buildroot())
 
   for target in targets:
-    target.walk(collect_sources, predicate=is_thrift_target)
-  return basedirs, sources
+    target.walk(collect_paths, predicate=is_thrift_target)
+  return basedirs
