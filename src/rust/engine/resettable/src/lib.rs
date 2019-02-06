@@ -65,19 +65,33 @@ where
   T: Send + Sync,
 {
   pub fn new<F: Fn() -> T + 'static>(make: F) -> Resettable<T> {
-    let val = (make)();
     Resettable {
-      val: Arc::new(RwLock::new(Some(val))),
+      val: Arc::new(RwLock::new(None)),
       make: Arc::new(make),
     }
   }
 
+  ///
+  /// Execute f with the value in the Resettable.
+  /// May lazily initialize the value in the Resettable.
+  ///
+  /// TODO Explore the use of parking_lot::RWLock::upgradable_read
+  /// to avoid reacquiring the lock for initialization.
+  /// This can be used if we are sure that a deadlock won't happen
+  /// when two readers are trying to upgrade at the same time.
+  ///
   pub fn with<O, F: FnOnce(&T) -> O>(&self, f: F) -> O {
-    let val_opt = self.val.read();
-    let val = val_opt
-      .as_ref()
-      .unwrap_or_else(|| panic!("A Resettable value cannot be used while it is shutdown."));
-    f(val)
+    {
+      let val_opt = self.val.read();
+      if let Some(val) = val_opt.as_ref() {
+        return f(val);
+      }
+    }
+    let mut val_write_opt = self.val.write();
+    if val_write_opt.as_ref().is_none() {
+      *val_write_opt = Some((self.make)())
+    }
+    f(val_write_opt.as_ref().unwrap())
   }
 
   ///
@@ -89,9 +103,7 @@ where
   {
     let mut val = self.val.write();
     *val = None;
-    let t = f();
-    *val = Some((self.make)());
-    t
+    f()
   }
 }
 
@@ -106,10 +118,6 @@ where
   /// be sure that dropping it will actually deallocate the resource.
   ///
   pub fn get(&self) -> T {
-    let val_opt = self.val.read();
-    let val = val_opt
-      .as_ref()
-      .unwrap_or_else(|| panic!("A Resettable value cannot be used while it is shutdown."));
-    val.clone()
+    self.with(T::clone)
   }
 }
