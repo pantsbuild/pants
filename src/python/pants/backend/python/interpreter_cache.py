@@ -97,6 +97,7 @@ class PythonInterpreterCache(Subsystem):
 
     tgts_by_compatibilities, total_filter_set = self.partition_targets_by_compatibility(targets)
     allowed_interpreters = set(self.setup(filters=total_filter_set))
+
     # Constrain allowed_interpreters based on each target's compatibility requirements.
     for compatibility in tgts_by_compatibilities:
       compatible_with_target = set(self._matching(allowed_interpreters, compatibility))
