@@ -97,7 +97,6 @@ class PythonInterpreterCache(Subsystem):
 
     tgts_by_compatibilities, total_filter_set = self.partition_targets_by_compatibility(targets)
     allowed_interpreters = set(self.setup(filters=total_filter_set))
-
     # Constrain allowed_interpreters based on each target's compatibility requirements.
     for compatibility in tgts_by_compatibilities:
       compatible_with_target = set(self._matching(allowed_interpreters, compatibility))
@@ -118,9 +117,11 @@ class PythonInterpreterCache(Subsystem):
   def _interpreter_from_path(self, path, filters=()):
     try:
       executable = os.readlink(os.path.join(path, 'python'))
+      if not os.path.exists(executable):
+        if os.path.dirname(path) == self._cache_dir:
+          self._purge_interpreter(path)
+        return None
     except OSError:
-      if os.path.dirname(path) == self._cache_dir:
-        self._purge_interpreter(path)
       return None
     interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
     if self._matches(interpreter, filters=filters):

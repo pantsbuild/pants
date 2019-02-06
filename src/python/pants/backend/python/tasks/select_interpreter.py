@@ -79,7 +79,7 @@ class SelectInterpreter(Task):
       if not os.path.exists(interpreter_path_file):
         self._create_interpreter_path_file(interpreter_path_file, python_tgts)
       else:
-        if _detect_and_purge_invalid_interpreter(interpreter_path_file):
+        if self._detect_and_purge_invalid_interpreter(interpreter_path_file):
           self._create_interpreter_path_file(interpreter_path_file, python_tgts)
 
     interpreter = self._get_interpreter(interpreter_path_file)
@@ -98,6 +98,17 @@ class SelectInterpreter(Task):
   def _interpreter_path_file(self, target_set_id):
     return os.path.join(self.workdir, target_set_id, 'interpreter.info')
 
+  def _detect_and_purge_invalid_interpreter(self, interpreter_path_file):
+    with open(interpreter_path_file, 'r') as infile:
+      lines = infile.readlines()
+    binary = lines[0].strip()
+    if not os.path.exists(binary):
+      self.context.log.info('Stale interpreter reference detected: {}, removing reference and '
+                            'selecting a new interpreter.'.format(binary))
+      os.remove(interpreter_path_file)
+      return True
+    return False
+
   @staticmethod
   def _get_interpreter(interpreter_path_file):
     with open(interpreter_path_file, 'r') as infile:
@@ -108,15 +119,3 @@ class SelectInterpreter(Task):
         dist_name, dist_version, location = line.strip().split('\t')
         interpreter = interpreter.with_extra(dist_name, dist_version, location)
       return interpreter
-
-  @staticmethod
-  def _detect_and_purge_invalid_interpreter(interpreter_path_file):
-    with open(interpreter_path_file, 'r') as infile:
-      lines = infile.readlines()
-    binary = lines[0].strip()
-    if not os.path.exists(binary):
-      self.context.log.info('Stale interpreter reference detected, removing reference and '
-                            'selecting a new interpreter.')
-      os.remove(interpreter_path_file)
-      return True
-    return False
