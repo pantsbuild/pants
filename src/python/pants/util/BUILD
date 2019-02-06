@@ -56,6 +56,7 @@ python_library(
   dependencies = [
     ':strutil',
     '3rdparty/python:future',
+    'src/python/pants/base:deprecated',
   ],
 )
 

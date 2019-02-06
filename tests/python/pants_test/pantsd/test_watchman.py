@@ -57,12 +57,13 @@ class TestWatchman(TestBase):
                                metadata_base_dir=self.subprocess_dir)
 
   def test_maybe_init_metadata(self):
+    # TODO(#7106): is this the right path to patch?
     with mock.patch('pants.pantsd.watchman.safe_mkdir', **self.PATCH_OPTS) as mock_mkdir, \
          mock.patch('pants.pantsd.watchman.safe_file_dump', **self.PATCH_OPTS) as mock_file_dump:
       self.watchman._maybe_init_metadata()
 
       mock_mkdir.assert_called_once_with(self._watchman_dir)
-      mock_file_dump.assert_called_once_with(self._state_file, b'{}')
+      mock_file_dump.assert_called_once_with(self._state_file, b'{}', mode='wb')
 
   def test_construct_cmd(self):
     output = self.watchman._construct_cmd(['cmd', 'parts', 'etc'],

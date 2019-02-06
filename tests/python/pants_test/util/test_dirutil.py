@@ -396,6 +396,8 @@ class DirutilTest(unittest.TestCase):
   def assert_dump_and_read(self, test_content, dump_kwargs, read_kwargs):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
+      # TODO(#7121): remove all deprecated usages of `binary_mode` and `mode` arguments to
+      # safe_file_dump() in this file when the deprecation period is over!
       safe_file_dump(test_filename, test_content, **dump_kwargs)
       self.assertEqual(read_file(test_filename, **read_kwargs), test_content)
 
@@ -407,7 +409,7 @@ class DirutilTest(unittest.TestCase):
       self.assert_dump_and_read(b'333', {'mode': 'w'}, {'binary_mode': True})
     with self.assertRaises(AssertionError):
       # Both `binary_mode` and `mode` specified.
-      # TODO: Should be removed along with https://github.com/pantsbuild/pants/issues/6543
+      # TODO(#6543): Should be removed along with https://github.com/pantsbuild/pants/issues/6543
       self.assert_dump_and_read(b'333', {'binary_mode': True, 'mode': 'wb'}, {'binary_mode': True})
 
   def test_readwrite_file_unicode(self):

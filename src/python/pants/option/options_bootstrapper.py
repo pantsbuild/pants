@@ -103,7 +103,7 @@ class OptionsBootstrapper(datatype([
     short_flags = set()
 
     def filecontent_for(path):
-      return FileContent(ensure_text(path), read_file(path))
+      return FileContent(ensure_text(path), read_file(path, binary_mode=True))
 
     def capture_the_flags(*args, **kwargs):
       for arg in args:

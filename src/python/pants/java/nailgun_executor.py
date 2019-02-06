@@ -228,8 +228,8 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
   def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr, stdin):
     """Synchronously spawn a new nailgun server."""
     # Truncate the nailguns stdout & stderr.
-    safe_file_dump(self._ng_stdout, b'')
-    safe_file_dump(self._ng_stderr, b'')
+    safe_file_dump(self._ng_stdout, b'', mode='wb')
+    safe_file_dump(self._ng_stderr, b'', mode='wb')
 
     jvm_options = jvm_options + [self._PANTS_NG_BUILDROOT_ARG,
                                  self._create_owner_arg(self._workdir),

@@ -76,7 +76,7 @@ testprojects/
 def harness():
   try:
     for name, content in BUILD_FILES.items():
-      safe_file_dump(name, dedent(content), binary_mode=False)
+      safe_file_dump(name, dedent(content), mode='w')
     yield
   finally:
     safe_rmtree(SUBPROJ_SPEC)
@@ -102,7 +102,7 @@ class SubprojectIntegrationTest(PantsRunIntegrationTest):
     """
     with harness():
       # Has dependencies below the subproject.
-      pants_args = ['--subproject-roots={}'.format(SUBPROJ_ROOT), 
+      pants_args = ['--subproject-roots={}'.format(SUBPROJ_ROOT),
                     'dependencies', SUBPROJ_SPEC]
       self.assert_success(self.run_pants(pants_args))
 

@@ -632,7 +632,7 @@ class TestBase(unittest.TestCase):
     """
     with temporary_dir() as temp_dir:
       for file_name, content in files.items():
-        safe_file_dump(os.path.join(temp_dir, file_name), content)
+        safe_file_dump(os.path.join(temp_dir, file_name), content, mode='w')
       return self.scheduler.capture_snapshots((
         PathGlobsAndRoot(PathGlobs(('**',)), text_type(temp_dir)),
       ))[0]

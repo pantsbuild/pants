@@ -82,7 +82,7 @@ class Watchman(ProcessManager):
   def _maybe_init_metadata(self):
     safe_mkdir(self._watchman_work_dir)
     # Initialize watchman with an empty, but valid statefile so it doesn't complain on startup.
-    safe_file_dump(self._state_file, b'{}')
+    safe_file_dump(self._state_file, b'{}', mode='wb')
 
   def _construct_cmd(self, cmd_parts, state_file, sock_file, pid_file, log_file, log_level):
     return [part for part in cmd_parts] + ['--no-save-state',

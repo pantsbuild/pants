@@ -60,9 +60,11 @@ def stdout_contents(wu):
     return f.read().rstrip()
 
 
-def dump_digest(output_dir, digest):
-  safe_file_dump('{}.digest'.format(output_dir),
-    '{}:{}'.format(digest.fingerprint, digest.serialized_bytes_length), mode='w')
+def write_digest(output_dir, digest):
+  safe_file_dump(
+    '{}.digest'.format(output_dir),
+    mode='w',
+    payload='{}:{}'.format(digest.fingerprint, digest.serialized_bytes_length))
 
 
 def load_digest(output_dir):
@@ -823,7 +825,7 @@ class RscCompile(ZincCompile):
       raise TaskError(res.stderr)
 
     if output_dir:
-      dump_digest(output_dir, res.output_directory_digest)
+      write_digest(output_dir, res.output_directory_digest)
       self.context._scheduler.materialize_directories((
         DirectoryToMaterialize(
           # NB the first element here is the root to materialize into, not the dir to snapshot
