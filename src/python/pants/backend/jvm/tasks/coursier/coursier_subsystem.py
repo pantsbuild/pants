@@ -77,9 +77,8 @@ class CoursierSubsystem(Subsystem):
 
     bootstrap_jar_path = os.path.join(coursier_bootstrap_dir, 'coursier.jar')
 
-    with workunit_factory(name='bootstrap-coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
-
-      if not os.path.exists(bootstrap_jar_path):
+    if not os.path.exists(bootstrap_jar_path):
+      with workunit_factory(name='bootstrap-coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
         with safe_concurrent_creation(bootstrap_jar_path) as temp_path:
           fetcher = Fetcher(get_buildroot())
           checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
@@ -98,4 +97,4 @@ class CoursierSubsystem(Subsystem):
           else:
             workunit.set_outcome(WorkUnit.SUCCESS)
 
-      return bootstrap_jar_path
+    return bootstrap_jar_path
