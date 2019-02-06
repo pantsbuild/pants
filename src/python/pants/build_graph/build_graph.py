@@ -448,7 +448,7 @@ class BuildGraph(AbstractClass):
       _walk_rec(address)
 
   def transitive_dependees_of_addresses(self, addresses, predicate=None, postorder=False):
-    """Returns all transitive dependees of `address`.
+    """Returns all transitive dependees of `addresses`.
 
     Note that this uses `walk_transitive_dependee_graph` and the predicate is passed through,
     hence it trims graphs rather than just filtering out Targets that do not match the predicate.

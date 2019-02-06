@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 from builtins import str
+from collections import defaultdict
 
 from future.utils import PY2
 from pex.fetcher import Fetcher
@@ -48,6 +49,19 @@ def has_resources(tgt):
 
 def has_python_requirements(tgt):
   return isinstance(tgt, PythonRequirementLibrary)
+
+
+def can_have_python_platform(tgt):
+  return isinstance(tgt, (PythonBinary, PythonDistribution))
+
+
+def targets_by_platform(targets, python_setup):
+  d = defaultdict(OrderedSet)
+  for target in targets:
+    if can_have_python_platform(target):
+      for platform in target.platforms if target.platforms else python_setup.platforms:
+        d[platform].add(target)
+  return d
 
 
 def _create_source_dumper(builder, tgt):
