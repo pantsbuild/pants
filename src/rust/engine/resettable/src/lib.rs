@@ -75,6 +75,11 @@ where
   /// Execute f with the value in the Resettable.
   /// May lazily initialize the value in the Resettable.
   ///
+  /// TODO Explore the use of parking_lot::RWLock::upgradable_read
+  /// to avoid reacquiring the lock for initialization.
+  /// This can be used if we are sure that a deadlock won't happen
+  /// when two readers are trying to upgrade at the same time.
+  ///
   pub fn with<O, F: FnOnce(&T) -> O>(&self, f: F) -> O {
     {
       let val_opt = self.val.read();
