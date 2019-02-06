@@ -14,7 +14,14 @@ function pants3_maybe_clean() {
   _PYTHON_VERSION_FILE="${REPO_ROOT}/.pants-python-version"
 
   if [[ -z "$_RECURSIVE_PANTS_SHELL_SCRIPT_INVOCATION" ]]; then
-    _PREV_RUN_PYTHON_VERSION="$(cat 2>/dev/null "$_PYTHON_VERSION_FILE")"
+    if [[ -f "$_PYTHON_VERSION_FILE" ]]; then
+      _PREV_RUN_PYTHON_VERSION="$(cat "$_PYTHON_VERSION_FILE")"
+    else
+      cat >&2 <<EOF
+${_PYTHON_VERSION_FILE} not found. Forcing an initial clean-all...
+EOF
+      _PREV_RUN_PYTHON_VERSION=''
+    fi
 
     if [[ "$_PYTHON_VERSION_TO_RUN" != "$_PREV_RUN_PYTHON_VERSION" ]]; then
       export _RECURSIVE_PANTS_SHELL_SCRIPT_INVOCATION='y'
@@ -29,9 +36,8 @@ EOF
   fi
 }
 
-# If we are running at a terminal, run the cleaning process if necessary. This should return false
-# in CI.
-if [[ -t 0 ]]; then
+# We can currently assume the CI environment does not switch python versions within a shard.
+if [[ -z "$RUNNING_VIA_TRAVIS_CI_SCRIPT" ]]; then
   pants3_maybe_clean
 fi
 
