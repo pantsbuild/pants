@@ -237,8 +237,6 @@ class DaemonPantsRunner(ProcessManager):
     if self._deferred_exception:
       try:
         exc_type, exc_value, exc_traceback = self._deferred_exception
-        if exc_type == GracefulTerminationException:
-          self._exiter.exit(exc_value.exit_code)
         raise_with_traceback(exc_value, exc_traceback)
       except TypeError:
         # If `_deferred_exception` isn't a 3-item tuple (raising a TypeError on the above
@@ -327,6 +325,10 @@ class DaemonPantsRunner(ProcessManager):
         runner.run()
       except KeyboardInterrupt:
         self._exiter.exit_and_fail('Interrupted by user.\n')
+      except GracefulTerminationException as e:
+        ExceptionSink.log_exception(
+          'Encountered graceful termination exception {}; exiting'.format(e))
+        self._exiter.exit(e.exit_code)
       except Exception:
         ExceptionSink._log_unhandled_exception_and_exit()
       else:
