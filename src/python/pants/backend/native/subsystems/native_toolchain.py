@@ -87,10 +87,11 @@ class LLVMCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
 
 @rule(LibcObjects, [Select(Platform), Select(NativeToolchain)])
 def select_libc_objects(platform, native_toolchain):
-  paths = platform.resolve_platform_specific({
+  # We use lambdas here to avoid searching for libc on osx, where it will fail.
+  paths = platform.resolve_for_enum_variant({
     'darwin': lambda: [],
     'linux': lambda: native_toolchain._libc_dev.get_libc_objects(),
-  })
+  })()
   yield LibcObjects(paths)
 
 

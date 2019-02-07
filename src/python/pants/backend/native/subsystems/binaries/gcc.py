@@ -44,9 +44,9 @@ class GCC(NativeTool):
 
   @memoized_method
   def _common_lib_dirs(self, platform):
-    lib64_tuples = platform.resolve_platform_specific({
-      'darwin': lambda: [],
-      'linux': lambda: [('lib64',)],
+    lib64_tuples = platform.resolve_for_enum_variant({
+      'darwin': [],
+      'linux': [('lib64',)],
     })
     return self._filemap(lib64_tuples + [
       ('lib',),
