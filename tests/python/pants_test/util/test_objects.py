@@ -678,7 +678,8 @@ field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(
       WithCollectionTypeConstraint([3, "asdf"])
     expected_msg = """\
 error: in constructor of type WithCollectionTypeConstraint: type check error:
-field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)) matching iterable object [3, {u}'asdf']: value {u}'asdf' (with type 'unicode') must satisfy this type constraint: Exactly(int).""".format(u='u' if PY2 else '')
+field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)) matching iterable object [3, {u}'asdf']: value {u}'asdf' (with type '{string_type}') must satisfy this type constraint: Exactly(int).\
+""".format(u='u' if PY2 else '', string_type='unicode' if PY2 else 'str')
     self.assertEqual(str(cm.exception), expected_msg)
 
   def test_copy(self):
