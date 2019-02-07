@@ -28,6 +28,9 @@ class TypedDatatypeInstanceConstructionError(TypeCheckError):
   """Raised when a datatype()'s fields fail a type check upon construction."""
 
 
+# TODO: create a mixin which declares/implements the methods we define on the generated class in
+# datatype() and enum() to decouple the class's logic from the way it's created. This may also make
+# migration to python 3 dataclasses as per #7074 easier.
 def datatype(field_decls, superclass_name=None, **kwargs):
   """A wrapper for `namedtuple` that accounts for the type of the object in equality.
 
@@ -318,6 +321,15 @@ def enum(*args):
           .format(list(self.allowed_values), list(keys)))
       match_for_variant = mapping[self._get_value(self)]
       return match_for_variant
+
+    @classmethod
+    def iterate_enum_variants(cls):
+      """Iterate over all instances of this enum, in the declared order.
+
+      NB: This method is exposed for testing enum variants easily. resolve_for_enum_variant() should
+      be used for performing conditional logic based on an enum instance's value.
+      """
+      return [cls.create(variant_value) for variant_value in cls.allowed_values]
 
   return ChoiceDatatype
 

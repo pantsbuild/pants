@@ -70,6 +70,7 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
 
     task = self.create_task(self.context(target_roots=[cpp_lib_target]))
     compiler = task.get_compiler(cpp_lib_target)
+    # TODO(#6866): test specifically which compiler is selected, traversing the PATH if necessary.
     self.assertIn('llvm', compiler.path_entries[0])
 
   def test_target_level_toolchain_variant_default_llvm(self):
