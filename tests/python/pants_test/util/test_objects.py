@@ -12,7 +12,9 @@ from builtins import object, str
 
 from future.utils import PY2, PY3, text_type
 
-from pants.util.objects import (Collection, Exactly, SubclassesOf, SuperclassesOf, TypeCheckError,
+from pants.util.collections_abc_backport import OrderedDict
+from pants.util.objects import (Collection, EnumVariantSelectionError, Exactly, SubclassesOf,
+                                SuperclassesOf, TypeCheckError,
                                 TypedDatatypeInstanceConstructionError, datatype, enum)
 from pants_test.test_base import TestBase
 
@@ -471,7 +473,7 @@ class TypedDatatypeTest(TestBase):
   def test_instance_construction_errors(self):
     with self.assertRaises(TypeError) as cm:
       SomeTypedDatatype(something=3)
-    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n__new__() got an unexpected keyword argument 'something'"
+    expected_msg = "type check error in class SomeTypedDatatype: error in namedtuple() base constructor: __new__() got an unexpected keyword argument 'something'"
     self.assertEqual(str(cm.exception), expected_msg)
 
     # not providing all the fields
@@ -482,7 +484,7 @@ class TypedDatatypeTest(TestBase):
       if PY3 else
       "__new__() takes exactly 2 arguments (1 given)"
     )
-    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n" + expected_msg_ending
+    expected_msg = "type check error in class SomeTypedDatatype: error in namedtuple() base constructor: {}".format(expected_msg_ending)
     self.assertEqual(str(cm.exception), expected_msg)
 
     # unrecognized fields
@@ -493,20 +495,20 @@ class TypedDatatypeTest(TestBase):
       if PY3 else
       "__new__() takes exactly 2 arguments (3 given)"
     )
-    expected_msg = "error: in constructor of type SomeTypedDatatype: type check error:\n" + expected_msg_ending
+    expected_msg = "type check error in class SomeTypedDatatype: error in namedtuple() base constructor: {}".format(expected_msg_ending)
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypedDatatypeInstanceConstructionError) as cm:
       CamelCaseWrapper(nonneg_int=3)
     expected_msg = (
-      """error: in constructor of type CamelCaseWrapper: type check error:
+      """type check error in class CamelCaseWrapper: errors type checking constructor arguments:
 field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(NonNegativeInt).""")
     self.assertEqual(str(cm.exception), expected_msg)
 
     # test that kwargs with keywords that aren't field names fail the same way
     with self.assertRaises(TypeError) as cm:
       CamelCaseWrapper(4, a=3)
-    expected_msg = "error: in constructor of type CamelCaseWrapper: type check error:\n__new__() got an unexpected keyword argument 'a'"
+    expected_msg = "type check error in class CamelCaseWrapper: error in namedtuple() base constructor: __new__() got an unexpected keyword argument 'a'"
     self.assertEqual(str(cm.exception), expected_msg)
 
   def test_type_check_errors(self):
@@ -514,7 +516,7 @@ field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type
     with self.assertRaises(TypeCheckError) as cm:
       SomeTypedDatatype([])
     expected_msg = (
-      """error: in constructor of type SomeTypedDatatype: type check error:
+      """type check error in class SomeTypedDatatype: errors type checking constructor arguments:
 field 'val' was invalid: value [] (with type 'list') must satisfy this type constraint: Exactly(int).""")
     self.assertEqual(str(cm.exception), expected_msg)
 
@@ -523,7 +525,7 @@ field 'val' was invalid: value [] (with type 'list') must satisfy this type cons
       AnotherTypedDatatype(text_type('correct'), text_type('should be list'))
     def compare_str(unicode_type_name, include_unicode=False):
       expected_message = (
-        """error: in constructor of type AnotherTypedDatatype: type check error:
+        """type check error in class AnotherTypedDatatype: errors type checking constructor arguments:
 field 'elements' was invalid: value {unicode_literal}'should be list' (with type '{type_name}') must satisfy this type constraint: Exactly(list)."""
       .format(type_name=unicode_type_name, unicode_literal='u' if include_unicode else ''))
       self.assertEqual(str(cm.exception), expected_message)
@@ -537,7 +539,7 @@ field 'elements' was invalid: value {unicode_literal}'should be list' (with type
       AnotherTypedDatatype(3, text_type('should be list'))
     def compare_str(unicode_type_name, include_unicode=False):
       expected_message = (
-        """error: in constructor of type AnotherTypedDatatype: type check error:
+        """type check error in class AnotherTypedDatatype: errors type checking constructor arguments:
 field 'string' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly({type_name}).
 field 'elements' was invalid: value {unicode_literal}'should be list' (with type '{type_name}') must satisfy this type constraint: Exactly(list)."""
           .format(type_name=unicode_type_name, unicode_literal='u' if include_unicode else ''))
@@ -551,7 +553,7 @@ field 'elements' was invalid: value {unicode_literal}'should be list' (with type
       NonNegativeInt(text_type('asdf'))
     def compare_str(unicode_type_name, include_unicode=False):
       expected_message = (
-        """error: in constructor of type NonNegativeInt: type check error:
+        """type check error in class NonNegativeInt: errors type checking constructor arguments:
 field 'an_int' was invalid: value {unicode_literal}'asdf' (with type '{type_name}') must satisfy this type constraint: Exactly(int)."""
           .format(type_name=unicode_type_name, unicode_literal='u' if include_unicode else ''))
       self.assertEqual(str(cm.exception), expected_message)
@@ -562,15 +564,13 @@ field 'an_int' was invalid: value {unicode_literal}'asdf' (with type '{type_name
 
     with self.assertRaises(TypeCheckError) as cm:
       NonNegativeInt(-3)
-    expected_msg = (
-      """error: in constructor of type NonNegativeInt: type check error:
-value is negative: -3.""")
+    expected_msg = "type check error in class NonNegativeInt: value is negative: -3."
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypeCheckError) as cm:
       WithSubclassTypeConstraint(3)
     expected_msg = (
-      """error: in constructor of type WithSubclassTypeConstraint: type check error:
+      """type check error in class WithSubclassTypeConstraint: errors type checking constructor arguments:
 field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(SomeBaseClass).""")
     self.assertEqual(str(cm.exception), expected_msg)
 
@@ -588,14 +588,13 @@ field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type
     with self.assertRaises(TypeCheckError) as cm:
       obj.copy(nonexistent_field=3)
     expected_msg = (
-      """error: in constructor of type AnotherTypedDatatype: type check error:
-__new__() got an unexpected keyword argument 'nonexistent_field'""")
+      """type check error in class AnotherTypedDatatype: error in namedtuple() base constructor: __new__() got an unexpected keyword argument 'nonexistent_field'""")
     self.assertEqual(str(cm.exception), expected_msg)
 
     with self.assertRaises(TypeCheckError) as cm:
       obj.copy(elements=3)
     expected_msg = (
-      """error: in constructor of type AnotherTypedDatatype: type check error:
+      """type check error in class AnotherTypedDatatype: errors type checking constructor arguments:
 field 'elements' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(list).""")
     self.assertEqual(str(cm.exception), expected_msg)
 
@@ -615,15 +614,65 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
   def test_enum_instance_creation_errors(self):
     expected_rx = re.escape(
       "Value 3 for 'x' must be one of: OrderedSet([1, 2]).")
-    with self.assertRaisesRegexp(TypeCheckError, expected_rx):
+    with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx):
       SomeEnum.create(3)
-    with self.assertRaisesRegexp(TypeCheckError, expected_rx):
+    with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx):
       SomeEnum(3)
-    with self.assertRaisesRegexp(TypeCheckError, expected_rx):
+    with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx):
       SomeEnum(x=3)
+
+    # Test that None is not used as the default unless none_is_default=True.
+    with self.assertRaisesRegexp(EnumVariantSelectionError, re.escape(
+        "Value None for 'x' must be one of: OrderedSet([1, 2])."
+    )):
+      SomeEnum.create(None)
+    self.assertEqual(1, SomeEnum.create(None, none_is_default=True).x)
 
     expected_rx_falsy_value = re.escape(
       "Value {}'' for 'x' must be one of: OrderedSet([1, 2])."
       .format('u' if PY2 else ''))
-    with self.assertRaisesRegexp(TypeCheckError, expected_rx_falsy_value):
+    with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx_falsy_value):
       SomeEnum(x='')
+
+  def test_enum_resolve_variant(self):
+    one_enum_instance = SomeEnum(1)
+    two_enum_instance = SomeEnum(2)
+    self.assertEqual(3, one_enum_instance.resolve_for_enum_variant({
+      1: 3,
+      2: 4,
+    }))
+    self.assertEqual(4, two_enum_instance.resolve_for_enum_variant({
+      1: 3,
+      2: 4,
+    }))
+
+    # Test that an unrecognized variant raises an error.
+    with self.assertRaisesRegexp(EnumVariantSelectionError, re.escape("""\
+type check error in class SomeEnum: pattern matching must have exactly the keys [1, 2] (was: [1, 2, 3])""",
+    )):
+      one_enum_instance.resolve_for_enum_variant({
+        1: 3,
+        2: 4,
+        3: 5,
+      })
+
+    # Test that not providing all the variants raises an error.
+    with self.assertRaisesRegexp(EnumVariantSelectionError, re.escape("""\
+type check error in class SomeEnum: pattern matching must have exactly the keys [1, 2] (was: [1])""")):
+      one_enum_instance.resolve_for_enum_variant({
+        1: 3,
+      })
+
+    # Test that the ordering of the values in the enum constructor is not relevant for testing
+    # whether all variants are provided.
+    class OutOfOrderEnum(enum([2, 1, 3])): pass
+    two_out_of_order_instance = OutOfOrderEnum(2)
+    # This OrderedDict mapping is in a different order than in the enum constructor. This test means
+    # we can rely on providing simply a literal dict to resolve_for_enum_variant() and not worry
+    # that the dict ordering will cause an error.
+    letter = two_out_of_order_instance.resolve_for_enum_variant(OrderedDict([
+      (1, 'b'),
+      (2, 'a'),
+      (3, 'c'),
+    ]))
+    self.assertEqual(letter, 'a')

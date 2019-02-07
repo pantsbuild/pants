@@ -16,7 +16,7 @@ from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.objects import datatype, enum
+from pants.util.objects import datatype, enum, register_enum_option
 
 
 class GlobMatchErrorBehavior(enum('failure_behavior', ['ignore', 'warn', 'error'])):
@@ -25,8 +25,6 @@ class GlobMatchErrorBehavior(enum('failure_behavior', ['ignore', 'warn', 'error'
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
-
-  default_option_value = 'warn'
 
 
 class ExecutionOptions(datatype([
@@ -197,12 +195,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
-    register('--glob-expansion-failure', type=str,
-             choices=GlobMatchErrorBehavior.allowed_values,
-             default=GlobMatchErrorBehavior.default_option_value,
-             advanced=True,
-             help="Raise an exception if any targets declaring source files "
-                  "fail to match any glob provided in the 'sources' argument.")
+    register_enum_option(
+      register, GlobMatchErrorBehavior, '--glob-expansion-failure', default='warn', type=str,
+      advanced=True,
+      help="Raise an exception if any targets declaring source files "
+           "fail to match any glob provided in the 'sources' argument.")
 
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
              metavar='<regexp>', help='Exclude target roots that match these regexes.')

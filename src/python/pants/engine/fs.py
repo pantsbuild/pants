@@ -56,8 +56,9 @@ class PathGlobs(datatype([
       cls,
       include=tuple(include),
       exclude=tuple(exclude),
-      glob_match_error_behavior=GlobMatchErrorBehavior.create(glob_match_error_behavior),
-      conjunction=GlobExpansionConjunction.create(conjunction))
+      glob_match_error_behavior=GlobMatchErrorBehavior.create(glob_match_error_behavior,
+                                                              none_is_default=True),
+      conjunction=GlobExpansionConjunction.create(conjunction, none_is_default=True))
 
 
 class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', text_type)])):
