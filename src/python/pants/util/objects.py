@@ -263,10 +263,6 @@ def enum(*args):
     # but more specific.
     type_check_error_type = EnumVariantSelectionError
 
-    # Overriden from datatype() so providing an invalid variant is catchable as a TypeCheckError,
-    # but more specific.
-    type_check_error_type = EnumVariantSelectionError
-
     @memoized_classproperty
     def _singletons(cls):
       """Generate memoized instances of this enum wrapping each of this enum's allowed values.
