@@ -10,14 +10,10 @@ from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
-from pants.util.objects import enum
+from pants.util.objects import enum, register_enum_option
 
 
-class ToolchainVariant(enum('descriptor', ['gnu', 'llvm'])):
-
-  @property
-  def is_gnu(self):
-    return self.descriptor == 'gnu'
+class ToolchainVariant(enum(['gnu', 'llvm'])): pass
 
 
 class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsystem):
@@ -39,11 +35,10 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
              help='The default for the "compiler_option_sets" argument '
                   'for targets of this language.')
 
-    register('--toolchain-variant', type=str, fingerprint=True, advanced=True,
-             choices=ToolchainVariant.allowed_values,
-             default=ToolchainVariant.default_value,
-             help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
-                  "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
+    register_enum_option(
+      register, ToolchainVariant, '--toolchain-variant', type=str, advanced=True,
+      help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
+           "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 
   def get_compiler_option_sets_for_target(self, target):
     return self.get_target_mirrored_option('compiler_option_sets', target)
