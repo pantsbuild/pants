@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from future.utils import binary_type, text_type
 
-from pants.base.project_tree import Dir, File
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
@@ -94,8 +93,8 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
     return repr(self)
 
 
-class Snapshot(datatype([('directory_digest', Digest), ('path_stats', tuple)])):
-  """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
+class Snapshot(datatype([('directory_digest', Digest), ('files', tuple), ('dirs', tuple)])):
+  """A Snapshot is a collection of file paths and dir paths fingerprinted by their names/content.
 
   Snapshots are used to make it easier to isolate process execution by fixing the contents
   of the files being operated on and easing their movement to and from isolated execution
@@ -105,22 +104,6 @@ class Snapshot(datatype([('directory_digest', Digest), ('path_stats', tuple)])):
   @property
   def is_empty(self):
     return self == EMPTY_SNAPSHOT
-
-  @property
-  def dirs(self):
-    return [p for p in self.path_stats if type(p.stat) == Dir]
-
-  @property
-  def dir_stats(self):
-    return [p.stat for p in self.dirs]
-
-  @property
-  def files(self):
-    return [p for p in self.path_stats if type(p.stat) == File]
-
-  @property
-  def file_stats(self):
-    return [p.stat for p in self.files]
 
 
 class MergedDirectories(datatype([('directories', tuple)])):
@@ -150,7 +133,8 @@ EMPTY_DIRECTORY_DIGEST = Digest(
 
 EMPTY_SNAPSHOT = Snapshot(
   directory_digest=EMPTY_DIRECTORY_DIGEST,
-  path_stats=(),
+  files=(),
+  dirs=()
 )
 
 
