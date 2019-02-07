@@ -15,6 +15,7 @@ from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 from pants.process.subprocess import Subprocess
 from pants.task.task import Task, TaskBase
 from pants.util.memo import memoized_property
+from pants.util.objects import enum, register_enum_option
 
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
@@ -24,30 +25,16 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   SUBPROCESS = 'subprocess'
   HERMETIC = 'hermetic'
 
-  class InvalidExecutionStrategyMapping(Exception): pass
-
-  _all_execution_strategies = frozenset([NAILGUN, SUBPROCESS, HERMETIC])
-
-  def do_for_execution_strategy_variant(self, mapping):
-    """Invoke the method in `mapping` with the key corresponding to the execution strategy.
-
-    `mapping` is a dict mapping execution strategy -> zero-argument lambda.
-    """
-    variants = frozenset(mapping.keys())
-    if variants != self._all_execution_strategies:
-      raise self.InvalidExecutionStrategyMapping(
-        'Must specify a mapping with exactly the keys {} (was: {})'
-        .format(self._all_execution_strategies, variants))
-    method_for_variant = mapping[self.execution_strategy]
-    # The methods need not return a value, but we pass it along if they do.
-    return method_for_variant()
+  class ExecutionStrategy(enum([NAILGUN, SUBPROCESS, HERMETIC])): pass
 
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
-    register('--execution-strategy', choices=[cls.NAILGUN, cls.SUBPROCESS, cls.HERMETIC], default=cls.NAILGUN,
-             help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
-                  'task will be quicker. If set to subprocess, then the task will be run without nailgun.')
+    register_enum_option(
+      register, cls.ExecutionStrategy, '--execution-strategy',
+      help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
+           'task will be quicker. If set to subprocess, then the task will be run without nailgun. '
+           'Hermetic execution is an experimental subprocess execution framework.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
              help='Timeout (secs) for nailgun startup.')
     register('--nailgun-connect-attempts', advanced=True, default=5, type=int,
@@ -77,8 +64,13 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                           *id_tuple)
 
   @memoized_property
+  def execution_strategy_enum(self):
+    return self.ExecutionStrategy.create(self.get_options().execution_strategy)
+
+  # TODO: eventually deprecate this when we can move all subclasses to use the enum!
+  @property
   def execution_strategy(self):
-    return self.get_options().execution_strategy
+    return self.execution_strategy_enum.value
 
   def create_java_executor(self, dist=None):
     """Create java executor that uses this task's ng daemon, if allowed.
