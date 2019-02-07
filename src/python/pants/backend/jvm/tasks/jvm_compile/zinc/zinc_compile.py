@@ -401,7 +401,8 @@ class BaseZincCompile(JvmCompile):
       self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, zinc_args),
     })()
 
-  class ZincCompileError(TaskError): pass
+  class ZincCompileError(TaskError):
+    """An exception type specifically to signal a failed zinc execution."""
 
   def _compile_nonhermetic(self, jvm_options, zinc_args):
     exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
@@ -462,7 +463,7 @@ class BaseZincCompile(JvmCompile):
       req, self.name(), [WorkUnitLabel.COMPILER])
 
     if res.exit_code != 0:
-      raise TaskError(res.stderr, exit_code=res.exit_code)
+      raise self.ZincCompileError(res.stderr, exit_code=res.exit_code)
 
     # TODO: Materialize as a batch in do_compile or somewhere
     self.context._scheduler.materialize_directories((
