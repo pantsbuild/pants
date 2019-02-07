@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import shutil
 from builtins import str
 from contextlib import contextmanager
 
@@ -16,6 +17,7 @@ from pex.resolver import Unsatisfiable, resolve
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import chmod_plus_x, safe_mkdir
 from pants_test.backend.python.interpreter_selection_utils import (PY_27, PY_36,
                                                                    python_interpreter_path,
                                                                    skip_unless_python27_and_python36)
@@ -171,3 +173,32 @@ class TestInterpreterCache(TestBase):
   def test_setup_cached_cold(self):
     with self._setup_cache() as (cache, _):
       self.assertEqual([], list(cache._setup_cached()))
+
+  def test_interpreter_from_relpath_purges_stale_interpreter(self):
+    """
+    Simulates a stale interpreter cache and tests that _interpreter_from_relpath
+    properly detects it and removes the stale dist directory.
+
+    See https://github.com/pantsbuild/pants/issues/3416 for more info.
+    """
+    with temporary_dir() as temp_dir:
+      # Setup a interpreter distribution that we can safely mutate.
+      test_interpreter_binary = os.path.join(temp_dir, 'python2.7')
+      src = '/usr/bin/python2.7'
+      shutil.copyfile(src, test_interpreter_binary)
+      chmod_plus_x(test_interpreter_binary)
+
+      with self._setup_cache(constraints=[]) as (cache, path):
+        # Setup cache for test interpreter distribution.
+        identity_str = str(PythonInterpreter.from_binary(test_interpreter_binary).identity)
+        cached_interpreter_dir = os.path.join(cache._cache_dir, identity_str)
+        safe_mkdir(cached_interpreter_dir)
+        cached_symlink = os.path.join(cached_interpreter_dir, 'python')
+        os.symlink(test_interpreter_binary, cached_symlink)
+
+        # Remove the test interpreter binary from filesystem and assert that the cache is purged.
+        os.remove(test_interpreter_binary)
+        self.assertEqual(os.path.exists(test_interpreter_binary), False)
+        self.assertEqual(os.path.exists(cached_interpreter_dir), True)
+        cache._interpreter_from_relpath(identity_str)
+        self.assertEqual(os.path.exists(cached_interpreter_dir), False)

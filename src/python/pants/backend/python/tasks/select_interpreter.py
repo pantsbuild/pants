@@ -99,10 +99,8 @@ class SelectInterpreter(Task):
     return os.path.join(self.workdir, target_set_id, 'interpreter.info')
 
   def _detect_and_purge_invalid_interpreter(self, interpreter_path_file):
-    with open(interpreter_path_file, 'r') as infile:
-      lines = infile.readlines()
-    binary = lines[0].strip()
-    if not os.path.exists(binary):
+    interpreter = self._get_interpreter(interpreter_path_file)
+    if not os.path.exists(interpreter.binary):
       self.context.log.info('Stale interpreter reference detected: {}, removing reference and '
                             'selecting a new interpreter.'.format(binary))
       os.remove(interpreter_path_file)

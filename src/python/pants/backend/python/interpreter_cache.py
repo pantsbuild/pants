@@ -115,18 +115,19 @@ class PythonInterpreterCache(Subsystem):
     # Return the lowest compatible interpreter.
     return min(allowed_interpreters)
 
-  def _interpreter_from_path(self, path, filters=()):
-    try:
-      executable = os.readlink(os.path.join(path, 'python'))
-      if not os.path.exists(executable):
-        if os.path.dirname(path) == self._cache_dir:
+  def _interpreter_from_relpath(self, path, filters=()):
+    path = os.path.join(self._cache_dir, path)
+    if os.path.isdir(path):
+      try:
+        executable = os.readlink(os.path.join(path, 'python'))
+        if not os.path.exists(executable):
           self._purge_interpreter(path)
+          return None
+      except OSError:
         return None
-    except OSError:
-      return None
-    interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
-    if self._matches(interpreter, filters=filters):
-      return self._resolve(interpreter)
+      interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
+      if self._matches(interpreter, filters=filters):
+        return self._resolve(interpreter)
     return None
 
   def _setup_interpreter(self, interpreter, cache_target_path):
@@ -138,22 +139,20 @@ class PythonInterpreterCache(Subsystem):
   def _setup_cached(self, filters=()):
     """Find all currently-cached interpreters."""
     for interpreter_dir in os.listdir(self._cache_dir):
-      path = os.path.join(self._cache_dir, interpreter_dir)
-      if os.path.isdir(path):
-        pi = self._interpreter_from_path(path, filters=filters)
-        if pi:
-          logger.debug('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
-          yield pi
+      pi = self._interpreter_from_relpath(interpreter_dir, filters=filters)
+      if pi:
+        logger.debug('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
+        yield pi
 
   def _setup_paths(self, paths, filters=()):
     """Find interpreters under paths, and cache them."""
     for interpreter in self._matching(PythonInterpreter.all(paths), filters=filters):
       identity_str = str(interpreter.identity)
-      cache_path = os.path.join(self._cache_dir, identity_str)
-      pi = self._interpreter_from_path(cache_path, filters=filters)
+      pi = self._interpreter_from_relpath(identity_str, filters=filters)
       if pi is None:
+        cache_path = os.path.join(self._cache_dir, identity_str)
         self._setup_interpreter(interpreter, cache_path)
-        pi = self._interpreter_from_path(cache_path, filters=filters)
+        pi = self._interpreter_from_relpath(identity_str, filters=filters)
       if pi:
         yield pi
 
