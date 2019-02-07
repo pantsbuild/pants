@@ -11,8 +11,21 @@ from collections import namedtuple
 from twitter.common.collections import OrderedSet
 
 from pants.util.collections_abc_backport import Iterable, OrderedDict
-from pants.util.memo import memoized_classproperty
+from pants.util.memo import memoized, memoized_classproperty
 from pants.util.meta import AbstractClass, classproperty
+
+
+class TypeCheckError(TypeError):
+
+  # TODO: make some wrapper exception class to make this kind of
+  # prefixing easy (maybe using a class field format string?).
+  def __init__(self, type_name, msg, *args, **kwargs):
+    formatted_msg = "type check error in class {}: {}".format(type_name, msg)
+    super(TypeCheckError, self).__init__(formatted_msg, *args, **kwargs)
+
+
+class TypedDatatypeInstanceConstructionError(TypeCheckError):
+  """Raised when a datatype()'s fields fail a type check upon construction."""
 
 
 class TypeCheckError(TypeError):
@@ -250,6 +263,15 @@ def enum(*args):
     # but more specific.
     type_check_error_type = EnumVariantSelectionError
 
+    # Overriden from datatype() so providing an invalid variant is catchable as a TypeCheckError,
+    # but more specific.
+    type_check_error_type = EnumVariantSelectionError
+
+    @classmethod
+    def _get_value(cls, obj):
+      """Helper method to avoid using `field_name` in the class implementation a lot."""
+      return getattr(obj, field_name)
+
     @memoized_classproperty
     def _singletons(cls):
       """Generate memoized instances of this enum wrapping each of this enum's allowed values.
@@ -347,7 +369,6 @@ def enum(*args):
       return cls._singletons.values()
 
   return ChoiceDatatype
-
 
 # TODO(#7233): allow usage of the normal register() by using an enum class as the `type` argument!
 def register_enum_option(register, enum_cls, *args, **kwargs):
