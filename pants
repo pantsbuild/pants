@@ -37,7 +37,7 @@ EOF
 }
 
 # We can currently assume the CI environment does not switch python versions within a shard.
-if [[ -z "$RUNNING_VIA_TRAVIS_CI_SCRIPT" ]]; then
+if [[ "$ONLY_USING_SINGLE_PYTHON_VERSION" != 'true' ]]; then
   pants3_maybe_clean
 fi
 
