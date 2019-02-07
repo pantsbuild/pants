@@ -22,9 +22,9 @@ class NativeArtifact(datatype(['lib_name']), PayloadField):
 
   def as_shared_lib(self, platform):
     # TODO: check that the name conforms to some format in the constructor (e.g. no dots?).
-    return platform.resolve_platform_specific({
-      'darwin': lambda: 'lib{}.dylib'.format(self.lib_name),
-      'linux': lambda: 'lib{}.so'.format(self.lib_name),
+    return platform.resolve_for_enum_variant({
+      'darwin': 'lib{}.dylib'.format(self.lib_name),
+      'linux': 'lib{}.so'.format(self.lib_name),
     })
 
   def _compute_fingerprint(self):

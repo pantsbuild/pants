@@ -9,37 +9,14 @@ from abc import abstractproperty
 
 from pants.engine.rules import SingletonRule
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import datatype, enum
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var
 
 
-class Platform(datatype(['normalized_os_name'])):
+class Platform(enum('normalized_os_name', all_normalized_os_names())):
 
-  class UnsupportedPlatformError(Exception):
-    """Thrown if pants is running on an unrecognized platform."""
-
-  @classmethod
-  def create(cls):
-    return Platform(get_normalized_os_name())
-
-  _NORMALIZED_OS_NAMES = frozenset(all_normalized_os_names())
-
-  def resolve_platform_specific(self, platform_specific_funs):
-    arg_keys = frozenset(platform_specific_funs.keys())
-    unknown_plats = self._NORMALIZED_OS_NAMES - arg_keys
-    if unknown_plats:
-      raise self.UnsupportedPlatformError(
-        "platform_specific_funs {} must support platforms {}"
-        .format(platform_specific_funs, list(unknown_plats)))
-    extra_plats = arg_keys - self._NORMALIZED_OS_NAMES
-    if extra_plats:
-      raise self.UnsupportedPlatformError(
-        "platform_specific_funs {} has unrecognized platforms {}"
-        .format(platform_specific_funs, list(extra_plats)))
-
-    fun_for_platform = platform_specific_funs[self.normalized_os_name]
-    return fun_for_platform()
+  default_value = get_normalized_os_name()
 
 
 class Executable(AbstractClass):
@@ -89,9 +66,9 @@ class Executable(AbstractClass):
 
     :rtype: dict of string -> string
     """
-    lib_env_var = self._platform.resolve_platform_specific({
-      'darwin': lambda: 'DYLD_LIBRARY_PATH',
-      'linux': lambda: 'LD_LIBRARY_PATH',
+    lib_env_var = self._platform.resolve_for_enum_variant({
+      'darwin': 'DYLD_LIBRARY_PATH',
+      'linux': 'LD_LIBRARY_PATH',
     })
     return {
       'PATH': create_path_env_var(self.path_entries),
