@@ -202,7 +202,34 @@ class RscCompile(ZincCompile):
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
     })()
 
-  class _JvmTargetType(enum(['zinc-scala', 'zinc-java', 'rsc-scala', 'rsc-java'])): pass
+  class _JvmTargetType(enum(['zinc-scala', 'zinc-java', 'rsc-scala', 'rsc-java'])):
+    """Target classifications used to correctly schedule zinc and rsc jobs.
+
+    There are some limitations we have to work around before we can compile everything with rsc and
+    then zinc (and eventually just rsc).
+    - rsc is not able to outline all scala code just yet (this is also being addressed through
+      automated rewrites).
+    - javac is unable to consume rsc's jars just yet.
+    - rsc is not able to outline all java code just yet (this is likely to *not* require rewrites,
+      just some more work on rsc).
+
+    To work around this, we can mark targets as rsc-compatible incrementally until all of them are
+    supported. This means that for rsc-compatible targets which depend on targets with incompatible
+    java or scala, we have to compile the incompatible target with zinc first, then put the zinc
+    output on the rsc classpath in order to compile the rsc-compatible target.
+
+    Because javac cannot consume rsc's jars just yet, we also have to wait until all of a java
+    target's dependencies are compiled with zinc to compile that target. However, if rsc is able to
+    outline the java in that target, this need not stop downstream rsc jobs from starting -- it just
+    slows down the time it takes for the java target to be compiled.
+
+    The situation which most affects the less-parallelizable rsc compile is a target with many
+    dependents which is incompatible with rsc, requiring a zinc compile before its dependencies can
+    be rsc compiled.
+
+    This enum class and pattern matching with resolve_for_enum_variant() makes it easier to schedule
+    jobs according to the above rules.
+    """
 
   @memoized_property
   def _exclude_regexps(self):
