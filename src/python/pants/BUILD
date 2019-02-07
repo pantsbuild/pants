@@ -18,6 +18,7 @@ python_library(
     name='pantsbuild.pants',
     description='A scalable build tool for large, complex, heterogeneous repos.',
     namespace_packages=['pants', 'pants.backend'],
+    ext_modules=[('native_engine', {'sources': []})],
   ).with_binaries(
     pants='src/python/pants/bin:pants',
   )
