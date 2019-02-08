@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import shutil
+import sys
 from builtins import str
 from contextlib import contextmanager
 
@@ -16,8 +17,8 @@ from pex.resolver import Unsatisfiable, resolve
 
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import chmod_plus_x, safe_mkdir
+from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import safe_mkdir
 from pants_test.backend.python.interpreter_selection_utils import (PY_27, PY_36,
                                                                    python_interpreter_path,
                                                                    skip_unless_python27_and_python36)
@@ -184,21 +185,23 @@ class TestInterpreterCache(TestBase):
     with temporary_dir() as temp_dir:
       # Setup a interpreter distribution that we can safely mutate.
       test_interpreter_binary = os.path.join(temp_dir, 'python2.7')
-      src = '/usr/bin/python2.7'
-      shutil.copyfile(src, test_interpreter_binary)
-      chmod_plus_x(test_interpreter_binary)
+      src = os.path.realpath(sys.executable)
+      sys_exe_dist = os.path.dirname(os.path.dirname(src))
+      shutil.copy2(src, test_interpreter_binary)
+      with environment_as(
+        PYTHONPATH='{}'.format(os.path.join(sys_exe_dist, 'lib/python2.7'))
+      ):
+        with self._setup_cache(constraints=[]) as (cache, path):
+          # Setup cache for test interpreter distribution.
+          identity_str = str(PythonInterpreter.from_binary(test_interpreter_binary).identity)
+          cached_interpreter_dir = os.path.join(cache._cache_dir, identity_str)
+          safe_mkdir(cached_interpreter_dir)
+          cached_symlink = os.path.join(cached_interpreter_dir, 'python')
+          os.symlink(test_interpreter_binary, cached_symlink)
 
-      with self._setup_cache(constraints=[]) as (cache, path):
-        # Setup cache for test interpreter distribution.
-        identity_str = str(PythonInterpreter.from_binary(test_interpreter_binary).identity)
-        cached_interpreter_dir = os.path.join(cache._cache_dir, identity_str)
-        safe_mkdir(cached_interpreter_dir)
-        cached_symlink = os.path.join(cached_interpreter_dir, 'python')
-        os.symlink(test_interpreter_binary, cached_symlink)
-
-        # Remove the test interpreter binary from filesystem and assert that the cache is purged.
-        os.remove(test_interpreter_binary)
-        self.assertEqual(os.path.exists(test_interpreter_binary), False)
-        self.assertEqual(os.path.exists(cached_interpreter_dir), True)
-        cache._interpreter_from_relpath(identity_str)
-        self.assertEqual(os.path.exists(cached_interpreter_dir), False)
+          # Remove the test interpreter binary from filesystem and assert that the cache is purged.
+          os.remove(test_interpreter_binary)
+          self.assertEqual(os.path.exists(test_interpreter_binary), False)
+          self.assertEqual(os.path.exists(cached_interpreter_dir), True)
+          cache._interpreter_from_relpath(identity_str)
+          self.assertEqual(os.path.exists(cached_interpreter_dir), False)

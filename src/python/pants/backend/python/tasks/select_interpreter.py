@@ -102,7 +102,7 @@ class SelectInterpreter(Task):
     interpreter = self._get_interpreter(interpreter_path_file)
     if not os.path.exists(interpreter.binary):
       self.context.log.info('Stale interpreter reference detected: {}, removing reference and '
-                            'selecting a new interpreter.'.format(binary))
+                            'selecting a new interpreter.'.format(interpreter.binary))
       os.remove(interpreter_path_file)
       return True
     return False

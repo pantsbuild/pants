@@ -117,20 +117,20 @@ class PythonInterpreterCache(Subsystem):
 
   def _interpreter_from_relpath(self, path, filters=()):
     path = os.path.join(self._cache_dir, path)
-    if os.path.isdir(path):
-      try:
-        executable = os.readlink(os.path.join(path, 'python'))
-        if not os.path.exists(executable):
-          self._purge_interpreter(path)
-          return None
-      except OSError:
+    try:
+      executable = os.readlink(os.path.join(path, 'python'))
+      if not os.path.exists(executable):
+        self._purge_interpreter(path)
         return None
-      interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
-      if self._matches(interpreter, filters=filters):
-        return self._resolve(interpreter)
+    except OSError:
+      return None
+    interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
+    if self._matches(interpreter, filters=filters):
+      return self._resolve(interpreter)
     return None
 
-  def _setup_interpreter(self, interpreter, cache_target_path):
+  def _setup_interpreter(self, interpreter, identity_str):
+    cache_target_path = os.path.join(self._cache_dir, identity_str)
     with safe_concurrent_creation(cache_target_path) as safe_path:
       os.mkdir(safe_path)  # Parent will already have been created by safe_concurrent_creation.
       os.symlink(interpreter.binary, os.path.join(safe_path, 'python'))
@@ -150,8 +150,7 @@ class PythonInterpreterCache(Subsystem):
       identity_str = str(interpreter.identity)
       pi = self._interpreter_from_relpath(identity_str, filters=filters)
       if pi is None:
-        cache_path = os.path.join(self._cache_dir, identity_str)
-        self._setup_interpreter(interpreter, cache_path)
+        self._setup_interpreter(interpreter, identity_str)
         pi = self._interpreter_from_relpath(identity_str, filters=filters)
       if pi:
         yield pi
