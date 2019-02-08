@@ -4,6 +4,68 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.15.0.dev0 (2/8/2019)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* deprecate implicit usage of binary_mode=True and mode='wb' in dirutil methods (#7120)
+  `PR #7120 <https://github.com/pantsbuild/pants/pull/7120>`_
+
+* Resolve all platforms from all python targets (#7156)
+  `PR #7156 <https://github.com/pantsbuild/pants/pull/7156>`_
+
+* Only lint the direct sources of a linted target. (#7219)
+  `PR #7219 <https://github.com/pantsbuild/pants/pull/7219>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add flag reporting-zipkin-sample-rate (#7211)
+  `PR #7211 <https://github.com/pantsbuild/pants/pull/7211>`_
+
+* Add flags to prosecc_executor that say where to materialize output and what is output  (#7201)
+  `PR #7201 <https://github.com/pantsbuild/pants/pull/7201>`_
+
+Bugfixes
+~~~~~~~~
+
+* Do not render the coursier workunit unless it will run. (#7218)
+  `PR #7218 <https://github.com/pantsbuild/pants/pull/7218>`_
+
+* Output non-empty digest for empty directory as output_directories when running ExecuteProcessRequest (#7208)
+  `PR #7208 <https://github.com/pantsbuild/pants/pull/7208>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* documentation for grpcio (#7155)
+  `PR #7155 <https://github.com/pantsbuild/pants/pull/7155>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Make Resettable lazy again (#7222)
+  `PR #7222 <https://github.com/pantsbuild/pants/pull/7222>`_
+
+* fix _raise_deferred_exc() (#7008)
+  `PR #7008 <https://github.com/pantsbuild/pants/pull/7008>`_
+
+* Skip flaky test (#7209)
+  `PR #7209 <https://github.com/pantsbuild/pants/pull/7209>`_
+
+* Only run master-dependent commithooks on master (#7214)
+  `PR #7214 <https://github.com/pantsbuild/pants/pull/7214>`_
+
+* Revert "make GoTest subclass PartitionedTestRunnerTaskMixin to test transitively" (#7212)
+  `PR #7212 <https://github.com/pantsbuild/pants/pull/7212>`_
+
+* Absolute-ify GIT_DIR (#7210)
+  `PR #7210 <https://github.com/pantsbuild/pants/pull/7210>`_
+
+* Fix release script ownership check command name. (#7204)
+  `PR #7204 <https://github.com/pantsbuild/pants/pull/7204>`_
 
 1.14.0rc0 (2/01/2019)
 ---------------------
