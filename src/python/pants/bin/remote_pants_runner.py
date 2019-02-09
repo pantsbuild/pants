@@ -97,19 +97,10 @@ class RemotePantsRunner(object):
 
   @contextmanager
   def _trapped_signals(self, client):
-    """A contextmanager that overrides the SIGINT (control-c) and SIGQUIT (control-\\) handlers
-    and handles them remotely."""
-
+    """A contextmanager that handles SIGINT (control-c) and SIGQUIT (control-\\) remotely."""
     graceful_signal_handler = PailgunClientSignalHandler(client)
-    previous_signals = ExceptionSink.reset_graceful_signal_handler(graceful_signal_handler)
-
-    try:
+    with ExceptionSink.trapped_signals(graceful_signal_handler):
       yield
-    finally:
-      for signum, handler in previous_signals.items():
-        signal.signal(signum, handler)
-        # siginterrupt(3) says this is the default behavior on Linux.
-        signal.siginterrupt(signum, False)
 
   def _setup_logging(self):
     """Sets up basic stdio logging for the thin client."""

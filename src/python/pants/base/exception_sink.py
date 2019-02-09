@@ -12,6 +12,7 @@ import signal
 import sys
 import traceback
 from builtins import object, str
+from contextlib import contextmanager
 
 import setproctitle
 from future.utils import PY3
@@ -261,22 +262,31 @@ class ExceptionSink(object):
     OS state:
     - Overwrites signal handlers for SIGINT, SIGQUIT, and SIGTERM.
 
-    :returns: a dict (int -> func) mapping signal numbers to handlers which can be used to restore
-              the previous handlers for the affected signals later.
+    :returns: The :class:`GracefulSignalHandler` that was previously registered, or None if this is
+              the first time this method was called.
     """
     assert(isinstance(graceful_signal_handler, GracefulSignalHandler))
     # NB: Modify process-global state!
-    replaced_previous_handlers_by_signal = {
-      signum: signal.signal(signum, handler)
-      for signum, handler in graceful_signal_handler.signal_handler_mapping.items()
-    }
-    # Retry any system calls interrupted by any of the signals we just installed handlers for
-    # (instead of having them raise EINTR). siginterrupt(3) says this is the default behavior on
-    # Linux.
-    for signum in replaced_previous_handlers_by_signal.keys():
+    for signum, handler in graceful_signal_handler.signal_handler_mapping.items():
+      signal.signal(signum, handler)
+      # Retry any system calls interrupted by any of the signals we just installed handlers for
+      # (instead of having them raise EINTR). siginterrupt(3) says this is the default behavior on
+      # Linux.
       signal.siginterrupt(signum, False)
+
+    previous_signal_handler = cls._graceful_signal_handler
+    # NB: Mutate the class variables!
     cls._graceful_signal_handler = graceful_signal_handler
-    return replaced_previous_handlers_by_signal
+    return previous_signal_handler
+
+  @contextmanager
+  def trapped_signals(cls, new_graceful_signal_handler):
+    """A contextmanager which temporarily overrides signal handling."""
+    try:
+      previous_signal_handler = cls.reset_graceful_signal_handler(new_graceful_signal_handler)
+      yield
+    finally:
+      cls.reset_graceful_signal_handler(previous_signal_handler)
 
   @classmethod
   def _iso_timestamp_for_now(cls):
