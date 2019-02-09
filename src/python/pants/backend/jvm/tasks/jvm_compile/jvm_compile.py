@@ -400,8 +400,15 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
     valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
 
-    if self.execution_strategy in {self.HERMETIC, self.HERMETIC_WITH_NAILGUN}:
-      self._set_directory_digests_for_valid_target_classpath_directories(valid_targets, compile_contexts)
+    def set_directory_digests_for_hermetic():
+      self._set_directory_digests_for_valid_target_classpath_directories(
+        valid_targets, compile_contexts)
+    self.execution_strategy_enum.resolve_for_enum_variant({
+      self.HERMETIC: set_directory_digests_for_hermetic,
+      self.HERMETIC_WITH_NAILGUN: set_directory_digests_for_hermetic,
+      self.SUBPROCESS: lambda: None,
+      self.NAILGUN: lambda: None,
+    })()
 
     for valid_target in valid_targets:
       cc = self.select_runtime_context(compile_contexts[valid_target])

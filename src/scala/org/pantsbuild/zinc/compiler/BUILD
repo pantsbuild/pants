@@ -31,7 +31,6 @@ jvm_binary(
     dependencies = [
         ":rsc",
         ":compiler",
-        ":semanticdb",
     ],
 )
 
