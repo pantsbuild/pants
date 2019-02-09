@@ -227,7 +227,8 @@ class BaseZincCompile(JvmCompile):
     # Validate zinc options.
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args,
                                    self._args)
-    if self.execution_strategy in {self.HERMETIC, self.HERMETIC_WITH_NAILGUN}:
+
+    def hermetic_init():
       # TODO: Make incremental compiles work. See:
       # hermetically https://github.com/pantsbuild/pants/issues/6517
       if self.get_options().incremental:
@@ -249,6 +250,13 @@ class BaseZincCompile(JvmCompile):
         # right places.
         # See https://github.com/pantsbuild/pants/issues/6432
         raise TaskError("Hermetic zinc execution currently doesn't work with classpath jars")
+
+    self.execution_strategy_enum.resolve_for_enum_variant({
+      self.HERMETIC: hermetic_init,
+      self.HERMETIC_WITH_NAILGUN: hermetic_init,
+      self.SUBPROCESS: lambda: None,
+      self.NAILGUN: lambda: None,
+    })()
 
   def select(self, target):
     raise NotImplementedError()
@@ -314,7 +322,13 @@ class BaseZincCompile(JvmCompile):
     if self.get_options().capture_classpath:
       self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir.path)
 
-    self._verify_zinc_classpath(absolute_classpath, allow_dist=(self.execution_strategy not in {self.HERMETIC, self.HERMETIC_WITH_NAILGUN}))
+    self._verify_zinc_classpath(absolute_classpath,
+                                allow_dist=self.execution_strategy_enum.resolve_for_enum_variant({
+                                  self.HERMETIC: False,
+                                  self.HERMETIC_WITH_NAILGUN: False,
+                                  self.SUBPROCESS: True,
+                                  self.NAILGUN: True,
+                                }))
     # TODO: Investigate upstream_analysis for hermetic compiles
     self._verify_zinc_classpath(upstream_analysis.keys())
 
