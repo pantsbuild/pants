@@ -175,6 +175,18 @@ class BaseZincCompile(JvmCompile):
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
 
+    register('--ng-client-input-digest', default=None, metavar='<digest>',
+             help='When using the `hermetic-with-nailgun` execution strategy, the `ng` command '
+                  'line client is used to connect to a running nailgun instance. Currently, the '
+                  'environment performing the sandboxed hermetic execution is expected to set the '
+                  'NAILGUN_PORT environment variable itself to point to a running nailgun instance '
+                  'containing a jar with both rsc and zinc. This is for internal iteration only. '
+                  'See https://github.com/facebook/nailgun/blob/master/nailgun-client/c/ng.c for '
+                  'the `ng` command-line client, buildable with `gcc ng.c -o ng`.')
+    register('--ng-client-input-digest-length', default=None, type=int,
+             help='The other component of a Digest required for hermetic execution. See '
+                  '--ng-client-input-digest.')
+
   @classmethod
   def subsystem_dependencies(cls):
     return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
@@ -183,6 +195,11 @@ class BaseZincCompile(JvmCompile):
   def prepare(cls, options, round_manager):
     super(BaseZincCompile, cls).prepare(options, round_manager)
     ScalaPlatform.prepare_tools(round_manager)
+
+  @property
+  def _ng_client_digest(self):
+    return Digest(text_type(self.get_options().ng_client_input_digest),
+                  self.get_options().ng_client_input_digest_length)
 
   @property
   def incremental(self):
@@ -319,9 +336,11 @@ class BaseZincCompile(JvmCompile):
 
     zinc_args = []
     zinc_args.extend([
-      '-log-level', self.get_options().level,
+      # TODO: for some reason this argument isn't accepted (although it is also later on the command
+      # line, and that appears to work -- unclear)!
+      # '-log-level', self.get_options().level,
       '-analysis-cache', analysis_cache,
-      '-classpath', ':'.join(relative_classpath),
+      '--classpath', ':'.join(relative_classpath),
       '-d', classes_dir,
     ])
     if not self.get_options().colors:
@@ -350,7 +369,7 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
-                        ','.join('{}:{}'.format(
+                        ','.join('{}={}'.format(
                           relative_to_exec_root(k),
                           relative_to_exec_root(v)
                         ) for k, v in upstream_analysis.items())])
@@ -450,11 +469,14 @@ class BaseZincCompile(JvmCompile):
     if with_nailgun:
       argv = [
         './ng', Zinc.ZINC_COMPILE_MAIN,
-        '--nailgun-compiler-cache-dir', '/tmp/compiler-cache',
+        # TODO: for some reason this argument isn't getting accepted right now, but the default in
+        # the zinc wrapper should suffice for now!
+        # '--nailgun-compiler-cache-dir', '/tmp/compiler-cache',
       ] + zinc_args
-      # TODO: ensure the ng client is available!
       merged_input_digest = self.context._scheduler.merge_directories(
-        tuple(s.directory_digest for s in (snapshots)) + directory_digests + (Digest("41749768429b763c401744fc89a92e99322f968e5aea66ff51b8be9c664f9488", 80),)
+        tuple(s.directory_digest for s in snapshots)
+        + directory_digests
+        + (self._ng_client_digest,)
       )
     else:
       argv = ['.jdk/bin/java'] + jvm_options + [

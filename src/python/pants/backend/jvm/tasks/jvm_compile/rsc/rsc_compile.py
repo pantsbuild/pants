@@ -164,7 +164,7 @@ class RscCompile(ZincCompile):
              help="If a target isn't tagged as rsc-compatible, but matches any of these regexps, "
                   "compile it with zinc instead.")
 
-    rsc_toolchain_version = '0.0.0-446-c64e6937'
+    rsc_toolchain_version = '0.0.0-733-05951a97-20190208-1804'
 
     cls.register_jvm_tool(
       register,
@@ -172,7 +172,10 @@ class RscCompile(ZincCompile):
       classpath=[
           JarDependency(
               org='com.twitter',
-              name='rsc_2.11',
+              # NB: Rsc must be published with 2.12 to keep up with the recent change in upstream
+              # pants which uses zinc with 2.12! This causes one test to fail in the rsc repo and must
+              # be published with publish-m2 (ivy publishes don't produce a pom, or something).
+              name='rsc_2.12',
               rev=rsc_toolchain_version,
           ),
       ],
@@ -620,7 +623,6 @@ class RscCompile(ZincCompile):
     if with_nailgun:
       cmd = [
         './ng', main,
-        '--nailgun-compiler-cache-dir', '/tmp/compiler-cache',
       ] + args
     else:
       cmd = [
@@ -633,18 +635,17 @@ class RscCompile(ZincCompile):
     pathglobs = list(tool_classpath)
     pathglobs.extend(f if os.path.isfile(f) else '{}/**'.format(f) for f in input_files)
 
+    # dont capture snapshot, if pathglobs is empty
     if pathglobs:
       root = PathGlobsAndRoot(
       PathGlobs(tuple(pathglobs)),
       text_type(get_buildroot()))
-      # dont capture snapshot, if pathglobs is empty
       path_globs_input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
 
     epr_input_files = self.context._scheduler.merge_directories(
       ((path_globs_input_digest,) if path_globs_input_digest else ())
       + ((input_digest,) if input_digest else ())
-      # TODO: ensure the ng client is available!
-      + ((Digest("41749768429b763c401744fc89a92e99322f968e5aea66ff51b8be9c664f9488", 80),) if with_nailgun else ()))
+      + ((self._ng_client_digest,) if with_nailgun else ()))
 
     req = ExecuteProcessRequest(
       argv=tuple(cmd),
@@ -657,6 +658,8 @@ class RscCompile(ZincCompile):
       # Since this is always hermetic, we need to use `underlying_dist`
       jdk_home=text_type(self._zinc.underlying_dist.home),
     )
+
+    self.context.log.debug("local process execution req: {}".format(req))
 
     retry_iteration = 0
 
