@@ -342,20 +342,17 @@ def enum(*args):
       NB: This method is exposed for testing enum variants easily. resolve_for_enum_variant() should
       be used for performing conditional logic based on an enum instance's value.
       """
-      # TODO: use this method to register attributes on the generated type object for each of the
-      # singletons!
+      # TODO(#7232): use this method to register attributes on the generated type object for each of
+      # the singletons!
       return cls._singletons.values()
 
   return ChoiceDatatype
 
 
-# TODO: allow usage of the normal register() by using an enum class as the `type` argument by
-# extending option registration to allow extracting `choices` and `default` value from the `type`!
+# TODO(#7233): allow usage of the normal register() by using an enum class as the `type` argument!
 def register_enum_option(register, enum_cls, *args, **kwargs):
   """A helper method for declaring a pants option from an `enum()`."""
   default_value = kwargs.pop('default', enum_cls.default_value)
-  # TODO: the `choices` argument is checked against after the `type` is applied, which then produces
-  # the enum type check error message instead of the `choices` error message. This should be fixed.
   register(*args, choices=enum_cls._allowed_values, default=default_value, **kwargs)
 
 
