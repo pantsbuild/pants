@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import time
-from builtins import str
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import Exiter
@@ -39,4 +38,4 @@ def main():
     try:
       PantsRunner(exiter, start_time=start_time).run()
     except KeyboardInterrupt as e:
-      exiter.exit_and_fail('Interrupted by user. {}'.format(str(e)))
+      exiter.exit_and_fail('Interrupted by user:\n{}'.format(e.message))
