@@ -36,7 +36,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                   'for targets of this language.')
 
     register_enum_option(
-      register, ToolchainVariant, '--toolchain-variant', type=str, advanced=True,
+      register, ToolchainVariant, '--toolchain-variant', advanced=True,
       help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
            "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 

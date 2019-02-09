@@ -196,7 +196,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
     register_enum_option(
-      register, GlobMatchErrorBehavior, '--glob-expansion-failure', default='warn', type=str,
+      # TODO: allow using the attribute `GlobMatchErrorBehavior.warn` for more safety!
+      register, GlobMatchErrorBehavior, '--glob-expansion-failure', default='warn',
       advanced=True,
       help="Raise an exception if any targets declaring source files "
            "fail to match any glob provided in the 'sources' argument.")

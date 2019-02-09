@@ -47,6 +47,13 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                           rev='0.9.1'),
                           ])
 
+  @memoized_property
+  def execution_strategy_enum(self):
+    # TODO: This .create() call can be removed when the enum interface is more stable as the option
+    # is converted into an instance of self.ExecutionStrategy vai the `type` argument through
+    # register_enum_option().
+    return self.ExecutionStrategy.create(self.get_options().execution_strategy)
+
   @classmethod
   def subsystem_dependencies(cls):
     return super(NailgunTaskBase, cls).subsystem_dependencies() + (Subprocess.Factory,)
@@ -62,10 +69,6 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     self._identity = '_'.join(id_tuple)
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
-
-  @memoized_property
-  def execution_strategy_enum(self):
-    return self.ExecutionStrategy.create(self.get_options().execution_strategy)
 
   # TODO: eventually deprecate this when we can move all subclasses to use the enum!
   @property

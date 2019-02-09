@@ -601,7 +601,7 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
   def test_enum_class_creation_errors(self):
     expected_rx = re.escape(
       "When converting all_values ([1, 2, 3, 1]) to a set, at least one duplicate "
-      "was detected. The unique elements of all_values were: OrderedSet([1, 2, 3]).")
+      "was detected. The unique elements of all_values were: [1, 2, 3].")
     with self.assertRaisesRegexp(ValueError, expected_rx):
       class DuplicateAllowedValues(enum('x', [1, 2, 3, 1])): pass
 
@@ -609,30 +609,31 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
     self.assertEqual(1, SomeEnum.create().x)
     self.assertEqual(2, SomeEnum.create(2).x)
     self.assertEqual(1, SomeEnum(1).x)
-    self.assertEqual(2, SomeEnum(x=2).x)
 
   def test_enum_instance_creation_errors(self):
     expected_rx = re.escape(
-      "Value 3 for 'x' must be one of: OrderedSet([1, 2]).")
+      "Value 3 for 'x' must be one of: [1, 2].")
     with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx):
       SomeEnum.create(3)
     with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx):
       SomeEnum(3)
-    with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx):
+
+    # Specifying the value by keyword argument is not allowed.
+    with self.assertRaisesRegexp(TypeError, re.escape("__new__() got an unexpected keyword argument 'x'")):
       SomeEnum(x=3)
 
     # Test that None is not used as the default unless none_is_default=True.
     with self.assertRaisesRegexp(EnumVariantSelectionError, re.escape(
-        "Value None for 'x' must be one of: OrderedSet([1, 2])."
+        "Value None for 'x' must be one of: [1, 2]."
     )):
       SomeEnum.create(None)
     self.assertEqual(1, SomeEnum.create(None, none_is_default=True).x)
 
     expected_rx_falsy_value = re.escape(
-      "Value {}'' for 'x' must be one of: OrderedSet([1, 2])."
+      "Value {}'' for 'x' must be one of: [1, 2]."
       .format('u' if PY2 else ''))
     with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx_falsy_value):
-      SomeEnum(x='')
+      SomeEnum('')
 
   def test_enum_resolve_variant(self):
     one_enum_instance = SomeEnum(1)
