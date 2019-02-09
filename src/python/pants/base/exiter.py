@@ -16,6 +16,11 @@ from pants.util.strutil import ensure_binary
 logger = logging.getLogger(__name__)
 
 
+# ???/so we're all on the same page
+PANTS_SUCCESS_EXIT_CODE = 0
+PANTS_FAILED_EXIT_CODE = 1
+
+
 class Exiter(object):
   """A class that provides standard runtime exit behavior.
 
@@ -38,7 +43,8 @@ class Exiter(object):
     """Map class calls to self.exit() to support sys.exit() fungibility."""
     return self.exit(*args, **kwargs)
 
-  def exit(self, result=0, msg=None, out=None):
+  # TODO: add PANTS_SUCCESS_EXIT_CODE and PANTS_FAILED_EXIT_CODE to the docstring!
+  def exit(self, result=PANTS_SUCCESS_EXIT_CODE, msg=None, out=None):
     """Exits the runtime.
 
     :param result: The exit status. Typically a 0 indicating success or a 1 indicating failure, but
@@ -67,10 +73,10 @@ class Exiter(object):
     self._exit(result)
 
   def exit_and_fail(self, msg=None, out=None):
-    """Exits the runtime with an exit code of 1, indicating failure.
+    """Exits the runtime with a nonzero exit code, indicating failure.
 
     :param msg: A string message to print to stderr or another custom file desciptor before exiting.
                 (Optional)
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
-    self.exit(result=1, msg=msg, out=out)
+    self.exit(result=PANTS_FAILED_EXIT_CODE, msg=msg, out=out)

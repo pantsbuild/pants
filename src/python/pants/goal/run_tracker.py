@@ -21,6 +21,7 @@ from future.utils import PY2, PY3
 
 from pants.auth.cookies import Cookies
 from pants.base.build_environment import get_pants_cachedir
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCESS_EXIT_CODE
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -453,6 +454,8 @@ class RunTracker(Subsystem):
   def has_ended(self):
     return self._end_memoized_result is not None
 
+  # TODO: memoize this with a decorator!
+  # TODO: add PANTS_SUCCESS_EXIT_CODE and PANTS_FAILED_EXIT_CODE to the docstring!
   def end(self):
     """This pants run is over, so stop tracking it.
 
@@ -496,7 +499,8 @@ class RunTracker(Subsystem):
     self.report.close()
     self.store_stats()
 
-    result = 1 if outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED] else 0
+    run_failed = outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED]
+    result = PANTS_FAILED_EXIT_CODE if run_failed else PANTS_SUCCESS_EXIT_CODE
     self._end_memoized_result = result
     return self._end_memoized_result
 

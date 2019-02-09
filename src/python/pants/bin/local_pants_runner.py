@@ -9,7 +9,7 @@ from builtins import object
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import Exiter
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCESS_EXIT_CODE, Exiter
 from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
@@ -35,13 +35,27 @@ class LocalExiter(Exiter):
     self._repro = repro
     super(LocalExiter, self).__init__(*args, **kwargs)
 
-  def exit(self, result=0, *args, **kwargs):
+  def exit(self, result=PANTS_SUCCESS_EXIT_CODE, msg=None, *args, **kwargs):
+    additional_message = None
     try:
       if not self._run_tracker.has_ended():
-        outcome = WorkUnit.SUCCESS if result == 0 else WorkUnit.FAILURE
+        if result == PANTS_SUCCESS_EXIT_CODE:
+          outcome = WorkUnit.SUCCESS
+        elif result == PANTS_FAILED_EXIT_CODE:
+          outcome = WorkUnit.FAILURE
+        else:
+          run_tracker_msg = ("unrecognized exit code {} provided to {}.exit() -- "
+                             "interpreting as a failure in the run tracker"
+                             .format(result, type(self).__name__))
+          # Log the unrecognized exit code to the fatal exception log.
+          ExceptionSink.log_exception(run_tracker_msg)
+          # Ensure the unrecognized exit code message is also logged to the terminal.
+          additional_message = run_tracker_msg
+          outcome = WorkUnit.FAILURE
+
         self._run_tracker.set_root_outcome(outcome)
         run_tracker_result = self._run_tracker.end()
-        assert(result == run_tracker_result)
+        assert result == run_tracker_result, "pants exit code not correctly recorded by run tracker"
     except ValueError as e:
       # If we have been interrupted by a signal, calling .end() sometimes writes to a closed file,
       # so we just log that fact here and keep going.
@@ -54,7 +68,10 @@ class LocalExiter(Exiter):
         # a signal.
         self._repro.log_location_of_repro_file()
 
-    super(LocalExiter, self).exit(result=result, *args, **kwargs)
+    if additional_message:
+      msg = '{}\n\n{}'.format(additional_message, msg)
+
+    super(LocalExiter, self).exit(result=result, msg=msg, *args, **kwargs)
 
 
 class LocalPantsRunner(object):
@@ -220,7 +237,7 @@ class LocalPantsRunner(object):
 
   def _maybe_run_v1(self):
     if not self._global_options.v1:
-      return 0
+      return PANTS_SUCCESS_EXIT_CODE
 
     # Setup and run GoalRunner.
     goal_runner_factory = GoalRunner.Factory(
@@ -239,7 +256,7 @@ class LocalPantsRunner(object):
     # N.B. For daemon runs, @console_rules are invoked pre-fork -
     # so this path only serves the non-daemon run mode.
     if self._is_daemon or not self._global_options.v2:
-      return 0
+      return PANTS_SUCCESS_EXIT_CODE
 
     # If we're a pure --v2 run, validate goals - otherwise some goals specified
     # may be provided by the --v1 task paths.
@@ -258,9 +275,9 @@ class LocalPantsRunner(object):
     except Exception as e:
       logger.warn('Encountered unhandled exception {} during rule execution!'
                   .format(e))
-      return 1
+      return PANTS_FAILED_EXIT_CODE
     else:
-      return 0
+      return PANTS_SUCCESS_EXIT_CODE
 
   @staticmethod
   def _compute_final_exit_code(*codes):
@@ -281,7 +298,7 @@ class LocalPantsRunner(object):
       except ValueError as e:
         # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
         logger.exception(e)
-        run_tracker_result = 0
+        run_tracker_result = PANTS_SUCCESS_EXIT_CODE
 
     final_exit_code = self._compute_final_exit_code(
       engine_result,
