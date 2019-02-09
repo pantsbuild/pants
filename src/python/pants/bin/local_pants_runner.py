@@ -38,10 +38,8 @@ class LocalExiter(Exiter):
   def exit(self, result=0, *args, **kwargs):
     try:
       if not self._run_tracker.has_ended():
-        if result == 0:
-          self._run_tracker.set_root_outcome(WorkUnit.SUCCESS)
-        else:
-          self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
+        outcome = WorkUnit.SUCCESS if result == 0 else WorkUnit.FAILURE
+        self._run_tracker.set_root_outcome(outcome)
         run_tracker_result = self._run_tracker.end()
         assert(result == run_tracker_result)
     except ValueError as e:

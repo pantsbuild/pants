@@ -35,14 +35,24 @@ class GracefulSignalHandler(object):
   Note that the terminal will convert a ctrl-c from the user into a SIGINT.
   """
 
+  # TODO: use an enum and .resolve_for_enum_variant() when #7226 is merged!
+  @property
+  def signal_handler_mapping(self):
+    """???"""
+    return {
+      signal.SIGINT: self.handle_sigint,
+      signal.SIGQUIT: self.handle_sigquit,
+      signal.SIGTERM: self.handle_sigterm,
+    }
+
   def handle_sigint(self, signum, frame):
-    ExceptionSink._handle_signal_gracefully(signum, frame)
+    ExceptionSink._handle_signal_gracefully(signum, 'SIGINT', frame)
 
   def handle_sigquit(self, signum, frame):
-    ExceptionSink._handle_signal_gracefully(signum, frame)
+    ExceptionSink._handle_signal_gracefully(signum, 'SIGQUIT', frame)
 
   def handle_sigterm(self, signum, frame):
-    ExceptionSink._handle_signal_gracefully(signum, frame)
+    ExceptionSink._handle_signal_gracefully(signum, 'SIGTERM', frame)
 
 
 class ExceptionSink(object):
@@ -155,13 +165,12 @@ class ExceptionSink(object):
       # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
       faulthandler.register(signal.SIGUSR2, interactive_output_stream,
                             all_threads=True, chain=False)
+      # NB: mutate the class variables!
+      cls._interactive_output_stream = interactive_output_stream
     except ValueError:
       # Warn about "ValueError: IO on closed file" when the stream is closed.
       cls.log_exception(
         "Cannot reset interactive_output_stream -- stream (probably stderr) is closed")
-
-    # NB: mutate the class variables!
-    cls._interactive_output_stream = interactive_output_stream
 
   @classmethod
   def exceptions_log_path(cls, for_pid=None, in_dir=None):
@@ -258,9 +267,8 @@ class ExceptionSink(object):
     assert(isinstance(graceful_signal_handler, GracefulSignalHandler))
     # NB: Modify process-global state!
     replaced_previous_handlers_by_signal = {
-      signal.SIGINT: signal.signal(signal.SIGINT, graceful_signal_handler.handle_sigint),
-      signal.SIGQUIT: signal.signal(signal.SIGQUIT, graceful_signal_handler.handle_sigquit),
-      signal.SIGTERM: signal.signal(signal.SIGTERM, graceful_signal_handler.handle_sigterm),
+      signum: signal.signal(signum, handler)
+      for signum, handler in graceful_signal_handler.signal_handler_mapping.items()
     }
     # Retry any system calls interrupted by any of the signals we just installed handlers for
     # (instead of having them raise EINTR). siginterrupt(3) says this is the default behavior on
@@ -358,23 +366,18 @@ timestamp: {timestamp}
       stderr_printed_error = '{}\n{}'.format(stderr_printed_error, extra_err_msg)
     cls._exit_with_failure(stderr_printed_error)
 
-  # From https://stackoverflow.com/a/2549950/2518889.
-  _SIGNAL_NAMES = dict((k, v) for v, k in reversed(sorted(signal.__dict__.items()))
-     if v.startswith('SIG') and not v.startswith('SIG_'))
-
   _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\
 Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_traceback}
 """
 
   @classmethod
-  def _handle_signal_gracefully(cls, signum, frame):
+  def _handle_signal_gracefully(cls, signum, signame, frame):
     """Signal handler for non-fatal signals which raises or logs an error and exits with failure.
 
     NB: Ensure this method remains registered for all the signals supported by GracefulSignalHandler
     in reset_graceful_signal_handler()!
     """
     tb = frame.f_exc_traceback or sys.exc_info()[2]
-    signame = cls._SIGNAL_NAMES.get(signum, '<unknown signal>')
 
     # Format an entry to be written to the exception log.
     formatted_traceback = cls._format_traceback(tb, should_print_backtrace=bool(tb))
