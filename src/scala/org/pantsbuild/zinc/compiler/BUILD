@@ -31,6 +31,7 @@ jvm_binary(
     dependencies = [
         ":rsc",
         ":compiler",
+        ":semanticdb",
     ],
 )
 
@@ -39,8 +40,11 @@ jar_library(
     jars = [
         jar(
             org = "com.twitter",
-            name = "rsc_2.11",
-            rev = "0.0.0-665-31f0e61a",
+            # NB: Rsc must be published with 2.12 to keep up with the recent change in upstream
+            # pants which uses zinc with 2.12! This causes one test to fail in the rsc repo and must
+            # be published with publish-m2 (ivy publishes don't produce a pom, or something).
+            name = "rsc_2.12",
+            rev = "0.0.0-733-05951a97-20190208-1804",
         ),
     ],
 )

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import os
 
 from future.utils import binary_type, text_type
 
@@ -12,6 +13,7 @@ from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.util.objects import Exactly, TypeCheckError, datatype
+from pants.util.strutil import safe_shlex_join
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,40 @@ class ExecuteProcessRequest(datatype([
   ('jdk_home', Exactly(text_type, type(None))),
 ])):
   """Request for execution with args and snapshots to extract."""
+
+  def __str__(self):
+    scheduler_url = os.environ.get('SCHEDULER_URL')
+    apiserver_url = os.environ.get('APISERVER_URL')
+    cache_key_gen_version = os.environ['PANTS_CACHE_KEY_GEN_VERSION']
+    cmdline = [
+      '/var/lib/jenkins/pants-github/src/rust/engine/target/debug/process_executor',
+      '--input-digest', self.input_files.fingerprint,
+      '--input-digest-length', str(self.input_files.serialized_bytes_length),
+      '--cache-key-gen-version', cache_key_gen_version,
+    ]
+    if self.env:
+      cmdline.extend(['--env'] + [
+        '{}={}'.format(self.env[st], self.env[st + 1])
+        for st in range(0, len(self.env), 2)
+      ])
+    if self.jdk_home:
+      cmdline.extend([
+        '--jdk',
+        self.jdk_home,
+      ])
+    if scheduler_url:
+      assert(apiserver_url)
+      cmdline.extend([
+        '--server', scheduler_url,
+        '--cas-server', apiserver_url,
+      ])
+    cmdline.extend(['--'] + list(self.argv))
+    return """\
+base: {base}
+process_executor cmdline:
+{cmdline}
+""".format(base=super(ExecuteProcessRequest, self).__str__(),
+           cmdline=safe_shlex_join(cmdline))
 
   def __new__(
     cls,
