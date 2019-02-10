@@ -869,7 +869,7 @@ class RscCompile(ZincCompile):
           wu, self.tool_classpath(tool_name), main, tool_name, args, distribution),
         self.NAILGUN: lambda: self._runtool_nonhermetic(
           wu, self._nailgunnable_combined_classpath, main, tool_name, args, distribution),
-      })
+      })()
 
   def _run_metai_tool(self,
                       distribution,
