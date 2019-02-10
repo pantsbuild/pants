@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-from builtins import object
+from builtins import object, str
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
@@ -36,6 +36,7 @@ class LocalExiter(Exiter):
     super(LocalExiter, self).__init__(*args, **kwargs)
 
   def exit(self, result=PANTS_SUCCESS_EXIT_CODE, msg=None, *args, **kwargs):
+    # This variable is prepended to the existing exit message when calling the superclass .exit().
     additional_message = None
     try:
       if not self._run_tracker.has_ended():
@@ -59,7 +60,9 @@ class LocalExiter(Exiter):
     except ValueError as e:
       # If we have been interrupted by a signal, calling .end() sometimes writes to a closed file,
       # so we just log that fact here and keep going.
-      logger.exception(e)
+      exception_string = str(e)
+      ExceptionSink.log_exception(exception_string)
+      additional_message = exception_string
     finally:
       if self._repro:
         # TODO: Have Repro capture the 'after' state (as a diff) as well? (in reference to the below
@@ -69,7 +72,7 @@ class LocalExiter(Exiter):
         self._repro.log_location_of_repro_file()
 
     if additional_message:
-      msg = '{}\n\n{}'.format(additional_message, msg)
+      msg = '{}\n\n{}'.format(additional_message, msg or '')
 
     super(LocalExiter, self).exit(result=result, msg=msg, *args, **kwargs)
 
