@@ -205,7 +205,7 @@ class RscCompile(ZincCompile):
       self.HERMETIC: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.SUBPROCESS: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
-    })
+    })()
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
