@@ -26,12 +26,13 @@ from pants.util.osutil import IntegerForPid
 logger = logging.getLogger(__name__)
 
 
-class GracefulSignalHandler(object):
+class SignalHandler(object):
   """A specification for how to handle a fixed set of nonfatal signals.
 
-  This is subclassed and registered with ExceptionSink.reset_graceful_signal_handler() whenever the
-  signal handling behavior is modified for different pants processes, for example in the remote client
-  when pantsd is enabled.
+  This is subclassed and registered with ExceptionSink.reset_signal_handler() whenever the signal
+  handling behavior is modified for different pants processes, for example in the remote client when
+  pantsd is enabled. The default behavior is to exit "gracefully" by leaving a detailed log of which
+  signal was received, then exiting with failure.
 
   Note that the terminal will convert a ctrl-c from the user into a SIGINT.
   """
@@ -69,10 +70,10 @@ class ExceptionSink(object):
   _interactive_output_stream = None
   # Whether to print a stacktrace in any fatal error message printed to the terminal.
   _should_print_backtrace_to_terminal = True
-  # An instance of `GracefulSignalHandler` which is invoked to handle a static set of specific
+  # An instance of `SignalHandler` which is invoked to handle a static set of specific
   # nonfatal signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they
   # don't need to immediately).
-  _graceful_signal_handler = None
+  _signal_handler = None
 
   # These persistent open file descriptors are kept so the signal handler can do almost no work
   # (and lets faulthandler figure out signal safety).
@@ -255,38 +256,38 @@ class ExceptionSink(object):
     return (pid_specific_error_stream, shared_error_stream)
 
   @classmethod
-  def reset_graceful_signal_handler(cls, graceful_signal_handler):
+  def reset_signal_handler(cls, signal_handler):
     """
     Class state:
-    - Overwrites `cls._graceful_signal_handler`.
+    - Overwrites `cls._signal_handler`.
     OS state:
     - Overwrites signal handlers for SIGINT, SIGQUIT, and SIGTERM.
 
-    :returns: The :class:`GracefulSignalHandler` that was previously registered, or None if this is
+    :returns: The :class:`SignalHandler` that was previously registered, or None if this is
               the first time this method was called.
     """
-    assert(isinstance(graceful_signal_handler, GracefulSignalHandler))
+    assert(isinstance(signal_handler, SignalHandler))
     # NB: Modify process-global state!
-    for signum, handler in graceful_signal_handler.signal_handler_mapping.items():
+    for signum, handler in signal_handler.signal_handler_mapping.items():
       signal.signal(signum, handler)
       # Retry any system calls interrupted by any of the signals we just installed handlers for
       # (instead of having them raise EINTR). siginterrupt(3) says this is the default behavior on
       # Linux.
       signal.siginterrupt(signum, False)
 
-    previous_signal_handler = cls._graceful_signal_handler
+    previous_signal_handler = cls._signal_handler
     # NB: Mutate the class variables!
-    cls._graceful_signal_handler = graceful_signal_handler
+    cls._signal_handler = signal_handler
     return previous_signal_handler
 
   @contextmanager
-  def trapped_signals(cls, new_graceful_signal_handler):
+  def trapped_signals(cls, new_signal_handler):
     """A contextmanager which temporarily overrides signal handling."""
     try:
-      previous_signal_handler = cls.reset_graceful_signal_handler(new_graceful_signal_handler)
+      previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
       yield
     finally:
-      cls.reset_graceful_signal_handler(previous_signal_handler)
+      cls.reset_signal_handler(previous_signal_handler)
 
   @classmethod
   def _iso_timestamp_for_now(cls):
@@ -384,8 +385,8 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
   def _handle_signal_gracefully(cls, signum, signame, frame):
     """Signal handler for non-fatal signals which raises or logs an error and exits with failure.
 
-    NB: Ensure this method remains registered for all the signals supported by GracefulSignalHandler
-    in reset_graceful_signal_handler()!
+    NB: Ensure this method remains registered for all the signals supported by SignalHandler
+    in reset_signal_handler()!
     """
     tb = frame.f_exc_traceback or sys.exc_info()[2]
 
@@ -420,4 +421,4 @@ ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
 ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
 # Sets a handler that logs nonfatal signals to the exception sink before exiting.
-ExceptionSink.reset_graceful_signal_handler(GracefulSignalHandler())
+ExceptionSink.reset_signal_handler(SignalHandler())

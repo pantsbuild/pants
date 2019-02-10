@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from future.utils import PY3, raise_with_traceback
 
-from pants.base.exception_sink import ExceptionSink, GracefulSignalHandler
+from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
@@ -25,7 +25,7 @@ from pants.util.dirutil import maybe_read_file
 logger = logging.getLogger(__name__)
 
 
-class PailgunClientSignalHandler(GracefulSignalHandler):
+class PailgunClientSignalHandler(SignalHandler):
 
   def __init__(self, pailgun_client, *args, **kwargs):
     assert(isinstance(pailgun_client, NailgunClient))
@@ -98,8 +98,8 @@ class RemotePantsRunner(object):
   @contextmanager
   def _trapped_signals(self, client):
     """A contextmanager that handles SIGINT (control-c) and SIGQUIT (control-\\) remotely."""
-    graceful_signal_handler = PailgunClientSignalHandler(client)
-    with ExceptionSink.trapped_signals(graceful_signal_handler):
+    signal_handler = PailgunClientSignalHandler(client)
+    with ExceptionSink.trapped_signals(signal_handler):
       yield
 
   def _setup_logging(self):

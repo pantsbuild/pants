@@ -16,7 +16,7 @@ from future.utils import PY3, raise_with_traceback
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink, GracefulSignalHandler
+from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import PANTS_SUCCESS_EXIT_CODE, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
@@ -28,7 +28,7 @@ from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
 
-class DaemonSignalHandler(GracefulSignalHandler):
+class DaemonSignalHandler(SignalHandler):
 
   def handle_sigint(self, signum, frame):
     raise KeyboardInterrupt('remote client sent control-c!')
@@ -289,7 +289,7 @@ class DaemonPantsRunner(ProcessManager):
     ExceptionSink.reset_exiter(self._exiter)
 
     ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
-    ExceptionSink.reset_graceful_signal_handler(DaemonSignalHandler())
+    ExceptionSink.reset_signal_handler(DaemonSignalHandler())
 
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
