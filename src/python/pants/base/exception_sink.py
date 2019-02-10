@@ -280,6 +280,7 @@ class ExceptionSink(object):
     cls._signal_handler = signal_handler
     return previous_signal_handler
 
+  @classmethod
   @contextmanager
   def trapped_signals(cls, new_signal_handler):
     """A contextmanager which temporarily overrides signal handling."""
