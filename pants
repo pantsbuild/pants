@@ -2,13 +2,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd -P)
+REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
 
 # TODO(#7152): remove this after the python 3 migration!
 function pants3_maybe_clean() {
-  _PYTHON_VERSION_TO_RUN='2'
-  if [[ "$PANTS_USE_PYTHON3" == 'true' ]]; then
-    _PYTHON_VERSION_TO_RUN='3'
+  _PYTHON_VERSION_TO_RUN='3'
+  if [[ "$_PANTS_USING_PYTHON2" == 'true' ]]; then
+    _PYTHON_VERSION_TO_RUN='2'
   fi
 
   _PYTHON_VERSION_FILE="${REPO_ROOT}/.pants-python-version"

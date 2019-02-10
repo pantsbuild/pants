@@ -362,7 +362,7 @@ cargo_audit: &cargo_audit
 base_build_wheels: &base_build_wheels
   stage: *test
   env:
-    - &base_build_wheels_env PREPARE_DEPLOY=1
+    - &base_build_wheels_env PREPARE_DEPLOY=1 ONLY_USING_SINGLE_PYTHON_VERSION='true'
 
 py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
   # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize
