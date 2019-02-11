@@ -349,12 +349,19 @@ class BaseZincCompile(JvmCompile):
     scala_path = [classpath_entry.path for classpath_entry in scalac_classpath_entries]
 
     zinc_args = []
+    # TODO: The scopt option parsing from rsc-and-zinc.jar says -classpath alone isn't recognized.
+    classpath_arg_name = self.execution_strategy_enum.resolve_for_enum_variant({
+      self.HERMETIC_WITH_NAILGUN: '--classpath',
+      self.HERMETIC: '-classpath',
+      self.SUBPROCESS: '-classpath',
+      self.NAILGUN: '-classpath',
+    })
     zinc_args.extend([
       # TODO: for some reason this argument isn't accepted (although it is also later on the command
       # line, and that appears to work -- unclear)!
       # '-log-level', self.get_options().level,
       '-analysis-cache', analysis_cache,
-      '--classpath', ':'.join(relative_classpath),
+      classpath_arg_name, ':'.join(relative_classpath),
       '-d', classes_dir,
     ])
     if not self.get_options().colors:
