@@ -50,7 +50,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   @memoized_property
   def execution_strategy_enum(self):
     # TODO: This .create() call can be removed when the enum interface is more stable as the option
-    # is converted into an instance of self.ExecutionStrategy vai the `type` argument through
+    # is converted into an instance of self.ExecutionStrategy via the `type` argument through
     # register_enum_option().
     return self.ExecutionStrategy.create(self.get_options().execution_strategy)
 
