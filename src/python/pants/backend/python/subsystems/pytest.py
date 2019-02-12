@@ -14,6 +14,8 @@ class PyTest(Subsystem):
   def register_options(cls, register):
     super(PyTest, cls).register_options(register)
     # TODO: This is currently bounded below `3.7` due to #6282.
+    # TODO: Additionally, this is temporarily pinned to 3.0.7 due to more-itertools 6.0.0 dropping
+    # Python 2 support: https://github.com/pytest-dev/pytest/issues/4770.
     register('--requirements', advanced=True, default='pytest==3.0.7',
              help='Requirements string for the pytest library.')
     register('--timeout-requirements', advanced=True, default='pytest-timeout>=1.2,<1.3',
