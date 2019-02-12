@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 from contextlib import contextmanager
 
 from pex.pex import PEX
@@ -99,19 +100,25 @@ class PythonToolPrepBase(Task):
       pex_builder.set_entry_point(tool_subsystem.get_entry_point())
       pex_builder.freeze()
 
+  def _generate_cached_pex_path(self, interpreter, fingerprinted_pex_filename):
+    return os.path.join(
+      get_pants_cachedir(),
+      'python',
+      str(interpreter.identity),
+      self.fingerprint,
+      fingerprinted_pex_filename,
+    )
+
   def execute(self):
+    interpreter_cache = PythonInterpreterCache.global_instance()
+    interpreter = interpreter_cache.select_interpreter_for_targets([])
+
     tool_subsystem = self.tool_subsystem_cls.scoped_instance(self)
     specs_fingerprint = stable_json_sha1(tool_subsystem.get_requirement_specs())
     pex_name_base = tool_subsystem.options_scope
-    full_pex_filename = '{}-{}.pex'.format(pex_name_base, specs_fingerprint)
-    pex_path = os.path.join(
-      get_pants_cachedir(),
-      'python-tools',
-      self.fingerprint,
-      full_pex_filename)
+    fingerprinted_pex_filename = '{}-{}.pex'.format(pex_name_base, specs_fingerprint)
 
-    interpreter_cache = PythonInterpreterCache.global_instance()
-    interpreter = interpreter_cache.select_interpreter_for_targets([])
+    pex_path = self._generate_cached_pex_path(interpreter, fingerprinted_pex_filename)
 
     if not os.path.exists(pex_path):
       with self.context.new_workunit(name='create-{}-pex'.format(pex_name_base),
