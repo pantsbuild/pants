@@ -17,12 +17,12 @@ from pants.engine.build_files import UnhydratedStruct, create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
+from pants.engine.objects import Collection
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, Select
 from pants.engine.struct import Struct
 from pants.util.dirutil import safe_open
-from pants.util.objects import Collection
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import Target, TargetTable

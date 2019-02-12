@@ -7,10 +7,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from future.utils import binary_type, text_type
 
 from pants.base.project_tree import Dir, File
+from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
-from pants.util.objects import Collection, datatype
+from pants.util.objects import datatype
 
 
 class FileContent(datatype([('path', text_type), ('content', binary_type)])):

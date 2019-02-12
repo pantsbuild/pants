@@ -50,6 +50,7 @@ python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
+    ':objects',
     ':rules',
     ':selectors',
     'src/python/pants/base:project_tree',
@@ -121,7 +122,10 @@ python_library(
   name='objects',
   sources=['objects.py'],
   dependencies=[
+    '3rdparty/python:future',
     'src/python/pants/util:meta',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -172,6 +176,7 @@ python_library(
     ':isolated_process',
     ':native',
     ':nodes',
+    ':objects',
     ':rules',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
