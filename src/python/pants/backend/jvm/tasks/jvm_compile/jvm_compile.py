@@ -451,12 +451,12 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     with open(path, 'w') as f:
       f.write(text)
 
-  def _set_direcotry_digests_for_valid_target_classpath_directories(self, valid_targets, compile_contexts):
+  def _set_directory_digests_for_valid_target_classpath_directories(self, valid_targets, compile_contexts):
     snapshots = self.context._scheduler.capture_snapshots(
       tuple(PathGlobsAndRoot(PathGlobs(
         [self._get_relative_classes_dir_from_target(target, compile_contexts)]
       ), get_buildroot()) for target in valid_targets))
-    [self._set_direcotry_digest_for_compile_context(
+    [self._set_directory_digest_for_compile_context(
       snapshot.directory_digest, target, compile_contexts)
       for target, snapshot in list(zip(valid_targets, snapshots))]
 
@@ -464,7 +464,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     cc = self.select_runtime_context(compile_contexts[target])
     return fast_relpath(cc.classes_dir.path, get_buildroot()) + '/**'
 
-  def _set_direcotry_digest_for_compile_context(self, directory_digest, target, compile_contexts):
+  def _set_directory_digest_for_compile_context(self, directory_digest, target, compile_contexts):
     cc = self.select_runtime_context(compile_contexts[target])
     new_classpath_entry = ClasspathEntry(cc.classes_dir.path, directory_digest)
     cc.classes_dir = new_classpath_entry
