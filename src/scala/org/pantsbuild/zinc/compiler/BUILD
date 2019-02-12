@@ -41,9 +41,23 @@ jar_library(
             org = "com.twitter",
             # NB: Rsc must be published with 2.12 to keep up with the recent change in upstream
             # pants which uses zinc with 2.12! This causes one test to fail in the rsc repo and must
-            # be published with publish-m2 (ivy publishes don't produce a pom, or something).
+            # be published with publish-m2 (ivy publishes don't produce a pom, or something)
             name = "rsc_2.12",
             rev = "0.0.0-733-05951a97-20190208-1804",
+            url = 'file:///Users/dmcclanahan/.ivy2/local/com.twitter/rsc_2.12/0.0.0-733-05951a97-20190208-1736/jars/rsc_2.12.jar',
+            mutable = True,
+        ),
+        jar(
+          org = 'com.twitter',
+          name = 'scalasig_2.12',
+          rev = 'xxx',
+          url = 'file:///Users/dmcclanahan/.m2/repository/com/twitter/scalasig_2.12/0.0.0-733-05951a97-20190211-1714/scalasig_2.12-0.0.0-733-05951a97-20190211-1714.jar',
+          mutable = True,
+        ),
+        jar(
+          org = 'org.scalameta',
+          name = 'semanticdb-scalac_2.12.8',
+          rev = '4.1.1',
         ),
     ],
 )
