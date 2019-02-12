@@ -26,10 +26,15 @@ from pants.util.strutil import ensure_binary, safe_shlex_join
 class PythonToolInstance(object):
   def __init__(self, pex_path, interpreter):
     self._pex = PEX(pex_path, interpreter=interpreter)
+    self._interpreter = interpreter
 
   @property
   def pex(self):
     return self._pex
+
+  @property
+  def interpreter(self):
+    return self._interpreter
 
   def _pretty_cmdline(self, args):
     return safe_shlex_join(self._pex.cmdline(args))
@@ -110,16 +115,16 @@ class PythonToolPrepBase(Task):
     )
 
   def execute(self):
-    interpreter_cache = PythonInterpreterCache.global_instance()
-    interpreter = interpreter_cache.select_interpreter_for_targets([])
-
     tool_subsystem = self.tool_subsystem_cls.scoped_instance(self)
+
+    interpreter_cache = PythonInterpreterCache.global_instance()
+    interpreter = min(interpreter_cache.setup(filters=tool_subsystem.get_interpreter_constraints()))
+
     specs_fingerprint = stable_json_sha1(tool_subsystem.get_requirement_specs())
     pex_name_base = tool_subsystem.options_scope
     fingerprinted_pex_filename = '{}-{}.pex'.format(pex_name_base, specs_fingerprint)
 
     pex_path = self._generate_cached_pex_path(interpreter, fingerprinted_pex_filename)
-
     if not os.path.exists(pex_path):
       with self.context.new_workunit(name='create-{}-pex'.format(pex_name_base),
                                      labels=[WorkUnitLabel.PREP]):
