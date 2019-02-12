@@ -360,22 +360,51 @@ cargo_audit: &cargo_audit
 # Build wheels
 # -------------------------------------------------------------------------
 
+# N.B. With Python 2, we must build pantsbuild.pants with both UCS2 and UCS4 to provide full
+# compatibility for end users. This is because we constrain our ABI due to the native engine.
+# See https://www.python.org/dev/peps/pep-0513/#ucs-2-vs-ucs-4-builds. Note this distinction is
+# not necessary with Python 3.3+ due to flexible storage of Unicode strings (https://www.python.org/dev/peps/pep-0393/).
+
 base_build_wheels: &base_build_wheels
   stage: *test
   env:
     - &base_build_wheels_env RUN_PANTS_FROM_PEX=1 PREPARE_DEPLOY=1
 
-linux_build_wheels: &linux_build_wheels
+py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
   # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize
   # compatibility. This is a Py2.7 shard, so it is not subject to #6985.
   <<: *travis_docker_image
   <<: *py27_linux_test_config
   <<: *base_build_wheels
-  name: "Build Linux wheels (No PEX)"
+
+py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
+  <<: *py27_linux_build_wheels_no_ucs
+  name: "Build Linux wheels (Py27 and UCS2 pantsbuild.pants)"
   env:
     - *py27_linux_test_config_env
     - *base_build_wheels_env
-    - CACHE_NAME=linuxwheelsbuild
+    - CACHE_NAME=linuxwheelsbuild.ucs2
+  script:
+    - docker build --rm -t travis_ci_py27_ucs2
+      --build-arg "TRAVIS_USER=$(id -un)"
+      --build-arg "TRAVIS_UID=$(id -u)"
+      --build-arg "TRAVIS_GROUP=$(id -gn)"
+      --build-arg "TRAVIS_GID=$(id -g)"
+      build-support/docker/travis_ci_py2_ucs2/
+    - &docker_dry_run_release docker run --rm -t
+      -v "${HOME}:/travis/home"
+      -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci_py27_ucs2:latest
+      sh -c "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
+
+py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
+  # Linux defaults to UCS4, so we simply use the pre-installed Python.
+  <<: *py27_linux_build_wheels_no_ucs
+  name: "Build Linux wheels (Py27 and UCS4 pantsbuild.pants)"
+  env:
+    - *py27_linux_test_config_env
+    - *base_build_wheels_env
+    - CACHE_NAME=linuxwheelsbuild.ucs4
   script:
     - *travis_docker_image_launch
     - docker run --rm -t
@@ -384,17 +413,37 @@ linux_build_wheels: &linux_build_wheels
       travis_ci:latest
       sh -c "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
 
-osx_build_wheels: &osx_build_wheels
+py27_osx_build_wheels_no_ucs: &py27_osx_build_wheels_no_ucs
   <<: *py27_osx_test_config
   <<: *base_build_wheels
-  name: "Build OSX wheels (No PEX)"
   osx_image: xcode8
+  script:
+    - ./build-support/bin/release.sh -n
+
+py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
+  # OSX defaults to using UCS2, so we simply use the pre-installed Python.
+  <<: *py27_osx_build_wheels_no_ucs
+  name: "Build OSX wheels (Py27 and UCS2 pantsbuild.pants)"
   env:
     - *py27_osx_test_config_env
     - *base_build_wheels_env
-    - CACHE_NAME=osxwheelsbuild
-  script:
-    - ./build-support/bin/release.sh -n
+    - CACHE_NAME=osxwheelsbuild.ucs2
+
+py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
+  <<: *py27_osx_build_wheels_no_ucs
+  name: "Build OSX wheels (Py27 and UCS4 pantsbuild.pants)"
+  env:
+    - *py27_osx_test_config_env
+    - *base_build_wheels_env
+    - CACHE_NAME=osxwheelsbuild.ucs4
+    - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
+    - PYENV_ROOT="${HOME}/.pyenv"
+    - PATH="${PYENV_ROOT}/shims:${PATH}"
+  before_install:
+    {{>before_install_osx}}
+    - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
+    - ${PYENV_ROOT}/bin/pyenv install 2.7.13
+    - ${PYENV_ROOT}/bin/pyenv global 2.7.13
 
 # -------------------------------------------------------------------------
 # Rust tests
@@ -596,8 +645,10 @@ matrix:
     - <<: *linux_rust_clippy
     - <<: *cargo_audit
 
-    - <<: *linux_build_wheels
-    - <<: *osx_build_wheels
+    - <<: *py27_linux_build_wheels_ucs2
+    - <<: *py27_linux_build_wheels_ucs4
+    - <<: *py27_osx_build_wheels_ucs2
+    - <<: *py27_osx_build_wheels_ucs4
 
     - <<: *py27_linux_test_config
       name: "Unit tests for pants and pants-plugins (Py2.7 PEX)"
