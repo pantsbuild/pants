@@ -201,11 +201,11 @@ class RscCompile(ZincCompile):
 
   # Overrides the normal zinc compiler classpath, which only contains zinc.
   def get_zinc_compiler_classpath(self):
-    return self.do_for_execution_strategy_variant({
+    return self.execution_strategy_enum.resolve_for_enum_variant({
       self.HERMETIC: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.SUBPROCESS: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
-    })
+    })()
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
@@ -861,7 +861,7 @@ class RscCompile(ZincCompile):
   def _runtool(self, main, tool_name, args, distribution,
                tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
     with self.context.new_workunit(tool_name) as wu:
-      return self.do_for_execution_strategy_variant({
+      return self.execution_strategy_enum.resolve_for_enum_variant({
         self.HERMETIC: lambda: self._runtool_hermetic(
           main, tool_name, args, distribution,
           tgt=tgt, input_files=input_files, input_digest=input_digest, output_dir=output_dir),
@@ -869,7 +869,7 @@ class RscCompile(ZincCompile):
           wu, self.tool_classpath(tool_name), main, tool_name, args, distribution),
         self.NAILGUN: lambda: self._runtool_nonhermetic(
           wu, self._nailgunnable_combined_classpath, main, tool_name, args, distribution),
-      })
+      })()
 
   def _run_metai_tool(self,
                       distribution,

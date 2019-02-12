@@ -87,10 +87,11 @@ class LLVMCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
 
 @rule(LibcObjects, [Select(Platform), Select(NativeToolchain)])
 def select_libc_objects(platform, native_toolchain):
-  paths = platform.resolve_platform_specific({
+  # We use lambdas here to avoid searching for libc on osx, where it will fail.
+  paths = platform.resolve_for_enum_variant({
     'darwin': lambda: [],
     'linux': lambda: native_toolchain._libc_dev.get_libc_objects(),
-  })
+  })()
   yield LibcObjects(paths)
 
 
@@ -343,8 +344,12 @@ class ToolchainVariantRequest(datatype([
 @rule(CToolchain, [Select(ToolchainVariantRequest)])
 def select_c_toolchain(toolchain_variant_request):
   native_toolchain = toolchain_variant_request.toolchain
-  # TODO: make an enum exhaustiveness checking method that works with `yield Get(...)` statements!
-  if toolchain_variant_request.variant.is_gnu:
+  # TODO(#5933): make an enum exhaustiveness checking method that works with `yield Get(...)`!
+  use_gcc = toolchain_variant_request.variant.resolve_for_enum_variant({
+    'gnu': True,
+    'llvm': False,
+  })
+  if use_gcc:
     toolchain_resolved = yield Get(GCCCToolchain, NativeToolchain, native_toolchain)
   else:
     toolchain_resolved = yield Get(LLVMCToolchain, NativeToolchain, native_toolchain)
@@ -354,7 +359,12 @@ def select_c_toolchain(toolchain_variant_request):
 @rule(CppToolchain, [Select(ToolchainVariantRequest)])
 def select_cpp_toolchain(toolchain_variant_request):
   native_toolchain = toolchain_variant_request.toolchain
-  if toolchain_variant_request.variant.is_gnu:
+  # TODO(#5933): make an enum exhaustiveness checking method that works with `yield Get(...)`!
+  use_gcc = toolchain_variant_request.variant.resolve_for_enum_variant({
+    'gnu': True,
+    'llvm': False,
+  })
+  if use_gcc:
     toolchain_resolved = yield Get(GCCCppToolchain, NativeToolchain, native_toolchain)
   else:
     toolchain_resolved = yield Get(LLVMCppToolchain, NativeToolchain, native_toolchain)

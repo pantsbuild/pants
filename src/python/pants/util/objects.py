@@ -15,6 +15,22 @@ from pants.util.memo import memoized_classproperty
 from pants.util.meta import AbstractClass, classproperty
 
 
+class TypeCheckError(TypeError):
+
+  # TODO: make some wrapper exception class to make this kind of
+  # prefixing easy (maybe using a class field format string?).
+  def __init__(self, type_name, msg, *args, **kwargs):
+    formatted_msg = "type check error in class {}: {}".format(type_name, msg)
+    super(TypeCheckError, self).__init__(formatted_msg, *args, **kwargs)
+
+
+class TypedDatatypeInstanceConstructionError(TypeCheckError):
+  """Raised when a datatype()'s fields fail a type check upon construction."""
+
+
+# TODO: create a mixin which declares/implements the methods we define on the generated class in
+# datatype() and enum() to decouple the class's logic from the way it's created. This may also make
+# migration to python 3 dataclasses as per #7074 easier.
 def datatype(field_decls, superclass_name=None, **kwargs):
   """A wrapper for `namedtuple` that accounts for the type of the object in equality.
 
@@ -56,9 +72,20 @@ def datatype(field_decls, superclass_name=None, **kwargs):
   namedtuple_cls = namedtuple(superclass_name, field_names, **kwargs)
 
   class DataType(namedtuple_cls):
+    @classproperty
+    def type_check_error_type(cls):
+      """The exception type to use in make_type_error()."""
+      return TypedDatatypeInstanceConstructionError
+
     @classmethod
     def make_type_error(cls, msg, *args, **kwargs):
-      return TypeCheckError(cls.__name__, msg, *args, **kwargs)
+      """A helper method to generate an exception type for type checking errors.
+
+      This method uses `cls.type_check_error_type` to ensure that type checking errors can be caught
+      with a reliable exception type. The type returned by `cls.type_check_error_type` should ensure
+      that the exception messages are prefixed with enough context to be useful and *not* confusing.
+      """
+      return cls.type_check_error_type(cls.__name__, msg, *args, **kwargs)
 
     def __new__(cls, *args, **kwargs):
       # TODO: Ideally we could execute this exactly once per `cls` but it should be a
@@ -69,7 +96,8 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       try:
         this_object = super(DataType, cls).__new__(cls, *args, **kwargs)
       except TypeError as e:
-        raise cls.make_type_error(e)
+        raise cls.make_type_error(
+          "error in namedtuple() base constructor: {}".format(e))
 
       # TODO: Make this kind of exception pattern (filter for errors then display them all at once)
       # more ergonomic.
@@ -82,7 +110,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
           type_failure_msgs.append(
             "field '{}' was invalid: {}".format(field_name, e))
       if type_failure_msgs:
-        raise cls.make_type_error('\n'.join(type_failure_msgs))
+        raise cls.make_type_error(
+          'errors type checking constructor arguments:\n{}'
+          .format('\n'.join(type_failure_msgs)))
 
       return this_object
 
@@ -168,17 +198,37 @@ def datatype(field_decls, superclass_name=None, **kwargs):
     return type(superclass_name.encode('utf-8'), (DataType,), {})
 
 
-def enum(field_name, all_values):
+class EnumVariantSelectionError(TypeCheckError):
+  """Raised when an invalid variant for an enum() is constructed or matched against."""
+
+
+def enum(*args):
   """A datatype which can take on a finite set of values. This method is experimental and unstable.
 
   Any enum subclass can be constructed with its create() classmethod. This method will use the first
-  element of `all_values` as the enum value if none is specified.
+  element of `all_values` as the default value, but enum classes can override this behavior by
+  setting `default_value` in the class body.
 
-  :param field_name: A string used as the field for the datatype. Note that enum does not yet
-                     support type checking as with datatype.
-  :param all_values: An iterable of objects representing all possible values for the enum.
-                     NB: `all_values` must be a finite, non-empty iterable with unique values!
+  NB: Relying on the `field_name` directly is discouraged in favor of using
+  resolve_for_enum_variant() in Python code. The `field_name` argument is exposed to make enum
+  instances more readable when printed, and to allow code in another language using an FFI to
+  reliably extract the value from an enum instance.
+
+  :param string field_name: A string used as the field for the datatype. This positional argument is
+                            optional, and defaults to 'value'. Note that `enum()` does not yet
+                            support type checking as with `datatype()`.
+  :param Iterable all_values: A nonempty iterable of objects representing all possible values for
+                              the enum.  This argument must be a finite, non-empty iterable with
+                              unique values.
+  :raises: :class:`ValueError`
   """
+  if len(args) == 1:
+    field_name = 'value'
+    all_values, = args
+  elif len(args) == 2:
+    field_name, all_values = args
+  else:
+    raise ValueError("enum() accepts only 1 or 2 args! args = {!r}".format(args))
 
   # This call to list() will eagerly evaluate any `all_values` which would otherwise be lazy, such
   # as a generator.
@@ -186,82 +236,124 @@ def enum(field_name, all_values):
   # `OrderedSet` maintains the order of the input iterable, but is faster to check membership.
   allowed_values_set = OrderedSet(all_values_realized)
 
-  if len(allowed_values_set) < len(all_values_realized):
+  if len(allowed_values_set) == 0:
+    raise ValueError("all_values must be a non-empty iterable!")
+  elif len(allowed_values_set) < len(all_values_realized):
     raise ValueError("When converting all_values ({}) to a set, at least one duplicate "
                      "was detected. The unique elements of all_values were: {}."
-                     .format(all_values_realized, allowed_values_set))
+                     .format(all_values_realized, list(allowed_values_set)))
 
   class ChoiceDatatype(datatype([field_name])):
-    allowed_values = allowed_values_set
-    default_value = next(iter(allowed_values))
+    default_value = next(iter(allowed_values_set))
+
+    # Overriden from datatype() so providing an invalid variant is catchable as a TypeCheckError,
+    # but more specific.
+    type_check_error_type = EnumVariantSelectionError
 
     @memoized_classproperty
     def _singletons(cls):
-      """Generate memoized instances of this enum wrapping each of this enum's allowed values."""
-      return { value: cls(value) for value in cls.allowed_values }
+      """Generate memoized instances of this enum wrapping each of this enum's allowed values.
+
+      NB: The implementation of enum() should use this property as the source of truth for allowed
+      values and enum instances from those values.
+      """
+      return OrderedDict((value, cls._make_singleton(value)) for value in allowed_values_set)
 
     @classmethod
-    def _check_value(cls, value):
-      if value not in cls.allowed_values:
-        raise cls.make_type_error(
-          "Value {!r} for '{}' must be one of: {!r}."
-          .format(value, field_name, cls.allowed_values))
+    def _make_singleton(cls, value):
+      """
+      We convert uses of the constructor to call create(), so we then need to go around __new__ to
+      bootstrap singleton creation from datatype()'s __new__.
+      """
+      return super(ChoiceDatatype, cls).__new__(cls, value)
+
+    @classproperty
+    def _allowed_values(cls):
+      """The values provided to the enum() type constructor, for use in error messages."""
+      return list(cls._singletons.keys())
+
+    def __new__(cls, value):
+      """Forward `value` to the .create() factory method.
+
+      The .create() factory method is preferred, but forwarding the constructor like this allows us
+      to use the generated enum type both as a type to check against with isinstance() as well as a
+      function to create instances with. This makes it easy to use as a pants option type.
+      """
+      return cls.create(value)
 
     @classmethod
-    def create(cls, value=None):
+    def create(cls, *args, **kwargs):
+      """Create an instance of this enum, using the default value if specified.
+
+      :param value: Use this as the enum value. If `value` is an instance of this class, return it,
+                    otherwise it is checked against the enum's allowed values. This positional
+                    argument is optional, and if not specified, `cls.default_value` is used.
+      :param bool none_is_default: If this is True, a None `value` is converted into
+                                   `cls.default_value` before being checked against the enum's
+                                   allowed values.
+      """
+      none_is_default = kwargs.pop('none_is_default', False)
+      if kwargs:
+        raise ValueError('unrecognized keyword arguments for {}.create(): {!r}'
+                         .format(cls.__name__, kwargs))
+
+      if len(args) == 0:
+        value = cls.default_value
+      elif len(args) == 1:
+        value = args[0]
+        if none_is_default and value is None:
+          value = cls.default_value
+      else:
+        raise ValueError('{}.create() accepts 0 or 1 positional args! *args = {!r}'
+                         .format(cls.__name__, args))
+
       # If we get an instance of this enum class, just return it. This means you can call .create()
-      # on None, an allowed value for the enum, or an existing instance of the enum.
+      # on an allowed value for the enum, or an existing instance of the enum.
       if isinstance(value, cls):
         return value
 
-      # Providing an explicit value that is not None will *not* use the default value!
-      if value is None:
-        value = cls.default_value
-
-      # We actually circumvent the constructor in this method due to the cls._singletons
-      # memoized_classproperty, but we want to raise the same error, so we move checking into a
-      # common method.
-      cls._check_value(value)
-
+      if value not in cls._singletons:
+        raise cls.make_type_error(
+          "Value {!r} for '{}' must be one of: {!r}."
+          .format(value, field_name, cls._allowed_values))
       return cls._singletons[value]
 
-    def __new__(cls, *args, **kwargs):
-      this_object = super(ChoiceDatatype, cls).__new__(cls, *args, **kwargs)
+    def resolve_for_enum_variant(self, mapping):
+      """Return the object in `mapping` with the key corresponding to the enum value.
 
-      field_value = getattr(this_object, field_name)
+      `mapping` is a dict mapping enum variant value -> arbitrary object. All variant values must be
+      provided.
 
-      cls._check_value(field_value)
+      NB: The objects in `mapping` should be made into lambdas if lazy execution is desired, as this
+      will "evaluate" all of the values in `mapping`.
+      """
+      keys = frozenset(mapping.keys())
+      if keys != frozenset(self._allowed_values):
+        raise self.make_type_error(
+          "pattern matching must have exactly the keys {} (was: {})"
+          .format(self._allowed_values, list(keys)))
+      match_for_variant = mapping[getattr(self, field_name)]
+      return match_for_variant
 
-      return this_object
+    @classmethod
+    def iterate_enum_variants(cls):
+      """Iterate over all instances of this enum, in the declared order.
+
+      NB: This method is exposed for testing enum variants easily. resolve_for_enum_variant() should
+      be used for performing conditional logic based on an enum instance's value.
+      """
+      # TODO(#7232): use this method to register attributes on the generated type object for each of
+      # the singletons!
+      return cls._singletons.values()
 
   return ChoiceDatatype
 
 
-class TypedDatatypeClassConstructionError(Exception):
-
-  # TODO: make some wrapper exception class to make this kind of
-  # prefixing easy (maybe using a class field format string?).
-  def __init__(self, type_name, msg, *args, **kwargs):
-    full_msg =  "error: while trying to generate typed datatype {}: {}".format(
-      type_name, msg)
-    super(TypedDatatypeClassConstructionError, self).__init__(
-      full_msg, *args, **kwargs)
-
-
-class TypedDatatypeInstanceConstructionError(TypeError):
-
-  def __init__(self, type_name, msg, *args, **kwargs):
-    full_msg = "error: in constructor of type {}: {}".format(type_name, msg)
-    super(TypedDatatypeInstanceConstructionError, self).__init__(
-      full_msg, *args, **kwargs)
-
-
-class TypeCheckError(TypedDatatypeInstanceConstructionError):
-
-  def __init__(self, type_name, msg, *args, **kwargs):
-    formatted_msg = "type check error:\n{}".format(msg)
-    super(TypeCheckError, self).__init__(
-      type_name, formatted_msg, *args, **kwargs)
+# TODO(#7233): allow usage of the normal register() by using an enum class as the `type` argument!
+def register_enum_option(register, enum_cls, *args, **kwargs):
+  """A helper method for declaring a pants option from an `enum()`."""
+  default_value = kwargs.pop('default', enum_cls.default_value)
+  register(*args, choices=enum_cls._allowed_values, default=default_value, **kwargs)
 
 
 # TODO: make these members of the `TypeConstraint` class!
