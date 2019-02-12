@@ -3,7 +3,7 @@
 
 use crate::glob_matching::GlobMatching;
 use crate::pool::ResettablePool;
-use crate::{File, PathGlobs, PathStat, PosixFS, Store};
+use crate::{Dir, File, PathGlobs, PathStat, PosixFS, Store};
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use futures::future::{self, join_all};
@@ -62,6 +62,34 @@ impl Snapshot {
     }
     Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
       .map(|digest| Snapshot { digest, path_stats })
+      .to_boxed()
+  }
+
+  pub fn from_digest(store: Store, digest: Digest) -> BoxFuture<Snapshot, String> {
+    store
+      .walk(digest, |_, path_so_far, _, directory| {
+        let mut path_stats = Vec::new();
+        path_stats.extend(directory.get_directories().iter().map(move |dir_node| {
+          let path = path_so_far.join(dir_node.get_name());
+          PathStat::dir(path.clone(), Dir(path))
+        }));
+        path_stats.extend(directory.get_files().iter().map(move |file_node| {
+          let path = path_so_far.join(file_node.get_name());
+          PathStat::file(
+            path.clone(),
+            File {
+              path,
+              is_executable: file_node.is_executable,
+            },
+          )
+        }));
+        future::ok(path_stats).to_boxed()
+      })
+      .map(move |path_stats_per_directory| {
+        let path_stats =
+          Iterator::flatten(path_stats_per_directory.into_iter().map(|v| v.into_iter())).collect();
+        Snapshot { digest, path_stats }
+      })
       .to_boxed()
   }
 
@@ -312,29 +340,44 @@ impl Snapshot {
       .to_boxed()
   }
 
-  pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path>>(
+  ///
+  /// Capture a Snapshot of a presumed-immutable piece of the filesystem.
+  ///
+  /// Note that we don't use a Graph here, and don't cache any intermediate steps, we just place
+  /// the resultant Snapshot into the store and return it. This is important, because we're reading
+  /// things from arbitrary filepaths which we don't want to cache in the graph, as we don't watch
+  /// them for changes.
+  ///
+  /// If the `digest_hint` is given, first attempt to load the Snapshot using that Digest, and only
+  /// fall back to actually walking the filesystem if we don't have it (either due to garbage
+  /// collection or Digest-oblivious legacy caching).
+  ///
+  pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path> + Send + 'static>(
     store: Store,
     fs_pool: Arc<ResettablePool>,
     root_path: P,
     path_globs: PathGlobs,
+    digest_hint: Option<Digest>,
   ) -> BoxFuture<Snapshot, String> {
-    // Note that we don't use a Graph here, and don't cache any intermediate steps, we just place
-    // the resultant Snapshot into the store and return it. This is important, because we're reading
-    // things from arbitrary filepaths which we don't want to cache in the graph, as we don't watch
-    // them for changes.
-    // We assume that this Snapshot is of an immutable piece of the filesystem.
+    // Attempt to use the digest hint to load a Snapshot without expanding the globs; otherwise,
+    // expand the globs to capture a Snapshot.
+    let store2 = store.clone();
+    future::result(digest_hint.ok_or_else(|| "No digest hint provided.".to_string()))
+      .and_then(move |digest| Snapshot::from_digest(store, digest))
+      .or_else(|_| {
+        let posix_fs = Arc::new(try_future!(PosixFS::new(root_path, fs_pool, &[])));
 
-    let posix_fs = Arc::new(try_future!(PosixFS::new(root_path, fs_pool, &[])));
-
-    posix_fs
-      .expand(path_globs)
-      .map_err(|err| format!("Error expanding globs: {:?}", err))
-      .and_then(|path_stats| {
-        Snapshot::from_path_stats(
-          store.clone(),
-          &OneOffStoreFileByDigest::new(store, posix_fs),
-          path_stats,
-        )
+        posix_fs
+          .expand(path_globs)
+          .map_err(|err| format!("Error expanding globs: {:?}", err))
+          .and_then(|path_stats| {
+            Snapshot::from_path_stats(
+              store2.clone(),
+              &OneOffStoreFileByDigest::new(store2, posix_fs),
+              path_stats,
+            )
+          })
+          .to_boxed()
       })
       .to_boxed()
   }

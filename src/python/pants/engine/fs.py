@@ -10,7 +10,7 @@ from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
-from pants.util.objects import datatype
+from pants.util.objects import Exactly, datatype
 
 
 class FileContent(datatype([('path', text_type), ('content', binary_type)])):
@@ -61,10 +61,6 @@ class PathGlobs(datatype([
       conjunction=GlobExpansionConjunction.create(conjunction, none_is_default=True))
 
 
-class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', text_type)])):
-  pass
-
-
 class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', int)])):
   """A Digest is a content-digest fingerprint, and a length of underlying content.
 
@@ -91,6 +87,23 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
 
   def __str__(self):
     return repr(self)
+
+
+class PathGlobsAndRoot(datatype([
+    ('path_globs', PathGlobs),
+    ('root', text_type),
+    ('digest_hint', Exactly(Digest, type(None))),
+])):
+  """A set of PathGlobs to capture relative to some root (which may exist outside of the buildroot).
+
+  If the `digest_hint` is set, it must be the Digest that we would expect to get if we were to
+  expand and Digest the globs. The hint is an optimization that allows for bypassing filesystem
+  operations in cases where the expected Digest is known, and the content for the Digest is already
+  stored.
+  """
+
+  def __new__(cls, path_globs, root, digest_hint=None):
+    return super(PathGlobsAndRoot, cls).__new__(cls, path_globs, root, digest_hint)
 
 
 class Snapshot(datatype([('directory_digest', Digest), ('files', tuple), ('dirs', tuple)])):

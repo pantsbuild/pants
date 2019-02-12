@@ -658,15 +658,24 @@ pub extern "C" fn capture_snapshots(
   path_globs_and_root_tuple_wrapper: Handle,
 ) -> PyResult {
   let values = externs::project_multi(&path_globs_and_root_tuple_wrapper.into(), "dependencies");
-  let path_globs_and_roots_result: Result<Vec<(fs::PathGlobs, PathBuf)>, String> = values
+  let path_globs_and_roots_result = values
     .iter()
     .map(|value| {
       let root = PathBuf::from(externs::project_str(&value, "root"));
       let path_globs =
         nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
-      path_globs.map(|path_globs| (path_globs, root))
+      let digest_hint = {
+        let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
+        // TODO: Extract a singleton Key for None.
+        if maybe_digest == externs::eval("None").unwrap() {
+          None
+        } else {
+          Some(nodes::lift_digest(&maybe_digest)?)
+        }
+      };
+      path_globs.map(|path_globs| (path_globs, root, digest_hint))
     })
-    .collect();
+    .collect::<Result<Vec<_>, _>>();
 
   let path_globs_and_roots = match path_globs_and_roots_result {
     Ok(v) => v,
@@ -681,13 +690,14 @@ pub extern "C" fn capture_snapshots(
     futures::future::join_all(
       path_globs_and_roots
         .into_iter()
-        .map(|(path_globs, root)| {
+        .map(|(path_globs, root, digest_hint)| {
           let core = core.clone();
           fs::Snapshot::capture_snapshot_from_arbitrary_root(
             core.store(),
             core.fs_pool.clone(),
             root,
             path_globs,
+            digest_hint,
           )
           .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
         })
