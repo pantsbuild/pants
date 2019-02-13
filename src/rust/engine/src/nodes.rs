@@ -216,22 +216,11 @@ impl WrappedNode for Select {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
             .and_then(move |digest| {
-              let store = context.core.store();
               context
                 .core
                 .store()
-                .load_directory(digest)
+                .contents_for_directory(digest)
                 .map_err(|str| throw(&str))
-                .and_then(move |maybe_directory| {
-                  maybe_directory
-                    .ok_or_else(|| format!("Could not find directory with digest {:?}", digest))
-                    .map_err(|str| throw(&str))
-                })
-                .and_then(move |directory| {
-                  store
-                    .contents_for_directory(&directory)
-                    .map_err(|str| throw(&str))
-                })
                 .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
             })
             .to_boxed()
