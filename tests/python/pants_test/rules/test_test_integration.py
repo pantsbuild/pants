@@ -74,7 +74,7 @@ rootdir: SOME_TEXT
 plugins: SOME_TEXT
 collected 1 items
 
-testprojects/tests/python/pants/dummies/test_pass.py .                   [100%]
+testprojects/tests/python/pants/dummies/test_pass.py .
 
 =========================== 1 passed in SOME_TEXT ===========================
 
@@ -94,7 +94,7 @@ rootdir: SOME_TEXT
 plugins: SOME_TEXT
 collected 1 items
 
-testprojects/tests/python/pants/dummies/test_fail.py F                   [100%]
+testprojects/tests/python/pants/dummies/test_fail.py F
 
 =================================== FAILURES ===================================
 __________________________________ test_fail ___________________________________
@@ -122,7 +122,7 @@ rootdir: SOME_TEXT
 plugins: SOME_TEXT
 collected 1 items
 
-testprojects/tests/python/pants/dummies/test_with_source_dep.py .        [100%]
+testprojects/tests/python/pants/dummies/test_with_source_dep.py .
 
 =========================== 1 passed in SOME_TEXT ===========================
 
@@ -141,7 +141,7 @@ rootdir: SOME_TEXT
 plugins: SOME_TEXT
 collected 1 items
 
-testprojects/tests/python/pants/dummies/test_with_thirdparty_dep.py .    [100%]
+testprojects/tests/python/pants/dummies/test_with_thirdparty_dep.py .
 
 =========================== 1 passed in SOME_TEXT ===========================
 
@@ -162,7 +162,7 @@ rootdir: SOME_TEXT
 plugins: SOME_TEXT
 collected 1 items
 
-testprojects/tests/python/pants/dummies/test_fail.py F                   [100%]
+testprojects/tests/python/pants/dummies/test_fail.py F
 
 =================================== FAILURES ===================================
 __________________________________ test_fail ___________________________________
@@ -179,7 +179,7 @@ rootdir: SOME_TEXT
 plugins: SOME_TEXT
 collected 1 items
 
-testprojects/tests/python/pants/dummies/test_pass.py .                   [100%]
+testprojects/tests/python/pants/dummies/test_pass.py .
 
 =========================== 1 passed in SOME_TEXT ===========================
 
