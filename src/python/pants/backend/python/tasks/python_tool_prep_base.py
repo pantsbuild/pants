@@ -105,13 +105,14 @@ class PythonToolPrepBase(Task):
       pex_builder.set_entry_point(tool_subsystem.get_entry_point())
       pex_builder.freeze()
 
-  def _generate_cached_pex_path(self, interpreter, fingerprinted_pex_filename):
+  def _generate_fingerprinted_pex_path(self, tool_subsystem, interpreter):
+    specs_fingerprint = stable_json_sha1(tool_subsystem.get_requirement_specs())
     return os.path.join(
       get_pants_cachedir(),
       'python',
       str(interpreter.identity),
       self.fingerprint,
-      fingerprinted_pex_filename,
+      '{}-{}.pex'.format(tool_subsystem.options_scope, specs_fingerprint),
     )
 
   def execute(self):
@@ -120,13 +121,9 @@ class PythonToolPrepBase(Task):
     interpreter_cache = PythonInterpreterCache.global_instance()
     interpreter = min(interpreter_cache.setup(filters=tool_subsystem.get_interpreter_constraints()))
 
-    specs_fingerprint = stable_json_sha1(tool_subsystem.get_requirement_specs())
-    pex_name_base = tool_subsystem.options_scope
-    fingerprinted_pex_filename = '{}-{}.pex'.format(pex_name_base, specs_fingerprint)
-
-    pex_path = self._generate_cached_pex_path(interpreter, fingerprinted_pex_filename)
+    pex_path = self._generate_fingerprinted_pex_path(tool_subsystem, interpreter)
     if not os.path.exists(pex_path):
-      with self.context.new_workunit(name='create-{}-pex'.format(pex_name_base),
+      with self.context.new_workunit(name='create-{}-pex'.format(tool_subsystem.options_scope),
                                      labels=[WorkUnitLabel.PREP]):
         self._build_tool_pex(tool_subsystem=tool_subsystem,
                              interpreter=interpreter,

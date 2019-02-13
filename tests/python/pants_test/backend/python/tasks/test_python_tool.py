@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import glob
 import os
+import re
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.tasks.python_tool_prep_base import PythonToolInstance, PythonToolPrepBase
@@ -20,7 +21,7 @@ class Tool(PythonToolBase):
   default_requirements = [
     'pex==1.5.3',
   ]
-  default_entry_point = 'pex.bin.pex:main',
+  default_entry_point = 'pex.bin.pex:main'
 
 
 class ToolInstance(PythonToolInstance):
@@ -47,7 +48,10 @@ class ToolTask(Task):
 
   def execute(self):
     tool_for_pex = self.context.products.get_data(ToolPrep.tool_instance_cls)
-    self.context.products.register_data('test_pex', tool_for_pex)
+    stdout, stderr, exit_code, _ = tool_for_pex.output(['--version'])
+    assert '' == stderr
+    assert re.match(r'.*\.pex 1.5.3', stdout)
+    assert 0 == exit_code
 
 
 class PythonToolPrepTest(PythonTaskTestBase):
@@ -56,9 +60,9 @@ class PythonToolPrepTest(PythonTaskTestBase):
   def task_type(cls):
     return ToolTask
 
-  def _assert_tool_execution_for_python_version(self, is_py3=True):
-    scope_string = '3' if is_py3 else '2'
-    constraint_string = 'CPython>=3' if is_py3 else 'CPython<3'
+  def _assert_tool_execution_for_python_version(self, use_py3=True):
+    scope_string = '3' if use_py3 else '2'
+    constraint_string = 'CPython>=3' if use_py3 else 'CPython<3'
     tool_prep_type = self.synthesize_task_subtype(ToolPrep, 'tp_scope_py{}'.format(scope_string))
     context = self.context(for_task_types=[tool_prep_type], for_subsystems=[Tool], options={
       'test-tool': {
@@ -82,14 +86,10 @@ class PythonToolPrepTest(PythonTaskTestBase):
 
       # Check that the tool can be executed successfully.
       self.create_task(context).execute()
-      pex_tool = context.products.get_data('test_pex')
+      pex_tool = context.products.get_data(ToolPrep.tool_instance_cls)
       self.assertTrue(pex_tool.interpreter.identity.matches(constraint_string))
-      self.maxDiff = None
-      stdout, stderr, exit_code, _ = pex_tool.output('--version')
-      self.assertEqual('', stderr)
-      self.assertEqual('pex 1.5.3', stdout)
-      self.assertEqual(0, exit_code)
 
   def test_tool_execution(self):
-    self._assert_tool_execution_for_python_version(is_py3=True)
-    self._assert_tool_execution_for_python_version(is_py3=False)
+    """Test that python tools are fingerprinted by python interpreter."""
+    self._assert_tool_execution_for_python_version(use_py3=True)
+    self._assert_tool_execution_for_python_version(use_py3=False)
