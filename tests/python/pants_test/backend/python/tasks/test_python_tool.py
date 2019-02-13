@@ -42,10 +42,6 @@ class ToolTask(Task):
     super(ToolTask, cls).prepare(options, round_manager)
     round_manager.require_data(ToolPrep.tool_instance_cls)
 
-  @classmethod
-  def product_types(cls):
-    return ['test_pex']
-
   def execute(self):
     tool_for_pex = self.context.products.get_data(ToolPrep.tool_instance_cls)
     stdout, stderr, exit_code, _ = tool_for_pex.output(['--version'])

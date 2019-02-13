@@ -106,6 +106,11 @@ class PythonToolPrepBase(Task):
       pex_builder.freeze()
 
   def _generate_fingerprinted_pex_path(self, tool_subsystem, interpreter):
+    # `tool_subsystem.get_requirement_specs()` is a list, but order shouldn't actually matter. This
+    # should probably be sorted, but it's possible a user could intentionally tweak order to work
+    # around a particular requirement resolution resolve-order issue. In practice the lists are
+    # expected to be mostly static, so we accept the risk of too-fine-grained caching creating lots
+    # of pexes in the cache dir.
     specs_fingerprint = stable_json_sha1(tool_subsystem.get_requirement_specs())
     return os.path.join(
       get_pants_cachedir(),
