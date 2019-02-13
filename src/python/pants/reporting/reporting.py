@@ -112,6 +112,14 @@ class Reporting(Subsystem):
       raise ValueError(
         "Flags zipkin-trace-id and zipkin-parent-id must both either be set or not set."
       )
+    if trace_id and len(trace_id) != 16 and len(trace_id) != 32:
+      raise ValueError(
+        "Value of the flag zipkin-trace-id must be a 16-character or 32-character hex string."
+      )
+    if parent_id and len(parent_id) != 16:
+      raise ValueError(
+        "Value of the flag zipkin-parent-id must be a 16-character hex string."
+      )
 
     if zipkin_endpoint is not None:
       zipkin_reporter_settings = ZipkinReporter.Settings(log_level=Report.INFO)

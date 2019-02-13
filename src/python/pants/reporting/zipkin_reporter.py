@@ -95,7 +95,8 @@ class ZipkinReporter(Reporter):
         span_name=workunit.name,
         transport_handler=self.handler,
         encoding=Encoding.V1_THRIFT,
-        zipkin_attrs=zipkin_attrs
+        zipkin_attrs=zipkin_attrs,
+        use_128bit_trace_id=len(zipkin_attrs.trace_id) == 32
       )
     else:
       span = zipkin_span(
