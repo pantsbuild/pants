@@ -4,12 +4,15 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
+
 from future.utils import binary_type, text_type
 
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
+from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
 from pants.util.objects import Exactly, datatype
 
 
@@ -78,6 +81,33 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
   relies on the latter existing. This can be resolved when ordering is removed from Snapshots. See
   https://github.com/pantsbuild/pants/issues/5802
   """
+
+  @classmethod
+  def _path(cls, directory):
+    return '{}.digest'.format(directory.rstrip(os.sep))
+
+  @classmethod
+  def clear(cls, directory):
+    """Clear any existing Digest file adjacent to the given directory."""
+    safe_delete(cls._path(directory))
+
+  @classmethod
+  def load(cls, directory):
+    """Load a Digest from a `.digest` file adjacent to the given directory.
+
+    :return: A Digest, or None if the Digest did not exist.
+    """
+    read_file = maybe_read_file(cls._path(directory), binary_mode=False)
+    if read_file:
+      fingerprint, length = read_file.split(':')
+      return Digest(fingerprint, int(length))
+    else:
+      return None
+
+  def dump(self, directory):
+    """Dump this Digest object adjacent to the given directory."""
+    payload = '{}:{}'.format(self.fingerprint, self.serialized_bytes_length)
+    safe_file_dump(self._path(directory), payload=payload, mode='w')
 
   def __repr__(self):
     return '''Digest(fingerprint={}, serialized_bytes_length={})'''.format(

@@ -18,11 +18,11 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.task.task import Task
 from pants.util.collections_abc_backport import OrderedDict
-from pants.util.dirutil import safe_delete
+from pants.util.dirutil import fast_relpath, safe_delete
 
 
 logger = logging.getLogger(__name__)
@@ -112,6 +112,10 @@ class SimpleCodegenTask(Task):
     :return: a list of dependencies.
     """
     return []
+
+  @classmethod
+  def implementation_version(cls):
+    return super(SimpleCodegenTask, cls).implementation_version() + [('SimpleCodegenTask', 2)]
 
   def synthetic_target_extra_exports(self, target, target_workdir):
     """Gets any extra exports generated synthetic targets should have.
@@ -206,7 +210,7 @@ class SimpleCodegenTask(Task):
 
   def _get_synthetic_address(self, target, target_workdir):
     synthetic_name = target.id
-    sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
+    sources_rel_path = fast_relpath(target_workdir, get_buildroot())
     synthetic_address = Address(sources_rel_path, synthetic_name)
     return synthetic_address
 
@@ -230,7 +234,8 @@ class SimpleCodegenTask(Task):
       with self.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
         vts_to_sources = OrderedDict()
         for vt in invalidation_check.all_vts:
-          synthetic_target_dir = self.synthetic_target_dir(vt.target, vt.results_dir)
+
+          synthetic_target_dir = self.synthetic_target_dir(vt.target, vt.current_results_dir)
 
           key = (vt, synthetic_target_dir)
           vts_to_sources[key] = None
@@ -242,7 +247,7 @@ class SimpleCodegenTask(Task):
               sources = self._capture_sources((key,))[0]
               # _handle_duplicate_sources may delete files from the filesystem, so we need to
               # re-capture the sources.
-              if not self._handle_duplicate_sources(vt.target, vt.results_dir, sources):
+              if not self._handle_duplicate_sources(vt.target, synthetic_target_dir, sources):
                 vts_to_sources[key] = sources
             vt.update()
 
@@ -290,7 +295,7 @@ class SimpleCodegenTask(Task):
     for target, synthetic_target_dir in targets_and_dirs:
       files = self.sources_globs
 
-      results_dir_relpath = os.path.relpath(synthetic_target_dir, get_buildroot())
+      results_dir_relpath = fast_relpath(synthetic_target_dir, get_buildroot())
       buildroot_relative_globs = tuple(os.path.join(results_dir_relpath, file) for file in files)
       buildroot_relative_excludes = tuple(
         os.path.join(results_dir_relpath, file)
@@ -300,12 +305,16 @@ class SimpleCodegenTask(Task):
         PathGlobsAndRoot(
           PathGlobs(buildroot_relative_globs, buildroot_relative_excludes),
           text_type(get_buildroot()),
+          Digest.load(synthetic_target_dir),
         )
       )
       results_dirs.append(results_dir_relpath)
       filespecs.append(FilesetRelPathWrapper.to_filespec(buildroot_relative_globs))
 
     snapshots = self.context._scheduler.capture_snapshots(tuple(to_capture))
+
+    for snapshot, (_, synthetic_target_dir) in zip(snapshots, targets_and_dirs):
+      snapshot.directory_digest.dump(synthetic_target_dir)
 
     return tuple(EagerFilesetWithSpec(
       results_dir_relpath,
@@ -457,6 +466,8 @@ class SimpleCodegenTask(Task):
       for duped_source in duped_sources:
         safe_delete(os.path.join(target_workdir, duped_source))
         did_modify = True
+    if did_modify:
+      Digest.clear(target_workdir)
     return did_modify
 
   class DuplicateSourceError(TaskError):
