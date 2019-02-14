@@ -51,15 +51,14 @@ class Reporting(Subsystem):
               help='The full HTTP URL of a zipkin server to which traces should be posted. '
                    'No traces will be made if this is not set.')
     register('--zipkin-trace-id', advanced=True, default=None,
-              help='The overall 64 or 128-bit ID of the trace. '
-                   'Set if Pants trace should be a part of larger trace '
-                   'for systems that invoke Pants. If zipkin-trace-id '
-                   'and zipkin-parent-id are not set, a trace_id value is randomly generated for a '
-                   'Zipkin trace')
+              help='The overall 64 or 128-bit ID of the trace (the format is 16-character or '
+                   '32-character hex string). Set if Pants trace should be a part of larger trace '
+                   'for systems that invoke Pants. If flags zipkin-trace-id and zipkin-parent-id '
+                   'are not set, a trace_id value is randomly generated for a Zipkin trace.')
     register('--zipkin-parent-id', advanced=True, default=None,
-              help='The 64-bit ID for a parent span that invokes Pants. '
-                   'zipkin-trace-id and zipkin-parent-id must both either be set or not set '
-                   'when run Pants command')
+              help='The 64-bit ID for a parent span that invokes Pants (the format is 16-character '
+                   'hex string). Flags zipkin-trace-id and zipkin-parent-id must both either be set '
+                   'or not set when run Pants command.')
     register('--zipkin-sample-rate', advanced=True, default=100.0,
               help='Rate at which to sample Zipkin traces. Value 0.0 - 100.0.')
 
@@ -112,13 +111,17 @@ class Reporting(Subsystem):
       raise ValueError(
         "Flags zipkin-trace-id and zipkin-parent-id must both either be set or not set."
       )
-    if trace_id and len(trace_id) != 16 and len(trace_id) != 32:
+    if trace_id and (len(trace_id) != 16 and len(trace_id) != 32 or \
+      any(ch not in set('0123456789abcdefABCDEF') for ch in trace_id)):
       raise ValueError(
-        "Value of the flag zipkin-trace-id must be a 16-character or 32-character hex string."
+        "Value of the flag zipkin-trace-id must be a 16-character or 32-character hex string. "
+        + "Got {}.".format(trace_id)
       )
-    if parent_id and len(parent_id) != 16:
+    if parent_id and (len(parent_id) != 16 or \
+      any(ch not in set('0123456789abcdefABCDEF') for ch in parent_id)):
       raise ValueError(
-        "Value of the flag zipkin-parent-id must be a 16-character hex string."
+        "Value of the flag zipkin-parent-id must be a 16-character hex string. "
+        + "Got {}.".format(parent_id)
       )
 
     if zipkin_endpoint is not None:
