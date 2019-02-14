@@ -107,7 +107,7 @@ class TestBase(unittest.TestCase):
     """
     path = os.path.join(self.build_root, relpath)
     safe_mkdir(path)
-    self._invalidate_for(relpath)
+    self.invalidate_for(relpath)
     return path
 
   def create_workdir_dir(self, relpath):
@@ -119,10 +119,10 @@ class TestBase(unittest.TestCase):
     """
     path = os.path.join(self.pants_workdir, relpath)
     safe_mkdir(path)
-    self._invalidate_for(relpath)
+    self.invalidate_for(relpath)
     return path
 
-  def _invalidate_for(self, *relpaths):
+  def invalidate_for(self, *relpaths):
     """Invalidates all files from the relpath, recursively up to the root.
 
     Many python operations implicitly create parent directories, so we assume that touching a
@@ -131,7 +131,7 @@ class TestBase(unittest.TestCase):
     if self._scheduler is None:
       return
     files = {f for relpath in relpaths for f in recursive_dirname(relpath)}
-    self._scheduler.invalidate_files(files)
+    return self._scheduler.invalidate_files(files)
 
   def create_link(self, relsrc, reldst):
     """Creates a symlink within the buildroot.
@@ -144,7 +144,7 @@ class TestBase(unittest.TestCase):
     src = os.path.join(self.build_root, relsrc)
     dst = os.path.join(self.build_root, reldst)
     relative_symlink(src, dst)
-    self._invalidate_for(reldst)
+    self.invalidate_for(reldst)
 
   def create_file(self, relpath, contents='', mode='w'):
     """Writes to a file under the buildroot.
@@ -158,7 +158,7 @@ class TestBase(unittest.TestCase):
     path = os.path.join(self.build_root, relpath)
     with safe_open(path, mode=mode) as fp:
       fp.write(contents)
-    self._invalidate_for(relpath)
+    self.invalidate_for(relpath)
     return path
 
   def create_files(self, path, files):
@@ -432,7 +432,7 @@ class TestBase(unittest.TestCase):
       if delete_build_files:
         for f in files:
           os.remove(os.path.join(self.build_root, f))
-      self._invalidate_for(*files)
+      self.invalidate_for(*files)
     if self._build_graph is not None:
       self._build_graph.reset()
 

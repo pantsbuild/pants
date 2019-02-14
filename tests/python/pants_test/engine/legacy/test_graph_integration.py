@@ -138,6 +138,14 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertNotIn("WARN]", pants_run.stderr_data)
 
+  def test_existing_directory_with_no_build_files_fails(self):
+    options = [
+        '--pants-ignore=+["/build-support/bin/native/src"]',
+      ]
+    pants_run = self.run_pants(options + ['list', 'build-support/bin::'])
+    self.assert_failure(pants_run)
+    self.assertIn("does not match any targets.", pants_run.stderr_data)
+
   def test_error_message(self):
     for k in self._ERR_TARGETS:
       self._list_target_check_error(k)
