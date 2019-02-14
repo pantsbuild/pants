@@ -206,8 +206,10 @@ class Reporting(Subsystem):
 
     return invalidation_report
 
+
 def is_hex_string(id_value):
   return all(is_hex_ch(ch) for ch in id_value)
+
 
 def is_hex_ch(ch):
   num = ord(ch)
