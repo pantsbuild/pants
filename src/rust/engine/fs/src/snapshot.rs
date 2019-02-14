@@ -86,8 +86,10 @@ impl Snapshot {
         future::ok(path_stats).to_boxed()
       })
       .map(move |path_stats_per_directory| {
-        let path_stats =
-          Iterator::flatten(path_stats_per_directory.into_iter().map(|v| v.into_iter())).collect();
+        let mut path_stats =
+          Iterator::flatten(path_stats_per_directory.into_iter().map(|v| v.into_iter()))
+            .collect::<Vec<_>>();
+        path_stats.sort_by(|l, r| l.path().cmp(&r.path()));
         Snapshot { digest, path_stats }
       })
       .to_boxed()

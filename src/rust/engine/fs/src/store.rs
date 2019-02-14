@@ -589,6 +589,9 @@ impl Store {
   /// Given the Digest for a Directory, recursively walk the Directory, calling the given function
   /// with the path so far, and the new Directory.
   ///
+  /// The recursive walk will proceed concurrently, so if order matters, a caller should sort the
+  /// output after the call.
+  ///
   pub fn walk<
     T: Send + 'static,
     F: Fn(
@@ -598,13 +601,14 @@ impl Store {
         &bazel_protos::remote_execution::Directory,
       ) -> BoxFuture<T, String>
       + Send
+      + Sync
       + 'static,
   >(
     &self,
     digest: Digest,
     f: F,
   ) -> BoxFuture<Vec<T>, String> {
-    let f = Arc::new(Mutex::new(f));
+    let f = Arc::new(f);
     let accumulator = Arc::new(Mutex::new(Vec::new()));
     self
       .walk_helper(digest, PathBuf::new(), f, accumulator.clone())
@@ -625,12 +629,13 @@ impl Store {
         &bazel_protos::remote_execution::Directory,
       ) -> BoxFuture<T, String>
       + Send
+      + Sync
       + 'static,
   >(
     &self,
     digest: Digest,
     path_so_far: PathBuf,
-    f: Arc<Mutex<F>>,
+    f: Arc<F>,
     accumulator: Arc<Mutex<Vec<T>>>,
   ) -> BoxFuture<(), String> {
     let store = self.clone();
@@ -638,10 +643,7 @@ impl Store {
       .load_directory(digest)
       .and_then(move |maybe_directory| match maybe_directory {
         Some(directory) => {
-          let result_for_directory = {
-            let f = f.lock();
-            f(&store, &path_so_far, digest, &directory)
-          };
+          let result_for_directory = f(&store, &path_so_far, digest, &directory);
           result_for_directory
             .and_then(move |r| {
               {
