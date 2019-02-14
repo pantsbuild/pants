@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from parameterized import parameterized
+
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.wire.java.register import build_file_aliases as register_codegen
 from pants.backend.codegen.wire.java.wire_gen import WireGen
@@ -59,28 +61,35 @@ class WireGenTest(TaskTestBase):
       'bar.proto'],
       task.format_args_for_target(wire_targetv1, self.TARGET_WORKDIR))
 
-  def test_compiler_args_all(self):
+  @parameterized.expand([(True,), (False,)])
+  def test_compiler_args_all(self, ordered_sources):
     self._create_fake_wire_tool(version='1.8.0')
     kitchen_sink = self.make_target('src/wire:kitchen-sink', JavaWireLibrary,
                                     sources=['foo.proto', 'bar.proto', 'baz.proto'],
                                     registry_class='org.pantsbuild.Registry',
                                     service_writer='org.pantsbuild.DummyServiceWriter',
                                     no_options=True,
+                                    ordered_sources=ordered_sources,
                                     roots=['root1', 'root2', 'root3'],
                                     enum_options=['enum1', 'enum2', 'enum3'],)
     task = self.create_task(self.context(target_roots=[kitchen_sink]))
-    self.assertEqual([
-      '--java_out={}'.format(self.TARGET_WORKDIR),
-      '--no_options',
-      '--service_writer=org.pantsbuild.DummyServiceWriter',
-      '--registry_class=org.pantsbuild.Registry',
-      '--roots=root1,root2,root3',
-      '--enum_options=enum1,enum2,enum3',
-      '--proto_path={}/src/wire'.format(self.build_root),
-      'foo.proto',
-      'bar.proto',
-      'baz.proto'],
-      task.format_args_for_target(kitchen_sink, self.TARGET_WORKDIR))
+    expected = [
+        '--java_out={}'.format(self.TARGET_WORKDIR),
+        '--no_options',
+        '--service_writer=org.pantsbuild.DummyServiceWriter',
+        '--registry_class=org.pantsbuild.Registry',
+        '--roots=root1,root2,root3',
+        '--enum_options=enum1,enum2,enum3',
+        '--proto_path={}/src/wire'.format(self.build_root),
+        'foo.proto',
+        'bar.proto',
+        'baz.proto',
+      ]
+    actual = task.format_args_for_target(kitchen_sink, self.TARGET_WORKDIR)
+    if not ordered_sources:
+      expected = set(expected)
+      actual = set(actual)
+    self.assertEqual(expected, actual)
 
   def test_compiler_args_proto_paths(self):
     self._create_fake_wire_tool()

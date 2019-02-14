@@ -44,23 +44,23 @@ impl Snapshot {
   >(
     store: Store,
     file_digester: &S,
-    path_stats: Vec<PathStat>,
+    mut path_stats: Vec<PathStat>,
   ) -> BoxFuture<Snapshot, String> {
-    let mut sorted_path_stats = path_stats.clone();
-    sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
+    path_stats.sort_by(|a, b| a.path().cmp(b.path()));
 
     // The helper assumes that if a Path has multiple children, it must be a directory.
     // Proactively error if we run into identically named files, because otherwise we will treat
     // them like empty directories.
-    sorted_path_stats.dedup_by(|a, b| a.path() == b.path());
-    if sorted_path_stats.len() != path_stats.len() {
+    let pre_dedupe_len = path_stats.len();
+    path_stats.dedup_by(|a, b| a.path() == b.path());
+    if path_stats.len() != pre_dedupe_len {
       return future::err(format!(
         "Snapshots must be constructed from unique path stats; got duplicates in {:?}",
         path_stats
       ))
       .to_boxed();
     }
-    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &sorted_path_stats)
+    Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, &path_stats)
       .map(|digest| Snapshot { digest, path_stats })
       .to_boxed()
   }
@@ -553,6 +553,27 @@ mod tests {
   }
 
   #[test]
+  fn snapshot_from_digest() {
+    let (store, dir, posix_fs, digester) = setup();
+
+    let cats = PathBuf::from("cats");
+    let roland = cats.join("roland");
+    std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
+    make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
+
+    let path_stats = expand_all_sorted(posix_fs);
+    let expected_snapshot = Snapshot::from_path_stats(store.clone(), &digester, path_stats.clone())
+      .wait()
+      .unwrap();
+    assert_eq!(
+      expected_snapshot,
+      Snapshot::from_digest(store, expected_snapshot.digest)
+        .wait()
+        .unwrap(),
+    );
+  }
+
+  #[test]
   fn snapshot_recursive_directories_including_empty() {
     let (store, dir, posix_fs, digester) = setup();
 
@@ -580,7 +601,7 @@ mod tests {
           .unwrap(),
           232,
         ),
-        path_stats: unsorted_path_stats,
+        path_stats: sorted_path_stats,
       }
     );
   }

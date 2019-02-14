@@ -112,9 +112,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                 out=pants_run.stderr_data,
                 blocks=block_text))
 
-    biggest_proto = -1
     for block in all_blocks:
-      last_proto = -1
       seen_extracted = False
       for line in block:
         # Make sure import bases appear after the bases for actual sources.
@@ -124,14 +122,3 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
           else:
             self.assertFalse(seen_extracted,
                              'Local protoc bases must be ordered before imported bases!')
-          continue
-        # Check to make sure, eg, testproto4.proto never precedes testproto2.proto.
-        match = re.search(r'(?P<sequence>\d+)\.proto[\\.]?$', line)
-        if match:
-          number = int(match.group('sequence'))
-          self.assertTrue(number > last_proto, '{proto} succeeded proto #{number}!\n{blocks}'
-                          .format(proto=line, number=last_proto, blocks=block_text))
-          last_proto = number
-      if last_proto > biggest_proto:
-        biggest_proto = last_proto
-    self.assertEqual(biggest_proto, 6, 'Not all protos were seen!\n{}'.format(block_text))
