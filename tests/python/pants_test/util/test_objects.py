@@ -741,6 +741,18 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
     with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx_falsy_value):
       SomeEnum('')
 
+  def test_enum_comparison_fails(self):
+    enum_instance = SomeEnum(1)
+    with self.assertRaisesRegexp(TypeCheckError,
+                                 re.escape("enum equality is defined to be an error")):
+      enum_instance == enum_instance
+    # Test that comparison also fails against another type.
+    with self.assertRaisesRegexp(TypeCheckError,
+                                 re.escape("enum equality is defined to be an error")):
+      enum_instance == 1
+    # TODO: figure out if there's a way to make this direction raise as well!
+    self.assertNotEqual(1, enum_instance)
+
   def test_enum_resolve_variant(self):
     one_enum_instance = SomeEnum(1)
     two_enum_instance = SomeEnum(2)

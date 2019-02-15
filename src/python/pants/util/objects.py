@@ -281,6 +281,15 @@ def enum(*args):
       """
       return cls.create(value)
 
+    # TODO: figure out if there's a way to make the opposite direction of `==` raise
+    # (e.g. 1 == SomeEnum(1), which currently just returns False).
+    def __eq__(self, other):
+      """Redefine equality to raise to nudge people to use static pattern matching."""
+      raise self.make_type_error(
+        "enum equality is defined to be an error -- use .resolve_for_enum_variant() instead!")
+    # Redefine the canary so datatype __new__ doesn't raise.
+    __eq__._eq_override_canary = None
+
     @classmethod
     def create(cls, *args, **kwargs):
       """Create an instance of this enum, using the default value if specified.
