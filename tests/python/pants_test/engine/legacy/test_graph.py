@@ -61,8 +61,9 @@ class GraphTest(TestBase):
     self.assertGreater(invalidated_count, 0)
 
   def test_sources_ordering(self):
-    expected_sources = ['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd']
-    self.create_library('src/example', 'files', 'things', sources=expected_sources)
+    input_sources = ['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd']
+    expected_sources = sorted(input_sources)
+    self.create_library('src/example', 'files', 'things', sources=input_sources)
 
     target = self.target('src/example:things')
     sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]

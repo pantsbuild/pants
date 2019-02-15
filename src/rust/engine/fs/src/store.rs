@@ -461,51 +461,22 @@ impl Store {
   }
 
   pub fn expand_directory(&self, digest: Digest) -> BoxFuture<HashMap<Digest, EntryType>, String> {
-    let accumulator = Arc::new(Mutex::new(HashMap::new()));
-
     self
-      .expand_directory_helper(digest, accumulator.clone())
-      .map(|()| {
-        Arc::try_unwrap(accumulator)
-          .expect("Arc should have been unwrappable")
-          .into_inner()
-      })
-      .to_boxed()
-  }
-
-  fn expand_directory_helper(
-    &self,
-    digest: Digest,
-    accumulator: Arc<Mutex<HashMap<Digest, EntryType>>>,
-  ) -> BoxFuture<(), String> {
-    let store = self.clone();
-    self
-      .load_directory(digest)
-      .and_then(move |maybe_directory| match maybe_directory {
-        Some(directory) => {
-          {
-            let mut accumulator = accumulator.lock();
-            accumulator.insert(digest, EntryType::Directory);
-            for file in directory.get_files() {
-              accumulator.insert(try_future!(file.get_digest().into()), EntryType::File);
-            }
-          }
-          future::join_all(
-            directory
-              .get_directories()
-              .iter()
-              .map(move |subdir| {
-                store.clone().expand_directory_helper(
-                  try_future!(subdir.get_digest().into()),
-                  accumulator.clone(),
-                )
-              })
-              .collect::<Vec<_>>(),
-          )
-          .map(|_| ())
-          .to_boxed()
+      .walk(digest, |_, _, digest, directory| {
+        let mut digest_types = Vec::new();
+        digest_types.push((digest, EntryType::Directory));
+        for file in directory.get_files() {
+          digest_types.push((try_future!(file.get_digest().into()), EntryType::File));
         }
-        None => future::err(format!("Could not expand unknown directory: {:?}", digest)).to_boxed(),
+        future::ok(digest_types).to_boxed()
+      })
+      .map(|digest_pairs_per_directory| {
+        Iterator::flatten(
+          digest_pairs_per_directory
+            .into_iter()
+            .map(|v| v.into_iter()),
+        )
+        .collect()
       })
       .to_boxed()
   }
@@ -579,78 +550,124 @@ impl Store {
   }
 
   // Returns files sorted by their path.
-  pub fn contents_for_directory(
-    &self,
-    directory: &bazel_protos::remote_execution::Directory,
-  ) -> BoxFuture<Vec<FileContent>, String> {
-    let accumulator = Arc::new(Mutex::new(HashMap::new()));
+  pub fn contents_for_directory(&self, digest: Digest) -> BoxFuture<Vec<FileContent>, String> {
     self
-      .contents_for_directory_helper(directory, PathBuf::new(), accumulator.clone())
-      .map(|()| {
-        let map = Arc::try_unwrap(accumulator).unwrap().into_inner();
-        let mut vec: Vec<FileContent> = map
-          .into_iter()
-          .map(|(path, content)| FileContent { path, content })
-          .collect();
+      .walk(digest, |store, path_so_far, _, directory| {
+        future::join_all(
+          directory
+            .get_files()
+            .iter()
+            .map(move |file_node| {
+              let path = path_so_far.join(file_node.get_name());
+              store
+                .load_file_bytes_with(try_future!(file_node.get_digest().into()), |b| b)
+                .and_then(move |maybe_bytes| {
+                  maybe_bytes
+                    .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
+                    .map(|content| FileContent { path, content })
+                })
+                .to_boxed()
+            })
+            .collect::<Vec<_>>(),
+        )
+        .to_boxed()
+      })
+      .map(|file_contents_per_directory| {
+        let mut vec = Iterator::flatten(
+          file_contents_per_directory
+            .into_iter()
+            .map(|v| v.into_iter()),
+        )
+        .collect::<Vec<_>>();
         vec.sort_by(|l, r| l.path.cmp(&r.path));
         vec
       })
       .to_boxed()
   }
 
-  // Assumes that all fingerprints it encounters are valid.
-  fn contents_for_directory_helper(
+  ///
+  /// Given the Digest for a Directory, recursively walk the Directory, calling the given function
+  /// with the path so far, and the new Directory.
+  ///
+  /// The recursive walk will proceed concurrently, so if order matters, a caller should sort the
+  /// output after the call.
+  ///
+  pub fn walk<
+    T: Send + 'static,
+    F: Fn(
+        &Store,
+        &PathBuf,
+        Digest,
+        &bazel_protos::remote_execution::Directory,
+      ) -> BoxFuture<T, String>
+      + Send
+      + Sync
+      + 'static,
+  >(
     &self,
-    directory: &bazel_protos::remote_execution::Directory,
+    digest: Digest,
+    f: F,
+  ) -> BoxFuture<Vec<T>, String> {
+    let f = Arc::new(f);
+    let accumulator = Arc::new(Mutex::new(Vec::new()));
+    self
+      .walk_helper(digest, PathBuf::new(), f, accumulator.clone())
+      .map(|()| {
+        Arc::try_unwrap(accumulator)
+          .unwrap_or_else(|_| panic!("walk_helper violated its contract."))
+          .into_inner()
+      })
+      .to_boxed()
+  }
+
+  fn walk_helper<
+    T: Send + 'static,
+    F: Fn(
+        &Store,
+        &PathBuf,
+        Digest,
+        &bazel_protos::remote_execution::Directory,
+      ) -> BoxFuture<T, String>
+      + Send
+      + Sync
+      + 'static,
+  >(
+    &self,
+    digest: Digest,
     path_so_far: PathBuf,
-    contents_wrapped: Arc<Mutex<HashMap<PathBuf, Bytes>>>,
+    f: Arc<F>,
+    accumulator: Arc<Mutex<Vec<T>>>,
   ) -> BoxFuture<(), String> {
-    let contents_wrapped_copy = contents_wrapped.clone();
-    let path_so_far_copy = path_so_far.clone();
-    let store_copy = self.clone();
-    let file_futures = future::join_all(
-      directory
-        .get_files()
-        .iter()
-        .map(move |file_node| {
-          let path = path_so_far_copy.join(file_node.get_name());
-          let contents_wrapped_copy = contents_wrapped_copy.clone();
-          store_copy
-            .load_file_bytes_with(try_future!(file_node.get_digest().into()), |b| b)
-            .and_then(move |maybe_bytes| {
-              maybe_bytes
-                .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                .map(move |bytes| {
-                  let mut contents = contents_wrapped_copy.lock();
-                  contents.insert(path, bytes);
-                })
-            })
-            .to_boxed()
-        })
-        .collect::<Vec<_>>(),
-    );
     let store = self.clone();
-    let dir_futures = future::join_all(
-      directory
-        .get_directories()
-        .iter()
-        .map(move |dir_node| {
-          let digest = try_future!(dir_node.get_digest().into());
-          let path = path_so_far.join(dir_node.get_name());
-          let store = store.clone();
-          let contents_wrapped = contents_wrapped.clone();
-          store
-            .load_directory(digest)
-            .and_then(move |maybe_dir| {
-              maybe_dir
-                .ok_or_else(|| format!("Could not find sub-directory with digest {:?}", digest))
+    self
+      .load_directory(digest)
+      .and_then(move |maybe_directory| match maybe_directory {
+        Some(directory) => {
+          let result_for_directory = f(&store, &path_so_far, digest, &directory);
+          result_for_directory
+            .and_then(move |r| {
+              {
+                let mut accumulator = accumulator.lock();
+                accumulator.push(r);
+              }
+              future::join_all(
+                directory
+                  .get_directories()
+                  .iter()
+                  .map(move |dir_node| {
+                    let subdir_digest = try_future!(dir_node.get_digest().into());
+                    let path = path_so_far.join(dir_node.get_name());
+                    store.walk_helper(subdir_digest, path, f.clone(), accumulator.clone())
+                  })
+                  .collect::<Vec<_>>(),
+              )
+              .map(|_| ())
             })
-            .and_then(move |dir| store.contents_for_directory_helper(&dir, path, contents_wrapped))
             .to_boxed()
-        })
-        .collect::<Vec<_>>(),
-    );
-    file_futures.join(dir_futures).map(|(_, _)| ()).to_boxed()
+        }
+        None => future::err(format!("Could not walk unknown directory: {:?}", digest)).to_boxed(),
+      })
+      .to_boxed()
   }
 }
 
@@ -3501,7 +3518,7 @@ mod tests {
     let store = new_local_store(store_dir.path());
 
     let file_contents = store
-      .contents_for_directory(&TestDirectory::empty().directory())
+      .contents_for_directory(TestDirectory::empty().digest())
       .wait()
       .expect("Getting FileContents");
 
@@ -3535,7 +3552,7 @@ mod tests {
       .expect("Error saving catnip file bytes");
 
     let file_contents = store
-      .contents_for_directory(&recursive_testdir.directory())
+      .contents_for_directory(recursive_testdir.digest())
       .wait()
       .expect("Getting FileContents");
 

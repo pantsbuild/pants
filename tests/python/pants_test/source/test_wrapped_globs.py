@@ -266,10 +266,6 @@ class FilesetWithSpecTest(TestBase):
     self.add_to_build_file('package/dir', 'files(name = "target", sources = ["foo"])')
     target = self.target('package/dir:target')
     snapshot = target.sources_snapshot(scheduler=self.scheduler)
-    snapshot_paths = tuple(file.path for file in snapshot.path_stats)
-    self.assertEqual(
-      ('package/dir/foo',),
-      snapshot_paths
-    )
+    self.assertEqual(('package/dir/foo',), snapshot.files)
     self.assertEqual(target.sources_relative_to_target_base().files, ('foo',))
     self.assertEqual(target.sources_relative_to_buildroot(), ['package/dir/foo'])

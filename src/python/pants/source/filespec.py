@@ -9,6 +9,9 @@ import re
 
 def glob_to_regex(pattern):
   """Given a glob pattern, return an equivalent regex expression.
+
+  TODO: Replace with implementation in `fs.rs`. See https://github.com/pantsbuild/pants/issues/6795.
+
   :param string glob: The glob pattern. "**" matches 0 or more dirs recursively.
                       "*" only matches patterns in a single dir.
   :returns: A regex string that matches same paths as the input glob does.

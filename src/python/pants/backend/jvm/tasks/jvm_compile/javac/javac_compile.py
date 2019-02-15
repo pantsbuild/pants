@@ -209,8 +209,8 @@ class JavacCompile(JvmCompile):
       # Assume no extra .class files to grab. We'll fix up that case soon.
       # Drop the source_root from the file path.
       # Assumes `-d .` has been put in the command.
-      os.path.relpath(f.path.replace('.java', '.class'), ctx.target.target_base)
-      for f in input_snapshot.files if f.path.endswith('.java')
+      os.path.relpath(f.replace('.java', '.class'), ctx.target.target_base)
+      for f in input_snapshot.files if f.endswith('.java')
     )
     exec_process_request = ExecuteProcessRequest(
       argv=tuple(cmd),

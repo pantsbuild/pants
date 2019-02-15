@@ -216,22 +216,11 @@ impl WrappedNode for Select {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
             .and_then(move |digest| {
-              let store = context.core.store();
               context
                 .core
                 .store()
-                .load_directory(digest)
+                .contents_for_directory(digest)
                 .map_err(|str| throw(&str))
-                .and_then(move |maybe_directory| {
-                  maybe_directory
-                    .ok_or_else(|| format!("Could not find directory with digest {:?}", digest))
-                    .map_err(|str| throw(&str))
-                })
-                .and_then(move |directory| {
-                  store
-                    .contents_for_directory(&directory)
-                    .map_err(|str| throw(&str))
-                })
                 .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
             })
             .to_boxed()
@@ -540,44 +529,30 @@ impl Snapshot {
   }
 
   pub fn store_snapshot(core: &Arc<Core>, item: &fs::Snapshot) -> Value {
-    let path_stats: Vec<_> = item
-      .path_stats
-      .iter()
-      .map(|ps| Self::store_path_stat(core, ps))
-      .collect();
+    let mut files = Vec::new();
+    let mut dirs = Vec::new();
+    for ps in &item.path_stats {
+      match ps {
+        &PathStat::File { ref path, .. } => {
+          files.push(Self::store_path(path));
+        }
+        &PathStat::Dir { ref path, .. } => {
+          dirs.push(Self::store_path(path));
+        }
+      }
+    }
     externs::unsafe_call(
       &core.types.construct_snapshot,
       &[
         Self::store_directory(core, &item.digest),
-        externs::store_tuple(&path_stats),
+        externs::store_tuple(&files),
+        externs::store_tuple(&dirs),
       ],
     )
   }
 
   fn store_path(item: &Path) -> Value {
     externs::store_utf8_osstr(item.as_os_str())
-  }
-
-  fn store_dir(core: &Arc<Core>, item: &Dir) -> Value {
-    let args = [Self::store_path(item.0.as_path())];
-    externs::unsafe_call(&core.types.construct_dir, &args)
-  }
-
-  fn store_file(core: &Arc<Core>, item: &File) -> Value {
-    let args = [Self::store_path(item.path.as_path())];
-    externs::unsafe_call(&core.types.construct_file, &args)
-  }
-
-  fn store_path_stat(core: &Arc<Core>, item: &PathStat) -> Value {
-    let args = match item {
-      &PathStat::Dir { ref path, ref stat } => {
-        vec![Self::store_path(path), Self::store_dir(core, stat)]
-      }
-      &PathStat::File { ref path, ref stat } => {
-        vec![Self::store_path(path), Self::store_file(core, stat)]
-      }
-    };
-    externs::unsafe_call(&core.types.construct_path_stat, &args)
   }
 
   fn store_file_content(context: &Context, item: &FileContent) -> Value {

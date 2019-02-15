@@ -32,6 +32,7 @@ class JavaWireLibrary(JvmTarget):
                registry_class=None,
                enum_options=None,
                no_options=None,
+               ordered_sources=None,
                **kwargs):
     """
     :param string service_writer: the name of the class to pass as the --service_writer option to
@@ -43,6 +44,9 @@ class JavaWireLibrary(JvmTarget):
     doubt, specify com.squareup.wire.SimpleServiceWriter
     :param list enum_options: list of enums to pass to as the --enum-enum_options option, # optional
     :param boolean no_options: boolean that determines if --no_options flag is passed
+    :param boolean ordered_sources: boolean that declares whether the sources argument represents
+      literal ordered sources to be passed directly to the compiler. If false, no ordering is
+      guaranteed for the sources passed to an individual compiler invoke.
     """
 
     if not service_writer and service_writer_options:
@@ -59,6 +63,7 @@ class JavaWireLibrary(JvmTarget):
       'registry_class': PrimitiveField(registry_class or None),
       'enum_options': PrimitiveField(enum_options or []),
       'no_options': PrimitiveField(no_options or False),
+      'ordered_sources': PrimitiveField(ordered_sources or False),
     })
 
     super(JavaWireLibrary, self).__init__(payload=payload, **kwargs)

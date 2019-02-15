@@ -14,8 +14,7 @@ from types import GeneratorType
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
-                             MergedDirectories, Path, PathGlobs, PathGlobsAndRoot, Snapshot,
-                             UrlToFetch)
+                             MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, Throw
@@ -100,10 +99,6 @@ class Scheduler(object):
       construct_snapshot=Snapshot,
       construct_file_content=FileContent,
       construct_files_content=FilesContent,
-      construct_path_stat=Path,
-      construct_dir=Dir,
-      construct_file=File,
-      construct_link=Link,
       construct_process_result=FallibleExecuteProcessResult,
       constraint_address=constraint_for(Address),
       constraint_path_globs=constraint_for(PathGlobs),

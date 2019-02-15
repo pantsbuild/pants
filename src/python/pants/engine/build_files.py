@@ -219,7 +219,7 @@ def addresses_from_address_families(address_mapper, specs):
   """
   # Capture a Snapshot covering all paths for these Specs, then group by directory.
   snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
-  dirnames = {dirname(f.stat.path) for f in snapshot.files}
+  dirnames = {dirname(f) for f in snapshot.files}
   address_families = yield [Get(AddressFamily, Dir(d)) for d in dirnames]
   address_family_by_directory = {af.namespace: af for af in address_families}
 
