@@ -132,13 +132,10 @@ def datatype(field_decls, superclass_name=None, **kwargs):
     def __ne__(self, other):
       return not (self == other)
 
-    def __hash__(self):
-      return super(DataType, self).__hash__()
-
     # NB: As datatype is not iterable, we need to override both __iter__ and all of the
     # namedtuple methods that expect self to be iterable.
     def __iter__(self):
-      raise TypeError("'{}' object is not iterable".format(type(self).__name__))
+      raise self.make_type_error("datatype object is not iterable")
 
     def _super_iter(self):
       return super(DataType, self).__iter__()
@@ -285,6 +282,9 @@ def enum(*args):
     # won't call this __eq__ (and therefore won't raise like we want).
     def __eq__(self, other):
       """Redefine equality to raise to nudge people to use static pattern matching."""
+      # TODO: determine why this is necessary for hashability.
+      # if type(self) == type(other):
+      #   return super(ChoiceDatatype, self).__eq__(other)
       raise self.make_type_error(
         "enum equality is defined to be an error -- use .resolve_for_enum_variant() instead!")
     # Redefine the canary so datatype __new__ doesn't raise.
