@@ -6,8 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from future.utils import text_type
 
-from pants.base.project_tree import File
-from pants.engine.fs import Digest, Path, Snapshot
+from pants.engine.fs import Digest, Snapshot
 from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import Globs, LazyFilesetWithSpec
 from pants_test.test_base import TestBase
@@ -83,10 +82,7 @@ class PayloadTest(TestBase):
     self.assertEqual(['foo/foo/a.txt'], list(sf.relative_to_buildroot()))
 
     digest = '56001a7e48555f156420099a99da60a7a83acc90853046709341bf9f00a6f944'
-    want_snapshot = Snapshot(
-      Digest(text_type(digest), 77),
-      (Path('foo/foo/a.txt', stat=File('foo/foo/a.txt')),)
-    )
+    want_snapshot = Snapshot(Digest(text_type(digest), 77), ('foo/foo/a.txt',), ())
 
     # We explicitly pass a None scheduler because we expect no scheduler lookups to be required
     # in order to get a Snapshot.

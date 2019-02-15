@@ -53,7 +53,7 @@ class ShellCat(datatype([('binary_location', BinaryLocation)])):
     return self.binary_location.bin_path
 
   def argv_from_snapshot(self, snapshot):
-    cat_file_paths = [f.path for f in snapshot.files]
+    cat_file_paths = snapshot.files
 
     option_like_files = [p for p in cat_file_paths if p.startswith('-')]
     if option_like_files:
@@ -138,9 +138,7 @@ class JavacCompileRequest(datatype([
     return self.binary_location.bin_path
 
   def argv_from_source_snapshot(self, snapshot):
-    snapshot_file_paths = [f.path for f in snapshot.files]
-
-    return (self.bin_path,) + tuple(snapshot_file_paths)
+    return (self.bin_path,) + snapshot.files
 
 
 class JavacCompileResult(datatype([

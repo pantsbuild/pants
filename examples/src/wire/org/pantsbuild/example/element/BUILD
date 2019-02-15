@@ -3,10 +3,12 @@
 
 java_wire_library(
   sources=[
-    'elements.proto', # Order matters here.
+    # NB: Order matters for these two paths, so we set `ordered_sources=True` below.
+    'elements.proto',
     'compound.proto',
   ],
   dependencies=[
     'examples/src/wire/org/pantsbuild/example/temperature',
   ],
+  ordered_sources=True,
 )
