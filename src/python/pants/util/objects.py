@@ -132,9 +132,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
     def __ne__(self, other):
       return not (self == other)
 
-    # NB: it appears that in Python 3, whenever __eq__ is overridden, __hash__() must also be
-    # explicitly implemented, otherwise Python will raise "unhashable type". It's not clear whether
-    # or where this behavior is documented.
+    # NB: in Python 3, whenever __eq__ is overridden, __hash__() must also be
+    # explicitly implemented, otherwise Python will raise "unhashable type". See
+    # https://docs.python.org/3/reference/datamodel.html#object.__hash__.
     def __hash__(self):
       return super(DataType, self).__hash__()
 
@@ -294,7 +294,7 @@ def enum(*args):
     __eq__._eq_override_canary = None
 
     # NB: as noted in datatype(), __hash__ must be explicitly implemented whenever __eq__ is
-    # overridden in Python 3. This behavior appears to be undocumented.
+    # overridden. See https://docs.python.org/3/reference/datamodel.html#object.__hash__.
     def __hash__(self):
       return super(ChoiceDatatype, self).__hash__()
 
