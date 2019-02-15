@@ -281,8 +281,8 @@ def enum(*args):
       """
       return cls.create(value)
 
-    # TODO: figure out if there's a way to make the opposite direction of `==` raise
-    # (e.g. 1 == SomeEnum(1), which currently just returns False).
+    # TODO: figure out if this will always trigger on primitives like strings, and what situations
+    # won't call this __eq__ (and therefore won't raise like we want).
     def __eq__(self, other):
       """Redefine equality to raise to nudge people to use static pattern matching."""
       raise self.make_type_error(
