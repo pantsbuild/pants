@@ -460,6 +460,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
     - PYENV_ROOT="${HOME}/.pyenv"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
+    - PEX_VERBOSE=9
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq

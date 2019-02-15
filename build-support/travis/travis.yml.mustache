@@ -439,6 +439,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
     - PYENV_ROOT="${HOME}/.pyenv"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
+    - PEX_VERBOSE=9
   before_install:
     {{>before_install_osx}}
     - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
