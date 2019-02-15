@@ -122,8 +122,8 @@ class SchedulerTraceTest(unittest.TestCase):
     trace = remove_locations_from_traceback(trace)
 
     assert_equal_with_printing(self, dedent('''
-                     Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, =A)
-                       Computing Task(nested_raise, <pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, =A, true)
+                     Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, Exactly(A))
+                       Computing Task(nested_raise, <pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, Exactly(A), true)
                          Throw(An exception for B)
                            Traceback (most recent call last):
                              File LOCATION-INFO, in call

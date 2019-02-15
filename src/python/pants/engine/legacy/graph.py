@@ -26,13 +26,14 @@ from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.mapper import AddressMapper
+from pants.engine.objects import Collection
 from pants.engine.parser import SymbolTable, TargetAdaptorContainer
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
-from pants.util.objects import Collection, datatype
+from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)

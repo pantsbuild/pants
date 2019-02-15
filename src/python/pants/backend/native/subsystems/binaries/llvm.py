@@ -80,16 +80,13 @@ class LLVM(NativeTool):
   def path_entries(self):
     return self._filemap([('bin',)])
 
-  _PLATFORM_SPECIFIC_LINKER_NAME = {
-    'darwin': lambda: 'ld64.lld',
-    'linux': lambda: 'lld',
-  }
-
   def linker(self, platform):
     return Linker(
       path_entries=self.path_entries,
-      exe_filename=platform.resolve_platform_specific(
-        self._PLATFORM_SPECIFIC_LINKER_NAME),
+      exe_filename=platform.resolve_for_enum_variant({
+        'darwin': 'ld64.lld',
+        'linux': 'lld',
+      }),
       library_dirs=[],
       linking_library_dirs=[],
       extra_args=[],

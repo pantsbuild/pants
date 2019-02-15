@@ -129,6 +129,7 @@ python_tests(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/init',
     'tests/python/pants_test/engine:util',
+    'tests/python/pants_test:test_base'
   ]
 )
 

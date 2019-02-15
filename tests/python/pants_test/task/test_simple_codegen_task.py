@@ -14,6 +14,7 @@ from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.target import Target
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdtemp
+from pants.util.objects import datatype
 from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
@@ -111,6 +112,12 @@ class DummyGen(SimpleCodegenTask):
   @property
   def _copy_target_attributes(self):
     return ['copied']
+
+
+class DummyVersionedTarget(datatype(['target', 'results_dir'])):
+  @property
+  def current_results_dir(self):
+    return self.results_dir
 
 
 class SimpleCodegenTaskTest(TaskTestBase):
@@ -212,12 +219,13 @@ class SimpleCodegenTaskTest(TaskTestBase):
     def execute():
       for target in targets:
         target_workdir = target_workdirs[target]
+        vt = DummyVersionedTarget(target, target_workdir)
         task.execute_codegen(target, target_workdir)
-        sources = task._capture_sources(((target, target_workdir),))[0]
-        task._handle_duplicate_sources(target, target_workdir, sources)
+        sources = task._capture_sources((vt,))[0]
+        task._handle_duplicate_sources(vt, sources)
         # _handle_duplicate_sources may delete files from the filesystem, so we need to re-capture.
-        sources = task._capture_sources(((target, target_workdir),))[0]
-        syn_targets.append(task._inject_synthetic_target(target, target_workdir, sources))
+        sources = task._capture_sources((vt,))[0]
+        syn_targets.append(task._inject_synthetic_target(vt, sources))
 
     if should_fail:
       # If we're expected to fail, validate the resulting message.

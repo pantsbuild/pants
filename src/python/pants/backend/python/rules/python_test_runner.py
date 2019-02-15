@@ -64,7 +64,7 @@ def run_python_test(transitive_hydrated_target, pytest):
   # pex27, where it should be hermetically provided in some way.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   requirements_pex_argv = [
-    './{}'.format(pex_snapshot.files[0].path),
+    './{}'.format(pex_snapshot.files[0]),
     '--python', python_binary,
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,

@@ -6,6 +6,7 @@ python_tests(
   sources = globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:parameterized',
     'src/python/pants/backend/codegen/wire/java',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -29,4 +30,5 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 300,
 )

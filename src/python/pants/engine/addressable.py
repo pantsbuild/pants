@@ -11,9 +11,9 @@ from functools import update_wrapper
 from future.utils import string_types
 
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.objects import Resolvable, Serializable
+from pants.engine.objects import Collection, Resolvable, Serializable
 from pants.util.collections_abc_backport import MutableMapping, MutableSequence
-from pants.util.objects import Collection, TypeConstraintError
+from pants.util.objects import TypeConstraintError
 
 
 Addresses = Collection.of(Address)

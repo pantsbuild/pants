@@ -346,7 +346,8 @@ class EngineInitializer(object):
     rules = (
       [
         RootRule(Console),
-        SingletonRule.from_instance(GlobMatchErrorBehavior.create(glob_match_error_behavior)),
+        SingletonRule.from_instance(GlobMatchErrorBehavior.create(glob_match_error_behavior,
+                                                                  none_is_default=True)),
         SingletonRule.from_instance(build_configuration),
         SingletonRule(SymbolTable, symbol_table),
       ] +

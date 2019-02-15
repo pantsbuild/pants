@@ -54,7 +54,6 @@ python_tests(
     'tests/python/pants_test/backend/python/tasks/util',
     'tests/python/pants_test/engine:scheduler_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/tasks:task_test_base',
     'tests/python/pants_test:task_test_base',
   ],
   timeout=600
