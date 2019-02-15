@@ -3,6 +3,11 @@
 This document describes releases leading up to the ``1.14.x`` ``stable`` series.
 
 
+1.14.0 (2/15/2019)
+------------------
+
+The first stable release of the ``1.14.x`` series, with no changes since ``rc1``.
+
 1.14.0rc1 (2/06/2019)
 ---------------------
 
