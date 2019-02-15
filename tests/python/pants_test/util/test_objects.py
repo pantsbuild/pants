@@ -744,12 +744,10 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
   def test_enum_comparison_fails(self):
     enum_instance = SomeEnum(1)
     rx_str = re.escape("enum equality is defined to be an error")
-    # # TODO: Figure out a way to raise on any use of `==` without breaking hashability for use by the
-    # # engine.
-    # self.assertEqual(enum_instance, SomeEnum(1))
-    # self.assertNotEqual(enum_instance, SomeEnum(2))
     with self.assertRaisesRegexp(TypeCheckError, rx_str):
       enum_instance == enum_instance
+    with self.assertRaisesRegexp(TypeCheckError, rx_str):
+      enum_instance != enum_instance
     # Test that comparison also fails against another type.
     with self.assertRaisesRegexp(TypeCheckError, rx_str):
       enum_instance == 1
