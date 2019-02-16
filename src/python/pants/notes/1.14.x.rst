@@ -3,10 +3,15 @@
 This document describes releases leading up to the ``1.14.x`` ``stable`` series.
 
 
-1.14.0 (2/15/2019)
-------------------
+1.14.0rc2 (2/15/2019)
+---------------------
 
-The first stable release of the ``1.14.x`` series, with no changes since ``rc1``.
+API Changes
+~~~~~~~~~~~
+
+* Pin pytest version to avoid induced breakage from more-itertools transitive dep (#7238)
+  `PR #7238 <https://github.com/pantsbuild/pants/pull/7238>`_
+  `PR #7240 <https://github.com/pantsbuild/pants/pull/7240>`_
 
 1.14.0rc1 (2/06/2019)
 ---------------------
