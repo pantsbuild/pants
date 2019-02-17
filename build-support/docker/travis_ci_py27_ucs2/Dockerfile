@@ -1,5 +1,8 @@
-# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+# This file duplicates travis_ci/Dockerfile, except it installs Python 2.7 instaed of Python 3.6
+# and adds the env var PYTHON_CONFIGURE_OPTS to install it with UCS2.
 
 # Use our custom Centos6 image for binary compatibility with old linux distros.
 FROM pantsbuild/centos6:latest
