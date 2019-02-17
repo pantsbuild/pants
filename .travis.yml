@@ -396,7 +396,7 @@ py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
 
 py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
   <<: *py27_linux_build_wheels_no_ucs
-  name: "Build Linux wheels (Py27 and UCS2 pantsbuild.pants)"
+  name: "Build wheels - Linux and cp27m (UCS2)"
   env:
     - *py27_linux_test_config_env
     - *base_build_wheels_env
@@ -417,7 +417,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
 py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
   # Linux defaults to UCS4, so we simply use the pre-installed Python.
   <<: *py27_linux_build_wheels_no_ucs
-  name: "Build Linux wheels (Py27 and UCS4 pantsbuild.pants)"
+  name: "Build wheels - Linux and cp27mu (UCS4)"
   env:
     - *py27_linux_test_config_env
     - *base_build_wheels_env
@@ -440,7 +440,7 @@ py27_osx_build_wheels_no_ucs: &py27_osx_build_wheels_no_ucs
 py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
   # OSX defaults to using UCS2, so we simply use the pre-installed Python.
   <<: *py27_osx_build_wheels_no_ucs
-  name: "Build OSX wheels (Py27 and UCS2 pantsbuild.pants)"
+  name: "Build wheels - OSX and cp27m (UCS2)"
   env:
     - *py27_osx_test_config_env
     - *base_build_wheels_env
@@ -448,7 +448,7 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *py27_osx_build_wheels_no_ucs
-  name: "Build OSX wheels (Py27 and UCS4 pantsbuild.pants)"
+  name: "Build wheels - OSX and cp27mu (UCS4)"
   addons:
     brew:
       packages:
