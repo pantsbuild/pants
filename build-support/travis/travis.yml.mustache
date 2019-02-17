@@ -158,9 +158,7 @@ py36_osx_config: &py36_osx_config
   env:
     # Fix Python 3 issue linking to OpenSSL
     - &py36_osx_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
+      {{>osx_openssl_env}}
       PYENV_ROOT="${HOME}/.pyenv"
       PATH="${PYENV_ROOT}/shims:${PATH}"
   before_install:
@@ -192,9 +190,7 @@ py36_osx_test_config: &py36_osx_test_config
   env:
     # Must duplicate py36_osx_config's env because it cannot be merged into a new anchor
     - &py36_osx_test_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
+      {{>osx_openssl_env}}
       PYENV_ROOT="${HOME}/.pyenv"
       PATH="${PYENV_ROOT}/shims:${PATH}"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
@@ -432,10 +428,15 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *py27_osx_build_wheels_no_ucs
   name: "Build OSX wheels (Py27 and UCS4 pantsbuild.pants)"
+  addons:
+    brew:
+      packages:
+      - openssl
   env:
     - *py27_osx_test_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs4
+    - {{>osx_openssl_env}}
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
     - PYENV_ROOT="${HOME}/.pyenv"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
