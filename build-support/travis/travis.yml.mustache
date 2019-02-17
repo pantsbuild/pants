@@ -390,7 +390,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
       --build-arg "TRAVIS_UID=$(id -u)"
       --build-arg "TRAVIS_GROUP=$(id -gn)"
       --build-arg "TRAVIS_GID=$(id -g)"
-      build-support/docker/travis_ci_py2_ucs2/
+      build-support/docker/travis_ci_py27_ucs2/
     - &docker_dry_run_release docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
