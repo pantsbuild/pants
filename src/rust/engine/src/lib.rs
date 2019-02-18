@@ -319,11 +319,11 @@ pub extern "C" fn scheduler_metrics(
       let values = scheduler
         .metrics(session)
         .into_iter()
-        .map(|(metric, value)| {
-          externs::store_tuple(&[externs::store_utf8(metric), externs::store_i64(value)])
+        .flat_map(|(metric, value)| {
+          vec![externs::store_utf8(metric), externs::store_i64(value)]
         })
         .collect::<Vec<_>>();
-      externs::store_tuple(&values).into()
+      externs::store_dict(&values).into()
     })
   })
 }

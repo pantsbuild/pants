@@ -82,7 +82,6 @@ pub fn store_set<I: Iterator<Item = Value>>(values: I) -> Value {
 ///
 /// The underlying slice _must_ contain an even number of elements.
 ///
-#[allow(dead_code)]
 pub fn store_dict(keys_and_values_interleaved: &[(Value)]) -> Value {
   if keys_and_values_interleaved.len() % 2 != 0 {
     panic!("store_dict requires an even number of elements");

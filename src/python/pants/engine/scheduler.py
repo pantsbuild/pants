@@ -278,8 +278,7 @@ class Scheduler(object):
     return self._visualize_to_dir
 
   def _metrics(self, session):
-    metrics_val = self._native.lib.scheduler_metrics(self._scheduler, session)
-    return {k: v for k, v in self._from_value(metrics_val)}
+    return self._from_value(self._native.lib.scheduler_metrics(self._scheduler, session))
 
   def with_fork_context(self, func):
     """See the rustdocs for `scheduler_fork_context` for more information."""
