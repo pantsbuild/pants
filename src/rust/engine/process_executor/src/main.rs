@@ -93,6 +93,13 @@ fn main() {
         ),
     )
       .arg(
+        Arg::with_name("execution-root-ca-cert-file")
+            .help("Path to file containing root certificate authority certificates for the execution server. If not set, TLS will not be used when connecting to the execution server.")
+            .takes_value(true)
+            .long("execution-root-ca-cert-file")
+            .required(false)
+      )
+      .arg(
         Arg::with_name("execution-oauth-bearer-token-path")
             .help("Path to file containing oauth bearer token for communication with the execution server. If not set, no authorization will be provided to remote servers.")
             .takes_value(true)
@@ -283,6 +290,12 @@ fn main() {
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
     Some(address) => {
+      let root_ca_certs = if let Some(path) = args.value_of("execution-root-ca-cert-file") {
+        Some(std::fs::read(path).expect("Error reading root CA certs file"))
+      } else {
+        None
+      };
+
       let oauth_bearer_token =
         if let Some(path) = args.value_of("execution-oauth-bearer-token-path") {
           Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
@@ -290,17 +303,16 @@ fn main() {
           None
         };
 
-      Box::new(
-        process_execution::remote::CommandRunner::new(
-          address,
-          args.value_of("cache-key-gen-version").map(str::to_owned),
-          remote_instance_arg,
-          oauth_bearer_token,
-          store.clone(),
-          timer_thread,
-        )
-        .expect("Could not initialize remote execution client"),
-      ) as Box<dyn process_execution::CommandRunner>
+      Box::new(process_execution::remote::CommandRunner::new(
+        address,
+        args.value_of("cache-key-gen-version").map(str::to_owned),
+        remote_instance_arg,
+        root_ca_certs,
+        oauth_bearer_token,
+        1,
+        store.clone(),
+        timer_thread,
+      )) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
@@ -309,18 +321,17 @@ fn main() {
       true,
     )) as Box<dyn process_execution::CommandRunner>,
   };
-  let mut rt = tokio::runtime::Runtime::new().unwrap();
-  let result = rt.block_on(runner.run(request)).unwrap();
+
+  let result = runner.run(request).wait().expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
-    rt.block_on(store.materialize_directory(output, result.output_directory))
+    store
+      .materialize_directory(output, result.output_directory)
+      .wait()
       .unwrap();
-  };
+  }
 
   print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
   eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
-
-  rt.shutdown_now().wait().unwrap();
-
   exit(result.exit_code);
 }
