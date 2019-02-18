@@ -303,19 +303,16 @@ fn main() {
           None
         };
 
-      Box::new(
-        process_execution::remote::CommandRunner::new(
-          address,
-          args.value_of("cache-key-gen-version").map(str::to_owned),
-          remote_instance_arg,
-          root_ca_certs,
-          oauth_bearer_token,
-          1,
-          store.clone(),
-          timer_thread,
-        )
-        .expect("Could not initialize remote execution client"),
-      ) as Box<dyn process_execution::CommandRunner>
+      Box::new(process_execution::remote::CommandRunner::new(
+        address,
+        args.value_of("cache-key-gen-version").map(str::to_owned),
+        remote_instance_arg,
+        root_ca_certs,
+        oauth_bearer_token,
+        1,
+        store.clone(),
+        timer_thread,
+      )) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
@@ -324,18 +321,17 @@ fn main() {
       true,
     )) as Box<dyn process_execution::CommandRunner>,
   };
-  let mut rt = tokio::runtime::Runtime::new().unwrap();
-  let result = rt.block_on(runner.run(request)).unwrap();
+
+  let result = runner.run(request).wait().expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
-    rt.block_on(store.materialize_directory(output, result.output_directory))
+    store
+      .materialize_directory(output, result.output_directory)
+      .wait()
       .unwrap();
-  };
+  }
 
   print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
   eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
-
-  rt.shutdown_now().wait().unwrap();
-
   exit(result.exit_code);
 }

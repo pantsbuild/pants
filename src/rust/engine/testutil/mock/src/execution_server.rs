@@ -53,12 +53,12 @@ impl MockExecution {
   ///
   pub fn new(
     name: String,
-    execute_request: bazel_protos::build::bazel::remote::execution::v2::ExecuteRequest,
+    execute_request: bazel_protos::remote_execution::ExecuteRequest,
     operation_responses: Vec<MockOperation>,
   ) -> MockExecution {
     MockExecution {
       name: name,
-      execute_request: execute_request.into(),
+      execute_request: execute_request,
       operation_responses: Arc::new(Mutex::new(VecDeque::from(operation_responses))),
     }
   }
