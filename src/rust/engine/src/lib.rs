@@ -307,7 +307,8 @@ pub extern "C" fn scheduler_create(
 }
 
 ///
-/// Returns a Handle representing a tuple of tuples of metric name string and metric value int.
+/// Returns a Handle representing a dictionary where key is metric name string and value is
+/// metric value int.
 ///
 #[no_mangle]
 pub extern "C" fn scheduler_metrics(
@@ -319,11 +320,9 @@ pub extern "C" fn scheduler_metrics(
       let values = scheduler
         .metrics(session)
         .into_iter()
-        .map(|(metric, value)| {
-          externs::store_tuple(&[externs::store_utf8(metric), externs::store_i64(value)])
-        })
+        .flat_map(|(metric, value)| vec![externs::store_utf8(metric), externs::store_i64(value)])
         .collect::<Vec<_>>();
-      externs::store_tuple(&values).into()
+      externs::store_dict(&values).into()
     })
   })
 }
