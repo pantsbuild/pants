@@ -307,8 +307,9 @@ pub extern "C" fn scheduler_create(
 }
 
 ///
-/// Returns a Handle representing a tuple of tuples of metric name string and metric value int.
-///
+/// Returns a Handle representing a dictionary where key is metric name string and value is
+/// metric value int.
+/// 
 #[no_mangle]
 pub extern "C" fn scheduler_metrics(
   scheduler_ptr: *mut Scheduler,
