@@ -399,7 +399,6 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
   <<: *native_engine_cache_config
   name: "Build wheels - Linux and cp27m (UCS2)"
   env:
-    - *py27_linux_config_env
     - *base_build_wheels_env
     - CACHE_NAME=linuxwheelsbuild.ucs2
   script:
@@ -456,7 +455,6 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
       packages:
       - openssl
   env:
-    - *py27_osx_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs4
     - PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include" PYENV_ROOT="${HOME}/.pyenv" PATH="${PYENV_ROOT}/shims:${PATH}"
