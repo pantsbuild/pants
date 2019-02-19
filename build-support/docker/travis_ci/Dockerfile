@@ -11,11 +11,12 @@ ARG PYTHON_36_VERSION=3.6.8
 ARG PYTHON_37_VERSION=3.7.2
 RUN yum install -y \
     zlib-devel \
-    bzip2 \
-    bzip2-devel \
+    bzip2{,-devel} \
     readline-devel \
-    sqlite \
-    sqlite-devel
+    sqlite{,-devel} \
+    openssl-devel \
+    xz{,-devel} \
+    libffi-devel
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
