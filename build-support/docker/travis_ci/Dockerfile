@@ -13,10 +13,7 @@ RUN yum install -y \
     zlib-devel \
     bzip2{,-devel} \
     readline-devel \
-    sqlite{,-devel} \
-    openssl-devel \
-    xz{,-devel} \
-    libffi-devel
+    sqlite{,-devel}
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
