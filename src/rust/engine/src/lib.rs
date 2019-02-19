@@ -71,6 +71,7 @@ use fs::{GlobMatching, MemFS, PathStat};
 use futures::Future;
 use hashing::Digest;
 use log::error;
+use crate::scheduler::WorkUnit;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -313,13 +314,31 @@ pub extern "C" fn scheduler_metrics(
 ) -> Handle {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      let values = scheduler
+      let mut values = scheduler
         .metrics(session)
         .into_iter()
         .flat_map(|(metric, value)| {
           vec![externs::store_utf8(metric), externs::store_i64(value)]
         })
         .collect::<Vec<_>>();
+      let mut workunits = session.workunits.lock();
+      let start_time = std::time::SystemTime::now().duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap().as_secs() as f64;
+      let test_workunit = WorkUnit {
+        name: "test_workunit".to_string(),
+        start_timestamp: start_time,
+        end_timestamp: start_time + 1.0,
+        span_id: "2222222222222222".to_string(),
+      };
+      workunits.push(test_workunit);
+      let workunits  = workunits.iter().map(|workunit| {
+        let values = vec![externs::store_utf8("name"), externs::store_utf8(&workunit.name),
+          externs::store_utf8("start_timestamp"), externs::store_i64(workunit.start_timestamp as i64),
+          externs::store_utf8("end_timestamp"), externs::store_i64(workunit.end_timestamp as i64),
+          externs::store_utf8("span_id"), externs::store_utf8(&workunit.span_id)];
+        externs::store_dict(&values)
+      }).collect::<Vec<_>>();
+      values.push(externs::store_utf8("engine_workunits"));
+      values.push(externs::store_tuple(&workunits));
       externs::store_dict(&values).into()
     })
   })

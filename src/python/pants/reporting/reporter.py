@@ -47,6 +47,10 @@ class Reporter(object):
     """A workunit has finished."""
     pass
 
+  def bulk_record_workunits(self, metrics):
+    """A collection of workunits from Rust (engine) part"""
+    pass
+
   def handle_log(self, workunit, level, *msg_elements):
     """Handle a message logged by pants code.
 

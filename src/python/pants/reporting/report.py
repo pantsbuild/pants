@@ -140,3 +140,8 @@ class Report(object):
         if len(s) > 0:
           for reporter in self._reporters.values():
             reporter.handle_output(workunit, label, s)
+
+  def bulk_record_workunits(self, metrics):
+    with self._lock:
+      for reporter in self._reporters.values():
+        reporter.bulk_record_workunits(metrics)
