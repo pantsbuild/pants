@@ -64,7 +64,7 @@ while getopts "h27fxbmrjlpeasu:ny:ci:tzw" opt; do
   case ${opt} in
     h) usage ;;
     2) python_two="true" ;;
-    2) python_three_seven="true" ;;
+    7) python_three_seven="true" ;;
     f) run_pre_commit_checks="true" ;;
     x) run_bootstrap_clean="true" ;;
     b) run_bootstrap="true" ;;
