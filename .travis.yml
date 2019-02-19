@@ -391,15 +391,15 @@ py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
   # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize
   # compatibility. This is a Py2.7 shard, so it is not subject to #6985.
   <<: *travis_docker_image
-  <<: *py27_linux_test_config
   <<: *base_build_wheels
 
 py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
+  <<: *py27_linux_config
   <<: *py27_linux_build_wheels_no_ucs
   <<: *native_engine_cache_config
   name: "Build wheels - Linux and cp27m (UCS2)"
   env:
-    - *py27_linux_test_config_env
+    - *py27_linux_config_env
     - *base_build_wheels_env
     - CACHE_NAME=linuxwheelsbuild.ucs2
   script:
@@ -416,6 +416,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
       sh -c "RUN_PANTS_FROM_PEX=0 ./build-support/bin/ci.sh -2b && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
 
 py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
+  <<: *py27_linux_test_config
   <<: *py27_linux_build_wheels_no_ucs
   name: "Build wheels - Linux and cp27mu (UCS4)"
   env:
@@ -431,11 +432,11 @@ py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
       sh -c "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
 
 py27_osx_build_wheels_no_ucs: &py27_osx_build_wheels_no_ucs
-  <<: *py27_osx_test_config
   <<: *base_build_wheels
   osx_image: xcode8
 
 py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
+  <<: *py27_osx_test_config
   <<: *py27_osx_build_wheels_no_ucs
   name: "Build wheels - OSX and cp27m (UCS2)"
   env:
@@ -446,6 +447,7 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
     - ./build-support/bin/release.sh -n
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
+  <<: *py27_osx_config
   <<: *py27_osx_build_wheels_no_ucs
   <<: *native_engine_cache_config
   name: "Build wheels - OSX and cp27mu (UCS4)"
@@ -454,7 +456,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
       packages:
       - openssl
   env:
-    - *py27_osx_test_config_env
+    - *py27_osx_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs4
     - PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include" PYENV_ROOT="${HOME}/.pyenv" PATH="${PYENV_ROOT}/shims:${PATH}"
