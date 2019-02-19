@@ -62,7 +62,7 @@ use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, HandleBuffer,
   IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
-  SatisfiedByExtern, SatisfiedByTypeExtern, StoreBoolExtern, StoreBytesExtern, StoreI64Extern,
+  SatisfiedByExtern, SatisfiedByTypeExtern, StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern,
   StoreTupleExtern, StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
@@ -119,6 +119,7 @@ pub extern "C" fn externs_set(
   store_bytes: StoreBytesExtern,
   store_utf8: StoreUtf8Extern,
   store_i64: StoreI64Extern,
+  store_f64: StoreF64Extern,
   store_bool: StoreBoolExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
@@ -146,6 +147,7 @@ pub extern "C" fn externs_set(
     store_bytes,
     store_utf8,
     store_i64,
+    store_f64,
     store_bool,
     project_ignoring_type,
     project_multi,
