@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 
 import requests
-from py_zipkin import Encoding
+from py_zipkin import Encoding, storage
 from py_zipkin.transport import BaseTransportHandler
 from py_zipkin.util import generate_random_64bit_string
 from py_zipkin.zipkin import ZipkinAttrs, create_attrs_for_span, zipkin_span
@@ -64,6 +64,7 @@ class ZipkinReporter(Reporter):
     self.parent_id = parent_id
     self.sample_rate = float(sample_rate)
     self.endpoint = endpoint
+    self.span_storage = storage.default_span_storage()
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -97,18 +98,19 @@ class ZipkinReporter(Reporter):
         )
         self.trace_id = zipkin_attrs.trace_id
 
-
       span = zipkin_span(
         service_name=service_name,
         span_name=workunit.name,
         transport_handler=self.handler,
         encoding=Encoding.V1_THRIFT,
-        zipkin_attrs=zipkin_attrs
+        zipkin_attrs=zipkin_attrs,
+        span_storage=self.span_storage,
       )
     else:
       span = zipkin_span(
         service_name=service_name,
         span_name=workunit.name,
+        span_storage=self.span_storage,
       )
     self._workunits_to_spans[workunit] = span
     span.start()
@@ -129,3 +131,26 @@ class ZipkinReporter(Reporter):
     endpoint = self.endpoint.replace("/api/v1/spans", "")
 
     logger.debug("Zipkin trace may be located at this URL {}/traces/{}".format(endpoint, self.trace_id))
+
+  def bulk_record_workunits(self, metrics):
+    """A collection of workunits from Rust (engine) part"""
+    engine_workunits = metrics["engine_workunits"]
+    for workunit in engine_workunits:
+      duration = workunit['end_timestamp'] - workunit['start_timestamp']
+
+      span = zipkin_span(
+        service_name="pants",
+        span_name=workunit['name'],
+        duration=duration,
+        span_storage=self.span_storage,
+      )
+      span.zipkin_attrs = ZipkinAttrs(
+        trace_id=self.trace_id,
+        span_id=workunit['span_id'],
+        parent_span_id=workunit.get("parent_id", None),
+        flags='0', # flags: stores flags header. Currently unused
+        is_sampled=True,
+      )
+      span.start()
+      span.start_timestamp = workunit['start_timestamp']
+      span.stop()

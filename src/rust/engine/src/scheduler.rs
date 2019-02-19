@@ -33,6 +33,15 @@ pub struct Session {
   roots: Mutex<HashSet<Root>>,
   // If enabled, the display that will render the progress of the V2 engine.
   display: Option<Mutex<EngineDisplay>>,
+  // A place to store info about workunits in rust part
+  pub workunits: Arc<Mutex<Vec<WorkUnit>>>,
+}
+
+pub struct WorkUnit {
+  pub name: String,
+  pub start_timestamp: f64,
+  pub end_timestamp: f64,
+  pub span_id: String,
 }
 
 impl Session {
@@ -41,6 +50,7 @@ impl Session {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
       display: EngineDisplay::create(ui_worker_count, should_render_ui).map(Mutex::new),
+      workunits: Arc::new(Mutex::new(Vec::new()))
     }
   }
 
