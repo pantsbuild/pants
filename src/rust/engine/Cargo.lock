@@ -98,7 +98,6 @@ dependencies = [
  "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=4dfafe9355dc996d7d0702e7386a6fedcd9734c0)",
  "grpcio-compiler 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost-derive 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "prost-types 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1280,28 +1279,18 @@ dependencies = [
  "fs 0.0.1",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-timer 0.1.1 (git+https://github.com/pantsbuild/futures-timer?rev=0b747e565309a58537807ab43c674d8951f9e5a0)",
- "h2 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=4dfafe9355dc996d7d0702e7386a6fedcd9734c0)",
  "hashing 0.0.1",
- "http 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mock 0.0.1",
- "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost-types 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "resettable 0.0.1",
  "sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "testutil 0.0.1",
  "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-codec 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-connect 0.1.0 (git+https://github.com/pantsbuild/tokio-connect?rev=f7ad1ca437973d6e24037ac6f7d5ef1013833c0b)",
  "tokio-process 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "tower-grpc 0.1.0 (git+https://github.com/pantsbuild/tower-grpc.git?rev=ef19f2e1715f415ecb699e8f17f5845ad2b45daf)",
- "tower-h2 0.1.0 (git+https://github.com/pantsbuild/tower-h2?rev=44b0efb4983b769283efd5b2a3bc3decbf7c33de)",
- "tower-http 0.1.0 (git+https://github.com/pantsbuild/tower-http?rev=56049ee7f31d4f6c549f5d1d5fbbfd7937df3d00)",
- "tower-util 0.1.0 (git+https://github.com/pantsbuild/tower?rev=7b61c1fc1992c1df684fd3f179644ef0ca9bfa4c)",
 ]
 
 [[package]]
@@ -1316,7 +1305,6 @@ dependencies = [
  "hashing 0.0.1",
  "process_execution 0.0.1",
  "resettable 0.0.1",
- "tokio 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

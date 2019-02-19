@@ -15,4 +15,3 @@ hashing = { path = "../hashing" }
 futures = "^0.1.16"
 process_execution = { path = "../process_execution" }
 resettable = { path = "../resettable" }
-tokio = "0.1.14"
