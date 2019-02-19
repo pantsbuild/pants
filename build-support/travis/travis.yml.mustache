@@ -119,11 +119,11 @@ py27_linux_config: &py27_linux_config
 
 py36_linux_config: &py36_linux_config
   <<: *base_linux_config
-  python: &python3_version "3.6"
+  python: "3.6"
 
 py37_linux_config: &py37_linux_config
   <<: *base_linux_config
-  python: &python3_version "3.7"
+  python: "3.7"
 
 base_linux_test_config: &base_linux_test_config
   <<: *base_linux_config
@@ -401,7 +401,7 @@ linux_rust_clippy: &linux_rust_clippy
   sudo: required
   stage: *test
   language: python
-  python: *python3_version
+  python: "3.6"
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -481,7 +481,7 @@ linux_rust_tests: &linux_rust_tests
   dist: xenial
   sudo: required
   language: python
-  python: *python3_version
+  python: "3.6"
   script:
     - ./build-support/bin/travis-ci.sh -e
 
