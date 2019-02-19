@@ -16,6 +16,7 @@ Runs commons tests for local or hosted CI.
 Usage: $0 (-h|-2fxbkmrjlpuneycitzsw)
  -h           print out this help message
  -2           Run using Python 2.7 (defaults to using Python 3.6).
+ -7           Run using Python 3.7 (defaults to using Python 3.6).
  -f           run python code formatting checks
  -x           run bootstrap clean-all (assume bootstrapping from a
               fresh clone)
@@ -59,10 +60,11 @@ python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "h2fxbmrjlpeasu:ny:ci:tzw" opt; do
+while getopts "h27fxbmrjlpeasu:ny:ci:tzw" opt; do
   case ${opt} in
     h) usage ;;
     2) python_two="true" ;;
+    2) python_three_seven="true" ;;
     f) run_pre_commit_checks="true" ;;
     x) run_bootstrap_clean="true" ;;
     b) run_bootstrap="true" ;;
@@ -113,6 +115,9 @@ export PANTS_DEV=1
 # pull down `./pants.pex` but still use a virtualenv (such as Rust Tests) will fail to execute.
 if [[ "${python_two:-false}" == "false" ]]; then
   py_version_number="3.6"
+  if [[ "${python_three_seven:-false}" == "true" ]]; then
+    py_version_number="3.7"
+  fi
   bootstrap_pants_script="./pants3"
   export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${py_version_number}.*']"
 else

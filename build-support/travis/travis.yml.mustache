@@ -301,7 +301,7 @@ py37_linux_build_engine: &py37_linux_build_engine
   env:
     - CACHE_NAME=linuxpexbuild.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - BOOTSTRAP_ARGS='-b'
+    - BOOTSTRAP_ARGS='-7b'
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
@@ -350,7 +350,7 @@ py37_osx_build_engine: &py37_osx_build_engine
     - *py37_osx_config_env
     - CACHE_NAME=osxpexbuild.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
-    - BOOTSTRAP_ARGS='-b'
+    - BOOTSTRAP_ARGS='-7b'
 
 # -------------------------------------------------------------------------
 # Lint
@@ -365,25 +365,23 @@ py27_lint: &py27_lint
   script:
     - ./build-support/bin/travis-ci.sh -fmrt2
 
-base_py3_lint: &base_py3_lint
-  script:
-    - ./build-support/bin/travis-ci.sh -fmrt
-
 py36_lint: &py36_lint
   <<: *py36_linux_test_config
-  <<: *base_py3_lint
   name: "Self-checks and lint (Py3.6 PEX)"
   env:
     - *py36_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py36
+  script:
+    - ./build-support/bin/travis-ci.sh -fmrt
 
 py37_lint: &py37_lint
   <<: *py37_linux_test_config
-  <<: *base_py3_lint
   name: "Self-checks and lint (Py3.7 PEX)"
   env:
     - *py37_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py37
+  script:
+    - ./build-support/bin/travis-ci.sh -fmrt7
 
 # -------------------------------------------------------------------------
 # Rust lints
@@ -580,13 +578,8 @@ py27_osx_platform_tests: &py27_osx_platform_tests
   script:
     - ./build-support/bin/travis-ci.sh -z2
 
-base_py3_osx_platform_tests: &base_py3_osx_platform_tests
-  script:
-    - ./build-support/bin/travis-ci.sh -z
-
 py36_osx_platform_tests: &py36_osx_platform_tests
   <<: *py36_osx_test_config
-  <<: *base_py3_osx_platform_tests
   name: "OSX platform-specific tests (Py3.6 PEX)"
   env:
     - *py36_osx_test_config_env
@@ -596,11 +589,12 @@ py36_osx_platform_tests: &py36_osx_platform_tests
 
 py37_osx_platform_tests: &py37_osx_platform_tests
   <<: *py37_osx_test_config
-  <<: *base_py3_osx_platform_tests
   name: "OSX platform-specific tests (Py3.7 PEX)"
   env:
     - *py37_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py37
+  script:
+    - ./build-support/bin/travis-ci.sh -z7
 
 # -------------------------------------------------------------------------
 # JVM tests
@@ -619,26 +613,25 @@ py27_jvm_tests: &py27_jvm_tests
   script:
     - ./build-support/bin/travis-ci.sh -j2
 
-base_py3_jvm_tests: &base_py3_jvm_tests
-  <<: *base_jvm_tests
-  script:
-    - ./build-support/bin/travis-ci.sh -j
-
 py36_jvm_tests: &py36_jvm_tests
   <<: *py36_linux_test_config
-  <<: *base_py3_jvm_tests
+  <<: *base_jvm_tests
   name: "JVM tests (Py3.6 PEX)"
   env:
     - *py36_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py36
+  script:
+    - ./build-support/bin/travis-ci.sh -j
 
 py37_jvm_tests: &py37_jvm_tests
   <<: *py37_linux_test_config
-  <<: *base_py3_jvm_tests
+  <<: *base_jvm_tests
   name: "JVM tests (Py3.7 PEX)"
   env:
     - *py37_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py37
+  script:
+    - ./build-support/bin/travis-ci.sh -j7
 
 # -------------------------------------------------------------------------
 # Deploy
@@ -732,7 +725,7 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=linuxunittests.py37
       script:
-        - ./build-support/bin/travis-ci.sh -lp
+        - ./build-support/bin/travis-ci.sh -7lp
 
 {{#py3_integration_shards}}
     - <<: *py36_linux_test_config
@@ -751,7 +744,7 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}
       script:
-        - ./build-support/bin/travis-ci.sh -c -i {{.}}/{{py3_integration_shards_length}}
+        - ./build-support/bin/travis-ci.sh -c7 -i {{.}}/{{py3_integration_shards_length}}
 
 {{/py3_integration_shards}}
 {{#py2_blacklist_integration_shards}}
@@ -803,7 +796,7 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py37
       script:
-        - ./build-support/bin/travis-ci.sh -n
+        - ./build-support/bin/travis-ci.sh -7n
 
     - <<: *py27_osx_10_12_sanity_check
     - <<: *py36_osx_10_12_sanity_check
