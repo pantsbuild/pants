@@ -360,6 +360,11 @@ cargo_audit: &cargo_audit
 # compatibility for end users. This is because we constrain our ABI due to the native engine.
 # See https://www.python.org/dev/peps/pep-0513/#ucs-2-vs-ucs-4-builds. Note this distinction is
 # not necessary with Python 3.3+ due to flexible storage of Unicode strings (https://www.python.org/dev/peps/pep-0393/).
+#
+# We treat both Linux UCS4 and OSX UCS2 normally, as these are the defaults for those environments.
+# Linux UCS2 and OSX UCS4, however, must rebuild Python with
+# `PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs{2,4}` set, along with bootstrapping Pants again rather
+# than pulling the PEX from AWS.
 
 base_build_wheels: &base_build_wheels
   stage: *test
@@ -375,10 +380,12 @@ py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
 
 py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
   <<: *py27_linux_build_wheels_no_ucs
+  <<: *native_engine_cache_config
   name: "Build wheels - Linux and cp27m (UCS2)"
   env:
     - *py27_linux_test_config_env
     - *base_build_wheels_env
+    - RUN_PANTS_FROM_PEX=0
     - CACHE_NAME=linuxwheelsbuild.ucs2
   script:
     - docker build --rm -t travis_ci_py27_ucs2
@@ -391,10 +398,9 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci_py27_ucs2:latest
-      sh -c "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
+      sh -c "./build-support/bin/ci.sh -2b && ./build-support/bin/release.sh -n"
 
 py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
-  # Linux defaults to UCS4, so we simply use the pre-installed Python.
   <<: *py27_linux_build_wheels_no_ucs
   name: "Build wheels - Linux and cp27mu (UCS4)"
   env:
@@ -413,20 +419,20 @@ py27_osx_build_wheels_no_ucs: &py27_osx_build_wheels_no_ucs
   <<: *py27_osx_test_config
   <<: *base_build_wheels
   osx_image: xcode8
-  script:
-    - ./build-support/bin/release.sh -n
 
 py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
-  # OSX defaults to using UCS2, so we simply use the pre-installed Python.
   <<: *py27_osx_build_wheels_no_ucs
   name: "Build wheels - OSX and cp27m (UCS2)"
   env:
     - *py27_osx_test_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs2
+  script:
+    - ./build-support/bin/release.sh -n
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *py27_osx_build_wheels_no_ucs
+  <<: *native_engine_cache_config
   name: "Build wheels - OSX and cp27mu (UCS4)"
   addons:
     brew:
@@ -441,11 +447,15 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - PYENV_ROOT="${HOME}/.pyenv"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
     - PEX_VERBOSE=9
+    - RUN_PANTS_FROM_PEX=0
   before_install:
     {{>before_install_osx}}
     - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
     - ${PYENV_ROOT}/bin/pyenv install 2.7.13
     - ${PYENV_ROOT}/bin/pyenv global 2.7.13
+  script:
+    - ./build-support/bin/ci.sh -2b
+    - ./build-support/bin/release.sh -n
 
 # -------------------------------------------------------------------------
 # Rust tests
