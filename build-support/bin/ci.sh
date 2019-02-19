@@ -105,19 +105,20 @@ esac
 export PANTS_DEV=1
 
 # Note that we set PY, and when running with Python 3, also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS.
-# This would usually not be necessary when developing locally, because the `./pants` and `./pants3`
+# This would usually not be necessary when developing locally, because the `./pants` and `./pants2`
 # scripts set these constraints for us already. However, we must set the values here because in non-bootstrap shards
-# we run CI using `./pants.pex` instead of the scripts `./pants` and `./pants3`, so those scripts cannot set
+# we run CI using `./pants.pex` instead of the scripts `./pants` and `./pants2`, so those scripts cannot set
 # the relevant environment variables. Without setting these environment variables, the Python 3 shards will try to
 # execute subprocesses using Python 2, which results in the _Py_Dealloc error (#6985), and shards that do not
 # pull down `./pants.pex` but still use a virtualenv (such as Rust Tests) will fail to execute.
 if [[ "${python_two:-false}" == "false" ]]; then
   py_version_number="3.6"
-  bootstrap_pants_script="./pants3"
+  bootstrap_pants_script="./pants"
   export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${py_version_number}.*']"
 else
   py_version_number="2.7"
-  bootstrap_pants_script="./pants"
+  bootstrap_pants_script="./pants2"
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=2.7,<3','CPython>=3.6,<4']"
 fi
 export PY="python${py_version_number}"
 banner "Using Python ${py_version_number} to execute spawned subprocesses (e.g. tests)"
