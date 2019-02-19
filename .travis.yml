@@ -125,6 +125,10 @@ py36_linux_config: &py36_linux_config
   <<: *base_linux_config
   python: &python3_version "3.6"
 
+py37_linux_config: &py37_linux_config
+  <<: *base_linux_config
+  python: &python3_version "3.7"
+
 base_linux_test_config: &base_linux_test_config
   <<: *base_linux_config
   <<: *pants_run_cache_config
@@ -151,6 +155,13 @@ py36_linux_test_config: &py36_linux_test_config
   stage: *test
   env:
     - &py36_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
+
+py37_linux_test_config: &py37_linux_test_config
+  <<: *py37_linux_config
+  <<: *base_linux_test_config
+  stage: *cron
+  env:
+    - &py37_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
 
 base_osx_config: &base_osx_config
   os: osx
@@ -187,6 +198,30 @@ py36_osx_config: &py36_osx_config
     - ${PYENV_ROOT}/bin/pyenv install 3.6.8
     - ${PYENV_ROOT}/bin/pyenv global 3.6.8
 
+py37_osx_config: &py37_osx_config
+  <<: *base_osx_config
+  addons:
+    brew:
+      packages: &py37_osx_config_brew_packages
+      - openssl
+  env:
+    # Fix Python 3 issue linking to OpenSSL
+    - &py37_osx_config_env >
+      PATH="/usr/local/opt/openssl/bin:$PATH"
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CPPFLAGS="-I/usr/local/opt/openssl/include"
+      PYENV_ROOT="${HOME}/.pyenv"
+      PATH="${PYENV_ROOT}/shims:${PATH}"
+  before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    # Clone pyenv directly from GitHub. For multiple osx images, brew's version of pyenv is too old to get
+    # modern Python 3.7. Pulling from GitHub instead allows us to use the same Python 3 version accross every OSX shard.
+    - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
+    - ${PYENV_ROOT}/bin/pyenv install 3.7.2
+    - ${PYENV_ROOT}/bin/pyenv global 3.7.2
+
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
   before_script:
@@ -214,6 +249,20 @@ py36_osx_test_config: &py36_osx_test_config
       PYENV_ROOT="${HOME}/.pyenv"
       PATH="${PYENV_ROOT}/shims:${PATH}"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
+
+py37_osx_test_config: &py37_osx_test_config
+  <<: *py37_osx_config
+  <<: *base_osx_test_config
+  stage: *cron
+  env:
+    # Must duplicate py37_osx_config's env because it cannot be merged into a new anchor
+    - &py37_osx_test_config_env >
+      PATH="/usr/local/opt/openssl/bin:$PATH"
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CPPFLAGS="-I/usr/local/opt/openssl/include"
+      PYENV_ROOT="${HOME}/.pyenv"
+      PATH="${PYENV_ROOT}/shims:${PATH}"
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
 
 linux_with_fuse: &linux_with_fuse
   before_install:
@@ -284,6 +333,15 @@ py36_linux_build_engine: &py36_linux_build_engine
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - BOOTSTRAP_ARGS='-b'
 
+py37_linux_build_engine: &py37_linux_build_engine
+  <<: *py37_linux_config
+  <<: *base_linux_build_engine
+  name: "Build Linux native engine and pants.pex (Py3.7 PEX)"
+  env:
+    - CACHE_NAME=linuxpexbuild.py37
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
+    - BOOTSTRAP_ARGS='-b'
+
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
   stage: *bootstrap
@@ -321,6 +379,17 @@ py36_osx_build_engine: &py36_osx_build_engine
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - BOOTSTRAP_ARGS='-b'
 
+py37_osx_build_engine: &py37_osx_build_engine
+  <<: *py37_osx_config
+  <<: *base_osx_build_engine
+  name: "Build OSX native engine and pants.pex (Py3.7 PEX)"
+  env:
+    - *base_osx_build_engine_env
+    - *py37_osx_config_env
+    - CACHE_NAME=osxpexbuild.py37
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
+    - BOOTSTRAP_ARGS='-b'
+
 # -------------------------------------------------------------------------
 # Lint
 # -------------------------------------------------------------------------
@@ -334,14 +403,25 @@ py27_lint: &py27_lint
   script:
     - ./build-support/bin/travis-ci.sh -fmrt2
 
+base_py3_lint: &base_py3_lint
+  script:
+    - ./build-support/bin/travis-ci.sh -fmrt
+
 py36_lint: &py36_lint
   <<: *py36_linux_test_config
+  <<: *base_py3_lint
   name: "Self-checks and lint (Py3.6 PEX)"
   env:
     - *py36_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py36
-  script:
-    - ./build-support/bin/travis-ci.sh -fmrt
+
+py37_lint: &py37_lint
+  <<: *py37_linux_test_config
+  <<: *base_py3_lint
+  name: "Self-checks and lint (Py3.7 PEX)"
+  env:
+    - *py37_linux_test_config_env
+    - CACHE_NAME=linuxselfchecks.py37
 
 # -------------------------------------------------------------------------
 # Rust lints
@@ -456,8 +536,8 @@ osx_rust_tests: &osx_rust_tests
       - osxfuse
   script:
   # N.B. We run this with Python 2 because this osx_image does not have
-  # Python 3.6 in its environment. We do not care which Python version
-  # we use and do not want to incur the cost of using pyenv to get 3.6.
+  # Python 3.6 or 3.7 in its environment. We do not care which Python version
+  # we use and do not want to incur the cost of using pyenv to get 3.6 or 3.7.
     - ./build-support/bin/travis-ci.sh -e2
 
 # -------------------------------------------------------------------------
@@ -489,6 +569,14 @@ py36_osx_10_12_sanity_check: &py36_osx_10_12_sanity_check
     - *py36_osx_test_config_env
     - CACHE_NAME=macos10.12sanity.py36
 
+py37_osx_10_12_sanity_check: &py37_osx_10_12_sanity_check
+  <<: *py37_osx_test_config
+  <<: *base_osx_10_12_sanity_check
+  name: "OSX 10.12 sanity check (Py3.7 PEX)"
+  env:
+    - *py37_osx_test_config_env
+    - CACHE_NAME=macos10.12sanity.py37
+
 base_osx_10_13_sanity_check: &base_osx_10_13_sanity_check
   <<: *base_osx_sanity_check
   osx_image: xcode10.1
@@ -509,6 +597,14 @@ py36_osx_10_13_sanity_check: &py36_osx_10_13_sanity_check
     - *py36_osx_test_config_env
     - CACHE_NAME=macos10.13sanity.py36
 
+py37_osx_10_13_sanity_check: &py37_osx_10_13_sanity_check
+  <<: *py37_osx_test_config
+  <<: *base_osx_10_13_sanity_check
+  name: "OSX 10.13 sanity check (Py3.7 PEX)"
+  env:
+    - *py37_osx_test_config_env
+    - CACHE_NAME=macos10.13sanity.py37
+
 # -------------------------------------------------------------------------
 # Platform specific tests
 # -------------------------------------------------------------------------
@@ -522,14 +618,27 @@ py27_osx_platform_tests: &py27_osx_platform_tests
   script:
     - ./build-support/bin/travis-ci.sh -z2
 
+base_py3_osx_platform_tests: &base_py3_osx_platform_tests
+  script:
+    - ./build-support/bin/travis-ci.sh -z
+
 py36_osx_platform_tests: &py36_osx_platform_tests
   <<: *py36_osx_test_config
+  <<: *base_py3_osx_platform_tests
   name: "OSX platform-specific tests (Py3.6 PEX)"
   env:
     - *py36_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py36
   script:
     - ./build-support/bin/travis-ci.sh -z
+
+py37_osx_platform_tests: &py37_osx_platform_tests
+  <<: *py37_osx_test_config
+  <<: *base_py3_osx_platform_tests
+  name: "OSX platform-specific tests (Py3.7 PEX)"
+  env:
+    - *py37_osx_test_config_env
+    - CACHE_NAME=macosplatformtests.py37
 
 # -------------------------------------------------------------------------
 # JVM tests
@@ -548,15 +657,26 @@ py27_jvm_tests: &py27_jvm_tests
   script:
     - ./build-support/bin/travis-ci.sh -j2
 
+base_py3_jvm_tests: &base_py3_jvm_tests
+  <<: *base_jvm_tests
+  script:
+    - ./build-support/bin/travis-ci.sh -j
+
 py36_jvm_tests: &py36_jvm_tests
   <<: *py36_linux_test_config
-  <<: *base_jvm_tests
+  <<: *base_py3_jvm_tests
   name: "JVM tests (Py3.6 PEX)"
   env:
     - *py36_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py36
-  script:
-    - ./build-support/bin/travis-ci.sh -j
+
+py37_jvm_tests: &py37_jvm_tests
+  <<: *py37_linux_test_config
+  <<: *base_py3_jvm_tests
+  name: "JVM tests (Py3.7 PEX)"
+  env:
+    - *py37_linux_test_config_env
+    - CACHE_NAME=linuxjvmtests.py37
 
 # -------------------------------------------------------------------------
 # Deploy
@@ -607,12 +727,15 @@ matrix:
   include:
     - <<: *py27_linux_build_engine
     - <<: *py36_linux_build_engine
+    - <<: *py37_linux_build_engine
 
     - <<: *py27_osx_build_engine
     - <<: *py36_osx_build_engine
+    - <<: *py37_osx_build_engine
 
     - <<: *py27_lint
     - <<: *py36_lint
+    - <<: *py37_lint
 
     - <<: *linux_rust_clippy
     - <<: *cargo_audit
@@ -634,6 +757,14 @@ matrix:
       env:
         - *py36_linux_test_config_env
         - CACHE_NAME=linuxunittests.py36
+      script:
+        - ./build-support/bin/travis-ci.sh -lp
+
+    - <<: *py37_linux_test_config
+      name: "Unit tests for pants and pants-plugins (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=linuxunittests.py37
       script:
         - ./build-support/bin/travis-ci.sh -lp
 
@@ -785,6 +916,158 @@ matrix:
       name: "Integration tests for pants - shard 18 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - CACHE_NAME=integrationshard18
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 18/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 0 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard0
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 0/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 1 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard1
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 1/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 2 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard2
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 2/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 3 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard3
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 3/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 4 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard4
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 4/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 5 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard5
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 5/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 6 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard6
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 6/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 7 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard7
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 7/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 8 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard8
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 8/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 9 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard9
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 9/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 10 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard10
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 10/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 11 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard11
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 11/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 12 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard12
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 12/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 13 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard13
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 13/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 14 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard14
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 14/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 15 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard15
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 15/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 16 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard16
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 16/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 17 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integrationshard17
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 17/19
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests for pants - shard 18 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
         - CACHE_NAME=integrationshard18
       script:
         - ./build-support/bin/travis-ci.sh -c -i 18/19
@@ -980,17 +1263,29 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -n
 
+    - <<: *py37_linux_test_config
+      name: "Python contrib tests (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=linuxcontribtests.py37
+      script:
+        - ./build-support/bin/travis-ci.sh -n
+
     - <<: *py27_osx_10_12_sanity_check
     - <<: *py36_osx_10_12_sanity_check
+    - <<: *py37_osx_10_12_sanity_check
 
     - <<: *py27_osx_10_13_sanity_check
     - <<: *py36_osx_10_13_sanity_check
+    - <<: *py37_osx_10_13_sanity_check
 
     - <<: *py27_osx_platform_tests
     - <<: *py36_osx_platform_tests
+    - <<: *py37_osx_platform_tests
 
     - <<: *py27_jvm_tests
     - <<: *py36_jvm_tests
+    - <<: *py37_jvm_tests
 
     - <<: *deploy_stable_multiplatform_pex
     - <<: *deploy_unstable_multiplatform_pex
