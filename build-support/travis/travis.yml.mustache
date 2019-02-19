@@ -225,7 +225,6 @@ py37_osx_test_config: &py37_osx_test_config
   <<: *base_osx_test_config
   stage: *cron
   env:
-    # Must duplicate py37_osx_config's env because it cannot be merged into a new anchor
     - &py37_osx_test_config_env >
       {{>env_osx_with_pyenv}}
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
