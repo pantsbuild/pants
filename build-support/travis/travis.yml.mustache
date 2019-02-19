@@ -156,11 +156,8 @@ py36_osx_config: &py36_osx_config
       packages: &py36_osx_config_brew_packages
       - openssl
   env:
-    # Fix Python 3 issue linking to OpenSSL
     - &py36_osx_config_env >
-      {{>osx_openssl_env}}
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
+      {{>env_osx_with_pyenv}}
   before_install:
     {{>before_install_osx}}
     # Clone pyenv directly from GitHub. For multiple osx images, brew's version of pyenv is too old to get
@@ -190,9 +187,7 @@ py36_osx_test_config: &py36_osx_test_config
   env:
     # Must duplicate py36_osx_config's env because it cannot be merged into a new anchor
     - &py36_osx_test_config_env >
-      {{>osx_openssl_env}}
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
+      {{>env_osx_with_pyenv}}
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
 
 linux_with_fuse: &linux_with_fuse
@@ -442,10 +437,8 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - *py27_osx_test_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs4
-    - {{>osx_openssl_env}}
+    - {{>env_osx_with_pyenv}}
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
-    - PYENV_ROOT="${HOME}/.pyenv"
-    - PATH="${PYENV_ROOT}/shims:${PATH}"
     - RUN_PANTS_FROM_PEX=0
   before_install:
     {{>before_install_osx}}

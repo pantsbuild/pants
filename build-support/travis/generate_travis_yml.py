@@ -31,7 +31,7 @@ def generate_travis_yml():
   template = get_mustache_file('travis.yml.mustache')
   before_install_linux = get_mustache_file('before_install_linux.mustache')
   before_install_osx = get_mustache_file('before_install_osx.mustache')
-  osx_openssl_env = get_mustache_file('osx_openssl_env.mustache')
+  env_osx_with_pyenv = get_mustache_file('env_osx_with_pyenv.mustache')
 
   context = {
     'header': HEADER,
@@ -45,6 +45,6 @@ def generate_travis_yml():
   renderer = pystache.Renderer(partials={
     'before_install_linux': before_install_linux,
     'before_install_osx': before_install_osx,
-    'osx_openssl_env': osx_openssl_env
+    'env_osx_with_pyenv': env_osx_with_pyenv
   })
   print(renderer.render(template, context))
