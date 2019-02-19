@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Display;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -1061,27 +1062,6 @@ impl Node for NodeKey {
     }
   }
 
-  fn format(&self) -> String {
-    fn keystr(key: &Key) -> String {
-      externs::key_to_str(&key)
-    }
-    fn typstr(tc: &TypeConstraint) -> String {
-      externs::key_to_str(&tc.0)
-    }
-    // TODO: these should all be converted to fmt::Debug implementations, and then this method can
-    // go away in favor of the auto-derived Debug for this type.
-    match self {
-      &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
-      &NodeKey::DownloadedFile(ref s) => format!("DownloadedFile({:?})", s.0),
-      &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
-      &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
-      &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
-      &NodeKey::Select(ref s) => format!("Select({}, {})", s.params, typstr(&s.product)),
-      &NodeKey::Task(ref s) => format!("{:?}", s),
-      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
-    }
-  }
-
   fn digest(res: NodeResult) -> Option<hashing::Digest> {
     match res {
       NodeResult::Digest(d) => Some(d),
@@ -1099,6 +1079,26 @@ impl Node for NodeKey {
       // TODO Select nodes are made uncacheable as a workaround to #6146. Will be worked on in #6598
       &NodeKey::Select(_) => false,
       _ => true,
+    }
+  }
+}
+
+impl Display for NodeKey {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    match self {
+      &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({:?})", s.0),
+      &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({:?})", s.0),
+      &NodeKey::ExecuteProcess(ref s) => write!(f, "ExecuteProcess({:?}", s.0),
+      &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
+      &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
+      &NodeKey::Select(ref s) => write!(
+        f,
+        "Select({}, {})",
+        s.params,
+        externs::key_to_str(&s.product.0)
+      ),
+      &NodeKey::Task(ref s) => write!(f, "{:?}", s),
+      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", externs::key_to_str(&s.0)),
     }
   }
 }
