@@ -25,9 +25,9 @@ env:
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
-  - &bootstrap Bootstrap Pants
+  - name: &bootstrap Bootstrap Pants
     if: type = cron
-  - &bootstrap_cron Bootstrap Pants (Cron)
+  - name: &bootstrap_cron Bootstrap Pants (Cron)
     if: type != cron
   - name: &test Test Pants
     if: type = cron
