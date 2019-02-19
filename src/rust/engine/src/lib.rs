@@ -332,8 +332,8 @@ pub extern "C" fn scheduler_metrics(
       workunits.push(test_workunit);
       let workunits  = workunits.iter().map(|workunit| {
         let values = vec![externs::store_utf8("name"), externs::store_utf8(&workunit.name),
-          externs::store_utf8("start_timestamp"), externs::store_i64(workunit.start_timestamp as i64),
-          externs::store_utf8("end_timestamp"), externs::store_i64(workunit.end_timestamp as i64),
+          externs::store_utf8("start_timestamp"), externs::store_f64(workunit.start_timestamp),
+          externs::store_utf8("end_timestamp"), externs::store_f64(workunit.end_timestamp),
           externs::store_utf8("span_id"), externs::store_utf8(&workunit.span_id)];
         externs::store_dict(&values)
       }).collect::<Vec<_>>();
