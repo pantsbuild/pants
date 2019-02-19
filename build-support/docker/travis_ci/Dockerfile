@@ -9,7 +9,13 @@ FROM pantsbuild/centos6:latest
 # this requires publishing an updated image to Docker hub, so we copy the code here until then.
 ARG PYTHON_36_VERSION=3.6.8
 ARG PYTHON_37_VERSION=3.7.2
-RUN yum install libssl-dev zlib1g-dev libbz2-dev libreadline-dev sqlite-devel -y
+RUN yum install -y \
+    zlib-devel \
+    bzip2 \
+    bzip2-devel \
+    readline-devel \
+    sqlite \
+    sqlite-devel
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
