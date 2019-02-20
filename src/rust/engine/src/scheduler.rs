@@ -13,7 +13,7 @@ use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeConstraint, Value};
 use crate::nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use crate::selectors;
-use graph::{EntryId, Graph, InvalidationResult, Node, NodeContext};
+use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use indexmap::IndexMap;
 use log::{debug, info, warn};
 use parking_lot::Mutex;
@@ -210,10 +210,7 @@ impl Scheduler {
                   // Otherwise (if it is a success, some other type of Failure, or if we've run
                   // out of retries) recover to complete the join, which will cause the results to
                   // propagate to the user.
-                  debug!(
-                    "Root {} completed.",
-                    NodeKey::Select(Box::new(root)).format()
-                  );
+                  debug!("Root {} completed.", NodeKey::Select(Box::new(root)));
                   Ok(other.map(|res| {
                     res
                       .try_into()
