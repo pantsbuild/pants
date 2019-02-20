@@ -213,6 +213,15 @@ def enum(all_values, field_name='value'):
   element of `all_values` as the default value, but enum classes can override this behavior by
   setting `default_value` in the class body.
 
+  If `all_values` contains only strings, then each variant is made into an attribute on the
+  generated enum class object. This allows code such as the following:
+
+  class MyResult(enum(['success', 'failure'])):
+    pass
+
+  MyResult.success # The same as: MyResult(success)
+  MyResult.failure # The same as: MyResult(failure)
+
   NB: Relying on the `field_name` directly is discouraged in favor of using
   resolve_for_enum_variant() in Python code. The `field_name` argument is exposed to make enum
   instances more readable when printed, and to allow code in another language using an FFI to
@@ -310,8 +319,16 @@ def enum(all_values, field_name='value'):
         raise self.make_type_error(
           "pattern matching must have exactly the keys {} (was: {})"
           .format(self._allowed_values, list(keys)))
-      match_for_variant = mapping[getattr(self, field_name)]
+      match_for_variant = mapping[self.underlying()]
       return match_for_variant
+
+    def underlying(self):
+      """Get the element of `all_values` corresponding to this enum instance.
+
+      This should be used only for generating option values in tests. In general, it is less
+      error-prone to deal with enum objects directly.
+      """
+      return getattr(self, field_name)
 
     @classmethod
     def iterate_enum_variants(cls):
@@ -320,9 +337,14 @@ def enum(all_values, field_name='value'):
       NB: This method is exposed for testing enum variants easily. resolve_for_enum_variant() should
       be used for performing conditional logic based on an enum instance's value.
       """
-      # TODO(#7232): use this method to register attributes on the generated type object for each of
-      # the singletons!
       return cls._singletons.values()
+
+  # Python requires creating an explicit closure to save the value on each loop iteration.
+  accessor_generator = lambda case: lambda cls: cls(case)
+  for case in all_values_realized:
+    if isinstance(case, six.string_types):
+      accessor = classproperty(accessor_generator(case))
+      setattr(ChoiceDatatype, case, accessor)
 
   return ChoiceDatatype
 

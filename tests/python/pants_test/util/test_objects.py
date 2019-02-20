@@ -723,6 +723,11 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
     with self.assertRaisesRegexp(TypeError, re.escape("__new__() got an unexpected keyword argument 'x'")):
       SomeEnum(x=3)
 
+  def test_enum_generated_attrs(self):
+    class HasAttrs(enum(['a', 'b'])): pass
+    self.assertEqual(HasAttrs.a, HasAttrs('a'))
+    self.assertEqual(type(HasAttrs.a), HasAttrs)
+    self.assertEqual(HasAttrs.b, HasAttrs('b'))
 
   def test_enum_comparison(self):
     enum_instance = SomeEnum(1)
