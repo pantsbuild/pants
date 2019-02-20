@@ -308,9 +308,14 @@ class DictValueComponent(object):
     return '{} {}'.format(self.action, self.val)
 
 
-class GlobExpansionConjunction(enum('conjunction', ['any_match', 'all_match'])):
+class GlobExpansionConjunction(enum(['any_match', 'all_match'], field_name='conjunction')):
+  """Describe whether to require that only some or all glob strings match in a target's sources.
 
-  # NB: The `default_value` is automatically the first element of the value list, but can be
-  # overridden or made more explicit in the body of the class. We want to be explicit here about
-  # which behavior we have when merging globs, as that can affect performance.
-  default_value = 'any_match'
+  NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+  be aware of any changes to this object's definition.
+  """
+
+  @classmethod
+  def create(cls, value=None):
+    value = None or 'any_match'
+    return cls(value)

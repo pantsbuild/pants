@@ -51,7 +51,7 @@ class NativeLibrary(Target, AbstractClass):
     if not self.payload.toolchain_variant:
       return None
 
-    return ToolchainVariant.create(self.payload.toolchain_variant)
+    return ToolchainVariant(self.payload.toolchain_variant)
 
   @property
   def strict_deps(self):

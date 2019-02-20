@@ -36,7 +36,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                   'for targets of this language.')
 
     register_enum_option(
-      register, ToolchainVariant, '--toolchain-variant', advanced=True,
+      register, ToolchainVariant, '--toolchain-variant', advanced=True, default='gnu',
       help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
            "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 
@@ -44,7 +44,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
     return self.get_target_mirrored_option('compiler_option_sets', target)
 
   def get_toolchain_variant_for_target(self, target):
-    return ToolchainVariant.create(self.get_target_mirrored_option('toolchain_variant', target))
+    return ToolchainVariant(self.get_target_mirrored_option('toolchain_variant', target))
 
   @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):

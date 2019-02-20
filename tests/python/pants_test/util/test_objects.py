@@ -287,7 +287,7 @@ class ReturnsNotImplemented(object):
     return NotImplemented
 
 
-class SomeEnum(enum('x', [1, 2])): pass
+class SomeEnum(enum([1, 2], field_name='x')): pass
 
 
 class DatatypeTest(TestBase):
@@ -709,18 +709,13 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
       "When converting all_values ([1, 2, 3, 1]) to a set, at least one duplicate "
       "was detected. The unique elements of all_values were: [1, 2, 3].")
     with self.assertRaisesRegexp(ValueError, expected_rx):
-      class DuplicateAllowedValues(enum('x', [1, 2, 3, 1])): pass
+      class DuplicateAllowedValues(enum([1, 2, 3, 1])): pass
 
   def test_enum_instance_creation(self):
-    self.assertEqual(1, SomeEnum.create().x)
-    self.assertEqual(2, SomeEnum.create(2).x)
-    self.assertEqual(1, SomeEnum(1).x)
+    self.assertEqual(2, SomeEnum(2).x)
 
-  def test_enum_instance_creation_errors(self):
     expected_rx = re.escape(
       "Value 3 for 'x' must be one of: [1, 2].")
-    with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx):
-      SomeEnum.create(3)
     with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx):
       SomeEnum(3)
 
@@ -728,27 +723,15 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
     with self.assertRaisesRegexp(TypeError, re.escape("__new__() got an unexpected keyword argument 'x'")):
       SomeEnum(x=3)
 
-    # Test that None is not used as the default unless none_is_default=True.
-    with self.assertRaisesRegexp(EnumVariantSelectionError, re.escape(
-        "Value None for 'x' must be one of: [1, 2]."
-    )):
-      SomeEnum.create(None)
-    self.assertEqual(1, SomeEnum.create(None, none_is_default=True).x)
 
-    expected_rx_falsy_value = re.escape(
-      "Value {}'' for 'x' must be one of: [1, 2]."
-      .format('u' if PY2 else ''))
-    with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx_falsy_value):
-      SomeEnum('')
-
-  def test_enum_comparison_fails(self):
+  def test_enum_comparison(self):
     enum_instance = SomeEnum(1)
-    rx_str = re.escape("enum equality is defined to be an error")
-    with self.assertRaisesRegexp(TypeCheckError, rx_str):
-      enum_instance == enum_instance
-    with self.assertRaisesRegexp(TypeCheckError, rx_str):
-      enum_instance != enum_instance
-    # Test that comparison also fails against another type.
+    another_enum_instance = SomeEnum(2)
+    self.assertEqual(enum_instance, enum_instance)
+    self.assertNotEqual(enum_instance, another_enum_instance)
+
+    # Test that comparison fails against another type.
+    rx_str = re.escape("enum equality is only defined for instances of the same enum class!")
     with self.assertRaisesRegexp(TypeCheckError, rx_str):
       enum_instance == 1
     with self.assertRaisesRegexp(TypeCheckError, rx_str):

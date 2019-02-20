@@ -31,7 +31,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
     register_enum_option(
-      register, cls.ExecutionStrategy, '--execution-strategy',
+      register, cls.ExecutionStrategy, '--execution-strategy', default=cls.NAILGUN,
       help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
            'task will be quicker. If set to subprocess, then the task will be run without nailgun. '
            'Hermetic execution is an experimental subprocess execution framework.')
@@ -52,7 +52,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     # TODO: This .create() call can be removed when the enum interface is more stable as the option
     # is converted into an instance of self.ExecutionStrategy via the `type` argument through
     # register_enum_option().
-    return self.ExecutionStrategy.create(self.get_options().execution_strategy)
+    return self.ExecutionStrategy(self.get_options().execution_strategy)
 
   @classmethod
   def subsystem_dependencies(cls):
