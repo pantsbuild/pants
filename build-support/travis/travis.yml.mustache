@@ -394,8 +394,8 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
       sh -c "./build-support/bin/ci.sh -2b && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
 
 py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
-  <<: *py27_linux_test_config
   <<: *py27_linux_build_wheels_no_ucs
+  <<: *py27_linux_test_config
   name: "Build wheels - Linux and cp27mu (UCS4)"
   env:
     - *py27_linux_test_config_env
@@ -422,7 +422,7 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs2
   script:
-    - ./build-support/bin/release.sh -n
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *py27_osx_config
