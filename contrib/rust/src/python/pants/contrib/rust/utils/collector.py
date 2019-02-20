@@ -7,9 +7,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 def args(args, collector):
   def _c_flag_filter(key_value, collector):
-    needs = dict({
+    needs = {
       'extra-filename': True,
-    })
+    }
 
     is_key_value = key_value.split('=')
 
@@ -20,10 +20,10 @@ def args(args, collector):
       if has:
         collector.update({key: value})
 
-  needs = dict({
+  needs = {
     '--crate-name': lambda name, collector: collector.update({'crate_name': name}),
     '-C': _c_flag_filter,
-  })
+  }
 
   for index, arg in enumerate(args):
     filter = needs.get(arg, None)
@@ -32,22 +32,22 @@ def args(args, collector):
 
 
 def get_default_information():
-  return dict({
+  return {
     'args': args,
     'package_name': lambda name, collector: collector.update({'package_name': name})
-  })
+  }
 
 
 def get_test_target_information():
-  return dict({
+  return {
     'env': env
-  })
+  }
 
 
 def env(invocation, collector):
-  needs = dict({
+  needs = {
     'CARGO_MANIFEST_DIR': lambda key, vaule, collector: collector.update({key: vaule})
-  })
+  }
 
   for key, value in invocation.items():
     filter = needs.get(key, None)

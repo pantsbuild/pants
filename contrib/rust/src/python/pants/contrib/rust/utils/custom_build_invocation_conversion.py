@@ -18,19 +18,19 @@ from pants.contrib.rust.utils.custom_build_invocation_conversion_rules import (a
 
 
 def get_default_build_conversion_rules():
-  return dict({
+  return {
     'args': args_rules,
     'outputs': outputs_rules,
     'links': links_rules,
     'env': env_rules
-  })
+  }
 
 
 def get_default_run_conversion_rules():
-  return dict({
+  return {
     'program': program_rules,
     'env': env_rules
-  })
+  }
 
 
 def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_dir):

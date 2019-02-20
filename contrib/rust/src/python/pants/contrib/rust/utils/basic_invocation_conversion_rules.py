@@ -18,9 +18,9 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
       make_dirs.update({new_path: True})
       return new_path
 
-    rules = dict({
+    rules = {
       'incremental': _incremental,
-    })
+    }
 
     is_key_value = key_value.split('=')
 
@@ -35,9 +35,9 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
     def dependency(_):
       return libraries_dir
 
-    rules = dict({
+    rules = {
       'dependency': dependency,
-    })
+    }
 
     is_key_value = key_value.split('=')
 
@@ -63,12 +63,12 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
 
     return key_value
 
-  rules = dict({
+  rules = {
     '--out-dir': _out_dir_flag_rule,
     '-C': _c_flag_rules,
     '-L': _l_flag_rules,
     '--extern': _extern_flag_rule
-  })
+  }
 
   for index, arg in enumerate(invocation_key):
     apply_rule = rules.get(arg, None)
@@ -92,10 +92,10 @@ def env_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir,
     new_path = libraries_dir + ':' + system_paths
     return new_path
 
-  rules = dict({
+  rules = {
     'OUT_DIR': _out_dir_rule,
     'DYLD_LIBRARY_PATH': _dyld_lib_path_rule
-  })
+  }
 
   for key, value in invocation_key.items():
     apply_rule = rules.get(key, None)

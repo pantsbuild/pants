@@ -38,20 +38,19 @@ from pants.contrib.rust.utils.custom_build_output_parsing import (filter_cargo_s
 
 class Build(CargoTask):
   # https://docs.rs/cargo/0.20.0/cargo/core/manifest/enum.TargetKind.html
-  _synthetic_target_kind = dict({
+  _synthetic_target_kind = {
     'lib': CargoSyntheticLibrary,
     'custom-build': CargoSyntheticCustomBuild,
     'proc-macro': CargoSyntheticProcMacro,
     'bin': CargoSyntheticBinary,
     'cdylib': CargoLibrary,
-  })
+  }
 
-  _target_kind = dict({
+  _target_kind = {
     'lib': CargoLibrary,
     'bin': CargoBinary,
     'test': CargoTest,
-
-  })
+  }
 
   _build_script_output = dict()
   _package_out_dirs = dict()
@@ -98,9 +97,9 @@ class Build(CargoTask):
 
       cmd = self.create_command(pants_invocation['program'], pants_invocation['args'], target)
 
-      env = dict({
+      env = {
         'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-      })
+      }
 
       env = self._add_env_vars(env, pants_invocation['env'])
 
@@ -227,10 +226,10 @@ class Build(CargoTask):
 
       cmd.extend(self.get_options().cargo_opt)
 
-      env = dict({
+      env = {
         'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),
         'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-      })
+      }
 
       std_output = self.run_command_and_get_output(cmd, target.toolchain, env, workunit)
       cargo_build_plan = json.loads(std_output)

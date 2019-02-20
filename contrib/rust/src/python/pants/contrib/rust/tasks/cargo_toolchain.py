@@ -85,9 +85,9 @@ class Toolchain(CargoTask):
                                    labels=[WorkUnitLabel.BOOTSTRAP]) as workunit:
       cmd = ['rustup', 'install', toolchain]
 
-      env = dict({
+      env = {
         'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-      })
+      }
 
       self.run_command(cmd, get_buildroot(), env, workunit)
 
@@ -102,9 +102,9 @@ class Toolchain(CargoTask):
                                    labels=[WorkUnitLabel.BOOTSTRAP]) as workunit:
       cmd = ['rustup', 'default', toolchain]
 
-      env = dict({
+      env = {
         'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-      })
+      }
 
       self.run_command(cmd, get_buildroot(), env, workunit)
 

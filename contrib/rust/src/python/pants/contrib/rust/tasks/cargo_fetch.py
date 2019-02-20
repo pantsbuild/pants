@@ -41,10 +41,10 @@ class Fetch(CargoTask):
 
       cmd = ['cargo', 'fetch', '--manifest-path', abs_manifest_path]
 
-      env = dict({
+      env = {
         'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),
         'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-      })
+      }
 
       self.run_command(cmd, target.toolchain, env, workunit)
 

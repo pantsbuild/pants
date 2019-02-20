@@ -6,13 +6,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 def get_default_converter():
-  return dict({
+  return {
     'rustc-link-lib': lambda kind: ['-l', kind],
     'rustc-link-search': lambda path: ['-L', path],
     'rustc-flags': lambda path: ['-L', path],
     'rustc-cfg': lambda cfg: ['--cfg', cfg],
     'rustc-env': lambda var_value: var_value,
-  })
+  }
 
 
 def spilt_into_key_value(cargo_statement):
@@ -39,13 +39,13 @@ def parse_cargo_statement(cargo_statement):
 
 
 def parse_multiple_cargo_statements(cargo_statements):
-  result = dict({
+  result = {
     'rustc-link-lib': [],
     'rustc-link-search': [],
     'rustc-flags': [],
     'rustc-cfg': [],
     'rustc-env': [],
-  })
+  }
 
   cargo_statements_without_prefix = list(
     map(lambda cargo: cargo.split('cargo:', 1)[1], cargo_statements))

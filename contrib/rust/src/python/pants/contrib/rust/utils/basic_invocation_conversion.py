@@ -16,12 +16,12 @@ from pants.contrib.rust.utils.collector import (collect_information, get_default
 
 
 def get_default_conversion_rules():
-  return dict({
+  return {
     'args': args_rules,
     'outputs': outputs_rules,
     'links': links_rules,
     'env': env_rules
-  })
+  }
 
 
 def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_dir):
