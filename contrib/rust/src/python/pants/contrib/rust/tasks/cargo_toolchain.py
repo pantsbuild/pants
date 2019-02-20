@@ -9,6 +9,7 @@ import hashlib
 import os
 
 import requests
+from future.utils import PY3
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -71,7 +72,8 @@ class Toolchain(CargoTask):
     return requests.get('https://sh.rustup.rs')
 
   def check_integrity_of_rustup_install_script(self, install_script):
-    current_fingerprint = hashlib.sha256(install_script).hexdigest()
+    hasher = hashlib.sha256(install_script.encode('utf-8'))
+    current_fingerprint = hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
     if current_fingerprint != self.LAST_KNOWN_FINGERPRINT:
       raise TaskError(
         'The fingerprint of the rustup script has changed!\nLast known: {0}\ncurrent: {1}'.format(

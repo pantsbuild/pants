@@ -10,7 +10,7 @@ import json
 import os
 import shutil
 
-from future.utils import text_type
+from future.utils import PY3, text_type
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -255,7 +255,8 @@ class Build(CargoTask):
       # remove deps out of the fingerprint because the order of the targets is not fixed
       dependencies = invocation.pop('deps')
       # create a fingerprint over the item because the cargo build_plan dosen't provide a unique id
-      fingerprint = hashlib.md5(json.dumps(invocation, sort_keys=True)).hexdigest()
+      hasher = hashlib.md5(json.dumps(invocation, sort_keys=True).encode('utf-8'))
+      fingerprint = hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
       name = invocation['package_name']
       id = name + '_' + fingerprint
       kind = invocation['target_kind'][0]
