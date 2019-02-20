@@ -183,7 +183,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
     attempt_pants_run = Platform.create().resolve_for_enum_variant({
-      'darwin': toolchain_variant != 'gnu',
+      'darwin': toolchain_variant.resolve_for_enum_variant({
+        'gnu': False,
+        'llvm': True,
+      }),
       'linux': True,
     })
     if attempt_pants_run:
