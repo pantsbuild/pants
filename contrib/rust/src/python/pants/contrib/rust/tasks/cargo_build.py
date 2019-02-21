@@ -261,13 +261,13 @@ class Build(Workspace):
 
   def create_directories(self, make_dirs):
     build_root = get_buildroot()
-    for dir in make_dirs.keys():
+    for dir in make_dirs:
       self.context.log.debug('Create directory: {0}'.format(os.path.relpath(dir, build_root)))
       safe_mkdir(dir)
 
   def create_library_symlink(self, make_symlinks, libraries_dir):
     build_root = get_buildroot()
-    for file in make_symlinks.keys():
+    for file in make_symlinks:
       self.context.log.debug(
         'Create sym link: {0}\n\tto: {1}'.format(os.path.relpath(file, build_root),
                                                  os.path.relpath(libraries_dir, build_root)))

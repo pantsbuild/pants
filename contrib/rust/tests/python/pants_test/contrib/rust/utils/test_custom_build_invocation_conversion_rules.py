@@ -154,7 +154,7 @@ class UtilsTest(unittest.TestCase):
     dep3_target = TargetMock(AddressMock('cc'), [])
     target = TargetMock(AddressMock('engine'), [dep1_target, dep2_target, dep3_target])
 
-    make_dirs = dict()
+    make_dirs = []
     crate_out_dirs = {
       'build_utils': (
         'build_utils', ['/pants/pants.d/build_utils/deps/libbuild_utils-cb8514cd7dbe5a1c.rlib']),
@@ -203,8 +203,8 @@ class UtilsTest(unittest.TestCase):
                make_dirs)
     print(args)
     self.assertEqual(args, result)
-    self.assertEqual(make_dirs, {'/pants/pants.d/engine/incremental': True,
-                                 '/pants/pants.d/engine/build/engine-0c8d5cf2130633dc': True})
+    self.assertEqual(make_dirs, ['/pants/pants.d/engine/build/engine-0c8d5cf2130633dc',
+                                 '/pants/pants.d/engine/incremental'])
 
   def test_outputs_rules_custom_invocation(self):
     outputs = self.get_custom_build_invocation()['outputs']
@@ -212,12 +212,12 @@ class UtilsTest(unittest.TestCase):
       'package_name': 'engine',
       'extra-filename': '-0c8d5cf2130633dc'
     }
-    make_dirs = dict()
+    make_dirs = []
     outputs_rules(outputs, result_dir, create_information, make_dirs)
 
     self.assertEqual(outputs, [
       '/pants/pants.d/engine/build/engine-0c8d5cf2130633dc/build_script_cffi_build-0c8d5cf2130633dc'])
-    self.assertEqual(make_dirs, {'/pants/pants.d/engine/build/engine-0c8d5cf2130633dc': True})
+    self.assertEqual(make_dirs, ['/pants/pants.d/engine/build/engine-0c8d5cf2130633dc'])
 
   def test_links_rules_custom_invocation(self):
     links = self.get_custom_build_invocation()['links']
@@ -251,10 +251,10 @@ class UtilsTest(unittest.TestCase):
 
   def test_env_rules_run_custom_invocation(self):
     env = self.get_run_custom_build_invocation()['env']
-    make_dirs = dict()
+    make_dirs = []
     env_rules(env, result_dir, libraries_dir, make_dirs)
     self.assertEqual(env['DYLD_LIBRARY_PATH'],
                      '/pants/pants.d/deps:/root/.rustup/toolchains/nightly-2018-12-31-x86_64-apple-darwin/lib:/root/.rustup/toolchains/nightly-2018-12-31-x86_64-apple-darwin/lib')
     self.assertEqual(env['OUT_DIR'],
                      '/pants/pants.d/engine/build/engine-ba91b9939db2857c/out')
-    self.assertEqual(make_dirs, {'/pants/pants.d/engine/build/engine-ba91b9939db2857c/out': True})
+    self.assertEqual(make_dirs, ['/pants/pants.d/engine/build/engine-ba91b9939db2857c/out'])

@@ -91,13 +91,13 @@ class UtilsTest(unittest.TestCase):
 
   def test_outputs_rules(self):
     outputs = self.get_invocation()['outputs']
-    make_dirs = dict()
-    make_sym_links = dict()
+    make_dirs = []
+    make_sym_links = []
     outputs_rules(outputs, result_dir, make_dirs, make_sym_links)
     self.assertEqual(outputs, ['/pants/pants.d/libtar_api/deps/libtar_api-53a91134f88352d3.rlib'])
-    self.assertEqual(make_dirs, {'/pants/pants.d/libtar_api/deps': True})
+    self.assertEqual(make_dirs, ['/pants/pants.d/libtar_api/deps'])
     self.assertEqual(make_sym_links,
-                     {'/pants/pants.d/libtar_api/deps/libtar_api-53a91134f88352d3.rlib': True})
+                     ['/pants/pants.d/libtar_api/deps/libtar_api-53a91134f88352d3.rlib'])
 
   def test_env_rules(self):
     env = self.get_invocation()['env']
@@ -117,7 +117,7 @@ class UtilsTest(unittest.TestCase):
     dep2_target = TargetMock(AddressMock('tar'), [])
     target = TargetMock(AddressMock('tar_api'), [dep1_target, dep2_target])
 
-    make_dirs = dict()
+    make_dirs = []
     crate_out_dirs = {
       'flate2': ('flate2', ['/pants/pants.d/libflate2/deps/libflate2-c1056eac36b91d52.rlib']),
       'tar': ('tar', ['/pants/pants.d/tar/deps/libtar-1f0a911316416d2d.rlib'])
@@ -155,5 +155,6 @@ class UtilsTest(unittest.TestCase):
 
     args_rules(args, target, result_dir, crate_out_dirs, libraries_dir, make_dirs)
     self.assertEqual(args, result)
-    self.assertEqual(make_dirs, {'/pants/pants.d/libtar_api/incremental': True,
-                                 '/pants/pants.d/libtar_api/deps': True})
+    self.assertEqual(make_dirs,
+                     ['/pants/pants.d/libtar_api/deps', '/pants/pants.d/libtar_api/incremental'
+                      ])
