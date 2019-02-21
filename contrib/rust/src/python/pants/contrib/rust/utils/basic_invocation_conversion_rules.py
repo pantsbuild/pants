@@ -27,7 +27,7 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
     if len(is_key_value) == 2:
       key, value = is_key_value
       apply_rule = rules.get(key)
-      return (key + "=" + apply_rule(value)) if apply_rule else key_value
+      return ("{}={}".format(key, apply_rule(value))) if apply_rule else key_value
     else:
       return key_value
 
@@ -44,7 +44,7 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
     if len(is_key_value) == 2:
       key, value = is_key_value
       apply_rule = rules.get(key)
-      return (key + "=" + apply_rule(value)) if apply_rule else key_value
+      return ("{}={}".format(key, apply_rule(value))) if apply_rule else key_value
     else:
       return key_value
 
@@ -59,7 +59,7 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
     for dependency in target.dependencies:
       package_name, out_dir = crate_out_dirs[dependency.address.target_name]
       if key == package_name:
-        return key + '=' + out_dir[0]
+        return "{}={}".format(key, out_dir[0])
 
     return key_value
 
@@ -89,7 +89,7 @@ def env_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir,
 
   def _dyld_lib_path_rule(old_path):
     user_path, system_paths = old_path.split(':', 1)
-    new_path = libraries_dir + ':' + system_paths
+    new_path = "{}:{}".format(libraries_dir, system_paths)
     return new_path
 
   rules = {

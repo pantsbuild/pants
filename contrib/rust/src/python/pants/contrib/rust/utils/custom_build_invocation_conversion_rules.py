@@ -25,7 +25,7 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
     if len(is_key_value) == 2:
       key, value = is_key_value
       apply_rule = rules.get(key)
-      return (key + "=" + apply_rule(value)) if apply_rule else key_value
+      return ("{}={}".format(key, apply_rule(value))) if apply_rule else key_value
     else:
       return key_value
 
@@ -42,12 +42,12 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
     if len(is_key_value) == 2:
       key, value = is_key_value
       apply_rule = rules.get(key)
-      return (key + "=" + apply_rule(value)) if apply_rule else key_value
+      return ("{}={}".format(key, apply_rule(value))) if apply_rule else key_value
     else:
       return key_value
 
   def _out_dir_flag_rule(_):
-    package_name = information['package_name'] + information['extra-filename']
+    package_name = "{}{}".format(information['package_name'], information['extra-filename'])
     new_path = os.path.join(result_dir, 'build', package_name)
     make_dirs.update({new_path: True})
     return new_path
@@ -59,7 +59,7 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
     for dependency in target.dependencies:
       package_name, out_dir = crate_out_dirs[dependency.address.target_name]
       if key == package_name:
-        return key + '=' + out_dir[0]
+        return "{}={}".format(key, out_dir[0])
 
     return key_value
 
@@ -86,7 +86,7 @@ def env_rules(invocation_key, result_dir, libraries_dir, make_dirs, **kwargs):
 
   def _dyld_lib_path(old_path):
     user_path, system_paths = old_path.split(':', 1)
-    new_path = libraries_dir + ':' + system_paths
+    new_path = "{}:{}".format(libraries_dir, system_paths)
     return new_path
 
   rules = {
@@ -103,7 +103,7 @@ def env_rules(invocation_key, result_dir, libraries_dir, make_dirs, **kwargs):
 def outputs_rules(invocation_key, result_dir, information, make_dirs, **kwargs):
   def _change(path, result_dir):
     file_name = os.path.basename(path)
-    package_name = information['package_name'] + information['extra-filename']
+    package_name = "{}{}".format(information['package_name'], information['extra-filename'])
     new_dir = os.path.join(result_dir, 'build', package_name)
     make_dirs.update({new_dir: True})
     return os.path.join(new_dir, file_name)
@@ -115,7 +115,7 @@ def outputs_rules(invocation_key, result_dir, information, make_dirs, **kwargs):
 def links_rules(invocation_key, result_dir, information, **kwargs):
   def _change(path, result_dir):
     file_name = os.path.basename(path)
-    package_name = information['package_name'] + information['extra-filename']
+    package_name = "{}{}".format(information['package_name'], information['extra-filename'])
     return os.path.join(result_dir, 'build', package_name, file_name)
 
   tmp_copy = copy.deepcopy(invocation_key)
@@ -128,7 +128,7 @@ def links_rules(invocation_key, result_dir, information, **kwargs):
 def program_rules(target, crate_out_dirs, invocation, **kwargs):
   for dependency in target.dependencies:
     package_name, links = crate_out_dirs[dependency.address.target_name]
-    out_dir, syn = links.popitem()
+    out_dir, _ = links.popitem()
     # https://github.com/rust-lang/cargo/blob/245818076052dd7178f5bb7585f5aec5b6c1e03e/src/cargo/util/toml/targets.rs#L107
     if os.path.basename(out_dir).startswith('build-script-', 0, 13):
       invocation['program'] = out_dir

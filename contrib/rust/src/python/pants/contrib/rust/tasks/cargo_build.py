@@ -136,7 +136,7 @@ class Build(Workspace):
       hasher = hashlib.md5(json.dumps(invocation, sort_keys=True).encode('utf-8'))
       fingerprint = hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
       name = invocation['package_name']
-      id = name + '_' + fingerprint
+      id = "{}_{}".format(name, fingerprint)
       kind = invocation['target_kind'][0]
       compile_mode = invocation['compile_mode']
       target_definitions.append(
