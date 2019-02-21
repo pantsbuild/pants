@@ -238,9 +238,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
     """
-    return TargetFilter.scoped_instance(self).apply(
-      (self.context.targets(predicate) if self.act_transitively
-       else list(filter(predicate, self.context.target_roots))))
+    initial_targets = (self.context.targets(predicate) if self.act_transitively
+                       else list(filter(predicate, self.context.target_roots)))
+
+    included_targets = TargetFilter.scoped_instance(self).apply(initial_targets)
+    excluded_targets = set(initial_targets).difference(included_targets)
+
+    if excluded_targets:
+      self.context.log.info("{} target(s) excluded".format(len(excluded_targets)))
+      for target in excluded_targets:
+        self.context.log.debug("{} excluded".format(target.address.spec))
+
+    return included_targets
 
   @memoized_property
   def workdir(self):
