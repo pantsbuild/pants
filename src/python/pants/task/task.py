@@ -18,6 +18,7 @@ from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
+from pants.build_graph.target_filter_subsystem import TargetFilter
 from pants.invalidation.build_invalidator import (BuildInvalidator, CacheKeyGenerator,
                                                   UncacheableCacheKeyGenerator)
 from pants.invalidation.cache_manager import InvalidationCacheManager, InvalidationCheck
@@ -96,7 +97,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   @classmethod
   def subsystem_dependencies(cls):
     return (super(TaskBase, cls).subsystem_dependencies() +
-            (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig))
+            (CacheSetup.scoped(cls), TargetFilter.scoped(cls), BuildInvalidator.Factory, SourceRootConfig))
 
   @classmethod
   def product_types(cls):
@@ -237,8 +238,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
     """
-    return (self.context.targets(predicate) if self.act_transitively
-            else list(filter(predicate, self.context.target_roots)))
+    return TargetFilter.scoped_instance(self).apply(
+      (self.context.targets(predicate) if self.act_transitively
+       else list(filter(predicate, self.context.target_roots))))
 
   @memoized_property
   def workdir(self):

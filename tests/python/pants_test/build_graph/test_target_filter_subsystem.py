@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.build_graph.target_filter_subsystem import TargetFiltering
+from pants.build_graph.target_filter_subsystem import TargetFilter, TargetFiltering
 from pants.task.task import Task
 from pants_test.task_test_base import TaskTestBase
 
@@ -14,11 +14,25 @@ class TestTargetFilter(TaskTestBase):
   class DummyTask(Task):
     options_scope = 'dummy'
 
-    def execute(self): pass
+    def execute(self):
+      self.context.products.safe_create_data('task_targets', self.get_targets)
 
   @classmethod
   def task_type(cls):
     return cls.DummyTask
+
+  def test_task_execution_with_filter(self):
+    a = self.make_target('a', tags=['skip-me'])
+    b = self.make_target('b', dependencies=[a], tags=[])
+
+    context = self.context(for_task_types=[self.DummyTask], for_subsystems=[TargetFilter], target_roots=[b], options={
+      TargetFilter.options_scope: {
+        'exclude_tags': ['skip-me']
+      }
+    })
+
+    self.create_task(context).execute()
+    self.assertEqual([b], context.products.get_data('task_targets'))
 
   def test_filtering_single_tag(self):
     a = self.make_target('a', tags=[])
