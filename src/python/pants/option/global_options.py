@@ -28,7 +28,7 @@ class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'], field_name='failu
 
   @classmethod
   def create(cls, value=None):
-    value = None or 'ignore'
+    value = value or 'ignore'
     return cls(value)
 
 
