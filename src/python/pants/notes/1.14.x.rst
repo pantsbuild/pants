@@ -15,6 +15,9 @@ API Changes
 * Resolve all platforms from all python targets (#7156)
   `PR #7156 <https://github.com/pantsbuild/pants/pull/7156>`_
 
+* Remove deprecated test classes (#7243)
+  `PR #7243 <https://github.com/pantsbuild/pants/pull/7243>`_
+
 Bugfixes
 ~~~~~~~~
 
@@ -23,9 +26,6 @@ Bugfixes
 
 * Avoid capturing Snapshots for previously digested codegen outputs (#7241)
   `PR #7241 <https://github.com/pantsbuild/pants/pull/7241>`_
-
-* Remove deprecated test classes (#7243)
-  `PR #7243 <https://github.com/pantsbuild/pants/pull/7243>`_
 
 * Validate and maybe prune interpreter cache run over run (#7225)
   `PR #7225 <https://github.com/pantsbuild/pants/pull/7225>`_
