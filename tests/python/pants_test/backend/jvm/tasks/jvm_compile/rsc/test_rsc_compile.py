@@ -40,7 +40,7 @@ class RscCompileTest(TaskTestBase):
   def task_type(cls):
     return RscCompile
 
-  def test_metacp_job_scheduled_for_jar_library(self):
+  def test_no_dependencies_between_scala_and_java_targets(self):
     # Init dependencies for scala library targets.
     init_subsystem(
       ScalaPlatform,
@@ -55,27 +55,21 @@ class RscCompileTest(TaskTestBase):
       jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
     )
 
-    jar_target = self.make_target(
-      'java/classpath:jar_lib',
-      target_type=JarLibrary,
-      jars=[JarDependency(org='com.example', name='example', rev='0.0.0')]
-    )
-
     java_target = self.make_target(
       'java/classpath:java_lib',
       target_type=JavaLibrary,
       sources=['com/example/Foo.java'],
-      dependencies=[jar_target]
+      dependencies=[]
     )
 
     scala_target = self.make_target(
-      'java/classpath:scala_lib',
+      'scala/classpath:scala_lib',
       target_type=ScalaLibrary,
       sources=['com/example/Foo.scala'],
-      dependencies=[jar_target]
+      dependencies=[]
     )
 
-    context = self.context(target_roots=[jar_target])
+    context = self.context(target_roots=[java_target])
 
     context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
     context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
@@ -85,9 +79,9 @@ class RscCompileTest(TaskTestBase):
     task._size_estimator = lambda srcs: 0
     with temporary_dir() as tmp_dir:
       compile_contexts = {target: task.create_compile_context(target, os.path.join(tmp_dir, target.id))
-                          for target in [jar_target, java_target, scala_target]}
+                          for target in [java_target, scala_target]}
 
-      invalid_targets = [java_target, scala_target, jar_target]
+      invalid_targets = [java_target, scala_target]
 
       jobs = task._create_compile_jobs(compile_contexts,
                                        invalid_targets,
@@ -96,25 +90,79 @@ class RscCompileTest(TaskTestBase):
 
       exec_graph = ExecutionGraph(jobs, task.get_options().print_exception_stacktrace)
       dependee_graph = exec_graph.format_dependee_graph()
-
+      print(dependee_graph)
       self.assertEqual(dedent("""
-                     metacp(jdk) -> {
-                       metacp(java/classpath:java_lib),
-                       rsc(java/classpath:scala_lib),
-                       compile_against_rsc(java/classpath:scala_lib),
-                       metacp(java/classpath:jar_lib)
+                     zinc(java/classpath:java_lib) -> {}
+                     rsc(scala/classpath:scala_lib) -> {}
+                     zinc_against_rsc(scala/classpath:scala_lib) -> {}""").strip(),
+        dependee_graph)
+
+  def test_scala_dep_for_scala_and_java_targets(self):
+    # Init dependencies for scala library targets.
+    init_subsystem(
+      ScalaPlatform,
+      {ScalaPlatform.options_scope: {
+        'version': 'custom',
+        'suffix_version': '2.12',
+      }}
+    )
+    self.make_target(
+      '//:scala-library',
+      target_type=JarLibrary,
+      jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
+    )
+
+    scala_dep = self.make_target(
+      'scala/classpath:scala_dep',
+      target_type=ScalaLibrary,
+      sources=['com/example/Bar.scala']
+    )
+    java_target = self.make_target(
+      'java/classpath:java_lib',
+      target_type=JavaLibrary,
+      sources=['com/example/Foo.java'],
+      dependencies=[scala_dep]
+    )
+
+    scala_target = self.make_target(
+      'scala/classpath:scala_lib',
+      target_type=ScalaLibrary,
+      sources=['com/example/Foo.scala'],
+      dependencies=[scala_dep]
+    )
+
+    context = self.context(target_roots=[scala_target, java_target])
+
+    context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
+    context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
+
+    task = self.create_task(context)
+    # tried for options, but couldn't get it to reconfig
+    task._size_estimator = lambda srcs: 0
+    with temporary_dir() as tmp_dir:
+      compile_contexts = {target: task.create_compile_context(target, os.path.join(tmp_dir, target.id))
+        for target in [java_target, scala_target, scala_dep]}
+
+      invalid_targets = [java_target, scala_target, scala_dep]
+
+      jobs = task._create_compile_jobs(compile_contexts,
+        invalid_targets,
+        invalid_vts=[LightWeightVTS(t) for t in invalid_targets],
+        classpath_product=None)
+
+      exec_graph = ExecutionGraph(jobs, task.get_options().print_exception_stacktrace)
+      dependee_graph = exec_graph.format_dependee_graph()
+      print(dependee_graph)
+      self.assertEqual(dedent("""
+                     zinc(java/classpath:java_lib) -> {}
+                     rsc(scala/classpath:scala_lib) -> {}
+                     zinc_against_rsc(scala/classpath:scala_lib) -> {}
+                     rsc(scala/classpath:scala_dep) -> {
+                       rsc(scala/classpath:scala_lib),
+                       zinc_against_rsc(scala/classpath:scala_lib)
                      }
-                     metacp(java/classpath:java_lib) -> {}
-                     compile_against_rsc(java/classpath:java_lib) -> {
-                       metacp(java/classpath:java_lib)
-                     }
-                     rsc(java/classpath:scala_lib) -> {
-                       compile_against_rsc(java/classpath:scala_lib)
-                     }
-                     compile_against_rsc(java/classpath:scala_lib) -> {}
-                     metacp(java/classpath:jar_lib) -> {
-                       metacp(java/classpath:java_lib),
-                       rsc(java/classpath:scala_lib)
+                     zinc_against_rsc(scala/classpath:scala_dep) -> {
+                       zinc(java/classpath:java_lib)
                      }""").strip(),
         dependee_graph)
 
@@ -133,27 +181,28 @@ class RscCompileTest(TaskTestBase):
       jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
     )
 
-    jar_target = self.make_target(
-      'java/classpath:jar_lib',
-      target_type=JarLibrary,
-      jars=[JarDependency(org='com.example', name='example', rev='0.0.0')]
-    )
-
     java_target = self.make_target(
       'java/classpath:java_lib',
       target_type=JavaLibrary,
       sources=['com/example/Foo.java'],
-      dependencies=[jar_target]
+      dependencies=[]
     )
 
     scala_target = self.make_target(
       'java/classpath:scala_and_java_lib',
       target_type=ScalaLibrary,
       sources=['com/example/Foo.scala', 'com/example/Bar.java'],
-      dependencies=[jar_target]
+      dependencies=[]
+    )
+    scala_target2 = self.make_target(
+      'java/classpath:scala_and_java_lib2',
+      target_type=ScalaLibrary,
+      java_sources=['java/classpath:java_lib'],
+      sources=['com/example/Foo.scala'],
+      dependencies=[]
     )
 
-    context = self.context(target_roots=[jar_target])
+    context = self.context(target_roots=[scala_target])
 
     context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
     context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
@@ -163,9 +212,9 @@ class RscCompileTest(TaskTestBase):
     task._size_estimator = lambda srcs: 0
     with temporary_dir() as tmp_dir:
       compile_contexts = {target: task.create_compile_context(target, os.path.join(tmp_dir, target.id))
-        for target in [jar_target, java_target, scala_target]}
+        for target in [java_target, scala_target]}
 
-      invalid_targets = [java_target, scala_target, jar_target]
+      invalid_targets = [java_target, scala_target]
 
       jobs = task._create_compile_jobs(compile_contexts,
         invalid_targets,
@@ -174,25 +223,11 @@ class RscCompileTest(TaskTestBase):
 
       exec_graph = ExecutionGraph(jobs, task.get_options().print_exception_stacktrace)
       dependee_graph = exec_graph.format_dependee_graph()
+      print(dependee_graph)
 
       self.assertEqual(dedent("""
-                     metacp(jdk) -> {
-                       metacp(java/classpath:java_lib),
-                       metacp(java/classpath:scala_and_java_lib),
-                       metacp(java/classpath:jar_lib)
-                     }
-                     metacp(java/classpath:java_lib) -> {}
-                     compile_against_rsc(java/classpath:java_lib) -> {
-                       metacp(java/classpath:java_lib)
-                     }
-                     metacp(java/classpath:scala_and_java_lib) -> {}
-                     compile_against_rsc(java/classpath:scala_and_java_lib) -> {
-                       metacp(java/classpath:scala_and_java_lib)
-                     }
-                     metacp(java/classpath:jar_lib) -> {
-                       metacp(java/classpath:java_lib),
-                       metacp(java/classpath:scala_and_java_lib)
-                     }""").strip(),
+                     zinc(java/classpath:java_lib) -> {}
+                     zinc(java/classpath:scala_and_java_lib) -> {}""").strip(),
         dependee_graph)
 
   def test_desandbox_fn(self):
