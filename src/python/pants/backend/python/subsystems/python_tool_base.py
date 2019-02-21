@@ -21,7 +21,8 @@ class PythonToolBase(Subsystem):
     super(PythonToolBase, cls).register_options(register)
     register('--interpreter-constraints', type=list, advanced=True, fingerprint=True,
              default=cls.default_interpreter_constraints,
-             help='Python interpreter constraints for this tool.')
+             help='Python interpreter constraints for this tool. An empty list uses the default '
+                  'interpreter constraints for the repo.')
     register('--requirements', type=list, advanced=True, fingerprint=True,
              default=cls.default_requirements,
              help='Python requirement strings for the tool.')

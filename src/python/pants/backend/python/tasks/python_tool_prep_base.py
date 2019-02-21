@@ -71,6 +71,12 @@ class PythonToolInstance(object):
       return cmdline, exit_code
 
 
+# TODO: This python tool setup ends up eagerly generating each pex for each task in every goal which
+# is transitively required by the command-line goals, even for tasks which no-op. This requires each
+# pex for each relevant python tool to be buildable on the current host, even if it may never be
+# intended to be invoked. Especially given the existing clear separation of concerns into
+# PythonToolBase/PythonToolInstance/PythonToolPrepBase, this seems like an extremely ripe use case
+# for some v2 rules for free caching and no-op when not required for the command-line goals.
 class PythonToolPrepBase(Task):
   """Base class for tasks that resolve a python tool to be invoked out-of-process."""
 
