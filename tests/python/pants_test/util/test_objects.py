@@ -736,7 +736,9 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
     self.assertNotEqual(enum_instance, another_enum_instance)
 
     # Test that comparison fails against another type.
-    rx_str = re.escape("enum equality is only defined for instances of the same enum class!")
+    rx_str = re.escape(
+      "when comparing against 1 with type 'int': "
+      "enum equality is only defined for instances of the same enum class!")
     with self.assertRaisesRegexp(TypeCheckError, rx_str):
       enum_instance == 1
     with self.assertRaisesRegexp(TypeCheckError, rx_str):
@@ -744,6 +746,10 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
 
     class StrEnum(enum(['a'])): pass
     enum_instance = StrEnum('a')
+    rx_str = re.escape(
+      "when comparing against {u}'a' with type '{string_type}': "
+      "enum equality is only defined for instances of the same enum class!"
+      .format(u='u' if PY2 else '', string_type='unicode' if PY2 else 'str'))
     with self.assertRaisesRegexp(TypeCheckError, rx_str):
       enum_instance == 'a'
     with self.assertRaisesRegexp(TypeCheckError, rx_str):

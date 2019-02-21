@@ -295,7 +295,9 @@ def enum(all_values, field_name='value'):
       """Redefine equality to avoid accidentally comparing against a non-enum."""
       if type(self) != type(other):
         raise self.make_type_error(
-          "enum equality is only defined for instances of the same enum class!")
+          "when comparing against {!r} with type '{}': "
+          "enum equality is only defined for instances of the same enum class!"
+          .format(other, type(other).__name__))
       return super(ChoiceDatatype, self).__eq__(other)
     # Redefine the canary so datatype __new__ doesn't raise.
     __eq__._eq_override_canary = None
