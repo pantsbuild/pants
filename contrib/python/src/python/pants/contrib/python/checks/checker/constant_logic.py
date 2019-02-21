@@ -30,6 +30,7 @@ class ConstantLogic(CheckstylePlugin):
     if isinstance(expr, ast.Name):
       if expr.id in ['True', 'False', 'None']:
         return True
+    return False
 
   def nits(self):
     for bool_op in self.iter_bool_ops(self.python_file.tree):
