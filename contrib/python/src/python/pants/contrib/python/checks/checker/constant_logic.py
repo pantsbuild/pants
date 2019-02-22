@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import ast
 
-from six import PY3
+from future.utils import PY3
 
 from pants.contrib.python.checks.checker.common import CheckstylePlugin
 
@@ -21,9 +21,8 @@ class ConstantLogic(CheckstylePlugin):
   @classmethod
   def iter_bool_ops(cls, tree):
     for ast_node in ast.walk(tree):
-      if isinstance(ast_node, ast.BoolOp):
-        if isinstance(ast_node.op, (ast.And, ast.Or)):
-          yield ast_node
+      if isinstance(ast_node, ast.BoolOp) and isinstance(ast_node.op, (ast.And, ast.Or)):
+        yield ast_node
 
   @classmethod
   def is_name_constant(cls, expr):
@@ -31,9 +30,8 @@ class ConstantLogic(CheckstylePlugin):
       if isinstance(expr, ast.NameConstant):
         return True
     else:
-      if isinstance(expr, ast.Name):
-        if expr.id in ['True', 'False', 'None']:
-          return True
+      if isinstance(expr, ast.Name) and expr.id in ['True', 'False', 'None']:
+        return True
     return False
 
   @classmethod
@@ -46,14 +44,17 @@ class ConstantLogic(CheckstylePlugin):
 
   def nits(self):
     for bool_op in self.iter_bool_ops(self.python_file.tree):
-      # We don't try to check anything in the middle of more complex logical expressions.
+      # We don't try to check anything in the middle of logical expressions with more than two
+      # values.
       leftmost = bool_op.values[0]
       rightmost = bool_op.values[-1]
       if self.is_probably_constant(leftmost):
         yield self.error('T804',
-                         'Constant on left-hand side of a logical operator is probably an error.',
+                         'You are using a constant on the left-hand side of a logical operator. '
+                         'This is probably an error.',
                          bool_op)
       if isinstance(bool_op.op, ast.And) and self.is_probably_constant(rightmost):
         yield self.error('T805',
-                         'Constant on right-hand side of an `and` operator is probably an error.',
+                         'You are using a constant on the right-hand side of an `and` operator. '
+                         'This is probably an error.',
                          bool_op)
