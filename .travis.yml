@@ -469,7 +469,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - ${PYENV_ROOT}/bin/pyenv global 2.7.13
   script:
     - ./build-support/bin/ci.sh -2b
-    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
+    - PEX_VERBOSE=9 RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 # -------------------------------------------------------------------------
 # Rust tests
