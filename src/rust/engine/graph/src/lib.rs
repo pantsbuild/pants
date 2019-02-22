@@ -370,7 +370,7 @@ impl<N: Node> InnerGraph<N> {
     let format = |eid: EntryId, depth: usize, is_last: bool| -> String {
       let entry = self.unsafe_entry_for_id(eid);
       let indent = "  ".repeat(depth);
-      let output = format!("{}Computing {}", indent, entry.node().format());
+      let output = format!("{}Computing {}", indent, entry.node());
       if is_last {
         format!(
           "{}\n{}  {}",
@@ -430,7 +430,7 @@ impl<N: Node> InnerGraph<N> {
 
       if deps.peek().is_none() {
         // If the entry has no running deps, it is a leaf. Emit it.
-        res.insert(self.unsafe_entry_for_id(id).node().format(), duration);
+        res.insert(format!("{}", self.unsafe_entry_for_id(id).node()), duration);
         if res.len() >= k {
           break;
         }
@@ -1055,16 +1055,18 @@ mod tests {
       }
     }
 
-    fn format(&self) -> String {
-      format!("{:?}", self)
-    }
-
     fn digest(_result: Self::Item) -> Option<Digest> {
       None
     }
 
     fn cacheable(&self) -> bool {
       true
+    }
+  }
+
+  impl std::fmt::Display for TNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+      write!(f, "{:?}", self)
     }
   }
 

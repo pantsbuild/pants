@@ -1,7 +1,7 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
 use boxfuture::BoxFuture;
@@ -21,16 +21,13 @@ pub type EntryId = stable_graph::NodeIndex<u32>;
 ///
 /// Note that it is assumed that Nodes are very cheap to clone.
 ///
-pub trait Node: Clone + Debug + Eq + Hash + Send + 'static {
+pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   type Context: NodeContext<Node = Self>;
 
   type Item: Clone + Debug + Eq + Send + 'static;
   type Error: NodeError;
 
   fn run(self, context: Self::Context) -> BoxFuture<Self::Item, Self::Error>;
-
-  // TODO: Use a `Display` bound instead.
-  fn format(&self) -> String;
 
   ///
   /// If the given Node output represents an FS operation, returns its Digest.
