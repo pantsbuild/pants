@@ -417,6 +417,8 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
 py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
   <<: *py27_linux_build_wheels_no_ucs
   <<: *py27_linux_test_config
+  # `py27_linux_test_config` overrides the stage set by `base_build_wheels`, so we re-override it.
+  stage: *test
   name: "Build wheels - Linux and cp27mu (UCS4)"
   env:
     - *py27_linux_test_config_env
