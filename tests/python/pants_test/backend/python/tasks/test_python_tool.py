@@ -44,8 +44,7 @@ class ToolTask(Task):
 
   def execute(self):
     tool_for_pex = self.context.products.get_data(ToolPrep.tool_instance_cls)
-    stdout, stderr, exit_code, _ = tool_for_pex.output(['--version'])
-    assert '' == stderr
+    stdout, _, exit_code, _ = tool_for_pex.output(['--version'])
     assert re.match(r'.*\.pex 1.5.3', stdout)
     assert 0 == exit_code
 
