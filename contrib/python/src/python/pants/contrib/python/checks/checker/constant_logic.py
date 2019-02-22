@@ -6,6 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import ast
 
+from six import PY3
+
 from pants.contrib.python.checks.checker.common import CheckstylePlugin
 
 
@@ -24,12 +26,22 @@ class ConstantLogic(CheckstylePlugin):
           yield ast_node
 
   @classmethod
+  def is_name_constant(cls, expr):
+    if PY3:
+      if isinstance(expr, ast.NameConstant):
+        return True
+    else:
+      if isinstance(expr, ast.Name):
+        if expr.id in ['True', 'False', 'None']:
+          return True
+    return False
+
+  @classmethod
   def is_probably_constant(cls, expr):
     if isinstance(expr, (ast.Num, ast.Str)):
       return True
-    if isinstance(expr, ast.Name):
-      if expr.id in ['True', 'False', 'None']:
-        return True
+    if cls.is_name_constant(expr):
+      return True
     return False
 
   def nits(self):
