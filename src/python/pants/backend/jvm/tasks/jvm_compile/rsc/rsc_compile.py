@@ -172,7 +172,7 @@ class RscCompile(ZincCompile):
         JarDependency(
           org='com.twitter',
           name='rsc_2.11',
-          rev='0.0.0-733-05951a97',
+          rev='0.0.0-734-e57e96eb',
         ),
       ],
       custom_rules=[
