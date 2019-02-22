@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class TargetFilter(Subsystem):
-  """Filter out targets matching given options.
+  """Filter targets matching configured criteria.
 
   :API: public
   """
