@@ -225,21 +225,12 @@ class Build(Workspace):
 
       cmd = self.create_command(pants_invocation['program'], pants_invocation['args'], target)
 
-      env = {
-        'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-      }
-
-      env = self._add_env_vars(env, pants_invocation['env'])
+      env = self.create_env(pants_invocation['env'], target)
 
       if pants_invocation['program'] == 'rustc':
         self.run_command(cmd, pants_invocation['cwd'], env, workunit)
       else:
-        std_output = self.run_command_and_get_output(cmd, pants_invocation['cwd'], env, workunit)
-        build_script_std_out_dir = self._package_out_dirs[target.address.target_name]
-        self._build_script_output[
-          target.address.target_name] = self.parse_and_save_build_script_output(std_output,
-                                                                                build_script_std_out_dir[
-                                                                                  1])
+        self.run_custom_build(cmd, pants_invocation['cwd'], env, target, workunit)
 
       self.create_copies(pants_invocation['links'])
 
@@ -293,9 +284,9 @@ class Build(Workspace):
   def create_command(self, program, args, target):
     cmd = [program]
     cmd.extend(args)
-    return self.extend_args(cmd, target)
+    return self.extend_args_with_cargo_statement(cmd, target)
 
-  def extend_args(self, cmd, target):
+  def extend_args_with_cargo_statement(self, cmd, target):
     def extend_cmd(cmd, cargo_outputs):
       for output in cargo_outputs:
         cmd.extend(output)
@@ -310,6 +301,33 @@ class Build(Workspace):
         cmd = extend_cmd(cmd, cargo_outputs['rustc-flags'])
         cmd = extend_cmd(cmd, cargo_outputs['rustc-cfg'])
     return cmd
+
+  def create_env(self, invocation_env, target):
+    env = {
+      'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
+    }
+
+    env = self._add_env_vars(env, invocation_env)
+
+    return self.extend_env_with_cargo_statement(env, target)
+
+  def extend_env_with_cargo_statement(self, env, target):
+    for dependency in target.dependencies:
+      cargo_outputs = self._build_script_output.get(dependency.address.target_name, None)
+      if cargo_outputs:
+        self.context.log.debug('Custom build outputs:\n{0}'.format(self.stringify(cargo_outputs)))
+        for rustc_env in cargo_outputs['rustc-env']:
+          # is PATH also possible?
+          self._add_env_var(env, rustc_env[0], rustc_env[1])
+    return env
+
+  def run_custom_build(self, cmd, invocation_cwd, env, target, workunit):
+    std_output = self.run_command_and_get_output(cmd, invocation_cwd, env, workunit)
+    build_script_std_out_dir = self._package_out_dirs[target.address.target_name]
+    self._build_script_output[
+      target.address.target_name] = self.parse_and_save_build_script_output(std_output,
+                                                                            build_script_std_out_dir[
+                                                                              1])
 
   def add_rust_products(self, target, pants_invocation):
     name = pants_invocation['package_name']

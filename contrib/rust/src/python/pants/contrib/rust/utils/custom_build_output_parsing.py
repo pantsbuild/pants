@@ -4,26 +4,36 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from itertools import chain, izip
+
 
 def get_default_converter():
+  # https://github.com/rust-lang/cargo/blob/dc83ead224d8622f748f507574e1448a28d8dcc7/src/cargo/core/compiler/custom_build.rs#L482
   return {
     'rustc-link-lib': lambda kind: ['-l', kind],
     'rustc-link-search': lambda path: ['-L', path],
-    'rustc-flags': lambda path: ['-L', path],
+    'rustc-flags': lambda flags: spilt_flags(flags),
     'rustc-cfg': lambda cfg: ['--cfg', cfg],
-    'rustc-env': lambda var_value: var_value,
+    'rustc-env': lambda var_value: spilt_into_key_value(var_value),
   }
 
 
-def spilt_into_key_value(cargo_statement):
-  key_value = cargo_statement.split('=', 1)
+def spilt_flags(flags):
+  array_flags = flags.split(' ')
+  filter_whitespaces = list(filter(lambda flag: flag.strip() != '', array_flags))
+  iter_flags = iter(filter_whitespaces)
+  return list(chain.from_iterable(map(list, izip(iter_flags, iter_flags))))
+
+
+def spilt_into_key_value(key_value_str):
+  key_value = key_value_str.split('=', 1)
   return key_value
 
 
-def translate(key, value, converter):
-  transform = converter.get(key, None)
-  if transform:
-    return [key, transform(value)]
+def convert(key, value, converter):
+  convert_fn = converter.get(key, None)
+  if convert_fn:
+    return [key, convert_fn(value)]
   else:
     return [key, value]
 
@@ -33,7 +43,7 @@ def parse_cargo_statement(cargo_statement):
   key_value = spilt_into_key_value(cargo_statement)
   if len(key_value) == 2:
     key, value = key_value
-    return translate(key, value, converter)
+    return convert(key, value, converter)
   else:
     return key_value
 
@@ -65,5 +75,5 @@ def parse_multiple_cargo_statements(cargo_statements):
   return result
 
 
-def filter_cargo_statements(output):
-  return list(filter(lambda line: line.startswith('cargo:', 0, 6), output))
+def filter_cargo_statements(build_output):
+  return list(filter(lambda line: line.startswith('cargo:', 0, 6), build_output))

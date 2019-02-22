@@ -25,4 +25,12 @@ python_tests(
   ]
 )
 
+python_tests(
+  name='test_custom_build_output_parsing',
+  sources=['test_custom_build_output_parsing.py'],
+  dependencies=[
+    'contrib/rust/src/python/pants/contrib/rust/utils:custom_build_output_parsing',
+  ]
+)
+
 
