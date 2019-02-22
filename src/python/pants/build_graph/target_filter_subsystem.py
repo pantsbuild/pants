@@ -25,7 +25,7 @@ class TargetFilter(Subsystem):
     super(TargetFilter, cls).register_options(register)
 
     register('--exclude-tags', type=list,
-             default=[],
+             default=[], fingerprint=True,
              help='Skip targets with given tag(s).')
 
   def apply(self, targets):
