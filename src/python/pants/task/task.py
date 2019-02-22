@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 from abc import abstractmethod
-from builtins import filter, map, object, str, zip
+from builtins import filter, map, object, set, str, zip
 from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat

@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import set
+
 from pants.build_graph.target_filter_subsystem import TargetFilter, TargetFiltering
 from pants.task.task import Task
 from pants_test.task_test_base import TaskTestBase
