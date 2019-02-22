@@ -10,7 +10,7 @@ import re
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.tasks.python_tool_prep_base import PythonToolInstance, PythonToolPrepBase
 from pants.task.task import Task
-from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -57,13 +57,15 @@ class PythonToolPrepTest(PythonTaskTestBase):
     scope_string = '3' if use_py3 else '2'
     constraint_string = 'CPython>=3' if use_py3 else 'CPython<3'
     tool_prep_type = self.synthesize_task_subtype(ToolPrep, 'tp_scope_py{}'.format(scope_string))
-    context = self.context(for_task_types=[tool_prep_type], for_subsystems=[Tool], options={
-      'test-tool': {
-        'interpreter_constraints': [constraint_string],
-      },
-    })
-    # XDG_CACHE_HOME overrides the location of the cache dir.
-    with temporary_dir() as tmp_dir, environment_as(XDG_CACHE_HOME=tmp_dir):
+    with temporary_dir() as tmp_dir:
+      context = self.context(for_task_types=[tool_prep_type], for_subsystems=[Tool], options={
+        '': {
+          'pants_bootstrapdir': tmp_dir,
+        },
+        'test-tool': {
+          'interpreter_constraints': [constraint_string],
+        },
+      })
       tool_prep_task = tool_prep_type(context, os.path.join(
         self.pants_workdir, 'tp_py{}'.format(scope_string)))
       tool_prep_task.execute()
@@ -76,7 +78,10 @@ class PythonToolPrepTest(PythonTaskTestBase):
 
   def test_tool_execution(self):
     """Test that python tools are fingerprinted by python interpreter."""
-    py3_pex_tool_instance = self._assert_tool_execution_for_python_version(use_py3=True)
-    py2_pex_tool_instance = self._assert_tool_execution_for_python_version(use_py3=False)
-    self.assertNotEqual(py3_pex_tool_instance.pex.path,
-                        py2_pex_tool_instance.pex.path)
+    py3_pex_tool = self._assert_tool_execution_for_python_version(use_py3=True)
+    py3_pex_tool_path = py3_pex_tool.pex.path()
+    self.assertTrue(os.path.isdir(py3_pex_tool_path))
+    py2_pex_tool = self._assert_tool_execution_for_python_version(use_py3=False)
+    py2_pex_tool_path = py2_pex_tool.pex.path()
+    self.assertTrue(os.path.isdir(py2_pex_tool_path))
+    self.assertNotEqual(py3_pex_tool_path, py2_pex_tool_path)
