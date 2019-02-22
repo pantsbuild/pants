@@ -12,7 +12,7 @@ from pants.contrib.python.checks.checker.common import CheckstylePlugin
 
 
 class ConstantLogic(CheckstylePlugin):
-  """Check for constants provided to and/or which will disregard the other operand's value."""
+  """Check for constants provided to boolean operators which result in a constant expression."""
 
   @classmethod
   def name(cls):
@@ -54,6 +54,6 @@ class ConstantLogic(CheckstylePlugin):
                          'Constant on left-hand side of a logical operator is probably an error.',
                          bool_op)
       if isinstance(bool_op.op, ast.And) and self.is_probably_constant(rightmost):
-        yield self.error('T804',
-                         'Constant on right-hand side of an and operator is probably an error.',
+        yield self.error('T805',
+                         'Constant on right-hand side of an `and` operator is probably an error.',
                          bool_op)

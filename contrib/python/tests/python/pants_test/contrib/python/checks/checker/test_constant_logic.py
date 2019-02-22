@@ -22,5 +22,5 @@ class ConstantLogicTest(CheckstylePluginTestBase):
 
   def test_and(self):
     self.assertNit('None and x', 'T804')
-    self.assertNit('x and False', 'T804')
+    self.assertNit('x and False', 'T805')
     self.assertNoNits('x and y')
