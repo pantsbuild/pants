@@ -23,14 +23,14 @@ from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
 class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTestBase):
 
   @classproperty
-  def _run_before_task_types(cls):
+  def run_before_task_types(cls):
     return [
       CCompile,
       CppCompile,
       LinkSharedLibraries,
-    ] + super(TestBuildLocalDistsWithCtypesNativeSources, cls)._run_before_task_types
+    ] + super(TestBuildLocalDistsWithCtypesNativeSources, cls).run_before_task_types
 
-  _dist_specs = OrderedDict([
+  dist_specs = OrderedDict([
 
     ('src/python/plat_specific_c_dist:ctypes_c_library', {
       'key': 'ctypes_c_library',
