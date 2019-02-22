@@ -30,12 +30,15 @@ class TargetFilter(Subsystem):
 
   def apply(self, targets):
     exclude_tags = set(self.get_options().exclude_tags)
-    return TargetFiltering.apply_tag_blacklist(exclude_tags, targets)
+    return TargetFiltering(targets, exclude_tags).apply_tag_blacklist()
 
 
 class TargetFiltering(object):
   """Apply filtering logic against targets."""
 
-  @staticmethod
-  def apply_tag_blacklist(exclude_tags, targets):
-    return [t for t in targets if not exclude_tags.intersection(t.tags)]
+  def __init__(self, targets, exclude_tags):
+    self.targets = targets
+    self.exclude_tags = exclude_tags
+
+  def apply_tag_blacklist(self):
+    return [t for t in self.targets if not self.exclude_tags.intersection(t.tags)]
