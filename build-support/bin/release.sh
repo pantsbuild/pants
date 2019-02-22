@@ -509,7 +509,6 @@ function activate_twine() {
 
 function execute_pex() {
   run_pex27 \
-      -vvvvvvvvv \
       --no-build \
       --no-pypi \
       --disable-cache \
