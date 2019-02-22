@@ -4,14 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import glob
 import os
 import re
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.tasks.python_tool_prep_base import PythonToolInstance, PythonToolPrepBase
 from pants.task.task import Task
-from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as, temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
@@ -69,22 +67,16 @@ class PythonToolPrepTest(PythonTaskTestBase):
       tool_prep_task = tool_prep_type(context, os.path.join(
         self.pants_workdir, 'tp_py{}'.format(scope_string)))
       tool_prep_task.execute()
-      # Check that the tool is in an interpreter-specific subdir of the cache dir.
-      constructed_tool_location_glob = os.path.join(
-        tmp_dir, 'pants', 'python',
-        'CPython-{}*'.format(scope_string),
-        tool_prep_task.fingerprint,
-        'test-tool-*.pex',
-      )
-      tool_location = assert_single_element(glob.glob(constructed_tool_location_glob))
-      self.assertTrue(os.path.isdir(tool_location))
-
-      # Check that the tool can be executed successfully.
+      # Check that the tool can be created and executed successfully.
       self.create_task(context).execute()
       pex_tool = context.products.get_data(ToolPrep.tool_instance_cls)
+      # Check that our pex tool wrapper was constructed with the expected interpreter.
       self.assertTrue(pex_tool.interpreter.identity.matches(constraint_string))
+      return pex_tool
 
   def test_tool_execution(self):
     """Test that python tools are fingerprinted by python interpreter."""
-    self._assert_tool_execution_for_python_version(use_py3=True)
-    self._assert_tool_execution_for_python_version(use_py3=False)
+    py3_pex_tool_instance = self._assert_tool_execution_for_python_version(use_py3=True)
+    py2_pex_tool_instance = self._assert_tool_execution_for_python_version(use_py3=False)
+    self.assertNotEqual(py3_pex_tool_instance.pex.path,
+                        py2_pex_tool_instance.pex.path)
