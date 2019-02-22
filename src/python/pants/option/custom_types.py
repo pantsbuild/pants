@@ -308,7 +308,7 @@ class DictValueComponent(object):
     return '{} {}'.format(self.action, self.val)
 
 
-class GlobExpansionConjunction(enum(['any_match', 'all_match'], field_name='conjunction')):
+class GlobExpansionConjunction(enum(['any_match', 'all_match'])):
   """Describe whether to require that only some or all glob strings match in a target's sources.
 
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
@@ -319,4 +319,8 @@ class GlobExpansionConjunction(enum(['any_match', 'all_match'], field_name='conj
   def create(cls, value=None):
     # TODO: add testing for this value!
     value = value or 'any_match'
+    # If passed an instance of the object, just return it. This makes copying glob expansion
+    # settings from elsewhere when constructing PathGlobs more ergonomic.
+    if isinstance(value, cls):
+      return value
     return cls(value)

@@ -287,7 +287,7 @@ class ReturnsNotImplemented(object):
     return NotImplemented
 
 
-class SomeEnum(enum([1, 2], field_name='x')): pass
+class SomeEnum(enum([1, 2])): pass
 
 
 class DatatypeTest(TestBase):
@@ -712,16 +712,13 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
       class DuplicateAllowedValues(enum([1, 2, 3, 1])): pass
 
   def test_enum_instance_creation(self):
-    self.assertEqual(2, SomeEnum(2).x)
+    self.assertEqual(2, SomeEnum(2).value)
+    self.assertEqual(SomeEnum(2), SomeEnum(value=2))
 
     expected_rx = re.escape(
-      "Value 3 for 'x' must be one of: [1, 2].")
+      "Value 3 must be one of: [1, 2].")
     with self.assertRaisesRegexp(EnumVariantSelectionError, expected_rx):
       SomeEnum(3)
-
-    # Specifying the value by keyword argument is not allowed.
-    with self.assertRaisesRegexp(TypeError, re.escape("__new__() got an unexpected keyword argument 'x'")):
-      SomeEnum(x=3)
 
   def test_enum_generated_attrs(self):
     class HasAttrs(enum(['a', 'b'])): pass
@@ -737,7 +734,7 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
 
     # Test that comparison fails against another type.
     rx_str = re.escape(
-      "when comparing against 1 with type 'int': "
+      "when comparing SomeEnum(value=1) against 1 with type 'int': "
       "enum equality is only defined for instances of the same enum class!")
     with self.assertRaisesRegexp(TypeCheckError, rx_str):
       enum_instance == 1
@@ -747,7 +744,7 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
     class StrEnum(enum(['a'])): pass
     enum_instance = StrEnum('a')
     rx_str = re.escape(
-      "when comparing against {u}'a' with type '{string_type}': "
+      "when comparing StrEnum(value={u}'a') against {u}'a' with type '{string_type}': "
       "enum equality is only defined for instances of the same enum class!"
       .format(u='u' if PY2 else '', string_type='unicode' if PY2 else 'str'))
     with self.assertRaisesRegexp(TypeCheckError, rx_str):

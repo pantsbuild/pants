@@ -504,11 +504,11 @@ impl Snapshot {
 
     let glob_match_error_behavior =
       externs::project_ignoring_type(item, "glob_match_error_behavior");
-    let failure_behavior = externs::project_str(&glob_match_error_behavior, "failure_behavior");
+    let failure_behavior = externs::project_str(&glob_match_error_behavior, "value");
     let strict_glob_matching = StrictGlobMatching::create(failure_behavior.as_str())?;
 
     let conjunction_obj = externs::project_ignoring_type(item, "conjunction");
-    let conjunction_string = externs::project_str(&conjunction_obj, "conjunction");
+    let conjunction_string = externs::project_str(&conjunction_obj, "value");
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
 
     PathGlobs::create(&include, &exclude, strict_glob_matching, conjunction).map_err(|e| {

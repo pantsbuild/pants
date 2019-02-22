@@ -206,7 +206,7 @@ class EnumVariantSelectionError(TypeCheckError):
   """Raised when an invalid variant for an enum() is constructed or matched against."""
 
 
-def enum(all_values, field_name='value'):
+def enum(all_values):
   """A datatype which can take on a finite set of values. This method is experimental and unstable.
 
   Any enum subclass can be constructed with its create() classmethod. This method will use the first
@@ -222,30 +222,25 @@ def enum(all_values, field_name='value'):
   MyResult.success # The same as: MyResult(success)
   MyResult.failure # The same as: MyResult(failure)
 
-  NB: Relying on the `field_name` directly is discouraged in favor of using
-  resolve_for_enum_variant() in Python code. The `field_name` argument is exposed to make enum
-  instances more readable when printed, and to allow code in another language using an FFI to
-  reliably extract the value from an enum instance.
-
   :param Iterable all_values: A nonempty iterable of objects representing all possible values for
                               the enum.  This argument must be a finite, non-empty iterable with
                               unique values.
-  :param string field_name: A string used as the field for the datatype.
   :raises: :class:`ValueError`
   """
+  # namedtuple() raises a ValueError if you try to use a field with an underscore.
+  field_name = 'value'
 
   # This call to list() will eagerly evaluate any `all_values` which would otherwise be lazy, such
   # as a generator.
   all_values_realized = list(all_values)
-  # `OrderedSet` maintains the order of the input iterable, but is faster to check membership.
-  allowed_values_set = OrderedSet(all_values_realized)
 
-  if len(allowed_values_set) == 0:
+  unique_values = OrderedSet(all_values_realized)
+  if len(unique_values) == 0:
     raise ValueError("all_values must be a non-empty iterable!")
-  elif len(allowed_values_set) < len(all_values_realized):
+  elif len(unique_values) < len(all_values_realized):
     raise ValueError("When converting all_values ({}) to a set, at least one duplicate "
                      "was detected. The unique elements of all_values were: {}."
-                     .format(all_values_realized, list(allowed_values_set)))
+                     .format(all_values_realized, list(unique_values)))
 
   class ChoiceDatatype(datatype([field_name])):
     # Overriden from datatype() so providing an invalid variant is catchable as a TypeCheckError,
@@ -259,7 +254,7 @@ def enum(all_values, field_name='value'):
       NB: The implementation of enum() should use this property as the source of truth for allowed
       values and enum instances from those values.
       """
-      return OrderedDict((value, cls._make_singleton(value)) for value in allowed_values_set)
+      return OrderedDict((value, cls._make_singleton(value)) for value in all_values_realized)
 
     @classmethod
     def _make_singleton(cls, value):
@@ -280,13 +275,10 @@ def enum(all_values, field_name='value'):
       :param value: Use this as the enum value. If `value` is an instance of this class, return it,
                     otherwise it is checked against the enum's allowed values.
       """
-      if isinstance(value, cls):
-        return value
-
       if value not in cls._singletons:
         raise cls.make_type_error(
-          "Value {!r} for '{}' must be one of: {!r}."
-          .format(value, field_name, cls._allowed_values))
+          "Value {!r} must be one of: {!r}."
+          .format(value, cls._allowed_values))
       return cls._singletons[value]
 
     # TODO: figure out if this will always trigger on primitives like strings, and what situations
@@ -295,9 +287,9 @@ def enum(all_values, field_name='value'):
       """Redefine equality to avoid accidentally comparing against a non-enum."""
       if type(self) != type(other):
         raise self.make_type_error(
-          "when comparing against {!r} with type '{}': "
+          "when comparing {!r} against {!r} with type '{}': "
           "enum equality is only defined for instances of the same enum class!"
-          .format(other, type(other).__name__))
+          .format(self, other, type(other).__name__))
       return super(ChoiceDatatype, self).__eq__(other)
     # Redefine the canary so datatype __new__ doesn't raise.
     __eq__._eq_override_canary = None

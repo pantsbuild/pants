@@ -52,7 +52,10 @@ class PathGlobs(datatype([
 
     :param include: A list of filespecs to include.
     :param exclude: A list of filespecs to exclude.
-    :param glob_match_error_behavior: The value to pass to the GlobMatchErrorBehavior constructor.
+    :param GlobMatchErrorBehavior glob_match_error_behavior: How to respond to globs matching no
+                                                             files.
+    :param GlobExpansionConjunction conjunction: Whether all globs are expected to match at least
+                                                 one file, or if any glob matching is ok.
     :rtype: :class:`PathGlobs`
     """
     return super(PathGlobs, cls).__new__(

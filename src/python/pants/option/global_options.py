@@ -19,7 +19,7 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.objects import datatype, enum, register_enum_option
 
 
-class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'], field_name='failure_behavior')):
+class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
   """Describe the action to perform when matching globs in BUILD files to source files.
 
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
@@ -30,6 +30,10 @@ class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'], field_name='failu
   def create(cls, value=None):
     # TODO: add testing for this value!
     value = value or 'ignore'
+    # If passed an instance of the object, just return it. This makes copying glob expansion
+    # settings from elsewhere when constructing PathGlobs more ergonomic.
+    if isinstance(value, cls):
+      return value
     return cls(value)
 
 
