@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from itertools import chain, izip
+from itertools import chain
 
 
 def get_default_converter():
@@ -22,7 +22,7 @@ def spilt_flags(flags):
   array_flags = flags.split(' ')
   filter_whitespaces = list(filter(lambda flag: flag.strip() != '', array_flags))
   iter_flags = iter(filter_whitespaces)
-  return list(chain.from_iterable(map(list, izip(iter_flags, iter_flags))))
+  return list(chain.from_iterable(map(list, zip(iter_flags, iter_flags))))
 
 
 def spilt_into_key_value(key_value_str):
