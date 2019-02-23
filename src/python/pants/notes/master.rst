@@ -38,6 +38,9 @@ Documentation
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* cache python tools in ~/.cache/pants (#7236)
+  `PR #7236 <https://github.com/pantsbuild/pants/pull/7236>`_
+
 * Prepare 1.14.0rc3 (#7274)
   `PR #7274 <https://github.com/pantsbuild/pants/pull/7274>`_
 
