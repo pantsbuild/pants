@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 from abc import abstractmethod
-from builtins import filter, map, object, str, zip
+from builtins import filter, map, object, set, str, zip
 from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
@@ -16,6 +16,7 @@ from future.utils import PY3
 
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
+from pants.build_graph.target_filter_subsystem import TargetFilter
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
 from pants.invalidation.build_invalidator import (BuildInvalidator, CacheKeyGenerator,
@@ -96,7 +97,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   @classmethod
   def subsystem_dependencies(cls):
     return (super(TaskBase, cls).subsystem_dependencies() +
-            (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig))
+            (CacheSetup.scoped(cls), TargetFilter.scoped(cls), BuildInvalidator.Factory, SourceRootConfig))
 
   @classmethod
   def product_types(cls):
@@ -237,8 +238,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
     """
-    return (self.context.targets(predicate) if self.act_transitively
-            else list(filter(predicate, self.context.target_roots)))
+    initial_targets = (self.context.targets(predicate) if self.act_transitively
+                       else list(filter(predicate, self.context.target_roots)))
+
+    included_targets = TargetFilter.scoped_instance(self).apply(initial_targets)
+    excluded_targets = set(initial_targets).difference(included_targets)
+
+    if excluded_targets:
+      self.context.log.info("{} target(s) excluded".format(len(excluded_targets)))
+      for target in excluded_targets:
+        self.context.log.debug("{} excluded".format(target.address.spec))
+
+    return included_targets
 
   @memoized_property
   def workdir(self):
