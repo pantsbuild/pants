@@ -255,9 +255,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     if not self.target_filtering_enabled:
       return initial_targets
+    else: 
+      return self._filter_targets(initial_targets)
 
-    included_targets = TargetFilter.scoped_instance(self).apply(initial_targets)
-    excluded_targets = set(initial_targets).difference(included_targets)
+  def _filter_targets(self, targets):
+    included_targets = TargetFilter.scoped_instance(self).apply(targets)
+    excluded_targets = set(targets).difference(included_targets)
 
     if excluded_targets:
       self.context.log.info("{} target(s) excluded".format(len(excluded_targets)))
