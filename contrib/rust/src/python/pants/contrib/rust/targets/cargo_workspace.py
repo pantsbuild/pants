@@ -31,11 +31,13 @@ class CargoWorkspace(CargoTarget):
 
     payload = payload or Payload()
 
-    member_paths = self.get_member_paths(manifest)
-    member_names = self.get_member_names(manifest, member_paths)
+    member_toml_paths = self.get_member_paths(manifest)
+    member_names = self.get_member_names(manifest, member_toml_paths)
+    member_src_paths = list(
+      map(lambda path: os.path.join(address.spec_path, path), member_toml_paths))
 
     payload.add_field('member_names', PrimitiveField(member_names))
-    payload.add_field('member_paths', PrimitiveField(member_paths))
+    payload.add_field('member_paths', PrimitiveField(member_src_paths))
 
     payload.add_field('include_sources', PrimitiveField(include))
 
@@ -67,5 +69,4 @@ class CargoWorkspace(CargoTarget):
       member_toml_path = os.path.join(workspace_manifest, member_path, 'Cargo.toml')
       member_toml = toml.load(member_toml_path)
       member_names.append(member_toml['package']['name'])
-
     return member_names
