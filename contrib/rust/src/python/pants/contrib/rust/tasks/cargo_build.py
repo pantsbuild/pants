@@ -117,7 +117,7 @@ class Build(Workspace):
     return cargo_build_plan
 
   def include_compiling_tests(self):
-    return 'test' in self.context.requested_goals
+    return self.context.products.is_required_data('rust_tests')
 
   def get_target_definitions_out_of_cargo_build_plan(self, cargo_build_plan):
     cargo_invocations = cargo_build_plan['invocations']
