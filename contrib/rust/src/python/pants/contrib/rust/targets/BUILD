@@ -162,6 +162,7 @@ python_library(
      'src/python/pants/base:payload_field',
      'src/python/pants/base:build_environment',
      '3rdparty/python:future',
+     '3rdparty/python:toml',
    ]
 )
 
