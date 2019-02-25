@@ -444,7 +444,7 @@ class BaseZincCompile(JvmCompile):
     # TODO: Extract something common from Executor._create_command to make the command line
     # TODO: Lean on distribution for the bin/java appending here
     merged_input_digest = self.context._scheduler.merge_directories(
-      tuple(s.directory_digest for s in (snapshots)) + directory_digests
+      tuple(s.directory_digest for s in snapshots) + directory_digests
     )
     argv = ['.jdk/bin/java'] + jvm_options + [
       '-cp', zinc_relpath,
