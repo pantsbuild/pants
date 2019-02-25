@@ -126,14 +126,12 @@ class Toolchain(CargoTask):
     cargo_env['PATH'] = os.path.join(env['HOME'], '.cargo/bin')
 
   def execute(self):
-    self.context.log.info('Check if rust toolchain exist.')
+    self.context.log.debug('Check if rust toolchain exist.')
     if self.check_if_rustup_exist():
-      self.context.log.info('Toolchain is already installed.')
-      self.set_cargo_path()
-      self.setup_toolchain()
+      self.context.log.debug('Toolchain is already installed.')
     else:
-      self.context.log.info('Toolchain is missing.')
-      self.context.log.info('Installing toolchain...')
+      self.context.log.info('Toolchain is missing.\nInstalling toolchain...')
       self.setup_rustup()
-      self.set_cargo_path()
-      self.setup_toolchain()
+
+    self.set_cargo_path()
+    self.setup_toolchain()

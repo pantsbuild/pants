@@ -25,7 +25,7 @@ class Fetch(CargoTask):
 
   def create_cargo_home(self):
     cargo_home_path = os.path.join(self.versioned_workdir, 'cargo_home')
-    self.context.log.info('Creating Cargo home in: {0}'.format(cargo_home_path))
+    self.context.log.debug('Creating Cargo home in: {0}'.format(cargo_home_path))
     safe_mkdir(cargo_home_path)
     return cargo_home_path
 
@@ -33,7 +33,7 @@ class Fetch(CargoTask):
     with self.context.new_workunit(name='fetch', labels=[WorkUnitLabel.TOOL]) as workunit:
       abs_manifest_path = os.path.join(get_buildroot(), target.manifest, self.manifest_name())
 
-      self.context.log.info('Fetching dependencies for {0}'.format(abs_manifest_path))
+      self.context.log.debug('Fetching dependencies for {0}'.format(abs_manifest_path))
 
       cmd = ['cargo', 'fetch', '--manifest-path', abs_manifest_path]
 
@@ -47,7 +47,7 @@ class Fetch(CargoTask):
       if workunit.outcome() != WorkUnit.SUCCESS:
         self.context.log.error(workunit.outcome_string(workunit.outcome()))
       else:
-        self.context.log.info(workunit.outcome_string(workunit.outcome()))
+        self.context.log.debug(workunit.outcome_string(workunit.outcome()))
 
   def set_cargo_home(self, cargo_home):
     cargo_env = self.context.products.get_data('cargo_env')
