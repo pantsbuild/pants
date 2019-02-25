@@ -154,6 +154,7 @@ class TaskWithTargetFiltering(DummyTask):
   options_scope = 'task-with-target-filtering'
   target_filtering_enabled = True
 
+
 class TaskTest(TaskTestBase):
 
   _filename = 'f'
