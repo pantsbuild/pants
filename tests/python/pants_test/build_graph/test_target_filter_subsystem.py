@@ -41,7 +41,7 @@ class TestTargetFilter(TaskTestBase):
     b = self.make_target('b', tags=['skip-me'])
     c = self.make_target('c', tags=['tag1', 'skip-me'])
 
-    filtered_targets = TargetFiltering([a, b, c], {'skip-me'}).apply_tag_blacklist()
+    filtered_targets = TargetFiltering({'skip-me'}).apply_tag_blacklist([a, b, c])
     self.assertEqual([a], filtered_targets)
 
   def test_filtering_multiple_tags(self):
@@ -49,7 +49,7 @@ class TestTargetFilter(TaskTestBase):
     b = self.make_target('b', tags=['tag1', 'tag2', 'skip-me'])
     c = self.make_target('c', tags=['tag2'])
 
-    filtered_targets = TargetFiltering([a, b, c], {'skip-me', 'tag2'}).apply_tag_blacklist()
+    filtered_targets = TargetFiltering({'skip-me', 'tag2'}).apply_tag_blacklist([a, b, c])
     self.assertEqual([], filtered_targets)
 
   def test_filtering_no_tags(self):
@@ -57,5 +57,5 @@ class TestTargetFilter(TaskTestBase):
     b = self.make_target('b', tags=['tag1', 'tag2'])
     c = self.make_target('c', tags=['tag2'])
 
-    filtered_targets = TargetFiltering([a, b, c], set()).apply_tag_blacklist()
+    filtered_targets = TargetFiltering(set()).apply_tag_blacklist([a, b, c])
     self.assertEqual([a, b, c], filtered_targets)
