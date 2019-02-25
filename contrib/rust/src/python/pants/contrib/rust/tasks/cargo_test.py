@@ -20,10 +20,6 @@ class Test(CargoTask):
     round_manager.require_data('rust_tests')
 
   @classmethod
-  def supports_passthru_args(cls):
-    return True
-
-  @classmethod
   def implementation_version(cls):
     return super(Test, cls).implementation_version() + [('Cargo_Test', 1)]
 

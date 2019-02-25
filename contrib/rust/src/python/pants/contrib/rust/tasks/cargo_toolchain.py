@@ -22,10 +22,6 @@ class Toolchain(CargoTask):
   LAST_KNOWN_FINGERPRINT = '40328ad8fa5cfc15cdb0446bb812a4bba4c22b5aee195cfb8d64b8ef1de5879c'
 
   @classmethod
-  def supports_passthru_args(cls):
-    return True
-
-  @classmethod
   def register_options(cls, register):
     super(Toolchain, cls).register_options(register)
     register(

@@ -58,10 +58,6 @@ class Build(Workspace):
   def product_types(cls):
     return ['rust_libs', 'rust_bins', 'rust_tests']
 
-  @classmethod
-  def supports_passthru_args(cls):
-    return True
-
   def execute(self):
     self.prepare_task()
     self.prepare_cargo_targets()

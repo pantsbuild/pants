@@ -20,10 +20,6 @@ class Fetch(CargoTask):
     round_manager.require_data('cargo_env')
 
   @classmethod
-  def supports_passthru_args(cls):
-    return True
-
-  @classmethod
   def implementation_version(cls):
     return super(Fetch, cls).implementation_version() + [('Cargo_Fetch', 1)]
 

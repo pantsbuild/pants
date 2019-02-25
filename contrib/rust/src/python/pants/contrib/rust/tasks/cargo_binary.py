@@ -21,10 +21,6 @@ class Binary(CargoTask):
     round_manager.require_data('rust_bins')
 
   @classmethod
-  def supports_passthru_args(cls):
-    return True
-
-  @classmethod
   def implementation_version(cls):
     return super(Binary, cls).implementation_version() + [('Cargo_Binary', 1)]
 
