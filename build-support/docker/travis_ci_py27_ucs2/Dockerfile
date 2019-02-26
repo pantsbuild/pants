@@ -21,6 +21,7 @@ ENV PYTHON_CONFIGURE_OPTS --enable-unicode=ucs2
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
     ${PYENV_ROOT}/bin/pyenv install ${PYTHON_2_VERSION} \
     && ${PYENV_ROOT}/bin/pyenv global ${PYTHON_2_VERSION}'
+ENV PATH "${PYENV_ROOT}/shims:${PATH}"
 ENV PY "${PYENV_ROOT}/shims/python2.7"
 
 # Setup mount points for the travis ci user & workdir.
