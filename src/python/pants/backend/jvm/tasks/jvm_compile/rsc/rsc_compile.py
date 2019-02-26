@@ -388,9 +388,6 @@ class RscCompile(ZincCompile):
         if self._classify_compile_target(tgt) is not None:
           # Rely on the results of zinc compiles for zinc-compatible targets
           yield self._key_for_target_as_dep(tgt)
-      # TODO we could remove the dependency on the rsc target in favor of bumping the cache
-      #  separately. We would need to bring that dependency back for sub-target parallelism though.
-      yield self._rsc_key_for_target(compile_target)
 
     def make_rsc_job(target, dep_targets):
       return Job(
