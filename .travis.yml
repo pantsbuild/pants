@@ -400,8 +400,8 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
   name: "Build wheels - Linux and cp27m (UCS2)"
   env:
     - *base_build_wheels_env
-    # While we install 2.7.15 with UCS2, the Centos6 image already has 2.7.13. To disambiguate
-    # what `python2` resolves to, we require exactly 2.7.15.
+    # While we install 2.7.15 with UCS2, the Centos6 image already has 2.7.13 (UCS4). To disambiguate
+    # what `python2` resolves to and ensure we always use UCS2, we require exactly 2.7.15.
     - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==2.7.15']"
     - CACHE_NAME=linuxwheelsbuild.ucs2
   script:
@@ -465,6 +465,9 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include" PYENV_ROOT="${HOME}/.pyenv" PATH="${PYENV_ROOT}/shims:${PATH}"
 
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
+    # This OSX shard comes already with Python 2.7.10 (UCS2). We install 2.7.13 (UCS4) and set
+    # this interpreter constraint to ensure we always use UCS4.
+    - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==2.7.13']"
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
