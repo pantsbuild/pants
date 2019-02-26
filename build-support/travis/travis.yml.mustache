@@ -440,9 +440,6 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - CACHE_NAME=osxwheelsbuild.ucs4
     - {{>env_osx_with_pyenv}}
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
-    # This OSX shard comes already with Python 2.7.10 (UCS2). We install 2.7.13 (UCS4) and set
-    # this interpreter constraint to ensure we always use UCS4.
-    - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==2.7.13']"
   before_install:
     {{>before_install_osx}}
     - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
