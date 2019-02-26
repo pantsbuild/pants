@@ -148,16 +148,36 @@ class PexBuilderWrapper(object):
     reqs = [req for req_lib in req_libs for req in req_lib.requirements]
     self.add_resolved_requirements(reqs, platforms=platforms)
 
-  def add_resolved_requirements(self, reqs, platforms=None):
-    """Multi-platform dependency resolution for PEX files.
+  class SingleDistExtractionError(Exception): pass
 
-    :param builder: Dump the requirements into this builder.
-    :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
-    :param reqs: A list of :class:`PythonRequirement` to resolve.
-    :param log: Use this logger.
-    :param platforms: A list of :class:`Platform`s to resolve requirements for.
-                      Defaults to the platforms specified by PythonSetup.
+  def extract_single_dist_for_current_platform(self, reqs, dist_key):
+    """Resolve a specific distribution from a set of requirements matching the current platform.
+
+    :param list reqs: A list of :class:`PythonRequirement` to resolve.
+    :param str dist_key: The value of `distribution.key` to match for a `distribution` from the
+                         resolved requirements.
+    :return: A path to a wheel containing the single distribution specified by `dist_key`.
+    :raises: :class:`self.SingleDistExtractionError` if no dists or multiple dists matched the given
+             `dist_key`.
     """
+    distributions = self._resolve_distributions_by_platform(reqs, platforms=['current'])
+    matched_dist = None
+    for _, dists in distributions.items():
+      for dist in dists:
+        if dist.key == dist_key:
+          if matched_dist is not None:
+            raise self.SingleDistExtractionError(
+              "multiple dists from requirements {} were resolved matching the key {}: {}, {}. "
+              "this is expected to only match a single dist!"
+              .format(reqs, dist_key, matched_dist, dist.location))
+          matched_dist = dist.location
+    if matched_dist is None:
+      raise self.SingleDistExtractionError(
+        "no dist matched key {} from requirements {}."
+        .format(dist_key, reqs))
+    return matched_dist
+
+  def _resolve_distributions_by_platform(self, reqs, platforms):
     deduped_reqs = OrderedSet(reqs)
     find_links = OrderedSet()
     for req in deduped_reqs:
@@ -169,6 +189,19 @@ class PexBuilderWrapper(object):
     # Resolve the requirements into distributions.
     distributions = self._resolve_multi(self._builder.interpreter, deduped_reqs, platforms,
       find_links)
+    return distributions
+
+  def add_resolved_requirements(self, reqs, platforms=None):
+    """Multi-platform dependency resolution for PEX files.
+
+    :param builder: Dump the requirements into this builder.
+    :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
+    :param reqs: A list of :class:`PythonRequirement` to resolve.
+    :param log: Use this logger.
+    :param platforms: A list of :class:`Platform`s to resolve requirements for.
+                      Defaults to the platforms specified by PythonSetup.
+    """
+    distributions = self._resolve_distributions_by_platform(reqs, platforms=platforms)
     locations = set()
     for platform, dists in distributions.items():
       for dist in dists:
