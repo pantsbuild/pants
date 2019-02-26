@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from builtins import str
 from contextlib import contextmanager
 
 from pex.pex import PEX
@@ -13,6 +14,8 @@ from pex.pex_builder import PEXBuilder
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
+from pants.base.build_environment import get_pants_cachedir
+from pants.base.hash_utils import stable_json_sha1
 from pants.base.workunit import WorkUnitLabel
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -23,10 +26,15 @@ from pants.util.strutil import ensure_binary, safe_shlex_join
 class PythonToolInstance(object):
   def __init__(self, pex_path, interpreter):
     self._pex = PEX(pex_path, interpreter=interpreter)
+    self._interpreter = interpreter
 
   @property
   def pex(self):
     return self._pex
+
+  @property
+  def interpreter(self):
+    return self._interpreter
 
   def _pretty_cmdline(self, args):
     return safe_shlex_join(self._pex.cmdline(args))
@@ -63,6 +71,12 @@ class PythonToolInstance(object):
       return cmdline, exit_code
 
 
+# TODO: This python tool setup ends up eagerly generating each pex for each task in every goal which
+# is transitively required by the command-line goals, even for tasks which no-op. This requires each
+# pex for each relevant python tool to be buildable on the current host, even if it may never be
+# intended to be invoked. Especially given the existing clear separation of concerns into
+# PythonToolBase/PythonToolInstance/PythonToolPrepBase, this seems like an extremely ripe use case
+# for some v2 rules for free caching and no-op when not required for the command-line goals.
 class PythonToolPrepBase(Task):
   """Base class for tasks that resolve a python tool to be invoked out-of-process."""
 
@@ -97,16 +111,30 @@ class PythonToolPrepBase(Task):
       pex_builder.set_entry_point(tool_subsystem.get_entry_point())
       pex_builder.freeze()
 
+  def _generate_fingerprinted_pex_path(self, tool_subsystem, interpreter):
+    # `tool_subsystem.get_requirement_specs()` is a list, but order shouldn't actually matter. This
+    # should probably be sorted, but it's possible a user could intentionally tweak order to work
+    # around a particular requirement resolution resolve-order issue. In practice the lists are
+    # expected to be mostly static, so we accept the risk of too-fine-grained caching creating lots
+    # of pexes in the cache dir.
+    specs_fingerprint = stable_json_sha1(tool_subsystem.get_requirement_specs())
+    return os.path.join(
+      get_pants_cachedir(),
+      'python',
+      str(interpreter.identity),
+      self.fingerprint,
+      '{}-{}.pex'.format(tool_subsystem.options_scope, specs_fingerprint),
+    )
+
   def execute(self):
     tool_subsystem = self.tool_subsystem_cls.scoped_instance(self)
-    pex_name = tool_subsystem.options_scope
-    pex_path = os.path.join(self.workdir, self.fingerprint, '{}.pex'.format(pex_name))
 
     interpreter_cache = PythonInterpreterCache.global_instance()
-    interpreter = interpreter_cache.select_interpreter_for_targets([])
+    interpreter = min(interpreter_cache.setup(filters=tool_subsystem.get_interpreter_constraints()))
 
+    pex_path = self._generate_fingerprinted_pex_path(tool_subsystem, interpreter)
     if not os.path.exists(pex_path):
-      with self.context.new_workunit(name='create-{}-pex'.format(pex_name),
+      with self.context.new_workunit(name='create-{}-pex'.format(tool_subsystem.options_scope),
                                      labels=[WorkUnitLabel.PREP]):
         self._build_tool_pex(tool_subsystem=tool_subsystem,
                              interpreter=interpreter,
