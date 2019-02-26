@@ -9,7 +9,9 @@ FROM pantsbuild/centos6:latest
 
 # Note we use 2.7.15, rather than 2.7.13, as the centos6 image already comes with 2.7.13
 # installed, which uses UCS4 instead of UCS2. This allows us to disambiguate which Python 2
-# interpreter to use when `ci.sh` sets the interpreter constraints for Pants and PEX.
+# interpreter to use when `ci.sh` sets the interpreter constraints for Pants and PEX. We
+# set $PY to the exact Python 2.7 version we want to ensure the PEX is bootstrapped
+# with UCS 2.
 ARG PYTHON_2_VERSION=2.7.15
 RUN yum install sqlite-devel -y
 ENV PYENV_ROOT /pyenv-docker-build
@@ -19,7 +21,7 @@ ENV PYTHON_CONFIGURE_OPTS --enable-unicode=ucs2
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
     ${PYENV_ROOT}/bin/pyenv install ${PYTHON_2_VERSION} \
     && ${PYENV_ROOT}/bin/pyenv global ${PYTHON_2_VERSION}'
-ENV PATH "${PYENV_ROOT}/shims:${PATH}"
+ENV PY "${PYENV_ROOT}/shims/python2.7"
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
