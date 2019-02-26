@@ -378,7 +378,7 @@ cargo_audit: &cargo_audit
 # not necessary with Python 3.3+ due to flexible storage of Unicode strings (https://www.python.org/dev/peps/pep-0393/).
 #
 # We treat both Linux UCS4 and OSX UCS2 normally, as these are the defaults for those environments.
-# Linux UCS2 and OSX UCS4, however, must rebuild Python with
+# The Linux UCS2 and OSX UCS4 shards, however, must rebuild Python with
 # `PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs{2,4}` set, along with bootstrapping Pants again rather
 # than pulling the PEX from AWS.
 
