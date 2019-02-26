@@ -168,7 +168,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
                         JvmPlatformSettings('1.6', '1.6', ['-Xfoo:bar']))
 
   def _get_zinc_arguments(self, settings):
-    distribution = JvmCompile._local_jvm_distribution()
+    distribution = JvmCompile._local_jvm_distribution(settings=settings)
     return ZincCompile._format_zinc_arguments(settings, distribution)
 
   def test_java_home_extraction(self):
@@ -188,6 +188,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
     self.assertEqual('foo:{0}/bar:{0}/foobar'.format(single), composite)
 
   def test_java_home_extraction_empty(self):
+    init_subsystem(DistributionLocator)
     result = tuple(self._get_zinc_arguments(
       JvmPlatformSettings('1.7', '1.7', [])
     ))

@@ -9,7 +9,7 @@ import os
 from builtins import object, open, str
 from multiprocessing import cpu_count
 
-from future.utils import string_types
+from future.utils import string_types, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -836,10 +836,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   @staticmethod
   def _local_jvm_distribution(settings=None):
-    # TODO We may want to use different jvm distributions depending on what
-    # java version the target expects to be compiled against.
-    # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
-    #      different jdks in remote builds.
     settings_args = [settings] if settings else []
     try:
       local_distribution = JvmPlatform.preferred_jvm_distribution(settings_args, strict=True)
@@ -855,6 +851,14 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     def find_libs(self, names):
       underlying_libs = self._underlying.find_libs(names)
       return [self._rehome(l) for l in underlying_libs]
+
+    def find_libs_path_globs(self, names):
+      libs_abs = self._underlying.find_libs(names)
+      libs_unrooted = [self._unroot_lib_path(l) for l in libs_abs]
+      path_globs = PathGlobsAndRoot(
+        PathGlobs(tuple(libs_unrooted)),
+        text_type(self._underlying.home))
+      return (libs_unrooted, path_globs)
 
     @property
     def java(self):
@@ -875,6 +879,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       return os.path.join(self._home, self._unroot_lib_path(l))
 
   def _get_jvm_distribution(self):
+    # TODO We may want to use different jvm distributions depending on what
+    # java version the target expects to be compiled against.
+    # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
+    #      different jdks in remote builds.
     local_distribution = self._local_jvm_distribution()
     return self.execution_strategy_enum.resolve_for_enum_variant({
       self.SUBPROCESS: lambda: local_distribution,
