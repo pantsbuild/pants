@@ -255,9 +255,9 @@ class PexBuilderWrapper(object):
     # TODO this would be a great place to validate the constraints and present a good error message
     # if they are incompatible because all the sources of the constraints are available.
     # See: https://github.com/pantsbuild/pex/blob/584b6e367939d24bc28aa9fa36eb911c8297dac8/pex/interpreter_constraints.py
-    for tgt in constraint_tgts:
-      for constraint in tgt.compatibility:
-        self.add_interpreter_constraint(constraint)
+    constraints = {self._python_setup_subsystem.compatibility_or_constraints(tgt) for tgt in constraint_tgts}
+    for constraint in constraints:
+      self.add_interpreter_constraint(constraint)
 
   def add_direct_requirements(self, reqs):
     for req in reqs:
