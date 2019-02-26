@@ -17,6 +17,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -117,7 +118,8 @@ class _JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
     # TODO: Rsc's produced header jars don't yet work with javac. Once this is resolved, we may add
     #       additional workflow types.
     if target.has_sources('.java') or \
-      isinstance(target, JUnitTests):
+      isinstance(target, JUnitTests) or \
+      (isinstance(target, ScalaLibrary) and tuple(target.java_sources)):
       target_type = _JvmCompileWorkflowType.create('zinc-only')
     elif target.has_sources('.scala'):
       target_type = _JvmCompileWorkflowType.create('rsc-then-zinc')
@@ -394,9 +396,6 @@ class RscCompile(ZincCompile):
         if self._classify_compile_target(tgt) is not None:
           # Rely on the results of zinc compiles for zinc-compatible targets
           yield self._key_for_target_as_dep(tgt)
-      # TODO we could remove the dependency on the rsc target in favor of bumping the cache
-      #  separately. We would need to bring that dependency back for sub-target parallelism though.
-      yield self._rsc_key_for_target(compile_target)
 
     def make_rsc_job(target, dep_targets):
       return Job(
@@ -462,7 +461,13 @@ class RscCompile(ZincCompile):
           output_products=[
             runtime_classpath_product,
           ],
-          dep_keys=all_zinc_rsc_invalid_dep_keys(invalid_dependencies))),
+          dep_keys=[
+            # TODO we could remove the dependency on the rsc target in favor of bumping
+            # the cache separately. We would need to bring that dependency back for
+            # sub-target parallelism though.
+            self._rsc_key_for_target(compile_target)
+          ] + list(all_zinc_rsc_invalid_dep_keys(invalid_dependencies))
+        )),
     })()
 
     return rsc_jobs + zinc_jobs

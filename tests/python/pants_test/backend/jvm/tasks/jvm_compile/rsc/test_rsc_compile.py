@@ -93,7 +93,9 @@ class RscCompileTest(TaskTestBase):
       print(dependee_graph)
       self.assertEqual(dedent("""
                      zinc(java/classpath:java_lib) -> {}
-                     rsc(scala/classpath:scala_lib) -> {}
+                     rsc(scala/classpath:scala_lib) -> {
+                       zinc_against_rsc(scala/classpath:scala_lib)
+                     }
                      zinc_against_rsc(scala/classpath:scala_lib) -> {}""").strip(),
         dependee_graph)
 
@@ -155,11 +157,14 @@ class RscCompileTest(TaskTestBase):
       print(dependee_graph)
       self.assertEqual(dedent("""
                      zinc(java/classpath:java_lib) -> {}
-                     rsc(scala/classpath:scala_lib) -> {}
+                     rsc(scala/classpath:scala_lib) -> {
+                       zinc_against_rsc(scala/classpath:scala_lib)
+                     }
                      zinc_against_rsc(scala/classpath:scala_lib) -> {}
                      rsc(scala/classpath:scala_dep) -> {
                        rsc(scala/classpath:scala_lib),
-                       zinc_against_rsc(scala/classpath:scala_lib)
+                       zinc_against_rsc(scala/classpath:scala_lib),
+                       zinc_against_rsc(scala/classpath:scala_dep)
                      }
                      zinc_against_rsc(scala/classpath:scala_dep) -> {
                        zinc(java/classpath:java_lib)
@@ -188,21 +193,22 @@ class RscCompileTest(TaskTestBase):
       dependencies=[]
     )
 
-    scala_target = self.make_target(
-      'java/classpath:scala_and_java_lib',
+    scala_target_direct_java_sources = self.make_target(
+      'scala/classpath:scala_with_direct_java_sources',
       target_type=ScalaLibrary,
       sources=['com/example/Foo.scala', 'com/example/Bar.java'],
       dependencies=[]
     )
-    scala_target2 = self.make_target(
-      'java/classpath:scala_and_java_lib2',
+    scala_target_indirect_java_sources = self.make_target(
+      'scala/classpath:scala_with_indirect_java_sources',
       target_type=ScalaLibrary,
       java_sources=['java/classpath:java_lib'],
       sources=['com/example/Foo.scala'],
       dependencies=[]
     )
 
-    context = self.context(target_roots=[scala_target])
+    context = self.context(
+      target_roots=[scala_target_direct_java_sources, scala_target_indirect_java_sources])
 
     context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
     context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
@@ -211,10 +217,9 @@ class RscCompileTest(TaskTestBase):
     # tried for options, but couldn't get it to reconfig
     task._size_estimator = lambda srcs: 0
     with temporary_dir() as tmp_dir:
+      invalid_targets = [java_target, scala_target_direct_java_sources, scala_target_indirect_java_sources]
       compile_contexts = {target: task.create_compile_context(target, os.path.join(tmp_dir, target.id))
-        for target in [java_target, scala_target]}
-
-      invalid_targets = [java_target, scala_target]
+        for target in invalid_targets}
 
       jobs = task._create_compile_jobs(compile_contexts,
         invalid_targets,
@@ -227,7 +232,8 @@ class RscCompileTest(TaskTestBase):
 
       self.assertEqual(dedent("""
                      zinc(java/classpath:java_lib) -> {}
-                     zinc(java/classpath:scala_and_java_lib) -> {}""").strip(),
+                     zinc(scala/classpath:scala_with_direct_java_sources) -> {}
+                     zinc(scala/classpath:scala_with_indirect_java_sources) -> {}""").strip(),
         dependee_graph)
 
   def test_desandbox_fn(self):
