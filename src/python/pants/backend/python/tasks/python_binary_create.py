@@ -15,6 +15,7 @@ from pants.backend.python.subsystems.pex_build_util import (PexBuilderWrapper,
                                                             has_python_sources, has_resources,
                                                             is_python_target)
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import get_buildroot
@@ -140,8 +141,9 @@ class PythonBinaryCreate(Task):
         if is_python_target(tgt):
           constraint_tgts.append(tgt)
 
-      # Add target's interpreter compatibility constraints to pex info.
+      # Add global and target-level interpreter compatibility constraints to pex info.
       pex_builder.add_interpreter_constraints_from(constraint_tgts)
+      pex_builder.add_interpreter_constraints(PythonSetup.global_instance().interpreter_constraints)
 
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
