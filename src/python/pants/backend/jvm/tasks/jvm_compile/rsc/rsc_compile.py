@@ -267,10 +267,11 @@ class RscCompile(ZincCompile):
   def _classify_compile_target(self, target):
     return _JvmCompileWorkflowType.classify_target(target)
 
-  def _key_for_target_as_dep(self, compile_target):
-    return self._classify_compile_target(compile_target).resolve_for_enum_variant({
-      'zinc-only': lambda: self._zinc_key_for_target(compile_target),
-      'rsc-then-zinc': lambda: self._rsc_key_for_target(compile_target),
+  def _key_for_target_as_dep(self, target):
+    # used for jobs that are either rsc jobs or zinc jobs run against rsc
+    return self._classify_compile_target(target).resolve_for_enum_variant({
+      'zinc-only': lambda: self._zinc_key_for_target(target),
+      'rsc-then-zinc': lambda: self._rsc_key_for_target(target),
     })()
 
   def _rsc_key_for_target(self, compile_target):
@@ -386,8 +387,6 @@ class RscCompile(ZincCompile):
     compile_target = ivts.target
     rsc_compile_context, zinc_compile_context = compile_contexts[compile_target]
 
-    # Create the rsc job.
-    # Currently, rsc only supports outlining scala.
     def all_zinc_rsc_invalid_dep_keys(invalid_deps):
       for tgt in invalid_deps:
         # None can occur for e.g. JarLibrary deps, which we don't need to compile as they are
@@ -395,6 +394,9 @@ class RscCompile(ZincCompile):
         if self._classify_compile_target(tgt) is not None:
           # Rely on the results of zinc compiles for zinc-compatible targets
           yield self._key_for_target_as_dep(tgt)
+      # TODO we could remove the dependency on the rsc target in favor of bumping the cache
+      #  separately. We would need to bring that dependency back for sub-target parallelism though.
+      yield self._rsc_key_for_target(compile_target)
 
     def make_rsc_job(target, dep_targets):
       return Job(
@@ -407,30 +409,16 @@ class RscCompile(ZincCompile):
         # processed by rsc.
         list(all_zinc_rsc_invalid_dep_keys(dep_targets)),
         self._size_estimator(rsc_compile_context.sources),
-        # TODO maybe add a force_invalidate here? A test case that validates that with caching
-        # enabled, a rsc compile failure will prevent the target from being considered valid.
       )
-
-    self._classify_compile_target(compile_target).resolve_for_enum_variant({
-      'zinc-only': lambda: None,
-      'rsc-then-zinc': lambda: rsc_jobs.append(make_rsc_job(compile_target, invalid_dependencies)),
-    })()
-
-    # Create the zinc compile jobs.
-    # - Scala zinc compile jobs depend on the results of running rsc on the scala target.
-    # - Java zinc compile jobs depend on the zinc compiles of their dependencies, because we can't
-    #   generate jars that make javac happy at this point.
 
     def only_zinc_invalid_dep_keys(invalid_deps):
       for tgt in invalid_deps:
         if self._classify_compile_target(tgt) is not None:
           yield self._zinc_key_for_target(tgt)
 
-    # NB: zinc jobs for rsc-compatible targets never depend on their own corresponding rsc jobs,
-    # just the rsc jobs of their dependencies!
-    # In order to implement sub-target compiles, that will need to change.
     def make_zinc_job(target, input_product_key, output_products, dep_keys):
-      return Job(key=self._zinc_key_for_target(target),
+      return Job(
+        key=self._zinc_key_for_target(target),
         fn=functools.partial(
           self._default_work_for_vts,
           ivts,
@@ -442,19 +430,34 @@ class RscCompile(ZincCompile):
         dependencies=list(dep_keys),
         size=self._size_estimator(zinc_compile_context.sources),
         on_success=ivts.update,
-        on_failure=ivts.force_invalidate,
       )
 
-    self._classify_compile_target(compile_target).resolve_for_enum_variant({
+    # Create the rsc job.
+    # Currently, rsc only supports outlining scala.
+    workflow = self._classify_compile_target(compile_target)
+    workflow.resolve_for_enum_variant({
+      'zinc-only': lambda: None,
+      'rsc-then-zinc': lambda: rsc_jobs.append(make_rsc_job(compile_target, invalid_dependencies)),
+    })()
+
+    # Create the zinc compile jobs.
+    # - Scala zinc compile jobs depend on the results of running rsc on the scala target.
+    # - Java zinc compile jobs depend on the zinc compiles of their dependencies, because we can't
+    #   generate jars that make javac happy at this point.
+    workflow.resolve_for_enum_variant({
+      # NB: zinc-only zinc jobs run zinc and depend on zinc compile outputs.
       'zinc-only': lambda: zinc_jobs.append(
-        make_zinc_job(compile_target,
+        make_zinc_job(
+          compile_target,
           input_product_key='runtime_classpath',
           output_products=[
             runtime_classpath_product,
             self.context.products.get_data('rsc_classpath')],
           dep_keys=only_zinc_invalid_dep_keys(invalid_dependencies))),
       'rsc-then-zinc': lambda: zinc_jobs.append(
-        make_zinc_job(compile_target,
+        # NB: rsc-then-zinc jobs run zinc and depend on both rsc and zinc compile outputs.
+        make_zinc_job(
+          compile_target,
           input_product_key='rsc_classpath',
           output_products=[
             runtime_classpath_product,
