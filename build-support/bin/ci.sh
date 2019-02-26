@@ -116,7 +116,7 @@ else
   py_major_minor="2.7"
   bootstrap_pants_script="./pants"
 fi
-export PY="python${py_major_minor}"
+export PY="${PY:-python${py_major_minor}}"
 
 # Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
 # to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
