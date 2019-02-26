@@ -35,6 +35,7 @@ from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
@@ -832,6 +833,54 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       raise TaskError('Unknown JVM compiler: {}'.format(compiler))
     plugin_tgts = self.context.targets(predicate=lambda t: isinstance(t, plugin_cls))
     return {t.plugin: t.closure() for t in plugin_tgts}
+
+  @staticmethod
+  def _local_jvm_distribution(settings=None):
+    # TODO We may want to use different jvm distributions depending on what
+    # java version the target expects to be compiled against.
+    # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
+    #      different jdks in remote builds.
+    settings_args = [settings] if settings else []
+    try:
+      local_distribution = JvmPlatform.preferred_jvm_distribution(settings_args, strict=True)
+    except DistributionLocator.Error:
+      local_distribution = JvmPlatform.preferred_jvm_distribution(settings_args, strict=False)
+    return local_distribution
+
+  class _HermeticDistribution(object):
+    def __init__(self, home_path, distribution):
+      self._underlying = distribution
+      self._home = home_path
+
+    def find_libs(self, names):
+      underlying_libs = self._underlying.find_libs(names)
+      return [self._rehome(l) for l in underlying_libs]
+
+    @property
+    def java(self):
+      return os.path.join(self._home, 'bin', 'java')
+
+    @property
+    def home(self):
+      return self._home
+
+    @property
+    def underlying_home(self):
+      return self._underlying.home
+
+    def _unroot_lib_path(self, path):
+      return path[len(self._underlying.home)+1:]
+
+    def _rehome(self, l):
+      return os.path.join(self._home, self._unroot_lib_path(l))
+
+  def _get_jvm_distribution(self):
+    local_distribution = self._local_jvm_distribution()
+    return self.execution_strategy_enum.resolve_for_enum_variant({
+      self.SUBPROCESS: lambda: local_distribution,
+      self.NAILGUN: lambda: local_distribution,
+      self.HERMETIC: lambda: self._HermeticDistribution('.jdk', local_distribution),
+    })()
 
   def _default_work_for_vts(self, vts, ctx, input_classpath_product_key, counter, all_compile_contexts, output_classpath_product):
     progress_message = ctx.target.address.spec
