@@ -540,8 +540,9 @@ class RscCompile(ZincCompile):
       timeout_seconds=15*60,
       description='run {} for {}'.format(tool_name, tgt),
       # TODO: These should always be unicodes
-      # Since this is always hermetic, we need to use `underlying_dist`
-      jdk_home=text_type(self._zinc.underlying_dist.home),
+      # Since this is always hermetic, we need to use `underlying.home` because
+      # ExecuteProcessRequest requires an existing, local jdk location.
+      jdk_home=text_type(distribution.underlying_home),
     )
     res = self.context.execute_process_synchronously_without_raising(
       epr,
@@ -565,7 +566,8 @@ class RscCompile(ZincCompile):
   # The classpath is parameterized so that we can have a single nailgun instance serving all of our
   # execution requests.
   def _runtool_nonhermetic(self, parent_workunit, classpath, main, tool_name, args, distribution):
-    result = self.runjava(classpath=classpath,
+    result = self.runjava(
+      classpath=classpath,
       main=main,
       jvm_options=self.get_options().jvm_options,
       args=args,
@@ -631,6 +633,14 @@ class RscCompile(ZincCompile):
     @property
     def java(self):
       return os.path.join(self._home, 'bin', 'java')
+
+    @property
+    def home(self):
+      return self._home
+
+    @property
+    def underlying_home(self):
+      return self._underlying.home
 
     def _unroot_lib_path(self, path):
       return path[len(self._underlying.home)+1:]
