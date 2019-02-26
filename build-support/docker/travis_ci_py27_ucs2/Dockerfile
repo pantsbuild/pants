@@ -9,7 +9,7 @@ FROM pantsbuild/centos6:latest
 
 # Note we use 2.7.15, rather than 2.7.13, as the centos6 image already comes with 2.7.13
 # installed, which uses UCS4 instead of UCS2. We pair this change with setting
-# PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS to exactly 2.7.15 in `.travis.yml` to disambiguate
+# PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS to exactly 2.7.15 to disambiguate
 # the two and always choose the UCS2 interpeter.
 ARG PYTHON_2_VERSION=2.7.15
 RUN yum install sqlite-devel -y
@@ -21,6 +21,7 @@ RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
     ${PYENV_ROOT}/bin/pyenv install ${PYTHON_2_VERSION} \
     && ${PYENV_ROOT}/bin/pyenv global ${PYTHON_2_VERSION}'
 ENV PATH "${PYENV_ROOT}/shims:${PATH}"
+ENV PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS "['CPython==${PYTHON_2_VERSION}']"
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home

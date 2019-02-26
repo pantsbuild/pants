@@ -379,9 +379,6 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
   name: "Build wheels - Linux and cp27m (UCS2)"
   env:
     - *base_build_wheels_env
-    # While we install 2.7.15 with UCS2, the Centos6 image already has 2.7.13 (UCS4). To disambiguate
-    # what `python2` resolves to and ensure we always use UCS2, we require exactly 2.7.15.
-    - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==2.7.15']"
     - CACHE_NAME=linuxwheelsbuild.ucs2
   script:
     - docker build --rm -t travis_ci_py27_ucs2
