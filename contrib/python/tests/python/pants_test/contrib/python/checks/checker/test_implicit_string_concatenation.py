@@ -21,6 +21,7 @@ class ImplicitStringConcatenationTest(CheckstylePluginTestBase):
     self.assertNit("('a'\n'b')", 'T806', Nit.WARNING)
     self.assertNit("('a''b')", 'T806', Nit.WARNING)
     self.assertNit("'a''b'", 'T806', Nit.WARNING)
+    self.assertNit("'a \\'' 'b'", 'T806', Nit.WARNING)
     self.assertNoNits("'a' + 'b'")
     self.assertNoNits("('a' + 'b')")
     self.assertNoNits("'''hello!'''")

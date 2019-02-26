@@ -25,7 +25,10 @@ class ImplicitStringConcatenation(CheckstylePlugin):
 
   def maybe_uses_implicit_concatenation(self, expr):
     str_node_text = self.python_file.tokenized_file_body.get_text(expr)
-    if re.match(r"^\s*(('[^']*'|\"[^\"]*\")\s+('[^']*'|\"[^\"]*\")|('[^']+'|\"[^\"]+\")\s*('[^']*'|\"[^\"]*\"))",
+    # Search for string nodes of the form 'a' 'b', using any combination of single or double quotes,
+    # with any spacing in between them, but don't flag instances of """. This searches from the
+    # start of the string node and parses backslashes.
+    if re.match(r"^\s*(('([^']|(\\)*')*'|\"([^\"]|(\\)*\")*\")\s+('([^']|(\\)*')*'|\"([^\"]|(\\)*\")*\")|('([^']|(\\)*')+'|\"([^\"]|(\\)*\")+\")\s*('([^']|(\\)*')+'|\"([^\"]|(\\)*\")+\"))",
                 str_node_text):
       return True
 
