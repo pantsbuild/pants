@@ -1,13 +1,17 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# This file duplicates travis_ci/Dockerfile, except it installs Python 2.7 instaed of Python 3.6
+# This file duplicates travis_ci/Dockerfile, except it installs Python 2.7 instead of Python 3.6
 # and adds the env var PYTHON_CONFIGURE_OPTS to install it with UCS2.
 
 # Use our custom Centos6 image for binary compatibility with old linux distros.
 FROM pantsbuild/centos6:latest
 
-ARG PYTHON_2_VERSION=2.7.13
+# Note we use 2.7.15, rather than 2.7.13, as the centos6 image already comes with 2.7.13
+# installed, which uses UCS4 instead of UCS2. By using 2.7.15, `ci.sh` will set the interpreter
+# constraints to `CPython==2.7.15` when bootstrapping the PEX, which will disambiguate the
+# interpreter version and ensure we always use 2.7.15 with UCS2. 
+ARG PYTHON_2_VERSION=2.7.15
 RUN yum install sqlite-devel -y
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}
