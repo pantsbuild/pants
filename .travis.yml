@@ -673,11 +673,6 @@ matrix:
     - <<: *linux_rust_clippy
     - <<: *cargo_audit
 
-    - <<: *py27_linux_build_wheels_ucs2
-    - <<: *py27_linux_build_wheels_ucs4
-    - <<: *py27_osx_build_wheels_ucs2
-    - <<: *py27_osx_build_wheels_ucs4
-
     - <<: *py27_linux_test_config
       name: "Unit tests for pants and pants-plugins (Py2.7 PEX)"
       stage: *test
@@ -694,6 +689,11 @@ matrix:
         - CACHE_NAME=linuxunittests.py36
       script:
         - ./build-support/bin/travis-ci.sh -lp
+
+    - <<: *py27_linux_build_wheels_ucs2
+    - <<: *py27_linux_build_wheels_ucs4
+    - <<: *py27_osx_build_wheels_ucs2
+    - <<: *py27_osx_build_wheels_ucs4
 
     - <<: *py36_linux_test_config
       name: "Integration tests for pants - shard 0 (Py3.6 PEX)"
