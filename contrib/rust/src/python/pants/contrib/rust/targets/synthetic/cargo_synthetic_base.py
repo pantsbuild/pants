@@ -9,14 +9,14 @@ from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
 
 
-class CargoBaseTarget(Target):
-  """A base class for all cargo targets."""
+class CargoSyntheticBase(Target):
+  """A base class for all synthetic cargo targets."""
 
   def __init__(self, address=None, payload=None, cargo_invocation=None, **kwargs):
     payload = payload or Payload()
     payload.add_field('cargo_invocation', PrimitiveField(cargo_invocation))
 
-    super(CargoBaseTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super(CargoSyntheticBase, self).__init__(address=address, payload=payload, **kwargs)
 
   @property
   def cargo_invocation(self):

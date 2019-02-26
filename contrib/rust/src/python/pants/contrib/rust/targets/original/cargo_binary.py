@@ -4,8 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.contrib.rust.targets.cargo_base_proc_macro import CargoBaseProcMacro
+from pants.contrib.rust.targets.original.cargo_base import CargoBase
 
 
-class CargoSyntheticProcMacro(CargoBaseProcMacro):
-  """A base class for all cargo targets."""
+class CargoBinary(CargoBase):
+  """A base class for all original cargo binary targets."""

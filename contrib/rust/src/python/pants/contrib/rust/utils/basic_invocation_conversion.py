@@ -49,7 +49,7 @@ def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_
   crate_name = sanitize_crate_name(information['crate_name'])
   crate_out_dirs[target.address.target_name] = (crate_name, pants_invocation['outputs'])
 
-  if CargoTask.is_cargo_test(target):
+  if CargoTask.is_cargo_project_test(target):
     test_cwd = collect_information(pants_invocation, get_test_target_information())
     pants_invocation['cwd_test'] = test_cwd['CARGO_MANIFEST_DIR']
 

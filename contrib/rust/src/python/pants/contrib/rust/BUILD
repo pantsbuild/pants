@@ -4,7 +4,7 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/rust/src/python/pants/contrib/rust/targets',
+    'contrib/rust/src/python/pants/contrib/rust/targets/original',
     'contrib/rust/src/python/pants/contrib/rust/tasks',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar'

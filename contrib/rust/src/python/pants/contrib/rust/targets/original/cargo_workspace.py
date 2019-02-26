@@ -11,14 +11,15 @@ from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
-from pants.contrib.rust.targets.cargo_target import CargoTarget
+from pants.contrib.rust.targets.original.cargo_base import CargoBase
 
 
-class CargoWorkspace(CargoTarget):
-  """A class for a cargo workspace target."""
+class CargoWorkspace(CargoBase):
+  """A base class for all original cargo workspace targets."""
 
   def __init__(self, address=None, manifest=None, toolchain=None, include=None,
                payload=None, **kwargs):
+
     if manifest is not None:
       manifest = os.path.join(get_buildroot(), address.spec_path, manifest)
     else:

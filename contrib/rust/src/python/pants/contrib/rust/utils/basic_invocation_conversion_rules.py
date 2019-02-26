@@ -7,7 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import copy
 import os
 
-from pants.contrib.rust.targets.cargo_synthetic_custom_build import CargoSyntheticCustomBuild
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_custom_build import \
+  CargoSyntheticCustomBuild
 
 
 def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir, make_dirs,

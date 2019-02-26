@@ -9,30 +9,32 @@ from pants.base.build_environment import get_buildroot
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.source.wrapped_globs import EagerFilesetWithSpec, RGlobs
 
-from pants.contrib.rust.targets.cargo_binary import CargoBinary
-from pants.contrib.rust.targets.cargo_library import CargoLibrary
-from pants.contrib.rust.targets.cargo_synthetic_binary import CargoSyntheticBinary
-from pants.contrib.rust.targets.cargo_synthetic_custom_build import CargoSyntheticCustomBuild
-from pants.contrib.rust.targets.cargo_synthetic_library import CargoSyntheticLibrary
-from pants.contrib.rust.targets.cargo_synthetic_proc_macro import CargoSyntheticProcMacro
-from pants.contrib.rust.targets.cargo_test import CargoTest
+from pants.contrib.rust.targets.synthetic.cargo_project_binary import CargoProjectBinary
+from pants.contrib.rust.targets.synthetic.cargo_project_library import CargoProjectLibrary
+from pants.contrib.rust.targets.synthetic.cargo_project_test import CargoProjectTest
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_binary import CargoSyntheticBinary
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_custom_build import \
+  CargoSyntheticCustomBuild
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_library import CargoSyntheticLibrary
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_proc_macro import CargoSyntheticProcMacro
 from pants.contrib.rust.tasks.cargo_task import CargoTask
 
 
 class Workspace(CargoTask):
   # https://docs.rs/cargo/0.20.0/cargo/core/manifest/enum.TargetKind.html
   _synthetic_target_kind = {
+    'bin': CargoSyntheticBinary,
     'lib': CargoSyntheticLibrary,
+    'cdylib': CargoSyntheticLibrary,
     'custom-build': CargoSyntheticCustomBuild,
     'proc-macro': CargoSyntheticProcMacro,
-    'bin': CargoSyntheticBinary,
-    'cdylib': CargoLibrary,
   }
 
-  _target_kind = {
-    'lib': CargoLibrary,
-    'bin': CargoBinary,
-    'test': CargoTest,
+  _project_target_kind = {
+    'bin': CargoProjectBinary,
+    'lib': CargoProjectLibrary,
+    'cdylib': CargoProjectLibrary,
+    'test': CargoProjectTest,
   }
 
   @classmethod
@@ -58,7 +60,7 @@ class Workspace(CargoTask):
 
   @staticmethod
   def is_lib_or_bin_target(target_definition):
-    if target_definition.kind == 'lib' or target_definition.kind == 'bin':
+    if target_definition.kind == 'lib' or target_definition.kind == 'bin' or target_definition.kind == 'cdylib':
       return True
     else:
       return False
@@ -78,19 +80,19 @@ class Workspace(CargoTask):
           return member
 
     member_definitions = tuple((name, path, member_targets.include_sources) for (name, path) in
-                    zip(member_targets.member_names, member_targets.member_paths))
+                               zip(member_targets.member_names, member_targets.member_paths))
 
     member_definition = find_member(target_definition.name, member_definitions)
     target_sources = self.get_member_sources_files(member_definition)
 
     if self.is_test_target(target_definition):
       self.context.build_graph.inject_synthetic_target(address=target_definition.address,
-                                                       target_type=self._target_kind['test'],
+                                                       target_type=self._project_target_kind['test'],
                                                        cargo_invocation=target_definition.invocation,
                                                        sources=target_sources)
     else:
       self.context.build_graph.inject_synthetic_target(address=target_definition.address,
-                                                       target_type=self._target_kind[
+                                                       target_type=self._project_target_kind[
                                                          target_definition.kind],
                                                        cargo_invocation=target_definition.invocation,
                                                        sources=target_sources)

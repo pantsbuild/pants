@@ -4,8 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.contrib.rust.targets.cargo_base_binary import CargoBaseBinary
+from pants.contrib.rust.targets.original.cargo_base import CargoBase
 
 
-class CargoSyntheticBinary(CargoBaseBinary):
-  """A base class for all cargo targets."""
+class CargoLibrary(CargoBase):
+  """A base class for all original cargo library targets."""

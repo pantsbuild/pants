@@ -13,10 +13,10 @@ python_library(
   name='cargo_binary',
   sources=['cargo_binary.py'],
   dependencies=[
-    ':cargo_task',
+    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
-    '3rdparty/python:future',
+    ':cargo_task',
   ]
 )
 
@@ -24,17 +24,16 @@ python_library(
   name='cargo_build',
   sources=['cargo_build.py'],
   dependencies=[
-    ':cargo_workspace',
-    'contrib/rust/src/python/pants/contrib/rust/utils:basic_invocation_conversion',
-    'contrib/rust/src/python/pants/contrib/rust/utils:custom_build_invocation_conversion',
-    'contrib/rust/src/python/pants/contrib/rust/utils:custom_build_output_parsing',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_base_target',
+    '3rdparty/python:future',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
-    '3rdparty/python:future',
+    'contrib/rust/src/python/pants/contrib/rust/utils:basic_invocation_conversion',
+    'contrib/rust/src/python/pants/contrib/rust/utils:custom_build_invocation_conversion',
+    'contrib/rust/src/python/pants/contrib/rust/utils:custom_build_output_parsing',
+    ':cargo_workspace',
   ]
 )
 
@@ -42,11 +41,11 @@ python_library(
   name='cargo_fetch',
   sources=['cargo_fetch.py'],
   dependencies=[
-    ':cargo_task',
+    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
-    '3rdparty/python:future',
+    ':cargo_task',
   ]
 )
 
@@ -54,23 +53,21 @@ python_library(
   name='cargo_task',
   sources=['cargo_task.py'],
   dependencies=[
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_target',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_workspace',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_base_target',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_base_library',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_base_binary',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_base_custom_build',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_base_proc_macro',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_synthetic_library',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_synthetic_binary',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_synthetic_custom_build',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_synthetic_proc_macro',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_library',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_binary',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_test',
+    '3rdparty/python:future',
     'src/python/pants/task:task',
     'src/python/pants/util:process_handler',
-    '3rdparty/python:future',
+    'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_base',
+    'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_binary',
+    'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_library',
+    'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_workspace',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_project_binary',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_project_library',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_project_test',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_base',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_library',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_binary',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_custom_build',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_proc_macro',
   ]
 )
 
@@ -78,10 +75,10 @@ python_library(
   name='cargo_test',
   sources=['cargo_test.py'],
   dependencies=[
-    ':cargo_task',
+    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
-    '3rdparty/python:future',
+    ':cargo_task',
   ]
 )
 
@@ -89,13 +86,13 @@ python_library(
   name='cargo_toolchain',
   sources=['cargo_toolchain.py'],
   dependencies=[
-    ':cargo_task',
+    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
-    '3rdparty/python:future',
+    ':cargo_task',
   ]
 )
 
@@ -103,18 +100,18 @@ python_library(
   name='cargo_workspace',
   sources=['cargo_workspace.py'],
   dependencies=[
-    ':cargo_task',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_synthetic_library',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_synthetic_binary',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_synthetic_custom_build',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_synthetic_proc_macro',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_library',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_binary',
-    'contrib/rust/src/python/pants/contrib/rust/targets:cargo_test',
+    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/source',
     'src/python/pants/engine:fs',
-    '3rdparty/python:future',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_project_binary',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_project_library',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_project_test',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_library',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_binary',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_custom_build',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_proc_macro',
+    ':cargo_task',
   ]
 )
 

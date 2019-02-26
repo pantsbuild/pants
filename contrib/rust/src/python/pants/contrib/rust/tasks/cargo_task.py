@@ -9,20 +9,19 @@ import os
 from pants.task.task import Task
 from pants.util.process_handler import subprocess
 
-from pants.contrib.rust.targets.cargo_base_binary import CargoBaseBinary
-from pants.contrib.rust.targets.cargo_base_custom_build import CargoBaseCustomBuild
-from pants.contrib.rust.targets.cargo_base_library import CargoBaseLibrary
-from pants.contrib.rust.targets.cargo_base_proc_macro import CargoBaseProcMacro
-from pants.contrib.rust.targets.cargo_base_target import CargoBaseTarget
-from pants.contrib.rust.targets.cargo_binary import CargoBinary
-from pants.contrib.rust.targets.cargo_library import CargoLibrary
-from pants.contrib.rust.targets.cargo_synthetic_binary import CargoSyntheticBinary
-from pants.contrib.rust.targets.cargo_synthetic_custom_build import CargoSyntheticCustomBuild
-from pants.contrib.rust.targets.cargo_synthetic_library import CargoSyntheticLibrary
-from pants.contrib.rust.targets.cargo_synthetic_proc_macro import CargoSyntheticProcMacro
-from pants.contrib.rust.targets.cargo_target import CargoTarget
-from pants.contrib.rust.targets.cargo_test import CargoTest
-from pants.contrib.rust.targets.cargo_workspace import CargoWorkspace
+from pants.contrib.rust.targets.original.cargo_base import CargoBase
+from pants.contrib.rust.targets.original.cargo_binary import CargoBinary
+from pants.contrib.rust.targets.original.cargo_library import CargoLibrary
+from pants.contrib.rust.targets.original.cargo_workspace import CargoWorkspace
+from pants.contrib.rust.targets.synthetic.cargo_project_binary import CargoProjectBinary
+from pants.contrib.rust.targets.synthetic.cargo_project_library import CargoProjectLibrary
+from pants.contrib.rust.targets.synthetic.cargo_project_test import CargoProjectTest
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_base import CargoSyntheticBase
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_binary import CargoSyntheticBinary
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_custom_build import \
+  CargoSyntheticCustomBuild
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_library import CargoSyntheticLibrary
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_proc_macro import CargoSyntheticProcMacro
 
 
 class CargoTask(Task):
@@ -32,36 +31,24 @@ class CargoTask(Task):
     return 'Cargo.toml'
 
   @staticmethod
-  def is_cargo_binary(target):
+  def is_cargo_original(target):
+    return isinstance(target, CargoBase)
+
+  @staticmethod
+  def is_cargo_original_binary(target):
     return isinstance(target, CargoBinary)
 
   @staticmethod
-  def is_workspace(target):
+  def is_cargo_original_library(target):
+    return isinstance(target, CargoLibrary)
+
+  @staticmethod
+  def is_cargo_original_workspace(target):
     return isinstance(target, CargoWorkspace)
 
   @staticmethod
-  def is_cargo_workspace(target):
-    return isinstance(target, CargoWorkspace)
-
-  @staticmethod
-  def is_cargo_base_target(target):
-    return isinstance(target, CargoBaseTarget)
-
-  @staticmethod
-  def is_cargo_base_library(target):
-    return isinstance(target, CargoBaseLibrary)
-
-  @staticmethod
-  def is_cargo_base_binary(target):
-    return isinstance(target, CargoBaseBinary)
-
-  @staticmethod
-  def is_cargo_base_custom_build(target):
-    return isinstance(target, CargoBaseCustomBuild)
-
-  @staticmethod
-  def is_cargo_base_proc_macro(target):
-    return isinstance(target, CargoBaseProcMacro)
+  def is_cargo_synthetic(target):
+    return isinstance(target, CargoSyntheticBase)
 
   @staticmethod
   def is_cargo_synthetic_library(target):
@@ -80,16 +67,16 @@ class CargoTask(Task):
     return isinstance(target, CargoSyntheticProcMacro)
 
   @staticmethod
-  def is_cargo(target):
-    return isinstance(target, CargoTarget)
+  def is_cargo_project_binary(target):
+    return isinstance(target, CargoProjectBinary)
 
   @staticmethod
-  def is_cargo_library(target):
-    return isinstance(target, CargoLibrary)
+  def is_cargo_project_library(target):
+    return isinstance(target, CargoProjectLibrary)
 
   @staticmethod
-  def is_cargo_test(target):
-    return isinstance(target, CargoTest)
+  def is_cargo_project_test(target):
+    return isinstance(target, CargoProjectTest)
 
   def _add_env_var(self, dict, name, value, extend=False):
     dict.update({name: (value, extend)})

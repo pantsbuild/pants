@@ -12,8 +12,8 @@ from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
 
 
-class CargoTarget(Target):
-  """A base class for all cargo targets."""
+class CargoBase(Target):
+  """A base class for all original cargo targets."""
 
   def __init__(self, address=None, sources=None, manifest=None, toolchain=None, payload=None,
                **kwargs):
@@ -39,7 +39,7 @@ class CargoTarget(Target):
     payload.add_field('manifest', PrimitiveField(manifest or manifest_default))
     payload.add_field('toolchain', PrimitiveField(toolchain or toolchain_default))
 
-    super(CargoTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super(CargoBase, self).__init__(address=address, payload=payload, **kwargs)
 
   @property
   def manifest(self):

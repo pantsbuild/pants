@@ -6,11 +6,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from pants.base.payload import Payload
 
-from pants.contrib.rust.targets.cargo_base_test import CargoBaseTest
+from pants.contrib.rust.targets.synthetic.cargo_synthetic_binary import CargoSyntheticBinary
 
 
-class CargoTest(CargoBaseTest):
-  """A base class for all cargo targets."""
+class CargoProjectBinary(CargoSyntheticBinary):
+  """A base class for all synthetic project related cargo binary targets."""
 
   def __init__(self, address=None, payload=None, sources=None, **kwargs):
     payload = payload or Payload()
@@ -20,4 +20,4 @@ class CargoTest(CargoBaseTest):
                                                              sources_rel_path=address.spec_path,
                                                              key_arg='sources'))
 
-    super(CargoTest, self).__init__(address=address, payload=payload, **kwargs)
+    super(CargoProjectBinary, self).__init__(address=address, payload=payload, **kwargs)

@@ -17,7 +17,6 @@ from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.util.dirutil import absolute_symlink, safe_file_dump, safe_mkdir
 
-from pants.contrib.rust.targets.cargo_base_target import CargoBaseTarget
 from pants.contrib.rust.tasks.cargo_workspace import Workspace
 from pants.contrib.rust.utils.basic_invocation_conversion import \
   convert_into_pants_invocation as convert_basic_into_pants_invocation
@@ -62,7 +61,7 @@ class Build(Workspace):
     self.prepare_task()
     self.prepare_cargo_targets()
 
-    cargo_targets = self.context.build_graph.targets(self.is_cargo_base_target)
+    cargo_targets = self.context.build_graph.targets(self.is_cargo_synthetic)
     self.build_targets(cargo_targets)
 
   def prepare_task(self):
@@ -77,7 +76,7 @@ class Build(Workspace):
     return libraries_dir_path
 
   def prepare_cargo_targets(self):
-    cargo_targets = self.get_targets(self.is_cargo_workspace)
+    cargo_targets = self.get_targets(self.is_cargo_original_workspace)
     for target in cargo_targets:
       cargo_build_plan = self.get_cargo_build_plan(target)
       target_definitions = self.get_target_definitions_out_of_cargo_build_plan(cargo_build_plan)
@@ -152,8 +151,7 @@ class Build(Workspace):
           self.context.log.debug(
             'Add synthetic target: {0}\ttarget kind: {1}'.format(target.id, target.kind))
           self.context.build_graph.inject_synthetic_target(address=target.address,
-                                                           target_type=self._synthetic_target_kind.get(
-                                                             target.kind, CargoBaseTarget),
+                                                           target_type=self._synthetic_target_kind[target.kind],
                                                            cargo_invocation=target.invocation)
         for dependency in target.dependencies:
           dependency = target_definitions[dependency]
@@ -176,31 +174,31 @@ class Build(Workspace):
         self.add_rust_products(vt.target, pants_invocation)
 
   def convert_cargo_invocation_into_pants_invocation(self, vt):
-    if self.is_cargo_base_library(vt.target):
+    if self.is_cargo_synthetic_library(vt.target):
       self.context.log.debug(
         'Convert library invocation for: {0}'.format(vt.target.address.target_name))
       pants_invocation = convert_basic_into_pants_invocation(vt.target, vt.results_dir,
                                                              self._package_out_dirs,
                                                              self._libraries_dir_path)
-    elif self.is_cargo_base_proc_macro(vt.target):
+    elif self.is_cargo_synthetic_proc_macro(vt.target):
       self.context.log.debug(
         'Convert pro macro invocation for: {0}'.format(vt.target.address.target_name))
       pants_invocation = convert_basic_into_pants_invocation(vt.target, vt.results_dir,
                                                              self._package_out_dirs,
                                                              self._libraries_dir_path)
-    elif self.is_cargo_base_binary(vt.target):
+    elif self.is_cargo_synthetic_binary(vt.target):
       self.context.log.debug(
         'Convert binary invocation for: {0}'.format(vt.target.address.target_name))
       pants_invocation = convert_basic_into_pants_invocation(vt.target, vt.results_dir,
                                                              self._package_out_dirs,
                                                              self._libraries_dir_path)
-    elif self.is_cargo_test(vt.target):
+    elif self.is_cargo_project_test(vt.target):
       self.context.log.debug(
         'Convert test invocation for: {0}'.format(vt.target.address.target_name))
       pants_invocation = convert_basic_into_pants_invocation(vt.target, vt.results_dir,
                                                              self._package_out_dirs,
                                                              self._libraries_dir_path)
-    elif self.is_cargo_base_custom_build(vt.target):
+    elif self.is_cargo_synthetic_custom_build(vt.target):
       self.context.log.debug(
         'Convert custom build invocation for: {0}'.format(vt.target.address.target_name))
       pants_invocation = convert_custom_build_into_pants_invocation(vt.target, vt.results_dir,
@@ -328,17 +326,17 @@ class Build(Workspace):
   def add_rust_products(self, target, pants_invocation):
     name = pants_invocation['package_name']
     links = pants_invocation['links']
-    if self.is_cargo_library(target):
+    if self.is_cargo_project_library(target):
       rust_libs = self.context.products.get_data('rust_libs')
       current = rust_libs.get(name, [])
       current.extend(list(filter(lambda path: os.path.exists(path), links.keys())))
       rust_libs.update({name: current})
-    elif self.is_cargo_binary(target):
+    elif self.is_cargo_project_binary(target):
       rust_bins = self.context.products.get_data('rust_bins')
       current = rust_bins.get(name, [])
       current.extend(list(filter(lambda path: os.path.exists(path), links.keys())))
       rust_bins.update({name: current})
-    elif self.is_cargo_test(target):
+    elif self.is_cargo_project_test(target):
       cwd_test = pants_invocation['cwd_test']
       rust_tests = self.context.products.get_data('rust_tests')
       current = rust_tests.get(target.address.target_name, [])

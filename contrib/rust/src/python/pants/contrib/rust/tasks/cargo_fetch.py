@@ -60,6 +60,6 @@ class Fetch(CargoTask):
   def execute(self):
     self.create_and_set_cargo_home()
 
-    workspace_targets = self.get_targets(self.is_workspace)
+    workspace_targets = self.get_targets(self.is_cargo_original_workspace)
     for member in workspace_targets:
       self.fetch(member)
