@@ -104,31 +104,26 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
-# Determine the Python version to use for bootstrapping pants.pex. This would usually not be
-# necessary to set when developing locally, because the `./pants` and `./pants3` scripts set
-# these constraints for us already. However, we must set the values here because in
-# non-bootstrap shards we run CI using `./pants.pex` instead of the scripts `./pants`
-# and `./pants3`, so those scripts cannot set the relevant environment variables.
+# Note that we set PY, and when running with Python 3, also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS.
+# This would usually not be necessary when developing locally, because the `./pants` and `./pants3`
+# scripts set these constraints for us already. However, we must set the values here because in non-bootstrap shards
+# we run CI using `./pants.pex` instead of the scripts `./pants` and `./pants3`, so those scripts cannot set
+# the relevant environment variables. Without setting these environment variables, the Python 3 shards will try to
+# execute subprocesses using Python 2, which results in the _Py_Dealloc error (#6985), and shards that do not
+# pull down `./pants.pex` but still use a virtualenv (such as Rust Tests) will fail to execute.
 if [[ "${python_two:-false}" == "false" ]]; then
-  py_major_minor="3.6"
+  py_version_number="3.6"
   bootstrap_pants_script="./pants3"
+  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${py_version_number}.*']"
 else
-  py_major_minor="2.7"
+  py_version_number="2.7"
   bootstrap_pants_script="./pants"
 fi
-export PY="python${py_major_minor}"
-
-# Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
-# to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
-# Python 2.7.10 vs. 2.7.13. When running with Python 3, we must also set this constraint to ensure
-# all spawned subprocesses use Python 3 rather than the default of Python 2. This is in part
-# necessary to avoid the _Py_Dealloc error (#6985).
-py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
-banner "Setting interpreter constraints to ${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}"
+export PY="python${py_version_number}"
+banner "Using Python ${py_version_number} to execute spawned subprocesses (e.g. tests)"
 
 if [[ "${run_bootstrap:-false}" == "true" ]]; then
-  start_travis_section "Bootstrap" "Bootstrapping pants as a Python ${py_major_minor_patch} PEX"
+  start_travis_section "Bootstrap" "Bootstrapping pants as a Python ${py_version_number} PEX"
   (
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
