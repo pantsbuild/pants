@@ -42,7 +42,6 @@ python_library(
   sources=['cargo_fetch.py'],
   dependencies=[
     '3rdparty/python:future',
-    'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
     ':cargo_task',

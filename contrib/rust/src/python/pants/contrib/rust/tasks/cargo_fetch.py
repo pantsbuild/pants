@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
@@ -31,7 +30,7 @@ class Fetch(CargoTask):
 
   def fetch(self, target):
     with self.context.new_workunit(name='fetch', labels=[WorkUnitLabel.TOOL]) as workunit:
-      abs_manifest_path = os.path.join(get_buildroot(), target.manifest, self.manifest_name())
+      abs_manifest_path = os.path.join(target.manifest, self.manifest_name())
 
       self.context.log.debug('Fetching dependencies for {0}'.format(abs_manifest_path))
 
@@ -42,7 +41,7 @@ class Fetch(CargoTask):
         'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
       }
 
-      self.run_command(cmd, target.toolchain, env, workunit)
+      self.run_command(cmd, target.manifest, env, workunit)
 
       if workunit.outcome() != WorkUnit.SUCCESS:
         self.context.log.error(workunit.outcome_string(workunit.outcome()))

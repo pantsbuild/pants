@@ -85,7 +85,7 @@ class Build(Workspace):
   def get_cargo_build_plan(self, target):
     with self.context.new_workunit(name='cargo-build-plan',
                                    labels=[WorkUnitLabel.COMPILER]) as workunit:
-      abs_manifest_path = os.path.join(get_buildroot(), target.manifest, self.manifest_name())
+      abs_manifest_path = os.path.join(target.manifest, self.manifest_name())
 
       self.context.log.info(
         'Getting cargo build plan for manifest: {0}\nAdditional cargo options: {1}'.format(
@@ -105,7 +105,7 @@ class Build(Workspace):
         'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
       }
 
-      std_output = self.run_command_and_get_output(cmd, target.toolchain, env, workunit)
+      std_output = self.run_command_and_get_output(cmd, target.manifest, env, workunit)
       cargo_build_plan = json.loads(std_output)
 
       if workunit.outcome() != WorkUnit.SUCCESS:

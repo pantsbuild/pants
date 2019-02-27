@@ -17,18 +17,13 @@ from pants.contrib.rust.targets.original.cargo_base import CargoBase
 class CargoWorkspace(CargoBase):
   """A base class for all original cargo workspace targets."""
 
-  def __init__(self, address=None, manifest=None, toolchain=None, include=None,
+  def __init__(self, address=None, manifest=None, include=None,
                payload=None, **kwargs):
 
     if manifest is not None:
       manifest = os.path.join(get_buildroot(), address.spec_path, manifest)
     else:
       manifest = os.path.join(get_buildroot(), address.spec_path)
-
-    if toolchain is not None:
-      toolchain = os.path.join(get_buildroot(), address.spec_path, toolchain)
-    else:
-      toolchain = os.path.join(get_buildroot(), address.spec_path)
 
     payload = payload or Payload()
 
@@ -42,8 +37,7 @@ class CargoWorkspace(CargoBase):
 
     payload.add_field('include_sources', PrimitiveField(include))
 
-    super(CargoWorkspace, self).__init__(address=address, manifest=manifest, toolchain=toolchain,
-                                         payload=payload, **kwargs)
+    super(CargoWorkspace, self).__init__(address=address, manifest=manifest, payload=payload, **kwargs)
 
   @property
   def member_paths(self):

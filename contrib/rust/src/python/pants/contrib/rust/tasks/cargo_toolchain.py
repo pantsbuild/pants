@@ -13,6 +13,7 @@ from future.utils import PY3
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.util.dirutil import read_file
 from pants.util.process_handler import subprocess
 
 from pants.contrib.rust.tasks.cargo_task import CargoTask
@@ -27,7 +28,7 @@ class Toolchain(CargoTask):
     register(
       '--toolchain',
       type=str,
-      default=None,
+      default='nightly-2018-12-31',
       help='Toolchain')
 
   @classmethod
@@ -76,7 +77,7 @@ class Toolchain(CargoTask):
           self.LAST_KNOWN_FINGERPRINT, current_fingerprint))
 
   def install_rust_toolchain(self, toolchain):
-    self.context.log.info('Installing toolchain: {0}'.format(toolchain))
+    self.context.log.debug('Installing toolchain: {0}'.format(toolchain))
     with self.context.new_workunit(name='install-rustup-toolchain',
                                    labels=[WorkUnitLabel.BOOTSTRAP]) as workunit:
       cmd = ['rustup', 'install', toolchain]
@@ -90,10 +91,10 @@ class Toolchain(CargoTask):
       if workunit.outcome() != WorkUnit.SUCCESS:
         self.context.log.error(workunit.outcome_string(workunit.outcome()))
       else:
-        self.context.log.info(workunit.outcome_string(workunit.outcome()))
+        self.context.log.debug(workunit.outcome_string(workunit.outcome()))
 
   def set_new_toolchain_as_default(self, toolchain):
-    self.context.log.info('Set {0} as default toolchain'.format(toolchain))
+    self.context.log.debug('Set {0} as default toolchain'.format(toolchain))
     with self.context.new_workunit(name='setup-rustup-toolchain',
                                    labels=[WorkUnitLabel.BOOTSTRAP]) as workunit:
       cmd = ['rustup', 'default', toolchain]
@@ -107,17 +108,16 @@ class Toolchain(CargoTask):
       if workunit.outcome() != WorkUnit.SUCCESS:
         self.context.log.error(workunit.outcome_string(workunit.outcome()))
       else:
-        self.context.log.info(workunit.outcome_string(workunit.outcome()))
+        self.context.log.debug(workunit.outcome_string(workunit.outcome()))
 
   @staticmethod
   def check_if_rustup_exist():
     return distutils.spawn.find_executable('rustup') is not None
 
   def setup_toolchain(self):
-    toolchain = self.get_options().toolchain
-    if toolchain:
-      self.install_rust_toolchain(toolchain)
-      self.set_new_toolchain_as_default(toolchain)
+    toolchain = self.get_toolchain()
+    self.install_rust_toolchain(toolchain)
+    self.set_new_toolchain_as_default(toolchain)
 
   def set_cargo_path(self):
     env = os.environ.copy()
@@ -125,12 +125,22 @@ class Toolchain(CargoTask):
     cargo_env = self.context.products.get_data('cargo_env')
     cargo_env['PATH'] = os.path.join(env['HOME'], '.cargo/bin')
 
-  def execute(self):
-    self.context.log.debug('Check if rust toolchain exist.')
-    if self.check_if_rustup_exist():
-      self.context.log.debug('Toolchain is already installed.')
+  def get_toolchain(self):
+    toolchain_opt = self.get_options().toolchain
+    toolchain_path = os.path.join(get_buildroot(), toolchain_opt, 'rust-toolchain')
+    if os.path.isfile(toolchain_path):
+      self.context.log.debug('Found rust-toolchain file.')
+      toolchain = read_file(toolchain_path, binary_mode='r')
+      return toolchain.strip()
     else:
-      self.context.log.info('Toolchain is missing.\nInstalling toolchain...')
+      return toolchain_opt
+
+  def execute(self):
+    self.context.log.debug('Check if rustup exist.')
+    if self.check_if_rustup_exist():
+      self.context.log.debug('Rustup is already installed.')
+    else:
+      self.context.log.info('Rustup is missing.\nInstalling rustup...')
       self.setup_rustup()
 
     self.set_cargo_path()
