@@ -20,6 +20,10 @@ from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 class PytestRunIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
 
+  @classmethod
+  def hermetic(cls):
+    return True
+
   def test_pytest_run_timeout_succeeds(self):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
