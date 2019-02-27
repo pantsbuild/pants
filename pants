@@ -64,8 +64,8 @@ export PY="${PY:-python3}"
 # any interpreter constraints, when PY is set to Python 3 we get the _Py_Dealloc exception (#6985) as
 # Pants will try to use Python 2 for subprocesses. Without setting minor version constraints, when using Python 3
 # we could end up using a different Python minor version for subprocesses than we do for Pants.
-py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor}.*']}"
+py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 
