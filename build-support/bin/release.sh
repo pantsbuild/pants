@@ -55,7 +55,7 @@ function run_pex27() {
 
     curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" > "${pex}"
     chmod +x "${pex}"
-    "${pex}" "$@"
+    "${pex}" -vvvvvvvvv "$@"
   )
 }
 
