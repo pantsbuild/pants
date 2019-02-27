@@ -54,6 +54,7 @@ use std::mem;
 use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::context::Core;
@@ -70,6 +71,7 @@ use crate::rule_graph::{GraphMaker, RuleGraph};
 use crate::scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use crate::tasks::Tasks;
 use crate::types::Types;
+use fs::{GlobMatching, MemFS, PathStat};
 use futures::Future;
 use hashing::Digest;
 use log::error;
@@ -651,6 +653,36 @@ pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
       Err(err) => error!("{}", &err),
     }
   });
+}
+
+#[no_mangle]
+pub extern "C" fn match_path_globs(path_globs: Handle, paths_buf: BufferBuffer) -> PyResult {
+  let path_globs = match nodes::Snapshot::lift_path_globs(&path_globs.into()) {
+    Ok(path_globs) => path_globs,
+    Err(msg) => {
+      let e: Result<(), _> = Err(msg);
+      return e.into();
+    }
+  };
+
+  let static_fs = Arc::new(MemFS::new(
+    paths_buf
+      .to_os_strings()
+      .into_iter()
+      .map(PathBuf::from)
+      .collect(),
+  ));
+
+  static_fs
+    .expand(path_globs)
+    .wait()
+    .map(|path_stats| {
+      externs::store_bool(path_stats.iter().any(|p| match p {
+        PathStat::File { .. } => true,
+        PathStat::Dir { .. } => false,
+      }))
+    })
+    .into()
 }
 
 #[no_mangle]

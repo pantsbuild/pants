@@ -674,6 +674,12 @@ class Native(Singleton):
     result = self.lib.decompress_tarball(tarfile_path, dest_dir)
     return self.context.raise_or_return(result)
 
+  def match_path_globs(self, path_globs, paths):
+    path_globs = self.context.to_value(path_globs)
+    paths_buf = self.context.utf8_buf_buf(tuple(paths))
+    result = self.lib.match_path_globs(path_globs, paths_buf)
+    return self.context.raise_or_return(result)
+
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 

@@ -44,9 +44,10 @@ pub use crate::pool::ResettablePool;
 pub use serverset::BackoffConfig;
 
 use std::cmp::min;
+use std::collections::HashMap;
 use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Components, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
 
@@ -71,6 +72,17 @@ impl Stat {
       &Stat::File(File { path: ref p, .. }) => p.as_path(),
       &Stat::Link(Link(ref p)) => p.as_path(),
     }
+  }
+
+  fn dir(path: PathBuf) -> Stat {
+    Stat::Dir(Dir(path))
+  }
+
+  fn file(path: PathBuf, is_executable: bool) -> Stat {
+    Stat::File(File {
+      path,
+      is_executable,
+    })
   }
 }
 
@@ -765,6 +777,81 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
 }
 
 ///
+/// An in-memory implementation of VFS, useful for precisely reproducing glob matching behavior for
+/// a set of file paths.
+///
+pub struct MemFS {
+  contents: HashMap<Dir, Arc<DirectoryListing>>,
+}
+
+impl MemFS {
+  pub fn new(paths: Vec<PathBuf>) -> MemFS {
+    let mut unordered_contents = HashMap::new();
+    let empty_path = PathBuf::new();
+    for path in paths {
+      Self::add_path(&mut unordered_contents, &empty_path, path.components());
+    }
+    let contents = unordered_contents
+      .into_iter()
+      .map(|(dir, mut stats)| {
+        stats.sort_by(|a, b| a.path().cmp(b.path()));
+        (dir, Arc::new(DirectoryListing(stats)))
+      })
+      .collect();
+    MemFS { contents }
+  }
+
+  fn add_path(
+    contents: &mut HashMap<Dir, Vec<Stat>>,
+    path_so_far: &Path,
+    mut remainder: Components,
+  ) -> bool {
+    if let Some(component) = remainder.next() {
+      // The component represents a directory if it has child components: otherwise, a file.
+      let path = path_so_far.join(component);
+      let stat = if Self::add_path(contents, &path, remainder) {
+        Stat::dir(path)
+      } else {
+        Stat::file(path, false)
+      };
+      contents
+        .entry(Dir(path_so_far.to_owned()))
+        .or_insert_with(Vec::new)
+        .push(stat);
+      true
+    } else {
+      false
+    }
+  }
+}
+
+impl VFS<String> for Arc<MemFS> {
+  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, String> {
+    // The creation of a static filesystem does not allow for Links.
+    future::err(format!("{:?} does not exist within this filesystem.", link)).to_boxed()
+  }
+
+  fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, String> {
+    future::result(
+      self
+        .contents
+        .get(&dir)
+        .cloned()
+        .ok_or_else(|| format!("{:?} does not exist within this filesystem.", dir)),
+    )
+    .to_boxed()
+  }
+
+  fn is_ignored(&self, _stat: &Stat) -> bool {
+    false
+  }
+
+  fn mk_error(msg: &str) -> String {
+    msg.to_owned()
+  }
+}
+
+///
 /// A context for filesystem operations parameterized on an error type 'E'.
 ///
 pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
@@ -829,7 +916,8 @@ mod posixfs_test {
   use testutil;
 
   use super::{
-    Dir, DirectoryListing, File, Link, PathStat, PathStatGetter, PosixFS, ResettablePool, Stat,
+    Dir, DirectoryListing, File, GlobExpansionConjunction, GlobMatching, Link, MemFS, PathGlobs,
+    PathStat, PathStatGetter, PosixFS, ResettablePool, Stat, StrictGlobMatching,
   };
   use futures::Future;
   use std;
@@ -1112,6 +1200,35 @@ mod posixfs_test {
       None,
     ];
     assert_eq!(v, path_stats);
+  }
+
+  #[test]
+  fn memfs_expand_basic() {
+    // Create two files, with the effect that there is a nested directory for the longer path.
+    let p1 = PathBuf::from("some/file");
+    let p2 = PathBuf::from("some/other");
+    let fs = Arc::new(MemFS::new(vec![p1.clone(), p2.join("file")]));
+    let globs = PathGlobs::create(
+      &["some/*".into()],
+      &[],
+      StrictGlobMatching::Ignore,
+      GlobExpansionConjunction::AnyMatch,
+    )
+    .unwrap();
+
+    assert_eq!(
+      fs.expand(globs).wait().unwrap(),
+      vec![
+        PathStat::file(
+          p1.clone(),
+          File {
+            path: p1,
+            is_executable: false,
+          },
+        ),
+        PathStat::dir(p2.clone(), Dir(p2)),
+      ],
+    );
   }
 
   fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
