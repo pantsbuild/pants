@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Display;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -216,22 +217,11 @@ impl WrappedNode for Select {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
             .and_then(move |digest| {
-              let store = context.core.store();
               context
                 .core
                 .store()
-                .load_directory(digest)
+                .contents_for_directory(digest)
                 .map_err(|str| throw(&str))
-                .and_then(move |maybe_directory| {
-                  maybe_directory
-                    .ok_or_else(|| format!("Could not find directory with digest {:?}", digest))
-                    .map_err(|str| throw(&str))
-                })
-                .and_then(move |directory| {
-                  store
-                    .contents_for_directory(&directory)
-                    .map_err(|str| throw(&str))
-                })
                 .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
             })
             .to_boxed()
@@ -540,44 +530,30 @@ impl Snapshot {
   }
 
   pub fn store_snapshot(core: &Arc<Core>, item: &fs::Snapshot) -> Value {
-    let path_stats: Vec<_> = item
-      .path_stats
-      .iter()
-      .map(|ps| Self::store_path_stat(core, ps))
-      .collect();
+    let mut files = Vec::new();
+    let mut dirs = Vec::new();
+    for ps in &item.path_stats {
+      match ps {
+        &PathStat::File { ref path, .. } => {
+          files.push(Self::store_path(path));
+        }
+        &PathStat::Dir { ref path, .. } => {
+          dirs.push(Self::store_path(path));
+        }
+      }
+    }
     externs::unsafe_call(
       &core.types.construct_snapshot,
       &[
         Self::store_directory(core, &item.digest),
-        externs::store_tuple(&path_stats),
+        externs::store_tuple(&files),
+        externs::store_tuple(&dirs),
       ],
     )
   }
 
   fn store_path(item: &Path) -> Value {
     externs::store_utf8_osstr(item.as_os_str())
-  }
-
-  fn store_dir(core: &Arc<Core>, item: &Dir) -> Value {
-    let args = [Self::store_path(item.0.as_path())];
-    externs::unsafe_call(&core.types.construct_dir, &args)
-  }
-
-  fn store_file(core: &Arc<Core>, item: &File) -> Value {
-    let args = [Self::store_path(item.path.as_path())];
-    externs::unsafe_call(&core.types.construct_file, &args)
-  }
-
-  fn store_path_stat(core: &Arc<Core>, item: &PathStat) -> Value {
-    let args = match item {
-      &PathStat::Dir { ref path, ref stat } => {
-        vec![Self::store_path(path), Self::store_dir(core, stat)]
-      }
-      &PathStat::File { ref path, ref stat } => {
-        vec![Self::store_path(path), Self::store_file(core, stat)]
-      }
-    };
-    externs::unsafe_call(&core.types.construct_path_stat, &args)
   }
 
   fn store_file_content(context: &Context, item: &FileContent) -> Value {
@@ -1086,27 +1062,6 @@ impl Node for NodeKey {
     }
   }
 
-  fn format(&self) -> String {
-    fn keystr(key: &Key) -> String {
-      externs::key_to_str(&key)
-    }
-    fn typstr(tc: &TypeConstraint) -> String {
-      externs::key_to_str(&tc.0)
-    }
-    // TODO: these should all be converted to fmt::Debug implementations, and then this method can
-    // go away in favor of the auto-derived Debug for this type.
-    match self {
-      &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
-      &NodeKey::DownloadedFile(ref s) => format!("DownloadedFile({:?})", s.0),
-      &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
-      &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
-      &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
-      &NodeKey::Select(ref s) => format!("Select({}, {})", s.params, typstr(&s.product)),
-      &NodeKey::Task(ref s) => format!("{:?}", s),
-      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
-    }
-  }
-
   fn digest(res: NodeResult) -> Option<hashing::Digest> {
     match res {
       NodeResult::Digest(d) => Some(d),
@@ -1124,6 +1079,26 @@ impl Node for NodeKey {
       // TODO Select nodes are made uncacheable as a workaround to #6146. Will be worked on in #6598
       &NodeKey::Select(_) => false,
       _ => true,
+    }
+  }
+}
+
+impl Display for NodeKey {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    match self {
+      &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({:?})", s.0),
+      &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({:?})", s.0),
+      &NodeKey::ExecuteProcess(ref s) => write!(f, "ExecuteProcess({:?}", s.0),
+      &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
+      &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
+      &NodeKey::Select(ref s) => write!(
+        f,
+        "Select({}, {})",
+        s.params,
+        externs::key_to_str(&s.product.0)
+      ),
+      &NodeKey::Task(ref s) => write!(f, "{:?}", s),
+      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", externs::key_to_str(&s.0)),
     }
   }
 }

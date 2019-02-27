@@ -4,13 +4,16 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
+
 from future.utils import binary_type, text_type
 
-from pants.base.project_tree import Dir, File
+from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
-from pants.util.objects import Collection, datatype
+from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
+from pants.util.objects import Exactly, datatype
 
 
 class FileContent(datatype([('path', text_type), ('content', binary_type)])):
@@ -56,12 +59,9 @@ class PathGlobs(datatype([
       cls,
       include=tuple(include),
       exclude=tuple(exclude),
-      glob_match_error_behavior=GlobMatchErrorBehavior.create(glob_match_error_behavior),
-      conjunction=GlobExpansionConjunction.create(conjunction))
-
-
-class PathGlobsAndRoot(datatype([('path_globs', PathGlobs), ('root', text_type)])):
-  pass
+      glob_match_error_behavior=GlobMatchErrorBehavior.create(glob_match_error_behavior,
+                                                              none_is_default=True),
+      conjunction=GlobExpansionConjunction.create(conjunction, none_is_default=True))
 
 
 class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', int)])):
@@ -82,6 +82,33 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
   https://github.com/pantsbuild/pants/issues/5802
   """
 
+  @classmethod
+  def _path(cls, directory):
+    return '{}.digest'.format(directory.rstrip(os.sep))
+
+  @classmethod
+  def clear(cls, directory):
+    """Clear any existing Digest file adjacent to the given directory."""
+    safe_delete(cls._path(directory))
+
+  @classmethod
+  def load(cls, directory):
+    """Load a Digest from a `.digest` file adjacent to the given directory.
+
+    :return: A Digest, or None if the Digest did not exist.
+    """
+    read_file = maybe_read_file(cls._path(directory), binary_mode=False)
+    if read_file:
+      fingerprint, length = read_file.split(':')
+      return Digest(fingerprint, int(length))
+    else:
+      return None
+
+  def dump(self, directory):
+    """Dump this Digest object adjacent to the given directory."""
+    payload = '{}:{}'.format(self.fingerprint, self.serialized_bytes_length)
+    safe_file_dump(self._path(directory), payload=payload, mode='w')
+
   def __repr__(self):
     return '''Digest(fingerprint={}, serialized_bytes_length={})'''.format(
       self.fingerprint,
@@ -92,8 +119,25 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
     return repr(self)
 
 
-class Snapshot(datatype([('directory_digest', Digest), ('path_stats', tuple)])):
-  """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
+class PathGlobsAndRoot(datatype([
+    ('path_globs', PathGlobs),
+    ('root', text_type),
+    ('digest_hint', Exactly(Digest, type(None))),
+])):
+  """A set of PathGlobs to capture relative to some root (which may exist outside of the buildroot).
+
+  If the `digest_hint` is set, it must be the Digest that we would expect to get if we were to
+  expand and Digest the globs. The hint is an optimization that allows for bypassing filesystem
+  operations in cases where the expected Digest is known, and the content for the Digest is already
+  stored.
+  """
+
+  def __new__(cls, path_globs, root, digest_hint=None):
+    return super(PathGlobsAndRoot, cls).__new__(cls, path_globs, root, digest_hint)
+
+
+class Snapshot(datatype([('directory_digest', Digest), ('files', tuple), ('dirs', tuple)])):
+  """A Snapshot is a collection of file paths and dir paths fingerprinted by their names/content.
 
   Snapshots are used to make it easier to isolate process execution by fixing the contents
   of the files being operated on and easing their movement to and from isolated execution
@@ -103,22 +147,6 @@ class Snapshot(datatype([('directory_digest', Digest), ('path_stats', tuple)])):
   @property
   def is_empty(self):
     return self == EMPTY_SNAPSHOT
-
-  @property
-  def dirs(self):
-    return [p for p in self.path_stats if type(p.stat) == Dir]
-
-  @property
-  def dir_stats(self):
-    return [p.stat for p in self.dirs]
-
-  @property
-  def files(self):
-    return [p for p in self.path_stats if type(p.stat) == File]
-
-  @property
-  def file_stats(self):
-    return [p.stat for p in self.files]
 
 
 class MergedDirectories(datatype([('directories', tuple)])):
@@ -148,7 +176,8 @@ EMPTY_DIRECTORY_DIGEST = Digest(
 
 EMPTY_SNAPSHOT = Snapshot(
   directory_digest=EMPTY_DIRECTORY_DIGEST,
-  path_stats=(),
+  files=(),
+  dirs=()
 )
 
 

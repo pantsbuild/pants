@@ -1,20 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
-  name = 'task_test_base',
-  sources = ['task_test_base.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/goal:context',
-    'src/python/pants/ivy',
-    'src/python/pants/task',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
-    'tests/python/pants_test:base_test',
-  ]
-)
-
 python_tests(
   name = 'scalastyle_integration',
   sources = ['test_scalastyle_integration.py'],

@@ -10,7 +10,7 @@ target(
 
 python_library(
   name='pants-packaged',
-  sources=[],
+  sources=['dummy.c'],
   dependencies=[
     ':version',
   ],
@@ -18,7 +18,7 @@ python_library(
     name='pantsbuild.pants',
     description='A scalable build tool for large, complex, heterogeneous repos.',
     namespace_packages=['pants', 'pants.backend'],
-    ext_modules=[('native_engine', {'sources': []})],
+    ext_modules=[('native_engine', {'sources': ['src/pants/dummy.c']})],
   ).with_binaries(
     pants='src/python/pants/bin:pants',
   )

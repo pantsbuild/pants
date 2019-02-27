@@ -346,11 +346,11 @@ class BinaryUtilTest(TestBase):
     """Test invoking binary_util.py as a standalone script."""
     with temporary_dir() as tmp_dir:
       config_file_loc = os.path.join(tmp_dir, 'pants.ini')
-      safe_file_dump(config_file_loc, """\
+      safe_file_dump(config_file_loc, mode='w', payload="""\
 [GLOBAL]
 allow_external_binary_tool_downloads: True
 pants_bootstrapdir: {}
-""".format(tmp_dir), binary_mode=False)
+""".format(tmp_dir))
       expected_output_glob = os.path.join(
         tmp_dir, 'bin', 'cmake', '*', '*', '3.9.5', 'cmake')
       with environment_as(PANTS_CONFIG_FILES='[{!r}]'.format(config_file_loc)):

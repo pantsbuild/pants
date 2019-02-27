@@ -114,7 +114,7 @@ function run_pex() {
 
     curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" > "${pex}"
     chmod +x "${pex}"
-    "${pex}" "$@"
+    "${pex}" -vvvvvvvvv "$@"
   )
 }
 

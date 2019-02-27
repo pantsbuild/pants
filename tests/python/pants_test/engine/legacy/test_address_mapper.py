@@ -40,15 +40,15 @@ class LegacyAddressMapperTest(TestBase):
     safe_mkdir(dir_b)
     safe_mkdir(dir_a_subdir)
 
-    safe_file_dump(os.path.join(self.build_root, 'BUILD'), 'target(name="a")\ntarget(name="b")', binary_mode=False)
-    safe_file_dump(os.path.join(self.build_root, 'BUILD.other'), 'target(name="c")', binary_mode=False)
+    safe_file_dump(os.path.join(self.build_root, 'BUILD'), 'target(name="a")\ntarget(name="b")', mode='w')
+    safe_file_dump(os.path.join(self.build_root, 'BUILD.other'), 'target(name="c")', mode='w')
 
-    safe_file_dump(os.path.join(dir_a, 'BUILD'), 'target(name="a")\ntarget(name="b")', binary_mode=False)
-    safe_file_dump(os.path.join(dir_a, 'BUILD.other'), 'target(name="c")', binary_mode=False)
+    safe_file_dump(os.path.join(dir_a, 'BUILD'), 'target(name="a")\ntarget(name="b")', mode='w')
+    safe_file_dump(os.path.join(dir_a, 'BUILD.other'), 'target(name="c")', mode='w')
 
-    safe_file_dump(os.path.join(dir_b, 'BUILD'), 'target(name="a")', binary_mode=False)
+    safe_file_dump(os.path.join(dir_b, 'BUILD'), 'target(name="a")', mode='w')
 
-    safe_file_dump(os.path.join(dir_a_subdir, 'BUILD'), 'target(name="a")', binary_mode=False)
+    safe_file_dump(os.path.join(dir_a_subdir, 'BUILD'), 'target(name="a")', mode='w')
 
   def test_is_valid_single_address(self):
     self.create_build_files()

@@ -5,7 +5,6 @@ python_library(
   name='test_infra',
   dependencies=[
     '3rdparty/python:future',
-    ':base_test',
     'tests/python/pants_test:int-test-for-export',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/jvm:jar_task_test_base',
@@ -22,28 +21,6 @@ python_library(
       'Topic :: Software Development :: Testing',
     ]
   )
-)
-
-python_library(
-  name = 'base_test',
-  sources = ['base_test.py'],
-  dependencies = [
-    '3rdparty/python:future',
-    'src/python/pants/base:build_file',
-    'src/python/pants/base:build_root',
-    'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/base:deprecated',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:project_tree',
-    'src/python/pants/build_graph',
-    'src/python/pants/init',
-    'src/python/pants/source',
-    'src/python/pants/subsystem',
-    'src/python/pants/task',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test/base:context_utils',
-    'tests/python/pants_test/option/util',
-  ]
 )
 
 python_library(
@@ -119,7 +96,7 @@ python_tests(
   name = 'test_maven_layout',
   sources = ['test_maven_layout.py'],
   dependencies = [
-    ':base_test',
+    ':test_base',
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/build_graph',
     'src/python/pants/source',

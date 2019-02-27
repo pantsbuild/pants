@@ -3,6 +3,67 @@
 This document describes releases leading up to the ``1.14.x`` ``stable`` series.
 
 
+1.14.0rc3 (2/21/2019)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add flags to processs_executor that say where to materialize output and what output is (#7201)
+  `PR #7201 <https://github.com/pantsbuild/pants/pull/7201>`_
+
+* Resolve all platforms from all python targets (#7156)
+  `PR #7156 <https://github.com/pantsbuild/pants/pull/7156>`_
+
+* Remove deprecated test classes (#7243)
+  `PR #7243 <https://github.com/pantsbuild/pants/pull/7243>`_
+
+Bugfixes
+~~~~~~~~
+
+* Revert remote execution from tower to grpcio (#7256)
+  `PR #7256 <https://github.com/pantsbuild/pants/pull/7256>`_
+
+* Avoid capturing Snapshots for previously digested codegen outputs (#7241)
+  `PR #7241 <https://github.com/pantsbuild/pants/pull/7241>`_
+
+* Validate and maybe prune interpreter cache run over run (#7225)
+  `PR #7225 <https://github.com/pantsbuild/pants/pull/7225>`_
+
+1.14.0rc2 (2/15/2019)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Pin pytest version to avoid induced breakage from more-itertools transitive dep (#7238)
+  `PR #7238 <https://github.com/pantsbuild/pants/pull/7238>`_
+  `PR #7240 <https://github.com/pantsbuild/pants/pull/7240>`_
+
+1.14.0rc1 (2/06/2019)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Only lint the direct sources of a linted target. (#7219)
+  `PR #7219 <https://github.com/pantsbuild/pants/pull/7219>`_
+
+* Do not render the coursier workunit unless it will run. (#7218)
+  `PR #7218 <https://github.com/pantsbuild/pants/pull/7218>`_
+
+* Revert "make GoTest subclass PartitionedTestRunnerTaskMixin to test transitively" (#7212)
+  `PR #7212 <https://github.com/pantsbuild/pants/pull/7212>`_
+
+* Only run master-dependent commithooks on master (#7214)
+  `PR #7214 <https://github.com/pantsbuild/pants/pull/7214>`_
+
+* Absolute-ify GIT_DIR (#7210)
+  `PR #7210 <https://github.com/pantsbuild/pants/pull/7210>`_
+
+* Fix release script ownership check command name. (#7204)
+  `PR #7204 <https://github.com/pantsbuild/pants/pull/7204>`_
+
 1.14.0rc0 (2/01/2019)
 ---------------------
 

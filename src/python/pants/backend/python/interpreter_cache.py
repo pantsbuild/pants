@@ -115,9 +115,13 @@ class PythonInterpreterCache(Subsystem):
     # Return the lowest compatible interpreter.
     return min(allowed_interpreters)
 
-  def _interpreter_from_path(self, path, filters=()):
+  def _interpreter_from_relpath(self, path, filters=()):
+    path = os.path.join(self._cache_dir, path)
     try:
       executable = os.readlink(os.path.join(path, 'python'))
+      if not os.path.exists(executable):
+        self._purge_interpreter(path)
+        return None
     except OSError:
       return None
     interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
@@ -125,7 +129,8 @@ class PythonInterpreterCache(Subsystem):
       return self._resolve(interpreter)
     return None
 
-  def _setup_interpreter(self, interpreter, cache_target_path):
+  def _setup_interpreter(self, interpreter, identity_str):
+    cache_target_path = os.path.join(self._cache_dir, identity_str)
     with safe_concurrent_creation(cache_target_path) as safe_path:
       os.mkdir(safe_path)  # Parent will already have been created by safe_concurrent_creation.
       os.symlink(interpreter.binary, os.path.join(safe_path, 'python'))
@@ -134,22 +139,19 @@ class PythonInterpreterCache(Subsystem):
   def _setup_cached(self, filters=()):
     """Find all currently-cached interpreters."""
     for interpreter_dir in os.listdir(self._cache_dir):
-      path = os.path.join(self._cache_dir, interpreter_dir)
-      if os.path.isdir(path):
-        pi = self._interpreter_from_path(path, filters=filters)
-        if pi:
-          logger.debug('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
-          yield pi
+      pi = self._interpreter_from_relpath(interpreter_dir, filters=filters)
+      if pi:
+        logger.debug('Detected interpreter {}: {}'.format(pi.binary, str(pi.identity)))
+        yield pi
 
   def _setup_paths(self, paths, filters=()):
     """Find interpreters under paths, and cache them."""
     for interpreter in self._matching(PythonInterpreter.all(paths), filters=filters):
       identity_str = str(interpreter.identity)
-      cache_path = os.path.join(self._cache_dir, identity_str)
-      pi = self._interpreter_from_path(cache_path, filters=filters)
+      pi = self._interpreter_from_relpath(identity_str, filters=filters)
       if pi is None:
-        self._setup_interpreter(interpreter, cache_path)
-        pi = self._interpreter_from_path(cache_path, filters=filters)
+        self._setup_interpreter(interpreter, identity_str)
+        pi = self._interpreter_from_relpath(identity_str, filters=filters)
       if pi:
         yield pi
 
@@ -251,3 +253,14 @@ class PythonInterpreterCache(Subsystem):
     _safe_link(target_location, target_link)
     logger.debug('    installed {}'.format(target_location))
     return Package.from_href(target_location)
+
+  def _purge_interpreter(self, interpreter_dir):
+    try:
+      logger.info('Detected stale interpreter `{}` in the interpreter cache, purging.'
+                  .format(interpreter_dir))
+      shutil.rmtree(interpreter_dir, ignore_errors=True)
+    except Exception as e:
+      logger.warn(
+        'Caught exception {!r} during interpreter purge. Please run `./pants clean-all`!'
+        .format(e)
+      )

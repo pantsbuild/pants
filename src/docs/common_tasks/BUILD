@@ -132,3 +132,9 @@ page(
   name='thrift_gen',
   source='thrift_gen.md',
 )
+
+
+page(
+  name='python_proto_gen',
+  source='python_proto_gen.md',
+)

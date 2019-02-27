@@ -18,11 +18,11 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.task.task import Task
 from pants.util.collections_abc_backport import OrderedDict
-from pants.util.dirutil import safe_delete
+from pants.util.dirutil import fast_relpath, safe_delete
 
 
 logger = logging.getLogger(__name__)
@@ -112,6 +112,10 @@ class SimpleCodegenTask(Task):
     :return: a list of dependencies.
     """
     return []
+
+  @classmethod
+  def implementation_version(cls):
+    return super(SimpleCodegenTask, cls).implementation_version() + [('SimpleCodegenTask', 2)]
 
   def synthetic_target_extra_exports(self, target, target_workdir):
     """Gets any extra exports generated synthetic targets should have.
@@ -206,7 +210,7 @@ class SimpleCodegenTask(Task):
 
   def _get_synthetic_address(self, target, target_workdir):
     synthetic_name = target.id
-    sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
+    sources_rel_path = fast_relpath(target_workdir, get_buildroot())
     synthetic_address = Address(sources_rel_path, synthetic_name)
     return synthetic_address
 
@@ -230,32 +234,26 @@ class SimpleCodegenTask(Task):
       with self.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
         vts_to_sources = OrderedDict()
         for vt in invalidation_check.all_vts:
-          synthetic_target_dir = self.synthetic_target_dir(vt.target, vt.results_dir)
 
-          key = (vt, synthetic_target_dir)
-          vts_to_sources[key] = None
+          vts_to_sources[vt] = None
 
           # Build the target and handle duplicate sources.
           if not vt.valid:
             if self._do_validate_sources_present(vt.target):
-              self.execute_codegen(vt.target, vt.results_dir)
-              sources = self._capture_sources((key,))[0]
+              self.execute_codegen(vt.target, vt.current_results_dir)
+              sources = self._capture_sources((vt,))[0]
               # _handle_duplicate_sources may delete files from the filesystem, so we need to
               # re-capture the sources.
-              if not self._handle_duplicate_sources(vt.target, vt.results_dir, sources):
-                vts_to_sources[key] = sources
+              if not self._handle_duplicate_sources(vt, sources):
+                vts_to_sources[vt] = sources
             vt.update()
 
         vts_to_capture = tuple(key for key, sources in vts_to_sources.items() if sources is None)
         filesets = self._capture_sources(vts_to_capture)
         for key, fileset in zip(vts_to_capture, filesets):
           vts_to_sources[key] = fileset
-        for (vt, synthetic_target_dir), fileset in vts_to_sources.items():
-          self._inject_synthetic_target(
-            vt.target,
-            synthetic_target_dir,
-            fileset,
-          )
+        for vt, fileset in vts_to_sources.items():
+          self._inject_synthetic_target(vt, fileset)
         self._mark_transitive_invalidation_hashes_dirty(
           vt.target.address for vt in invalidation_check.all_vts
         )
@@ -280,17 +278,23 @@ class SimpleCodegenTask(Task):
     """
     return target_workdir
 
-  # Accepts tuple of tuples of (target, synthetic_target_dir)
+  # Accepts tuple of VersionedTarget instances.
   # Returns tuple of EagerFilesetWithSpecs in matching order.
-  def _capture_sources(self, targets_and_dirs):
+  def _capture_sources(self, vts):
     to_capture = []
     results_dirs = []
     filespecs = []
 
-    for target, synthetic_target_dir in targets_and_dirs:
+    for vt in vts:
+      target = vt.target
+      # Compute the (optional) subdirectory of the results_dir to generate code to. This
+      # path will end up in the generated FilesetWithSpec and target, and thus needs to be
+      # located below the stable/symlinked `vt.results_dir`.
+      synthetic_target_dir = self.synthetic_target_dir(target, vt.results_dir)
+
       files = self.sources_globs
 
-      results_dir_relpath = os.path.relpath(synthetic_target_dir, get_buildroot())
+      results_dir_relpath = fast_relpath(synthetic_target_dir, get_buildroot())
       buildroot_relative_globs = tuple(os.path.join(results_dir_relpath, file) for file in files)
       buildroot_relative_excludes = tuple(
         os.path.join(results_dir_relpath, file)
@@ -300,6 +304,8 @@ class SimpleCodegenTask(Task):
         PathGlobsAndRoot(
           PathGlobs(buildroot_relative_globs, buildroot_relative_excludes),
           text_type(get_buildroot()),
+          # The digest is stored adjacent to the hash-versioned `vt.current_results_dir`.
+          Digest.load(vt.current_results_dir),
         )
       )
       results_dirs.append(results_dir_relpath)
@@ -307,33 +313,35 @@ class SimpleCodegenTask(Task):
 
     snapshots = self.context._scheduler.capture_snapshots(tuple(to_capture))
 
+    for snapshot, vt in zip(snapshots, vts):
+      snapshot.directory_digest.dump(vt.current_results_dir)
+
     return tuple(EagerFilesetWithSpec(
       results_dir_relpath,
       filespec,
       snapshot,
     ) for (results_dir_relpath, filespec, snapshot) in zip(results_dirs, filespecs, snapshots))
 
-  def _inject_synthetic_target(
-    self,
-    target,
-    target_workdir,
-    sources,
-  ):
+  def _inject_synthetic_target(self, vt, sources):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
-    :param target: The target to inject a synthetic target for.
-    :param target_workdir: The work directory containing the generated code for the target.
+    :param vt: A codegen input VersionedTarget to inject a synthetic target for.
+    :param sources: A FilesetWithSpec to inject for the target.
     """
+    target = vt.target
 
+    # NB: For stability, the injected target exposes the stable-symlinked `vt.results_dir`,
+    # rather than the hash-named `vt.current_results_dir`.
+    synthetic_target_dir = self.synthetic_target_dir(target, vt.results_dir)
     synthetic_target_type = self.synthetic_target_type(target)
-    synthetic_extra_dependencies = self.synthetic_target_extra_dependencies(target, target_workdir)
+    synthetic_extra_dependencies = self.synthetic_target_extra_dependencies(target, synthetic_target_dir)
 
     copied_attributes = {}
     for attribute in self._copy_target_attributes:
       copied_attributes[attribute] = getattr(target, attribute)
 
     if self._supports_exports(synthetic_target_type):
-      extra_exports = self.synthetic_target_extra_exports(target, target_workdir)
+      extra_exports = self.synthetic_target_extra_exports(target, synthetic_target_dir)
 
       extra_exports_not_in_extra_dependencies = set(extra_exports).difference(
         set(synthetic_extra_dependencies))
@@ -349,7 +357,7 @@ class SimpleCodegenTask(Task):
       copied_attributes['exports'] = sorted(union)
 
     synthetic_target = self.context.add_new_target(
-      address=self._get_synthetic_address(target, target_workdir),
+      address=self._get_synthetic_address(target, synthetic_target_dir),
       target_type=synthetic_target_type,
       dependencies=synthetic_extra_dependencies,
       sources=sources,
@@ -405,7 +413,7 @@ class SimpleCodegenTask(Task):
     :param target_workdir: A clean directory into which to generate code
     """
 
-  def _handle_duplicate_sources(self, target, target_workdir, sources):
+  def _handle_duplicate_sources(self, vt, sources):
     """Handles duplicate sources generated by the given gen target by either failure or deletion.
 
     This method should be called after all dependencies have been injected into the graph, but
@@ -420,6 +428,8 @@ class SimpleCodegenTask(Task):
     default, this behavior is disabled, and duplication in generated sources will raise a
     TaskError. This is controlled by the --allow-dups flag.
     """
+    target = vt.target
+    target_workdir = vt.results_dir
 
     # Walk dependency gentargets and record any sources owned by those targets that are also
     # owned by this target.
@@ -457,6 +467,8 @@ class SimpleCodegenTask(Task):
       for duped_source in duped_sources:
         safe_delete(os.path.join(target_workdir, duped_source))
         did_modify = True
+    if did_modify:
+      Digest.clear(vt.current_results_dir)
     return did_modify
 
   class DuplicateSourceError(TaskError):

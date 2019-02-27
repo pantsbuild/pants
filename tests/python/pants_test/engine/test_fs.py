@@ -61,7 +61,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       if prepare:
         prepare(project_tree)
       result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
-      self.assertEqual(sorted([p.path for p in getattr(result, field)]), sorted(paths))
+      self.assertEqual(sorted(getattr(result, field)), sorted(paths))
 
   def assert_content(self, filespecs_or_globs, expected_content):
     with self.mk_project_tree() as project_tree:
@@ -76,7 +76,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
       result = self.execute(scheduler, Snapshot, self.specs(filespecs_or_globs))[0]
       # Confirm all expected files were digested.
-      self.assertEqual(set(expected_files), {f.path for f in result.files})
+      self.assertEqual(set(expected_files), set(result.files))
       self.assertTrue(result.directory_digest.fingerprint is not None)
 
   def test_walk_literal(self):
@@ -270,7 +270,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assertIn("doesnotexist", str(cm.exception))
 
   def assert_snapshot_equals(self, snapshot, files, directory_digest):
-    self.assertEqual([file.path for file in snapshot.files], files)
+    self.assertEqual(list(snapshot.files), files)
     self.assertEqual(snapshot.directory_digest, directory_digest)
 
   def test_merge_zero_directories(self):

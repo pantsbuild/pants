@@ -358,17 +358,17 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         pantsd_run(['help'])
         checker.assert_started()
 
-        safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))", binary_mode=False)
+        safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))", mode='w')
         result = pantsd_run(export_cmd)
         checker.assert_running()
         assertNotRegex(self, result.stdout_data, has_source_root_regex)
 
-        safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))", binary_mode=False)
+        safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))", mode='w')
         result = pantsd_run(export_cmd)
         checker.assert_running()
         assertNotRegex(self, result.stdout_data, has_source_root_regex)
 
-        safe_file_dump(test_src_file, 'import this\n', binary_mode=False)
+        safe_file_dump(test_src_file, 'import this\n', mode='w')
         result = pantsd_run(export_cmd)
         checker.assert_running()
         assertRegex(self, result.stdout_data, has_source_root_regex)
@@ -385,7 +385,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     try:
       safe_mkdir(test_path, clean=True)
-      safe_file_dump(test_build_file, "{}()".format(invalid_symbol), binary_mode=False)
+      safe_file_dump(test_build_file, "{}()".format(invalid_symbol), mode='w')
       for _ in range(3):
         with self.pantsd_run_context(success=False) as (pantsd_run, checker, _, _):
           result = pantsd_run(['list', 'testprojects::'])

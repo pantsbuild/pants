@@ -62,8 +62,8 @@ use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, HandleBuffer,
   IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
-  SatisfiedByExtern, SatisfiedByTypeExtern, StoreBoolExtern, StoreBytesExtern, StoreI64Extern,
-  StoreTupleExtern, StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
+  SatisfiedByExtern, SatisfiedByTypeExtern, StoreBoolExtern, StoreBytesExtern, StoreF64Extern,
+  StoreI64Extern, StoreTupleExtern, StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
 use crate::rule_graph::{GraphMaker, RuleGraph};
@@ -119,6 +119,7 @@ pub extern "C" fn externs_set(
   store_bytes: StoreBytesExtern,
   store_utf8: StoreUtf8Extern,
   store_i64: StoreI64Extern,
+  store_f64: StoreF64Extern,
   store_bool: StoreBoolExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
@@ -146,6 +147,7 @@ pub extern "C" fn externs_set(
     store_bytes,
     store_utf8,
     store_i64,
+    store_f64,
     store_bool,
     project_ignoring_type,
     project_multi,
@@ -177,10 +179,6 @@ pub extern "C" fn scheduler_create(
   construct_snapshot: Function,
   construct_file_content: Function,
   construct_files_content: Function,
-  construct_path_stat: Function,
-  construct_dir: Function,
-  construct_file: Function,
-  construct_link: Function,
   construct_process_result: Function,
   type_address: TypeConstraint,
   type_path_globs: TypeConstraint,
@@ -224,10 +222,6 @@ pub extern "C" fn scheduler_create(
     construct_snapshot: construct_snapshot,
     construct_file_content: construct_file_content,
     construct_files_content: construct_files_content,
-    construct_path_stat: construct_path_stat,
-    construct_dir: construct_dir,
-    construct_file: construct_file,
-    construct_link: construct_link,
     construct_process_result: construct_process_result,
     address: type_address,
     path_globs: type_path_globs,
@@ -315,7 +309,8 @@ pub extern "C" fn scheduler_create(
 }
 
 ///
-/// Returns a Handle representing a tuple of tuples of metric name string and metric value int.
+/// Returns a Handle representing a dictionary where key is metric name string and value is
+/// metric value int.
 ///
 #[no_mangle]
 pub extern "C" fn scheduler_metrics(
@@ -327,11 +322,9 @@ pub extern "C" fn scheduler_metrics(
       let values = scheduler
         .metrics(session)
         .into_iter()
-        .map(|(metric, value)| {
-          externs::store_tuple(&[externs::store_utf8(metric), externs::store_i64(value)])
-        })
+        .flat_map(|(metric, value)| vec![externs::store_utf8(metric), externs::store_i64(value)])
         .collect::<Vec<_>>();
-      externs::store_tuple(&values).into()
+      externs::store_dict(&values).into()
     })
   })
 }
@@ -666,15 +659,24 @@ pub extern "C" fn capture_snapshots(
   path_globs_and_root_tuple_wrapper: Handle,
 ) -> PyResult {
   let values = externs::project_multi(&path_globs_and_root_tuple_wrapper.into(), "dependencies");
-  let path_globs_and_roots_result: Result<Vec<(fs::PathGlobs, PathBuf)>, String> = values
+  let path_globs_and_roots_result = values
     .iter()
     .map(|value| {
       let root = PathBuf::from(externs::project_str(&value, "root"));
       let path_globs =
         nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
-      path_globs.map(|path_globs| (path_globs, root))
+      let digest_hint = {
+        let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
+        // TODO: Extract a singleton Key for None.
+        if maybe_digest == externs::eval("None").unwrap() {
+          None
+        } else {
+          Some(nodes::lift_digest(&maybe_digest)?)
+        }
+      };
+      path_globs.map(|path_globs| (path_globs, root, digest_hint))
     })
-    .collect();
+    .collect::<Result<Vec<_>, _>>();
 
   let path_globs_and_roots = match path_globs_and_roots_result {
     Ok(v) => v,
@@ -689,13 +691,14 @@ pub extern "C" fn capture_snapshots(
     futures::future::join_all(
       path_globs_and_roots
         .into_iter()
-        .map(|(path_globs, root)| {
+        .map(|(path_globs, root, digest_hint)| {
           let core = core.clone();
           fs::Snapshot::capture_snapshot_from_arbitrary_root(
             core.store(),
             core.fs_pool.clone(),
             root,
             path_globs,
+            digest_hint,
           )
           .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
         })

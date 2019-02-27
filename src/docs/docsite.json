@@ -96,6 +96,7 @@
     "test_suite": "dist/markdown/html/src/docs/common_tasks/test_suite.html",
     "thrift_deps": "dist/markdown/html/examples/src/thrift/org/pantsbuild/example/README.html",
     "thrift_gen": "dist/markdown/html/src/docs/common_tasks/thrift_gen.html",
+    "grpcio_gen": "dist/markdown/html/src/docs/common_tasks/python_proto_gen.html",
     "tshoot": "dist/markdown/html/src/docs/tshoot.html",
     "why_use_pants": "dist/markdown/html/src/docs/why_use_pants.html"
   },
@@ -173,6 +174,7 @@
        {"heading": "Code & Doc Generation"},
        {"pages" : [
                     "thrift_deps",
+                    "grpcio_gen",
                     "page"
                 ]
        },

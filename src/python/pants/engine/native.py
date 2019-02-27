@@ -376,6 +376,12 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     return c.to_value(i64)
 
+  @_extern_decl('Handle', ['ExternContext*', 'double'])
+  def extern_store_f64(self, context_handle, f64):
+    """Given a context and double, return a new Handle to represent the double."""
+    c = self._ffi.from_handle(context_handle)
+    return c.to_value(f64)
+
   @_extern_decl('Handle', ['ExternContext*', '_Bool'])
   def extern_store_bool(self, context_handle, b):
     """Given a context and _Bool, return a new Handle to represent the _Bool."""
@@ -634,6 +640,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_store_bytes,
                            self.ffi_lib.extern_store_utf8,
                            self.ffi_lib.extern_store_i64,
+                           self.ffi_lib.extern_store_f64,
                            self.ffi_lib.extern_store_bool,
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,
@@ -690,10 +697,6 @@ class Native(Singleton):
                     construct_snapshot,
                     construct_file_content,
                     construct_files_content,
-                    construct_path_stat,
-                    construct_dir,
-                    construct_file,
-                    construct_link,
                     construct_process_result,
                     constraint_address,
                     constraint_path_globs,
@@ -722,10 +725,6 @@ class Native(Singleton):
         func(construct_snapshot),
         func(construct_file_content),
         func(construct_files_content),
-        func(construct_path_stat),
-        func(construct_dir),
-        func(construct_file),
-        func(construct_link),
         func(construct_process_result),
         # TypeConstraints.
         tc(constraint_address),

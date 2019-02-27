@@ -80,16 +80,13 @@ class LLVM(NativeTool):
   def path_entries(self):
     return self._filemap([('bin',)])
 
-  _PLATFORM_SPECIFIC_LINKER_NAME = {
-    'darwin': lambda: 'ld64.lld',
-    'linux': lambda: 'lld',
-  }
-
   def linker(self, platform):
     return Linker(
       path_entries=self.path_entries,
-      exe_filename=platform.resolve_platform_specific(
-        self._PLATFORM_SPECIFIC_LINKER_NAME),
+      exe_filename=platform.resolve_for_enum_variant({
+        'darwin': 'ld64.lld',
+        'linux': 'lld',
+      }),
       library_dirs=[],
       linking_library_dirs=[],
       extra_args=[],
@@ -108,7 +105,7 @@ class LLVM(NativeTool):
     return CCompiler(
       path_entries=self.path_entries,
       exe_filename='clang',
-      library_dirs=self._common_lib_dirs,
+      runtime_library_dirs=self._common_lib_dirs,
       include_dirs=self._common_include_dirs,
       extra_args=[])
 
@@ -120,7 +117,7 @@ class LLVM(NativeTool):
     return CppCompiler(
       path_entries=self.path_entries,
       exe_filename='clang++',
-      library_dirs=self._common_lib_dirs,
+      runtime_library_dirs=self._common_lib_dirs,
       include_dirs=(self._cpp_include_dirs + self._common_include_dirs),
       extra_args=[])
 

@@ -14,17 +14,17 @@ from types import GeneratorType
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
-                             MergedDirectories, Path, PathGlobs, PathGlobsAndRoot, Snapshot,
-                             UrlToFetch)
+                             MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, Throw
+from pants.engine.objects import Collection
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import Params, Select, constraint_for
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
-from pants.util.objects import Collection, datatype
+from pants.util.objects import datatype
 from pants.util.strutil import pluralize
 
 
@@ -100,10 +100,6 @@ class Scheduler(object):
       construct_snapshot=Snapshot,
       construct_file_content=FileContent,
       construct_files_content=FilesContent,
-      construct_path_stat=Path,
-      construct_dir=Dir,
-      construct_file=File,
-      construct_link=Link,
       construct_process_result=FallibleExecuteProcessResult,
       constraint_address=constraint_for(Address),
       constraint_path_globs=constraint_for(PathGlobs),
@@ -282,8 +278,7 @@ class Scheduler(object):
     return self._visualize_to_dir
 
   def _metrics(self, session):
-    metrics_val = self._native.lib.scheduler_metrics(self._scheduler, session)
-    return {k: v for k, v in self._from_value(metrics_val)}
+    return self._from_value(self._native.lib.scheduler_metrics(self._scheduler, session))
 
   def with_fork_context(self, func):
     """See the rustdocs for `scheduler_fork_context` for more information."""

@@ -5,46 +5,123 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from abc import abstractproperty
+from abc import abstractmethod, abstractproperty
 
 from pants.engine.rules import SingletonRule
+from pants.util.memo import memoized_classproperty
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
+from pants.util.objects import datatype, enum
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var
 
 
-class Platform(datatype(['normalized_os_name'])):
+class Platform(enum('normalized_os_name', all_normalized_os_names())):
 
-  class UnsupportedPlatformError(Exception):
-    """Thrown if pants is running on an unrecognized platform."""
-
-  @classmethod
-  def create(cls):
-    return Platform(get_normalized_os_name())
-
-  _NORMALIZED_OS_NAMES = frozenset(all_normalized_os_names())
-
-  def resolve_platform_specific(self, platform_specific_funs):
-    arg_keys = frozenset(platform_specific_funs.keys())
-    unknown_plats = self._NORMALIZED_OS_NAMES - arg_keys
-    if unknown_plats:
-      raise self.UnsupportedPlatformError(
-        "platform_specific_funs {} must support platforms {}"
-        .format(platform_specific_funs, list(unknown_plats)))
-    extra_plats = arg_keys - self._NORMALIZED_OS_NAMES
-    if extra_plats:
-      raise self.UnsupportedPlatformError(
-        "platform_specific_funs {} has unrecognized platforms {}"
-        .format(platform_specific_funs, list(extra_plats)))
-
-    fun_for_platform = platform_specific_funs[self.normalized_os_name]
-    return fun_for_platform()
+  default_value = get_normalized_os_name()
 
 
-class Executable(AbstractClass):
+def _list_field(func):
+  """A decorator for methods corresponding to list-valued fields of an `ExtensibleAlgebraic`.
 
-  @abstractproperty
+  The result is also wrapped in `abstractproperty`.
+  """
+  wrapped = abstractproperty(func)
+  wrapped._field_type = 'list'
+  return wrapped
+
+
+def _algebraic_data(metaclass):
+  """A class decorator to pull out `_list_fields` from a mixin class for use with a `datatype`."""
+  def wrapper(cls):
+    cls.__bases__ += (metaclass,)
+    cls._list_fields = metaclass._list_fields
+    return cls
+  return wrapper
+
+
+# NB: prototypal inheritance seems *deeply* linked with the idea here!
+# TODO: since we are calling these methods from other files, we should remove the leading underscore
+# and add testing!
+class _ExtensibleAlgebraic(AbstractClass):
+  """A mixin to make it more concise to coalesce datatypes with related collection fields."""
+
+  @memoized_classproperty
+  def _list_fields(cls):
+    all_list_fields = []
+    for field_name in cls.__abstractmethods__:
+      f = getattr(cls, field_name)
+      if getattr(f, '_field_type', None) == 'list':
+        all_list_fields.append(field_name)
+    return frozenset(all_list_fields)
+
+  @abstractmethod
+  def copy(self, **kwargs):
+    """Implementations should have the same behavior as a `datatype()`'s `copy()` method."""
+
+  class AlgebraicDataError(Exception): pass
+
+  def _single_list_field_operation(self, field_name, list_value, prepend=True):
+    if field_name not in self._list_fields:
+      raise self.AlgebraicDataError(
+        "Field '{}' is not in this object's set of declared list fields: {} (this object is : {})."
+        .format(field_name, self._list_fields, self))
+    cur_value = getattr(self, field_name)
+
+    if prepend:
+      new_value = list_value + cur_value
+    else:
+      new_value = cur_value + list_value
+
+    arg_dict = {field_name: new_value}
+    return self.copy(**arg_dict)
+
+  def prepend_field(self, field_name, list_value):
+    """Return a copy of this object with `list_value` prepended to the field named `field_name`."""
+    return self._single_list_field_operation(field_name, list_value, prepend=True)
+
+  def append_field(self, field_name, list_value):
+    """Return a copy of this object with `list_value` appended to the field named `field_name`."""
+    return self._single_list_field_operation(field_name, list_value, prepend=False)
+
+  def sequence(self, other, exclude_list_fields=None):
+    """Return a copy of this object which combines all the fields common to both `self` and `other`.
+
+    List fields will be concatenated.
+
+    The return type of this method is the type of `self` (or whatever `.copy()` returns), but the
+    `other` argument can be any `_ExtensibleAlgebraic` instance.
+    """
+    exclude_list_fields = frozenset(exclude_list_fields or [])
+    overwrite_kwargs = {}
+
+    nonexistent_excluded_fields = exclude_list_fields - self._list_fields
+    if nonexistent_excluded_fields:
+      raise self.AlgebraicDataError(
+        "Fields {} to exclude from a sequence() were not found in this object's list fields: {}. "
+        "This object is {}, the other object is {}."
+        .format(nonexistent_excluded_fields, self._list_fields, self, other))
+
+    shared_list_fields = (self._list_fields
+                          & other._list_fields
+                          - exclude_list_fields)
+    if not shared_list_fields:
+      raise self.AlgebraicDataError(
+        "Objects to sequence have no shared fields after excluding {}. "
+        "This object is {}, with list fields: {}. "
+        "The other object is {}, with list fields: {}."
+        .format(exclude_list_fields, self, self._list_fields, other, other._list_fields))
+
+    for list_field_name in shared_list_fields:
+      lhs_value = getattr(self, list_field_name)
+      rhs_value = getattr(other, list_field_name)
+      overwrite_kwargs[list_field_name] = lhs_value + rhs_value
+
+    return self.copy(**overwrite_kwargs)
+
+
+class _Executable(_ExtensibleAlgebraic):
+
+  @_list_field
   def path_entries(self):
     """A list of directory paths containing this executable, to be used in a subprocess's PATH.
 
@@ -60,63 +137,65 @@ class Executable(AbstractClass):
     :rtype: str
     """
 
-  # TODO: rename this to 'runtime_library_dirs'!
-  @abstractproperty
-  def library_dirs(self):
+  @_list_field
+  def runtime_library_dirs(self):
     """Directories containing shared libraries that must be on the runtime library search path.
 
-    Note: this is for libraries needed for the current Executable to run -- see LinkerMixin below
+    Note: this is for libraries needed for the current _Executable to run -- see _LinkerMixin below
     for libraries that are needed at link time.
-
     :rtype: list of str
     """
 
-  @property
+  @_list_field
   def extra_args(self):
-    """Additional arguments used when invoking this Executable.
+    """Additional arguments used when invoking this _Executable.
 
     These are typically placed before the invocation-specific command line arguments.
 
     :rtype: list of str
     """
-    return []
 
   _platform = Platform.create()
 
   @property
-  def as_invocation_environment_dict(self):
-    """A dict to use as this Executable's execution environment.
+  def invocation_environment_dict(self):
+    """A dict to use as this _Executable's execution environment.
+
+    This isn't made into an "algebraic" field because its contents (the keys of the dict) are
+    generally known to the specific class which is overriding this property. Implementations of this
+    property can then make use of the data in the algebraic fields to populate this dict.
 
     :rtype: dict of string -> string
     """
-    lib_env_var = self._platform.resolve_platform_specific({
-      'darwin': lambda: 'DYLD_LIBRARY_PATH',
-      'linux': lambda: 'LD_LIBRARY_PATH',
+    lib_env_var = self._platform.resolve_for_enum_variant({
+      'darwin': 'DYLD_LIBRARY_PATH',
+      'linux': 'LD_LIBRARY_PATH',
     })
     return {
       'PATH': create_path_env_var(self.path_entries),
-      lib_env_var: create_path_env_var(self.library_dirs),
+      lib_env_var: create_path_env_var(self.runtime_library_dirs),
     }
 
 
+@_algebraic_data(_Executable)
 class Assembler(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
-]), Executable):
-  pass
+    'runtime_library_dirs',
+    'extra_args',
+])): pass
 
 
-class LinkerMixin(Executable):
+class _LinkerMixin(_Executable):
 
-  @abstractproperty
+  @_list_field
   def linking_library_dirs(self):
     """Directories to search for libraries needed at link time.
 
     :rtype: list of str
     """
 
-  @abstractproperty
+  @_list_field
   def extra_object_files(self):
     """A list of object files required to perform a successful link.
 
@@ -126,8 +205,8 @@ class LinkerMixin(Executable):
     """
 
   @property
-  def as_invocation_environment_dict(self):
-    ret = super(LinkerMixin, self).as_invocation_environment_dict.copy()
+  def invocation_environment_dict(self):
+    ret = super(_LinkerMixin, self).invocation_environment_dict.copy()
 
     full_library_path_dirs = self.linking_library_dirs + [
       os.path.dirname(f) for f in self.extra_object_files
@@ -141,19 +220,20 @@ class LinkerMixin(Executable):
     return ret
 
 
+@_algebraic_data(_LinkerMixin)
 class Linker(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
     'linking_library_dirs',
     'extra_args',
     'extra_object_files',
-]), LinkerMixin): pass
+])): pass
 
 
-class CompilerMixin(Executable):
+class _CompilerMixin(_Executable):
 
-  @abstractproperty
+  @_list_field
   def include_dirs(self):
     """Directories to search for header files to #include during compilation.
 
@@ -161,8 +241,8 @@ class CompilerMixin(Executable):
     """
 
   @property
-  def as_invocation_environment_dict(self):
-    ret = super(CompilerMixin, self).as_invocation_environment_dict.copy()
+  def invocation_environment_dict(self):
+    ret = super(_CompilerMixin, self).invocation_environment_dict.copy()
 
     if self.include_dirs:
       ret['CPATH'] = create_path_env_var(self.include_dirs)
@@ -170,34 +250,36 @@ class CompilerMixin(Executable):
     return ret
 
 
+@_algebraic_data(_CompilerMixin)
 class CCompiler(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
     'include_dirs',
     'extra_args',
-]), CompilerMixin):
+])):
 
   @property
-  def as_invocation_environment_dict(self):
-    ret = super(CCompiler, self).as_invocation_environment_dict.copy()
+  def invocation_environment_dict(self):
+    ret = super(CCompiler, self).invocation_environment_dict.copy()
 
     ret['CC'] = self.exe_filename
 
     return ret
 
 
+@_algebraic_data(_CompilerMixin)
 class CppCompiler(datatype([
     'path_entries',
     'exe_filename',
-    'library_dirs',
+    'runtime_library_dirs',
     'include_dirs',
     'extra_args',
-]), CompilerMixin):
+])):
 
   @property
-  def as_invocation_environment_dict(self):
-    ret = super(CppCompiler, self).as_invocation_environment_dict.copy()
+  def invocation_environment_dict(self):
+    ret = super(CppCompiler, self).invocation_environment_dict.copy()
 
     ret['CXX'] = self.exe_filename
 

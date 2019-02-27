@@ -123,6 +123,7 @@ Signal {signum} was raised. Exiting with failure. \\(backtrace omitted\\)
       self._assert_graceful_signal_log_matches(
           waiter_run.pid, signal.SIGTERM, read_file(shared_log_file, binary_mode=False))
 
+  @unittest.skip('Hangs a lot: https://github.com/pantsbuild/pants/issues/7199')
   def test_dumps_traceback_on_sigabrt(self):
     # SIGABRT sends a traceback to the log file for the current process thanks to
     # faulthandler.enable().
@@ -197,7 +198,7 @@ Current thread [^\n]+ \\(most recent call first\\):
 
     with temporary_dir() as tmpdir:
       some_file = os.path.join(tmpdir, 'some_file')
-      safe_file_dump(some_file, b'', binary_mode=True)
+      safe_file_dump(some_file, b'', mode='wb')
       redirected_pants_run = self.run_pants([
         "--lifecycle-stubs-new-interactive-stream-output-file={}".format(some_file),
       ] + lifecycle_stub_cmdline)

@@ -51,15 +51,17 @@ class Reporting(Subsystem):
               help='The full HTTP URL of a zipkin server to which traces should be posted. '
                    'No traces will be made if this is not set.')
     register('--zipkin-trace-id', advanced=True, default=None,
-              help='The overall 64 or 128-bit ID of the trace. '
-                   'Set if Pants trace should be a part of larger trace '
-                   'for systems that invoke Pants. If zipkin-trace-id '
-                   'and zipkin-parent-id are not set, a trace_id value is randomly generated for a '
-                   'Zipkin trace')
+              help='The overall 64 or 128-bit ID of the trace (the format is 16-character or '
+                   '32-character hex string). Set if the Pants trace should be a part of a larger '
+                   'trace for systems that invoke Pants. If flags zipkin-trace-id and '
+                   'zipkin-parent-id are not set, a trace_id value is randomly generated '
+                   'for a Zipkin trace.')
     register('--zipkin-parent-id', advanced=True, default=None,
-              help='The 64-bit ID for a parent span that invokes Pants. '
-                   'zipkin-trace-id and zipkin-parent-id must both either be set or not set '
-                   'when run Pants command')
+              help='The 64-bit ID for a parent span that invokes Pants (the format is 16-character '
+                   'hex string). Flags zipkin-trace-id and zipkin-parent-id must both either be set '
+                   'or not set when running a Pants command.')
+    register('--zipkin-sample-rate', advanced=True, default=100.0,
+              help='Rate at which to sample Zipkin traces. Value 0.0 - 100.0.')
 
   def initialize(self, run_tracker, all_options, start_time=None):
     """Initialize with the given RunTracker.
@@ -100,6 +102,7 @@ class Reporting(Subsystem):
     zipkin_endpoint = self.get_options().zipkin_endpoint
     trace_id = self.get_options().zipkin_trace_id
     parent_id = self.get_options().zipkin_parent_id
+    sample_rate = self.get_options().zipkin_sample_rate
 
     if zipkin_endpoint is None and trace_id is not None and parent_id is not None:
       raise ValueError(
@@ -109,11 +112,21 @@ class Reporting(Subsystem):
       raise ValueError(
         "Flags zipkin-trace-id and zipkin-parent-id must both either be set or not set."
       )
+    if trace_id and (len(trace_id) != 16 and len(trace_id) != 32 or not is_hex_string(trace_id)):
+      raise ValueError(
+        "Value of the flag zipkin-trace-id must be a 16-character or 32-character hex string. "
+        + "Got {}.".format(trace_id)
+      )
+    if parent_id and (len(parent_id) != 16 or not is_hex_string(parent_id)):
+      raise ValueError(
+        "Value of the flag zipkin-parent-id must be a 16-character hex string. "
+        + "Got {}.".format(parent_id)
+      )
 
     if zipkin_endpoint is not None:
       zipkin_reporter_settings = ZipkinReporter.Settings(log_level=Report.INFO)
       zipkin_reporter = ZipkinReporter(
-        run_tracker, zipkin_reporter_settings, zipkin_endpoint, trace_id, parent_id
+        run_tracker, zipkin_reporter_settings, zipkin_endpoint, trace_id, parent_id, sample_rate
       )
       report.add_reporter('zipkin', zipkin_reporter)
 
@@ -192,3 +205,12 @@ class Reporting(Subsystem):
       invalidation_report.set_filename(outfile)
 
     return invalidation_report
+
+
+def is_hex_string(id_value):
+  return all(is_hex_ch(ch) for ch in id_value)
+
+
+def is_hex_ch(ch):
+  num = ord(ch)
+  return ord('0') <= num <= ord('9') or ord('a') <= num <= ord('f') or ord('A') <= num <= ord('F')

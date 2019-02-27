@@ -15,7 +15,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.option.ranked_value import RankedValue
 from pants.task.lint_task_mixin import LintTaskMixin
 
-from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
+from pants.contrib.scrooge.tasks.thrift_util import calculate_include_paths
 
 
 class ThriftLintError(Exception):
@@ -87,14 +87,14 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
     if not self._is_strict(target):
       config_args.append('--ignore-errors')
 
-    include_paths , paths = calculate_compile_sources([target], self._is_thrift)
+    paths = list(target.sources_relative_to_buildroot())
+    include_paths = calculate_include_paths([target], self._is_thrift)
     if target.include_paths:
       include_paths |= set(target.include_paths)
     for p in include_paths:
       config_args.extend(['--include-path', p])
 
-    args = config_args + list(paths)
-
+    args = config_args + paths
 
     # If runjava returns non-zero, this marks the workunit as a
     # FAILURE, and there is no way to wrap this here.

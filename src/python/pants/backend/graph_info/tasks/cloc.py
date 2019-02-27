@@ -40,7 +40,7 @@ class CountLinesOfCode(ConsoleTask):
     input_snapshots = tuple(
       target.sources_snapshot(scheduler=self.context._scheduler) for target in targets
     )
-    input_files = {f.path for snapshot in input_snapshots for f in snapshot.files}
+    input_files = {f for snapshot in input_snapshots for f in snapshot.files}
 
     # TODO: Work out a nice library-like utility for writing an argfile, as this will be common.
     with temporary_dir() as tmpdir:

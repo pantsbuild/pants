@@ -220,6 +220,23 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assertTrue(main_children)
       self.assertTrue(any(span['name'] == 'cloc' for span in main_children))
 
+  def test_zipkin_reporter_with_zero_sample_rate(self):
+    ZipkinHandler = zipkin_handler()
+    with http_server(ZipkinHandler) as port:
+      endpoint = "http://localhost:{}".format(port)
+      command = [
+        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        '--reporting-zipkin-sample-rate=0.0',
+        'cloc',
+        'src/python/pants:version'
+      ]
+
+      pants_run = self.run_pants(command)
+      self.assert_success(pants_run)
+
+      num_of_traces = len(ZipkinHandler.traces)
+      self.assertEqual(num_of_traces, 0)
+
   @staticmethod
   def find_spans_by_name(trace, name):
     return [span for span in trace if span['name'] == name]

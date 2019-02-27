@@ -33,8 +33,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecute
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
-from pants.util.dirutil import (fast_relpath, fast_relpath_optional, maybe_read_file,
-                                safe_file_dump, safe_mkdir)
+from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
 from pants.util.memo import memoized_property
 
 
@@ -58,20 +57,6 @@ def stdout_contents(wu):
     return wu.stdout.rstrip()
   with open(wu.output_paths()['stdout']) as f:
     return f.read().rstrip()
-
-
-def dump_digest(output_dir, digest):
-  safe_file_dump('{}.digest'.format(output_dir),
-    '{}:{}'.format(digest.fingerprint, digest.serialized_bytes_length), mode='w')
-
-
-def load_digest(output_dir):
-  read_file = maybe_read_file('{}.digest'.format(output_dir), binary_mode=False)
-  if read_file:
-    fingerprint, length = read_file.split(':')
-    return Digest(fingerprint, int(length))
-  else:
-    return None
 
 
 def _create_desandboxify_fn(possible_path_patterns):
@@ -130,7 +115,7 @@ class RscCompile(ZincCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super(RscCompile, cls).implementation_version() + [('RscCompile', 171)]
+    return super(RscCompile, cls).implementation_version() + [('RscCompile', 172)]
 
   @classmethod
   def register_options(cls, register):
@@ -199,11 +184,11 @@ class RscCompile(ZincCompile):
 
   # Overrides the normal zinc compiler classpath, which only contains zinc.
   def get_zinc_compiler_classpath(self):
-    return self.do_for_execution_strategy_variant({
+    return self.execution_strategy_enum.resolve_for_enum_variant({
       self.HERMETIC: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.SUBPROCESS: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
-    })
+    })()
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
@@ -216,7 +201,7 @@ class RscCompile(ZincCompile):
     def to_classpath_entries(paths, scheduler):
       # list of path ->
       # list of (path, optional<digest>) ->
-      path_and_digests = [(p, load_digest(os.path.dirname(p))) for p in paths]
+      path_and_digests = [(p, Digest.load(os.path.dirname(p))) for p in paths]
       # partition: list of path, list of tuples
       paths_without_digests = [p for (p, d) in path_and_digests if not d]
       if paths_without_digests:
@@ -823,7 +808,7 @@ class RscCompile(ZincCompile):
       raise TaskError(res.stderr)
 
     if output_dir:
-      dump_digest(output_dir, res.output_directory_digest)
+      res.output_directory_digest.dump(output_dir)
       self.context._scheduler.materialize_directories((
         DirectoryToMaterialize(
           # NB the first element here is the root to materialize into, not the dir to snapshot
@@ -859,7 +844,7 @@ class RscCompile(ZincCompile):
   def _runtool(self, main, tool_name, args, distribution,
                tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
     with self.context.new_workunit(tool_name) as wu:
-      return self.do_for_execution_strategy_variant({
+      return self.execution_strategy_enum.resolve_for_enum_variant({
         self.HERMETIC: lambda: self._runtool_hermetic(
           main, tool_name, args, distribution,
           tgt=tgt, input_files=input_files, input_digest=input_digest, output_dir=output_dir),
@@ -867,7 +852,7 @@ class RscCompile(ZincCompile):
           wu, self.tool_classpath(tool_name), main, tool_name, args, distribution),
         self.NAILGUN: lambda: self._runtool_nonhermetic(
           wu, self._nailgunnable_combined_classpath, main, tool_name, args, distribution),
-      })
+      })()
 
   def _run_metai_tool(self,
                       distribution,

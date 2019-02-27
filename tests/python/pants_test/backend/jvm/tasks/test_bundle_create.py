@@ -38,7 +38,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     entry_path = safe_mkdtemp(dir=target_dir)
     classpath_dir = safe_mkdtemp(dir=target_dir)
     for rel_path, content in files_dict.items():
-      safe_file_dump(os.path.join(entry_path, rel_path), content, binary_mode=False)
+      safe_file_dump(os.path.join(entry_path, rel_path), content, mode='w')
 
     # Create Jar to mimic consolidate classpath behavior.
     jarpath = os.path.join(classpath_dir, 'output-0.jar')
@@ -71,12 +71,12 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                           JarDependency(org='org.gnu', name='gary', rev='4.0.0',
                                                         ext='tar.gz')])
 
-    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content', binary_mode=False)
+    safe_file_dump(os.path.join(self.build_root, 'resources/foo/file'), '// dummy content', mode='w')
     self.resources_target = self.make_target('//resources:foo-resources', Resources,
                                              sources=['foo/file'])
 
     # This is so that payload fingerprint can be computed.
-    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content', binary_mode=False)
+    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content', mode='w')
     self.java_lib_target = self.make_target('//foo:foo-library', JavaLibrary, sources=['Foo.java'])
 
     self.binary_target = self.make_target(spec='//foo:foo-binary',

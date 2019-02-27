@@ -170,13 +170,8 @@ py36_osx_config: &py36_osx_config
       packages: &py36_osx_config_brew_packages
       - openssl
   env:
-    # Fix Python 3 issue linking to OpenSSL
     - &py36_osx_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
+      PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include" PYENV_ROOT="${HOME}/.pyenv" PATH="${PYENV_ROOT}/shims:${PATH}"
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
@@ -208,11 +203,7 @@ py36_osx_test_config: &py36_osx_test_config
   env:
     # Must duplicate py36_osx_config's env because it cannot be merged into a new anchor
     - &py36_osx_test_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
+      PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include" PYENV_ROOT="${HOME}/.pyenv" PATH="${PYENV_ROOT}/shims:${PATH}"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
 
 linux_with_fuse: &linux_with_fuse
@@ -381,10 +372,20 @@ cargo_audit: &cargo_audit
 # Build wheels
 # -------------------------------------------------------------------------
 
+# N.B. With Python 2, we must build pantsbuild.pants with both UCS2 and UCS4 to provide full
+# compatibility for end users. This is because we constrain our ABI due to the native engine.
+# See https://www.python.org/dev/peps/pep-0513/#ucs-2-vs-ucs-4-builds. Note this distinction is
+# not necessary with Python 3.3+ due to flexible storage of Unicode strings (https://www.python.org/dev/peps/pep-0393/).
+#
+# We treat both Linux UCS4 and OSX UCS2 normally, as these are the defaults for those environments.
+# The Linux UCS2 and OSX UCS4 shards, however, must rebuild Python with
+# `PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs{2,4}` set, along with bootstrapping Pants again rather
+# than pulling the PEX from AWS.
+
 base_build_wheels: &base_build_wheels
   stage: *test
   env:
-    - &base_build_wheels_env RUN_PANTS_FROM_PEX=1 PREPARE_DEPLOY=1
+    - &base_build_wheels_env PREPARE_DEPLOY=1
 
 base_linux_build_wheels: &base_linux_build_wheels
   # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize compatibility.
@@ -398,51 +399,102 @@ base_linux_build_wheels: &base_linux_build_wheels
       travis_ci:latest
       sh -c "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh ${RELEASE_ARGS} -n"
 
-py27_linux_build_wheels: &py27_linux_build_wheels
-  <<: *py27_linux_test_config
+py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
+  <<: *py27_linux_config
   <<: *base_linux_build_wheels
-  name: "Build Linux wheels (Py2.7 PEX)"
+  <<: *native_engine_cache_config
+  name: "Build wheels - Linux and cp27m (UCS2)"
+  env:
+    - *base_build_wheels_env
+    - CACHE_NAME=linuxwheelsbuild.ucs2
+  script:
+    - docker build --rm -t travis_ci_py27_ucs2
+      --build-arg "TRAVIS_USER=$(id -un)"
+      --build-arg "TRAVIS_UID=$(id -u)"
+      --build-arg "TRAVIS_GROUP=$(id -gn)"
+      --build-arg "TRAVIS_GID=$(id -g)"
+      build-support/docker/travis_ci_py27_ucs2/
+    - &docker_dry_run_release docker run --rm -t
+      -v "${HOME}:/travis/home"
+      -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci_py27_ucs2:latest
+      sh -c "PEX_VERBOSE=9 ./build-support/bin/ci.sh -2b && RUN_PANTS_FROM_PEX=1 PEX_VERBOSE=9 ./build-support/bin/release.sh -n"
+
+py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
+  <<: *base_linux_build_wheels
+  <<: *py27_linux_test_config
+  # `py27_linux_test_config` overrides the stage set by `base_build_wheels`, so we re-override it.
+  stage: *test
+  name: "Build wheels - Linux and cp27mu (UCS4)"
   env:
     - *py27_linux_test_config_env
     - *base_build_wheels_env
     - RELEASE_ARGS=''
-    - CACHE_NAME=linuxwheelsbuild.py27
+    - CACHE_NAME=linuxwheelsbuild.ucs4
 
 py36_linux_build_wheels: &py36_linux_build_wheels
-  <<: *py36_linux_test_config
   <<: *base_linux_build_wheels
-  name: "Build Linux wheels (Py3.6 PEX)"
+  <<: *py36_linux_test_config
+  name: "Build wheels - Linux and abi3 (Py3.6+)"
   env:
     - *py36_linux_test_config_env
     - *base_build_wheels_env
     - RELEASE_ARGS='-3'
-    - CACHE_NAME=linuxwheelsbuild.py36
+    - CACHE_NAME=linuxwheelsbuild.abi3
 
 base_osx_build_wheels: &base_osx_build_wheels
   <<: *base_build_wheels
   osx_image: xcode8
   script:
-    - ./build-support/bin/release.sh ${RELEASE_ARGS} -n
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh ${RELEASE_ARGS} -n
 
-py27_osx_build_wheels: &py27_osx_build_wheels
+py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
   <<: *py27_osx_test_config
   <<: *base_osx_build_wheels
-  name: "Build OSX wheels (Py2.7 PEX)"
+  name: "Build wheels - OSX and cp27m (UCS2)"
   env:
     - *py27_osx_test_config_env
     - *base_build_wheels_env
     - RELEASE_ARGS=''
-    - CACHE_NAME=osxwheelsbuild.py27
+    - CACHE_NAME=osxwheelsbuild.ucs2
+
+py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
+  <<: *py27_osx_config
+  <<: *base_osx_build_wheels
+  <<: *native_engine_cache_config
+  name: "Build wheels - OSX and cp27mu (UCS4)"
+  addons:
+    brew:
+      packages:
+      - openssl
+  env:
+    - *base_build_wheels_env
+    - CACHE_NAME=osxwheelsbuild.ucs4
+    - PATH="/usr/local/opt/openssl/bin:$PATH" LDFLAGS="-L/usr/local/opt/openssl/lib" CPPFLAGS="-I/usr/local/opt/openssl/include" PYENV_ROOT="${HOME}/.pyenv" PATH="${PYENV_ROOT}/shims:${PATH}"
+
+    - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
+    # We set $PY to ensure the UCS4 interpreter is used when bootstrapping the PEX.
+    - PY=${PYENV_ROOT}/shims/python2.7
+  before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
+    - ${PYENV_ROOT}/bin/pyenv install 2.7.13
+    - ${PYENV_ROOT}/bin/pyenv global 2.7.13
+  script:
+    - PEX_VERBOSE=9 ./build-support/bin/ci.sh -2b
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 py36_osx_build_wheels: &py36_osx_build_wheels
   <<: *py36_osx_test_config
   <<: *base_osx_build_wheels
-  name: "Build OSX wheels (Py3.6 PEX)"
+  name: "Build wheels - OSX and abi3 (Py3.6+)"
   env:
     - *py36_osx_test_config_env
     - *base_build_wheels_env
     - RELEASE_ARGS='-3'
-    - CACHE_NAME=osxwheelsbuild.py36
+    - CACHE_NAME=osxwheelsbuild.abi3
 
 # -------------------------------------------------------------------------
 # Rust tests
@@ -644,11 +696,6 @@ matrix:
     - <<: *linux_rust_clippy
     - <<: *cargo_audit
 
-    - <<: *py27_linux_build_wheels
-    - <<: *py36_linux_build_wheels
-    - <<: *py27_osx_build_wheels
-    - <<: *py36_osx_build_wheels
-
     - <<: *py27_linux_test_config
       name: "Unit tests for pants and pants-plugins (Py2.7 PEX)"
       stage: *test
@@ -665,6 +712,14 @@ matrix:
         - CACHE_NAME=linuxunittests.py36
       script:
         - ./build-support/bin/travis-ci.sh -lp
+
+    - <<: *py27_linux_build_wheels_ucs2
+    - <<: *py27_linux_build_wheels_ucs4
+    - <<: *py36_linux_build_wheels
+
+    - <<: *py27_osx_build_wheels_ucs2
+    - <<: *py27_osx_build_wheels_ucs4
+    - <<: *py36_osx_build_wheels
 
     - <<: *py36_linux_test_config
       name: "Integration tests for pants - shard 0 (Py3.6 PEX)"
