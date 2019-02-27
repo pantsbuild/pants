@@ -3,6 +3,33 @@
 This document describes releases leading up to the ``1.14.x`` ``stable`` series.
 
 
+1.14.0rc3 (2/21/2019)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add flags to processs_executor that say where to materialize output and what output is (#7201)
+  `PR #7201 <https://github.com/pantsbuild/pants/pull/7201>`_
+
+* Resolve all platforms from all python targets (#7156)
+  `PR #7156 <https://github.com/pantsbuild/pants/pull/7156>`_
+
+* Remove deprecated test classes (#7243)
+  `PR #7243 <https://github.com/pantsbuild/pants/pull/7243>`_
+
+Bugfixes
+~~~~~~~~
+
+* Revert remote execution from tower to grpcio (#7256)
+  `PR #7256 <https://github.com/pantsbuild/pants/pull/7256>`_
+
+* Avoid capturing Snapshots for previously digested codegen outputs (#7241)
+  `PR #7241 <https://github.com/pantsbuild/pants/pull/7241>`_
+
+* Validate and maybe prune interpreter cache run over run (#7225)
+  `PR #7225 <https://github.com/pantsbuild/pants/pull/7225>`_
+
 1.14.0rc2 (2/15/2019)
 ---------------------
 

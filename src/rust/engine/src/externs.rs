@@ -121,6 +121,11 @@ pub fn store_i64(val: i64) -> Value {
 }
 
 #[allow(dead_code)]
+pub fn store_f64(val: f64) -> Value {
+  with_externs(|e| (e.store_f64)(e.context, val).into())
+}
+
+#[allow(dead_code)]
 pub fn store_bool(val: bool) -> Value {
   with_externs(|e| (e.store_bool)(e.context, val).into())
 }
@@ -343,6 +348,7 @@ pub struct Externs {
   pub store_bytes: StoreBytesExtern,
   pub store_utf8: StoreUtf8Extern,
   pub store_i64: StoreI64Extern,
+  pub store_f64: StoreF64Extern,
   pub store_bool: StoreBoolExtern,
   pub project_ignoring_type: ProjectIgnoringTypeExtern,
   pub project_multi: ProjectMultiExtern,
@@ -381,6 +387,8 @@ pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) 
 pub type StoreUtf8Extern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
 
 pub type StoreI64Extern = extern "C" fn(*const ExternContext, i64) -> Handle;
+
+pub type StoreF64Extern = extern "C" fn(*const ExternContext, f64) -> Handle;
 
 pub type StoreBoolExtern = extern "C" fn(*const ExternContext, bool) -> Handle;
 

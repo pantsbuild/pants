@@ -183,7 +183,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
     attempt_pants_run = Platform.create().resolve_for_enum_variant({
-      'darwin': toolchain_variant != 'gnu',
+      'darwin': toolchain_variant.resolve_for_enum_variant({
+        'gnu': False,
+        'llvm': True,
+      }),
       'linux': True,
     })
     if attempt_pants_run:
@@ -226,6 +229,18 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     This target uses the ndebug and asdf option sets.
     If either of these are not present (disabled), this test will fail.
     """
+    # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
+    # be available on the runtime library path.
+    attempt_pants_run = Platform.create().resolve_for_enum_variant({
+      'darwin': toolchain_variant.resolve_for_enum_variant({
+        'gnu': False,
+        'llvm': True,
+      }),
+      'linux': True,
+    })
+    if not attempt_pants_run:
+      return
+
     command = [
       'run',
       self._binary_target_with_compiler_option_sets

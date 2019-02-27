@@ -8,19 +8,18 @@ import os
 from abc import abstractmethod
 from collections import defaultdict
 
-from pants.backend.native.config.environment import Executable
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass, classproperty
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.objects import datatype
 from pants.util.process_handler import subprocess
 
 
 class NativeCompileRequest(datatype([
-    ('compiler', SubclassesOf(Executable)),
+    'compiler',
     # TODO: add type checking for Collection.of(<type>)!
     'include_dirs',
     'sources',
@@ -134,11 +133,11 @@ class NativeCompile(NativeTask, AbstractClass):
 
   @abstractmethod
   def get_compiler(self, native_library_target):
-    """An instance of `Executable` which can be invoked to compile files.
+    """An instance of `_CompilerMixin` which can be invoked to compile files.
 
     NB: Subclasses will be queried for the compiler instance once and the result cached.
 
-    :return: :class:`pants.backend.native.config.environment.Executable`
+    :return: :class:`pants.backend.native.config.environment._CompilerMixin`
     """
 
   def _compiler(self, native_library_target):
@@ -229,7 +228,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
     compiler = compile_request.compiler
     output_dir = compile_request.output_dir
-    env = compiler.as_invocation_environment_dict
+    env = compiler.invocation_environment_dict
 
     with self.context.new_workunit(
         name=self.workunit_label, labels=[WorkUnitLabel.COMPILER]) as workunit:
