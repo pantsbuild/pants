@@ -16,6 +16,7 @@ from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -83,6 +84,9 @@ class SelectInterpreter(Task):
         if self._detect_and_purge_invalid_interpreter(interpreter_path_file):
           self._create_interpreter_path_file(interpreter_path_file, python_tgts)
     interpreter = self._get_interpreter(interpreter_path_file)
+    if not interpreter:
+      raise TaskError(
+        'Pants could not load interpreter from path file: {}'.format(interpreter_path_file))
     self.context.products.register_data(PythonInterpreter, interpreter)
 
   def _create_interpreter_path_file(self, interpreter_path_file, targets):
@@ -101,7 +105,7 @@ class SelectInterpreter(Task):
   def _detect_and_purge_invalid_interpreter(self, interpreter_path_file):
     interpreter = self._get_interpreter(interpreter_path_file)
     if not interpreter:
-      self.context.log.info('Stale interpreter reference detected: {}, removing reference and '
+      self.context.log.debug('Stale interpreter reference detected: {}, removing reference and '
                             'selecting a new interpreter.'.format(interpreter_path_file))
       os.remove(interpreter_path_file)
       return True
