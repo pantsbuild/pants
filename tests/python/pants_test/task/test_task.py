@@ -13,6 +13,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.files import Files
+from pants.build_graph.target_filter_subsystem import TargetFilter
 from pants.cache.cache_setup import CacheSetup
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.subsystem.subsystem import Subsystem
@@ -147,6 +148,11 @@ class TaskWithTransitiveSubsystemDependencies(Task):
 
   def execute(self):
     pass
+
+
+class TaskWithTargetFiltering(DummyTask):
+  options_scope = 'task-with-target-filtering'
+  target_filtering_enabled = True
 
 
 class TaskTest(TaskTestBase):
@@ -650,3 +656,9 @@ files(
     fp3 = self._synth_fp(cls=TaskWithTransitiveSubsystemDependencies,
                          options_fingerprintable=option_spec)
     self.assertNotEqual(fp1, fp3)
+
+  def test_target_filtering_enabled(self):
+    self.assertNotIn(TargetFilter.scoped(DummyTask),
+                     DummyTask.subsystem_dependencies())
+    self.assertIn(TargetFilter.scoped(TaskWithTargetFiltering), 
+                  TaskWithTargetFiltering.subsystem_dependencies())

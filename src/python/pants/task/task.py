@@ -30,7 +30,7 @@ from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass
+from pants.util.meta import AbstractClass, classproperty
 
 
 class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
@@ -97,7 +97,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   @classmethod
   def subsystem_dependencies(cls):
     return (super(TaskBase, cls).subsystem_dependencies() +
-            (CacheSetup.scoped(cls), TargetFilter.scoped(cls), BuildInvalidator.Factory, SourceRootConfig))
+            (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig) +
+            ((TargetFilter.scoped(cls),) if cls.target_filtering_enabled else tuple()))
 
   @classmethod
   def product_types(cls):
@@ -223,6 +224,17 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return True
 
+  @classproperty
+  def target_filtering_enabled(cls):
+    """Whether this task should apply configured filters against targets.
+
+    Tasks can override to enable target filtering (e.g. based on tags) and must
+    access targets via get_targets()
+
+    :API: public
+    """
+    return False
+
   def get_targets(self, predicate=None):
     """Returns the candidate targets this task should act on.
 
@@ -241,8 +253,14 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     initial_targets = (self.context.targets(predicate) if self.act_transitively
                        else list(filter(predicate, self.context.target_roots)))
 
-    included_targets = TargetFilter.scoped_instance(self).apply(initial_targets)
-    excluded_targets = set(initial_targets).difference(included_targets)
+    if not self.target_filtering_enabled:
+      return initial_targets
+    else: 
+      return self._filter_targets(initial_targets)
+
+  def _filter_targets(self, targets):
+    included_targets = TargetFilter.scoped_instance(self).apply(targets)
+    excluded_targets = set(targets).difference(included_targets)
 
     if excluded_targets:
       self.context.log.info("{} target(s) excluded".format(len(excluded_targets)))

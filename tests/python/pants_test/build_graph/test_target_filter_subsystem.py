@@ -15,6 +15,7 @@ class TestTargetFilter(TaskTestBase):
 
   class DummyTask(Task):
     options_scope = 'dummy'
+    target_filtering_enabled = True
 
     def execute(self):
       self.context.products.safe_create_data('task_targets', self.get_targets)
