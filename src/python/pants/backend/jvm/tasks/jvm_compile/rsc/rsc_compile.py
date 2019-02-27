@@ -19,7 +19,6 @@ from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
-from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import Job
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
@@ -137,16 +136,13 @@ class RscCompileContext(CompileContext):
                jar_file,
                log_dir,
                zinc_args_file,
-               sources,
-               rsc_index_dir):
+               sources):
     super(RscCompileContext, self).__init__(target, analysis_file, classes_dir, jar_file,
                                                log_dir, zinc_args_file, sources)
     self.rsc_jar_file = rsc_jar_file
-    self.rsc_index_dir = rsc_index_dir
 
   def ensure_output_dirs_exist(self):
     safe_mkdir(os.path.dirname(self.rsc_jar_file))
-    safe_mkdir(self.rsc_index_dir)
 
 
 class RscCompile(ZincCompile):
@@ -154,10 +150,6 @@ class RscCompile(ZincCompile):
 
   _name = 'rsc' # noqa
   compiler_name = 'rsc'
-
-  def __init__(self, *args, **kwargs):
-    super(RscCompile, self).__init__(*args, **kwargs)
-    self._metacp_jars_classpath_product = ClasspathProducts(self.get_options().pants_workdir)
 
   @classmethod
   def implementation_version(cls):
@@ -478,7 +470,6 @@ class RscCompile(ZincCompile):
   def create_compile_context(self, target, target_workdir):
     # workdir layout:
     # rsc/
-    #   - index/   -- metacp results
     #   - outline/ -- semanticdbs for the current target as created by rsc
     #   - m.jar    -- reified scala signature jar
     # zinc/
@@ -499,7 +490,6 @@ class RscCompile(ZincCompile):
         rsc_jar_file=os.path.join(rsc_dir, 'm.jar'),
         log_dir=os.path.join(rsc_dir, 'logs'),
         sources=sources,
-        rsc_index_dir=os.path.join(rsc_dir, 'index'),
       ),
       CompileContext(
         target=target,
