@@ -102,9 +102,7 @@ function run_pex() {
     PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
     PEX_PEX=pex27
     if [[ "${python_three}" == "true" ]]; then
-      # TODO(pex#654). Once PEX is released more flexibly, set this to `pex3` or `pex` (depending
-      # on what we end up releasing).
-      PEX_PEX=pex37
+      PEX_PEX=pex36
     fi
 
     pexdir="$(mktemp -d -t build_pex.XXXXX)"
