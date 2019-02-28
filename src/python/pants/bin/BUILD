@@ -71,6 +71,9 @@ python_binary(
   dependencies=[
     ':bin',
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
+    # The pants local binary depends on the rust contrib module in order to transitively pick up
+    # its `toml` dep in a slightly more self-documenting way than directly adding the `toml` dep.
+    'contrib/rust/src/python/pants/contrib/rust:plugin',
     'pants-plugins/src/python/internal_backend:plugins',
   ],
 )
