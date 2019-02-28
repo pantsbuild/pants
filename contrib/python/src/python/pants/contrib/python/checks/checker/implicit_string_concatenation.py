@@ -26,11 +26,16 @@ class ImplicitStringConcatenation(CheckstylePlugin):
   def maybe_uses_implicit_concatenation(self, expr):
     str_node_text = self.python_file.tokenized_file_body.get_text(expr)
     # Search for string nodes of the form 'a' 'b', using any combination of single or double quotes,
-    # with any spacing in between them, but don't flag instances of """. This searches from the
-    # start of the string node and parses backslashes.
+    # with any spacing in between them, but don't flag instances of """ or '''. This searches from
+    # the start of the string node and parses backslashes.
+    # TODO: consider just parsing the string for string components and then raising if there is more
+    # than one. This would also allow for more complex logic like reaching into triple-quoted
+    # strings.
     if re.match(r"^\s*(('([^']|(\\)*')*'|\"([^\"]|(\\)*\")*\")\s+('([^']|(\\)*')*'|\"([^\"]|(\\)*\")*\")|('([^']|(\\)*')+'|\"([^\"]|(\\)*\")+\")\s*('([^']|(\\)*')+'|\"([^\"]|(\\)*\")+\"))",
                 str_node_text):
       return True
+    # TODO: also consider checking when triple-quoted strings are used -- e.g. '''''a''' becomes
+    # "''a", but '''a''''' is just "a", which is confusing.
 
   def nits(self):
     for str_node in self.iter_strings(self.python_file.tree):
