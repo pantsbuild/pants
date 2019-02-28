@@ -171,7 +171,7 @@ class PexBuilderWrapper(object):
       ))
     except (StopIteration, ValueError) as e:
       raise self.SingleDistExtractionError(
-        "exactly one dist was expected to match name {} in requirements {}: {}"
+        "Exactly one dist was expected to match name {} in requirements {}: {}"
         .format(dist_key, reqs, e))
     return matched_dist
 
