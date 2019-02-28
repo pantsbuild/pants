@@ -14,6 +14,7 @@ from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.deprecated import deprecated
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
@@ -41,11 +42,13 @@ class Context(object):
   # repository of attributes?
   def __init__(self, options, run_tracker, target_roots,
                requested_goals=None, target_base=None, build_graph=None,
-               build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
+               build_file_parser=None, build_configuration=None,
+               address_mapper=None, console_outstream=None, scm=None,
                workspace=None, invalidation_report=None, scheduler=None):
     self._options = options
     self.build_graph = build_graph
-    self.build_file_parser = build_file_parser
+    self._build_file_parser = build_file_parser
+    self.build_configuration = build_configuration
     self.address_mapper = address_mapper
     self.run_tracker = run_tracker
     self._log = run_tracker.logger
@@ -62,6 +65,11 @@ class Context(object):
     self._replace_targets(target_roots)
     self._invalidation_report = invalidation_report
     self._scheduler = scheduler
+
+  @property
+  @deprecated('1.17.0.dev2', hint_message='Use the build_configuration property.')
+  def build_file_parser(self):
+    return self._build_file_parser
 
   @property
   def options(self):

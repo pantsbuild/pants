@@ -375,7 +375,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
   @memoized_property
   def target_aliases_map(self):
-    registered_aliases = self.context.build_file_parser.registered_aliases()
+    registered_aliases = self.context.build_configuration.registered_aliases()
     mapping = {}
     for alias, target_types in registered_aliases.target_types_by_alias.items():
       # If a target class is registered under multiple aliases returns the last one.
