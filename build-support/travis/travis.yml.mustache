@@ -112,11 +112,6 @@ base_linux_config: &base_linux_config
   language: python
   before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    # N.B. When ran with Python 3.7, Linux shards complain that they cannot find `libffi.so.5`.
-    # e.g. https://travis-ci.org/pantsbuild/pants/jobs/499644021#L552. Ubuntu does not provide a way
-    # to install `libffi5`, so instead we create a symbolic link from libffi6 to libffi5. See
-    # https://askubuntu.com/questions/518644/error-while-loading-shared-libraries-libffi-so-5.
-    - ln -s /usr/lib/x86_64-linux-gnu/liffi.so.6 /usr/lib/x86_64-linux-gnu/liffi.so.5
   after_failure:
     - ./build-support/bin/ci-failure.sh
 

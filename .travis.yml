@@ -119,11 +119,6 @@ base_linux_config: &base_linux_config
   language: python
   before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    # N.B. When ran with Python 3.7, Linux shards complain that they cannot find `libffi.so.5`.
-    # e.g. https://travis-ci.org/pantsbuild/pants/jobs/499644021#L552. Ubuntu does not provide a way
-    # to install `libffi5`, so instead we create a symbolic link from libffi6 to libffi5. See
-    # https://askubuntu.com/questions/518644/error-while-loading-shared-libraries-libffi-so-5.
-    - ln -s /usr/lib/x86_64-linux-gnu/liffi.so.6 /usr/lib/x86_64-linux-gnu/liffi.so.5
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
@@ -149,11 +144,6 @@ base_linux_test_config: &base_linux_test_config
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    # N.B. When ran with Python 3.7, Linux shards complain that they cannot find `libffi.so.5`.
-    # e.g. https://travis-ci.org/pantsbuild/pants/jobs/499644021#L552. Ubuntu does not provide a way
-    # to install `libffi5`, so instead we create a symbolic link from libffi6 to libffi5. See
-    # https://askubuntu.com/questions/518644/error-while-loading-shared-libraries-libffi-so-5.
-    - ln -s /usr/lib/x86_64-linux-gnu/liffi.so.6 /usr/lib/x86_64-linux-gnu/liffi.so.5
   before_script:
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
 
@@ -267,11 +257,6 @@ linux_with_fuse: &linux_with_fuse
     # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    # N.B. When ran with Python 3.7, Linux shards complain that they cannot find `libffi.so.5`.
-    # e.g. https://travis-ci.org/pantsbuild/pants/jobs/499644021#L552. Ubuntu does not provide a way
-    # to install `libffi5`, so instead we create a symbolic link from libffi6 to libffi5. See
-    # https://askubuntu.com/questions/518644/error-while-loading-shared-libraries-libffi-so-5.
-    - ln -s /usr/lib/x86_64-linux-gnu/liffi.so.6 /usr/lib/x86_64-linux-gnu/liffi.so.5
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
