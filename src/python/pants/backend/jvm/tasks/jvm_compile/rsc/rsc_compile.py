@@ -13,7 +13,6 @@ from future.utils import PY3, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
-from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -327,19 +326,19 @@ class RscCompile(ZincCompile):
 
           sources_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
 
+          distribution = self._get_jvm_distribution()
+
           def hermetic_digest_classpath():
-            hermetic_dist = self._hermetic_jvm_distribution()
-            jdk_libs_rel, jdk_libs_digest = self._jdk_libs_paths_and_digest(hermetic_dist)
+            jdk_libs_rel, jdk_libs_digest = self._jdk_libs_paths_and_digest(distribution)
             merged_sources_and_jdk_digest = self.context._scheduler.merge_directories(
               (jdk_libs_digest, sources_snapshot.directory_digest))
             classpath_rel_jdk = rsc_classpath_rel + jdk_libs_rel
-            return (merged_sources_and_jdk_digest, classpath_rel_jdk, hermetic_dist)
+            return (merged_sources_and_jdk_digest, classpath_rel_jdk)
           def nonhermetic_digest_classpath():
-            nonhermetic_dist = self._nonhermetic_jvm_distribution()
-            classpath_abs_jdk = rsc_classpath_rel + self._jdk_libs_abs(nonhermetic_dist)
-            return ((EMPTY_DIRECTORY_DIGEST), classpath_abs_jdk, nonhermetic_dist)
+            classpath_abs_jdk = rsc_classpath_rel + self._jdk_libs_abs(distribution)
+            return ((EMPTY_DIRECTORY_DIGEST), classpath_abs_jdk)
 
-          (input_digest, classpath_entry_paths, distribution) = self.execution_strategy_enum.resolve_for_enum_variant({
+          (input_digest, classpath_entry_paths) = self.execution_strategy_enum.resolve_for_enum_variant({
             self.HERMETIC: hermetic_digest_classpath,
             self.SUBPROCESS: nonhermetic_digest_classpath,
             self.NAILGUN: nonhermetic_digest_classpath,
@@ -607,54 +606,6 @@ class RscCompile(ZincCompile):
   @memoized_method
   def _jdk_libs_abs(self, nonhermetic_dist):
     return nonhermetic_dist.find_libs(self._JDK_LIB_NAMES)
-
-  class _HermeticDistribution(object):
-    def __init__(self, home_path, distribution):
-      self._underlying = distribution
-      self._home = home_path
-
-    def find_libs(self, names):
-      underlying_libs = self._underlying.find_libs(names)
-      return [self._rehome(l) for l in underlying_libs]
-
-    def find_libs_path_globs(self, names):
-      libs_abs = self._underlying.find_libs(names)
-      libs_unrooted = [self._unroot_lib_path(l) for l in libs_abs]
-      path_globs = PathGlobsAndRoot(
-        PathGlobs(tuple(libs_unrooted)),
-        text_type(self._underlying.home))
-      return (libs_unrooted, path_globs)
-
-    @property
-    def java(self):
-      return os.path.join(self._home, 'bin', 'java')
-
-    @property
-    def home(self):
-      return self._home
-
-    @property
-    def underlying_home(self):
-      return self._underlying.home
-
-    def _unroot_lib_path(self, path):
-      return path[len(self._underlying.home)+1:]
-
-    def _rehome(self, l):
-      return os.path.join(self._home, self._unroot_lib_path(l))
-
-  @memoized_method
-  def _hermetic_jvm_distribution(self):
-    # TODO We may want to use different jvm distributions depending on what
-    # java version the target expects to be compiled against.
-    # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
-    #      different jdks in remote builds.
-    local_distribution = JvmPlatform.preferred_jvm_distribution([], strict=True)
-    return self._HermeticDistribution('.jdk', local_distribution)
-
-  @memoized_method
-  def _nonhermetic_jvm_distribution(self):
-    return JvmPlatform.preferred_jvm_distribution([], strict=True)
 
   def _on_invalid_compile_dependency(self, dep, compile_target):
     """Decide whether to continue searching for invalid targets to use in the execution graph.
