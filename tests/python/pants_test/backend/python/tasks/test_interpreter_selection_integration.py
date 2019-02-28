@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import glob
 import os
 
+from pex.interpreter import PythonInterpreter
+
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
 from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27, skip_unless_python3,
@@ -116,8 +118,13 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
 
       def _validate_good_interpreter_path_file(path):
         with open(path, 'r') as fp:
-          interpreter_binary = fp.readline()
-          return os.path.exists(interpreter_binary)
+          lines = fp.readlines()
+          binary = lines[0].strip()
+          try:
+            interpreter = PythonInterpreter.from_binary(binary)
+            return True if interpreter else False
+          except Executor.ExecutableNotFound:
+            return False
 
       # Mangle interpreter.info.
       for path in glob.glob(os.path.join(workdir, 'pyprep/interpreter/*/interpreter.info')):
