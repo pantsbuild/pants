@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 from builtins import str
 from hashlib import sha1
 
@@ -19,7 +20,7 @@ from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, Fing
 from pants.fs.archive import ZIP
 from pants.task.unpack_remote_sources_base import UnpackRemoteSourcesBase
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_concurrent_creation
+from pants.util.dirutil import mergetree, safe_concurrent_creation
 from pants.util.memo import memoized_method
 from pants.util.objects import SubclassesOf
 
@@ -77,13 +78,21 @@ class UnpackWheels(UnpackRemoteSourcesBase):
   def unpack_target(self, unpacked_whls, unpack_dir):
     interpreter = self._compatible_interpreter(unpacked_whls)
 
-    with temporary_dir() as tmp_dir:
+    with temporary_dir() as resolve_dir,\
+         temporary_dir() as extract_dir:
       try:
-        wheel_path = self._get_matching_wheel(tmp_dir, interpreter,
-                                              unpacked_whls.all_imported_requirements,
-                                              unpacked_whls.module_name)
+        matched_dist = self._get_matching_wheel(resolve_dir, interpreter,
+                                                unpacked_whls.all_imported_requirements,
+                                                unpacked_whls.module_name)
+        ZIP.extract(matched_dist.location, extract_dir)
+        data_dir_prefix = '{name}-{version}.data/purelib/{name}'.format(
+          name=matched_dist.project_name,
+          version=matched_dist.version,
+        )
+        dist_data_dir = os.path.join(extract_dir, data_dir_prefix)
         unpack_filter = self.get_unpack_filter(unpacked_whls)
-        ZIP.extract(wheel_path, unpack_dir, filter_func=unpack_filter)
+        # Copy over the module's data files into `unpack_dir`.
+        mergetree(dist_data_dir, unpack_dir, file_filter=unpack_filter)
       except Exception as e:
         raise self.NativeCodeExtractionError(
           "Error extracting wheel for target {}: {}"
