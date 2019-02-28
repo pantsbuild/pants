@@ -112,12 +112,12 @@ class NailgunProtocol(object):
         yield item
 
   @classmethod
-  def send_request(cls, sock, working_dir, command, *arguments, **environment):
+  def send_request(cls, sock, working_dir, command, args, env):
     """Send the initial Nailgun request over the specified socket."""
-    for argument in arguments:
+    for argument in args:
       cls.write_chunk(sock, cls.CHUNK_TYPE.ARGUMENT, argument)
 
-    for item_tuple in environment.items():
+    for item_tuple in env.items():
       cls.write_chunk(sock,
                       cls.CHUNK_TYPE.ENVIRONMENT,
                       cls.ENVIRON_SEP.join(cls._decode_unicode_seq(item_tuple)))

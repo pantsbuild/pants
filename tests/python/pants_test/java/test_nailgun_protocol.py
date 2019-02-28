@@ -59,8 +59,8 @@ class TestNailgunProtocol(NailgunProtocolTestBase):
       self.client_sock,
       self.TEST_WORKING_DIR,
       self.TEST_COMMAND,
-      *self.TEST_ARGUMENTS,
-      **self.TEST_ENVIRON
+      args=self.TEST_ARGUMENTS,
+      env=self.TEST_ENVIRON,
     )
 
     # Receive the request from the server-side context.

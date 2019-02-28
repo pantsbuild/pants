@@ -85,6 +85,6 @@ class TestPailgunHandler(unittest.TestCase):
 
   @mock.patch.object(PailgunHandler, '_run_pants', **PATCH_OPTS)
   def test_handle_request(self, mock_run_pants):
-    PailgunProtocol.send_request(self.client_sock, '/test', './pants', 'help-advanced')
+    PailgunProtocol.send_request(self.client_sock, '/test', './pants', args=['help-advanced'])
     self.handler.handle_request()
     self.assertIs(mock_run_pants.called, True)

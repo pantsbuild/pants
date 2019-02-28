@@ -15,29 +15,37 @@ from contextlib import contextmanager
 
 from future.utils import binary_type
 
-from future.utils import PY3
-
 from pants.java.nailgun_io import NailgunStreamWriter
-from pants.java.nailgun_protocol import (ChunkType, NailgunProtocol, PailgunChunkType,
-                                         PailgunProtocol)
+from pants.java.nailgun_protocol import ChunkType, NailgunProtocol, PailgunProtocol
 from pants.util.memo import memoized_property
 from pants.util.objects import Exactly, datatype  # TODO: cache the datatype __hash__!
+from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
 
 
 logger = logging.getLogger(__name__)
 
 
-class NailgunClientSession(NailgunProtocol):
+class NailgunClientSession(object):
   """Handles a single nailgun client session."""
+
+  _protocol = NailgunProtocol
 
   def __init__(self, request):
     assert(isinstance(request, self.NailgunClientSessionInitiationRequest))
     self._request = request
 
   @property
-  def sock(self):
+  def _sock(self):
     return self._request.sock
+
+  @property
+  def _stdout(self):
+    return self._request.stdout
+
+  @property
+  def _stderr(self):
+    return self._request.stderr
 
   class NailgunClientSessionInitiationRequest(datatype([
       'sock',
@@ -87,11 +95,11 @@ class NailgunClientSession(NailgunProtocol):
       # Send the nailgun request synchronously -- there is no "response" to this in the base
       # NailgunProtocol, or a way to know if the remote end is doing anything (yet), so we just
       # yield a session which can have process_session() called at most once.
-      self.send_request(sock=self._request.sock,
-                        workdir_dir=exe_request.cwd,
-                        command=exe_request.main_class,
-                        *exe_request.arguments,
-                        **exe_request.environment)
+      self._protocol.send_request(sock=self._sock,
+                                  working_dir=exe_request.cwd or os.getcwd(),
+                                  command=exe_request.main_class,
+                                  args=exe_request.arguments,
+                                  env=exe_request.environment)
       yield
     except NailgunProtocol.ProtocolError as e:
       raise self.NailgunClientSessionProtocolError(
@@ -131,17 +139,21 @@ class NailgunClientSession(NailgunProtocol):
   def process_session(self, **iter_chunks_kwargs):
     """Process the outputs of the nailgun session."""
     exit_code = None
-    for chunk_type, payload in self.iter_chunks(
-        self.sock, return_bytes=True, break_on_exit_chunk=True, **iter_chunks_kwargs):
-      if chunk_type == PailgunChunkType.STDOUT:
+    for chunk_type, payload in self._protocol.iter_chunks(
+        self._sock,
+        return_bytes=True,
+        valid_chunk_types=self._protocol.CHUNK_TYPE.EXECUTION_TYPES,
+        **iter_chunks_kwargs):
+      logger.debug('chunk_type: {}'.format(chunk_type))
+      if chunk_type == self._protocol.CHUNK_TYPE.STDOUT:
         self._write_flush(self._stdout, payload)
-      elif chunk_type == PailgunChunkType.STDERR:
+      elif chunk_type == self._protocol.CHUNK_TYPE.STDERR:
         self._write_flush(self._stderr, payload)
-      elif chunk_type == PailgunChunkType.EXIT:
+      elif chunk_type == self._protocol.CHUNK_TYPE.EXIT:
         self._write_flush(self._stdout)
         self._write_flush(self._stderr)
         exit_code = int(payload)
-      elif chunk_type == PailgunChunkType.START_READING_INPUT:
+      elif chunk_type == self._protocol.CHUNK_TYPE.START_READING_INPUT:
         self._maybe_start_input_writer()
       else:
         raise self.InvalidChunkType('unrecognized chunk type {}'.format(chunk_type))
@@ -153,15 +165,9 @@ class NailgunClientSession(NailgunProtocol):
   #     exit_code = self.process_session(**iter_chunks_kwargs)
   #     return self.NailgunClientSessionExecutionResult(exit_code)
 
-class PailgunClientSession(PailgunProtocol):
+class PailgunClientSession(NailgunClientSession):
 
-  def __init__(self, nailgun_session):
-    # Delegate everything to a NailgunClientSession instance to keep the PailgunProtocol
-    # inheritance.
-    # TODO: figure out if this is the least confusing mixture of inheritance and composition for the
-    # case of implementing/extending a binary protocol like Nailgun.
-    assert(isinstance(nailgun_session, NailgunClientSession))
-    self._nailgun_session = nailgun_session
+  _protocol = PailgunProtocol
 
   class PailgunClientSessionProtocolError(NailgunProtocol.ProtocolError): pass
 
@@ -169,11 +175,10 @@ class PailgunClientSession(PailgunProtocol):
   def execution_sub_session_for(self, exe_request):
     """???/so the client can be sure to have the pid and pgrp before proceeding"""
     # The base NailgunClientSession doesn't yield anything, but we are waiting for pailgun chunks.
-    with self._nailgun_session.execution_sub_session_for(exe_request):
+    with super(PailgunClientSession, self).execution_sub_session_for(exe_request):
       try:
         # Block for the Pailgun-specific PID and PGRP chunks to enable signalling and log traversal.
-        remote_process_info = self.parse_remote_process_initialization_sequence(
-          self._nailgun_session.sock)
+        remote_process_info = self._protocol.parse_remote_process_initialization_sequence(self._sock)
       except NailgunProtocol.ProtocolError as e:
         raise self.PailgunClientSessionProtocolError(
           'Error when reading remote process info: {}'.format(str(e)),
@@ -190,11 +195,58 @@ class PailgunClientSession(PailgunProtocol):
   def process_session(self, **iter_chunks_kwargs):
     # We return the same execution result, and don't otherwise modify anything compared to base
     # Nailgun from here on.
-    self._nailgun_session.process_session(
+    return super(PailgunClientSession, self).process_session(
       # Allow a 0-length read at the beginning of a chunk to denote graceful shutdown.
       none_on_zero_length_chunk=True,
-      valid_chunk_types=PailgunChunkType.EXECUTION_TYPES,
       **iter_chunks_kwargs)
+
+
+class NailgunClientRequest(datatype([
+    ('host', binary_type),
+    ('port', int),
+    'stdin',
+    'stdout',
+    'stderr',
+    ('workdir', binary_type),
+    ('exit_on_broken_pipe', bool),
+])):
+
+  # For backwards compatibility with nails expecting the ng c client special env vars.
+  ENV_DEFAULTS = dict(NAILGUN_FILESEPARATOR=os.sep, NAILGUN_PATHSEPARATOR=os.pathsep)
+  DEFAULT_NG_HOST = '127.0.0.1'
+  DEFAULT_NG_PORT = 2113
+
+  def __new__(cls, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
+              workdir=None, exit_on_broken_pipe=False):
+    """Creates a nailgun client request that can be ???
+    :param string host: the nailgun server to contact (defaults to '127.0.0.1')
+    :param int port: the port the nailgun server is listening on (defaults to the default nailgun
+                     port: 2113)
+    :param file ins: a file to read command standard input from (defaults to stdin) - can be None
+                     in which case no input is read
+    :param file out: a stream to write command standard output to (defaults to stdout)
+    :param file err: a stream to write command standard error to (defaults to stderr)
+    :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
+    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
+                                     encountered
+    """
+    return super(NailgunClientRequest, cls).__new__(
+      cls,
+      host=binary_type(host),
+      port=int(port),
+      stdin=ins,
+      stdout=(out or sys.stdout),
+      stderr=(err or sys.stderr),
+      workdir=binary_type(workdir or os.path.abspath(os.path.curdir)),
+      exit_on_broken_pipe=exit_on_broken_pipe)
+
+  @memoized_property
+  def address(self):
+    return (self.host, self.port)
+
+  @memoized_property
+  def address_string(self):
+    return ':'.join(str(i) for i in self.address)
 
 
 class NailgunClient(object):
@@ -203,57 +255,12 @@ class NailgunClient(object):
   This nailgun client can be used to issue zero or more nailgun commands (TODO: with?).
   """
 
+  _client_request_cls = NailgunClientRequest
+  _client_session_cls = NailgunClientSession
+
   def __init__(self, request):
-    assert(isinstance(request, self.NailgunClientRequest))
+    assert(isinstance(request, self._client_request_cls))
     self._request = request
-
-  class NailgunClientRequest(datatype([
-      ('host', binary_type),
-      ('port', int),
-      'stdin',
-      'stdout',
-      'stderr',
-      ('workdir', binary_type),
-      ('exit_on_broken_pipe', bool),
-  ])):
-
-    # For backwards compatibility with nails expecting the ng c client special env vars.
-    ENV_DEFAULTS = dict(NAILGUN_FILESEPARATOR=os.sep, NAILGUN_PATHSEPARATOR=os.pathsep)
-    DEFAULT_NG_HOST = '127.0.0.1'
-    DEFAULT_NG_PORT = 2113
-
-    def __new__(cls, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
-                workdir=None, exit_on_broken_pipe=False):
-      """Creates a nailgun client request that can be ???
-
-      :param string host: the nailgun server to contact (defaults to '127.0.0.1')
-      :param int port: the port the nailgun server is listening on (defaults to the default nailgun
-                       port: 2113)
-      :param file ins: a file to read command standard input from (defaults to stdin) - can be None
-                       in which case no input is read
-      :param file out: a stream to write command standard output to (defaults to stdout)
-      :param file err: a stream to write command standard error to (defaults to stderr)
-      :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
-      :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
-                                       encountered
-      """
-      return super(NailgunClient.NailgunClientRequest, cls).__new__(
-        cls,
-        host=binary_type(host),
-        port=int(port),
-        stdin=ins,
-        stdout=(out or sys.stdout),
-        stderr=(err or sys.stderr),
-        workdir=binary_type(workdir or os.path.abspath(os.path.curdir)),
-        exit_on_broken_pipe=exit_on_broken_pipe)
-
-    @memoized_property
-    def address(self):
-      return (self.host, self.port)
-
-    @memoized_property
-    def address_string(self):
-      return ':'.join(str(i) for i in self.address)
 
   class NailgunError(Exception):
     "Indicates an error interacting with a nailgun server."""
@@ -270,11 +277,11 @@ class NailgunClient(object):
       self.wrapped_exc = wrapped_exc
       self.traceback = traceback or sys.exc_info()[2]
 
-      msg = self.MSG_FMT.format(
+      msg = self._MSG_FMT.format(
         description=self.DESCRIPTION,
         address=self.address,
         wrapped_exc=self.wrapped_exc,
-        backtrace=self.traceback(self.traceback))
+        backtrace=self._traceback(self.traceback))
       super(NailgunClient.NailgunError, self).__init__(msg, self.wrapped_exc)
 
     @classmethod
@@ -289,6 +296,11 @@ class NailgunClient(object):
     """Indicates an error upon initial command execution on the nailgun server."""
     DESCRIPTION = 'Problem executing command on nailgun server'
 
+  def _get_socket(self):
+    sock = RecvBufferedSocket(socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+    sock.connect(self._request.address)
+    return sock
+
   @contextmanager
   def connect_socket(self):
     """Creates a socket, connects it to this client's address and returns the connected socket.
@@ -296,16 +308,17 @@ class NailgunClient(object):
     :yields: a connected `socket.socket`.
     :raises: `PailgunClient.NailgunConnectionError` on failure to connect.
     """
-    sock = RecvBufferedSocket(socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+    sock = None
     try:
-      sock.connect(self._request.address)
+      sock = self._get_socket()
       yield sock
     except (socket.error, socket.gaierror) as e:
       logger.debug('Encountered socket exception {!r} when attempting to connect to nailgun'
                    .format(e))
       raise self.NailgunConnectionError(address=self._request.address_string, wrapped_exc=e)
     finally:
-      sock.close()
+      if sock:
+        sock.close()
 
   @contextmanager
   def initiate_new_client_session(self):
@@ -314,7 +327,7 @@ class NailgunClient(object):
         sock,
         in_file=self._request.stdin, out_file=self._request.stdout, err_file=self._request.stderr,
         exit_on_broken_pipe=self._request.exit_on_broken_pipe)
-      session = NailgunClientSession(session_init_request)
+      session = self._client_session_cls(session_init_request)
       try:
         yield session
       except (socket.error, NailgunProtocol.ProtocolError) as e:
@@ -323,25 +336,21 @@ class NailgunClient(object):
 
 class PailgunClient(NailgunClient):
 
-  def __init__(self, nailgun_client):
-    assert(isinstance(nailgun_client, NailgunClient))
-    self._nailgun_client = nailgun_client
+  _client_session_cls = PailgunClientSession
 
   class PailgunError(NailgunClient.NailgunError): pass
-
-  @contextmanager
-  def initiate_new_client_session(self):
-    with self._nailgun_client.initiate_new_client_session() as nailgun_session:
-      yield PailgunClientSession(nailgun_session)
 
   class RemotePantsSessionHandle(datatype([
       ('session', PailgunClientSession),
       ('remote_process_info', PailgunProtocol.ProcessInitialized),
-  ])): pass
+  ])):
+
+    def send_signal(self, signum):
+      safe_kill(self.remote_process_info.pid, signum)
+      safe_kill(self.remote_process_info.pgrp, signum)
 
   @contextmanager
   def remote_pants_session(self, exe_request):
-    with self.initiate_new_client_session() as nailgun_session:
-      pailgun_session = PailgunClientSession(nailgun_session)
+    with self.initiate_new_client_session() as pailgun_session:
       with pailgun_session.execution_sub_session_for(exe_request) as remote_process_info:
         yield self.RemotePantsSessionHandle(pailgun_session, remote_process_info)
