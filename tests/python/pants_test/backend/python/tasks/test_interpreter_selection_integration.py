@@ -107,16 +107,21 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       )
       self.assert_success(pants_run)
 
-      def _prepend_to_interpreter_path_file(path):
+      def _prepend_bad_interpreter_to_interpreter_path_file(path):
         with open(path, 'r') as fp:
           file_data = fp.readlines()
           file_data[0] = '/my/bogus/interpreter/python2.7'
         with open(path, 'w') as fp:
           fp.writelines(file_data)
 
+      def _validate_good_interpreter_path_file(path):
+        with open(path, 'r') as fp:
+          interpreter_binary = fp.readline()
+          return os.path.exists(interpreter_binary)
+
       # Mangle interpreter.info.
       for path in glob.glob(os.path.join(workdir, 'pyprep/interpreter/*/interpreter.info')):
-        _prepend_to_interpreter_path_file(path)
+        _prepend_bad_interpreter_to_interpreter_path_file(path)
 
       pants_run = self.run_pants_with_workdir(
         ["run", target],
@@ -124,3 +129,8 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
         config=config
       )
       self.assert_success(pants_run)
+      for path in glob.glob(os.path.join(workdir, 'pyprep/interpreter/*/interpreter.info')):
+        self.assertTrue(
+          _validate_good_interpreter_path_file(path),
+          'interpreter.info was not purged and repopulated properly: {}'.format(path)
+        )
