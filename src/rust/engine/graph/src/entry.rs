@@ -574,6 +574,6 @@ impl<N: Node> Entry<N> {
       Some(Err(ref x)) => format!("{:?}", x),
       None => "<None>".to_string(),
     };
-    format!("{} == {}", self.node.content().format(), state).replace("\"", "\\\"")
+    format!("{} == {}", self.node.content(), state).replace("\"", "\\\"")
   }
 }

@@ -4,6 +4,76 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.15.0.dev1 (2/22/2019)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Allow passing floating point numbers from rust to python (#7259)
+  `PR #7259 <https://github.com/pantsbuild/pants/pull/7259>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix nightly cron ctypes enum failure (#7249)
+  `PR #7249 <https://github.com/pantsbuild/pants/pull/7249>`_
+
+* Revert remote execution from tower to grpcio (#7256)
+  `PR #7256 <https://github.com/pantsbuild/pants/pull/7256>`_
+
+* Pin pytest version to avoid induced breakage from more-itertools transitive dep (#7238)
+  `Issue #4770#issuecomment-462869367, <https://github.com/pytest-dev/pytest/issues/4770#issuecomment-462869367,>`_
+  `PR #7238 <https://github.com/pantsbuild/pants/pull/7238>`_
+
+* Validate and maybe prune interpreter cache run over run (#7225)
+  `PR #7225 <https://github.com/pantsbuild/pants/pull/7225>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* [jvm-compile] fix typo: s/direcotry/directory/ (#7265)
+  `PR #7265 <https://github.com/pantsbuild/pants/pull/7265>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* cache python tools in ~/.cache/pants (#7236)
+  `PR #7236 <https://github.com/pantsbuild/pants/pull/7236>`_
+
+* Prepare 1.14.0rc3 (#7274)
+  `PR #7274 <https://github.com/pantsbuild/pants/pull/7274>`_
+
+* Node is Display (#7264)
+  `PR #7264 <https://github.com/pantsbuild/pants/pull/7264>`_
+
+* Scheduler returns metrics as a dictionary instead of a tuple of tuples (#7255)
+  `PR #7255 <https://github.com/pantsbuild/pants/pull/7255>`_
+
+* Prepare 1.14.0.rc2 instead. (#7251)
+  `PR #7251 <https://github.com/pantsbuild/pants/pull/7251>`_
+
+* Prepare 1.14.0 (#7246)
+  `PR #7246 <https://github.com/pantsbuild/pants/pull/7246>`_
+
+* Avoid capturing Snapshots for previously digested codegen outputs (#7241)
+  `PR #7241 <https://github.com/pantsbuild/pants/pull/7241>`_
+
+* Add checks if values of flags zipkin-trace-id and zipkin-parent-id are valid (#7242)
+  `PR #7242 <https://github.com/pantsbuild/pants/pull/7242>`_
+
+* Remove deprecated test classes (#7243)
+  `PR #7243 <https://github.com/pantsbuild/pants/pull/7243>`_
+
+* fix expected pytest output for pytest integration after pinning to 3.0.7 (#7240)
+  `PR #7240 <https://github.com/pantsbuild/pants/pull/7240>`_
+
+* Canonicalize enum pattern matching for execution strategy, platform, and elsewhere (#7226)
+  `PR #7226 <https://github.com/pantsbuild/pants/pull/7226>`_
+
+* add a TypedCollection type constraint to reduce boilerplate for datatype tuple fields (#7115)
+  `PR #7115 <https://github.com/pantsbuild/pants/pull/7115>`_
+
 1.15.0.dev0 (2/8/2019)
 ----------------------
 

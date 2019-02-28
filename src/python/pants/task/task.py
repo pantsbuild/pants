@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import sys
 from abc import abstractmethod
-from builtins import filter, map, object, str, zip
+from builtins import filter, map, object, set, str, zip
 from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
@@ -16,6 +16,7 @@ from future.utils import PY3
 
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
+from pants.build_graph.target_filter_subsystem import TargetFilter
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
 from pants.invalidation.build_invalidator import (BuildInvalidator, CacheKeyGenerator,
@@ -29,7 +30,7 @@ from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass
+from pants.util.meta import AbstractClass, classproperty
 
 
 class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
@@ -96,7 +97,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   @classmethod
   def subsystem_dependencies(cls):
     return (super(TaskBase, cls).subsystem_dependencies() +
-            (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig))
+            (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig) +
+            ((TargetFilter.scoped(cls),) if cls.target_filtering_enabled else tuple()))
 
   @classmethod
   def product_types(cls):
@@ -222,6 +224,17 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return True
 
+  @classproperty
+  def target_filtering_enabled(cls):
+    """Whether this task should apply configured filters against targets.
+
+    Tasks can override to enable target filtering (e.g. based on tags) and must
+    access targets via get_targets()
+
+    :API: public
+    """
+    return False
+
   def get_targets(self, predicate=None):
     """Returns the candidate targets this task should act on.
 
@@ -237,8 +250,24 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
     """
-    return (self.context.targets(predicate) if self.act_transitively
-            else list(filter(predicate, self.context.target_roots)))
+    initial_targets = (self.context.targets(predicate) if self.act_transitively
+                       else list(filter(predicate, self.context.target_roots)))
+
+    if not self.target_filtering_enabled:
+      return initial_targets
+    else: 
+      return self._filter_targets(initial_targets)
+
+  def _filter_targets(self, targets):
+    included_targets = TargetFilter.scoped_instance(self).apply(targets)
+    excluded_targets = set(targets).difference(included_targets)
+
+    if excluded_targets:
+      self.context.log.info("{} target(s) excluded".format(len(excluded_targets)))
+      for target in excluded_targets:
+        self.context.log.debug("{} excluded".format(target.address.spec))
+
+    return included_targets
 
   @memoized_property
   def workdir(self):

@@ -235,6 +235,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           config,
         )
         self.assert_failure(pants_run)
+        self.assertIn('Please use --no-compile-zinc-incremental', pants_run.stdout_data)
 
   def test_failed_compile_with_hermetic(self):
     with temporary_dir() as cache_dir:
@@ -258,6 +259,36 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           config,
         )
         self.assert_failure(pants_run)
+        self.assertIn('package System2 does not exist', pants_run.stderr_data)
+        self.assertIn(
+          'Failed jobs: compile(testprojects/src/java/org/pantsbuild/testproject/dummies:'
+          'compilation_failure_target)',
+          pants_run.stdout_data)
+
+  def test_failed_compile_with_subprocess(self):
+    with temporary_dir() as cache_dir:
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir]},
+        'compile.zinc': {
+          'execution_strategy': 'subprocess',
+          'use_classpath_jars': False,
+          'incremental': False,
+        }
+      }
+
+      with self.temporary_workdir() as workdir:
+        pants_run = self.run_pants_with_workdir(
+          [
+            # NB: We don't use -q here because subprocess squashes the error output
+            # See https://github.com/pantsbuild/pants/issues/5646
+            'compile',
+            'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
+          ],
+          workdir,
+          config,
+        )
+        self.assert_failure(pants_run)
+        self.assertIn('package System2 does not exist', pants_run.stdout_data)
         self.assertIn(
           'Failed jobs: compile(testprojects/src/java/org/pantsbuild/testproject/dummies:'
           'compilation_failure_target)',

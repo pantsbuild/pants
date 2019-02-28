@@ -134,14 +134,15 @@ class XCodeCLITools(Subsystem):
     return Assembler(
       path_entries=self.path_entries(),
       exe_filename='as',
-      library_dirs=[])
+      runtime_library_dirs=[],
+      extra_args=[])
 
   @memoized_method
   def linker(self):
     return Linker(
       path_entries=self.path_entries(),
       exe_filename='ld',
-      library_dirs=[],
+      runtime_library_dirs=[],
       linking_library_dirs=[],
       extra_args=[MIN_OSX_VERSION_ARG],
       extra_object_files=[],
@@ -152,7 +153,7 @@ class XCodeCLITools(Subsystem):
     return CCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang',
-      library_dirs=self.lib_dirs(),
+      runtime_library_dirs=self.lib_dirs(),
       include_dirs=self.include_dirs(),
       extra_args=[MIN_OSX_VERSION_ARG])
 
@@ -161,7 +162,7 @@ class XCodeCLITools(Subsystem):
     return CppCompiler(
       path_entries=self.path_entries(),
       exe_filename='clang++',
-      library_dirs=self.lib_dirs(),
+      runtime_library_dirs=self.lib_dirs(),
       include_dirs=self.include_dirs(include_cpp_inc=True),
       extra_args=[MIN_OSX_VERSION_ARG])
 

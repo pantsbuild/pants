@@ -146,3 +146,14 @@ python_tests(
     'tests/python/pants_test:test_base',
   ]
 )
+
+python_tests(
+  name = 'target_filter_subsystem',
+  sources = ['test_target_filter_subsystem.py'],
+  dependencies = [
+    '3rdparty/python:future',
+    'src/python/pants/build_graph',
+    'src/python/pants/task',
+    'tests/python/pants_test:task_test_base',
+  ]
+)

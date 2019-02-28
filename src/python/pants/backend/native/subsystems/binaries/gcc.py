@@ -65,7 +65,7 @@ class GCC(NativeTool):
     return CCompiler(
       path_entries=self.path_entries,
       exe_filename='gcc',
-      library_dirs=self._common_lib_dirs(platform),
+      runtime_library_dirs=self._common_lib_dirs(platform),
       include_dirs=self._common_include_dirs,
       extra_args=[])
 
@@ -91,7 +91,7 @@ class GCC(NativeTool):
     return CppCompiler(
       path_entries=self.path_entries,
       exe_filename='g++',
-      library_dirs=self._common_lib_dirs(platform),
+      runtime_library_dirs=self._common_lib_dirs(platform),
       include_dirs=(self._common_include_dirs + self._cpp_include_dirs),
       extra_args=[])
 

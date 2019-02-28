@@ -105,7 +105,7 @@ class LLVM(NativeTool):
     return CCompiler(
       path_entries=self.path_entries,
       exe_filename='clang',
-      library_dirs=self._common_lib_dirs,
+      runtime_library_dirs=self._common_lib_dirs,
       include_dirs=self._common_include_dirs,
       extra_args=[])
 
@@ -117,7 +117,7 @@ class LLVM(NativeTool):
     return CppCompiler(
       path_entries=self.path_entries,
       exe_filename='clang++',
-      library_dirs=self._common_lib_dirs,
+      runtime_library_dirs=self._common_lib_dirs,
       include_dirs=(self._cpp_include_dirs + self._common_include_dirs),
       extra_args=[])
 

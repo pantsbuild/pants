@@ -132,13 +132,16 @@ def datatype(field_decls, superclass_name=None, **kwargs):
     def __ne__(self, other):
       return not (self == other)
 
+    # NB: in Python 3, whenever __eq__ is overridden, __hash__() must also be
+    # explicitly implemented, otherwise Python will raise "unhashable type". See
+    # https://docs.python.org/3/reference/datamodel.html#object.__hash__.
     def __hash__(self):
       return super(DataType, self).__hash__()
 
     # NB: As datatype is not iterable, we need to override both __iter__ and all of the
     # namedtuple methods that expect self to be iterable.
     def __iter__(self):
-      raise TypeError("'{}' object is not iterable".format(type(self).__name__))
+      raise self.make_type_error("datatype object is not iterable")
 
     def _super_iter(self):
       return super(DataType, self).__iter__()
@@ -280,6 +283,20 @@ def enum(*args):
       function to create instances with. This makes it easy to use as a pants option type.
       """
       return cls.create(value)
+
+    # TODO: figure out if this will always trigger on primitives like strings, and what situations
+    # won't call this __eq__ (and therefore won't raise like we want).
+    def __eq__(self, other):
+      """Redefine equality to raise to nudge people to use static pattern matching."""
+      raise self.make_type_error(
+        "enum equality is defined to be an error -- use .resolve_for_enum_variant() instead!")
+    # Redefine the canary so datatype __new__ doesn't raise.
+    __eq__._eq_override_canary = None
+
+    # NB: as noted in datatype(), __hash__ must be explicitly implemented whenever __eq__ is
+    # overridden. See https://docs.python.org/3/reference/datamodel.html#object.__hash__.
+    def __hash__(self):
+      return super(ChoiceDatatype, self).__hash__()
 
     @classmethod
     def create(cls, *args, **kwargs):

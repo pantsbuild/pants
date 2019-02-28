@@ -11,3 +11,4 @@ from pants.task.target_restriction_mixins import (HasSkipAndTransitiveGoalOption
 class FmtTaskMixin(HasSkipAndTransitiveGoalOptionsMixin):
   """A mixin to combine with code formatting tasks."""
   goal_options_registrar_cls = SkipAndTransitiveGoalOptionsRegistrar
+  target_filtering_enabled = True

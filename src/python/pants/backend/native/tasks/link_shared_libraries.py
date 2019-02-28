@@ -171,7 +171,7 @@ class LinkSharedLibraries(NativeTask):
     self.context.log.info("selected linker exe name: '{}'".format(linker.exe_filename))
     self.context.log.debug("linker argv: {}".format(cmd))
 
-    env = linker.as_invocation_environment_dict
+    env = linker.invocation_environment_dict
     self.context.log.debug("linker invocation environment: {}".format(env))
 
     with self.context.new_workunit(name='link-shared-libraries',
