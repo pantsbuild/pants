@@ -23,7 +23,8 @@ ENV OPENSSL_VERSION=1.0.2p
 ENV OPENSSL_DIR=/.pyenv_openssl
 ENV LD_LIBRARY_PATH="${OPENSSL_DIR}/lib"
 ENV PYTHON_CONFIGURE_OPTS="--with-openssl=${OPENSSL_DIR}"
-RUN bash -c 'curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz | tar -xz \
+RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
+    curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz | tar -xz \
     && cd openssl-${OPENSSL_VERSION} \
     && ./config shared --prefix="${OPENSSL_DIR}" \
     && make \
