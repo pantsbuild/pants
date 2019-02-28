@@ -70,10 +70,6 @@ class RscCompileIntegration(BaseCompileIT):
           'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/rsc',
           'm.jar')
         self.assertTrue(os.path.exists(path))
-        path = os.path.join(
-          workdir,
-          'compile/rsc/current/.scala-library-synthetic/current/rsc/index/scala-library-synthetics.jar')
-        self.assertTrue(os.path.exists(path))
 
   @_execution_strategies(['nailgun', 'subprocess'], [2])
   def test_executing_multi_target_binary_nonhermetic(self, execution_strategy, worker_count):
