@@ -30,8 +30,8 @@ RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
     curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz | tar -xz \
     && cd openssl-${OPENSSL_VERSION} \
     && ./config shared --prefix="${OPENSSL_DIR}" \
-    && make \
-    && make install \
+    && make --quiet \
+    && make install --quiet \
     && touch "${OPENSSL_DIR}/installed-${OPENSSL_VERSION}"'
 
 # Install Pythonn 3.7.
