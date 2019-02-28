@@ -1,4 +1,4 @@
-# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 # Use our custom Centos6 image for binary compatibility with old linux distros.
@@ -6,24 +6,42 @@ FROM pantsbuild/centos6:latest
 
 # ----------------------------------------------------------
 # TODO(7064) These changes belong in centos6/Dockerfile, because we always want that image to
-# have Py3 available and also avoid the cost of rebuilding Python 3.6 every time in CI. However,
+# have Py3.7 available and also avoid the cost of rebuilding both OpenSSL and Python 3.7 every time in CI. However,
 # this requires publishing an updated image to Docker hub, so we copy the code here until then.
 
-# Install dependencies to build Python.
+# This also copies `travis_ci/Dockerfile` quite a bit, which is bad. Rather, this entire
+# file should be deleted and merged into centos6.
+
+# Install dependencies to build Python and OpenSSL.
 RUN yum install -y \
     zlib-devel \
     bzip2{,-devel} \
     readline-devel \
     sqlite{,-devel}
 
-# Install Python 3.6.
-ARG PYTHON_36_VERSION=3.6.8
+# Install custom OpenSSL as Python 3.7 requires at least OpenSSL 1.0.2: https://docs.python.org/3/whatsnew/3.7.html#platform-support-removals.
+# Centos6's system OpenSSL is too outdated for this.
+# Note solution is adapted from PEX's Tox setup: https://github.com/pantsbuild/pex/blob/1b9e509ae36303d222445611420879bd4edcb1b1/.travis.yml#L46-L86.
+ENV OPENSSL_VERSION=1.0.2p
+ENV OPENSSL_DIR=/.pyenv_openssl
+ENV LD_LIBRARY_PATH="${OPENSSL_DIR}/lib"
+ENV PYTHON_CONFIGURE_OPTS="--with-openssl=${OPENSSL_DIR}"
+RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
+    curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz | tar -xz \
+    && cd openssl-${OPENSSL_VERSION} \
+    && ./config shared --prefix="${OPENSSL_DIR}" \
+    && make \
+    && make install \
+    && touch "${OPENSSL_DIR}/installed-${OPENSSL_VERSION}"'
+
+# Install Pythonn 3.7.
+ARG PYTHON_37_VERSION=3.7.2
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
-    ${PYENV_ROOT}/bin/pyenv install ${PYTHON_36_VERSION} \
-    && ${PYENV_ROOT}/bin/pyenv global ${PYTHON_36_VERSION}'
+    ${PYENV_ROOT}/bin/pyenv install ${PYTHON_37_VERSION} \
+    && ${PYENV_ROOT}/bin/pyenv global ${PYTHON_37_VERSION}'
 ENV PATH "${PYENV_ROOT}/shims:${PATH}"
 
 # End TODO(7064)

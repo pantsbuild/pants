@@ -302,6 +302,19 @@ py37_linux_build_engine: &py37_linux_build_engine
     - CACHE_NAME=linuxpexbuild.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - BOOTSTRAP_ARGS='-7b'
+  script:
+  - docker build --rm -t travis_ci_py37
+      --build-arg "TRAVIS_USER=$(id -un)"
+      --build-arg "TRAVIS_UID=$(id -u)"
+      --build-arg "TRAVIS_GROUP=$(id -gn)"
+      --build-arg "TRAVIS_GID=$(id -g)"
+      build-support/docker/travis_ci_py37/
+  - docker run --rm -t
+      -v "${HOME}:/travis/home"
+      -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci_py37:latest
+      sh -c "./build-support/bin/ci.sh -7b && ./build-support/bin/release.sh -f"
+  - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
