@@ -76,7 +76,7 @@ class Build(Workspace):
     return libraries_dir_path
 
   def prepare_cargo_targets(self):
-    cargo_targets = self.get_targets(self.is_cargo_original_workspace)
+    cargo_targets = self.get_targets(self.is_cargo_original)
     for target in cargo_targets:
       cargo_build_plan = self.get_cargo_build_plan(target)
       target_definitions = self.get_target_definitions_out_of_cargo_build_plan(cargo_build_plan)
@@ -147,11 +147,16 @@ class Build(Workspace):
           self.context.log.debug(
             'Add project member target: {0}\ttarget kind: {1}'.format(target.id, target.kind))
           self.inject_member_target(target, cargo_target)
+        elif self.is_lib_or_bin(target, cargo_target):
+          self.context.log.debug(
+            'Add project target: {0}\ttarget kind: {1}'.format(target.id, target.kind))
+          self.inject_lib_or_bin_target(target, cargo_target)
         else:
           self.context.log.debug(
             'Add synthetic target: {0}\ttarget kind: {1}'.format(target.id, target.kind))
           self.context.build_graph.inject_synthetic_target(address=target.address,
-                                                           target_type=self._synthetic_target_kind[target.kind],
+                                                           target_type=self._synthetic_target_kind[
+                                                             target.kind],
                                                            cargo_invocation=target.invocation)
         for dependency in target.dependencies:
           dependency = target_definitions[dependency]
@@ -159,6 +164,36 @@ class Build(Workspace):
             '\tInject dependency: {0}\tfor: {1}\ttarget kind: {2}'.format(dependency.id, target.id,
                                                                           dependency.kind))
           self.context.build_graph.inject_dependency(target.address, dependency.address)
+
+  def is_lib_or_bin(self, target_definition, original_target):
+    if not self.is_cargo_original_library(original_target) and not self.is_cargo_original_binary(
+            original_target):
+      return False
+    else:
+      is_original_target = target_definition.name == original_target.name
+
+      if is_original_target and (
+              self.is_lib_or_bin_target(target_definition) or self.is_test_target(
+        target_definition)):
+        return True
+      else:
+        return False
+
+  def inject_lib_or_bin_target(self, target_definition, original_target):
+    if self.is_test_target(target_definition):
+      synthetic_target_type = self._project_target_kind['test']
+    else:
+      synthetic_target_type = self._project_target_kind[target_definition.kind]
+
+    synthetic_of_original_target = self.context.add_new_target(address=target_definition.address,
+                                                               target_type=synthetic_target_type,
+                                                               cargo_invocation=target_definition.invocation,
+                                                               dependencies=original_target.dependencies,
+                                                               derived_from=original_target,
+                                                               sources=original_target.sources_relative_to_target_base())
+
+    self.inject_synthetic_of_original_target_into_build_graph(synthetic_of_original_target,
+                                                              original_target)
 
   def build_targets(self, targets):
     with self.invalidated(targets, invalidate_dependents=True,

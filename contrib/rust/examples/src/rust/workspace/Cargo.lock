@@ -1,0 +1,18 @@
+[[package]]
+name = "bin_1"
+version = "0.1.0"
+
+[[package]]
+name = "bin_2"
+version = "0.1.0"
+dependencies = [
+ "bin_1 0.1.0",
+]
+
+[[package]]
+name = "lib_1"
+version = "0.1.0"
+dependencies = [
+ "bin_2 0.1.0",
+]
+

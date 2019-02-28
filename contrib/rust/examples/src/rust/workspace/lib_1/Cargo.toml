@@ -1,0 +1,8 @@
+[package]
+name = "lib_1"
+version = "0.1.0"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+bin_2 = { path = "../bin_2" }

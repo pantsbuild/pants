@@ -43,20 +43,20 @@ class Workspace(CargoTask):
 
   @staticmethod
   def is_target_a_member(target_name, member_names):
-    for member_name in member_names:
-      if member_name == target_name:
-        return True
-    return False
+    return target_name in member_names
 
-  def is_workspace_member(self, target_definition, member_target):
-    target_is_a_member = self.is_target_a_member(target_definition.name,
-                                                 member_target.member_names)
-    if target_is_a_member and (
-            self.is_lib_or_bin_target(target_definition) or self.is_test_target(
-      target_definition)):
-      return True
-    else:
+  def is_workspace_member(self, target_definition, workspace_target):
+    if not self.is_cargo_original_workspace(workspace_target):
       return False
+    else:
+      target_is_a_member = self.is_target_a_member(target_definition.name,
+                                                   workspace_target.member_names)
+      if target_is_a_member and (
+              self.is_lib_or_bin_target(target_definition) or self.is_test_target(
+        target_definition)):
+        return True
+      else:
+        return False
 
   @staticmethod
   def is_lib_or_bin_target(target_definition):
@@ -72,30 +72,51 @@ class Workspace(CargoTask):
     else:
       return False
 
-  def inject_member_target(self, target_definition, member_targets):
+  def inject_member_target(self, target_definition, workspace_target):
     def find_member(target_name, members):
       for member in members:
         name, _, _ = member
         if target_name == name:
           return member
 
-    member_definitions = tuple((name, path, member_targets.include_sources) for (name, path) in
-                               zip(member_targets.member_names, member_targets.member_paths))
+    member_definitions = tuple((name, path, workspace_target.include_sources) for (name, path) in
+                               zip(workspace_target.member_names, workspace_target.member_paths))
 
     member_definition = find_member(target_definition.name, member_definitions)
     target_sources = self.get_member_sources_files(member_definition)
 
     if self.is_test_target(target_definition):
-      self.context.build_graph.inject_synthetic_target(address=target_definition.address,
-                                                       target_type=self._project_target_kind['test'],
-                                                       cargo_invocation=target_definition.invocation,
-                                                       sources=target_sources)
+      synthetic_target_type = self._project_target_kind['test']
     else:
-      self.context.build_graph.inject_synthetic_target(address=target_definition.address,
-                                                       target_type=self._project_target_kind[
-                                                         target_definition.kind],
-                                                       cargo_invocation=target_definition.invocation,
-                                                       sources=target_sources)
+      synthetic_target_type = self._project_target_kind[target_definition.kind]
+
+    synthetic_of_original_target = self.context.add_new_target(address=target_definition.address,
+                                                               target_type=synthetic_target_type,
+                                                               derived_from=workspace_target,
+                                                               dependencies=workspace_target.dependencies,
+                                                               cargo_invocation=target_definition.invocation,
+                                                               sources=target_sources)
+
+    self.inject_synthetic_of_original_target_into_build_graph(synthetic_of_original_target,
+                                                              workspace_target)
+
+  def inject_synthetic_of_original_target_into_build_graph(self, synthetic_target, original_target):
+    # https://github.com/pantsbuild/pants/blob/fedc91cb2e1455b7a8dca9c843bbd8b553a04241/src/python/pants/task/simple_codegen_task.py#L359
+    build_graph = self.context.build_graph
+    for dependent_address in build_graph.dependents_of(original_target.address):
+      build_graph.inject_dependency(
+        dependent=dependent_address,
+        dependency=synthetic_target.address,
+      )
+
+    for concrete_dependency_address in build_graph.dependencies_of(original_target.address):
+      build_graph.inject_dependency(
+        dependent=synthetic_target.address,
+        dependency=concrete_dependency_address,
+      )
+
+    if original_target in self.context.target_roots:
+      self.context.target_roots.append(synthetic_target)
 
   def get_member_sources_files(self, member_definition):
     _, path, include_sources = member_definition
