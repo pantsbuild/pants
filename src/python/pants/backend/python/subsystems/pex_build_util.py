@@ -26,6 +26,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 from pants.subsystem.subsystem import Subsystem
+from pants.util.collections import assert_single_element
 
 
 def is_python_target(tgt):
@@ -156,25 +157,22 @@ class PexBuilderWrapper(object):
     :param list reqs: A list of :class:`PythonRequirement` to resolve.
     :param str dist_key: The value of `distribution.key` to match for a `distribution` from the
                          resolved requirements.
-    :return: A path to a wheel containing the single distribution specified by `dist_key`.
+    :return: The single :class:`pkg_resources.Distribution` matching `dist_key`.
     :raises: :class:`self.SingleDistExtractionError` if no dists or multiple dists matched the given
              `dist_key`.
     """
     distributions = self._resolve_distributions_by_platform(reqs, platforms=['current'])
-    matched_dist = None
-    for _, dists in distributions.items():
-      for dist in dists:
-        if dist.key == dist_key:
-          if matched_dist is not None:
-            raise self.SingleDistExtractionError(
-              "multiple dists from requirements {} were resolved matching the key {}: {}, {}. "
-              "this is expected to only match a single dist!"
-              .format(reqs, dist_key, matched_dist, dist.location))
-          matched_dist = dist.location
-    if matched_dist is None:
+    try:
+      matched_dist = assert_single_element(list(
+        dist
+        for _, dists in distributions.items()
+        for dist in dists
+        if dist.key == dist_key
+      ))
+    except (StopIteration, ValueError) as e:
       raise self.SingleDistExtractionError(
-        "no dist matched key {} from requirements {}."
-        .format(dist_key, reqs))
+        "exactly one dist was expected to match name {} in requirements {}: {}"
+        .format(dist_key, reqs, e))
     return matched_dist
 
   def _resolve_distributions_by_platform(self, reqs, platforms):

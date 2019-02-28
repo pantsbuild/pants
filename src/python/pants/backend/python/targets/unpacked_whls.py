@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 class UnpackedWheels(ImportWheelsMixin, Target):
   """A set of sources extracted from JAR files.
 
+  NB: Currently, wheels are always resolved for the 'current' platform.
+
   :API: public
   """
 
@@ -56,6 +58,7 @@ class UnpackedWheels(ImportWheelsMixin, Target):
       'exclude_patterns' : PrimitiveField(exclude_patterns or ()),
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
       # TODO: consider supporting transitive deps like UnpackedJars!
+      # TODO: consider supporting `platforms` as in PythonBinary!
     })
     super(UnpackedWheels, self).__init__(payload=payload, **kwargs)
 
