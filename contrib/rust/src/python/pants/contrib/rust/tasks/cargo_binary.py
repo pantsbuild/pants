@@ -24,26 +24,25 @@ class Binary(CargoTask):
   def implementation_version(cls):
     return super(Binary, cls).implementation_version() + [('Cargo_Binary', 1)]
 
-  def copy_files_into_dist(self, files, bin=False):
-    build_root = get_buildroot()
+  def copy_libraries_into_dist(self):
+    files = self.context.products.get_data('rust_libs')
     dist_path = self.get_options().pants_distdir
     path_libs = os.path.join(dist_path, 'lib')
+    safe_mkdir(path_libs, clean=True)
+    self.copy_files_into_dist(path_libs, files)
+
+  def copy_binaries_into_dist(self):
+    files = self.context.products.get_data('rust_bins')
+    dist_path = self.get_options().pants_distdir
     path_bins = os.path.join(dist_path, 'bin')
+    safe_mkdir(path_bins, clean=True)
+    self.copy_files_into_dist(path_bins, files)
 
-    if not os.path.isdir(path_libs):
-      safe_mkdir(path_libs)
-
-    if not os.path.isdir(path_bins):
-      safe_mkdir(path_bins)
-
+  def copy_files_into_dist(self, libs_bins_path, files):
+    build_root = get_buildroot()
     for name, paths in files.items():
-      if bin:
-        path_project = os.path.join(path_bins, name)
-      else:
-        path_project = os.path.join(path_libs, name)
-      if not os.path.isdir(path_project):
-        safe_mkdir(path_project)
-
+      path_project = os.path.join(libs_bins_path, name)
+      safe_mkdir(path_project, clean=True)
       for path in paths:
         self.context.log.info('Copy: {0}\n\tto: {1}'.format(os.path.relpath(path, build_root),
                                                             os.path.relpath(path_project,
@@ -56,8 +55,5 @@ class Binary(CargoTask):
           shutil.copytree(path, dest_path)
 
   def execute(self):
-    rust_libs = self.context.products.get_data('rust_libs')
-    rust_bins = self.context.products.get_data('rust_bins')
-
-    self.copy_files_into_dist(rust_libs)
-    self.copy_files_into_dist(rust_bins, bin=True)
+    self.copy_libraries_into_dist()
+    self.copy_binaries_into_dist()
