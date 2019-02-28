@@ -24,18 +24,8 @@ function activate_venv() {
 
 function remove_venv() {
   rm -rf "$(venv_dir)"
-  # If `pants_dev_deps.venv` or `pants_dev_deps.py{2,3}.venv` still exist, delete both the legacy folders
-  # and the cached Python interpreter folder, which contains problematic symlinks. Note we only perform
-  # these removals for the first time, to avoid continually deleting the cache when switching
-  # between valid venvs.
-  legacy_venv_dirs=("${venv_dir_prefix}.venv" "${venv_dir_prefix}.py2.venv" "${venv_dir_prefix}.py3.venv")
-  for legacy_venv_dir in "${legacy_venv_dirs[@]}"; do
-    if [ -d "${legacy_venv_dir}" ]; then
-      rm -rf "${legacy_venv_dirs[@]}"
-      rm -rf "${HOME}/.cache/pants/python_cache/interpreters"
-      break
-    fi
-  done
+  # Also remove legacy folders.
+  rm -rf "${venv_dir_prefix}.venv" "${venv_dir_prefix}.py{2,3}.venv"
 }
 
 function create_venv() {
