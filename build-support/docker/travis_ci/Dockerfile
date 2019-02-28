@@ -23,18 +23,12 @@ ENV OPENSSL_VERSION=1.0.2p
 ENV OPENSSL_DIR=/.pyenv_openssl
 ENV LD_LIBRARY_PATH="${OPENSSL_DIR}/lib"
 ENV PYTHON_CONFIGURE_OPTS="--with-openssl=${OPENSSL_DIR}"
-RUN bash -c '\
-    if [ ! -f "${OPENSSL_DIR}/installed-${OPENSSL_VERSION}" ]; then \
-      rm -rf "${OPENSSL_DIR}" \
-      curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz | tar -xz \
-      ( \
-        cd openssl-${OPENSSL_VERSION} \
-        ./config shared --prefix="${OPENSSL_DIR}" \
-        make \
-        make install \
-      ) \
-      touch "${OPENSSL_DIR}/installed-${OPENSSL_VERSION}" \
-    fi'
+RUN bash -c 'curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz | tar -xz \
+    && cd openssl-${OPENSSL_VERSION} \
+    && ./config shared --prefix="${OPENSSL_DIR}" \
+    && make \
+    && make install \
+    && touch "${OPENSSL_DIR}/installed-${OPENSSL_VERSION}"'
 
 # Install both Python 3.6 and 3.7.
 ARG PYTHON_36_VERSION=3.6.8
