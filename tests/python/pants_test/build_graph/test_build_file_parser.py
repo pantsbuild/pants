@@ -28,7 +28,7 @@ class ErrorTarget(Target):
 class BuildFileParserBasicsTest(TestBase):
 
   def setUp(self):
-    super(TestBase, self).setUp()
+    super(BuildFileParserBasicsTest, self).setUp()
     self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
 
   @classmethod
