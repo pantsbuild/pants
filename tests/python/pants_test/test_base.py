@@ -35,6 +35,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_file_dump, safe_mkdir,
                                 safe_mkdtemp, safe_open, safe_rmtree)
@@ -674,3 +675,9 @@ class TestBase(unittest.TestCase):
     finally:
       root_logger.setLevel(old_level)
       root_logger.removeHandler(handler)
+
+  def retrieve_single_product_at_target_base(self, product_mapping, target):
+    mapping_for_target = product_mapping.get(target)
+    single_base_dir = assert_single_element(list(mapping_for_target.keys()))
+    single_product = assert_single_element(mapping_for_target[single_base_dir])
+    return single_product

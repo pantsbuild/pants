@@ -18,10 +18,10 @@ from pants.util.collections import assert_single_element
 from pants.util.meta import classproperty
 from pants_test.backend.python.tasks.python_task_test_base import (PythonTaskTestBase,
                                                                    name_and_platform)
-from pants_test.engine.scheduler_test_base import DeclarativeTaskTestBase
+from pants_test.task_test_base import DeclarativeTaskTestMixin
 
 
-class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskTestBase):
+class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
 
   @classmethod
   def task_type(cls):
@@ -95,7 +95,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
       str(resulting_dist_req.requirement))
 
     local_wheel_products = context.products.get('local_wheels')
-    local_wheel = self._retrieve_single_product_at_target_base(local_wheel_products, dist_target)
+    local_wheel = self.retrieve_single_product_at_target_base(local_wheel_products, dist_target)
     dist, version, platform = name_and_platform(local_wheel)
     self.assertEquals(dist, expected_name)
     self.assertEquals(version, expected_snapshot_version)
