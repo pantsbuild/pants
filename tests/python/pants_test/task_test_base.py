@@ -306,14 +306,23 @@ class ConsoleTaskTestBase(TaskTestBase):
 
 
 class DeclarativeTaskTestMixin(object):
-  """???/experimental blah, makes things declarative, whatever"""
+  """Experimental mixin combining target descriptions with a file path dict.
+
+  This class should be mixed in to subclasses of `TaskTestBase`!
+
+  NB: `self.populate_target_dict()` should be called in the `setUp()` method to use the target specs
+  specified in `dist_specs`!
+
+  This mixin also allows specifying tasks to be run before or after the task_type() is executed when
+  calling `self.invoke_tasks()`.
+  """
 
   @classproperty
   def dist_specs(cls):
-    """
-    This is an informally-specified nested dict -- see ../test_ctypes.py for an example. Special
-    keys are 'key' (used to index into `self.target_dict`) and 'filemap' (creates files at the
-    specified relative paths). The rest of the keys are fed into `self.make_target()`. An
+    """This is an informally-specified nested dict.
+
+    Special keys are 'key' (used to index into `self.target_dict`) and 'filemap' (creates files at
+    the specified relative paths). The rest of the keys are fed into `self.make_target()`. An
     `OrderedDict` of 2-tuples may be used if targets need to be created in a specific order (e.g. if
     they have dependencies on each other).
     """
