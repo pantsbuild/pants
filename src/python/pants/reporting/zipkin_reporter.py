@@ -16,7 +16,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.reporting.reporter import Reporter
 
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class HTTPTransportHandler(BaseTransportHandler):
@@ -34,7 +34,7 @@ class HTTPTransportHandler(BaseTransportHandler):
         headers={'Content-Type': 'application/x-thrift'},
       )
     except Exception as err:
-      log.error("Failed to post the payload to zipkin server. Error {}".format(err))
+      logger.error("Failed to post the payload to zipkin server. Error {}".format(err))
 
 
 class ZipkinReporter(Reporter):
@@ -89,6 +89,8 @@ class ZipkinReporter(Reporter):
         zipkin_attrs =  create_attrs_for_span(
           sample_rate=self.sample_rate, # Value between 0.0 and 100.0
         )
+        self.trace_id = zipkin_attrs.trace_id
+
 
       span = zipkin_span(
         service_name=service_name,
@@ -115,3 +117,7 @@ class ZipkinReporter(Reporter):
     if workunit in self._workunits_to_spans:
       span = self._workunits_to_spans.pop(workunit)
       span.stop()
+
+  def close(self):
+    """End the report."""
+    logger.info("{}".format(self.trace_id))
