@@ -221,7 +221,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # This facilitates bootstrap-time configuration of pantsd usage such that we can
     # determine whether or not to use the Pailgun client to invoke a given pants run
     # without resorting to heavier options parsing.
-    register('--enable-pantsd', advanced=True, type=bool, default=False,
+    register('--enable-pantsd', advanced=True, type=bool, default=True,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
     # These facilitate configuring the native engine.
