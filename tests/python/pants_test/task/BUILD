@@ -82,3 +82,12 @@ python_tests(
     'tests/python/pants_test:task_test_base',
   ]
 )
+
+python_tests(
+  name='unpack_remote_sources_base',
+  sources=['test_unpack_remote_sources_base.py'],
+  dependencies=[
+    'src/python/pants/task',
+    'tests/python/pants_test:test_base',
+  ],
+)
