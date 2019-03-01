@@ -118,9 +118,9 @@ class _JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
     if target.has_sources('.java') or \
       isinstance(target, JUnitTests) or \
       (isinstance(target, ScalaLibrary) and tuple(target.java_sources)):
-      target_type = _JvmCompileWorkflowType.create('zinc-only')
+      target_type = _JvmCompileWorkflowType('zinc-only')
     elif target.has_sources('.scala'):
-      target_type = _JvmCompileWorkflowType.create('rsc-then-zinc')
+      target_type = _JvmCompileWorkflowType('rsc-then-zinc')
     else:
       target_type = None
     return target_type

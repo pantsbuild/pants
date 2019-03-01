@@ -17,6 +17,7 @@ from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterial
                              MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch,
                              create_fs_rules)
 from pants.engine.scheduler import ExecutionError
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink
 from pants.util.meta import AbstractClass
@@ -375,7 +376,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assert_walk_files(PathGlobs(
         include=['not-a-file.txt'],
         exclude=[],
-        glob_match_error_behavior='error',
+        glob_match_error_behavior=GlobMatchErrorBehavior('error'),
       ), [])
     expected_msg = (
       "Globs did not match. Excludes were: []. Unmatched globs were: [\"not-a-file.txt\"].")
@@ -386,7 +387,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assert_walk_files(PathGlobs(
         include=['*.txt'],
         exclude=['4.txt'],
-        glob_match_error_behavior='error',
+        glob_match_error_behavior=GlobMatchErrorBehavior('error'),
       ), [])
     expected_msg = (
       "Globs did not match. Excludes were: [\"4.txt\"]. Unmatched globs were: [\"*.txt\"].")
@@ -397,7 +398,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assert_walk_files(PathGlobs(
         include=['not-a-file.txt'],
         exclude=[''],
-        glob_match_error_behavior='ignore',
+        glob_match_error_behavior=GlobMatchErrorBehavior('ignore'),
       ), [])
       self.assertEqual(0, len(captured.warnings()))
 
@@ -407,7 +408,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assert_walk_files(PathGlobs(
         include=['not-a-file.txt'],
         exclude=[''],
-        glob_match_error_behavior='warn',
+        glob_match_error_behavior=GlobMatchErrorBehavior('warn'),
       ), [])
       all_warnings = captured.warnings()
       self.assertEqual(1, len(all_warnings))
