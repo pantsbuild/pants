@@ -92,7 +92,7 @@ class CargoTask(Task):
     for name, value in env_vars.items():
       env_value, extend = value
       if extend:
-        current_env[name] = "{}:{}".format(current_env[name], env_value.encode('utf-8'))
+        current_env[name] = "{}:{}".format(current_env[name], env_value).encode('utf-8')
       else:
         current_env[name] = env_value.encode('utf-8')
     return current_env

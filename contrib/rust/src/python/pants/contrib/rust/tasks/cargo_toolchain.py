@@ -140,7 +140,7 @@ class Toolchain(CargoTask):
     if self.check_if_rustup_exist():
       self.context.log.debug('Rustup is already installed.')
     else:
-      self.context.log.info('Rustup is missing.\nInstalling rustup...')
+      self.context.log.info('Rustup is missing.')
       self.setup_rustup()
 
     self.set_cargo_path()
