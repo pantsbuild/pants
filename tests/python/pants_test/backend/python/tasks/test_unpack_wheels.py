@@ -65,10 +65,10 @@ class UnpackWheelsTest(TaskTestBase):
       pex_requirement,
       include_patterns=['pex/pex.py', 'pex/__init__.py'],
       module_name=module_name,
-      # TODO: `within_purelib_dir=True` is only tested implicitly by the tensorflow_custom_op target
-      # in examples/! Make a fake wheel, resolve it, and test that `within_purelib_dir=True`
+      # TODO: `within_data_subdir` is only tested implicitly by the tensorflow_custom_op target
+      # in examples/! Make a fake wheel, resolve it, and test that `within_data_subdir`
       # descends into the correct directory!
-      within_purelib_dir=False)
+      within_data_subdir=None)
     context = self.context(target_roots=[unpacked_wheel_tgt])
     unpack_task = self.create_task(context)
     unpack_task.execute()
@@ -86,5 +86,5 @@ class UnpackWheelsTest(TaskTestBase):
 
   def test_unpack_missing_module_name(self):
     with self.assertRaisesRegexp(UnpackWheels.WheelUnpackingError, re.escape(
-        'Error extracting wheel for target UnpackedWheels(unpack:foo): exactly one dist was expected to match name not-a-real-module')):
+        'Error extracting wheel for target UnpackedWheels(unpack:foo): Exactly one dist was expected to match name not-a-real-module')):
       self._assert_unpacking(module_name='not-a-real-module')

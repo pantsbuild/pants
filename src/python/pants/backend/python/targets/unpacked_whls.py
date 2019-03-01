@@ -36,8 +36,10 @@ class UnpackedWheels(ImportWheelsMixin, Target):
     """Thrown when the target has no libraries defined."""
     pass
 
+  # TODO: consider introducing some form of source roots instead of the manual `within_data_subdir`
+  # kwarg!
   def __init__(self, module_name, libraries=None, include_patterns=None, exclude_patterns=None,
-               compatibility=None, within_purelib_dir=False, payload=None, **kwargs):
+               compatibility=None, within_data_subdir=None, payload=None, **kwargs):
     """
     :param str module_name: The name of the specific python module containing headers and/or
                             libraries to extract (e.g. 'tensorflow').
@@ -49,9 +51,14 @@ class UnpackedWheels(ImportWheelsMixin, Target):
     :param compatibility: Python interpreter constraints used to create the pex for the requirement
                           target. If unset, the default interpreter constraints are used. This
                           argument is unnecessary unless the native code depends on libpython.
-    :param bool within_purelib_dir: Whether to descend into '<name>-<version>.data/purelib/' when
-                                    matching `include_patterns`. This layout is used in the
-                                    tensorflow wheel, for example.
+    :param str within_data_subdir: If provided, descend into '<name>-<version>.data/<subdir>' when
+                                   matching `include_patterns`. For python wheels which declare any
+                                   non-code data, this is usually needed to extract that without
+                                   manually specifying the relative path, including the package
+                                   version. For example, when `data_files` is used in a setup.py,
+                                   `within_data_subdir='data'` will allow specifying
+                                   `include_patterns` matching exactly what is specified in the
+                                   setup.py.
     """
     payload = payload or Payload()
     payload.add_fields({
@@ -60,7 +67,7 @@ class UnpackedWheels(ImportWheelsMixin, Target):
       'include_patterns' : PrimitiveField(include_patterns or ()),
       'exclude_patterns' : PrimitiveField(exclude_patterns or ()),
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
-      'within_purelib_dir': PrimitiveField(within_purelib_dir),
+      'within_data_subdir': PrimitiveField(within_data_subdir),
       # TODO: consider supporting transitive deps like UnpackedJars!
       # TODO: consider supporting `platforms` as in PythonBinary!
     })
@@ -79,5 +86,5 @@ class UnpackedWheels(ImportWheelsMixin, Target):
     return self.payload.compatibility
 
   @property
-  def within_purelib_dir(self):
-    return self.payload.within_purelib_dir
+  def within_data_subdir(self):
+    return self.payload.within_data_subdir

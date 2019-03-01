@@ -23,5 +23,5 @@ unpacked_whls(
     'include/**/*',
     './*.so',
   ],
-  within_purelib_dir=True,
+  within_data_subdir='purelib/tensorflow',
 )

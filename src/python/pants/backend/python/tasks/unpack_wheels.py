@@ -85,10 +85,11 @@ class UnpackWheels(UnpackRemoteSourcesBase):
                                                 unpacked_whls.all_imported_requirements,
                                                 unpacked_whls.module_name)
         ZIP.extract(matched_dist.location, extract_dir)
-        if unpacked_whls.within_purelib_dir:
-          data_dir_prefix = '{name}-{version}.data/purelib/{name}'.format(
+        if unpacked_whls.within_data_subdir:
+          data_dir_prefix = '{name}-{version}.data/{subdir}'.format(
             name=matched_dist.project_name,
             version=matched_dist.version,
+            subdir=unpacked_whls.within_data_subdir,
           )
           dist_data_dir = os.path.join(extract_dir, data_dir_prefix)
         else:
