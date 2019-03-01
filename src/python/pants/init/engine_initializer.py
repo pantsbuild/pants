@@ -262,7 +262,9 @@ class EngineInitializer(object):
       options_bootstrapper,
       build_configuration,
       native=native,
-      glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
+      # TODO(#7233): convert this into an enum instance using the `type` argument in option
+      # registration!
+      glob_match_error_behavior=GlobMatchErrorBehavior(bootstrap_options.glob_expansion_failure),
       build_ignore_patterns=bootstrap_options.build_ignore,
       exclude_target_regexps=bootstrap_options.exclude_target_regexp,
       subproject_roots=bootstrap_options.subproject_roots,
@@ -346,7 +348,7 @@ class EngineInitializer(object):
     rules = (
       [
         RootRule(Console),
-        SingletonRule.from_instance(GlobMatchErrorBehavior.create(glob_match_error_behavior)),
+        SingletonRule.from_instance(glob_match_error_behavior or GlobMatchErrorBehavior('ignore')),
         SingletonRule.from_instance(build_configuration),
         SingletonRule(SymbolTable, symbol_table),
       ] +

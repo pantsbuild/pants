@@ -44,7 +44,13 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
     return self.get_target_mirrored_option('compiler_option_sets', target)
 
   def get_toolchain_variant_for_target(self, target):
-    return ToolchainVariant(self.get_target_mirrored_option('toolchain_variant', target))
+    # TODO(#7233): convert this option into an enum instance using the `type` argument in option
+    # registration!
+    enum_or_value = self.get_target_mirrored_option('toolchain_variant', target)
+    if isinstance(enum_or_value, ToolchainVariant):
+      return enum_or_value
+    else:
+      return ToolchainVariant(enum_or_value)
 
   @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):

@@ -26,16 +26,6 @@ class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
   be aware of any changes to this object's definition.
   """
 
-  @classmethod
-  def create(cls, value=None):
-    # TODO: add testing for this value!
-    value = value or 'ignore'
-    # If passed an instance of the object, just return it. This makes copying glob expansion
-    # settings from elsewhere when constructing PathGlobs more ergonomic.
-    if isinstance(value, cls):
-      return value
-    return cls(value)
-
 
 class ExecutionOptions(datatype([
   'remote_store_server',
