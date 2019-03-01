@@ -181,6 +181,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Use experimental junit-runner logic for more options for parallelism.')
     register('--html-report', type=bool, fingerprint=True,
              help='If true, generate an html summary report of tests that were run.')
+    register('--html-report-error-on-conflict', type=bool, default=True,
+             help='If true, error when duplicate test cases are found in html results')
     register('--open', type=bool,
              help='Attempt to open the html summary report in a browser (implies --html-report)')
 
@@ -632,7 +634,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       junit_html_report = JUnitHtmlReport.create(xml_dir=output_dir,
                                                  open_report=self.get_options().open,
                                                  logger=self.context.log,
-                                                 error_on_conflict=True)
+                                                 error_on_conflict=self.get_options().html_report_error_on_conflict)
     else:
       junit_html_report = NoJunitHtmlReport()
 
