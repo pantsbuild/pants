@@ -23,7 +23,6 @@ from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.engine.legacy.graph import HydratedField
@@ -319,8 +318,6 @@ class TestBase(unittest.TestCase):
     }
 
     self._build_configuration = self.build_config()
-    self._build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
-
     self._inited_target = False
 
   def buildroot_files(self, relpath=None):
@@ -362,10 +359,6 @@ class TestBase(unittest.TestCase):
   @property
   def build_root(self):
     return self._build_root()
-
-  @property
-  def build_file_parser(self):
-    return self._build_file_parser
 
   @property
   def pants_workdir(self):
@@ -498,7 +491,7 @@ class TestBase(unittest.TestCase):
     context = create_context_from_options(fake_options,
                                           target_roots=target_roots,
                                           build_graph=self.build_graph,
-                                          build_file_parser=self._build_file_parser,
+                                          build_configuration=self._build_configuration,
                                           address_mapper=address_mapper,
                                           console_outstream=console_outstream,
                                           workspace=workspace,
