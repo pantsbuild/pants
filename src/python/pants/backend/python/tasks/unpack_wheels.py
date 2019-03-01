@@ -73,7 +73,7 @@ class UnpackWheels(UnpackRemoteSourcesBase):
     allowable_interpreters = PythonInterpreterCache.global_instance().setup(filters=constraints)
     return min(allowable_interpreters)
 
-  class NativeCodeExtractionError(TaskError): pass
+  class WheelUnpackingError(TaskError): pass
 
   def unpack_target(self, unpacked_whls, unpack_dir):
     interpreter = self._compatible_interpreter(unpacked_whls)
@@ -85,16 +85,19 @@ class UnpackWheels(UnpackRemoteSourcesBase):
                                                 unpacked_whls.all_imported_requirements,
                                                 unpacked_whls.module_name)
         ZIP.extract(matched_dist.location, extract_dir)
-        data_dir_prefix = '{name}-{version}.data/purelib/{name}'.format(
-          name=matched_dist.project_name,
-          version=matched_dist.version,
-        )
-        dist_data_dir = os.path.join(extract_dir, data_dir_prefix)
+        if unpacked_whls.within_purelib_dir:
+          data_dir_prefix = '{name}-{version}.data/purelib/{name}'.format(
+            name=matched_dist.project_name,
+            version=matched_dist.version,
+          )
+          dist_data_dir = os.path.join(extract_dir, data_dir_prefix)
+        else:
+          dist_data_dir = extract_dir
         unpack_filter = self.get_unpack_filter(unpacked_whls)
         # Copy over the module's data files into `unpack_dir`.
         mergetree(dist_data_dir, unpack_dir, file_filter=unpack_filter)
       except Exception as e:
-        raise self.NativeCodeExtractionError(
+        raise self.WheelUnpackingError(
           "Error extracting wheel for target {}: {}"
           .format(unpacked_whls, str(e)),
           e)
