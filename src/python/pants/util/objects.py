@@ -219,15 +219,15 @@ def enum(all_values):
   class MyResult(enum(['success', 'failure'])):
     pass
 
-  MyResult.success # The same as: MyResult(success)
-  MyResult.failure # The same as: MyResult(failure)
+  MyResult.success # The same as: MyResult('success')
+  MyResult.failure # The same as: MyResult('failure')
 
   :param Iterable all_values: A nonempty iterable of objects representing all possible values for
                               the enum.  This argument must be a finite, non-empty iterable with
                               unique values.
   :raises: :class:`ValueError`
   """
-  # namedtuple() raises a ValueError if you try to use a field with an underscore.
+  # namedtuple() raises a ValueError if you try to use a field with a leading underscore.
   field_name = 'value'
 
   # This call to list() will eagerly evaluate any `all_values` which would otherwise be lazy, such
