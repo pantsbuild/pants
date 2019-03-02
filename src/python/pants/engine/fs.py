@@ -62,8 +62,8 @@ class PathGlobs(datatype([
       cls,
       include=tuple(include),
       exclude=tuple(exclude),
-      glob_match_error_behavior=(glob_match_error_behavior or GlobMatchErrorBehavior('ignore')),
-      conjunction=(conjunction or GlobExpansionConjunction('any_match')))
+      glob_match_error_behavior=(glob_match_error_behavior or GlobMatchErrorBehavior.error),
+      conjunction=(conjunction or GlobExpansionConjunction.any_match))
 
 
 class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', int)])):

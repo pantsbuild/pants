@@ -348,7 +348,7 @@ class EngineInitializer(object):
     rules = (
       [
         RootRule(Console),
-        SingletonRule.from_instance(glob_match_error_behavior or GlobMatchErrorBehavior('ignore')),
+        SingletonRule.from_instance(glob_match_error_behavior or GlobMatchErrorBehavior.error),
         SingletonRule.from_instance(build_configuration),
         SingletonRule(SymbolTable, symbol_table),
       ] +
