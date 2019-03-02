@@ -191,14 +191,11 @@ class OptionsTest(unittest.TestCase):
     options.register('fingerprinting', '--definitely-not-fingerprinted', fingerprint=False)
 
     # For enum tests
-    self.SomeEnumOption.register_option(
-      lambda *args, **kwargs: options.register('enum-opt', *args, **kwargs),
-      '--some-enum')
+    options.register('enum-opt', '--some-enum',
+                     type=self.SomeEnumOption)
     # For testing the default value
-    self.SomeEnumOption.register_option(
-      lambda *args, **kwargs: options.register('separate-enum-opt-scope', default='a-value',
-                                               *args, **kwargs),
-      '--some-enum')
+    options.register('separate-enum-opt-scope', '--some-enum-with-default',
+                     default='a-value', type=self.SomeEnumOption)
 
   def test_env_type_int(self):
     options = Options.create(env={'PANTS_FOO_BAR': "['123','456']"},
@@ -810,15 +807,17 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(self.SomeEnumOption.another_value, options.for_scope('enum-opt').some_enum)
 
     # Getting the default value for an enum option.
-    self.assertEqual(self.SomeEnumOption.a_value,
-                     defaulted_only_options.for_scope('separate-enum-opt-scope').some_enum)
+    self.assertEqual(
+      self.SomeEnumOption.a_value,
+      defaulted_only_options.for_scope('separate-enum-opt-scope').some_enum_with_default)
 
   def test_enum_option_type_parse_error(self):
+    self.maxDiff = None
     with self.assertRaises(ParseError) as cm:
       options = self._parse('./pants enum-opt --some-enum=invalid-value')
       options.for_scope('enum-opt').some_enum
     self.assertIn("""\
-ParseError: Error applying types to option values for option some_enum in scope 'enum-opt': type check error in class SomeEnumOption: Value 'invalid-value' must be one of: ['a-value', 'another-value'].""",
+ParseError: Error applying type 'SomeEnumOption' to option value 'invalid-value', for option '--some_enum' in scope 'enum-opt': type check error in class SomeEnumOption: Value 'invalid-value' must be one of: ['a-value', 'another-value'].""",
                   str(cm.exception))
 
   def test_deprecated_option_past_removal(self):

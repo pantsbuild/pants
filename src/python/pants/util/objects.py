@@ -279,10 +279,14 @@ def enum(all_values):
       :param value: Use this as the enum value. If `value` is an instance of this class, return it,
                     otherwise it is checked against the enum's allowed values.
       """
+      if isinstance(value, cls):
+        return value
+
       if value not in cls._singletons:
         raise cls.make_type_error(
           "Value {!r} must be one of: {!r}."
           .format(value, cls._allowed_values))
+
       return cls._singletons[value]
 
     # TODO: figure out if this will always trigger on primitives like strings, and what situations
@@ -336,16 +340,6 @@ def enum(all_values):
       be used for performing conditional logic based on an enum instance's value.
       """
       return cls._singletons.values()
-
-    @classmethod
-    def register_option(cls, register, *args, **kwargs):
-      """Register an option which converts the given value into the specified enum."""
-      # Since __new__ will raise if provided an instance of the enum class (as opposed to a valid
-      # /value/ for the enum), `idempotent_type_check=False` avoids wrapping any instances of this
-      # enum type again if they are already instances of this enum type.
-      register(*args, idempotent_type_check=False, type=cls,
-               choices=list(cls.iterate_enum_variants()),
-               **kwargs)
 
   # Python requires creating an explicit closure to save the value on each loop iteration.
   accessor_generator = lambda case: lambda cls: cls(case)

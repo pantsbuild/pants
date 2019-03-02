@@ -195,10 +195,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
-    GlobMatchErrorBehavior.register_option(
-      register, '--glob-expansion-failure', default='warn', advanced=True,
-      help="Raise an exception if any targets declaring source files "
-           "fail to match any glob provided in the 'sources' argument.")
+    register('--glob-expansion-failure', advanced=True,
+             default='warn', type=GlobMatchErrorBehavior,
+             help="Raise an exception if any targets declaring source files "
+                  "fail to match any glob provided in the 'sources' argument.")
 
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
              metavar='<regexp>', help='Exclude target roots that match these regexes.')

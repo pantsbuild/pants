@@ -37,22 +37,16 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
              help='The default for the "compiler_option_sets" argument '
                   'for targets of this language.')
 
-    ToolchainVariant.register_option(
-      register, '--toolchain-variant', advanced=True, default='gnu',
-      help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
-           "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
+    register('--toolchain-variant', advanced=True,
+             default='gnu', type=ToolchainVariant,
+             help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
+                  "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 
   def get_compiler_option_sets_for_target(self, target):
     return self.get_target_mirrored_option('compiler_option_sets', target)
 
   def get_toolchain_variant_for_target(self, target):
-    # TODO(#7233): convert this option into an enum instance using the `type` argument in option
-    # registration!
-    enum_or_value = self.get_target_mirrored_option('toolchain_variant', target)
-    if isinstance(enum_or_value, ToolchainVariant):
-      return enum_or_value
-    else:
-      return ToolchainVariant(enum_or_value)
+    return self.get_target_mirrored_option('toolchain_variant', target)
 
   @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):

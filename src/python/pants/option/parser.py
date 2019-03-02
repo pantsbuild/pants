@@ -8,7 +8,7 @@ import copy
 import os
 import re
 import traceback
-from builtins import next, object, open
+from builtins import next, object, open, str
 from collections import defaultdict
 
 import six
@@ -341,7 +341,7 @@ class Parser(object):
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
     'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group',
-    'daemon', 'idempotent_type_check',
+    'daemon'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -443,14 +443,12 @@ class Parser(object):
         return self._ensure_bool(val_str)
       else:
         type_arg = kwargs.get('type', str)
-        if (not kwargs.get('idempotent_type_check', True)) and isinstance(val_str, type_arg):
-          return val_str
-        else:
-          try:
-            return self._wrap_type(type_arg)(val_str)
-          except TypeError as e:
-            raise ParseError('Error applying types to option values for option {} in {}: {}'
-                             .format(dest, self._scope_str(), e))
+        try:
+          return self._wrap_type(type_arg)(val_str)
+        except TypeError as e:
+          raise ParseError(
+            "Error applying type '{}' to option value '{}', for option '--{}' in {}: {}"
+            .format(type_arg.__name__, val_str, dest, self._scope_str(), e))
 
     # Helper function to expand a fromfile=True value string, if needed.
     def expand(val_str):
@@ -525,8 +523,6 @@ class Parser(object):
     # Rank all available values.
     # Note that some of these values may already be of the value type, but type conversion
     # is idempotent, so this is OK.
-    # NB: `idempotent_type_check=False` allows type conversions which are not idempotent (such as
-    # enums) by checking if values are instances of the value type.
 
     values_to_rank = [to_value_type(x) for x in
                       [flag_val, env_val_str, config_val_str,
@@ -561,6 +557,11 @@ class Parser(object):
     def check(val):
       if val is not None:
         choices = kwargs.get('choices')
+        # Reach into `enum` types to get the allowed `choices` if not explicitly set.
+        if choices is None and 'type' in kwargs:
+          type_arg = kwargs.get('type')
+          if hasattr(type_arg, 'iterate_enum_variants'):
+            choices = list(type_arg.iterate_enum_variants())
         if choices is not None and val not in choices:
           raise ParseError('`{}` is not an allowed value for option {} in {}. '
                            'Must be one of: {}'.format(val, dest, self._scope_str(), choices))
