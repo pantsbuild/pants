@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
 from abc import abstractmethod
 from builtins import zip
 from collections import namedtuple
@@ -216,11 +217,14 @@ def enum(all_values):
   If `all_values` contains only strings, then each variant is made into an attribute on the
   generated enum class object. This allows code such as the following:
 
-  class MyResult(enum(['success', 'failure'])):
+  class MyResult(enum(['success', 'not-success'])):
     pass
 
   MyResult.success # The same as: MyResult('success')
-  MyResult.failure # The same as: MyResult('failure')
+  MyResult.not_success # The same as: MyResult('not-success')
+
+  Note that like with option names, hyphenated ('-') enum values are converted into attribute names
+  with underscores ('_').
 
   :param Iterable all_values: A nonempty iterable of objects representing all possible values for
                               the enum.  This argument must be a finite, non-empty iterable with
@@ -338,7 +342,8 @@ def enum(all_values):
   for case in all_values_realized:
     if isinstance(case, six.string_types):
       accessor = classproperty(accessor_generator(case))
-      setattr(ChoiceDatatype, case, accessor)
+      attr_name = re.sub(r'-', '_', case)
+      setattr(ChoiceDatatype, attr_name, accessor)
 
   return ChoiceDatatype
 
