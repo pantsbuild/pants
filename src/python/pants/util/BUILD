@@ -115,6 +115,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
+    '3rdparty/python:six',
     ':collections_abc_backport',
     ':memo',
     ':meta',

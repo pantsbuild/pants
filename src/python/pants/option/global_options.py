@@ -19,7 +19,7 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.objects import datatype, enum, register_enum_option
 
 
-class GlobMatchErrorBehavior(enum('failure_behavior', ['ignore', 'warn', 'error'])):
+class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
   """Describe the action to perform when matching globs in BUILD files to source files.
 
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to

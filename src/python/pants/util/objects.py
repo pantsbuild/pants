@@ -8,6 +8,7 @@ from abc import abstractmethod
 from builtins import zip
 from collections import namedtuple
 
+import six
 from twitter.common.collections import OrderedSet
 
 from pants.util.collections_abc_backport import Iterable, OrderedDict
@@ -205,50 +206,43 @@ class EnumVariantSelectionError(TypeCheckError):
   """Raised when an invalid variant for an enum() is constructed or matched against."""
 
 
-def enum(*args):
+def enum(all_values):
   """A datatype which can take on a finite set of values. This method is experimental and unstable.
 
   Any enum subclass can be constructed with its create() classmethod. This method will use the first
   element of `all_values` as the default value, but enum classes can override this behavior by
   setting `default_value` in the class body.
 
-  NB: Relying on the `field_name` directly is discouraged in favor of using
-  resolve_for_enum_variant() in Python code. The `field_name` argument is exposed to make enum
-  instances more readable when printed, and to allow code in another language using an FFI to
-  reliably extract the value from an enum instance.
+  If `all_values` contains only strings, then each variant is made into an attribute on the
+  generated enum class object. This allows code such as the following:
 
-  :param string field_name: A string used as the field for the datatype. This positional argument is
-                            optional, and defaults to 'value'. Note that `enum()` does not yet
-                            support type checking as with `datatype()`.
+  class MyResult(enum(['success', 'failure'])):
+    pass
+
+  MyResult.success # The same as: MyResult('success')
+  MyResult.failure # The same as: MyResult('failure')
+
   :param Iterable all_values: A nonempty iterable of objects representing all possible values for
                               the enum.  This argument must be a finite, non-empty iterable with
                               unique values.
   :raises: :class:`ValueError`
   """
-  if len(args) == 1:
-    field_name = 'value'
-    all_values, = args
-  elif len(args) == 2:
-    field_name, all_values = args
-  else:
-    raise ValueError("enum() accepts only 1 or 2 args! args = {!r}".format(args))
+  # namedtuple() raises a ValueError if you try to use a field with a leading underscore.
+  field_name = 'value'
 
   # This call to list() will eagerly evaluate any `all_values` which would otherwise be lazy, such
   # as a generator.
   all_values_realized = list(all_values)
-  # `OrderedSet` maintains the order of the input iterable, but is faster to check membership.
-  allowed_values_set = OrderedSet(all_values_realized)
 
-  if len(allowed_values_set) == 0:
+  unique_values = OrderedSet(all_values_realized)
+  if len(unique_values) == 0:
     raise ValueError("all_values must be a non-empty iterable!")
-  elif len(allowed_values_set) < len(all_values_realized):
+  elif len(unique_values) < len(all_values_realized):
     raise ValueError("When converting all_values ({}) to a set, at least one duplicate "
                      "was detected. The unique elements of all_values were: {}."
-                     .format(all_values_realized, list(allowed_values_set)))
+                     .format(all_values_realized, list(unique_values)))
 
   class ChoiceDatatype(datatype([field_name])):
-    default_value = next(iter(allowed_values_set))
-
     # Overriden from datatype() so providing an invalid variant is catchable as a TypeCheckError,
     # but more specific.
     type_check_error_type = EnumVariantSelectionError
@@ -260,7 +254,7 @@ def enum(*args):
       NB: The implementation of enum() should use this property as the source of truth for allowed
       values and enum instances from those values.
       """
-      return OrderedDict((value, cls._make_singleton(value)) for value in allowed_values_set)
+      return OrderedDict((value, cls._make_singleton(value)) for value in all_values_realized)
 
     @classmethod
     def _make_singleton(cls, value):
@@ -276,20 +270,27 @@ def enum(*args):
       return list(cls._singletons.keys())
 
     def __new__(cls, value):
-      """Forward `value` to the .create() factory method.
+      """Create an instance of this enum.
 
-      The .create() factory method is preferred, but forwarding the constructor like this allows us
-      to use the generated enum type both as a type to check against with isinstance() as well as a
-      function to create instances with. This makes it easy to use as a pants option type.
+      :param value: Use this as the enum value. If `value` is an instance of this class, return it,
+                    otherwise it is checked against the enum's allowed values.
       """
-      return cls.create(value)
+      if value not in cls._singletons:
+        raise cls.make_type_error(
+          "Value {!r} must be one of: {!r}."
+          .format(value, cls._allowed_values))
+      return cls._singletons[value]
 
     # TODO: figure out if this will always trigger on primitives like strings, and what situations
     # won't call this __eq__ (and therefore won't raise like we want).
     def __eq__(self, other):
-      """Redefine equality to raise to nudge people to use static pattern matching."""
-      raise self.make_type_error(
-        "enum equality is defined to be an error -- use .resolve_for_enum_variant() instead!")
+      """Redefine equality to avoid accidentally comparing against a non-enum."""
+      if type(self) != type(other):
+        raise self.make_type_error(
+          "when comparing {!r} against {!r} with type '{}': "
+          "enum equality is only defined for instances of the same enum class!"
+          .format(self, other, type(other).__name__))
+      return super(ChoiceDatatype, self).__eq__(other)
     # Redefine the canary so datatype __new__ doesn't raise.
     __eq__._eq_override_canary = None
 
@@ -297,43 +298,6 @@ def enum(*args):
     # overridden. See https://docs.python.org/3/reference/datamodel.html#object.__hash__.
     def __hash__(self):
       return super(ChoiceDatatype, self).__hash__()
-
-    @classmethod
-    def create(cls, *args, **kwargs):
-      """Create an instance of this enum, using the default value if specified.
-
-      :param value: Use this as the enum value. If `value` is an instance of this class, return it,
-                    otherwise it is checked against the enum's allowed values. This positional
-                    argument is optional, and if not specified, `cls.default_value` is used.
-      :param bool none_is_default: If this is True, a None `value` is converted into
-                                   `cls.default_value` before being checked against the enum's
-                                   allowed values.
-      """
-      none_is_default = kwargs.pop('none_is_default', False)
-      if kwargs:
-        raise ValueError('unrecognized keyword arguments for {}.create(): {!r}'
-                         .format(cls.__name__, kwargs))
-
-      if len(args) == 0:
-        value = cls.default_value
-      elif len(args) == 1:
-        value = args[0]
-        if none_is_default and value is None:
-          value = cls.default_value
-      else:
-        raise ValueError('{}.create() accepts 0 or 1 positional args! *args = {!r}'
-                         .format(cls.__name__, args))
-
-      # If we get an instance of this enum class, just return it. This means you can call .create()
-      # on an allowed value for the enum, or an existing instance of the enum.
-      if isinstance(value, cls):
-        return value
-
-      if value not in cls._singletons:
-        raise cls.make_type_error(
-          "Value {!r} for '{}' must be one of: {!r}."
-          .format(value, field_name, cls._allowed_values))
-      return cls._singletons[value]
 
     def resolve_for_enum_variant(self, mapping):
       """Return the object in `mapping` with the key corresponding to the enum value.
@@ -349,8 +313,16 @@ def enum(*args):
         raise self.make_type_error(
           "pattern matching must have exactly the keys {} (was: {})"
           .format(self._allowed_values, list(keys)))
-      match_for_variant = mapping[getattr(self, field_name)]
+      match_for_variant = mapping[self.underlying()]
       return match_for_variant
+
+    def underlying(self):
+      """Get the element of `all_values` corresponding to this enum instance.
+
+      This should be used only for generating option values in tests. In general, it is less
+      error-prone to deal with enum objects directly.
+      """
+      return getattr(self, field_name)
 
     @classmethod
     def iterate_enum_variants(cls):
@@ -359,9 +331,14 @@ def enum(*args):
       NB: This method is exposed for testing enum variants easily. resolve_for_enum_variant() should
       be used for performing conditional logic based on an enum instance's value.
       """
-      # TODO(#7232): use this method to register attributes on the generated type object for each of
-      # the singletons!
       return cls._singletons.values()
+
+  # Python requires creating an explicit closure to save the value on each loop iteration.
+  accessor_generator = lambda case: lambda cls: cls(case)
+  for case in all_values_realized:
+    if isinstance(case, six.string_types):
+      accessor = classproperty(accessor_generator(case))
+      setattr(ChoiceDatatype, case, accessor)
 
   return ChoiceDatatype
 
@@ -369,8 +346,7 @@ def enum(*args):
 # TODO(#7233): allow usage of the normal register() by using an enum class as the `type` argument!
 def register_enum_option(register, enum_cls, *args, **kwargs):
   """A helper method for declaring a pants option from an `enum()`."""
-  default_value = kwargs.pop('default', enum_cls.default_value)
-  register(*args, choices=enum_cls._allowed_values, default=default_value, **kwargs)
+  register(*args, choices=enum_cls._allowed_values, **kwargs)
 
 
 # TODO: make these members of the `TypeConstraint` class!

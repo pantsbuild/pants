@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
 from textwrap import dedent
 
 from pants.backend.python.python_requirement import PythonRequirement
@@ -56,6 +57,9 @@ class UnpackedWheelsTest(TestBase):
     def assert_dep(reqA, reqB):
       self.assertEqual(reqA.requirement, reqB.requirement)
 
+    def sort_requirements(reqs):
+      return list(sorted(reqs, key=lambda r: str(r.requirement)))
+
     self.add_to_build_file('BUILD', dedent('''
     python_requirement_library(name='lib1',
       requirements=[
@@ -80,13 +84,13 @@ class UnpackedWheelsTest(TestBase):
 
     lib2 = self.target('//:lib2')
     self.assertIsInstance(lib2, PythonRequirementLibrary)
-    lib2_reqs = list(lib2.requirements)
+    lib2_reqs = sort_requirements(lib2.requirements)
     self.assertEqual(2, len(lib2_reqs))
     assert_dep(lib2_reqs[0], PythonRequirement('testName2==456'))
     assert_dep(lib2_reqs[1], PythonRequirement('testName3==789'))
 
     unpacked_lib = self.target('//:unpacked-lib')
-    unpacked_req_libs = unpacked_lib.all_imported_requirements
+    unpacked_req_libs = sort_requirements(unpacked_lib.all_imported_requirements)
 
     self.assertEqual(3, len(unpacked_req_libs))
     assert_dep(unpacked_req_libs[0], PythonRequirement('testName1==123'))

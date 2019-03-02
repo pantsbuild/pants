@@ -56,7 +56,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
           'pants_distdir': tmp_dir,
         },
         'native-build-step': {
-          'toolchain_variant': toolchain_variant.value,
+          'toolchain_variant': toolchain_variant.underlying(),
         },
       })
 
@@ -96,7 +96,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       dist_name, dist_version, wheel_platform = name_and_platform(wheel_dist)
       self.assertEqual(dist_name, 'ctypes_test')
-      contains_current_platform = Platform.create().resolve_for_enum_variant({
+      contains_current_platform = Platform.current.resolve_for_enum_variant({
         'darwin': wheel_platform.startswith('macosx'),
         'linux': wheel_platform.startswith('linux'),
       })
@@ -134,7 +134,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         # Explicitly set to True (although this is the default).
         config={
           'native-build-step': {
-            'toolchain_variant': toolchain_variant.value,
+            'toolchain_variant': toolchain_variant.underlying(),
           },
           # TODO(#6848): don't make it possible to forget to add the toolchain_variant option!
           'native-build-settings': {
@@ -152,17 +152,14 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
     # TODO(#6848): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
     # DYLD_LIBRARY_PATH during the 'run' goal somehow.
-    attempt_pants_run = Platform.create().resolve_for_enum_variant({
-      'darwin': toolchain_variant.resolve_for_enum_variant({
-        'gnu': False,
-        'llvm': True,
-      }),
+    attempt_pants_run = Platform.current.resolve_for_enum_variant({
+      'darwin': toolchain_variant == ToolchainVariant.llvm,
       'linux': True,
     })
     if attempt_pants_run:
       pants_run_interop = self.run_pants(['-q', 'run', self._binary_target_with_interop], config={
         'native-build-step': {
-          'toolchain_variant': toolchain_variant.value,
+          'toolchain_variant': toolchain_variant.underlying(),
         },
         'native-build-settings': {
           'strict_deps': True,
@@ -175,24 +172,21 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   def test_ctypes_third_party_integration(self, toolchain_variant):
     pants_binary = self.run_pants(['binary', self._binary_target_with_third_party], config={
       'native-build-step': {
-        'toolchain_variant': toolchain_variant.value,
+        'toolchain_variant': toolchain_variant.underlying(),
       },
     })
     self.assert_success(pants_binary)
 
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
-    attempt_pants_run = Platform.create().resolve_for_enum_variant({
-      'darwin': toolchain_variant.resolve_for_enum_variant({
-        'gnu': False,
-        'llvm': True,
-      }),
+    attempt_pants_run = Platform.current.resolve_for_enum_variant({
+      'darwin': toolchain_variant == ToolchainVariant.llvm,
       'linux': True,
     })
     if attempt_pants_run:
       pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party], config={
         'native-build-step': {
-          'toolchain_variant': toolchain_variant.value,
+          'toolchain_variant': toolchain_variant.underlying(),
         },
       })
       self.assert_success(pants_run)
@@ -231,11 +225,8 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     """
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
-    attempt_pants_run = Platform.create().resolve_for_enum_variant({
-      'darwin': toolchain_variant.resolve_for_enum_variant({
-        'gnu': False,
-        'llvm': True,
-      }),
+    attempt_pants_run = Platform.current.resolve_for_enum_variant({
+      'darwin': toolchain_variant == ToolchainVariant.llvm,
       'linux': True,
     })
     if not attempt_pants_run:
@@ -247,7 +238,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     ]
     pants_run = self.run_pants(command=command, config={
       'native-build-step': {
-        'toolchain_variant': toolchain_variant.value,
+        'toolchain_variant': toolchain_variant.underlying(),
       },
       'native-build-step.cpp-compile-settings': {
         'compiler_option_sets_enabled_args': {
