@@ -368,7 +368,9 @@ class DatatypeTest(TestBase):
   def test_invalid_field_name(self):
     with self.assertRaisesWithMessageContaining(
         ValueError,
-        "Type names and field names must be valid identifiers: '0isntanallowedfirstchar'",
+        "Type names and field names must be valid identifiers: '0isntanallowedfirstchar'"
+        if PY3 else
+        "Type names and field names cannot start with a number: '0isntanallowedfirstchar'",
         exact=True):
       datatype(['0isntanallowedfirstchar'])
     with self.assertRaisesWithMessageContaining(
@@ -398,13 +400,18 @@ class DatatypeTest(TestBase):
   def test_double_passed_arg(self):
     bar = datatype(['val', 'zal'])
     with self.assertRaisesWithMessageContaining(
-        TypeError, "__new__() got multiple values for argument 'val'"):
+        TypeError,
+        "__new__() got multiple values for {kw}argument 'val'"
+        .format(kw='' if PY3 else 'keyword ')):
       bar(1, val=1)
 
   def test_too_many_args(self):
     bar = datatype(['val', 'zal'])
     with self.assertRaisesWithMessageContaining(
-        TypeError, '__new__() takes 3 positional arguments but 4 were given'):
+        TypeError,
+        '__new__() takes 3 positional arguments but 4 were given'
+        if PY3 else
+        '__new__() takes exactly 3 arguments (4 given)'):
       bar(1, 1, 1)
 
   def test_unexpect_kwarg(self):
