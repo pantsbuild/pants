@@ -33,7 +33,7 @@ class Toolchain(CargoTask):
 
   @classmethod
   def product_types(cls):
-    return ['cargo_env']
+    return ['cargo_env', 'cargo_toolchain']
 
   @classmethod
   def implementation_version(cls):
@@ -93,23 +93,6 @@ class Toolchain(CargoTask):
       else:
         self.context.log.debug(workunit.outcome_string(workunit.outcome()))
 
-  def set_new_toolchain_as_default(self, toolchain):
-    self.context.log.debug('Set {0} as default toolchain'.format(toolchain))
-    with self.context.new_workunit(name='setup-rustup-toolchain',
-                                   labels=[WorkUnitLabel.BOOTSTRAP]) as workunit:
-      cmd = ['rustup', 'default', toolchain]
-
-      env = {
-        'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-      }
-
-      self.run_command(cmd, get_buildroot(), env, workunit)
-
-      if workunit.outcome() != WorkUnit.SUCCESS:
-        self.context.log.error(workunit.outcome_string(workunit.outcome()))
-      else:
-        self.context.log.debug(workunit.outcome_string(workunit.outcome()))
-
   @staticmethod
   def check_if_rustup_exist():
     return distutils.spawn.find_executable('rustup') is not None
@@ -117,7 +100,7 @@ class Toolchain(CargoTask):
   def setup_toolchain(self):
     toolchain = self.get_toolchain()
     self.install_rust_toolchain(toolchain)
-    self.set_new_toolchain_as_default(toolchain)
+    self.context.products.safe_create_data('cargo_toolchain', lambda: toolchain)
 
   def set_cargo_path(self):
     env = os.environ.copy()

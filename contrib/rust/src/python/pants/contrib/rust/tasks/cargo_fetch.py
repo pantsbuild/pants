@@ -17,6 +17,7 @@ class Fetch(CargoTask):
   def prepare(cls, options, round_manager):
     super(Fetch, cls).prepare(options, round_manager)
     round_manager.require_data('cargo_env')
+    round_manager.require_data('cargo_toolchain')
 
   @classmethod
   def implementation_version(cls):
@@ -34,7 +35,9 @@ class Fetch(CargoTask):
 
       self.context.log.debug('Fetching dependencies for {0}'.format(abs_manifest_path))
 
-      cmd = ['cargo', 'fetch', '--manifest-path', abs_manifest_path]
+      toolchain = "+{}".format(self.context.products.get_data('cargo_toolchain'))
+
+      cmd = ['cargo', toolchain, 'fetch', '--manifest-path', abs_manifest_path]
 
       env = {
         'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),

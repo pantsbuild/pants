@@ -48,6 +48,7 @@ class Build(Workspace):
   def prepare(cls, options, round_manager):
     super(Build, cls).prepare(options, round_manager)
     round_manager.require_data('cargo_env')
+    round_manager.require_data('cargo_toolchain')
 
   @property
   def cache_target_dirs(self):
@@ -91,7 +92,9 @@ class Build(Workspace):
         'Getting cargo build plan for manifest: {0}\nAdditional cargo options: {1}'.format(
           abs_manifest_path, self.get_options().cargo_opt))
 
-      cmd = ['cargo', 'build',
+      toolchain = "+{}".format(self.context.products.get_data('cargo_toolchain'))
+
+      cmd = ['cargo', toolchain, 'build',
              '--manifest-path', abs_manifest_path,
              '--build-plan', '-Z', 'unstable-options']
 
