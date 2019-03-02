@@ -56,7 +56,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
           'pants_distdir': tmp_dir,
         },
         'native-build-step': {
-          'toolchain_variant': toolchain_variant.underlying(),
+          'toolchain_variant': toolchain_variant.value,
         },
       })
 
@@ -134,7 +134,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         # Explicitly set to True (although this is the default).
         config={
           'native-build-step': {
-            'toolchain_variant': toolchain_variant.underlying(),
+            'toolchain_variant': toolchain_variant.value,
           },
           # TODO(#6848): don't make it possible to forget to add the toolchain_variant option!
           'native-build-settings': {
@@ -159,7 +159,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     if attempt_pants_run:
       pants_run_interop = self.run_pants(['-q', 'run', self._binary_target_with_interop], config={
         'native-build-step': {
-          'toolchain_variant': toolchain_variant.underlying(),
+          'toolchain_variant': toolchain_variant.value,
         },
         'native-build-settings': {
           'strict_deps': True,
@@ -172,7 +172,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   def test_ctypes_third_party_integration(self, toolchain_variant):
     pants_binary = self.run_pants(['binary', self._binary_target_with_third_party], config={
       'native-build-step': {
-        'toolchain_variant': toolchain_variant.underlying(),
+        'toolchain_variant': toolchain_variant.value,
       },
     })
     self.assert_success(pants_binary)
@@ -186,7 +186,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     if attempt_pants_run:
       pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party], config={
         'native-build-step': {
-          'toolchain_variant': toolchain_variant.underlying(),
+          'toolchain_variant': toolchain_variant.value,
         },
       })
       self.assert_success(pants_run)
@@ -238,7 +238,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     ]
     pants_run = self.run_pants(command=command, config={
       'native-build-step': {
-        'toolchain_variant': toolchain_variant.underlying(),
+        'toolchain_variant': toolchain_variant.value,
       },
       'native-build-step.cpp-compile-settings': {
         'compiler_option_sets_enabled_args': {

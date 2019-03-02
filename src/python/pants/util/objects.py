@@ -317,16 +317,8 @@ def enum(all_values):
         raise self.make_type_error(
           "pattern matching must have exactly the keys {} (was: {})"
           .format(self._allowed_values, list(keys)))
-      match_for_variant = mapping[self.underlying()]
+      match_for_variant = mapping[self.value]
       return match_for_variant
-
-    def underlying(self):
-      """Get the element of `all_values` corresponding to this enum instance.
-
-      This should be used only for generating option values in tests. In general, it is less
-      error-prone to deal with enum objects directly.
-      """
-      return getattr(self, field_name)
 
     @classmethod
     def iterate_enum_variants(cls):
