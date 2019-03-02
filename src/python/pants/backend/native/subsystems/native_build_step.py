@@ -12,7 +12,7 @@ from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
-from pants.util.objects import enum, register_enum_option
+from pants.util.objects import enum
 
 
 class ToolchainVariant(enum(['gnu', 'llvm'])): pass
@@ -37,8 +37,8 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
              help='The default for the "compiler_option_sets" argument '
                   'for targets of this language.')
 
-    register_enum_option(
-      register, ToolchainVariant, '--toolchain-variant', advanced=True, default='gnu',
+    ToolchainVariant.register_option(
+      register, '--toolchain-variant', advanced=True, default='gnu',
       help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
            "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 

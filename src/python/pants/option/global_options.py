@@ -16,7 +16,7 @@ from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.objects import datatype, enum, register_enum_option
+from pants.util.objects import datatype, enum
 
 
 class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
@@ -195,10 +195,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
-    register_enum_option(
-      # TODO: allow using the attribute `GlobMatchErrorBehavior.warn` for more safety!
-      register, GlobMatchErrorBehavior, '--glob-expansion-failure', default='warn',
-      advanced=True,
+    GlobMatchErrorBehavior.register_option(
+      register, '--glob-expansion-failure', default='warn', advanced=True,
       help="Raise an exception if any targets declaring source files "
            "fail to match any glob provided in the 'sources' argument.")
 

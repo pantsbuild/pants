@@ -341,7 +341,7 @@ class Parser(object):
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
     'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group',
-    'daemon'
+    'daemon', 'idempotent_type_check',
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -442,7 +442,15 @@ class Parser(object):
       elif kwargs.get('type') == bool:
         return self._ensure_bool(val_str)
       else:
-        return self._wrap_type(kwargs.get('type', str))(val_str)
+        type_arg = kwargs.get('type', str)
+        if (not kwargs.get('idempotent_type_check', True)) and isinstance(val_str, type_arg):
+          return val_str
+        else:
+          try:
+            return self._wrap_type(type_arg)(val_str)
+          except TypeError as e:
+            raise ParseError('Error applying types to option values for option {} in {}: {}'
+                             .format(dest, self._scope_str(), e))
 
     # Helper function to expand a fromfile=True value string, if needed.
     def expand(val_str):
@@ -517,6 +525,8 @@ class Parser(object):
     # Rank all available values.
     # Note that some of these values may already be of the value type, but type conversion
     # is idempotent, so this is OK.
+    # NB: `idempotent_type_check=False` allows type conversions which are not idempotent (such as
+    # enums) by checking if values are instances of the value type.
 
     values_to_rank = [to_value_type(x) for x in
                       [flag_val, env_val_str, config_val_str,

@@ -289,6 +289,14 @@ def enum(all_values):
     # won't call this __eq__ (and therefore won't raise like we want).
     def __eq__(self, other):
       """Redefine equality to avoid accidentally comparing against a non-enum."""
+      # Options parsing will use == to check whether an option's value has changed when recording
+      # where the option's value was set (in pants.ini, the command line, the environment). If the
+      # option isn't set and falls back to the default, it will be compared against None. Limiting
+      # __eq__ to raise on some comparisons is intended to avoid accidental comparisons against
+      # e.g. a string not wrapped in an enum instance -- comparing to None is much less confusing
+      # and not clearly an error, so we just return False here.
+      if other is None:
+        return False
       if type(self) != type(other):
         raise self.make_type_error(
           "when comparing {!r} against {!r} with type '{}': "
@@ -329,6 +337,16 @@ def enum(all_values):
       """
       return cls._singletons.values()
 
+    @classmethod
+    def register_option(cls, register, *args, **kwargs):
+      """Register an option which converts the given value into the specified enum."""
+      # Since __new__ will raise if provided an instance of the enum class (as opposed to a valid
+      # /value/ for the enum), `idempotent_type_check=False` avoids wrapping any instances of this
+      # enum type again if they are already instances of this enum type.
+      register(*args, idempotent_type_check=False, type=cls,
+               choices=list(cls.iterate_enum_variants()),
+               **kwargs)
+
   # Python requires creating an explicit closure to save the value on each loop iteration.
   accessor_generator = lambda case: lambda cls: cls(case)
   for case in all_values_realized:
@@ -338,12 +356,6 @@ def enum(all_values):
       setattr(ChoiceDatatype, attr_name, accessor)
 
   return ChoiceDatatype
-
-
-# TODO(#7233): allow usage of the normal register() by using an enum class as the `type` argument!
-def register_enum_option(register, enum_cls, *args, **kwargs):
-  """A helper method for declaring a pants option from an `enum()`."""
-  register(*args, choices=enum_cls._allowed_values, **kwargs)
 
 
 # TODO: make these members of the `TypeConstraint` class!

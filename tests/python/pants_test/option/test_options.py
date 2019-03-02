@@ -35,6 +35,7 @@ from pants.option.scope import ScopeInfo
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
+from pants.util.objects import enum
 
 
 def task(scope):
@@ -85,7 +86,11 @@ class OptionsTest(unittest.TestCase):
                         task('scoped.a.bit'),
                         task('scoped.and-dashed'),
                         task('fromfile'),
-                        task('fingerprinting')]
+                        task('fingerprinting'),
+                        task('enum-opt'),
+                        task('separate-enum-opt-scope')]
+
+  class SomeEnumOption(enum(['a-value', 'another-value'])): pass
 
   def _register(self, options):
     def register_global(*args, **kwargs):
@@ -184,6 +189,16 @@ class OptionsTest(unittest.TestCase):
     options.register('fingerprinting', '--definitely-not-inverted', daemon=False)
     options.register('fingerprinting', '--fingerprinted', fingerprint=True)
     options.register('fingerprinting', '--definitely-not-fingerprinted', fingerprint=False)
+
+    # For enum tests
+    self.SomeEnumOption.register_option(
+      lambda *args, **kwargs: options.register('enum-opt', *args, **kwargs),
+      '--some-enum')
+    # For testing the default value
+    self.SomeEnumOption.register_option(
+      lambda *args, **kwargs: options.register('separate-enum-opt-scope', default='a-value',
+                                               *args, **kwargs),
+      '--some-enum')
 
   def test_env_type_int(self):
     options = Options.create(env={'PANTS_FOO_BAR': "['123','456']"},
@@ -768,9 +783,11 @@ class OptionsTest(unittest.TestCase):
     check_scoped_spam('scoped.and-dashed', 'value', {'PANTS_SCOPED_AND_DASHED_SPAM': 'value'})
 
   def test_drop_flag_values(self):
-    options = self._parse('./pants --bar-baz=fred -n33 --pants-foo=red simple -n1',
-                          env={'PANTS_FOO': 'BAR'},
-                          config={'simple': {'num': 42}})
+    options = self._parse(
+      './pants --bar-baz=fred -n33 --pants-foo=red enum-opt --some-enum=another-value simple -n1',
+      env={'PANTS_FOO': 'BAR'},
+      config={'simple': {'num': 42},
+              'enum-opt': {'some-enum': 'a-value'}})
     defaulted_only_options = options.drop_flag_values()
 
     # No option value supplied in any form.
@@ -788,6 +805,21 @@ class OptionsTest(unittest.TestCase):
     # An env var specified option value.
     self.assertEqual('red', options.for_global_scope().pants_foo)
     self.assertEqual('BAR', defaulted_only_options.for_global_scope().pants_foo)
+
+    # Overriding an enum option value.
+    self.assertEqual(self.SomeEnumOption.another_value, options.for_scope('enum-opt').some_enum)
+
+    # Getting the default value for an enum option.
+    self.assertEqual(self.SomeEnumOption.a_value,
+                     defaulted_only_options.for_scope('separate-enum-opt-scope').some_enum)
+
+  def test_enum_option_type_parse_error(self):
+    with self.assertRaises(ParseError) as cm:
+      options = self._parse('./pants enum-opt --some-enum=invalid-value')
+      options.for_scope('enum-opt').some_enum
+    self.assertIn("""\
+ParseError: Error applying types to option values for option some_enum in scope 'enum-opt': type check error in class SomeEnumOption: Value 'invalid-value' must be one of: ['a-value', 'another-value'].""",
+                  str(cm.exception))
 
   def test_deprecated_option_past_removal(self):
     """Ensure that expired options raise CodeRemovedError on attempted use."""
