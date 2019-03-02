@@ -289,12 +289,12 @@ def enum(all_values):
     # won't call this __eq__ (and therefore won't raise like we want).
     def __eq__(self, other):
       """Redefine equality to avoid accidentally comparing against a non-enum."""
-      # Options parsing will use == to check whether an option's value has changed when recording
+      # This __eq__ implementation raises on anything that's not an instance of this enum class to
+      # avoid accidental comparisons, e.g. a string not being wrapped in an enum instance. However,
+      # options parsing will use == to check whether an option's value has changed when recording
       # where the option's value was set (in pants.ini, the command line, the environment). If the
-      # option isn't set and falls back to the default, it will be compared against None. Limiting
-      # __eq__ to raise on some comparisons is intended to avoid accidental comparisons against
-      # e.g. a string not wrapped in an enum instance -- comparing to None is much less confusing
-      # and not clearly an error, so we just return False here.
+      # option isn't set and it falls back to the default, then there will be a comparison against
+      # None. Comparing an enum to None is not clearly an error, so we just return False here.
       if other is None:
         return False
       if type(self) != type(other):
