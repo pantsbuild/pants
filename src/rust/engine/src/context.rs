@@ -14,7 +14,7 @@ use futures::Future;
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
 use crate::nodes::{NodeKey, TryInto, WrappedNode};
-use crate::rule_graph::{self, RuleGraph};
+use crate::rule_graph::RuleGraph;
 use crate::tasks::Tasks;
 use crate::types::Types;
 use boxfuture::{BoxFuture, Boxable};
@@ -51,7 +51,6 @@ pub struct Core {
 impl Core {
   pub fn new(
     root_subject_types: Vec<TypeId>,
-    union_rules: rule_graph::UnionMemberMap,
     tasks: Tasks,
     types: Types,
     build_root: PathBuf,
@@ -158,7 +157,7 @@ impl Core {
       (store, command_runner, http_client)
     });
 
-    let rule_graph = RuleGraph::new(&tasks, root_subject_types, union_rules);
+    let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 
     Core {
       graph: Graph::new(),

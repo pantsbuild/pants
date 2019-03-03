@@ -60,8 +60,7 @@ use crate::externs::{
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, HandleBuffer,
   IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
   SatisfiedByExtern, SatisfiedByTypeExtern, StoreBoolExtern, StoreBytesExtern, StoreF64Extern,
-  StoreI64Extern, StoreTupleExtern, StoreUtf8Extern, TypeConstraintBuffer, TypeIdBuffer,
-  TypeToStrExtern, ValToStrExtern,
+  StoreI64Extern, StoreTupleExtern, StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
 use crate::rule_graph::{GraphMaker, RuleGraph};
@@ -174,8 +173,6 @@ pub extern "C" fn val_for(key: Key) -> Handle {
 #[no_mangle]
 pub extern "C" fn scheduler_create(
   tasks_ptr: *mut Tasks,
-  /* TODO: turn this into a TypeIdBuffer! */
-  flattened_union_rules: TypeConstraintBuffer,
   construct_directory_digest: Function,
   construct_snapshot: Function,
   construct_file_content: Function,
@@ -276,7 +273,6 @@ pub extern "C" fn scheduler_create(
 
   Box::into_raw(Box::new(Scheduler::new(Core::new(
     root_type_ids.clone(),
-    flattened_union_rules.to_type_map(),
     tasks,
     types,
     PathBuf::from(build_root_buf.to_os_string()),
@@ -587,11 +583,7 @@ pub extern "C" fn rule_graph_visualize(
     let path = PathBuf::from(path_str);
 
     // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
-    let graph = graph_full(
-      scheduler,
-      subject_types.to_vec(),
-      rule_graph::UnionMemberMap::new(),
-    );
+    let graph = graph_full(scheduler, subject_types.to_vec());
     write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
       println!("Failed to visualize to {}: {:?}", path.display(), e);
     });
@@ -610,12 +602,7 @@ pub extern "C" fn rule_subgraph_visualize(
     let path = PathBuf::from(path_str);
 
     // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
-    let graph = graph_sub(
-      scheduler,
-      subject_type,
-      product_type,
-      rule_graph::UnionMemberMap::new(),
-    );
+    let graph = graph_sub(scheduler, subject_type, product_type);
     write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
       println!("Failed to visualize to {}: {:?}", path.display(), e);
     });
@@ -816,12 +803,8 @@ pub extern "C" fn materialize_directories(
   .into()
 }
 
-fn graph_full(
-  scheduler: &Scheduler,
-  subject_types: Vec<TypeId>,
-  union_rules: rule_graph::UnionMemberMap,
-) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types, union_rules);
+fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
+  let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
   graph_maker.full_graph()
 }
 
@@ -829,9 +812,8 @@ fn graph_sub(
   scheduler: &Scheduler,
   subject_type: TypeId,
   product_type: TypeConstraint,
-  union_rules: rule_graph::UnionMemberMap,
 ) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type], union_rules);
+  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type]);
   graph_maker.sub_graph(subject_type, &product_type)
 }
 

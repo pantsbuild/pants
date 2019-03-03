@@ -423,19 +423,16 @@ class _FFISpecification(object):
       if isinstance(res, Get):
         # Get.
         values = [res.subject]
-        declared_types = [constraint_for(res.subject_declared_type)]
         products = [constraint_for(res.product)]
         tag = 2
       elif type(res) in (tuple, list):
         # GetMulti.
         values = [g.subject for g in res]
-        declared_types = [constraint_for(g.subject_declared_type) for g in res]
         products = [constraint_for(g.product) for g in res]
         tag = 3
       else:
         # Break.
         values = [res]
-        declared_types = []
         products = []
         tag = 0
     except Exception as e:
@@ -443,14 +440,12 @@ class _FFISpecification(object):
       val = e
       val._formatted_exc = traceback.format_exc()
       values = [val]
-      declared_types = []
       products = []
       tag = 1
 
     return (
         tag,
         c.vals_buf([c.to_value(v) for v in values]),
-        c.vals_buf([c.to_value(v) for v in declared_types]),
         c.vals_buf([c.to_value(v) for v in products]),
       )
 
@@ -703,7 +698,6 @@ class Native(Singleton):
   def new_scheduler(self,
                     tasks,
                     root_subject_types,
-                    union_rules,
                     build_root,
                     work_dir,
                     local_store_dir,
@@ -733,26 +727,9 @@ class Native(Singleton):
       return Function(self.context.to_key(constraint))
     def tc(constraint):
       return TypeConstraint(self.context.to_key(constraint))
-    def flatten_type_map_to_constraints(type_constraints_map):
-      """Flatten a dict of types into a buffer of `TypeConstraint`s for the engine.
-
-      Given a mapping of (type -> [collection of other types]), first ensure every `type` is
-      converted into a `TypeConstraint`, then return a flat list alternating between key and value.
-      The result of this method is processed by `externs::TypeConstraintBuffer` back into a hash map
-      in the engine.
-      """
-      flattened_type_constraint_pairs = []
-      for union_base, union_rules in type_constraints_map.items():
-        union_base = constraint_for(union_base)
-        for union_member in union_rules:
-          flattened_type_constraint_pairs.extend([union_base, constraint_for(union_member)])
-      return self.context.type_constraints_buf([tc(c) for c in flattened_type_constraint_pairs])
-
-    flattened_union_rules = flatten_type_map_to_constraints(union_rules)
 
     scheduler = self.lib.scheduler_create(
         tasks,
-        flattened_union_rules,
         # Constructors/functions.
         func(construct_directory_digest),
         func(construct_snapshot),

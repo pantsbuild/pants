@@ -94,7 +94,6 @@ class Scheduler(object):
     self._scheduler = native.new_scheduler(
       tasks=self._tasks,
       root_subject_types=self._root_subject_types,
-      union_rules=rule_index.union_rules,
       build_root=project_tree.build_root,
       work_dir=work_dir,
       local_store_dir=local_store_dir,
