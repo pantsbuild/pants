@@ -15,7 +15,7 @@ from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.engine.objects import Locatable
-from pants.engine.rules import union, union_rule
+from pants.engine.rules import UnionRule, union
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.collections_abc_backport import MutableSequence, MutableSet
@@ -134,7 +134,6 @@ class Field(object):
 class HydrateableField(object): pass
 
 
-@union_rule(HydrateableField)
 class SourcesField(
   datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_globs', 'validate_fn']),
   Field
@@ -189,7 +188,6 @@ class PageAdaptor(TargetAdaptor):
       )
 
 
-@union_rule(HydrateableField)
 class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
 
@@ -437,6 +435,6 @@ class GlobsWithConjunction(datatype([
 
 def rules():
   return [
-    SourcesField,
-    BundlesField,
+    UnionRule(HydrateableField, SourcesField),
+    UnionRule(HydrateableField, BundlesField),
   ]

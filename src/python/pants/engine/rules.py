@@ -317,18 +317,47 @@ def console_rule(goal_name, input_selectors):
 
 
 def union(cls):
-  # TODO: do some checking!
-  assert(isinstance(cls, type))
-  return type(cls.__name__, (cls,), dict(_is_union=True))
+  """A class decorator which other classes can specify that they can resolve to with `UnionRule`.
+
+  Annotating a class with @union allows other classes to use a UnionRule() instance to indicate that
+  they can be resolved to this base union class. This class will never be instantiated, and should
+  have no members -- it is used as a tag only, and will be replaced with whatever object is passed
+  in as the subject of a `yield Get(...)`. See the following example:
+
+  @union
+  class UnionBase(object): pass
+
+  @rule(B, [Select(X)])
+  def get_some_union_type(x):
+    result = yield Get(ResultType, UnionBase, x.f())
+    # ...
+
+  If there exists a single path from (whatever type the expression `x.f()` returns) -> `ResultType`
+  in the rule graph, the engine will retrieve and execute that path to produce a `ResultType` from
+  `x.f()`. This requires also that whatever type `x.f()` returns was registered as a union member of
+  `UnionBase` with a `UnionRule`.
+
+  Unions allow @rule bodies to be written without knowledge of what types may eventually be provided
+  as input -- rather, they let the engine check that there is a valid path to the desired result.
+  """
+  # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
+  assert isinstance(cls, type)
+  return type(cls.__name__, (cls,), {
+    '_is_union': True,
+  })
 
 
-def union_rule(union_type):
-  assert(isinstance(union_type, type))
-  assert(union_type._is_union)
-  def class_wrapper(cls):
-    assert(isinstance(cls, type))
-    return type(cls.__name__, (cls,), dict(_union_type=union_type))
-  return class_wrapper
+class UnionRule(datatype([
+    ('union_base', type),
+    ('union_member', type),
+])):
+  """Specify that an instance of `union_member` can be substituted wherever `union_base` is used."""
+
+  def __new__(cls, union_base, union_member):
+    if not getattr(union_base, '_is_union', False):
+      raise cls.make_type_error('union_base must be a type annotated with @union: was {} (type {})'
+                                .format(union_base, type(union_base).__name__))
+    return super(UnionRule, cls).__new__(cls, union_base, union_member)
 
 
 class Rule(AbstractClass):
@@ -470,20 +499,21 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
         add_task(rule.output_constraint, rule)
 
     def add_type_transition_rule(union_rule):
-      union_base = union_rule._union_type
-      # TODO: better checking here -- this is how we ensure the union base was decorated with
-      # @union
-      # NB: Note that this does not require that union bases be supplied to `def rules():`! not
-      # sure if that's what we want.
-      assert(union_base._is_union)
+      """
+      NB: This does not require that union bases be supplied to `def rules():`! not sure if that's
+      what we want.
+      """
+      union_base = union_rule.union_base
+      assert union_base._is_union
+      union_member = union_rule.union_member
       if union_base not in union_rules:
         union_rules[union_base] = OrderedSet()
-      union_rules[union_base].add(union_rule)
+      union_rules[union_base].add(union_member)
 
     for entry in rule_entries:
       if isinstance(entry, Rule):
         add_rule(entry)
-      elif hasattr(entry, '_union_type'):
+      elif isinstance(entry, UnionRule):
         add_type_transition_rule(entry)
       elif hasattr(entry, '__call__'):
         rule = getattr(entry, 'rule', None)

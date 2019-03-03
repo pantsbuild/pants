@@ -10,7 +10,7 @@ from builtins import object, str
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.engine.rules import RootRule, rule, union, union_rule
+from pants.engine.rules import RootRule, UnionRule, rule, union
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Params, Select
 from pants.util.objects import datatype
@@ -69,7 +69,6 @@ class UnionWrapper(object):
     self.inner = inner
 
 
-@union_rule(UnionBase)
 class UnionA(object):
 
   def a(self):
@@ -81,7 +80,6 @@ def select_union_a(union_a):
   return union_a.a()
 
 
-@union_rule(UnionBase)
 class UnionB(object):
 
   def a(self):
@@ -131,10 +129,10 @@ class SchedulerTest(TestBase):
       transitive_b_c,
       transitive_coroutine_rule,
       RootRule(UnionWrapper),
-      UnionA,
+      UnionRule(UnionBase, UnionA),
       RootRule(UnionA),
       select_union_a,
-      UnionB,
+      UnionRule(union_base=UnionBase, union_member=UnionB),
       RootRule(UnionB),
       select_union_b,
       a_union_test,
