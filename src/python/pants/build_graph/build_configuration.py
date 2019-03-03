@@ -10,14 +10,12 @@ from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated
 from pants.base.parse_context import ParseContext
 from pants.build_graph.addressable import AddressableCallProxy
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.engine.rules import RuleIndex
 from pants.option.optionable import Optionable
-from pants.subsystem.subsystem import Subsystem
 from pants.util.collections_abc_backport import Iterable
 from pants.util.memo import memoized_method
 
@@ -114,10 +112,6 @@ class BuildConfiguration(object):
 
     self._exposed_context_aware_object_factory_by_alias[alias] = context_aware_object_factory
 
-  @deprecated('1.15.0.dev1', hint_message='Use self.register_optionables().')
-  def register_subsystems(self, subsystems):
-    return self.register_optionables(subsystems)
-
   def register_optionables(self, optionables):
     """Registers the given subsystem types.
 
@@ -146,14 +140,6 @@ class BuildConfiguration(object):
     :rtype set
     """
     return self._optionables
-
-  @deprecated('1.15.0.dev1', hint_message='Use self.optionables().')
-  def subsystems(self):
-    """Returns the registered Subsystem types.
-
-    :rtype set
-    """
-    return {o for o in self._optionables if issubclass(o, Subsystem)}
 
   def register_rules(self, rules):
     """Registers the given rules.

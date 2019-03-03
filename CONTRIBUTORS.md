@@ -4,6 +4,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Adam Chainz
 + Alan Paulin
 + Alan Velasco
++ Alex Schmitt
 + Alexander Johnson
 + Alyssa Pohahau
 + Andrew Hamilton
