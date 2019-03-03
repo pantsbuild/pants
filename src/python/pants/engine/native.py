@@ -528,10 +528,6 @@ class ExternContext(object):
     buf = self._ffi.new('TypeId[]', types)
     return (buf, len(types), self.to_value(buf))
 
-  def type_constraints_buf(self, type_constraints):
-    buf = self._ffi.new('TypeConstraint[]', type_constraints)
-    return (buf, len(type_constraints), self.to_value(buf))
-
   def to_value(self, obj):
     handle = self._ffi.new_handle(obj)
     self._handles.add(handle)
