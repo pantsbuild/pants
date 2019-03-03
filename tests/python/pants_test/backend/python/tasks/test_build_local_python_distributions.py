@@ -17,9 +17,9 @@ from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
   BuildLocalPythonDistributionsTestBase
 
 
-class TestBuildLocalDistsNativeSources(BuildLocalPythonDistributionsTestBase):
+class TestBuildLocalPythonDistributions(BuildLocalPythonDistributionsTestBase):
 
-  _dist_specs = OrderedDict([
+  dist_specs = OrderedDict([
 
     ('src/python/dist:universal_dist', {
       'key': 'universal',

@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import glob
 import os
+from builtins import object
 from contextlib import closing, contextmanager
 from io import BytesIO
 
@@ -14,7 +15,11 @@ from future.utils import PY2
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
+from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
+from pants.util.memo import memoized_method
+from pants.util.meta import classproperty
+from pants.util.objects import SubclassesOf, TypedCollection, datatype
 from pants.util.process_handler import subprocess
 from pants_test.test_base import TestBase
 
@@ -299,3 +304,86 @@ class ConsoleTaskTestBase(TaskTestBase):
     """
     with self.assertRaises(exception):
       self.execute_console_task(**kwargs)
+
+
+class DeclarativeTaskTestMixin(object):
+  """Experimental mixin for task tests allows specifying tasks to be run before or after the task.
+
+  Calling `self.invoke_tasks()` will create instances of and execute task types in
+  `self.run_before_task_types()`, then `task_type()`, then `self.run_after_task_types()`.
+  """
+
+  @classproperty
+  def run_before_task_types(cls):
+    return []
+
+  @classproperty
+  def run_after_task_types(cls):
+    return []
+
+  @memoized_method
+  def _synthesize_task_types(self, task_types=()):
+    return [
+      self.synthesize_task_subtype(tsk, '__tmp_{}'.format(tsk.__name__))
+      # TODO(#7127): make @memoized_method convert lists to tuples for hashing!
+      for tsk in task_types
+    ]
+
+  def _create_task(self, task_type, context):
+    """Helper method to instantiate tasks besides self._testing_task_type in the test workdir."""
+    return task_type(context, self.test_workdir)
+
+  class TaskInvocationResult(datatype([
+      'context',
+      ('before_tasks', TypedCollection(SubclassesOf(Task))),
+      ('this_task', SubclassesOf(Task)),
+      ('after_tasks', TypedCollection(SubclassesOf(Task))),
+  ])): pass
+
+  def invoke_tasks(self, target_closure=None, **context_kwargs):
+    """Create and execute the declaratively specified tasks in order.
+
+    Create instances of and execute task types in `self.run_before_task_types()`, then
+    `task_type()`, then `self.run_after_task_types()`.
+
+    :param Iterable target_closure: If not None, check that the build graph contains exactly these
+                                    targets before executing the tasks.
+    :param **context_kwargs: kwargs passed to `self.context()`. Note that this method already sets
+                                    `for_task_types`.
+    :return: A datatype containing the created context and the task instances which were executed.
+    :rtype: :class:`DeclarativeTaskTestMixin.TaskInvocationResult`
+    """
+    run_before_synthesized_task_types = self._synthesize_task_types(tuple(self.run_before_task_types))
+    run_after_synthesized_task_types = self._synthesize_task_types(tuple(self.run_after_task_types))
+    all_synthesized_task_types = run_before_synthesized_task_types + [
+      self._testing_task_type,
+    ] + run_after_synthesized_task_types
+
+    context = self.context(
+      for_task_types=all_synthesized_task_types,
+      **context_kwargs)
+    if target_closure is not None:
+      self.assertEqual(set(target_closure), set(context.build_graph.targets()))
+
+    run_before_task_instances = [
+      self._create_task(task_type, context)
+      for task_type in run_before_synthesized_task_types
+    ]
+    current_task_instance = self._create_task(
+      self._testing_task_type, context)
+    run_after_task_instances = [
+      self._create_task(task_type, context)
+      for task_type in run_after_synthesized_task_types
+    ]
+    all_task_instances = run_before_task_instances + [
+      current_task_instance
+    ] + run_after_task_instances
+
+    for tsk in all_task_instances:
+      tsk.execute()
+
+    return self.TaskInvocationResult(
+      context=context,
+      before_tasks=run_before_task_instances,
+      this_task=current_task_instance,
+      after_tasks=run_after_task_instances)
