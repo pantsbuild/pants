@@ -17,8 +17,6 @@ from pants.contrib.python.checks.checker.constant_logic import ConstantLogic
 from pants.contrib.python.checks.checker.except_statements import ExceptStatements
 from pants.contrib.python.checks.checker.file_excluder import FileExcluder
 from pants.contrib.python.checks.checker.future_compatibility import FutureCompatibility
-from pants.contrib.python.checks.checker.implicit_string_concatenation import \
-  ImplicitStringConcatenation
 from pants.contrib.python.checks.checker.import_order import ImportOrder
 from pants.contrib.python.checks.checker.indentation import Indentation
 from pants.contrib.python.checks.checker.missing_contextmanager import MissingContextManager
