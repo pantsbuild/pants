@@ -42,7 +42,7 @@ class TypeConstraintTestBase(TestBase):
 
 class SuperclassesOfTest(TypeConstraintTestBase):
   def test_none(self):
-    with self.assertRaisesWithMessageContaining(ValueError, 'Must supply at least one type'):
+    with self.assertRaisesWithMessage(ValueError, 'Must supply at least one type'):
       SubclassesOf()
 
   def test_str_and_repr(self):
@@ -72,7 +72,7 @@ class SuperclassesOfTest(TypeConstraintTestBase):
     superclasses_of_a_or_b = SuperclassesOf(self.A, self.B)
     self.assertEqual(self.A(), superclasses_of_a_or_b.validate_satisfied_by(self.A()))
     self.assertEqual(self.B(), superclasses_of_a_or_b.validate_satisfied_by(self.B()))
-    with self.assertRaisesWithMessageContaining(
+    with self.assertRaisesWithMessage(
         TypeConstraintError,
         "value C() (with type 'C') must satisfy this type constraint: SuperclassesOf(A or B)."):
       superclasses_of_a_or_b.validate_satisfied_by(self.C())
@@ -80,7 +80,7 @@ class SuperclassesOfTest(TypeConstraintTestBase):
 
 class ExactlyTest(TypeConstraintTestBase):
   def test_none(self):
-    with self.assertRaisesWithMessageContaining(ValueError, 'Must supply at least one type'):
+    with self.assertRaisesWithMessage(ValueError, 'Must supply at least one type'):
       Exactly()
 
   def test_single(self):
@@ -98,7 +98,7 @@ class ExactlyTest(TypeConstraintTestBase):
     self.assertFalse(exactly_a_or_b.satisfied_by(self.C()))
 
   def test_disallows_unsplatted_lists(self):
-    with self.assertRaisesWithMessageContaining(TypeError,
+    with self.assertRaisesWithMessage(TypeError,
                                                 'Supplied types must be types. ([1],)'):
       Exactly([1])
 
@@ -119,7 +119,7 @@ class ExactlyTest(TypeConstraintTestBase):
     exactly_a_or_b = Exactly(self.A, self.B)
     self.assertEqual(self.A(), exactly_a_or_b.validate_satisfied_by(self.A()))
     self.assertEqual(self.B(), exactly_a_or_b.validate_satisfied_by(self.B()))
-    with self.assertRaisesWithMessageContaining(
+    with self.assertRaisesWithMessage(
         TypeConstraintError,
         "value C() (with type 'C') must satisfy this type constraint: Exactly(A or B)."):
       exactly_a_or_b.validate_satisfied_by(self.C())
@@ -127,7 +127,7 @@ class ExactlyTest(TypeConstraintTestBase):
 
 class SubclassesOfTest(TypeConstraintTestBase):
   def test_none(self):
-    with self.assertRaisesWithMessageContaining(ValueError, 'Must supply at least one type'):
+    with self.assertRaisesWithMessage(ValueError, 'Must supply at least one type'):
       SubclassesOf()
 
   def test_str_and_repr(self):
@@ -158,7 +158,7 @@ class SubclassesOfTest(TypeConstraintTestBase):
     self.assertEqual(self.A(), subclasses_of_a_or_b.validate_satisfied_by(self.A()))
     self.assertEqual(self.B(), subclasses_of_a_or_b.validate_satisfied_by(self.B()))
     self.assertEqual(self.C(), subclasses_of_a_or_b.validate_satisfied_by(self.C()))
-    with self.assertRaisesWithMessageContaining(
+    with self.assertRaisesWithMessage(
         TypeConstraintError,
         "value 1 (with type 'int') must satisfy this type constraint: SubclassesOf(A or B)."):
       subclasses_of_a_or_b.validate_satisfied_by(1)
@@ -190,7 +190,7 @@ class TypedCollectionTest(TypeConstraintTestBase):
 
   def test_no_complex_sub_constraint(self):
     sub_collection = TypedCollection(Exactly(self.A))
-    with self.assertRaisesWithMessageContaining(
+    with self.assertRaisesWithMessage(
         TypeError,
         "constraint for collection must be a TypeOnlyConstraint! was: {}".format(sub_collection)):
       TypedCollection(sub_collection)
@@ -199,11 +199,11 @@ class TypedCollectionTest(TypeConstraintTestBase):
     collection_exactly_a_or_b = TypedCollection(Exactly(self.A, self.B))
     self.assertEqual([self.A()], collection_exactly_a_or_b.validate_satisfied_by([self.A()]))
     self.assertEqual([self.B()], collection_exactly_a_or_b.validate_satisfied_by([self.B()]))
-    with self.assertRaisesWithMessageContaining(
+    with self.assertRaisesWithMessage(
         TypeConstraintError,
         "in wrapped constraint TypedCollection(Exactly(A or B)): value A() (with type 'A') must satisfy this type constraint: SubclassesOf(Iterable)."):
       collection_exactly_a_or_b.validate_satisfied_by(self.A())
-    with self.assertRaisesWithMessageContaining(
+    with self.assertRaisesWithMessage(
         TypeConstraintError,
         "in wrapped constraint TypedCollection(Exactly(A or B)) matching iterable object [C()]: value C() (with type 'C') must satisfy this type constraint: Exactly(A or B)."):
       collection_exactly_a_or_b.validate_satisfied_by([self.C()])
@@ -330,10 +330,7 @@ class DatatypeTest(TestBase):
 
   def test_not_iterable(self):
     bar = datatype(['val'])
-    with self.assertRaisesWithMessageContaining(
-        TypeError,
-        'datatype object is not iterable',
-        exact=False):
+    with self.assertRaisesWithMessageContaining(TypeError, 'datatype object is not iterable'):
       for x in bar(1):
         pass
 
@@ -361,17 +358,17 @@ class DatatypeTest(TestBase):
   def test_properties_not_assignable(self):
     bar = datatype(['val'])
     bar_inst = bar(1)
-    with self.assertRaisesWithMessageContaining(AttributeError, "can't set attribute"):
+    with self.assertRaisesWithMessage(AttributeError, "can't set attribute"):
       bar_inst.val = 2
 
   def test_invalid_field_name(self):
-    with self.assertRaisesWithMessageContaining(
+    with self.assertRaisesWithMessage(
         ValueError,
         "Type names and field names must be valid identifiers: '0isntanallowedfirstchar'"
         if PY3 else
         "Type names and field names cannot start with a number: '0isntanallowedfirstchar'"):
       datatype(['0isntanallowedfirstchar'])
-    with self.assertRaisesWithMessageContaining(
+    with self.assertRaisesWithMessage(
         ValueError,
         "Field names cannot start with an underscore: '_no_leading_underscore'"):
       datatype(['_no_leading_underscore'])
@@ -380,7 +377,7 @@ class DatatypeTest(TestBase):
     class OverridesEq(datatype(['myval'])):
       def __eq__(self, other):
         return other.myval == self.myval
-    with self.assertRaisesWithMessageContaining(TypeCheckError, 'type check error in class OverridesEq: Should not override __eq__.'):
+    with self.assertRaisesWithMessage(TypeCheckError, 'type check error in class OverridesEq: Should not override __eq__.'):
       OverridesEq(1)
 
   def test_subclass_pickleable(self):
@@ -396,10 +393,10 @@ class DatatypeTest(TestBase):
 
   def test_double_passed_arg(self):
     bar = datatype(['val', 'zal'])
-    with self.assertRaisesWithMessageContaining(TypeError,
+    with self.assertRaisesWithMessageContaining(
+        TypeError,
         "__new__() got multiple values for {kw}argument 'val'"
-        .format(kw='' if PY3 else 'keyword '),
-                                                exact=False):
+        .format(kw='' if PY3 else 'keyword ')):
       bar(1, val=1)
 
   def test_too_many_args(self):
@@ -408,16 +405,14 @@ class DatatypeTest(TestBase):
         TypeError,
         '__new__() takes 3 positional arguments but 4 were given'
         if PY3 else
-        '__new__() takes exactly 3 arguments (4 given)',
-        exact=False):
+        '__new__() takes exactly 3 arguments (4 given)'):
       bar(1, 1, 1)
 
   def test_unexpect_kwarg(self):
     bar = datatype(['val'])
     with self.assertRaisesWithMessageContaining(
         TypeError,
-        "__new__() got an unexpected keyword argument 'other'",
-        exact=False):
+        "__new__() got an unexpected keyword argument 'other'"):
       bar(other=1)
 
 
@@ -434,7 +429,7 @@ class TypedDatatypeTest(TestBase):
       if PY3 else
       "Type names and field names can only contain alphanumeric characters and underscores: \"<type 'int'>\""
     )
-    with self.assertRaisesWithMessageContaining(ValueError, expected_msg):
+    with self.assertRaisesWithMessage(ValueError, expected_msg):
       class NonStrType(datatype([int])): pass
 
     # This raises a TypeError because it doesn't provide a required argument.
@@ -443,7 +438,7 @@ class TypedDatatypeTest(TestBase):
       if PY3 else
       "datatype() takes at least 1 argument (0 given)"
     )
-    with self.assertRaisesWithMessageContaining(TypeError, expected_msg):
+    with self.assertRaisesWithMessage(TypeError, expected_msg):
       class NoFields(datatype()): pass
 
     expected_msg = (
@@ -451,7 +446,7 @@ class TypedDatatypeTest(TestBase):
       if PY3 else
       "Type names and field names can only contain alphanumeric characters and underscores: \"<type 'unicode'>\""
     )
-    with self.assertRaisesWithMessageContaining(ValueError, expected_msg):
+    with self.assertRaisesWithMessage(ValueError, expected_msg):
       class JustTypeField(datatype([text_type])): pass
 
     expected_msg = (
@@ -459,7 +454,7 @@ class TypedDatatypeTest(TestBase):
       if PY3 else
       "Type names and field names cannot start with a number: '3'"
     )
-    with self.assertRaisesWithMessageContaining(ValueError, expected_msg):
+    with self.assertRaisesWithMessage(ValueError, expected_msg):
       class NonStringField(datatype([3])): pass
 
     expected_msg = (
@@ -467,11 +462,11 @@ class TypedDatatypeTest(TestBase):
       if PY3 else
       "Type names and field names cannot start with a number: '32'"
     )
-    with self.assertRaisesWithMessageContaining(ValueError, expected_msg):
+    with self.assertRaisesWithMessage(ValueError, expected_msg):
       class NonStringTypeField(datatype([(32, int)])): pass
 
     expected_msg = "Encountered duplicate field name: 'field_a'"
-    with self.assertRaisesWithMessageContaining(ValueError, expected_msg):
+    with self.assertRaisesWithMessage(ValueError, expected_msg):
       class MultipleSameName(datatype([
           'field_a',
           'field_b',
@@ -480,7 +475,7 @@ class TypedDatatypeTest(TestBase):
         pass
 
     expected_msg = "Encountered duplicate field name: 'field_a'"
-    with self.assertRaisesWithMessageContaining(ValueError, expected_msg):
+    with self.assertRaisesWithMessage(ValueError, expected_msg):
       class MultipleSameNameWithType(datatype([
             'field_a',
             ('field_a', int),
@@ -490,7 +485,7 @@ class TypedDatatypeTest(TestBase):
     expected_msg = (
       "type spec for field 'a_field' was not a type or TypeConstraint: "
       "was 2 (type 'int').")
-    with self.assertRaisesWithMessageContaining(TypeError, expected_msg):
+    with self.assertRaisesWithMessage(TypeError, expected_msg):
       class InvalidTypeSpec(datatype([('a_field', 2)])): pass
 
   def test_instance_construction_by_repr(self):
@@ -583,7 +578,7 @@ class TypedDatatypeTest(TestBase):
 
   def test_instance_construction_errors(self):
     expected_msg = "type check error in class SomeTypedDatatype: error in namedtuple() base constructor: __new__() got an unexpected keyword argument 'something'"
-    with self.assertRaisesWithMessageContaining(TypeError, expected_msg):
+    with self.assertRaisesWithMessage(TypeError, expected_msg):
       SomeTypedDatatype(something=3)
 
     # not providing all the fields
@@ -593,7 +588,7 @@ class TypedDatatypeTest(TestBase):
       "__new__() takes exactly 2 arguments (1 given)"
     )
     expected_msg = "type check error in class SomeTypedDatatype: error in namedtuple() base constructor: {}".format(expected_msg_ending)
-    with self.assertRaisesWithMessageContaining(TypeError, expected_msg):
+    with self.assertRaisesWithMessage(TypeError, expected_msg):
       SomeTypedDatatype()
 
     # unrecognized fields
@@ -603,19 +598,19 @@ class TypedDatatypeTest(TestBase):
       "__new__() takes exactly 2 arguments (3 given)"
     )
     expected_msg = "type check error in class SomeTypedDatatype: error in namedtuple() base constructor: {}".format(expected_msg_ending)
-    with self.assertRaisesWithMessageContaining(TypeError, expected_msg):
+    with self.assertRaisesWithMessage(TypeError, expected_msg):
       SomeTypedDatatype(3, 4)
 
     expected_msg = (
       """type check error in class CamelCaseWrapper: errors type checking constructor arguments:
 field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(NonNegativeInt).""")
-    with self.assertRaisesWithMessageContaining(TypedDatatypeInstanceConstructionError,
+    with self.assertRaisesWithMessage(TypedDatatypeInstanceConstructionError,
                                                 expected_msg):
       CamelCaseWrapper(nonneg_int=3)
 
     # test that kwargs with keywords that aren't field names fail the same way
     expected_msg = "type check error in class CamelCaseWrapper: error in namedtuple() base constructor: __new__() got an unexpected keyword argument 'a'"
-    with self.assertRaisesWithMessageContaining(TypeError, expected_msg):
+    with self.assertRaisesWithMessage(TypeError, expected_msg):
       CamelCaseWrapper(4, a=3)
 
   def test_type_check_errors(self):
@@ -630,14 +625,14 @@ field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type
     expected_msg = (
       """type check error in class SomeTypedDatatype: errors type checking constructor arguments:
 field 'val' was invalid: value [] (with type 'list') must satisfy this type constraint: Exactly(int).""")
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       SomeTypedDatatype([])
 
     # type checking failure with multiple arguments (one is correct)
     expected_msg = format_string_type_check_message(
       """type check error in class AnotherTypedDatatype: errors type checking constructor arguments:
 field 'elements' was invalid: value {u}'should be list' (with type '{str_type}') must satisfy this type constraint: Exactly(list).""")
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       AnotherTypedDatatype(text_type('correct'), text_type('should be list'))
 
     # type checking failure on both arguments
@@ -645,35 +640,35 @@ field 'elements' was invalid: value {u}'should be list' (with type '{str_type}')
         """type check error in class AnotherTypedDatatype: errors type checking constructor arguments:
 field 'string' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly({str_type}).
 field 'elements' was invalid: value {u}'should be list' (with type '{str_type}') must satisfy this type constraint: Exactly(list).""")
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       AnotherTypedDatatype(3, text_type('should be list'))
 
     expected_msg = format_string_type_check_message(
         """type check error in class NonNegativeInt: errors type checking constructor arguments:
 field 'an_int' was invalid: value {u}'asdf' (with type '{str_type}') must satisfy this type constraint: Exactly(int).""")
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       NonNegativeInt(text_type('asdf'))
 
     expected_msg = "type check error in class NonNegativeInt: value is negative: -3."
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       NonNegativeInt(-3)
 
     expected_msg = (
       """type check error in class WithSubclassTypeConstraint: errors type checking constructor arguments:
 field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(SomeBaseClass).""")
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       WithSubclassTypeConstraint(3)
 
     expected_msg = """\
 type check error in class WithCollectionTypeConstraint: errors type checking constructor arguments:
 field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)): value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(Iterable)."""
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       WithCollectionTypeConstraint(3)
 
     expected_msg = format_string_type_check_message("""\
 type check error in class WithCollectionTypeConstraint: errors type checking constructor arguments:
 field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)) matching iterable object [3, {u}'asdf']: value {u}'asdf' (with type '{str_type}') must satisfy this type constraint: Exactly(int).""")
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       WithCollectionTypeConstraint([3, "asdf"])
 
   def test_copy(self):
@@ -689,20 +684,20 @@ field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(
 
     expected_msg = (
       """type check error in class AnotherTypedDatatype: error in namedtuple() base constructor: __new__() got an unexpected keyword argument 'nonexistent_field'""")
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       obj.copy(nonexistent_field=3)
 
     expected_msg = (
       """type check error in class AnotherTypedDatatype: errors type checking constructor arguments:
 field 'elements' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(list).""")
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       obj.copy(elements=3)
 
   def test_enum_class_creation_errors(self):
     expected_msg = (
       "When converting all_values ([1, 2, 3, 1]) to a set, at least one duplicate "
       "was detected. The unique elements of all_values were: [1, 2, 3].")
-    with self.assertRaisesWithMessageContaining(ValueError, expected_msg):
+    with self.assertRaisesWithMessage(ValueError, expected_msg):
       class DuplicateAllowedValues(enum([1, 2, 3, 1])): pass
 
   def test_enum_instance_creation(self):
@@ -711,7 +706,7 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
 
     expected_msg = (
       "type check error in class SomeEnum: Value 3 must be one of: [1, 2].")
-    with self.assertRaisesWithMessageContaining(EnumVariantSelectionError, expected_msg):
+    with self.assertRaisesWithMessage(EnumVariantSelectionError, expected_msg):
       SomeEnum(3)
 
   def test_enum_generated_attrs(self):
@@ -730,9 +725,9 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
     expected_msg = (
       "type check error in class SomeEnum: when comparing SomeEnum(value=1) against 1 with type 'int': "
       "enum equality is only defined for instances of the same enum class!")
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       enum_instance == 1
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       1 == enum_instance
 
     class StrEnum(enum(['a'])): pass
@@ -741,9 +736,9 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
       "type check error in class StrEnum: when comparing StrEnum(value={u}'a') against {u}'a' with type '{string_type}': "
       "enum equality is only defined for instances of the same enum class!"
       .format(u='u' if PY2 else '', string_type='unicode' if PY2 else 'str'))
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       enum_instance == 'a'
-    with self.assertRaisesWithMessageContaining(TypeCheckError, expected_msg):
+    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       'a' == enum_instance
 
   def test_enum_resolve_variant(self):
@@ -759,7 +754,7 @@ field 'elements' was invalid: value 3 (with type 'int') must satisfy this type c
     }))
 
     # Test that an unrecognized variant raises an error.
-    with self.assertRaisesWithMessageContaining(EnumVariantSelectionError, """\
+    with self.assertRaisesWithMessage(EnumVariantSelectionError, """\
 type check error in class SomeEnum: pattern matching must have exactly the keys [1, 2] (was: [1, 2, 3])"""):
       one_enum_instance.resolve_for_enum_variant({
         1: 3,
@@ -768,7 +763,7 @@ type check error in class SomeEnum: pattern matching must have exactly the keys 
       })
 
     # Test that not providing all the variants raises an error.
-    with self.assertRaisesWithMessageContaining(EnumVariantSelectionError, """\
+    with self.assertRaisesWithMessage(EnumVariantSelectionError, """\
 type check error in class SomeEnum: pattern matching must have exactly the keys [1, 2] (was: [1])"""):
       one_enum_instance.resolve_for_enum_variant({
         1: 3,

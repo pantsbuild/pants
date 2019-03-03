@@ -617,21 +617,29 @@ class TestBase(unittest.TestCase):
       self.assertIn(string, content, '"{}" is not in the file {}:\n{}'.format(string, f.name, content))
 
   @contextmanager
-  def assertRaisesWithMessageContaining(self, exception_type, error_text, exact=True):
-    """Verifies that a string appears in an exception message.
+  def assertRaisesWithMessage(self, exception_type, error_text):
+    """Verifies than an exception message is equal to `error_text`.
 
     :param type exception_type: The exception type which is expected to be raised within the body.
-    :param str error_text: Text that the exception message should either contain or match exactly.
-    :param bool exact: If False, use `self.assertIn()` instead of `self.assertEqual()` to match the
-                       exception text.
+    :param str error_text: Text that the exception message should match exactly with
+                           `self.assertEqual()`.
     :API: public
     """
     with self.assertRaises(exception_type) as cm:
       yield cm
-    if exact:
-      self.assertEqual(error_text, str(cm.exception))
-    else:
-      self.assertIn(error_text, str(cm.exception))
+    self.assertEqual(error_text, str(cm.exception))
+
+  @contextmanager
+  def assertRaisesWithMessageContaining(self, exception_type, error_text):
+    """Verifies that the string `error_text` appears in an exception message.
+
+    :param type exception_type: The exception type which is expected to be raised within the body.
+    :param str error_text: Text that the exception message should contain with `self.assertIn()`.
+    :API: public
+    """
+    with self.assertRaises(exception_type) as cm:
+      yield cm
+    self.assertIn(error_text, str(cm.exception))
 
   def get_bootstrap_options(self, cli_options=()):
     """Retrieves bootstrap options.
