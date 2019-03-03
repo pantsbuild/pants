@@ -46,7 +46,7 @@ class RewriteBase(NailgunTask, AbstractClass):
   @memoized_property
   def _formatted_target_types(self):
     aliases = set(self.get_options().target_types)
-    registered_aliases = self.context.build_file_parser.registered_aliases()
+    registered_aliases = self.context.build_configuration.registered_aliases()
     return tuple({target_type
                   for alias in aliases
                   for target_type in registered_aliases.target_types_by_alias[alias]})

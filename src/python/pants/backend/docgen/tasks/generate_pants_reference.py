@@ -85,7 +85,7 @@ class GeneratePantsReference(Task):
     self.context.products.register_data(self.PANTS_REFERENCE_PRODUCT, ref_page)
 
   def _gen_build_dictionary(self):
-    buildfile_aliases = self.context.build_file_parser.registered_aliases()
+    buildfile_aliases = self.context.build_configuration.registered_aliases()
     extracter = BuildDictionaryInfoExtracter(buildfile_aliases)
     target_type_infos = extracter.get_target_type_info()
     other_infos = sorted(extracter.get_object_info() + extracter.get_object_factory_info())

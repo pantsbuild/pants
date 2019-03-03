@@ -25,8 +25,13 @@ class ErrorTarget(Target):
     assert False, "This fake target should never be initialized in this test!"
 
 
-class BuildFileParserBasicsTest(TestBase):
+class TestWithBuildFileParser(TestBase):
+  def setUp(self):
+    super(TestWithBuildFileParser, self).setUp()
+    self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
 
+
+class BuildFileParserBasicsTest(TestWithBuildFileParser):
   @classmethod
   def alias_groups(cls):
     return BuildFileAliases(targets={'jvm_binary': ErrorTarget,
@@ -115,7 +120,7 @@ class BuildFileParserBasicsTest(TestBase):
     self.build_file_parser.parse_build_file(build_file)
 
 
-class BuildFileParserTargetTest(TestBase):
+class BuildFileParserTargetTest(TestWithBuildFileParser):
   @classmethod
   def alias_groups(cls):
     return BuildFileAliases(targets={'fake': ErrorTarget})
@@ -205,8 +210,7 @@ class BuildFileParserTargetTest(TestBase):
         BuildFile.get_build_files_family(FileSystemProjectTree(self.build_root), '.'))
 
 
-class BuildFileParserExposedObjectTest(TestBase):
-
+class BuildFileParserExposedObjectTest(TestWithBuildFileParser):
   @classmethod
   def alias_groups(cls):
     return BuildFileAliases(objects={'fake_object': object()})
@@ -218,7 +222,7 @@ class BuildFileParserExposedObjectTest(TestBase):
     self.assertEqual(len(address_map), 0)
 
 
-class BuildFileParserExposedContextAwareObjectFactoryTest(TestBase):
+class BuildFileParserExposedContextAwareObjectFactoryTest(TestWithBuildFileParser):
 
   Jar = namedtuple('Jar', ['org', 'name', 'rev'])
   Repository = namedtuple('Repository', ['name', 'url', 'push_db_basedir'])

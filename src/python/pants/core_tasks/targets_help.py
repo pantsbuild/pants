@@ -21,7 +21,7 @@ class TargetsHelp(ConsoleTask):
     register('--details', help='Show details about this target type.')
 
   def console_output(self, targets):
-    buildfile_aliases = self.context.build_file_parser.registered_aliases()
+    buildfile_aliases = self.context.build_configuration.registered_aliases()
     extracter = BuildDictionaryInfoExtracter(buildfile_aliases)
 
     alias = self.get_options().details
