@@ -10,14 +10,12 @@ from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated
 from pants.base.parse_context import ParseContext
 from pants.build_graph.addressable import AddressableCallProxy
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.engine.rules import RuleIndex
 from pants.option.optionable import Optionable
-from pants.subsystem.subsystem import Subsystem
 from pants.util.collections_abc_backport import Iterable
 from pants.util.memo import memoized_method
 
