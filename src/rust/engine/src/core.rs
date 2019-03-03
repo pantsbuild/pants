@@ -147,6 +147,14 @@ pub const ANY_TYPE: TypeId = TypeId(0);
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Function(pub Key);
 
+impl fmt::Display for Function {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let Function(key) = self;
+    let name = externs::project_str(&externs::val_for(&key), "__name__");
+    write!(f, "{}()", name)
+  }
+}
+
 ///
 /// Wraps a type id for use as a key in HashMaps and sets.
 ///

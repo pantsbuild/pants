@@ -866,10 +866,7 @@ impl fmt::Debug for Task {
     write!(
       f,
       "Task({}, {}, {}, {})",
-      externs::project_str(&externs::val_for(&self.task.func.0), "__name__"),
-      self.params,
-      self.product,
-      self.task.cacheable,
+      self.task.func, self.params, self.product, self.task.cacheable,
     )
   }
 }
