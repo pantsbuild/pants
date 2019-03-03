@@ -290,16 +290,11 @@ def enum(all_values):
       return cls._singletons[value]
 
     # TODO: figure out if this will always trigger on primitives like strings, and what situations
-    # won't call this __eq__ (and therefore won't raise like we want).
+    # won't call this __eq__ (and therefore won't raise like we want). Also look into whether there
+    # is a way to return something more conventional like `NotImplemented` here that maintains the
+    # extra caution we're looking for.
     def __eq__(self, other):
       """Redefine equality to avoid accidentally comparing against a non-enum."""
-      # This __eq__ implementation raises on anything that's not an instance of this enum class to
-      # avoid accidental comparisons, e.g. a string not being wrapped in an enum
-      # instance. Currently, options parsing will use == to check whether an option's value has
-      # changed when recording where the option's value was set (in pants.ini, the command line, the
-      # environment). If the option isn't set and it falls back to the default, then there will be a
-      # comparison against None. Comparing an enum to None is not clearly an error, so we just
-      # return False here.
       if other is None:
         return False
       if type(self) != type(other):
