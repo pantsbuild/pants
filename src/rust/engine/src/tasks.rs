@@ -24,7 +24,7 @@ pub struct Task {
 pub struct Tasks {
   // output product type -> Intrinsic providing it
   intrinsics: HashMap<TypeId, Vec<Intrinsic>, FNV>,
-  // Singleton Values to be returned for a given TypeConstraint.
+  // Singleton Values to be returned for a given TypeId.
   singletons: HashMap<TypeId, (Key, Value), FNV>,
   // output product type -> list of tasks providing it
   tasks: HashMap<TypeId, Vec<Task>, FNV>,

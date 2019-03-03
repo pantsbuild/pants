@@ -40,10 +40,6 @@ fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
   future::err(failure).to_boxed()
 }
 
-pub fn type_str(type_id: TypeId) -> String {
-  format!("{}", type_id)
-}
-
 impl VFS<Failure> for Context {
   fn read_link(&self, link: &Link) -> NodeFuture<PathBuf> {
     self.get(ReadLink(link.clone())).map(|res| res.0).to_boxed()
@@ -138,8 +134,7 @@ impl Select {
       .ok_or_else(|| {
         throw(&format!(
           "Tried to select product {} for {} but found no edges",
-          type_str(product),
-          caller_description
+          product, caller_description
         ))
       });
     let context = context.clone();
@@ -873,7 +868,7 @@ impl fmt::Debug for Task {
       "Task({}, {}, {}, {})",
       externs::project_str(&externs::val_for(&self.task.func.0), "__name__"),
       self.params,
-      type_str(self.product),
+      self.product,
       self.task.cacheable,
     )
   }
@@ -1017,8 +1012,8 @@ impl NodeKey {
     match self {
       &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
-      &NodeKey::Select(ref s) => type_str(s.product),
-      &NodeKey::Task(ref s) => type_str(s.product),
+      &NodeKey::Select(ref s) => format!("{}", s.product),
+      &NodeKey::Task(ref s) => format!("{}", s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
       &NodeKey::DigestFile(..) => "DigestFile".to_string(),
       &NodeKey::ReadLink(..) => "LinkDest".to_string(),
@@ -1064,24 +1059,6 @@ impl Node for NodeKey {
     }
   }
 
-  fn format(&self) -> String {
-    fn keystr(key: &Key) -> String {
-      externs::key_to_str(&key)
-    }
-    // TODO: these should all be converted to fmt::Debug implementations, and then this method can
-    // go away in favor of the auto-derived Debug for this type.
-    match self {
-      &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
-      &NodeKey::DownloadedFile(ref s) => format!("DownloadedFile({:?})", s.0),
-      &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
-      &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
-      &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
-      &NodeKey::Select(ref s) => format!("Select({}, {})", s.params, type_str(s.product)),
-      &NodeKey::Task(ref s) => format!("{:?}", s),
-      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.0)),
-    }
-  }
-
   fn digest(res: NodeResult) -> Option<hashing::Digest> {
     match res {
       NodeResult::Digest(d) => Some(d),
@@ -1111,14 +1088,9 @@ impl Display for NodeKey {
       &NodeKey::ExecuteProcess(ref s) => write!(f, "ExecuteProcess({:?}", s.0),
       &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
-      &NodeKey::Select(ref s) => write!(
-        f,
-        "Select({}, {})",
-        s.params,
-        externs::key_to_str(&s.product.0)
-      ),
+      &NodeKey::Select(ref s) => write!(f, "Select({}, {})", s.params, s.product,),
       &NodeKey::Task(ref s) => write!(f, "{:?}", s),
-      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", externs::key_to_str(&s.0)),
+      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", format!("{}", &s.0)),
     }
   }
 }

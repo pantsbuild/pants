@@ -189,7 +189,8 @@ pub fn create_exception(msg: &str) -> Value {
   with_externs(|e| (e.create_exception)(e.context, msg.as_ptr(), msg.len() as u64).into())
 }
 
-// NB: This method is currently unused, but kept as an example of how to call methods on objects.
+// TODO: This method is currently unused, but kept as an example of how to call methods on objects.
+#[allow(dead_code)]
 pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value, Failure> {
   call(&project_ignoring_type(&value, method), args)
 }

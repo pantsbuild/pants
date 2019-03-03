@@ -142,11 +142,6 @@ impl fmt::Display for TypeId {
 // On the python side, the 0th type id is used as an anonymous id
 pub const ANY_TYPE: TypeId = TypeId(0);
 
-// A type constraint, which a TypeId may or may-not satisfy.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct TypeConstraint(pub Key);
-
 // An identifier for a python function.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

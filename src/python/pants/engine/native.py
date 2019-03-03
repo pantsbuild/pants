@@ -282,7 +282,7 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     obj = self._ffi.from_handle(val[0])
     # TODO: determine if this assertion has any performance implications.
-    assert(isinstance(obj, type))
+    assert isinstance(obj, type)
     tid = c.to_id(obj)
     return (hash(tid), TypeId(tid))
 
@@ -466,10 +466,6 @@ class Key(datatype(['tup_0', 'type_id'])):
 
 
 class Function(datatype(['key'])):
-  """Corresponds to the native object of the same name."""
-
-
-class TypeConstraint(datatype(['key'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -714,8 +710,8 @@ class Native(Singleton):
                     type_url_to_fetch):
     """Create and return an ExternContext and native Scheduler."""
 
-    def func(constraint):
-      return Function(self.context.to_key(constraint))
+    def func(fn):
+      return Function(self.context.to_key(fn))
     def ti(type_obj):
       return TypeId(self.context.to_id(type_obj))
 
