@@ -24,7 +24,6 @@
 // Default isn't as big a deal as people seem to think it is.
 #![allow(
   clippy::new_without_default,
-  clippy::new_without_default,
   clippy::new_ret_no_self
 )]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
