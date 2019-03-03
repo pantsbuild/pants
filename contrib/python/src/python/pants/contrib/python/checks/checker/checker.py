@@ -134,7 +134,9 @@ def plugins():
     ConstantLogic,
     ExceptStatements,
     FutureCompatibility,
-    ImplicitStringConcatenation,
+    # TODO(#7307): figure out how to selectively turn on and off checkers with a pants option, since
+    # this will make a lot of noise if turned on in this repo!
+    # ImplicitStringConcatenation,
     ImportOrder,
     Indentation,
     MissingContextManager,
