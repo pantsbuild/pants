@@ -114,10 +114,6 @@ class BuildConfiguration(object):
 
     self._exposed_context_aware_object_factory_by_alias[alias] = context_aware_object_factory
 
-  @deprecated('1.15.0.dev1', hint_message='Use self.register_optionables().')
-  def register_subsystems(self, subsystems):
-    return self.register_optionables(subsystems)
-
   def register_optionables(self, optionables):
     """Registers the given subsystem types.
 
@@ -146,14 +142,6 @@ class BuildConfiguration(object):
     :rtype set
     """
     return self._optionables
-
-  @deprecated('1.15.0.dev1', hint_message='Use self.optionables().')
-  def subsystems(self):
-    """Returns the registered Subsystem types.
-
-    :rtype set
-    """
-    return {o for o in self._optionables if issubclass(o, Subsystem)}
 
   def register_rules(self, rules):
     """Registers the given rules.
