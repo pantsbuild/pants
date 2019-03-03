@@ -6,7 +6,7 @@ use std::io;
 
 use itertools::Itertools;
 
-use crate::core::{Function, Key, Params, TypeId, Value};
+use crate::core::{Key, Params, TypeId};
 use crate::externs;
 use crate::selectors::{Get, Select};
 use crate::tasks::{Intrinsic, Task, Tasks};
@@ -455,13 +455,12 @@ impl<'t> GraphMaker<'t> {
           reason: if params.is_empty() {
             format!(
               "No rule was available to compute {}. Maybe declare it as a RootRule({})?",
-              type_str(product),
-              type_str(product),
+              product, product,
             )
           } else {
             format!(
               "No rule was available to compute {} with parameter type{} {}",
-              type_str(product),
+              product,
               if params.len() > 1 { "s" } else { "" },
               params_str(&params),
             )
@@ -779,29 +778,12 @@ pub struct RuleGraph {
   unreachable_rules: Vec<UnreachableError>,
 }
 
-fn to_val_from_func(func: &Function) -> Value {
-  externs::val_for(&func.0)
-}
-
-fn function_str(func: &Function) -> String {
-  let as_val = to_val_from_func(func);
-  val_name(&as_val)
-}
-
-pub fn type_str(type_id: TypeId) -> String {
-  format!("{}", type_id)
-}
-
 pub fn params_str(params: &ParamTypes) -> String {
   let param_names = params
     .iter()
-    .map(|type_id| type_str(*type_id))
+    .map(|type_id| format!("{}", *type_id))
     .collect::<Vec<_>>();
   Params::display(param_names)
-}
-
-fn val_name(val: &Value) -> String {
-  externs::project_str(val, "__name__")
 }
 
 pub fn select_key_str(select_key: &SelectKey) -> String {
@@ -812,11 +794,11 @@ pub fn select_key_str(select_key: &SelectKey) -> String {
 }
 
 pub fn select_str(select: &Select) -> String {
-  format!("Select({})", type_str(select.product)).to_string() // TODO variant key
+  format!("Select({})", select.product).to_string() // TODO variant key
 }
 
 fn get_str(get: &Get) -> String {
-  format!("Get({}, {})", type_str(get.product), type_str(get.subject))
+  format!("Get({}, {})", get.product, get.subject)
 }
 
 ///
@@ -825,12 +807,10 @@ fn get_str(get: &Get) -> String {
 pub fn entry_str(entry: &Entry) -> String {
   match entry {
     &Entry::WithDeps(ref e) => entry_with_deps_str(e),
-    &Entry::Param(type_id) => format!("Param({})", type_str(type_id)),
-    &Entry::Singleton(value, product) => format!(
-      "Singleton({}, {})",
-      externs::key_to_str(&value),
-      type_str(product)
-    ),
+    &Entry::Param(type_id) => format!("Param({})", type_id),
+    &Entry::Singleton(value, product) => {
+      format!("Singleton({}, {})", externs::key_to_str(&value), product)
+    }
   }
 }
 
@@ -845,8 +825,8 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
       ref params,
     }) => format!(
       "({}, ({},) for {}",
-      type_str(intrinsic.product),
-      type_str(intrinsic.input),
+      intrinsic.product,
+      intrinsic.input,
       params_str(params)
     ),
     &EntryWithDeps::Root(ref root) => format!(
@@ -863,7 +843,7 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
 }
 
 fn task_display(task: &Task) -> String {
-  let product = type_str(task.product);
+  let product = format!("{}", task.product);
   let mut clause_portion = task
     .clause
     .iter()
@@ -882,10 +862,9 @@ fn task_display(task: &Task) -> String {
   } else {
     format!("[{}], ", get_portion)
   };
-  let function_name = function_str(&&task.func);
   format!(
     "({}, {}, {}{})",
-    product, clause_portion, get_portion, function_name
+    product, clause_portion, get_portion, task.func,
   )
   .to_string()
 }
@@ -1041,7 +1020,7 @@ impl RuleGraph {
     let mut root_subject_type_strs = self
       .root_param_types
       .iter()
-      .map(|&t| type_str(t))
+      .map(|&t| format!("{}", t))
       .collect::<Vec<String>>();
     root_subject_type_strs.sort();
     writeln!(f, "digraph {{")?;

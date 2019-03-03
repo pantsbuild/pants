@@ -57,10 +57,10 @@ use crate::context::Core;
 use crate::core::{Function, Key, Params, TypeId, Value};
 use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
-  EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, HandleBuffer,
-  IdentifyExtern, LogExtern, ProductTypeExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern,
-  PyResult, StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
-  StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
+  EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern,
+  HandleBuffer, IdentifyExtern, LogExtern, ProductTypeExtern, ProjectIgnoringTypeExtern,
+  ProjectMultiExtern, PyResult, StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern,
+  StoreTupleExtern, StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
 use crate::rule_graph::{GraphMaker, RuleGraph};
@@ -104,6 +104,7 @@ pub extern "C" fn externs_set(
   generator_send: GeneratorSendExtern,
   eval: EvalExtern,
   product_type: ProductTypeExtern,
+  get_type_for: GetTypeForExtern,
   identify: IdentifyExtern,
   equals: EqualsExtern,
   clone_val: CloneValExtern,
@@ -130,6 +131,7 @@ pub extern "C" fn externs_set(
     generator_send,
     eval,
     product_type,
+    get_type_for,
     identify,
     equals,
     clone_val,

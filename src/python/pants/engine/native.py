@@ -286,14 +286,19 @@ class _FFISpecification(object):
     tid = c.to_id(obj)
     return (hash(tid), TypeId(tid))
 
-  @_extern_decl('Ident', ['ExternContext*', 'Handle*'])
-  def extern_identify(self, context_handle, val):
-    """Return an Ident containing the __hash__ and TypeId for the given Handle."""
+  @_extern_decl('TypeId', ['ExternContext*', 'Handle*'])
+  def extern_get_type_for(self, context_handle, val):
+    """Return a representation of the object's type."""
     c = self._ffi.from_handle(context_handle)
     obj = self._ffi.from_handle(val[0])
-    hash_ = hash(obj)
     type_id = c.to_id(type(obj))
-    return (hash_, TypeId(type_id))
+    return TypeId(type_id)
+
+  @_extern_decl('Ident', ['ExternContext*', 'Handle*'])
+  def extern_identify(self, context_handle, val):
+    """Return a representation of the object's identity, including a hash."""
+    obj = self._ffi.from_handle(val[0])
+    return (hash(obj),)
 
   @_extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
   def extern_equals(self, context_handle, val1, val2):
@@ -620,6 +625,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_generator_send,
                            self.ffi_lib.extern_eval,
                            self.ffi_lib.extern_product_type,
+                           self.ffi_lib.extern_get_type_for,
                            self.ffi_lib.extern_identify,
                            self.ffi_lib.extern_equals,
                            self.ffi_lib.extern_clone_val,

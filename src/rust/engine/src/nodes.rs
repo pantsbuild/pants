@@ -15,7 +15,7 @@ use url::Url;
 
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
-use crate::externs::{self, Ident};
+use crate::externs;
 use crate::rule_graph;
 use crate::selectors;
 use crate::tasks::{self, Intrinsic};
@@ -902,7 +902,8 @@ impl WrappedNode for Task {
       })
       .then(move |task_result| match task_result {
         Ok(val) => {
-          let Ident { type_id, .. } = externs::identify(&val);
+          let type_id = externs::get_type_for(&val);
+          // TODO: figure out if this can/should be turned into a `match` statement!
           if type_id == context.core.types.generator {
             Self::generate(context, params, entry, val)
           } else if type_id == product {

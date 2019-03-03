@@ -24,6 +24,10 @@ pub fn product_type(val: &Value) -> ProductTypeId {
   with_externs(|e| (e.product_type)(e.context, val as &Handle))
 }
 
+pub fn get_type_for(val: &Value) -> TypeId {
+  with_externs(|e| (e.get_type_for)(e.context, val as &Handle))
+}
+
 pub fn identify(val: &Value) -> Ident {
   with_externs(|e| (e.identify)(e.context, val as &Handle))
 }
@@ -338,6 +342,7 @@ pub struct Externs {
   pub generator_send: GeneratorSendExtern,
   pub eval: EvalExtern,
   pub product_type: ProductTypeExtern,
+  pub get_type_for: GetTypeForExtern,
   pub identify: IdentifyExtern,
   pub equals: EqualsExtern,
   pub clone_val: CloneValExtern,
@@ -364,6 +369,8 @@ unsafe impl Send for Externs {}
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
 pub type ProductTypeExtern = extern "C" fn(*const ExternContext, *const Handle) -> ProductTypeId;
+
+pub type GetTypeForExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
 
 pub type IdentifyExtern = extern "C" fn(*const ExternContext, *const Handle) -> Ident;
 
@@ -499,12 +506,11 @@ pub struct ProductTypeId {
 }
 
 ///
-/// The result of an `identify` call, including the __hash__ of a Handle and its TypeId.
+/// The result of an `identify` call, including the __hash__ of a Handle.
 ///
 #[repr(C)]
 pub struct Ident {
   pub hash: i64,
-  pub type_id: TypeId,
 }
 
 ///

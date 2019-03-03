@@ -62,7 +62,8 @@ impl Interns {
   }
 
   pub fn insert(&mut self, v: Value) -> Key {
-    let Ident { hash, type_id } = externs::identify(&v);
+    let type_id = externs::get_type_for(&v);
+    let Ident { hash } = externs::identify(&v);
     let mut inserted = false;
     let id_generator = self.id_generator;
     let key = *self
