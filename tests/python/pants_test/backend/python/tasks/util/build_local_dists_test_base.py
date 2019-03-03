@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
+from abc import abstractmethod
 from builtins import next, str
 
 from pants.backend.native.register import rules as native_backend_rules
@@ -40,9 +41,9 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     return super(BuildLocalPythonDistributionsTestBase, cls).rules() + native_backend_rules()
 
   @classproperty
+  @abstractmethod
   def dist_specs(cls):
     """Fed into `self.populate_target_dict()`."""
-    raise NotImplementedError('dist_specs must be implemented!')
 
   def setUp(self):
     super(BuildLocalPythonDistributionsTestBase, self).setUp()

@@ -42,12 +42,12 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
     return [UnpackedArchives]
 
   @classproperty
+  @abstractmethod
   def source_target_constraint(cls):
     """Return a type constraint which is evaluated to determine "source" targets for this task.
 
     :return: :class:`pants.util.objects.TypeConstraint`
     """
-    raise NotImplementedError()
 
   @abstractmethod
   def unpack_target(unpackable_target, unpack_dir):

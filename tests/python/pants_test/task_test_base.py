@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import glob
 import os
+from abc import abstractmethod
 from builtins import object
 from contextlib import closing, contextmanager
 from io import BytesIO
@@ -65,12 +66,12 @@ class TaskTestBase(TestBase):
   options_scope = 'test_scope'
 
   @classmethod
+  @abstractmethod
   def task_type(cls):
     """Subclasses must return the type of the Task subclass under test.
 
     :API: public
     """
-    raise NotImplementedError()
 
   def setUp(self):
     """
