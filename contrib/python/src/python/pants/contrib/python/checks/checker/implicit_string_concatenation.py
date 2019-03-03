@@ -5,7 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
-import re
+import token
+import tokenize
+from io import StringIO
 
 from pants.contrib.python.checks.checker.common import CheckstylePlugin
 
@@ -23,26 +25,29 @@ class ImplicitStringConcatenation(CheckstylePlugin):
       if isinstance(ast_node, ast.Str):
         yield ast_node
 
-  def maybe_uses_implicit_concatenation(self, expr):
-    str_node_text = self.python_file.tokenized_file_body.get_text(expr)
-    # Search for string nodes of the form 'a' 'b', using any combination of single or double quotes,
-    # with any spacing in between them, but don't flag instances of """ or '''. This searches from
-    # the start of the string node and parses backslashes.
-    # TODO: consider just parsing the string for string components and then raising if there is more
-    # than one. This would also allow for more complex logic like reaching into triple-quoted
-    # strings.
-    if re.match(r"^\s*(('([^']|(\\)*')*'|\"([^\"]|(\\)*\")*\")\s+('([^']|(\\)*')*'|\"([^\"]|(\\)*\")*\")|('([^']|(\\)*')+'|\"([^\"]|(\\)*\")+\")\s*('([^']|(\\)*')+'|\"([^\"]|(\\)*\")+\"))",
-                str_node_text):
-      return True
-    # TODO: also consider checking when triple-quoted strings are used -- e.g. '''''a''' becomes
-    # "''a", but '''a''''' is just "a", which is confusing.
+  @classmethod
+  def string_node_token_names(cls, str_node_text):
+    for tok in tokenize.generate_tokens(StringIO(str_node_text).readline):
+      yield token.tok_name[tok.type]
+
+  @classmethod
+  def has_multiple_strings(cls, token_names):
+    return sum(1 if name == 'STRING' else 0 for name in token_names) > 1
+
+  def uses_implicit_concatenation(self, str_node_text):
+    str_node_token_names = list(self.string_node_token_names(str_node_text))
+    return self.has_multiple_strings(str_node_token_names)
 
   def nits(self):
     for str_node in self.iter_strings(self.python_file.tree):
-      if self.maybe_uses_implicit_concatenation(str_node):
+      str_node_text = self.python_file.tokenized_file_body.get_text(str_node)
+      if self.uses_implicit_concatenation(str_node_text):
         yield self.warning(
           'T806',
           """\
 Implicit string concatenation by separating string literals with a space was detected. Using an
 explicit `+` operator can lead to less error-prone code.""",
           str_node)
+      # TODO: also consider checking when triple-quoted strings are used -- e.g. '''a''''' becomes
+      # just "a" (from implicit concatenation, which we catch here), but '''''a''' turns into "''a",
+      # without any implicit concatenation.
