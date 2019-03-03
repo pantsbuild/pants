@@ -681,3 +681,51 @@ class TestBase(unittest.TestCase):
     single_base_dir = assert_single_element(list(mapping_for_target.keys()))
     single_product = assert_single_element(mapping_for_target[single_base_dir])
     return single_product
+
+  def populate_target_dict(self, target_map):
+    """Return a dict containing targets with files generated according to `target_map`.
+
+    The values of `target_map` should themselves be a flat dict, which contains keyword arguments
+    fed into `self.make_target()`, along with a few special keys. Special keys are:
+    - 'key' (required -- used to index into the returned dict).
+    - 'filemap' (creates files at the specified relative paths to the target).
+
+    An `OrderedDict` of 2-tuples must be used with the targets topologically ordered, if
+    they have dependencies on each other. Note that dependency cycles are not currently supported
+    with this method.
+
+    :param target_map: Dict mapping each target address to generate -> kwargs for
+                       `self.make_target()`, along with a 'key' and optionally a 'filemap' argument.
+    :return: Dict mapping the required 'key' argument -> target instance for each element of
+             `target_map`.
+    :rtype: dict
+    """
+    target_dict = {}
+
+    # Create a target from each specification and insert it into `target_dict`.
+    for target_spec, target_kwargs in target_map.items():
+      unprocessed_kwargs = target_kwargs.copy()
+
+      target_base = Address.parse(target_spec).spec_path
+
+      # Populate the target's owned files from the specification.
+      filemap = unprocessed_kwargs.pop('filemap', {})
+      for rel_path, content in filemap.items():
+        buildroot_path = os.path.join(target_base, rel_path)
+        self.create_file(buildroot_path, content)
+
+      # Ensure any dependencies exist in the target dict (`target_map` must then be an
+      # OrderedDict).
+      # The 'key' is used to access the target in `target_dict`.
+      key = unprocessed_kwargs.pop('key')
+      dep_targets = []
+      for dep_spec in unprocessed_kwargs.pop('dependencies', []):
+        existing_tgt_key = target_map[dep_spec]['key']
+        dep_targets.append(target_dict[existing_tgt_key])
+
+      # Register the generated target.
+      generated_target = self.make_target(
+        spec=target_spec, dependencies=dep_targets, **unprocessed_kwargs)
+      target_dict[key] = generated_target
+
+    return target_dict

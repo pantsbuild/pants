@@ -12,13 +12,14 @@ from io import BytesIO
 
 from future.utils import PY2
 
-from pants.build_graph.address import Address
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
+from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_method
 from pants.util.meta import classproperty
+from pants.util.objects import SubclassesOf, TypedCollection, datatype
 from pants.util.process_handler import subprocess
 from pants_test.test_base import TestBase
 
@@ -306,87 +307,52 @@ class ConsoleTaskTestBase(TaskTestBase):
 
 
 class DeclarativeTaskTestMixin(object):
-  """Experimental mixin combining target descriptions with a file path dict.
+  """Experimental mixin for task tests allows specifying tasks to be run before or after the task.
 
-  This class should be mixed in to subclasses of `TaskTestBase`!
-
-  NB: `self.populate_target_dict()` should be called in the `setUp()` method to use the target specs
-  specified in `dist_specs`!
-
-  This mixin also allows specifying tasks to be run before or after the task_type() is executed when
-  calling `self.invoke_tasks()`.
+  Calling `self.invoke_tasks()` will create instances of and execute task types in
+  `self.run_before_task_types()`, then `task_type()`, then `self.run_after_task_types()`.
   """
 
   @classproperty
-  def dist_specs(cls):
-    """This is an informally-specified nested dict.
-
-    Special keys are 'key' (used to index into `self.target_dict`) and 'filemap' (creates files at
-    the specified relative paths). The rest of the keys are fed into `self.make_target()`. An
-    `OrderedDict` of 2-tuples may be used if targets need to be created in a specific order (e.g. if
-    they have dependencies on each other).
-    """
-    raise NotImplementedError('dist_specs must be implemented!')
-
-  @classproperty
   def run_before_task_types(cls):
-    """
-    By default, we just use a `BuildLocalPythonDistributions` task. When testing with C/C++ targets,
-    we want to compile and link them as well to get the resulting dist to build, so we add those
-    task types here and execute them beforehand.
-    """
     return []
 
   @classproperty
   def run_after_task_types(cls):
-    """Tasks to run after local dists are built, similar to `run_before_task_types`."""
     return []
-
-  def populate_target_dict(self):
-    self.target_dict = {}
-
-    # Create a target from each specification and insert it into `self.target_dict`.
-    for target_spec, target_kwargs in self.dist_specs.items():
-      unprocessed_kwargs = target_kwargs.copy()
-
-      target_base = Address.parse(target_spec).spec_path
-
-      # Populate the target's owned files from the specification.
-      filemap = unprocessed_kwargs.pop('filemap', {})
-      for rel_path, content in filemap.items():
-        buildroot_path = os.path.join(target_base, rel_path)
-        self.create_file(buildroot_path, content)
-
-      # Ensure any dependencies exist in the target dict (`dist_specs` must then be an
-      # OrderedDict).
-      # The 'key' is used to access the target in `self.target_dict`.
-      key = unprocessed_kwargs.pop('key')
-      dep_targets = []
-      for dep_spec in unprocessed_kwargs.pop('dependencies', []):
-        existing_tgt_key = self.dist_specs[dep_spec]['key']
-        dep_targets.append(self.target_dict[existing_tgt_key])
-
-      # Register the generated target.
-      generated_target = self.make_target(
-        spec=target_spec, dependencies=dep_targets, **unprocessed_kwargs)
-      self.target_dict[key] = generated_target
 
   @memoized_method
   def _synthesize_task_types(self, task_types=()):
     return [
       self.synthesize_task_subtype(tsk, '__tmp_{}'.format(tsk.__name__))
-      # TODO: make @memoized_method convert lists to tuples for hashing!
+      # TODO(#7127): make @memoized_method convert lists to tuples for hashing!
       for tsk in task_types
     ]
-
-  def _all_specified_targets(self):
-    return list(self.target_dict.values())
 
   def _create_task(self, task_type, context):
     """Helper method to instantiate tasks besides self._testing_task_type in the test workdir."""
     return task_type(context, self.test_workdir)
 
-  def invoke_tasks(self, **context_kwargs):
+  class TaskInvocationResult(datatype([
+      'context',
+      ('before_tasks', TypedCollection(SubclassesOf(Task))),
+      ('this_task', SubclassesOf(Task)),
+      ('after_tasks', TypedCollection(SubclassesOf(Task))),
+  ])): pass
+
+  def invoke_tasks(self, target_closure=None, **context_kwargs):
+    """Create and execute the declaratively specified tasks in order.
+
+    Create instances of and execute task types in `self.run_before_task_types()`, then
+    `task_type()`, then `self.run_after_task_types()`.
+
+    :param Iterable target_closure: If not None, check that the build graph contains exactly these
+                                    targets before executing the tasks.
+    :param **context_kwargs: kwargs passed to `self.context()`. Note that this method already sets
+                                    `for_task_types`.
+    :return: A datatype containing the created context and the task instances which were executed.
+    :rtype: :class:`DeclarativeTaskTestMixin.TaskInvocationResult`
+    """
     run_before_synthesized_task_types = self._synthesize_task_types(tuple(self.run_before_task_types))
     run_after_synthesized_task_types = self._synthesize_task_types(tuple(self.run_after_task_types))
     all_synthesized_task_types = run_before_synthesized_task_types + [
@@ -396,7 +362,8 @@ class DeclarativeTaskTestMixin(object):
     context = self.context(
       for_task_types=all_synthesized_task_types,
       **context_kwargs)
-    self.assertEqual(set(self._all_specified_targets()), set(context.build_graph.targets()))
+    if target_closure is not None:
+      self.assertEqual(set(target_closure), set(context.build_graph.targets()))
 
     run_before_task_instances = [
       self._create_task(task_type, context)
@@ -415,4 +382,8 @@ class DeclarativeTaskTestMixin(object):
     for tsk in all_task_instances:
       tsk.execute()
 
-    return (context, run_before_task_instances, current_task_instance, run_after_task_instances)
+    return self.TaskInvocationResult(
+      context=context,
+      before_tasks=run_before_task_instances,
+      this_task=current_task_instance,
+      after_tasks=run_after_task_instances)

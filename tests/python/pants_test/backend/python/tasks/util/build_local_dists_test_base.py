@@ -39,9 +39,15 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
   def rules(cls):
     return super(BuildLocalPythonDistributionsTestBase, cls).rules() + native_backend_rules()
 
+  @classproperty
+  def dist_specs(cls):
+    """Fed into `self.populate_target_dict()`."""
+    raise NotImplementedError('dist_specs must be implemented!')
+
   def setUp(self):
     super(BuildLocalPythonDistributionsTestBase, self).setUp()
-    self.populate_target_dict()
+    # Share the target mapping across all test cases.
+    self.target_dict = self.populate_target_dict(self.dist_specs)
 
   def _get_dist_snapshot_version(self, task, python_dist_target):
     """Get the target's fingerprint, and guess the resulting version string of the built dist.
@@ -65,7 +71,11 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     return re.sub(r'[^a-zA-Z0-9]', '.', versioned_target_fingerprint.lower())
 
   def _create_distribution_synthetic_target(self, python_dist_target, extra_targets=[]):
-    context, _, python_create_distributions_task_instance, _ = self.invoke_tasks(
+    all_specified_targets = list(self.target_dict.values())
+    result = self.invoke_tasks(
+      # We set `target_closure` to check that all the targets in the build graph are exactly the
+      # ones we've just created before building python_dist()s (which creates further targets).
+      target_closure=all_specified_targets,
       target_roots=[python_dist_target] + extra_targets,
       for_subsystems=[PythonRepos, LibcDev],
       # TODO(#6848): we should be testing all of these with both of our toolchains.
@@ -74,8 +84,10 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
           'toolchain_variant': 'llvm',
         },
       })
+    context = result.context
+    python_create_distributions_task_instance = result.this_task
 
-    synthetic_tgts = set(context.build_graph.targets()) - set(self._all_specified_targets())
+    synthetic_tgts = set(context.build_graph.targets()) - set(all_specified_targets)
     self.assertEqual(1, len(synthetic_tgts))
     synthetic_target = next(iter(synthetic_tgts))
 
