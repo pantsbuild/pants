@@ -173,7 +173,6 @@ class SchedulerTest(TestBase):
 
   @contextmanager
   def _assert_execution_error(self, expected_msg):
-    # TODO(#7303): use self.assertRaisesWithMessageContaining()!
     with self.assertRaises(ExecutionError) as cm:
       yield
     self.assertIn(expected_msg, remove_locations_from_traceback(str(cm.exception)))

@@ -499,10 +499,8 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
         add_task(rule.output_constraint, rule)
 
     def add_type_transition_rule(union_rule):
-      """
-      NB: This does not require that union bases be supplied to `def rules():`! not sure if that's
-      what we want.
-      """
+      # NB: This does not require that union bases be supplied to `def rules():`, as the union type
+      # is never instantiated!
       union_base = union_rule.union_base
       assert union_base._is_union
       union_member = union_rule.union_member
