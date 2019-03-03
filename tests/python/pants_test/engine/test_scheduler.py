@@ -61,8 +61,7 @@ def transitive_coroutine_rule(c):
 
 
 @union
-class UnionBase(object):
-  pass
+class UnionBase(object): pass
 
 
 class UnionWrapper(object):
@@ -187,13 +186,13 @@ class SchedulerTest(TestBase):
     a, = self.scheduler.product_request(A, [Params(UnionWrapper(UnionB()))])
     self.assertTrue(isinstance(a, A))
     # Fails due to no union relationship from A -> UnionBase.
-    expected_msg = "Exception: None of the registered union members matched the subject. declared union type: TypeConstraint(=UnionBase), union members: {TypeConstraint(=UnionA), TypeConstraint(=UnionB)}, subject: <pants_test.engine.test_scheduler.A object at 0xEEEEEEEEE>"
+    expected_msg = "Exception: None of the registered union members matched the subject. declared union type: TypeConstraint(Exactly(UnionBase)), union members: {TypeConstraint(Exactly(UnionA)), TypeConstraint(Exactly(UnionB))}, subject: <pants_test.engine.test_scheduler.A object at 0xEEEEEEEEE>"
     with self._assert_execution_error(expected_msg):
       self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
 
   def test_get_type_match_failure(self):
     """Test that Get(...)s are now type-checked during rule execution, to allow for union types."""
-    expected_msg = "Exception: Declared type did not match actual type for Get { product: TypeConstraint(=A), subject_declared_type: TypeConstraint(=B), subject: <pants_test.engine.test_scheduler.A object at 0xEEEEEEEEE>"
+    expected_msg = "Exception: Declared type did not match actual type for Get { product: TypeConstraint(Exactly(A)), subject_declared_type: TypeConstraint(Exactly(B)), subject: <pants_test.engine.test_scheduler.A object at 0xEEEEEEEEE>"
     with self._assert_execution_error(expected_msg):
       # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
       self.scheduler.product_request(A, [Params(TypeCheckFailWrapper(A()))])

@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-from builtins import str, zip
+from builtins import object, str, zip
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from os.path import dirname
@@ -24,7 +24,8 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
+from pants.engine.legacy.structs import (BundleAdaptor, BundlesField, HydrateableField,
+                                         SourcesField, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
 from pants.engine.parser import SymbolTable, TargetAdaptorContainer
@@ -506,9 +507,7 @@ def hydrate_target(target_adaptor_container):
   target_adaptor = target_adaptor_container.value
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
-  hydrated_fields = yield [(Get(HydratedField, BundlesField, fa)
-                            if type(fa) is BundlesField
-                            else Get(HydratedField, SourcesField, fa))
+  hydrated_fields = yield [Get(HydratedField, HydrateableField, fa)
                            for fa in target_adaptor.field_adaptors]
   kwargs = target_adaptor.kwargs()
   for field in hydrated_fields:
