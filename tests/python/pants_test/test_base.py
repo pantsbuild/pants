@@ -617,21 +617,21 @@ class TestBase(unittest.TestCase):
       self.assertIn(string, content, '"{}" is not in the file {}:\n{}'.format(string, f.name, content))
 
   @contextmanager
-  def assertRaisesWithMessageContaining(self, exception_type, error_text, exact=False):
+  def assertRaisesWithMessageContaining(self, exception_type, error_text, substring_match=False):
     """Verifies that a string appears in an exception message.
 
     :param type exception_type: The exception type which is expected to be raised within the body.
     :param str error_text: Text that the exception message should either contain or match exactly.
-    :param bool exact: If True, use `self.assertEqual()` instead of `self.assertIn()` to match the
-                       exception text. This provides a stronger guarantee but may not be necessary.
+    :param bool substring_match: If True, use `self.assertIn()` instead of `self.assertEqual()` to
+                                 match the exception text.
     :API: public
     """
     with self.assertRaises(exception_type) as cm:
       yield cm
-    if exact:
-      self.assertEqual(error_text, str(cm.exception))
-    else:
+    if substring_match:
       self.assertIn(error_text, str(cm.exception))
+    else:
+      self.assertEqual(error_text, str(cm.exception))
 
   def get_bootstrap_options(self, cli_options=()):
     """Retrieves bootstrap options.
