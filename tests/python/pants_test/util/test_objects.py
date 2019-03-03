@@ -333,7 +333,7 @@ class DatatypeTest(TestBase):
     with self.assertRaisesWithMessageContaining(
         TypeError,
         'datatype object is not iterable',
-        substring_match=True):
+        exact=False):
       for x in bar(1):
         pass
 
@@ -399,7 +399,7 @@ class DatatypeTest(TestBase):
     with self.assertRaisesWithMessageContaining(TypeError,
         "__new__() got multiple values for {kw}argument 'val'"
         .format(kw='' if PY3 else 'keyword '),
-        substring_match=True):
+                                                exact=False):
       bar(1, val=1)
 
   def test_too_many_args(self):
@@ -409,7 +409,7 @@ class DatatypeTest(TestBase):
         '__new__() takes 3 positional arguments but 4 were given'
         if PY3 else
         '__new__() takes exactly 3 arguments (4 given)',
-        substring_match=True):
+        exact=False):
       bar(1, 1, 1)
 
   def test_unexpect_kwarg(self):
@@ -417,7 +417,7 @@ class DatatypeTest(TestBase):
     with self.assertRaisesWithMessageContaining(
         TypeError,
         "__new__() got an unexpected keyword argument 'other'",
-        substring_match=True):
+        exact=False):
       bar(other=1)
 
 
