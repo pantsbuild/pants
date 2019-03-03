@@ -28,7 +28,7 @@ def invoke_pex_for_output(pex_file_to_run):
 def _toolchain_variants(func):
   @wraps(func)
   def wrapper(*args, **kwargs):
-    for variant in ToolchainVariant.iterate_enum_variants():
+    for variant in ToolchainVariant.all_variants:
       func(*args, toolchain_variant=variant, **kwargs)
   return wrapper
 

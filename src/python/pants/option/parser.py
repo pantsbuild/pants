@@ -557,11 +557,13 @@ class Parser(object):
     def check(val):
       if val is not None:
         choices = kwargs.get('choices')
-        # Reach into `enum` types to get the allowed `choices` if not explicitly set.
+        # If the `type` argument has an `all_variants` attribute, use that as `choices` if not
+        # already set. Using an attribute instead of checking a subclass allows `type` arguments
+        # which are functions to have an implicit fallback `choices` set as well.
         if choices is None and 'type' in kwargs:
           type_arg = kwargs.get('type')
-          if hasattr(type_arg, 'iterate_enum_variants'):
-            choices = list(type_arg.iterate_enum_variants())
+          if hasattr(type_arg, 'all_variants'):
+            choices = list(type_arg.all_variants)
         if choices is not None and val not in choices:
           raise ParseError('`{}` is not an allowed value for option {} in {}. '
                            'Must be one of: {}'.format(val, dest, self._scope_str(), choices))

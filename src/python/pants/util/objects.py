@@ -207,6 +207,18 @@ class EnumVariantSelectionError(TypeCheckError):
   """Raised when an invalid variant for an enum() is constructed or matched against."""
 
 
+# TODO: make an @abstract_classproperty which works with AbstractClass!
+class ChoicesMixin(AbstractClass):
+  """A mixin which declares that the type has a fixed set of possible instances."""
+
+  @classproperty
+  def all_variants(cls):
+    """Return an iterable containing a de-duplicated list of all possible instances of this type."""
+    raise NotImplementedError(
+      "The `all_variants` classproperty must be implemented for subclasses of {}!"
+      .format(cls.__name__))
+
+
 def enum(all_values):
   """A datatype which can take on a finite set of values. This method is experimental and unstable.
 
@@ -246,7 +258,7 @@ def enum(all_values):
                      "was detected. The unique elements of all_values were: {}."
                      .format(all_values_realized, list(unique_values)))
 
-  class ChoiceDatatype(datatype([field_name])):
+  class ChoiceDatatype(datatype([field_name]), ChoicesMixin):
     # Overriden from datatype() so providing an invalid variant is catchable as a TypeCheckError,
     # but more specific.
     type_check_error_type = EnumVariantSelectionError
@@ -328,12 +340,12 @@ def enum(all_values):
       match_for_variant = mapping[self.value]
       return match_for_variant
 
-    @classmethod
-    def iterate_enum_variants(cls):
+    @classproperty
+    def all_variants(cls):
       """Iterate over all instances of this enum, in the declared order.
 
-      NB: This method is exposed for testing enum variants easily. resolve_for_enum_variant() should
-      be used for performing conditional logic based on an enum instance's value.
+      NB: resolve_for_enum_variant() should be used instead of this method for performing
+      conditional logic based on an enum instance's value.
       """
       return cls._singletons.values()
 
