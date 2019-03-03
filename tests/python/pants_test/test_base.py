@@ -685,10 +685,11 @@ class TestBase(unittest.TestCase):
   def populate_target_dict(self, target_map):
     """Return a dict containing targets with files generated according to `target_map`.
 
-    The values of `target_map` should themselves be a flat dict, which contains keyword arguments
-    fed into `self.make_target()`, along with a few special keys. Special keys are:
-    - 'key' (required -- used to index into the returned dict).
-    - 'filemap' (creates files at the specified relative paths to the target).
+    The keys of `target_map` are target address strings, while the values of `target_map` should be
+    a dict which contains keyword arguments fed into `self.make_target()`, along with a few special
+    keys. Special keys are:
+    - 'key': used to access the target in the returned dict. Defaults to the target address spec.
+    - 'filemap': creates files at the specified relative paths to the target.
 
     An `OrderedDict` of 2-tuples must be used with the targets topologically ordered, if
     they have dependencies on each other. Note that dependency cycles are not currently supported
@@ -716,8 +717,8 @@ class TestBase(unittest.TestCase):
 
       # Ensure any dependencies exist in the target dict (`target_map` must then be an
       # OrderedDict).
-      # The 'key' is used to access the target in `target_dict`.
-      key = unprocessed_kwargs.pop('key')
+      # The 'key' is used to access the target in `target_dict`, and defaults to `target_spec`.
+      key = unprocessed_kwargs.pop('key', target_spec)
       dep_targets = []
       for dep_spec in unprocessed_kwargs.pop('dependencies', []):
         existing_tgt_key = target_map[dep_spec]['key']
