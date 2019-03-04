@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import glob
 import os
 
+from pex.executor import Executor
 from pex.interpreter import PythonInterpreter
 
 from pants.util.contextutil import temporary_dir
