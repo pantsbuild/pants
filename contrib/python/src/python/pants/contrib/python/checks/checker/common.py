@@ -12,6 +12,7 @@ import re
 import textwrap
 import tokenize
 
+import asttokens
 import six
 
 
@@ -105,6 +106,7 @@ class PythonFile(object):
   def __init__(self, blob, tree, root, filename):
     self._blob = self._remove_coding_header(blob)
     self.tree = tree
+    self.tokenized_file_body = asttokens.ASTTokens(self._blob, tree=self.tree, filename=filename)
     self.lines = OffByOneList(self._blob.decode('utf-8').split('\n'))
     self._root = root
     self.filename = filename
