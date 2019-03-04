@@ -9,6 +9,8 @@ import token
 import tokenize
 from io import StringIO
 
+from future.utils import PY3
+
 from pants.contrib.python.checks.checker.common import CheckstylePlugin
 
 
@@ -28,7 +30,8 @@ class ImplicitStringConcatenation(CheckstylePlugin):
   @classmethod
   def string_node_token_names(cls, str_node_text):
     for tok in tokenize.generate_tokens(StringIO(str_node_text).readline):
-      yield token.tok_name[tok.type]
+      token_type = tok.type if PY3 else tok[0]
+      yield token.tok_name[token_type]
 
   @classmethod
   def has_multiple_strings(cls, token_names):
