@@ -38,7 +38,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                   'for targets of this language.')
 
     register('--toolchain-variant', advanced=True,
-             default='gnu', type=ToolchainVariant,
+             default=ToolchainVariant.gnu, type=ToolchainVariant,
              help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
                   "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 

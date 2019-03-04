@@ -196,7 +196,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
     register('--glob-expansion-failure', advanced=True,
-             default='warn', type=GlobMatchErrorBehavior,
+             default=GlobMatchErrorBehavior.warn, type=GlobMatchErrorBehavior,
              help="Raise an exception if any targets declaring source files "
                   "fail to match any glob provided in the 'sources' argument.")
 

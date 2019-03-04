@@ -30,9 +30,30 @@ class TypedDatatypeInstanceConstructionError(TypeCheckError):
   """Raised when a datatype()'s fields fail a type check upon construction."""
 
 
-# TODO: create a mixin which declares/implements the methods we define on the generated class in
-# datatype() and enum() to decouple the class's logic from the way it's created. This may also make
-# migration to python 3 dataclasses as per #7074 easier.
+class DatatypeMixin(AbstractClass):
+  """Decouple datatype logic from the way it's created to ease migration to python 3 dataclasses."""
+
+  @classproperty
+  @abstractmethod
+  def type_check_error_type(cls):
+    """The exception type to use in make_type_error()."""
+
+  @classmethod
+  def make_type_error(cls, msg, *args, **kwargs):
+    """A helper method to generate an exception type for type checking errors.
+
+    This method uses `cls.type_check_error_type` to ensure that type checking errors can be caught
+    with a reliable exception type. The type returned by `cls.type_check_error_type` should ensure
+    that the exception messages are prefixed with enough context to be useful and *not* confusing.
+    """
+    return cls.type_check_error_type(cls.__name__, msg, *args, **kwargs)
+
+  @abstractmethod
+  def copy(self, **kwargs):
+    """Return a new object of the same type, replacing specified fields with new values"""
+
+
+# TODO(#7074): Migrate to python 3 dataclasses!
 def datatype(field_decls, superclass_name=None, **kwargs):
   """A wrapper for `namedtuple` that accounts for the type of the object in equality.
 
@@ -73,21 +94,8 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   namedtuple_cls = namedtuple(superclass_name, field_names, **kwargs)
 
-  class DataType(namedtuple_cls):
-    @classproperty
-    def type_check_error_type(cls):
-      """The exception type to use in make_type_error()."""
-      return TypedDatatypeInstanceConstructionError
-
-    @classmethod
-    def make_type_error(cls, msg, *args, **kwargs):
-      """A helper method to generate an exception type for type checking errors.
-
-      This method uses `cls.type_check_error_type` to ensure that type checking errors can be caught
-      with a reliable exception type. The type returned by `cls.type_check_error_type` should ensure
-      that the exception messages are prefixed with enough context to be useful and *not* confusing.
-      """
-      return cls.type_check_error_type(cls.__name__, msg, *args, **kwargs)
+  class DataType(namedtuple_cls, DatatypeMixin):
+    type_check_error_type = TypedDatatypeInstanceConstructionError
 
     def __new__(cls, *args, **kwargs):
       # TODO: Ideally we could execute this exactly once per `cls` but it should be a
@@ -149,20 +157,27 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       return super(DataType, self).__iter__()
 
     def _asdict(self):
-      '''Return a new OrderedDict which maps field names to their values'''
+      """Return a new OrderedDict which maps field names to their values.
+
+      Overrides a namedtuple() method which calls __iter__.
+      """
       return OrderedDict(zip(self._fields, self._super_iter()))
 
-    def _replace(_self, **kwds):
-      '''Return a new datatype object replacing specified fields with new values'''
-      field_dict = _self._asdict()
-      field_dict.update(**kwds)
-      return type(_self)(**field_dict)
+    def _replace(self, **kwargs):
+      """Return a new datatype object replacing specified fields with new values.
 
-    copy = _replace
+      Overrides a namedtuple() method which calls __iter__.
+      """
+      field_dict = self._asdict()
+      field_dict.update(**kwargs)
+      return type(self)(**field_dict)
+
+    def copy(self, **kwargs):
+      return self._replace(**kwargs)
 
     # NB: it is *not* recommended to rely on the ordering of the tuple returned by this method.
     def __getnewargs__(self):
-      '''Return self as a plain tuple.  Used by copy and pickle.'''
+      """Return self as a plain tuple.  Used by copy and pickle."""
       return tuple(self._super_iter())
 
     def __repr__(self):
@@ -207,7 +222,7 @@ class EnumVariantSelectionError(TypeCheckError):
   """Raised when an invalid variant for an enum() is constructed or matched against."""
 
 
-# TODO: make an @abstract_classproperty which works with AbstractClass!
+# TODO: look into merging this with pants.util.meta.Singleton!
 class ChoicesMixin(AbstractClass):
   """A mixin which declares that the type has a fixed set of possible instances."""
 

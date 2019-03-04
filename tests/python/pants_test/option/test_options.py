@@ -195,7 +195,7 @@ class OptionsTest(unittest.TestCase):
                      type=self.SomeEnumOption)
     # For testing the default value
     options.register('separate-enum-opt-scope', '--some-enum-with-default',
-                     default='a-value', type=self.SomeEnumOption)
+                     default=self.SomeEnumOption.a_value, type=self.SomeEnumOption)
 
   def test_env_type_int(self):
     options = Options.create(env={'PANTS_FOO_BAR': "['123','456']"},

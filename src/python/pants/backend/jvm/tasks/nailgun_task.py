@@ -14,7 +14,6 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 from pants.process.subprocess import Subprocess
 from pants.task.task import Task, TaskBase
-from pants.util.memo import memoized_property
 from pants.util.objects import enum
 
 
@@ -31,7 +30,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
     register('--execution-strategy',
-             default=cls.NAILGUN, type=cls.ExecutionStrategy,
+             default=cls.ExecutionStrategy.nailgun, type=cls.ExecutionStrategy,
              help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
                   'task will be quicker. If set to subprocess, then the task will be run without '
                   'nailgun. Hermetic execution is an experimental subprocess execution framework.')
@@ -47,7 +46,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                           rev='0.9.1'),
                           ])
 
-  @memoized_property
+  @property
   def execution_strategy_enum(self):
     return self.get_options().execution_strategy
 
