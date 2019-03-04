@@ -40,6 +40,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_file_dump, safe_mkdir,
                                 safe_mkdtemp, safe_open, safe_rmtree)
 from pants.util.memo import memoized_method
+from pants.util.meta import AbstractClass
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
@@ -78,7 +79,7 @@ class TestGenerator(object):
     setattr(cls, method_name, method)
 
 
-class TestBase(unittest.TestCase):
+class TestBase(unittest.TestCase, AbstractClass):
   """A baseclass useful for tests requiring a temporary buildroot.
 
   :API: public
