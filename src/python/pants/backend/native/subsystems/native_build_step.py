@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from abc import abstractmethod
+
 from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
   MirroredTargetOptionMixin
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
@@ -66,8 +68,9 @@ class CompileSettingsBase(Subsystem):
     )
 
   @classproperty
+  @abstractmethod
   def header_file_extensions_default(cls):
-    raise NotImplementedError('header_file_extensions_default() must be overridden!')
+    """Default value for --header-file-extensions."""
 
   @classmethod
   def register_options(cls, register):

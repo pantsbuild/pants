@@ -18,7 +18,7 @@ class SingletonMetaclass(type):
 
 
 class ClassPropertyDescriptor(object):
-  """Define a readable class property, given a function."""
+  """Define a readable attribute on a class, given a function."""
 
   # TODO: it seems overriding __set__ and __delete__ would require defining a metaclass or
   # overriding __setattr__/__delattr__ (see

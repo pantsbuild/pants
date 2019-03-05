@@ -412,13 +412,6 @@ class TypeOnlyConstraint(TypeConstraint):
   and easier to understand than the more complex validation allowed by `.satisfied_by()`.
   """
 
-  # TODO: make an @abstract_classproperty decorator to do this boilerplate!
-  @classproperty
-  def _variance_symbol(cls):
-    """This is propagated to the the `TypeConstraint` constructor."""
-    raise NotImplementedError('{} must implement the _variance_symbol classproperty!'
-                              .format(cls.__name__))
-
   def __init__(self, *types):
     """Creates a type constraint based on some logic to match the given types.
 
