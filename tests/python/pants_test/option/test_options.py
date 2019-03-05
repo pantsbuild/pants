@@ -13,7 +13,7 @@ from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
 
-from future.utils import text_type
+from future.utils import PY3, text_type
 
 from pants.base.deprecated import CodeRemovedError
 from pants.engine.fs import FileContent
@@ -817,7 +817,8 @@ class OptionsTest(unittest.TestCase):
       options = self._parse('./pants enum-opt --some-enum=invalid-value')
       options.for_scope('enum-opt').some_enum
     self.assertIn("""\
-ParseError: Error applying type 'SomeEnumOption' to option value 'invalid-value', for option '--some_enum' in scope 'enum-opt': type check error in class SomeEnumOption: Value 'invalid-value' must be one of: ['a-value', 'another-value'].""",
+ParseError: Error applying type 'SomeEnumOption' to option value 'invalid-value', for option '--some_enum' in scope 'enum-opt': type check error in class SomeEnumOption: Value {u}'invalid-value' must be one of: [{u}'a-value', {u}'another-value']."""
+                  .format(u='' if PY3 else 'u'),
                   str(cm.exception))
 
   def test_deprecated_option_past_removal(self):
