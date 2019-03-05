@@ -37,7 +37,7 @@ class PantsDaemonMonitor(ProcessManager):
       'PantsDaemonMonitor: pid is {} is_alive={}'.format(self._pid, self.is_alive()))
     )
 
-  def assert_started(self, timeout=6):
+  def assert_started(self, timeout=12):
     self._process = None
     self._pid = self.await_pid(timeout)
     self._check_pantsd_is_alive()
