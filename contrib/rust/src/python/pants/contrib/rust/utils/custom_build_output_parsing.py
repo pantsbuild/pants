@@ -15,6 +15,9 @@ def get_default_converter():
     'rustc-flags': lambda flags: spilt_flags(flags),
     'rustc-cfg': lambda cfg: ['--cfg', cfg],
     'rustc-env': lambda var_value: spilt_into_key_value(var_value),
+    'warning': lambda warning: warning,
+    # 'rerun-if-changed': lambda file: file,
+    # 'rerun-if-env-changed': lambda env: env,
   }
 
 
@@ -55,6 +58,7 @@ def parse_multiple_cargo_statements(cargo_statements):
     'rustc-flags': [],
     'rustc-cfg': [],
     'rustc-env': [],
+    'warning': [],
   }
 
   cargo_statements_without_prefix = list(
@@ -69,9 +73,10 @@ def parse_multiple_cargo_statements(cargo_statements):
       if in_result is not None:
         result[key].append(value)
       else:
-        print('Warn: Unsupported cargo statement: {0}'.format(key))
+        result['warning'].append(
+          '(Pants) Unsupported cargo statement: {0} - {1}'.format(key, value))
     else:
-      print('Warn: Unsupported cargo statement: {0}'.format(key_value))
+      result['warning'].append('(Pants) Unsupported cargo statement: {0}'.format(key_value))
   return result
 
 

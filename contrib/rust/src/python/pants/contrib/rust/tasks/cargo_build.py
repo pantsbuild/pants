@@ -361,6 +361,8 @@ class Build(Workspace):
       target.address.target_name] = self.parse_and_save_build_script_output(std_output,
                                                                             build_script_std_out_dir[
                                                                               1])
+    for warning in self._build_script_output[target.address.target_name]['warning']:
+      self.context.log.warn('Warning: {0}'.format(warning))
 
   def add_rust_products(self, target, pants_invocation):
     name = pants_invocation['package_name']
