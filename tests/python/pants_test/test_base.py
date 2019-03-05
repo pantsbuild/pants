@@ -8,7 +8,6 @@ import itertools
 import logging
 import os
 import unittest
-from abc import abstractmethod
 from builtins import object, open, str
 from collections import defaultdict
 from contextlib import contextmanager
@@ -51,7 +50,6 @@ class TestGenerator(object):
   """A mixin that facilitates test generation at runtime."""
 
   @classmethod
-  @abstractmethod
   def generate_tests(cls):
     """Generate tests for a given class.
 
@@ -63,6 +61,9 @@ class TestGenerator(object):
       ThingTest.generate_tests()
 
     """
+    # This would be an @abstractmethod, but making TestGenerator extend AbstractClass causes an
+    # error as it gets instantiated directly somehow in testing.
+    raise NotImplementedError()
 
   @classmethod
   def add_test(cls, method_name, method):
