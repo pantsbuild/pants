@@ -20,7 +20,7 @@ pub fn eval(python: &str) -> Result<Value, Failure> {
   with_externs(|e| (e.eval)(e.context, python.as_ptr(), python.len() as u64)).into()
 }
 
-pub fn product_type(val: &Value) -> ProductTypeId {
+pub fn product_type(val: &Value) -> TypeId {
   with_externs(|e| (e.product_type)(e.context, val as &Handle))
 }
 
@@ -368,7 +368,7 @@ unsafe impl Send for Externs {}
 
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
-pub type ProductTypeExtern = extern "C" fn(*const ExternContext, *const Handle) -> ProductTypeId;
+pub type ProductTypeExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
 
 pub type GetTypeForExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
 
@@ -492,17 +492,6 @@ pub enum GeneratorResponse {
   Break(Value),
   Get(Get),
   GetMulti(Vec<Get>),
-}
-
-///
-/// We need to make sure each type object is registered in `ExternContext#_types` in native.py by
-/// running it through an extern before wrapping it in a `TypeId`, so we codify that by wrapping it
-/// in this struct after going through a `product_type` call.
-///
-#[repr(C)]
-pub struct ProductTypeId {
-  pub hash: i64,
-  pub type_id: TypeId,
 }
 
 ///

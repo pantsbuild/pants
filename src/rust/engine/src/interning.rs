@@ -2,10 +2,12 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
-use std::hash;
+use std::hash::{self, BuildHasher, Hash, Hasher};
+
+use lazy_static::lazy_static;
 
 use crate::core::{Key, Value, FNV};
-use crate::externs::{self, Ident, ProductTypeId};
+use crate::externs::{self, Ident};
 
 ///
 /// A struct that encapsulates interning of python `Value`s as comparable `Key`s.
@@ -38,13 +40,20 @@ pub struct Interns {
   id_generator: u64,
 }
 
+lazy_static! {
+  static ref PRODUCT_TYPE_ID_HASH_BUILDER: FNV = FNV::default();
+}
+
 impl Interns {
   pub fn new() -> Interns {
     Interns::default()
   }
 
   pub fn insert_product(&mut self, v: Value) -> Key {
-    let ProductTypeId { hash, type_id } = externs::product_type(&v);
+    let type_id = externs::product_type(&v);
+    let mut hasher = PRODUCT_TYPE_ID_HASH_BUILDER.build_hasher();
+    type_id.hash(&mut hasher);
+    let hash: i64 = hasher.finish() as i64;
     let mut inserted = false;
     let id_generator = self.id_generator;
     let key = *self

@@ -276,15 +276,15 @@ class _FFISpecification(object):
     msg = bytes(self._ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
     logger.log(level, msg)
 
-  @_extern_decl('ProductTypeId', ['ExternContext*', 'Handle*'])
+  @_extern_decl('TypeId', ['ExternContext*', 'Handle*'])
   def extern_product_type(self, context_handle, val):
-    """Return a ProductTypeId for the given Handle, which must be a `type`."""
+    """Return a TypeId for the given Handle, which must be a `type`."""
     c = self._ffi.from_handle(context_handle)
     obj = self._ffi.from_handle(val[0])
     # TODO: determine if this assertion has any performance implications.
     assert isinstance(obj, type)
     tid = c.to_id(obj)
-    return (hash(tid), TypeId(tid))
+    return TypeId(tid)
 
   @_extern_decl('TypeId', ['ExternContext*', 'Handle*'])
   def extern_get_type_for(self, context_handle, val):
