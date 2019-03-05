@@ -520,7 +520,7 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
         add_rule(rule)
       else:
         raise TypeError("""\
-Unexpected rule type: {}. Rules either extend Rule or UnionRule, or are static functions decorated
+Unexpected rule type: {}. Rules either extend Rule or UnionRule, or are static functions decorated \
 with @rule.""".format(type(entry)))
 
     return cls(serializable_rules, serializable_roots, union_rules)

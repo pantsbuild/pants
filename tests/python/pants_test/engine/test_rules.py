@@ -78,8 +78,9 @@ class RuleIndexTest(unittest.TestCase):
   def test_creation_fails_with_bad_declaration_type(self):
     with self.assertRaises(TypeError) as cm:
       RuleIndex.create([A()])
-    self.assertEqual("Unexpected rule type: <class 'pants_test.engine.test_rules.A'>."
-                      " Rules either extend Rule, or are static functions decorated with @rule.",
+    self.assertEqual("""\
+Unexpected rule type: <class 'pants_test.engine.test_rules.A'>. Rules either extend Rule or \
+UnionRule, or are static functions decorated with @rule.""",
       str(cm.exception))
 
 
