@@ -464,8 +464,16 @@ Signal {signum} (SIGTERM) was raised\\. Exiting with failure\\. \\(backtrace omi
         config,
       )
 
-      time.sleep(5)
-      checker.assert_started()
+      # TODO: There is a race condition here, where if the waiter run is killed before it starts the
+      # remote client, it will display the PantsRunnerSignalHandler message, but if it is signalled
+      # after switching control to the remote client, it will display a message about being
+      # interrupted via the pailgun client (which is what we check here). This means we aren't
+      # necessarily testing that the remote client is handling signals correctly, but it does mean
+      # the test won't flake until we can figure out a better method than relying on timeouts. This
+      # 16-second sleep is longer than the timeout we wait for the process to start, and is
+      # *hopefully* long enough to have pants transition to the remote client phase.
+      time.sleep(16)
+      checker.assert_started(timeout=12)
 
       # Get all the pantsd-runner processes while they're still around.
       pantsd_runner_processes = checker.runner_process_context.current_processes()
@@ -488,13 +496,9 @@ Signal {signum} (SIGTERM) was raised\\. Exiting with failure\\. \\(backtrace omi
         # The pantsd-runner processes should be dead, and they should have exited with 1.
         self.assertFalse(proc.is_running())
 
-  def test_pantsd_control_c(self):
-    self._assert_pantsd_keyboardinterrupt_signal(signal.SIGINT)
-
-  def test_pantsd_sigquit(self):
-    # We convert a local SIGQUIT in the thin client process -> SIGINT on the remote end in
-    # RemotePantsRunner.
-    self._assert_pantsd_keyboardinterrupt_signal(signal.SIGQUIT)
+  def test_keyboardinterrupt_signals_with_pantsd(self):
+    for interrupt_signal in [signal.SIGINT, signal.SIGQUIT]:
+      self._assert_pantsd_keyboardinterrupt_signal(interrupt_signal)
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
