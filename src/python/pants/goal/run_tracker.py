@@ -388,9 +388,7 @@ class RunTracker(Subsystem):
 
   @classmethod
   def _json_dump_options(cls, stats):
-    return json.dumps(stats,
-                      ensure_ascii=True, allow_nan=False, sort_keys=True,
-                      cls=RunTrackerOptionEncoder)
+    return json.dumps(stats, cls=RunTrackerOptionEncoder)
 
   @classmethod
   def write_stats_to_json(cls, file_name, stats):
