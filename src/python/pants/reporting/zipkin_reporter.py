@@ -63,6 +63,7 @@ class ZipkinReporter(Reporter):
     self.trace_id = trace_id
     self.parent_id = parent_id
     self.sample_rate = float(sample_rate)
+    self.endpoint = endpoint
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -120,4 +121,7 @@ class ZipkinReporter(Reporter):
 
   def close(self):
     """End the report."""
-    logger.info("{}".format(self.trace_id))
+    endpoint = self.endpoint.replace("/api/v1/spans", "")
+
+    logger.info("Zipkin trace ID {}".format(self.trace_id))
+    logger.info("Zipkin trace may be located at this URL {}/traces/{}".format(endpoint, self.trace_id))
