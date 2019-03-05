@@ -6,7 +6,7 @@ use std::hash::{self, BuildHasher, Hash, Hasher};
 
 use lazy_static::lazy_static;
 
-use crate::core::{Key, Value, FNV};
+use crate::core::{Key, TypeId, Value, FNV};
 use crate::externs::{self, Ident};
 
 ///
@@ -49,11 +49,7 @@ impl Interns {
     Interns::default()
   }
 
-  pub fn insert_product(&mut self, v: Value) -> Key {
-    let type_id = externs::product_type(&v);
-    let mut hasher = PRODUCT_TYPE_ID_HASH_BUILDER.build_hasher();
-    type_id.hash(&mut hasher);
-    let hash: i64 = hasher.finish() as i64;
+  fn perform_insert(&mut self, v: Value, hash: i64, type_id: TypeId) -> Key {
     let mut inserted = false;
     let id_generator = self.id_generator;
     let key = *self
@@ -70,22 +66,17 @@ impl Interns {
     key
   }
 
+  pub fn insert_product(&mut self, v: Value) -> Key {
+    let type_id = externs::product_type(&v);
+    let mut hasher = PRODUCT_TYPE_ID_HASH_BUILDER.build_hasher();
+    type_id.hash(&mut hasher);
+    let hash: i64 = hasher.finish() as i64;
+    self.perform_insert(v, hash, type_id)
+  }
+
   pub fn insert(&mut self, v: Value) -> Key {
     let Ident { hash, type_id } = externs::identify(&v);
-    let mut inserted = false;
-    let id_generator = self.id_generator;
-    let key = *self
-      .forward
-      .entry(InternKey(hash, v.clone()))
-      .or_insert_with(|| {
-        inserted = true;
-        Key::new(id_generator, type_id)
-      });
-    if inserted {
-      self.reverse.insert(key, v);
-      self.id_generator += 1;
-    }
-    key
+    self.perform_insert(v, hash, type_id)
   }
 
   pub fn get(&self, k: &Key) -> &Value {
