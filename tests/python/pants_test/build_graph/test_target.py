@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import json
 import os.path
 from builtins import range, str
 from hashlib import sha1
@@ -19,6 +20,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.source.wrapped_globs import Globs
+from pants.util.contextutil import temporary_file
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.test_base import TestBase
 
@@ -109,6 +111,30 @@ class TargetTest(TestBase):
     init_subsystem(Target.Arguments, options)
     target = self.make_target('foo:bar', Target, foobar='barfoo')
     self.assertFalse(hasattr(target, 'foobar'))
+
+  def test_tags_applied_from_configured_json(self):
+    with temporary_file(binary_mode=False) as fp:
+      json.dump({
+        'tag_targets_mappings': {
+          'special_tag': ['foo:bar', 'path/to/target:foo', 'path/to/target'],
+          'special_tag2': ['path/to/target:target', '//base:foo']
+        }
+      }, fp)
+      fp.flush()
+
+      options = {Target.TagAssignments.options_scope: {'tag_targets_file': fp.name}}
+      init_subsystem(Target.TagAssignments, options)
+      target1 = self.make_target('foo:bar', Target, tags=['tag1', 'tag2'])
+      target2 = self.make_target('path/to/target:foo', Target, tags=['tag1'])
+      target3 = self.make_target('path/to/target', Target, tags=['tag2'])
+      target4 = self.make_target('//base:foo', Target, tags=['tag3'])
+      target5 = self.make_target('baz:qux', Target, tags=['tag3'])
+
+      self.assertEqual({'tag1', 'tag2', 'special_tag'}, target1.tags)
+      self.assertEqual({'tag1', 'special_tag'}, target2.tags)
+      self.assertEqual({'tag2', 'special_tag', 'special_tag2'}, target3.tags)
+      self.assertEqual({'tag3', 'special_tag2'}, target4.tags)
+      self.assertEqual({'tag3'}, target5.tags)
 
   def test_target_id_long(self):
     long_path = 'dummy'

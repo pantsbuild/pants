@@ -320,6 +320,7 @@ class TestBase(unittest.TestCase):
 
     self._build_configuration = self.build_config()
     self._inited_target = False
+    subsystem_util.init_subsystem(Target.TagAssignments)
 
   def buildroot_files(self, relpath=None):
     """Returns the set of all files under the test build root.
