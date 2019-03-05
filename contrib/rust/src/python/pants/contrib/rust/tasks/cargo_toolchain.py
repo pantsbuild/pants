@@ -13,15 +13,12 @@ from future.utils import PY3
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.util.dirutil import read_file
-from pants.util.process_handler import subprocess
+from pants.util.dirutil import chmod_plus_x, read_file, safe_file_dump, safe_mkdir
 
 from pants.contrib.rust.tasks.cargo_task import CargoTask
 
 
 class Toolchain(CargoTask):
-  LAST_KNOWN_FINGERPRINT = '40328ad8fa5cfc15cdb0446bb812a4bba4c22b5aee195cfb8d64b8ef1de5879c'
-
   @classmethod
   def register_options(cls, register):
     super(Toolchain, cls).register_options(register)
@@ -30,6 +27,11 @@ class Toolchain(CargoTask):
       type=str,
       default='nightly-2018-12-31',
       help='Toolchain')
+    register(
+      '--script_fingerprint',
+      type=str,
+      default='40328ad8fa5cfc15cdb0446bb812a4bba4c22b5aee195cfb8d64b8ef1de5879c',
+      help='The sha256 hash of the rustup install script.')
 
   @classmethod
   def product_types(cls):
@@ -43,27 +45,20 @@ class Toolchain(CargoTask):
     self.context.log.info('Installing rustup...')
     install_script = self.download_rustup_install_script()
     self.check_integrity_of_rustup_install_script(install_script.text)
+    install_script_dir_path, install_script_file_path = self.save_rustup_install_script(
+      install_script.text)
 
     with self.context.new_workunit(name='setup-rustup',
                                    labels=[WorkUnitLabel.BOOTSTRAP]) as workunit:
-      cmd = 'curl https://sh.rustup.rs -sSf | sh -s -- -y'  # -y Disable confirmation prompt.
-      self.run_shell_command(cmd, workunit)
+
+      cmd = [install_script_file_path, '-y']  # -y Disable confirmation prompt.
+
+      self.run_command(cmd, install_script_dir_path, {}, workunit)
 
       if workunit.outcome() != WorkUnit.SUCCESS:
         self.context.log.error(workunit.outcome_string(workunit.outcome()))
       else:
         self.context.log.info(workunit.outcome_string(workunit.outcome()))
-
-  def run_shell_command(self, command, workunit):
-    std_out = workunit.output('stdout')
-    std_err = workunit.output('stderr')
-
-    try:
-      subprocess.check_call(command, shell=True, stdout=std_out, stderr=std_err)
-    except subprocess.CalledProcessError as e:
-      workunit.set_outcome(1)
-      std_err.write('Execution failed: {0}'.format(e))
-    workunit.set_outcome(3)
 
   def download_rustup_install_script(self):
     return requests.get('https://sh.rustup.rs')
@@ -71,10 +66,19 @@ class Toolchain(CargoTask):
   def check_integrity_of_rustup_install_script(self, install_script):
     hasher = hashlib.sha256(install_script.encode('utf-8'))
     current_fingerprint = hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
-    if current_fingerprint != self.LAST_KNOWN_FINGERPRINT:
+    if current_fingerprint != self.get_options().script_fingerprint:
       raise TaskError(
         'The fingerprint of the rustup script has changed!\nLast known: {0}\ncurrent: {1}'.format(
           self.LAST_KNOWN_FINGERPRINT, current_fingerprint))
+
+  def save_rustup_install_script(self, install_script):
+    save_dir_path = os.path.join(self.versioned_workdir, 'rustup_install_script')
+    safe_mkdir(save_dir_path, clean=True)
+    save_file_path = os.path.join(save_dir_path, 'rustup.sh')
+    self.context.log.debug('Save rustup.sh in {}'.format(save_file_path))
+    safe_file_dump(save_file_path, install_script, mode='w')
+    chmod_plus_x(save_file_path)
+    return save_dir_path, save_file_path
 
   def install_rust_toolchain(self, toolchain):
     self.context.log.debug('Installing toolchain: {0}'.format(toolchain))
@@ -93,9 +97,21 @@ class Toolchain(CargoTask):
       else:
         self.context.log.debug(workunit.outcome_string(workunit.outcome()))
 
-  @staticmethod
-  def check_if_rustup_exist():
+  def check_if_rustup_exist(self):
+    # If the rustup executable can't be find via the path variable, try to find it in the default location.
+    return self.try_to_find_rustup_executable() or self.try_to_find_rustup_executable_in_default_location()
+
+  def try_to_find_rustup_executable(self):
     return distutils.spawn.find_executable('rustup') is not None
+
+  def try_to_find_rustup_executable_in_default_location(self):
+    env = os.environ.copy()
+    default_rustup_location = os.path.join(env['HOME'], '.cargo/bin', 'rustup')
+    if os.path.isfile(default_rustup_location):
+      self.context.log.debug('Found rustup in default location')
+      return True
+    else:
+      return False
 
   def setup_toolchain(self):
     toolchain = self.get_toolchain()
