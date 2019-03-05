@@ -274,7 +274,7 @@ class ExceptionSink(object):
       signal.signal(signum, handler)
       # Retry any system calls interrupted by any of the signals we just installed handlers for
       # (instead of having them raise EINTR). siginterrupt(3) says this is the default behavior on
-      # Linux.
+      # Linux and OSX.
       signal.siginterrupt(signum, False)
 
     previous_signal_handler = cls._signal_handler
