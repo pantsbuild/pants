@@ -336,7 +336,8 @@ class Build(Workspace):
 
   def create_env(self, invocation_env, target):
     env = {
-      'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
+      'PATH': (self.context.products.get_data('cargo_env')['PATH'], True),
+      'RUSTUP_TOOLCHAIN': (self.context.products.get_data('cargo_toolchain'), False)
     }
 
     env = self._add_env_vars(env, invocation_env)
