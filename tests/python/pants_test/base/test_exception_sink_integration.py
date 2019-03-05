@@ -151,10 +151,14 @@ Current thread [^\n]+ \\(most recent call first\\):
 """)
 
   def test_keyboardinterrupt_signals(self):
-    for interrupt_signal in [signal.SIGINT, signal.SIGQUIT]:
+    signal_messages = {
+      signal.SIGINT: 'User interrupted execution with control-c!',
+      signal.SIGQUIT: 'A SIGQUIT was received.',
+    }
+    for interrupt_signal, signal_msg in signal_messages.items():
       with self._send_signal_to_waiter_handle(interrupt_signal) as (workdir, waiter_run):
-        # TODO: update this to include the actual message from the KeyboardInterrupt raised!
-        self.assertIn('Interrupted by user:\n???', waiter_run.stderr_data)
+        self.assertIn('Interrupted by user:\n{}'.format(signal_msg),
+                      waiter_run.stderr_data)
 
   def _lifecycle_stub_cmdline(self):
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.

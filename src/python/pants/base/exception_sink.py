@@ -37,10 +37,12 @@ class SignalHandler(object):
   Note that the terminal will convert a ctrl-c from the user into a SIGINT.
   """
 
-  # TODO: use an enum and .resolve_for_enum_variant() when #7226 is merged!
   @property
   def signal_handler_mapping(self):
-    """???"""
+    """A dict mapping (signal number) -> (a method handling the signal)."""
+    # Could use an enum here, but we never end up doing any matching on the specific signal value,
+    # instead just iterating over the registered signals to set handlers, so a dict is probably
+    # better.
     return {
       signal.SIGINT: self.handle_sigint,
       signal.SIGQUIT: self.handle_sigquit,
@@ -315,9 +317,9 @@ pid: {pid}
   _traceback_omitted_default_text = '(backtrace omitted)'
 
   @classmethod
-  def _format_traceback(cls, tb, should_print_backtrace):
+  def _format_traceback(cls, traceback_lines, should_print_backtrace):
     if should_print_backtrace:
-      traceback_string = '\n{}'.format(''.join(traceback.format_tb(tb)))
+      traceback_string = '\n{}'.format(''.join(traceback_lines))
     else:
       traceback_string = ' {}'.format(cls._traceback_omitted_default_text)
     return traceback_string
@@ -335,7 +337,8 @@ Exception message: {exception_message}{maybe_newline}
     maybe_newline = '\n' if add_newline else ''
     return cls._UNHANDLED_EXCEPTION_LOG_FORMAT.format(
       exception_type=exception_full_name,
-      backtrace=cls._format_traceback(tb, should_print_backtrace=should_print_backtrace),
+      backtrace=cls._format_traceback(traceback_lines=traceback.format_tb(tb),
+                                      should_print_backtrace=should_print_backtrace),
       exception_message=exception_message,
       maybe_newline=maybe_newline)
 
@@ -383,16 +386,18 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 """
 
   @classmethod
-  def _handle_signal_gracefully(cls, signum, signame, frame):
+  def _handle_signal_gracefully(cls, signum, signame, _frame):
     """Signal handler for non-fatal signals which raises or logs an error and exits with failure.
+
+    The `_frame` argument is currently unused.
 
     NB: Ensure this method remains registered for all the signals supported by SignalHandler
     in reset_signal_handler()!
     """
-    tb = frame.f_exc_traceback or sys.exc_info()[2]
-
-    # Format an entry to be written to the exception log.
-    formatted_traceback = cls._format_traceback(tb, should_print_backtrace=bool(tb))
+    # Extract the stack, and format an entry to be written to the exception log.
+    traceback_lines = traceback.format_stack()
+    formatted_traceback = cls._format_traceback(traceback_lines=traceback_lines,
+                                                should_print_backtrace=True)
     signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
       signame=signame,
@@ -404,7 +409,8 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 
     # Create a potentially-abbreviated traceback for the terminal or other interactive stream.
     formatted_traceback_for_terminal = cls._format_traceback(
-      tb, should_print_backtrace=cls._should_print_backtrace_to_terminal and bool(tb))
+      traceback_lines=traceback_lines,
+      should_print_backtrace=cls._should_print_backtrace_to_terminal)
     terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
       signame=signame,

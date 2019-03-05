@@ -75,13 +75,15 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_running()
 
       # Assert there were no warnings or errors thrown in the pantsd log.
+      full_log = '\n'.join(read_pantsd_log(workdir))
       for line in read_pantsd_log(workdir):
         # Ignore deprecation warning emissions.
         if 'DeprecationWarning' in line:
           continue
 
         # Check if the line begins with W or E to check if it is a warning or error line.
-        assertNotRegex(self, line, r'^[WE].*')
+        assertNotRegex(self, line, r'^[WE].*',
+                       'error message detected in log:\n{}'.format(full_log))
 
   def test_pantsd_broken_pipe(self):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -471,7 +473,8 @@ Signal {signum} (SIGTERM) was raised\\. Exiting with failure\\. \\(backtrace omi
       os.kill(waiter_handle.process.pid, signum)
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
-      self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
+
+      self.assertIn('\nInterrupted by user over pailgun client!\n', waiter_run.stderr_data)
 
       # TODO: SIGTERM should be tested as well, but the expected behavior is a little different --
       # we should test that the pantsd-runner process exits with failure (if possible -- see the

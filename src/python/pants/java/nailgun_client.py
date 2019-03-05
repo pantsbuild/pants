@@ -7,14 +7,18 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import errno
 import logging
 import os
+import signal
 import socket
 import sys
+import time
 from builtins import object, str
 
+import psutil
 from future.utils import PY3
 
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.util.objects import enum
 from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
 from pants.util.strutil import ensure_binary
@@ -226,6 +230,33 @@ class NailgunClient(object):
     else:
       return sock
 
+  class RemoteClientStatus(enum(['before-started', 'started', 'completed'])): pass
+
+  def remote_client_status(self):
+    remote_pid = self._maybe_last_pid()
+    if remote_pid is None:
+      return self.RemoteClientStatus('before-started')
+    else:
+      if psutil.pid_exists(remote_pid):
+        return self.RemoteClientStatus.started
+      else:
+        return self.RemoteClientStatus.completed
+
+  def shutdown_gracefully(self, interval_sec=1):
+    # TODO: raise if the client hasn't started yet!
+    if self.remote_client_status() != self.RemoteClientStatus.started:
+      return
+    self.maybe_send_signal(signal.SIGINT)
+    time.sleep(interval_sec)
+    if self.remote_client_status() != self.RemoteClientStatus.started:
+      return
+    self.maybe_send_signal(signal.SIGTERM)
+    time.sleep(interval_sec)
+    self.maybe_send_signal(signal.SIGKILL)
+
+  # TODO: make all invocations of this method instead require that the process is alive via the
+  # result of .remote_client_status() before sending a signal! safe_kill() should probably be
+  # removed as well.
   def maybe_send_signal(self, signum, include_pgrp=True):
     """Send the signal `signum` send if the PID and/or PGRP chunks have been received.
 

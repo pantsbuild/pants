@@ -33,31 +33,20 @@ class PailgunClientSignalHandler(SignalHandler):
     super(PailgunClientSignalHandler, self).__init__(*args, **kwargs)
 
   def handle_sigint(self, signum, frame):
-    # Send a control-c signal to the remote process, if the session is still alive and we have
-    # already received the PID chunk.
-    self._pailgun_client.maybe_send_signal(signal.SIGINT)
-    # TODO(#7014): we should raise a KeyboardInterrupt after some timeout (or after multiple
-    # SIGINTs) -- right here is where control-c issues with the daemon are from. We delegated
-    # entirely to the pantsd-runner process's signal handling so we could let the pantsd-runner
-    # dictate what the "end" of a run was, which reduced the risk of stray pantsd-runner processes
-    # taking up tons of memory (because clients would reliably be waiting for them) at the cost of
-    # interactivity issues. The below line is commented so we don't cancel the client with our
-    # normal signal handler.
-    # super(PailgunClientSignalHandler, self).handle_sigint(signum, frame)
+    self._pailgun_client.shutdown_gracefully()
+    raise KeyboardInterrupt('Interrupted by user over pailgun client!')
 
   # N.B. SIGQUIT will abruptly kill the pantsd-runner, which will shut down the other end
   # of the Pailgun connection - so we send a gentler SIGINT here instead.
   def handle_sigquit(self, signum, frame):
-    self.handle_sigint(self, signum, frame)
+    self.handle_sigint(signum, frame)
 
   def handle_sigterm(self, signum, frame):
     # If possible, send a SIGTERM to the remote process to make it hurry up a bit more in dying if
     # possible.
-    try:
-      self._pailgun_client.maybe_send_signal(signal.SIGTERM)
-    finally:
-      # Quit the thin client.
-      super(PailgunClientSignalHandler, self).handle_sigterm(signum, frame)
+    self._pailgun_client.maybe_send_signal(signal.SIGTERM)
+    # Quit the thin client.
+    super(PailgunClientSignalHandler, self).handle_sigterm(signum, frame)
 
 
 class RemotePantsRunner(object):

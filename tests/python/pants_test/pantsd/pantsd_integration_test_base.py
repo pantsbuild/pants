@@ -37,7 +37,7 @@ class PantsDaemonMonitor(ProcessManager):
       'PantsDaemonMonitor: pid is {} is_alive={}'.format(self._pid, self.is_alive()))
     )
 
-  def assert_started(self, timeout=.1):
+  def assert_started(self, timeout=6):
     self._process = None
     self._pid = self.await_pid(timeout)
     self._check_pantsd_is_alive()
@@ -63,7 +63,7 @@ class PantsDaemonMonitor(ProcessManager):
 
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
   @contextmanager
-  def pantsd_test_context(self, log_level='info', extra_config=None, expected_runs=1):
+  def pantsd_test_context(self, log_level='info', extra_config=None):
     with no_lingering_process_by_command('pantsd-runner') as runner_process_context:
       with self.temporary_workdir() as workdir_base:
         pid_dir = os.path.join(workdir_base, '.pids')
@@ -151,7 +151,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     self.assertEqual(
         runs_created,
         expected_runs,
-        'Expected {} RunTracker run to be created per pantsd run: was {}'.format(
+        'Expected {} RunTracker run(s) to be created per pantsd run: was {}'.format(
           expected_runs,
           runs_created,
         )
