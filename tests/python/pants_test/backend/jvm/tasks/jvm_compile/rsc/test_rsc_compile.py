@@ -41,19 +41,7 @@ class RscCompileTest(TaskTestBase):
     return RscCompile
 
   def test_no_dependencies_between_scala_and_java_targets(self):
-    # Init dependencies for scala library targets.
-    init_subsystem(
-      ScalaPlatform,
-      {ScalaPlatform.options_scope: {
-      'version': 'custom',
-      'suffix_version': '2.12',
-      }}
-    )
-    self.make_target(
-      '//:scala-library',
-      target_type=JarLibrary,
-      jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
-    )
+    self.init_dependencies_for_scala_libraries()
 
     java_target = self.make_target(
       'java/classpath:java_lib',
@@ -61,7 +49,6 @@ class RscCompileTest(TaskTestBase):
       sources=['com/example/Foo.java'],
       dependencies=[]
     )
-
     scala_target = self.make_target(
       'scala/classpath:scala_lib',
       target_type=ScalaLibrary,
@@ -69,27 +56,19 @@ class RscCompileTest(TaskTestBase):
       dependencies=[]
     )
 
-    context = self.context(target_roots=[java_target])
-
-    context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
-    context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
-
-    task = self.create_task(context)
-    # tried for options, but couldn't get it to reconfig
-    task._size_estimator = lambda srcs: 0
     with temporary_dir() as tmp_dir:
-      compile_contexts = {target: task.create_compile_context(target, os.path.join(tmp_dir, target.id))
-                          for target in [java_target, scala_target]}
-
       invalid_targets = [java_target, scala_target]
+      task = self.create_task_with_target_roots(
+        target_roots=[java_target]
+      )
 
-      jobs = task._create_compile_jobs(compile_contexts,
-                                       invalid_targets,
-                                       invalid_vts=[LightWeightVTS(t) for t in invalid_targets],
-                                       classpath_product=None)
+      jobs = task._create_compile_jobs(
+        compile_contexts=self.create_compile_contexts([java_target, scala_target], task, tmp_dir),
+        invalid_targets=invalid_targets,
+        invalid_vts=self.wrap_in_vts(invalid_targets),
+        classpath_product=None)
 
-      exec_graph = ExecutionGraph(jobs, task.get_options().print_exception_stacktrace)
-      dependee_graph = exec_graph.format_dependee_graph()
+      dependee_graph = self.construct_dependee_graph_str(jobs, task)
       print(dependee_graph)
       self.assertEqual(dedent("""
                      zinc(java/classpath:java_lib) -> {}
@@ -100,19 +79,7 @@ class RscCompileTest(TaskTestBase):
         dependee_graph)
 
   def test_scala_dep_for_scala_and_java_targets(self):
-    # Init dependencies for scala library targets.
-    init_subsystem(
-      ScalaPlatform,
-      {ScalaPlatform.options_scope: {
-        'version': 'custom',
-        'suffix_version': '2.12',
-      }}
-    )
-    self.make_target(
-      '//:scala-library',
-      target_type=JarLibrary,
-      jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
-    )
+    self.init_dependencies_for_scala_libraries()
 
     scala_dep = self.make_target(
       'scala/classpath:scala_dep',
@@ -125,7 +92,6 @@ class RscCompileTest(TaskTestBase):
       sources=['com/example/Foo.java'],
       dependencies=[scala_dep]
     )
-
     scala_target = self.make_target(
       'scala/classpath:scala_lib',
       target_type=ScalaLibrary,
@@ -133,28 +99,20 @@ class RscCompileTest(TaskTestBase):
       dependencies=[scala_dep]
     )
 
-    context = self.context(target_roots=[scala_target, java_target])
-
-    context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
-    context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
-
-    task = self.create_task(context)
-    # tried for options, but couldn't get it to reconfig
-    task._size_estimator = lambda srcs: 0
     with temporary_dir() as tmp_dir:
-      compile_contexts = {target: task.create_compile_context(target, os.path.join(tmp_dir, target.id))
-        for target in [java_target, scala_target, scala_dep]}
-
       invalid_targets = [java_target, scala_target, scala_dep]
+      task = self.create_task_with_target_roots(
+        target_roots=[java_target, scala_target]
+      )
 
-      jobs = task._create_compile_jobs(compile_contexts,
-        invalid_targets,
-        invalid_vts=[LightWeightVTS(t) for t in invalid_targets],
+      jobs = task._create_compile_jobs(
+        compile_contexts=self.create_compile_contexts(invalid_targets, task, tmp_dir),
+        invalid_targets=invalid_targets,
+        invalid_vts=self.wrap_in_vts(invalid_targets),
         classpath_product=None)
 
-      exec_graph = ExecutionGraph(jobs, task.get_options().print_exception_stacktrace)
-      dependee_graph = exec_graph.format_dependee_graph()
-      print(dependee_graph)
+      dependee_graph = self.construct_dependee_graph_str(jobs, task)
+
       self.assertEqual(dedent("""
                      zinc(java/classpath:java_lib) -> {}
                      rsc(scala/classpath:scala_lib) -> {
@@ -172,19 +130,7 @@ class RscCompileTest(TaskTestBase):
         dependee_graph)
 
   def test_scala_lib_with_java_sources_not_passed_to_rsc(self):
-    # Init dependencies for scala library targets.
-    init_subsystem(
-      ScalaPlatform,
-      {ScalaPlatform.options_scope: {
-        'version': 'custom',
-        'suffix_version': '2.12',
-      }}
-    )
-    self.make_target(
-      '//:scala-library',
-      target_type=JarLibrary,
-      jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
-    )
+    self.init_dependencies_for_scala_libraries()
 
     java_target = self.make_target(
       'java/classpath:java_lib',
@@ -192,7 +138,6 @@ class RscCompileTest(TaskTestBase):
       sources=['com/example/Foo.java'],
       dependencies=[]
     )
-
     scala_target_direct_java_sources = self.make_target(
       'scala/classpath:scala_with_direct_java_sources',
       target_type=ScalaLibrary,
@@ -207,34 +152,34 @@ class RscCompileTest(TaskTestBase):
       dependencies=[]
     )
 
-    context = self.context(
-      target_roots=[scala_target_direct_java_sources, scala_target_indirect_java_sources])
-
-    context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
-    context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
-
-    task = self.create_task(context)
-    # tried for options, but couldn't get it to reconfig
-    task._size_estimator = lambda srcs: 0
     with temporary_dir() as tmp_dir:
-      invalid_targets = [java_target, scala_target_direct_java_sources, scala_target_indirect_java_sources]
-      compile_contexts = {target: task.create_compile_context(target, os.path.join(tmp_dir, target.id))
-        for target in invalid_targets}
+      invalid_targets = [
+        java_target,
+        scala_target_direct_java_sources,
+        scala_target_indirect_java_sources]
+      task = self.create_task_with_target_roots(
+        target_roots=[scala_target_indirect_java_sources, scala_target_direct_java_sources]
+      )
 
-      jobs = task._create_compile_jobs(compile_contexts,
-        invalid_targets,
+      jobs = task._create_compile_jobs(
+        compile_contexts=self.create_compile_contexts(invalid_targets, task, tmp_dir),
+        invalid_targets=invalid_targets,
         invalid_vts=[LightWeightVTS(t) for t in invalid_targets],
         classpath_product=None)
 
-      exec_graph = ExecutionGraph(jobs, task.get_options().print_exception_stacktrace)
-      dependee_graph = exec_graph.format_dependee_graph()
-      print(dependee_graph)
+      dependee_graph = self.construct_dependee_graph_str(jobs, task)
 
       self.assertEqual(dedent("""
                      zinc(java/classpath:java_lib) -> {}
                      zinc(scala/classpath:scala_with_direct_java_sources) -> {}
                      zinc(scala/classpath:scala_with_indirect_java_sources) -> {}""").strip(),
         dependee_graph)
+
+  def construct_dependee_graph_str(self, jobs, task):
+    exec_graph = ExecutionGraph(jobs, task.get_options().print_exception_stacktrace)
+    dependee_graph = exec_graph.format_dependee_graph()
+    print(dependee_graph)
+    return dependee_graph
 
   def test_desandbox_fn(self):
     # TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
@@ -253,3 +198,38 @@ class RscCompileTest(TaskTestBase):
     self.assertEqual(desandbox('/some/path/.pants.d/tmp.pants.d/cool/beans'), '.pants.d/tmp.pants.d/cool/beans')
     self.assertEqual(desandbox('/some/path/.pants.d/exec-location/.pants.d/tmp.pants.d/cool/beans'),
                                '.pants.d/tmp.pants.d/cool/beans')
+
+  def wrap_in_vts(self, invalid_targets):
+    return [LightWeightVTS(t) for t in invalid_targets]
+
+  def init_dependencies_for_scala_libraries(self):
+    init_subsystem(
+      ScalaPlatform,
+      {
+        ScalaPlatform.options_scope: {
+          'version': 'custom',
+          'suffix_version': '2.12',
+        }
+      }
+    )
+    self.make_target(
+      '//:scala-library',
+      target_type=JarLibrary,
+      jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
+    )
+
+  def create_task_with_target_roots(self, target_roots):
+    context = self.context(target_roots=target_roots)
+    self.init_products(context)
+    task = self.create_task(context)
+    # tried for options, but couldn't get it to reconfig
+    task._size_estimator = lambda srcs: 0
+    return task
+
+  def init_products(self, context):
+    context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
+    context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
+
+  def create_compile_contexts(self, invalid_targets, task, tmp_dir):
+    return {target: task.create_compile_context(target, os.path.join(tmp_dir, target.id))
+      for target in invalid_targets}
