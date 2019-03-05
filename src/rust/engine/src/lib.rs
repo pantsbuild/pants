@@ -603,8 +603,8 @@ pub extern "C" fn rule_subgraph_visualize(
   })
 }
 
-// TODO: This produces "thread panicked while processing panic. aborting." on my linux laptop,
-// requiring me to set RUST_BACKTRACE=1 (or "full") to get the panic message.
+// TODO(#4884): This produces "thread panicked while processing panic. aborting." on my linux
+// laptop, requiring me to set RUST_BACKTRACE=1 (or "full") to get the panic message.
 #[no_mangle]
 pub extern "C" fn set_panic_handler() {
   panic::set_hook(Box::new(|panic_info| {

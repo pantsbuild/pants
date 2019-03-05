@@ -296,9 +296,18 @@ class _FFISpecification(object):
 
   @_extern_decl('Ident', ['ExternContext*', 'Handle*'])
   def extern_identify(self, context_handle, val):
-    """Return a representation of the object's identity, including a hash."""
+    """Return a representation of the object's identity, including a hash and TypeId.
+
+    `extern_get_type_for()` also returns a TypeId, but doesn't hash the object -- this allows that
+    method to be used on unhashable objects. `extern_identify()` returns a TypeId as well to avoid
+    having to make two separate Python calls when interning a Python object in interning.rs, which
+    requires both the hash and type.
+    """
+    c = self._ffi.from_handle(context_handle)
     obj = self._ffi.from_handle(val[0])
-    return (hash(obj),)
+    hash_ = hash(obj)
+    type_id = c.to_id(type(obj))
+    return (hash_, TypeId(type_id))
 
   @_extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
   def extern_equals(self, context_handle, val1, val2):

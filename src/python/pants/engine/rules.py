@@ -449,12 +449,12 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
   @classmethod
   def create(cls, rule_entries, union_rules=None):
     """Creates a RuleIndex with tasks indexed by their output type."""
-    # TODO: make a defaultdict-like wrapper for OrderedDict (and other types?)!
     serializable_rules = OrderedDict()
     serializable_roots = OrderedSet()
     union_rules = OrderedDict(union_rules or ())
 
     def add_task(product_type, rule):
+      # TODO(#7311): make a defaultdict-like wrapper for OrderedDict if more widely used.
       if product_type not in serializable_rules:
         serializable_rules[product_type] = OrderedSet()
       serializable_rules[product_type].add(rule)

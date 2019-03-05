@@ -901,20 +901,14 @@ impl WrappedNode for Task {
         Err(failure) => Err(failure),
       })
       .then(move |task_result| match task_result {
-        Ok(val) => {
-          let type_id = externs::get_type_for(&val);
-          // TODO: figure out if this can/should be turned into a `match` statement!
-          if type_id == context.core.types.generator {
-            Self::generate(context, params, entry, val)
-          } else if type_id == product {
-            ok(val)
-          } else {
-            err(throw(&format!(
-              "{:?} returned a result value that did not satisfy its constraints: {:?}",
-              func, val
-            )))
-          }
-        }
+        Ok(val) => match externs::get_type_for(&val) {
+          t if t == context.core.types.generator => Self::generate(context, params, entry, val),
+          t if t == product => ok(val),
+          _ => err(throw(&format!(
+            "{:?} returned a result value that did not satisfy its constraints: {:?}",
+            func, val
+          ))),
+        },
         Err(failure) => err(failure),
       })
       .to_boxed()

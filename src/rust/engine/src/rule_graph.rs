@@ -1117,19 +1117,20 @@ fn rhs(tasks: &Tasks, params: &ParamTypes, product_type: TypeId) -> Vec<Entry> {
   }
 
   let mut entries = Vec::new();
+  // If the params can provide the type directly, add that.
   if let Some(type_id) = params.get(&product_type) {
-    // TODO: We only match the first param type here that satisfies the constraint although it's
-    // possible that multiple parameters could.
     entries.push(Entry::Param(*type_id));
   }
+  // If there are any intrinsics which can produce the desired type, add them.
   if let Some(matching_intrinsics) = tasks.gen_intrinsic(product_type) {
-    for matching_intrinsic in matching_intrinsics {
-      entries.push(Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
+    entries.extend(matching_intrinsics.iter().map(|matching_intrinsic| {
+      Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
         params: params.clone(),
         rule: Rule::Intrinsic(*matching_intrinsic),
-      })));
-    }
+      }))
+    }));
   }
+  // If there are any tasks which can produce the desired type, add those.
   if let Some(matching_tasks) = tasks.gen_tasks(product_type) {
     entries.extend(matching_tasks.iter().map(|task_rule| {
       Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {

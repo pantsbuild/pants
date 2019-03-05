@@ -231,16 +231,16 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
     PyGeneratorResponseType::GetMulti => {
       let mut interns = INTERNS.write();
       let PyGeneratorResponse {
-        values: values_buf,
         products: products_buf,
+        values: values_buf,
         ..
       } = response;
-      let values = values_buf.to_vec();
       let products = products_buf.to_vec();
-      assert_eq!(values.len(), products.len());
-      let continues: Vec<Get> = values
+      let values = values_buf.to_vec();
+      assert_eq!(products.len(), values.len());
+      let continues: Vec<Get> = products
         .into_iter()
-        .zip(products.into_iter())
+        .zip(values.into_iter())
         .map(|(p, v)| Get {
           product: *interns.insert_product(p).type_id(),
           subject: interns.insert(v),
@@ -506,11 +506,13 @@ pub struct ProductTypeId {
 }
 
 ///
-/// The result of an `identify` call, including the __hash__ of a Handle.
+/// The result of an `identify` call, including the __hash__ of a Handle and a TypeId representing
+/// the object's type.
 ///
 #[repr(C)]
 pub struct Ident {
   pub hash: i64,
+  pub type_id: TypeId,
 }
 
 ///
