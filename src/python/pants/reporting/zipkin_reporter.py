@@ -123,5 +123,4 @@ class ZipkinReporter(Reporter):
     """End the report."""
     endpoint = self.endpoint.replace("/api/v1/spans", "")
 
-    logger.info("Zipkin trace ID {}".format(self.trace_id))
-    logger.info("Zipkin trace may be located at this URL {}/traces/{}".format(endpoint, self.trace_id))
+    logger.debug("Zipkin trace may be located at this URL {}/traces/{}".format(endpoint, self.trace_id))
