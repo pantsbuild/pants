@@ -2,11 +2,9 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
-use std::hash::{self, BuildHasher, Hash, Hasher};
+use std::hash;
 
-use lazy_static::lazy_static;
-
-use crate::core::{Key, TypeId, Value, FNV};
+use crate::core::{Key, Value, FNV};
 use crate::externs::{self, Ident};
 
 ///
@@ -40,16 +38,13 @@ pub struct Interns {
   id_generator: u64,
 }
 
-lazy_static! {
-  static ref PRODUCT_TYPE_ID_HASH_BUILDER: FNV = FNV::default();
-}
-
 impl Interns {
   pub fn new() -> Interns {
     Interns::default()
   }
 
-  fn perform_insert(&mut self, v: Value, hash: i64, type_id: TypeId) -> Key {
+  pub fn insert(&mut self, v: Value) -> Key {
+    let Ident { hash, type_id } = externs::identify(&v);
     let mut inserted = false;
     let id_generator = self.id_generator;
     let key = *self
@@ -64,19 +59,6 @@ impl Interns {
       self.id_generator += 1;
     }
     key
-  }
-
-  pub fn insert_product(&mut self, v: Value) -> Key {
-    let type_id = externs::product_type(&v);
-    let mut hasher = PRODUCT_TYPE_ID_HASH_BUILDER.build_hasher();
-    type_id.hash(&mut hasher);
-    let hash: i64 = hasher.finish() as i64;
-    self.perform_insert(v, hash, type_id)
-  }
-
-  pub fn insert(&mut self, v: Value) -> Key {
-    let Ident { hash, type_id } = externs::identify(&v);
-    self.perform_insert(v, hash, type_id)
   }
 
   pub fn get(&self, k: &Key) -> &Value {

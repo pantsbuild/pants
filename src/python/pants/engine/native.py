@@ -277,16 +277,6 @@ class _FFISpecification(object):
     logger.log(level, msg)
 
   @_extern_decl('TypeId', ['ExternContext*', 'Handle*'])
-  def extern_product_type(self, context_handle, val):
-    """Return a TypeId for the given Handle, which must be a `type`."""
-    c = self._ffi.from_handle(context_handle)
-    obj = self._ffi.from_handle(val[0])
-    # TODO: determine if this assertion has any performance implications.
-    assert isinstance(obj, type)
-    tid = c.to_id(obj)
-    return TypeId(tid)
-
-  @_extern_decl('TypeId', ['ExternContext*', 'Handle*'])
   def extern_get_type_for(self, context_handle, val):
     """Return a representation of the object's type."""
     c = self._ffi.from_handle(context_handle)
@@ -457,7 +447,7 @@ class _FFISpecification(object):
     return (
         tag,
         c.vals_buf([c.to_value(v) for v in values]),
-        c.vals_buf([c.to_value(v) for v in products])
+        c.type_ids_buf([TypeId(c.to_id(t)) for t in products])
       )
 
   @_extern_decl('PyResult', ['ExternContext*', 'Handle*', 'Handle**', 'uint64_t'])
@@ -633,7 +623,6 @@ class Native(Singleton):
                            self.ffi_lib.extern_call,
                            self.ffi_lib.extern_generator_send,
                            self.ffi_lib.extern_eval,
-                           self.ffi_lib.extern_product_type,
                            self.ffi_lib.extern_get_type_for,
                            self.ffi_lib.extern_identify,
                            self.ffi_lib.extern_equals,
