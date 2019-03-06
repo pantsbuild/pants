@@ -208,6 +208,11 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
   .into()
 }
 
+///
+/// TODO: If we added support for inserting to the `Interns` using an `Ident`, `PyGeneratorResponse`
+/// could directly return `Idents` during `Get` calls. This would also require splitting its fields
+/// further to avoid needing to "identify" the result of a `PyGeneratorResponseType::Break`.
+///
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
   let response =
     with_externs(|e| (e.generator_send)(e.context, generator as &Handle, arg as &Handle));
@@ -522,7 +527,11 @@ impl HandleBuffer {
     })
   }
 
+  ///
   /// Asserts that the HandleBuffer contains one value, and returns it.
+  ///
+  /// NB: Consider making generic and merging with TypeIdBuffer if we get a third copy.
+  ///
   pub fn unwrap_one(&self) -> Value {
     assert!(
       self.handles_len == 1,
@@ -549,7 +558,11 @@ impl TypeIdBuffer {
     with_vec(self.ids_ptr, self.ids_len as usize, |vec| vec.clone())
   }
 
+  ///
   /// Asserts that the TypeIdBuffer contains one TypeId, and returns it.
+  ///
+  /// NB: Consider making generic and merging with HandleBuffer if we get a third copy.
+  ///
   pub fn unwrap_one(&self) -> TypeId {
     assert!(
       self.ids_len == 1,
