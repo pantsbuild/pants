@@ -232,8 +232,7 @@ def _get_starting_indent(source):
 def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
-  :param Constraint output_type: The return/output type for the Rule. This may be either a
-    concrete Python type, or an instance of `Exactly` representing a union of multiple types.
+  :param type output_type: The return/output type for the Rule. This must be a concrete Python type.
   :param list input_selectors: A list of Selector instances that matches the number of arguments
     to the @decorated function.
   :param str for_goal: If this is a @console_rule, which goal string it's called for.
@@ -348,8 +347,8 @@ def union(cls):
 
 
 class UnionRule(datatype([
-    ('union_base', type),
-    ('union_member', type),
+    ('union_base', _type_field),
+    ('union_member', _type_field),
 ])):
   """Specify that an instance of `union_member` can be substituted wherever `union_base` is used."""
 
@@ -487,8 +486,8 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
         add_rule(rule)
       else:
         raise TypeError("""\
-Unexpected rule type: {}. Rules either extend Rule or UnionRule, or are static functions decorated \
-with @rule.""".format(type(entry)))
+Rule entry {} had an unexpected type: {}. Rules either extend Rule or UnionRule, or are static \
+functions decorated with @rule.""".format(entry, type(entry)))
 
     return cls(serializable_rules, serializable_roots, union_rules)
 
