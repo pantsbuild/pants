@@ -123,8 +123,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A))
-        Computing Task(nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A), true)
+      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
+        Computing Task(nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
           Throw(An exception for B)
             Traceback (most recent call last):
               File LOCATION-INFO, in call
@@ -175,9 +175,9 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A))
-        Computing Task(a_from_c_and_d, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A), true)
-          Computing Task(d_from_b_nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
+      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
+        Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
+          Computing Task(d_from_b_nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
@@ -189,9 +189,9 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
               Exception: An exception for B
 
 
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A))
-        Computing Task(a_from_c_and_d, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, Exactly(A), true)
-          Computing Task(c_from_b_nested_raise, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
+      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
+        Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
+          Computing Task(c_from_b_nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
@@ -227,7 +227,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent('''
       Rules with errors: 1
-        (MyFloat, [Select(MyInt)], upcast):
+        (MyFloat, [Select(MyInt)], upcast()):
           No rule was available to compute MyInt. Maybe declare it as a RootRule(MyInt)?
         ''').strip(),
       str(cm.exception)

@@ -14,7 +14,7 @@ use futures::Stream;
 use url::Url;
 
 use crate::context::{Context, Core};
-use crate::core::{throw, Failure, Key, Params, TypeConstraint, Value};
+use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
 use crate::rule_graph;
 use crate::selectors;
@@ -93,12 +93,12 @@ pub trait WrappedNode: Into<NodeKey> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
   pub params: Params,
-  pub product: TypeConstraint,
+  pub product: TypeId,
   entry: rule_graph::Entry,
 }
 
 impl Select {
-  pub fn new(mut params: Params, product: TypeConstraint, entry: rule_graph::Entry) -> Select {
+  pub fn new(mut params: Params, product: TypeId, entry: rule_graph::Entry) -> Select {
     params.retain(|k| match &entry {
       &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
       &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
@@ -111,11 +111,7 @@ impl Select {
     }
   }
 
-  pub fn new_from_edges(
-    params: Params,
-    product: TypeConstraint,
-    edges: &rule_graph::RuleEdges,
-  ) -> Select {
+  pub fn new_from_edges(params: Params, product: TypeId, edges: &rule_graph::RuleEdges) -> Select {
     let select_key = rule_graph::SelectKey::JustSelect(selectors::Select::new(product));
     // TODO: Is it worth propagating an error here?
     let entry = edges
@@ -128,7 +124,7 @@ impl Select {
   fn select_product(
     &self,
     context: &Context,
-    product: TypeConstraint,
+    product: TypeId,
     caller_description: &str,
   ) -> NodeFuture<Value> {
     let edges = context
@@ -138,8 +134,7 @@ impl Select {
       .ok_or_else(|| {
         throw(&format!(
           "Tried to select product {} for {} but found no edges",
-          externs::key_to_str(&product.0),
-          caller_description
+          product, caller_description
         ))
       });
     let context = context.clone();
@@ -786,7 +781,7 @@ impl From<DownloadedFile> for NodeKey {
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Task {
   params: Params,
-  product: TypeConstraint,
+  product: TypeId,
   task: tasks::Task,
   entry: Arc<rule_graph::Entry>,
 }
@@ -871,10 +866,7 @@ impl fmt::Debug for Task {
     write!(
       f,
       "Task({}, {}, {}, {})",
-      externs::project_str(&externs::val_for(&self.task.func.0), "__name__"),
-      self.params,
-      externs::key_to_str(&self.product.0),
-      self.task.cacheable,
+      self.task.func, self.params, self.product, self.task.cacheable,
     )
   }
 }
@@ -909,18 +901,14 @@ impl WrappedNode for Task {
         Err(failure) => Err(failure),
       })
       .then(move |task_result| match task_result {
-        Ok(val) => {
-          if externs::satisfied_by(&context.core.types.generator, &val) {
-            Self::generate(context, params, entry, val)
-          } else if externs::satisfied_by(&product, &val) {
-            ok(val)
-          } else {
-            err(throw(&format!(
-              "{:?} returned a result value that did not satisfy its constraints: {:?}",
-              func, val
-            )))
-          }
-        }
+        Ok(val) => match externs::get_type_for(&val) {
+          t if t == context.core.types.generator => Self::generate(context, params, entry, val),
+          t if t == product => ok(val),
+          _ => err(throw(&format!(
+            "{:?} returned a result value that did not satisfy its constraints: {:?}",
+            func, val
+          ))),
+        },
         Err(failure) => err(failure),
       })
       .to_boxed()
@@ -1013,14 +1001,11 @@ pub enum NodeKey {
 
 impl NodeKey {
   fn product_str(&self) -> String {
-    fn typstr(tc: &TypeConstraint) -> String {
-      externs::key_to_str(&tc.0)
-    }
     match self {
       &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
-      &NodeKey::Select(ref s) => typstr(&s.product),
-      &NodeKey::Task(ref s) => typstr(&s.product),
+      &NodeKey::Select(ref s) => format!("{}", s.product),
+      &NodeKey::Task(ref s) => format!("{}", s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
       &NodeKey::DigestFile(..) => "DigestFile".to_string(),
       &NodeKey::ReadLink(..) => "LinkDest".to_string(),
@@ -1095,14 +1080,9 @@ impl Display for NodeKey {
       &NodeKey::ExecuteProcess(ref s) => write!(f, "ExecuteProcess({:?}", s.0),
       &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
-      &NodeKey::Select(ref s) => write!(
-        f,
-        "Select({}, {})",
-        s.params,
-        externs::key_to_str(&s.product.0)
-      ),
+      &NodeKey::Select(ref s) => write!(f, "Select({}, {})", s.params, s.product,),
       &NodeKey::Task(ref s) => write!(f, "{:?}", s),
-      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", externs::key_to_str(&s.0)),
+      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", format!("{}", &s.0)),
     }
   }
 }

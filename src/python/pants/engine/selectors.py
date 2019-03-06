@@ -6,28 +6,17 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import ast
 
-from pants.util.objects import Exactly, TypeConstraint, datatype
+from pants.util.objects import SubclassesOf, TypeConstraint, datatype
 
 
-def type_or_constraint_repr(constraint):
-  """Generate correct repr for types and TypeConstraints"""
-  if isinstance(constraint, type):
-    return constraint.__name__
-  elif isinstance(constraint, Exactly):
-    return repr(constraint)
+_type_field = SubclassesOf(type)
 
 
-def constraint_for(type_or_constraint):
-  """Given a type or an `Exactly` constraint, returns an `Exactly` constraint."""
-  if isinstance(type_or_constraint, Exactly):
-    return type_or_constraint
-  elif isinstance(type_or_constraint, type):
-    return Exactly(type_or_constraint)
-  else:
-    raise TypeError("Expected a type or constraint: got: {}".format(type_or_constraint))
-
-
-class Get(datatype(['product', 'subject_declared_type', 'subject'])):
+class Get(datatype([
+    ('product', _type_field),
+    ('subject_declared_type', _type_field),
+    'subject',
+])):
   """Experimental synchronous generator API.
 
   May be called equivalently as either:
@@ -115,22 +104,16 @@ class Params(datatype([('params', tuple)])):
     return super(Params, cls).__new__(cls, tuple(args))
 
 
-class Select(datatype(['product', 'optional'])):
+class Select(datatype([('product', _type_field), ('optional', bool)])):
   """Selects the given Product for the Subject provided to the constructor.
 
   If optional=True and no matching product can be produced, will return None.
   """
 
   def __new__(cls, product, optional=False):
-    obj = super(Select, cls).__new__(cls, product, optional)
-    return obj
-
-  @property
-  def type_constraint(self):
-    """The type constraint for the product type for this selector."""
-    return constraint_for(self.product)
+    return super(Select, cls).__new__(cls, product, optional)
 
   def __repr__(self):
     return '{}({}{})'.format(type(self).__name__,
-                             type_or_constraint_repr(self.product),
+                             self.product.__name__,
                              ', optional=True' if self.optional else '')

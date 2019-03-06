@@ -19,7 +19,7 @@ import pkg_resources
 from future.utils import PY2, binary_type, text_type
 from twitter.common.collections.orderedset import OrderedSet
 
-from pants.engine.selectors import Get, constraint_for
+from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
 from pants.util.memo import memoized_classproperty, memoized_property
@@ -276,9 +276,33 @@ class _FFISpecification(object):
     msg = bytes(self._ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
     logger.log(level, msg)
 
+  @_extern_decl('TypeId', ['ExternContext*', 'Handle*'])
+  def extern_product_type(self, context_handle, val):
+    """Return a TypeId for the given Handle, which must be a `type`."""
+    c = self._ffi.from_handle(context_handle)
+    obj = self._ffi.from_handle(val[0])
+    # TODO: determine if this assertion has any performance implications.
+    assert isinstance(obj, type)
+    tid = c.to_id(obj)
+    return TypeId(tid)
+
+  @_extern_decl('TypeId', ['ExternContext*', 'Handle*'])
+  def extern_get_type_for(self, context_handle, val):
+    """Return a representation of the object's type."""
+    c = self._ffi.from_handle(context_handle)
+    obj = self._ffi.from_handle(val[0])
+    type_id = c.to_id(type(obj))
+    return TypeId(type_id)
+
   @_extern_decl('Ident', ['ExternContext*', 'Handle*'])
   def extern_identify(self, context_handle, val):
-    """Return an Ident containing the __hash__ and TypeId for the given Handle."""
+    """Return a representation of the object's identity, including a hash and TypeId.
+
+    `extern_get_type_for()` also returns a TypeId, but doesn't hash the object -- this allows that
+    method to be used on unhashable objects. `extern_identify()` returns a TypeId as well to avoid
+    having to make two separate Python calls when interning a Python object in interning.rs, which
+    requires both the hash and type.
+    """
     c = self._ffi.from_handle(context_handle)
     obj = self._ffi.from_handle(val[0])
     hash_ = hash(obj)
@@ -317,19 +341,6 @@ class _FFISpecification(object):
     # Consistently use the empty string to indicate None.
     v_str = '' if v is None else text_type(v)
     return c.utf8_buf(v_str)
-
-  @_extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
-  def extern_satisfied_by(self, context_handle, constraint_val, val):
-    """Given a TypeConstraint and a Handle return constraint.satisfied_by(value)."""
-    constraint = self._ffi.from_handle(constraint_val[0])
-    return constraint.satisfied_by(self._ffi.from_handle(val[0]))
-
-  @_extern_decl('_Bool', ['ExternContext*', 'Handle*', 'TypeId*'])
-  def extern_satisfied_by_type(self, context_handle, constraint_val, cls_id):
-    """Given a TypeConstraint and a TypeId, return constraint.satisfied_by_type(type_id)."""
-    c = self._ffi.from_handle(context_handle)
-    constraint = self._ffi.from_handle(constraint_val[0])
-    return constraint.satisfied_by_type(c.from_id(cls_id.tup_0))
 
   @_extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
   def extern_store_tuple(self, context_handle, vals_ptr, vals_len):
@@ -423,12 +434,12 @@ class _FFISpecification(object):
       if isinstance(res, Get):
         # Get.
         values = [res.subject]
-        products = [constraint_for(res.product)]
+        products = [res.product]
         tag = 2
       elif type(res) in (tuple, list):
         # GetMulti.
         values = [g.subject for g in res]
-        products = [constraint_for(g.product) for g in res]
+        products = [g.product for g in res]
         tag = 3
       else:
         # Break.
@@ -446,7 +457,7 @@ class _FFISpecification(object):
     return (
         tag,
         c.vals_buf([c.to_value(v) for v in values]),
-        c.vals_buf([c.to_value(v) for v in products]),
+        c.vals_buf([c.to_value(v) for v in products])
       )
 
   @_extern_decl('PyResult', ['ExternContext*', 'Handle*', 'Handle**', 'uint64_t'])
@@ -469,10 +480,6 @@ class Key(datatype(['tup_0', 'type_id'])):
 
 
 class Function(datatype(['key'])):
-  """Corresponds to the native object of the same name."""
-
-
-class TypeConstraint(datatype(['key'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -626,14 +633,14 @@ class Native(Singleton):
                            self.ffi_lib.extern_call,
                            self.ffi_lib.extern_generator_send,
                            self.ffi_lib.extern_eval,
+                           self.ffi_lib.extern_product_type,
+                           self.ffi_lib.extern_get_type_for,
                            self.ffi_lib.extern_identify,
                            self.ffi_lib.extern_equals,
                            self.ffi_lib.extern_clone_val,
                            self.ffi_lib.extern_drop_handles,
                            self.ffi_lib.extern_type_to_str,
                            self.ffi_lib.extern_val_to_str,
-                           self.ffi_lib.extern_satisfied_by,
-                           self.ffi_lib.extern_satisfied_by_type,
                            self.ffi_lib.extern_store_tuple,
                            self.ffi_lib.extern_store_set,
                            self.ffi_lib.extern_store_dict,
@@ -644,8 +651,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_store_bool,
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,
-                           self.ffi_lib.extern_create_exception,
-                           TypeId(context.to_id(str)))
+                           self.ffi_lib.extern_create_exception)
       return context
 
     return self.ffi.init_once(init_externs, 'ExternContext singleton')
@@ -704,25 +710,25 @@ class Native(Singleton):
                     construct_file_content,
                     construct_files_content,
                     construct_process_result,
-                    constraint_address,
-                    constraint_path_globs,
-                    constraint_directory_digest,
-                    constraint_snapshot,
-                    constraint_merge_snapshots_request,
-                    constraint_files_content,
-                    constraint_dir,
-                    constraint_file,
-                    constraint_link,
-                    constraint_process_request,
-                    constraint_process_result,
-                    constraint_generator,
-                    constraint_url_to_fetch):
+                    type_address,
+                    type_path_globs,
+                    type_directory_digest,
+                    type_snapshot,
+                    type_merge_snapshots_request,
+                    type_files_content,
+                    type_dir,
+                    type_file,
+                    type_link,
+                    type_process_request,
+                    type_process_result,
+                    type_generator,
+                    type_url_to_fetch):
     """Create and return an ExternContext and native Scheduler."""
 
-    def func(constraint):
-      return Function(self.context.to_key(constraint))
-    def tc(constraint):
-      return TypeConstraint(self.context.to_key(constraint))
+    def func(fn):
+      return Function(self.context.to_key(fn))
+    def ti(type_obj):
+      return TypeId(self.context.to_id(type_obj))
 
     scheduler = self.lib.scheduler_create(
         tasks,
@@ -732,23 +738,22 @@ class Native(Singleton):
         func(construct_file_content),
         func(construct_files_content),
         func(construct_process_result),
-        # TypeConstraints.
-        tc(constraint_address),
-        tc(constraint_path_globs),
-        tc(constraint_directory_digest),
-        tc(constraint_snapshot),
-        tc(constraint_merge_snapshots_request),
-        tc(constraint_files_content),
-        tc(constraint_dir),
-        tc(constraint_file),
-        tc(constraint_link),
-        tc(constraint_process_request),
-        tc(constraint_process_result),
-        tc(constraint_generator),
-        tc(constraint_url_to_fetch),
         # Types.
-        TypeId(self.context.to_id(text_type)),
-        TypeId(self.context.to_id(binary_type)),
+        ti(type_address),
+        ti(type_path_globs),
+        ti(type_directory_digest),
+        ti(type_snapshot),
+        ti(type_merge_snapshots_request),
+        ti(type_files_content),
+        ti(type_dir),
+        ti(type_file),
+        ti(type_link),
+        ti(type_process_request),
+        ti(type_process_result),
+        ti(type_generator),
+        ti(type_url_to_fetch),
+        ti(text_type),
+        ti(binary_type),
         # Project tree.
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(work_dir),

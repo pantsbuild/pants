@@ -8,7 +8,7 @@ use std::os::raw;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::string::FromUtf8Error;
 
-use crate::core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
+use crate::core::{Failure, Function, Key, TypeId, Value};
 use crate::handles::{DroppingHandle, Handle};
 use crate::interning::Interns;
 use lazy_static::lazy_static;
@@ -18,6 +18,14 @@ use parking_lot::RwLock;
 
 pub fn eval(python: &str) -> Result<Value, Failure> {
   with_externs(|e| (e.eval)(e.context, python.as_ptr(), python.len() as u64)).into()
+}
+
+pub fn product_type(val: &Value) -> TypeId {
+  with_externs(|e| (e.product_type)(e.context, val as &Handle))
+}
+
+pub fn get_type_for(val: &Value) -> TypeId {
+  with_externs(|e| (e.get_type_for)(e.context, val as &Handle))
 }
 
 pub fn identify(val: &Value) -> Ident {
@@ -44,22 +52,6 @@ pub fn clone_val(handle: &Handle) -> Handle {
 
 pub fn drop_handles(handles: &[DroppingHandle]) {
   with_externs(|e| (e.drop_handles)(e.context, handles.as_ptr(), handles.len() as u64))
-}
-
-pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
-  let interns = INTERNS.read();
-  with_externs(|e| {
-    (e.satisfied_by)(
-      e.context,
-      interns.get(&constraint.0) as &Handle,
-      obj as &Handle,
-    )
-  })
-}
-
-pub fn satisfied_by_type(constraint: &TypeConstraint, cls: TypeId) -> bool {
-  let interns = INTERNS.read();
-  with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0) as &Handle, &cls))
 }
 
 pub fn store_tuple(values: &[Value]) -> Value {
@@ -201,6 +193,8 @@ pub fn create_exception(msg: &str) -> Value {
   with_externs(|e| (e.create_exception)(e.context, msg.as_ptr(), msg.len() as u64).into())
 }
 
+// TODO: This method is currently unused, but kept as an example of how to call methods on objects.
+#[allow(dead_code)]
 pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value, Failure> {
   call(&project_ignoring_type(&value, method), args)
 }
@@ -226,27 +220,30 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
     PyGeneratorResponseType::Throw => Err(PyResult::failure_from(response.values.unwrap_one())),
     PyGeneratorResponseType::Get => {
       let mut interns = INTERNS.write();
-      let product = TypeConstraint(interns.insert(response.products.unwrap_one()));
-      let subject = interns.insert(response.values.unwrap_one());
-      Ok(GeneratorResponse::Get(Get { product, subject }))
+      let p = response.products.unwrap_one();
+      let v = response.values.unwrap_one();
+      let g = Get {
+        product: *interns.insert_product(p).type_id(),
+        subject: interns.insert(v),
+      };
+      Ok(GeneratorResponse::Get(g))
     }
     PyGeneratorResponseType::GetMulti => {
       let mut interns = INTERNS.write();
       let PyGeneratorResponse {
-        values: values_buf,
         products: products_buf,
+        values: values_buf,
         ..
       } = response;
-      let values = values_buf.to_vec();
       let products = products_buf.to_vec();
-      assert_eq!(values.len(), products.len());
-      let continues: Vec<Get> = values
+      let values = values_buf.to_vec();
+      assert_eq!(products.len(), values.len());
+      let continues: Vec<Get> = products
         .into_iter()
-        .zip(products.into_iter())
-        .map(|(val, prod)| {
-          let subject = interns.insert(val);
-          let product = TypeConstraint(interns.insert(prod));
-          Get { subject, product }
+        .zip(values.into_iter())
+        .map(|(p, v)| Get {
+          product: *interns.insert_product(p).type_id(),
+          subject: interns.insert(v),
         })
         .collect();
       Ok(GeneratorResponse::GetMulti(continues))
@@ -344,12 +341,12 @@ pub struct Externs {
   pub call: CallExtern,
   pub generator_send: GeneratorSendExtern,
   pub eval: EvalExtern,
+  pub product_type: ProductTypeExtern,
+  pub get_type_for: GetTypeForExtern,
   pub identify: IdentifyExtern,
   pub equals: EqualsExtern,
   pub clone_val: CloneValExtern,
   pub drop_handles: DropHandlesExtern,
-  pub satisfied_by: SatisfiedByExtern,
-  pub satisfied_by_type: SatisfiedByTypeExtern,
   pub store_tuple: StoreTupleExtern,
   pub store_set: StoreTupleExtern,
   pub store_dict: StoreTupleExtern,
@@ -363,8 +360,6 @@ pub struct Externs {
   pub type_to_str: TypeToStrExtern,
   pub val_to_str: ValToStrExtern,
   pub create_exception: CreateExceptionExtern,
-  // TODO: This type is also declared on `types::Types`.
-  pub py_str_type: TypeId,
 }
 
 // The pointer to the context is safe for sharing between threads.
@@ -373,11 +368,9 @@ unsafe impl Send for Externs {}
 
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
-pub type SatisfiedByExtern =
-  extern "C" fn(*const ExternContext, *const Handle, *const Handle) -> bool;
+pub type ProductTypeExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
 
-pub type SatisfiedByTypeExtern =
-  extern "C" fn(*const ExternContext, *const Handle, *const TypeId) -> bool;
+pub type GetTypeForExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
 
 pub type IdentifyExtern = extern "C" fn(*const ExternContext, *const Handle) -> Ident;
 
@@ -471,6 +464,8 @@ impl From<Result<(), String>> for PyResult {
 }
 
 // Only constructed from the python side.
+// TODO: map this into a C enum with cbindgen and consume from python instead of using magic numbers
+// in extern_generator_send() in native.py!
 #[allow(dead_code)]
 #[repr(u8)]
 pub enum PyGeneratorResponseType {
@@ -489,8 +484,7 @@ pub struct PyGeneratorResponse {
 
 #[derive(Debug)]
 pub struct Get {
-  // TODO(#7114): convert all of these into `TypeId`s!
-  pub product: TypeConstraint,
+  pub product: TypeId,
   pub subject: Key,
 }
 
@@ -501,7 +495,8 @@ pub enum GeneratorResponse {
 }
 
 ///
-/// The result of an `identify` call, including the __hash__ of a Handle and its TypeId.
+/// The result of an `identify` call, including the __hash__ of a Handle and a TypeId representing
+/// the object's type.
 ///
 #[repr(C)]
 pub struct Ident {
