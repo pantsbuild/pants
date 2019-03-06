@@ -28,6 +28,7 @@ use fs::{
 use hashing;
 use process_execution::{self, CommandRunner};
 
+use crate::scheduler::WorkUnit;
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
@@ -1039,6 +1040,11 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
+    let start_timestamp = std::time::SystemTime::now()
+      .duration_since(std::time::SystemTime::UNIX_EPOCH)
+      .unwrap()
+      .as_secs() as f64;
+    let context2 = context.clone();
     match self {
       NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::DownloadedFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
@@ -1049,6 +1055,20 @@ impl Node for NodeKey {
       NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
     }
+    .inspect(move |_: &NodeResult| {
+      let end_timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as f64;
+      let workunit = WorkUnit {
+        name: "Node".to_string(),
+        start_timestamp: start_timestamp,
+        end_timestamp: end_timestamp,
+        span_id: "aaaaaaaaaaaaaaaa".to_string(),
+      };
+      context2.session.add_workunit(workunit);
+    })
+    .to_boxed()
   }
 
   fn digest(res: NodeResult) -> Option<hashing::Digest> {
