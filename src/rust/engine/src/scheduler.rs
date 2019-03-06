@@ -26,7 +26,7 @@ use ui::EngineDisplay;
 /// Both Scheduler and Session are exposed to python and expected to be used by multiple threads, so
 /// they use internal mutability in order to avoid exposing locks to callers.
 ///
-pub struct Session {
+struct InnerSession {
   // The total size of the graph at Session-creation time.
   preceding_graph_size: usize,
   // The set of roots that have been requested within this session.
@@ -34,8 +34,11 @@ pub struct Session {
   // If enabled, the display that will render the progress of the V2 engine.
   display: Option<Mutex<EngineDisplay>>,
   // A place to store info about workunits in rust part
-  pub workunits: Arc<Mutex<Vec<WorkUnit>>>,
+  workunits: Mutex<Vec<WorkUnit>>,
 }
+
+#[derive(Clone)]
+pub struct Session(Arc<InnerSession>);
 
 pub struct WorkUnit {
   pub name: String,
@@ -45,23 +48,45 @@ pub struct WorkUnit {
 }
 
 impl Session {
-  pub fn new(scheduler: &Scheduler, should_render_ui: bool, ui_worker_count: usize) -> Session {
-    Session {
+  pub fn new(
+    scheduler: &Scheduler,
+    _should_record_zipkin_spans: bool,
+    should_render_ui: bool,
+    ui_worker_count: usize,
+  ) -> Session {
+    let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
       display: EngineDisplay::create(ui_worker_count, should_render_ui).map(Mutex::new),
-      workunits: Arc::new(Mutex::new(Vec::new()))
-    }
+      workunits: Mutex::new(Vec::new()),
+    };
+    Session(Arc::new(inner_session))
   }
 
   fn extend(&self, new_roots: &[Root]) {
-    let mut roots = self.roots.lock();
+    let mut roots = self.0.roots.lock();
     roots.extend(new_roots.iter().cloned());
   }
 
   fn root_nodes(&self) -> Vec<NodeKey> {
-    let roots = self.roots.lock();
+    let roots = self.0.roots.lock();
     roots.iter().map(|r| r.clone().into()).collect()
+  }
+
+  pub fn preceding_graph_size(&self) -> usize {
+    self.0.preceding_graph_size
+  }
+
+  pub fn display(&self) -> &Option<Mutex<EngineDisplay>> {
+    &self.0.display
+  }
+
+  pub fn get_workunits(&self) -> &Mutex<Vec<WorkUnit>> {
+    &self.0.workunits
+  }
+
+  pub fn add_workunit(&self, workunit: WorkUnit) {
+    self.0.workunits.lock().push(workunit);
   }
 }
 
@@ -178,7 +203,10 @@ impl Scheduler {
         .graph
         .reachable_digest_count(&session.root_nodes()) as i64,
     );
-    m.insert("preceding_graph_size", session.preceding_graph_size as i64);
+    m.insert(
+      "preceding_graph_size",
+      session.preceding_graph_size() as i64,
+    );
     m.insert("resulting_graph_size", self.core.graph.len() as i64);
     m
   }
@@ -258,6 +286,7 @@ impl Scheduler {
     // individual Future in the join was (eventually) mapped into success.
     let context = RootContext {
       core: self.core.clone(),
+      session: session.clone(),
     };
     let (sender, receiver) = mpsc::channel();
 
@@ -270,7 +299,7 @@ impl Scheduler {
       .collect();
 
     // Lock the display for the remainder of the execution, and grab a reference to it.
-    let mut maybe_display = match &session.display {
+    let mut maybe_display = match &session.display() {
       &Some(ref d) => Some(d.lock()),
       &None => None,
     };
@@ -353,13 +382,14 @@ pub type RootResult = Result<Value, Failure>;
 #[derive(Clone)]
 struct RootContext {
   core: Arc<Core>,
+  session: Session,
 }
 
 impl NodeContext for RootContext {
   type Node = NodeKey;
 
   fn clone_for(&self, entry_id: EntryId) -> Context {
-    Context::new(entry_id, self.core.clone())
+    Context::new(entry_id, self.core.clone(), self.session.clone())
   }
 
   fn graph(&self) -> &Graph<NodeKey> {

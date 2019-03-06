@@ -97,6 +97,7 @@ class ZipkinReporter(Reporter):
           sample_rate=self.sample_rate, # Value between 0.0 and 100.0
         )
         self.trace_id = zipkin_attrs.trace_id
+        self.parent_id = zipkin_attrs.span_id # temporary code
 
       span = zipkin_span(
         service_name=service_name,
@@ -146,8 +147,10 @@ class ZipkinReporter(Reporter):
       )
       span.zipkin_attrs = ZipkinAttrs(
         trace_id=self.trace_id,
-        span_id=workunit['span_id'],
-        parent_span_id=workunit.get("parent_id", None),
+        span_id=generate_random_64bit_string(),
+        # span_id=workunit['span_id'],
+        parent_span_id=workunit.get("parent_id", self.parent_id), # TODO change it when we properly pass parent id
+        # parent_span_id=workunit.get("parent_id", None),
         flags='0', # flags: stores flags header. Currently unused
         is_sampled=True,
       )

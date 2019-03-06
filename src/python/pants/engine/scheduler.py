@@ -354,9 +354,11 @@ class Scheduler(object):
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
 
-  def new_session(self, v2_ui=False):
+  def new_session(self, zipkin_trace_v2, v2_ui=False):
     """Creates a new SchedulerSession for this Scheduler."""
-    return SchedulerSession(self, self._native.new_session(self._scheduler, v2_ui, multiprocessing.cpu_count()))
+    return SchedulerSession(self, self._native.new_session(
+      self._scheduler, zipkin_trace_v2, v2_ui, multiprocessing.cpu_count())
+    )
 
 
 _PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
