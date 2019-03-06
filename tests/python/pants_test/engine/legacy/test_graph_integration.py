@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import unittest
 
 from future.utils import PY2
 
@@ -146,6 +147,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     self.assert_failure(pants_run)
     self.assertIn("does not match any targets.", pants_run.stderr_data)
 
+  @unittest.skip('Flaky: https://github.com/pantsbuild/pants/issues/6787')
   def test_error_message(self):
     for k in self._ERR_TARGETS:
       self._list_target_check_error(k)
