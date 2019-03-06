@@ -31,6 +31,7 @@ from pants.engine.legacy.structs import (AppAdaptor, JvmBinaryAdaptor, PageAdapt
                                          PantsPluginAdaptor, PythonBinaryAdaptor,
                                          PythonTargetAdaptor, PythonTestsAdaptor,
                                          RemoteSourcesAdaptor, TargetAdaptor)
+from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import RootRule, SingletonRule
@@ -357,6 +358,7 @@ class EngineInitializer(object):
       create_process_rules() +
       create_graph_rules(address_mapper) +
       create_options_parsing_rules() +
+      structs_rules() +
       # TODO: This should happen automatically, but most tests (e.g. tests/python/pants_test/auth) fail if it's not here:
       python_test_runner.rules() +
       rules
@@ -364,12 +366,15 @@ class EngineInitializer(object):
 
     goal_map = EngineInitializer._make_goal_map_from_rules(rules)
 
+    union_rules = build_configuration.union_rules()
+
     scheduler = Scheduler(
       native,
       project_tree,
       workdir,
       local_store_dir,
       rules,
+      union_rules,
       execution_options,
       include_trace_on_error=include_trace_on_error,
       visualize_to_dir=bootstrap_options.native_engine_visualize_to,

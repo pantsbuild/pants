@@ -275,7 +275,9 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       parents_table=parents_table,
     )
     rule_visitor.visit(rule_func_node)
-    gets.update(Get(resolve_type(p), resolve_type(s)) for p, s in rule_visitor.gets)
+    gets.update(
+      Get.create_statically_for_rule_graph(resolve_type(p), resolve_type(s))
+      for p, s in rule_visitor.gets)
 
     # For @console_rule, redefine the function to avoid needing a literal return of the output type.
     if for_goal:
@@ -312,6 +314,50 @@ def rule(output_type, input_selectors):
 def console_rule(goal_name, input_selectors):
   output_type = _GoalProduct.for_name(goal_name)
   return _make_rule(output_type, input_selectors, goal_name, False)
+
+
+def union(cls):
+  """A class decorator which other classes can specify that they can resolve to with `UnionRule`.
+
+  Annotating a class with @union allows other classes to use a UnionRule() instance to indicate that
+  they can be resolved to this base union class. This class will never be instantiated, and should
+  have no members -- it is used as a tag only, and will be replaced with whatever object is passed
+  in as the subject of a `yield Get(...)`. See the following example:
+
+  @union
+  class UnionBase(object): pass
+
+  @rule(B, [Select(X)])
+  def get_some_union_type(x):
+    result = yield Get(ResultType, UnionBase, x.f())
+    # ...
+
+  If there exists a single path from (whatever type the expression `x.f()` returns) -> `ResultType`
+  in the rule graph, the engine will retrieve and execute that path to produce a `ResultType` from
+  `x.f()`. This requires also that whatever type `x.f()` returns was registered as a union member of
+  `UnionBase` with a `UnionRule`.
+
+  Unions allow @rule bodies to be written without knowledge of what types may eventually be provided
+  as input -- rather, they let the engine check that there is a valid path to the desired result.
+  """
+  # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
+  assert isinstance(cls, type)
+  return type(cls.__name__, (cls,), {
+    '_is_union': True,
+  })
+
+
+class UnionRule(datatype([
+    ('union_base', type),
+    ('union_member', type),
+])):
+  """Specify that an instance of `union_member` can be substituted wherever `union_base` is used."""
+
+  def __new__(cls, union_base, union_member):
+    if not getattr(union_base, '_is_union', False):
+      raise cls.make_type_error('union_base must be a type annotated with @union: was {} (type {})'
+                                .format(union_base, type(union_base).__name__))
+    return super(UnionRule, cls).__new__(cls, union_base, union_member)
 
 
 class Rule(AbstractClass):
@@ -375,9 +421,12 @@ class TaskRule(datatype([
       )
 
   def __str__(self):
-    return '({}, {!r}, {})'.format(type_or_constraint_repr(self.output_constraint),
-                                   self.input_selectors,
-                                   self.func.__name__)
+    return ('({}, {!r}, {}, gets={}, opts={})'
+            .format(type_or_constraint_repr(self.output_constraint),
+                    self.input_selectors,
+                    self.func.__name__,
+                    self.input_gets,
+                    self.dependency_optionables))
 
 
 class SingletonRule(datatype(['output_constraint', 'value']), Rule):
@@ -420,49 +469,67 @@ class RootRule(datatype(['output_constraint']), Rule):
     return tuple()
 
 
-class RuleIndex(datatype(['rules', 'roots'])):
+class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
   """Holds a normalized index of Rules used to instantiate Nodes."""
 
   @classmethod
-  def create(cls, rule_entries):
+  def create(cls, rule_entries, union_rules=None):
     """Creates a RuleIndex with tasks indexed by their output type."""
     serializable_rules = OrderedDict()
     serializable_roots = OrderedSet()
+    union_rules = OrderedDict(union_rules or ())
 
     def add_task(product_type, rule):
       if product_type not in serializable_rules:
         serializable_rules[product_type] = OrderedSet()
       serializable_rules[product_type].add(rule)
 
+    def add_root_rule(root_rule):
+      serializable_roots.add(root_rule)
+
     def add_rule(rule):
       if isinstance(rule, RootRule):
-        serializable_roots.add(rule)
-        return
-      # TODO: Ensure that interior types work by indexing on the list of types in
-      # the constraint. This heterogenity has some confusing implications:
-      #   see https://github.com/pantsbuild/pants/issues/4005
-      for kind in rule.output_constraint.types:
-        add_task(kind, rule)
-      add_task(rule.output_constraint, rule)
+        add_root_rule(rule)
+      else:
+        # TODO: Ensure that interior types work by indexing on the list of types in
+        # the constraint. This heterogenity has some confusing implications:
+        #   see https://github.com/pantsbuild/pants/issues/4005
+        for kind in rule.output_constraint.types:
+          add_task(kind, rule)
+        add_task(rule.output_constraint, rule)
+
+    def add_type_transition_rule(union_rule):
+      # NB: This does not require that union bases be supplied to `def rules():`, as the union type
+      # is never instantiated!
+      union_base = union_rule.union_base
+      assert union_base._is_union
+      union_member = union_rule.union_member
+      if union_base not in union_rules:
+        union_rules[union_base] = OrderedSet()
+      union_rules[union_base].add(union_member)
 
     for entry in rule_entries:
       if isinstance(entry, Rule):
         add_rule(entry)
+      elif isinstance(entry, UnionRule):
+        add_type_transition_rule(entry)
       elif hasattr(entry, '__call__'):
         rule = getattr(entry, 'rule', None)
         if rule is None:
           raise TypeError("Expected callable {} to be decorated with @rule.".format(entry))
         add_rule(rule)
       else:
-        raise TypeError("Unexpected rule type: {}. "
-                        "Rules either extend Rule, or are static functions "
-                        "decorated with @rule.".format(type(entry)))
+        raise TypeError("""\
+Unexpected rule type: {}. Rules either extend Rule or UnionRule, or are static functions decorated \
+with @rule.""".format(type(entry)))
 
-    return cls(serializable_rules, serializable_roots)
+    return cls(serializable_rules, serializable_roots, union_rules)
+
+  class NormalizedRules(datatype(['rules', 'union_rules'])): pass
 
   def normalized_rules(self):
     rules = OrderedSet(rule
                        for ruleset in self.rules.values()
                        for rule in ruleset)
     rules.update(self.roots)
-    return rules
+    return self.NormalizedRules(rules, self.union_rules)

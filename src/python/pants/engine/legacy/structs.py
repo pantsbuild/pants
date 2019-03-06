@@ -15,6 +15,7 @@ from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.engine.objects import Locatable
+from pants.engine.rules import UnionRule, union
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.collections_abc_backport import MutableSequence, MutableSet
@@ -127,6 +128,10 @@ class TargetAdaptor(StructWithDeps):
 
 class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
+
+
+@union
+class HydrateableField(object): pass
 
 
 class SourcesField(
@@ -426,3 +431,10 @@ class GlobsWithConjunction(datatype([
   @classmethod
   def for_literal_files(cls, file_paths, spec_path):
     return cls(Files(*file_paths, spec_path=spec_path), GlobExpansionConjunction.all_match)
+
+
+def rules():
+  return [
+    UnionRule(HydrateableField, SourcesField),
+    UnionRule(HydrateableField, BundlesField),
+  ]

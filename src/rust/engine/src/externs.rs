@@ -226,20 +226,28 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
     PyGeneratorResponseType::Throw => Err(PyResult::failure_from(response.values.unwrap_one())),
     PyGeneratorResponseType::Get => {
       let mut interns = INTERNS.write();
-      let constraint = TypeConstraint(interns.insert(response.constraints.unwrap_one()));
-      Ok(GeneratorResponse::Get(Get(
-        constraint,
-        interns.insert(response.values.unwrap_one()),
-      )))
+      let product = TypeConstraint(interns.insert(response.products.unwrap_one()));
+      let subject = interns.insert(response.values.unwrap_one());
+      Ok(GeneratorResponse::Get(Get { product, subject }))
     }
     PyGeneratorResponseType::GetMulti => {
       let mut interns = INTERNS.write();
-      let continues = response
-        .constraints
-        .to_vec()
+      let PyGeneratorResponse {
+        values: values_buf,
+        products: products_buf,
+        ..
+      } = response;
+      let values = values_buf.to_vec();
+      let products = products_buf.to_vec();
+      assert_eq!(values.len(), products.len());
+      let continues: Vec<Get> = values
         .into_iter()
-        .zip(response.values.to_vec().into_iter())
-        .map(|(c, v)| Get(TypeConstraint(interns.insert(c)), interns.insert(v)))
+        .zip(products.into_iter())
+        .map(|(val, prod)| {
+          let subject = interns.insert(val);
+          let product = TypeConstraint(interns.insert(prod));
+          Get { subject, product }
+        })
         .collect();
       Ok(GeneratorResponse::GetMulti(continues))
     }
@@ -476,11 +484,15 @@ pub enum PyGeneratorResponseType {
 pub struct PyGeneratorResponse {
   res_type: PyGeneratorResponseType,
   values: HandleBuffer,
-  constraints: HandleBuffer,
+  products: HandleBuffer,
 }
 
 #[derive(Debug)]
-pub struct Get(pub TypeConstraint, pub Key);
+pub struct Get {
+  // TODO(#7114): convert all of these into `TypeId`s!
+  pub product: TypeConstraint,
+  pub subject: Key,
+}
 
 pub enum GeneratorResponse {
   Break(Value),

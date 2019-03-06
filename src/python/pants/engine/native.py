@@ -423,30 +423,30 @@ class _FFISpecification(object):
       if isinstance(res, Get):
         # Get.
         values = [res.subject]
-        constraints = [constraint_for(res.product)]
+        products = [constraint_for(res.product)]
         tag = 2
       elif type(res) in (tuple, list):
         # GetMulti.
         values = [g.subject for g in res]
-        constraints = [constraint_for(g.product) for g in res]
+        products = [constraint_for(g.product) for g in res]
         tag = 3
       else:
         # Break.
         values = [res]
-        constraints = []
+        products = []
         tag = 0
     except Exception as e:
       # Throw.
       val = e
       val._formatted_exc = traceback.format_exc()
       values = [val]
-      constraints = []
+      products = []
       tag = 1
 
     return (
         tag,
         c.vals_buf([c.to_value(v) for v in values]),
-        c.vals_buf([c.to_value(v) for v in constraints])
+        c.vals_buf([c.to_value(v) for v in products]),
       )
 
   @_extern_decl('PyResult', ['ExternContext*', 'Handle*', 'Handle**', 'uint64_t'])

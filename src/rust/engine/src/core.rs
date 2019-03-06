@@ -116,8 +116,18 @@ pub type Id = u64;
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(pub Id);
+
+impl fmt::Debug for TypeId {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    if *self == ANY_TYPE {
+      write!(f, "Any")
+    } else {
+      write!(f, "{}", externs::type_to_str(*self))
+    }
+  }
+}
 
 impl fmt::Display for TypeId {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -146,10 +156,16 @@ pub struct Function(pub Key);
 /// Wraps a type id for use as a key in HashMaps and sets.
 ///
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Key {
   id: Id,
   type_id: TypeId,
+}
+
+impl fmt::Debug for Key {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", externs::key_to_str(self))
+  }
 }
 
 impl Eq for Key {}

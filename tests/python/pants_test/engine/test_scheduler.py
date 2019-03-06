@@ -4,11 +4,14 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import re
 import unittest
 from builtins import object, str
+from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, UnionRule, rule, union
+from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Params, Select
 from pants.util.objects import datatype
 from pants_test.engine.util import (assert_equal_with_printing, create_scheduler,
@@ -57,6 +60,62 @@ def transitive_coroutine_rule(c):
   yield D(b)
 
 
+@union
+class UnionBase(object): pass
+
+
+class UnionWrapper(object):
+  def __init__(self, inner):
+    self.inner = inner
+
+
+class UnionA(object):
+
+  def a(self):
+    return A()
+
+
+@rule(A, [Select(UnionA)])
+def select_union_a(union_a):
+  return union_a.a()
+
+
+class UnionB(object):
+
+  def a(self):
+    return A()
+
+
+@rule(A, [Select(UnionB)])
+def select_union_b(union_b):
+  return union_b.a()
+
+
+# TODO: add GetMulti testing for unions!
+@rule(A, [Select(UnionWrapper)])
+def a_union_test(union_wrapper):
+  union_a = yield Get(A, UnionBase, union_wrapper.inner)
+  yield union_a
+
+
+class TypeCheckFailWrapper(object):
+  """
+  This object wraps another object which will be used to demonstrate a type check failure when the
+  engine processes a `yield Get(...)` statement.
+  """
+
+  def __init__(self, inner):
+    self.inner = inner
+
+
+@rule(A, [Select(TypeCheckFailWrapper)])
+def a_typecheck_fail_test(wrapper):
+  # This `yield Get(A, B, ...)` will use the `nested_raise` rule defined above, but it won't get to
+  # the point of raising since the type check will fail at the Get.
+  supposedly_a = yield Get(A, B, wrapper.inner)
+  yield supposedly_a
+
+
 class SchedulerTest(TestBase):
 
   @classmethod
@@ -69,6 +128,16 @@ class SchedulerTest(TestBase):
       consumes_a_and_b,
       transitive_b_c,
       transitive_coroutine_rule,
+      RootRule(UnionWrapper),
+      UnionRule(UnionBase, UnionA),
+      RootRule(UnionA),
+      select_union_a,
+      UnionRule(union_base=UnionBase, union_member=UnionB),
+      RootRule(UnionB),
+      select_union_b,
+      a_union_test,
+      a_typecheck_fail_test,
+      RootRule(TypeCheckFailWrapper),
     ]
 
   def test_use_params(self):
@@ -82,7 +151,9 @@ class SchedulerTest(TestBase):
     self.assertEquals(result_str, consumes_a_and_b(a, b))
 
     # But not a subset.
-    with self.assertRaises(Exception):
+    expected_msg = ("No installed @rules can satisfy Select({}) for input Params(A)"
+                    .format(str.__name__))
+    with self.assertRaisesRegexp(Exception, re.escape(expected_msg)):
       self.scheduler.product_request(str, [Params(a)])
 
   def test_transitive_params(self):
@@ -99,6 +170,34 @@ class SchedulerTest(TestBase):
     # We don't need the inner B objects to be the same, and we know the arguments are type-checked,
     # we're just testing transitively resolving products in this file.
     self.assertTrue(isinstance(result_d, D))
+
+  @contextmanager
+  def _assert_execution_error(self, expected_msg):
+    with self.assertRaises(ExecutionError) as cm:
+      yield
+    self.assertIn(expected_msg, remove_locations_from_traceback(str(cm.exception)))
+
+  def test_union_rules(self):
+    a, = self.scheduler.product_request(A, [Params(UnionWrapper(UnionA()))])
+    # TODO: figure out what to assert here!
+    self.assertTrue(isinstance(a, A))
+    a, = self.scheduler.product_request(A, [Params(UnionWrapper(UnionB()))])
+    self.assertTrue(isinstance(a, A))
+    # Fails due to no union relationship from A -> UnionBase.
+    expected_msg = """\
+Exception: WithDeps(Inner(InnerEntry { params: {UnionWrapper}, rule: Task(Task { product: TypeConstraint(Exactly(A)), clause: [Select { product: Exactly(UnionWrapper) }], gets: [Get { product: TypeConstraint(Exactly(A)), subject: UnionA }, Get { product: TypeConstraint(Exactly(A)), subject: UnionB }], func: Function(<function a_union_test at 0xEEEEEEEEE>), cacheable: true }) })) did not declare a dependency on JustGet(Get { product: TypeConstraint(Exactly(A)), subject: A })
+"""
+    with self._assert_execution_error(expected_msg):
+      self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
+
+  def test_get_type_match_failure(self):
+    """Test that Get(...)s are now type-checked during rule execution, to allow for union types."""
+    expected_msg = """\
+Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { product: TypeConstraint(Exactly(A)), clause: [Select { product: Exactly(TypeCheckFailWrapper) }], gets: [Get { product: TypeConstraint(Exactly(A)), subject: B }], func: Function(<function a_typecheck_fail_test at 0xEEEEEEEEE>), cacheable: true }) })) did not declare a dependency on JustGet(Get { product: TypeConstraint(Exactly(A)), subject: A })
+"""
+    with self._assert_execution_error(expected_msg):
+      # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
+      self.scheduler.product_request(A, [Params(TypeCheckFailWrapper(A()))])
 
 
 class SchedulerTraceTest(unittest.TestCase):

@@ -800,29 +800,33 @@ impl Task {
   ) -> NodeFuture<Vec<Value>> {
     let get_futures = gets
       .into_iter()
-      .map(|externs::Get(product, subject)| {
+      .map(|get| {
+        let context = context.clone();
+        let params = params.clone();
+        let entry = entry.clone();
         let select_key = rule_graph::SelectKey::JustGet(selectors::Get {
-          product: product,
-          subject: *subject.type_id(),
+          product: get.product,
+          subject: *get.subject.type_id(),
         });
         let entry = context
           .core
           .rule_graph
-          .edges_for_inner(entry)
-          .expect("edges for task exist.")
-          .entry_for(&select_key)
-          .unwrap_or_else(|| {
-            panic!(
-              "{:?} did not declare a dependency on {:?}",
-              entry, select_key
-            )
-          })
-          .clone();
+          .edges_for_inner(&entry)
+          .ok_or_else(|| throw(&format!("no edges for task {:?} exist!", entry)))
+          .and_then(|edges| {
+            edges.entry_for(&select_key).cloned().ok_or_else(|| {
+              throw(&format!(
+                "{:?} did not declare a dependency on {:?}",
+                entry, select_key
+              ))
+            })
+          });
         // The subject of the get is a new parameter that replaces an existing param of the same
         // type.
         let mut params = params.clone();
-        params.put(subject);
-        Select::new(params, product, entry).run(context.clone())
+        params.put(get.subject);
+        future::result(entry)
+          .and_then(move |entry| Select::new(params, get.product, entry).run(context.clone()))
       })
       .collect::<Vec<_>>();
     future::join_all(get_futures).to_boxed()
