@@ -10,13 +10,14 @@ import time
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_file_dump
-from pants_test.pants_run_integration_test import ensure_daemon
+from pants_test.pants_run_integration_test import ensure_daemon, no_shutdown_between_runs
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
 class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
 
   @ensure_daemon
+  @no_shutdown_between_runs("Keep pantsd alive between runs inside the same test.")
   def test_v2_list(self):
     result = self.do_command(
       '--no-v1',

@@ -119,6 +119,10 @@ aws_get_pants_pex: &aws_get_pants_pex >
 # Generic shard setups
 # -------------------------------------------------------------------------
 
+pantsd_disable_env: &pantsd_disable_env >
+  PANTS_ENABLE_PANTSD="false"
+  PANTS_SHUTDOWN_PANTSD_AFTER_RUN="false"
+
 base_linux_config: &base_linux_config
   os: linux
   dist: xenial
@@ -168,14 +172,16 @@ py27_linux_test_config: &py27_linux_test_config
   <<: *base_linux_test_config
   stage: *test_cron
   env:
-    - &py27_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
+    - &py27_linux_test_config_env >
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
 py36_linux_test_config: &py36_linux_test_config
   <<: *py36_linux_config
   <<: *base_linux_test_config
   stage: *test
   env:
-    - &py36_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
+    - &py36_linux_test_config_env >
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
 py37_linux_test_config: &py37_linux_test_config
   <<: *py37_linux_config
@@ -880,6 +886,7 @@ matrix:
       name: "Integration tests - shard {{.}} (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -c -i {{.}}/{{integration_shards_length}}
@@ -900,6 +907,7 @@ matrix:
       name: "Integration tests - shard {{.}} (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i {{.}}/{{integration_shards_length}}
@@ -914,6 +922,7 @@ matrix:
       stage: *test
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=linuxcontribtests.py27
       script:
         - ./build-support/bin/travis-ci.sh -2n
@@ -922,6 +931,7 @@ matrix:
       name: "Python contrib tests (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=linuxcontribtests.py36
       script:
         - ./build-support/bin/travis-ci.sh -n

@@ -102,6 +102,57 @@ def ensure_resolver(f):
   return wrapper
 
 
+def daemon_blacklist(_unused_msg_for_documentation_purposes=None):
+  """A decorator to ensure that pantsd is not used (via env vars) for an integration test.
+
+  NB: pantsd is not yet enabled by default (via #4438), but it will be used temporarily
+  in pants' integration test environment via environment variables. This decorator will mark
+  tests that fail in that environment.
+  """
+  def decorator(f):
+    def wrapper(self, *args, **kwargs):
+      env = {
+          'PANTS_ENABLE_PANTSD': 'false',
+          'PANTS_SHUTDOWN_PANTSD_AFTER_RUN': 'false',
+      }
+      with environment_as(**env):
+        f(self, *args, **kwargs)
+    return wrapper
+  return decorator
+
+
+def no_shutdown_between_runs(_unused_msg_for_documentation_purposes=None):
+  """
+  A decorator to ensure we don't leak an external value for PANTS_SHUTDOWN_PANTSD_AFTER_RUN.
+
+  Some tests assume a particular instance of pantsd is alive run-after-run inside the same test.
+  If we leak this env var, pantsd will terminate after every run,
+  making most pantsd integration tests fail.
+  """
+  def decorator(f):
+    def wrapper(self, *args, **kwargs):
+      env = {
+          'PANTS_SHUTDOWN_PANTSD_AFTER_RUN': 'false'
+      }
+      with environment_as(**env):
+        f(self, *args, **kwargs)
+    return wrapper
+  return decorator
+
+
+def skip_if_tests_are_hermetic(pants_run_integration_test_cls, _unused_msg_for_documentation_purposes=None):
+  def decorator(f):
+    def wrapper(self, *args, **kwargs):
+      are_pantsd_tests_hermetic = pants_run_integration_test_cls.hermetic()
+      print("BL: are_pantsd_tests_hermetics: {}".format(are_pantsd_tests_hermetic))
+      if not are_pantsd_tests_hermetic:
+        return f(self, *args, **kwargs)
+      else:
+        print("Ignoring test because it will fail when run hermetically.")
+    return wrapper
+  return decorator
+
+
 def ensure_daemon(f):
   """A decorator for running an integration test with and without the daemon enabled."""
   def wrapper(self, *args, **kwargs):
@@ -273,7 +324,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
       '--pants-workdir={}'.format(workdir),
       '--kill-nailguns',
       '--print-exception-stacktrace={}'.format(print_exception_stacktrace),
+      '--enable-pantsd'
     ]
+
 
     if self.hermetic():
       args.extend(['--pants-config-files=[]',

@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
 
 
 class BuildGraphIntegrationTest(PantsRunIntegrationTest):
@@ -36,9 +36,11 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
       self.assertIn('{}/BUILD'.format(dir), pants_run.stderr_data)
       self.assertIn('os.path', pants_run.stderr_data)
 
+  @daemon_blacklist('Pantsd swallows logs into its log file, so stderr will be empty. (#7320)')
   def test_warn_module_import(self):
     self.warn_import('testprojects/src/python/build_file_imports_module')
 
+  @daemon_blacklist('Pantsd swallows logs into its log file, so stderr will be empty. (#7320)')
   def test_warn_function_import(self):
     self.warn_import('testprojects/src/python/build_file_imports_function')
 

@@ -8,7 +8,7 @@ import os
 import tempfile
 from builtins import open
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
 
 
 class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
@@ -60,6 +60,16 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:there-was-a-duck',
                      results)
 
+  @daemon_blacklist("""
+  This expects to read the standard error after an intentional failure.
+  However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
+  So stderr appears empty.
+  
+  CLI To repro locally (with this annotation removed):
+  PANTS_ENABLE_PANTSD=true ./pants test \
+   tests/python/pants_test/engine/legacy:build_ignore_integration -- \
+   -s -k test_build_ignore_dependency
+  """)
   def test_build_ignore_dependency(self):
     run_result = self.run_pants(['-q',
                                  'list',
@@ -73,6 +83,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
                                 })
 
     self.assert_failure(run_result)
+
     # Error message complains dependency dir has no BUILD files.
     self.assertIn('testprojects/src/thrift/org/pantsbuild/constants_only', run_result.stderr_data)
 

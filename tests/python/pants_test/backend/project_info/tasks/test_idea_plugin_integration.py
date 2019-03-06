@@ -13,7 +13,7 @@ from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.util.contextutil import temporary_file
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
 
 
 class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
@@ -96,21 +96,25 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
         self.assertTrue(os.path.exists(project_dir), "{} does not exist".format(project_dir))
         self._do_check(project_dir, project_path, target_specs, incremental_import=incremental_import)
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_idea_plugin_single_target(self):
     target = 'examples/src/scala/org/pantsbuild/example/hello:hello'
 
     self._run_and_check([target])
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_idea_plugin_single_directory(self):
     target = 'testprojects/src/python/antlr::'
 
     self._run_and_check([target])
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_idea_plugin_incremental_import(self):
     target = 'testprojects/src/python/antlr::'
 
     self._run_and_check([target], incremental_import=1337)
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_idea_plugin_multiple_targets(self):
     target_a = 'examples/src/scala/org/pantsbuild/example/hello:'
     target_b = 'testprojects/src/python/antlr::'
@@ -127,6 +131,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
       )
     )
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_idea_plugin_long_project_name(self):
     list_run = self.run_pants(['-q', 'list', 'testprojects/tests/java/org/pantsbuild/testproject/::'])
     self.assert_success(list_run)

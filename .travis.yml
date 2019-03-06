@@ -126,6 +126,10 @@ aws_get_pants_pex: &aws_get_pants_pex >
 # Generic shard setups
 # -------------------------------------------------------------------------
 
+pantsd_disable_env: &pantsd_disable_env >
+  PANTS_ENABLE_PANTSD="false"
+  PANTS_SHUTDOWN_PANTSD_AFTER_RUN="false"
+
 base_linux_config: &base_linux_config
   os: linux
   dist: xenial
@@ -179,14 +183,16 @@ py27_linux_test_config: &py27_linux_test_config
   <<: *base_linux_test_config
   stage: *test_cron
   env:
-    - &py27_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
+    - &py27_linux_test_config_env >
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
 py36_linux_test_config: &py36_linux_test_config
   <<: *py36_linux_config
   <<: *base_linux_test_config
   stage: *test
   env:
-    - &py36_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
+    - &py36_linux_test_config_env >
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
 py37_linux_test_config: &py37_linux_test_config
   <<: *py37_linux_config
@@ -936,6 +942,7 @@ matrix:
       name: "Integration tests - shard 0 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard0
       script:
         - ./build-support/bin/travis-ci.sh -c -i 0/20
@@ -944,6 +951,7 @@ matrix:
       name: "Integration tests - shard 1 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard1
       script:
         - ./build-support/bin/travis-ci.sh -c -i 1/20
@@ -952,6 +960,7 @@ matrix:
       name: "Integration tests - shard 2 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard2
       script:
         - ./build-support/bin/travis-ci.sh -c -i 2/20
@@ -960,6 +969,7 @@ matrix:
       name: "Integration tests - shard 3 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard3
       script:
         - ./build-support/bin/travis-ci.sh -c -i 3/20
@@ -968,6 +978,7 @@ matrix:
       name: "Integration tests - shard 4 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard4
       script:
         - ./build-support/bin/travis-ci.sh -c -i 4/20
@@ -976,6 +987,7 @@ matrix:
       name: "Integration tests - shard 5 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard5
       script:
         - ./build-support/bin/travis-ci.sh -c -i 5/20
@@ -984,6 +996,7 @@ matrix:
       name: "Integration tests - shard 6 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard6
       script:
         - ./build-support/bin/travis-ci.sh -c -i 6/20
@@ -992,6 +1005,7 @@ matrix:
       name: "Integration tests - shard 7 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard7
       script:
         - ./build-support/bin/travis-ci.sh -c -i 7/20
@@ -1000,6 +1014,7 @@ matrix:
       name: "Integration tests - shard 8 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard8
       script:
         - ./build-support/bin/travis-ci.sh -c -i 8/20
@@ -1008,6 +1023,7 @@ matrix:
       name: "Integration tests - shard 9 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard9
       script:
         - ./build-support/bin/travis-ci.sh -c -i 9/20
@@ -1016,6 +1032,7 @@ matrix:
       name: "Integration tests - shard 10 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard10
       script:
         - ./build-support/bin/travis-ci.sh -c -i 10/20
@@ -1024,6 +1041,7 @@ matrix:
       name: "Integration tests - shard 11 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard11
       script:
         - ./build-support/bin/travis-ci.sh -c -i 11/20
@@ -1032,6 +1050,7 @@ matrix:
       name: "Integration tests - shard 12 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard12
       script:
         - ./build-support/bin/travis-ci.sh -c -i 12/20
@@ -1040,6 +1059,7 @@ matrix:
       name: "Integration tests - shard 13 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard13
       script:
         - ./build-support/bin/travis-ci.sh -c -i 13/20
@@ -1048,6 +1068,7 @@ matrix:
       name: "Integration tests - shard 14 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard14
       script:
         - ./build-support/bin/travis-ci.sh -c -i 14/20
@@ -1056,6 +1077,7 @@ matrix:
       name: "Integration tests - shard 15 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard15
       script:
         - ./build-support/bin/travis-ci.sh -c -i 15/20
@@ -1064,6 +1086,7 @@ matrix:
       name: "Integration tests - shard 16 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard16
       script:
         - ./build-support/bin/travis-ci.sh -c -i 16/20
@@ -1072,6 +1095,7 @@ matrix:
       name: "Integration tests - shard 17 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard17
       script:
         - ./build-support/bin/travis-ci.sh -c -i 17/20
@@ -1080,6 +1104,7 @@ matrix:
       name: "Integration tests - shard 18 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard18
       script:
         - ./build-support/bin/travis-ci.sh -c -i 18/20
@@ -1088,6 +1113,7 @@ matrix:
       name: "Integration tests - shard 19 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=integrationshard19
       script:
         - ./build-support/bin/travis-ci.sh -c -i 19/20
@@ -1256,6 +1282,7 @@ matrix:
       name: "Integration tests - shard 0 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard0
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 0/20
@@ -1264,6 +1291,7 @@ matrix:
       name: "Integration tests - shard 1 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard1
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 1/20
@@ -1272,6 +1300,7 @@ matrix:
       name: "Integration tests - shard 2 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard2
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 2/20
@@ -1280,6 +1309,7 @@ matrix:
       name: "Integration tests - shard 3 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard3
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 3/20
@@ -1288,6 +1318,7 @@ matrix:
       name: "Integration tests - shard 4 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard4
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 4/20
@@ -1296,6 +1327,7 @@ matrix:
       name: "Integration tests - shard 5 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard5
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 5/20
@@ -1304,6 +1336,7 @@ matrix:
       name: "Integration tests - shard 6 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard6
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 6/20
@@ -1312,6 +1345,7 @@ matrix:
       name: "Integration tests - shard 7 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard7
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 7/20
@@ -1320,6 +1354,7 @@ matrix:
       name: "Integration tests - shard 8 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard8
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 8/20
@@ -1328,6 +1363,7 @@ matrix:
       name: "Integration tests - shard 9 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard9
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 9/20
@@ -1336,6 +1372,7 @@ matrix:
       name: "Integration tests - shard 10 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard10
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 10/20
@@ -1344,6 +1381,7 @@ matrix:
       name: "Integration tests - shard 11 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard11
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 11/20
@@ -1352,6 +1390,7 @@ matrix:
       name: "Integration tests - shard 12 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard12
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 12/20
@@ -1360,6 +1399,7 @@ matrix:
       name: "Integration tests - shard 13 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard13
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 13/20
@@ -1368,6 +1408,7 @@ matrix:
       name: "Integration tests - shard 14 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard14
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 14/20
@@ -1376,6 +1417,7 @@ matrix:
       name: "Integration tests - shard 15 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard15
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 15/20
@@ -1384,6 +1426,7 @@ matrix:
       name: "Integration tests - shard 16 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard16
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 16/20
@@ -1392,6 +1435,7 @@ matrix:
       name: "Integration tests - shard 17 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard17
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 17/20
@@ -1400,6 +1444,7 @@ matrix:
       name: "Integration tests - shard 18 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard18
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 18/20
@@ -1408,6 +1453,7 @@ matrix:
       name: "Integration tests - shard 19 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=cronshard19
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 19/20
@@ -1421,6 +1467,7 @@ matrix:
       stage: *test
       env:
         - *py27_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=linuxcontribtests.py27
       script:
         - ./build-support/bin/travis-ci.sh -2n
@@ -1429,6 +1476,7 @@ matrix:
       name: "Python contrib tests (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_disable_env
         - CACHE_NAME=linuxcontribtests.py36
       script:
         - ./build-support/bin/travis-ci.sh -n

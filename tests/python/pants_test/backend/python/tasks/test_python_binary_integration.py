@@ -12,7 +12,7 @@ from textwrap import dedent
 from pex.pex_info import PexInfo
 
 from pants.util.contextutil import open_zip, temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
 
 
 _LINUX_PLATFORM = "linux-x86_64"
@@ -41,6 +41,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
     pex_info = PexInfo.from_pex(pex)
     self.assertEqual(getattr(pex_info, attr), value)
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_zipsafe_caching(self):
     test_project = 'testprojects/src/python/cache_fields'
     test_build = os.path.join(test_project, 'BUILD')
@@ -74,6 +75,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(build())
       self.assert_pex_attribute(test_pex, 'zip_safe', True)
 
+  @daemon_blacklist('TODO: See the point about watchman in #7320.')
   def test_platform_defaults_to_config(self):
     self.platforms_test_impl(
       target_platforms=None,
@@ -82,6 +84,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       want_missing_platforms=[_LINUX_PLATFORM],
     )
 
+  @daemon_blacklist('TODO: See the point about watchman in #7320#7320.')
   def test_target_platform_without_config(self):
     self.platforms_test_impl(
       target_platforms=[_LINUX_PLATFORM],
@@ -90,6 +93,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       want_missing_platforms=[_OSX_WHEEL_SUBSTRING],
     )
 
+  @daemon_blacklist('TODO: See the point about watchman in #7320.')
   def test_target_platform_overrides_config(self):
     self.platforms_test_impl(
       target_platforms=[_LINUX_PLATFORM],
@@ -98,6 +102,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       want_missing_platforms=[_OSX_WHEEL_SUBSTRING],
     )
 
+  @daemon_blacklist('TODO: See the point about watchman in #7320.')
   def test_target_platform_narrows_config(self):
     self.platforms_test_impl(
       target_platforms=[_LINUX_PLATFORM],
@@ -106,6 +111,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
       want_missing_platforms=[_OSX_WHEEL_SUBSTRING],
     )
 
+  @daemon_blacklist('TODO: See the point about watchman in #7320.')
   def test_target_platform_expands_config(self):
     self.platforms_test_impl(
       target_platforms=[_LINUX_PLATFORM, _OSX_PLATFORM],

@@ -19,7 +19,7 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         'test',
         '--run-tracker-stats-local-json-file={}'.format(tmpfile),
         '--run-tracker-stats-version=1',
-        '--run-tracker-stats-option-scopes-to-record=["GLOBAL", "GLOBAL^enable_pantsd", "compile.zinc^capture_classpath"]',
+        '--run-tracker-stats-option-scopes-to-record=["GLOBAL", "GLOBAL^v2_ui", "compile.zinc^capture_classpath"]',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
       ])
       self.assert_success(pants_run)
@@ -35,9 +35,9 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('pantsd_stats', stats_json)
         self.assertIn('recorded_options', stats_json)
         self.assertIn('GLOBAL', stats_json['recorded_options'])
-        self.assertIs(stats_json['recorded_options']['GLOBAL']['enable_pantsd'], False)
+        self.assertIs(stats_json['recorded_options']['GLOBAL']['v2_ui'], False)
         self.assertEqual(stats_json['recorded_options']['GLOBAL']['level'], 'info')
-        self.assertIs(stats_json['recorded_options']['GLOBAL^enable_pantsd'], False)
+        self.assertIs(stats_json['recorded_options']['GLOBAL^v2_ui'], False)
         self.assertEqual(stats_json['recorded_options']['compile.zinc^capture_classpath'], True)
 
   def test_stats_local_json_file_v2(self):
