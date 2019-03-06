@@ -83,9 +83,6 @@ class RunTracker(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    register('--stats-upload-url', advanced=True, default=None,
-             removal_version='1.13.0.dev2', removal_hint='Use --stats-upload-urls instead.',
-             help='Upload stats to this URL on run completion.')
     register('--stats-upload-urls', advanced=True, type=dict, default={},
              help='Upload stats to these URLs on run completion.  Value is a map from URL to the '
                   'name of the auth provider the user must auth against in order to upload stats '
@@ -438,9 +435,6 @@ class RunTracker(Subsystem):
 
     # Upload to remote stats db.
     stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)
-    deprecated_stats_url = self.get_options().stats_upload_url
-    if deprecated_stats_url:
-      stats_upload_urls[deprecated_stats_url] = None
     timeout = self.get_options().stats_upload_timeout
     for stats_url, auth_provider in stats_upload_urls.items():
       self.post_stats(stats_url, stats, timeout=timeout, auth_provider=auth_provider)
