@@ -401,6 +401,7 @@ impl Store {
           .collect::<Vec<_>>();
 
         // Recursively call with sub-directories
+
         let directory_futures = directory
           .get_directories()
           .iter()
@@ -490,7 +491,28 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
   ) -> BoxFuture<(), String> {
+
+    // Warm up local store with the directory digest and its contents from remote, if necessary.
+    self
+      .ensure_local_has_recursive_directory(digest)
+      .map_err(|e| format!("Error warming up local store with digest: {:?}", e))
+      .to_boxed();
+
+    // Create an empty local directory on disk, if needed
     try_future!(super::safe_create_dir_all(&destination));
+
+    // Load directory digest and its contents from the local store and materialize on disk
+    self
+      .materialize_directory_helper(destination, digest)
+      .map_err(|e| format!("Error materializing directory with digest: {:?}", e))
+      .to_boxed()
+  }
+
+  fn materialize_directory_helper(
+    &self,
+    destination: PathBuf,
+    digest: Digest,
+  ) -> BoxFuture<(), String> {
     let store = self.clone();
     self
       .load_directory(digest)
@@ -498,6 +520,7 @@ impl Store {
         directory_opt.ok_or_else(|| format!("Directory with digest {:?} not found", digest))
       })
       .and_then(move |directory| {
+        // materialize all the files within the directory on disk
         let file_futures = directory
           .get_files()
           .iter()
@@ -515,7 +538,7 @@ impl Store {
             let store = store.clone();
             let path = destination.join(directory_node.get_name());
             let digest = try_future!(directory_node.get_digest().into());
-            store.materialize_directory(path, digest)
+            store.materialize_directory_helper(path, digest)
           })
           .collect::<Vec<_>>();
         future::join_all(file_futures)
@@ -525,6 +548,11 @@ impl Store {
       .to_boxed()
   }
 
+  ///
+  /// Loads the bytes of a file with the passed digest from the local store (if it exists) and
+  /// back-fill from remote when necessary and possible (i.e. when remote is configured). If the
+  /// file doesn't exist on disk, then create a new file at the destination.
+  ///
   fn materialize_file(
     &self,
     destination: PathBuf,
