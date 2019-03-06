@@ -29,7 +29,6 @@ from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import maybe_read_file
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -142,38 +141,23 @@ class Target(AbstractTarget):
         ))
 
   class TagAssignments(Subsystem):
-    """Tags to be applied to targets defined in a single source file."""
+    """Tags to add to targets in addition to any defined in their BUILD files."""
 
     options_scope = 'target-tag-assignments'
 
     @classmethod
     def register_options(cls, register):
-      register('--tag-targets-file', type=str, default=None, fingerprint=True,
-               help='Source JSON file with tag assignments for targets. Ex: \
-                    { "tag_targets_mappings": { "tag1": ["path/to/target:foo"] } }')
+      register('--tag-targets-mappings', type=dict, default=None, fromfile=True, fingerprint=True,
+               help='Dict with tag assignments for targets. Ex: { "tag1": ["path/to/target:foo"] }')
 
     @classmethod
     def tags_for(cls, target_address):
-      tag_assignments = cls.global_instance()
-      if tag_assignments.get_options().tag_targets_file:
-        return tag_assignments._parsed_tag_mappings().get(target_address, [])
-      else:
-        return []
+      return cls.global_instance()._invert_tag_targets_mappings().get(target_address, [])
 
     @memoized_method
-    def _parsed_tag_mappings(self):
-      tag_targets_file = maybe_read_file(self.get_options().tag_targets_file, binary_mode=False)
-
-      if tag_targets_file:
-        parsed_json = json.loads(tag_targets_file)
-        mappings = parsed_json.get("tag_targets_mappings", {})
-        return self._invert_tag_targets_mappings(mappings)
-      else:
-        return {}
-
-    def _invert_tag_targets_mappings(self, parsed_json):
+    def _invert_tag_targets_mappings(self):
       result = {}
-      for tag, targets in parsed_json.items():
+      for tag, targets in (self.get_options().tag_targets_mappings or {}).items():
         for target in targets:
           target_tags = result.setdefault(Address.parse(target).spec, []) 
           target_tags.append(tag)
