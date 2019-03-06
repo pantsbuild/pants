@@ -20,18 +20,16 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.process_handler import subprocess
 
 
 class TestResult(object):
-  @classmethod
-  @memoized_method
+  @memoized_classproperty
   def successful(cls):
     return cls.rc(0)
 
-  @classmethod
-  @memoized_method
+  @memoized_classproperty
   def exception(cls):
     return cls('EXCEPTION')
 
@@ -355,7 +353,7 @@ class TestRunnerTaskMixin(object):
 
     :return: list of targets
     """
-    return self.context.targets()
+    return self.get_targets()
 
   def _get_test_targets(self):
     """Returns the targets that are relevant test targets."""
@@ -500,7 +498,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
             result = rv
           else:
             log = self.context.log.info
-            result = self.result_class.successful()
+            result = self.result_class.successful
           log('{0:80}.....{1:>10}'.format(target.address.reference(), str(result)))
 
       msgs = [str(_rv) for _rv in results.values() if not _rv.success]
@@ -561,6 +559,8 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
       # 1.) output -> output_dir
       # 2.) [iff all == invalid] output_dir -> cache: We do this manually for now.
       # 3.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
+      if not invalid_test_tgts:
+        return TestResult.successful
 
       # 1.) Write all results that will be potentially cached to output_dir.
       result = self.run_tests(fail_fast, invalid_test_tgts, *args).checked()

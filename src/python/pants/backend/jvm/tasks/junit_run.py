@@ -365,7 +365,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def run_tests(self, fail_fast, test_targets, output_dir, coverage):
     test_registry = self._collect_test_targets(test_targets)
     if test_registry.empty:
-      return TestResult.rc(0)
+      return TestResult.successful
 
     coverage.instrument(output_dir)
 
@@ -455,7 +455,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           break
 
     if result == 0:
-      return TestResult.rc(0)
+      return TestResult.successful
 
     target_to_failed_test = parse_failed_targets(test_registry, output_dir, parse_error_handler)
 
