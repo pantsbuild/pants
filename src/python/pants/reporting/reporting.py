@@ -112,6 +112,11 @@ class Reporting(Subsystem):
       raise ValueError(
         "Flags zipkin-trace-id and zipkin-parent-id must both either be set or not set."
       )
+
+    # If trace_id isn't set by a flag, use UUID from run_id
+    if trace_id is None:
+      _, _, trace_id = run_id.rpartition("_")
+
     if trace_id and (len(trace_id) != 16 and len(trace_id) != 32 or not is_hex_string(trace_id)):
       raise ValueError(
         "Value of the flag zipkin-trace-id must be a 16-character or 32-character hex string. "

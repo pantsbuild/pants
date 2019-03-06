@@ -78,7 +78,7 @@ class ZipkinReporter(Reporter):
     first_span = not self._workunits_to_spans
     if first_span:
       # If trace_id and parent_id are given create zipkin_attrs
-      if self.trace_id is not None:
+      if self.trace_id is not None and self.parent_id is not None:
         zipkin_attrs = ZipkinAttrs(
           trace_id=self.trace_id,
           span_id=generate_random_64bit_string(),
@@ -88,6 +88,7 @@ class ZipkinReporter(Reporter):
         )
       else:
         zipkin_attrs =  create_attrs_for_span(
+          trace_id=self.trace_id, # use UUID from run_id as trace id
           sample_rate=self.sample_rate, # Value between 0.0 and 100.0
         )
         self.trace_id = zipkin_attrs.trace_id
