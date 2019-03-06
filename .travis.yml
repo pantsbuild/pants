@@ -144,14 +144,18 @@ py27_linux_test_config: &py27_linux_test_config
   <<: *base_linux_test_config
   stage: *test_cron
   env:
-    - &py27_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
+    - &py27_linux_test_config_env >
+      PANTS_ENABLE_PANTSD="true"
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
 py36_linux_test_config: &py36_linux_test_config
   <<: *py36_linux_config
   <<: *base_linux_test_config
   stage: *test
   env:
-    - &py36_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
+    - &py36_linux_test_config_env >
+      PANTS_ENABLE_PANTSD="true"
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
 base_osx_config: &base_osx_config
   os: osx
@@ -199,7 +203,9 @@ py27_osx_test_config: &py27_osx_test_config
   <<: *base_osx_test_config
   stage: *test_cron
   env:
-    - &py27_osx_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
+    - &py27_osx_test_config_env >
+      PANTS_ENABLE_PANTSD="true"
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
 
 py36_osx_test_config: &py36_osx_test_config
   <<: *py36_osx_config
@@ -213,6 +219,7 @@ py36_osx_test_config: &py36_osx_test_config
       CPPFLAGS="-I/usr/local/opt/openssl/include"
       PYENV_ROOT="${HOME}/.pyenv"
       PATH="${PYENV_ROOT}/shims:${PATH}"
+      PANTS_ENABLE_PANTSD="true"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
 
 linux_with_fuse: &linux_with_fuse
