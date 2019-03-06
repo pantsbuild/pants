@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import json
 import os.path
 from builtins import range, str
 from hashlib import sha1
@@ -20,7 +19,6 @@ from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.source.wrapped_globs import Globs
-from pants.util.contextutil import temporary_file
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.test_base import TestBase
 
