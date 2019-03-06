@@ -185,7 +185,7 @@ class SchedulerTest(TestBase):
     self.assertTrue(isinstance(a, A))
     # Fails due to no union relationship from A -> UnionBase.
     expected_msg = """\
-Exception: WithDeps(Inner(InnerEntry { params: {UnionWrapper}, rule: Task(Task { product: TypeConstraint(Exactly(A)), clause: [Select { product: Exactly(UnionWrapper) }], gets: [Get { product: TypeConstraint(Exactly(A)), subject: UnionA }, Get { product: TypeConstraint(Exactly(A)), subject: UnionB }], func: Function(<function a_union_test at 0xEEEEEEEEE>), cacheable: true }) })) did not declare a dependency on JustGet(Get { product: TypeConstraint(Exactly(A)), subject: A })
+Exception: WithDeps(Inner(InnerEntry { params: {UnionWrapper}, rule: Task(Task { product: A, clause: [Select { product: UnionWrapper }], gets: [Get { product: A, subject: UnionA }, Get { product: A, subject: UnionB }], func: a_union_test(), cacheable: true }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })
 """
     with self._assert_execution_error(expected_msg):
       self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
@@ -193,7 +193,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {UnionWrapper}, rule: Task(Task {
   def test_get_type_match_failure(self):
     """Test that Get(...)s are now type-checked during rule execution, to allow for union types."""
     expected_msg = """\
-Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { product: TypeConstraint(Exactly(A)), clause: [Select { product: Exactly(TypeCheckFailWrapper) }], gets: [Get { product: TypeConstraint(Exactly(A)), subject: B }], func: Function(<function a_typecheck_fail_test at 0xEEEEEEEEE>), cacheable: true }) })) did not declare a dependency on JustGet(Get { product: TypeConstraint(Exactly(A)), subject: A })
+Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { product: A, clause: [Select { product: TypeCheckFailWrapper }], gets: [Get { product: A, subject: B }], func: a_typecheck_fail_test(), cacheable: true }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })
 """
     with self._assert_execution_error(expected_msg):
       # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.

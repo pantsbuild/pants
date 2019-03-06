@@ -22,7 +22,7 @@ from pants.util.collections import assert_single_element
 from pants.util.collections_abc_backport import Iterable, OrderedDict
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
-from pants.util.objects import Exactly, SubclassesOf, datatype
+from pants.util.objects import SubclassesOf, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -252,17 +252,14 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
 
     def resolve_type(name):
       resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
-      if not isinstance(resolved, (type, Exactly)):
-        # TODO: should this say "...or Exactly instance;"?
-        raise ValueError('Expected either a `type` constructor or TypeConstraint instance; '
-                         'got: {}'.format(name))
+      if not isinstance(resolved, type):
+        raise ValueError('Expected a `type` constructor, but got: {}'.format(name))
       return resolved
 
     gets = OrderedSet()
     rule_func_node = assert_single_element(
       node for node in ast.iter_child_nodes(module_ast)
-      if isinstance(node, ast.FunctionDef) and node.name == func.__name__
-    )
+      if isinstance(node, ast.FunctionDef) and node.name == func.__name__)
 
     parents_table = {}
     for parent in ast.walk(rule_func_node):
@@ -303,7 +300,7 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
         wrapped_func,
         input_gets=tuple(gets),
         goal=for_goal,
-        cacheable=cacheable
+        cacheable=cacheable,
       )
 
     return wrapped_func
