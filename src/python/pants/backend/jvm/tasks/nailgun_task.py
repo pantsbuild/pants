@@ -14,8 +14,7 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 from pants.process.subprocess import Subprocess
 from pants.task.task import Task, TaskBase
-from pants.util.memo import memoized_property
-from pants.util.objects import enum, register_enum_option
+from pants.util.objects import enum
 
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
@@ -30,11 +29,11 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
-    register_enum_option(
-      register, cls.ExecutionStrategy, '--execution-strategy', default=cls.NAILGUN,
-      help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
-           'task will be quicker. If set to subprocess, then the task will be run without nailgun. '
-           'Hermetic execution is an experimental subprocess execution framework.')
+    register('--execution-strategy',
+             default=cls.ExecutionStrategy.nailgun, type=cls.ExecutionStrategy,
+             help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
+                  'task will be quicker. If set to subprocess, then the task will be run without '
+                  'nailgun. Hermetic execution is an experimental subprocess execution framework.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
              help='Timeout (secs) for nailgun startup.')
     register('--nailgun-connect-attempts', advanced=True, default=5, type=int,
@@ -47,12 +46,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                           rev='0.9.1'),
                           ])
 
-  @memoized_property
+  @property
   def execution_strategy_enum(self):
-    # TODO: This .create() call can be removed when the enum interface is more stable as the option
-    # is converted into an instance of self.ExecutionStrategy via the `type` argument through
-    # register_enum_option().
-    return self.ExecutionStrategy(self.get_options().execution_strategy)
+    return self.get_options().execution_strategy
 
   @classmethod
   def subsystem_dependencies(cls):

@@ -20,6 +20,7 @@ from pants.engine.selectors import Get, Select
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.util import (TargetTable, assert_equal_with_printing, create_scheduler,
                                     run_rule)
+from pants_test.test_base import TestBase
 
 
 class A(object):
@@ -73,14 +74,11 @@ class RuleTest(unittest.TestCase):
     self.assertEquals(res, _GoalProduct.for_name('example')())
 
 
-class RuleIndexTest(unittest.TestCase):
+class RuleIndexTest(TestBase):
   def test_creation_fails_with_bad_declaration_type(self):
-    with self.assertRaises(TypeError) as cm:
+    with self.assertRaisesWithMessage(TypeError, """\
+Rule entry A() had an unexpected type: <class 'pants_test.engine.test_rules.A'>. Rules either extend Rule or UnionRule, or are static functions decorated with @rule."""):
       RuleIndex.create([A()])
-    self.assertEqual("""\
-Unexpected rule type: <class 'pants_test.engine.test_rules.A'>. Rules either extend Rule or \
-UnionRule, or are static functions decorated with @rule.""",
-      str(cm.exception))
 
 
 class RulesetValidatorTest(unittest.TestCase):

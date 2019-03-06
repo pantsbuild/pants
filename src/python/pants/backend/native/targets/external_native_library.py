@@ -9,7 +9,7 @@ import re
 from future.utils import text_type
 
 from pants.base.deprecated import warn_or_error
-from pants.base.hash_utils import stable_json_hash
+from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField
 from pants.base.validation import assert_list
@@ -22,7 +22,7 @@ from pants.util.objects import datatype
 class ConanRequirementSetField(tuple, PayloadField):
 
   def _compute_fingerprint(self):
-    return stable_json_hash(tuple(hash(req) for req in self))
+    return stable_json_sha1(tuple(hash(req) for req in self))
 
 
 class ConanRequirement(datatype([
