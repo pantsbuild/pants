@@ -20,10 +20,6 @@ pub fn eval(python: &str) -> Result<Value, Failure> {
   with_externs(|e| (e.eval)(e.context, python.as_ptr(), python.len() as u64)).into()
 }
 
-pub fn product_type(val: &Value) -> TypeId {
-  with_externs(|e| (e.product_type)(e.context, val as &Handle))
-}
-
 pub fn get_type_for(val: &Value) -> TypeId {
   with_externs(|e| (e.get_type_for)(e.context, val as &Handle))
 }
@@ -223,7 +219,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
       let p = response.products.unwrap_one();
       let v = response.values.unwrap_one();
       let g = Get {
-        product: *interns.insert_product(p).type_id(),
+        product: p,
         subject: interns.insert(v),
       };
       Ok(GeneratorResponse::Get(g))
@@ -242,7 +238,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
         .into_iter()
         .zip(values.into_iter())
         .map(|(p, v)| Get {
-          product: *interns.insert_product(p).type_id(),
+          product: p,
           subject: interns.insert(v),
         })
         .collect();
@@ -341,7 +337,6 @@ pub struct Externs {
   pub call: CallExtern,
   pub generator_send: GeneratorSendExtern,
   pub eval: EvalExtern,
-  pub product_type: ProductTypeExtern,
   pub get_type_for: GetTypeForExtern,
   pub identify: IdentifyExtern,
   pub equals: EqualsExtern,
@@ -367,8 +362,6 @@ unsafe impl Sync for Externs {}
 unsafe impl Send for Externs {}
 
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
-
-pub type ProductTypeExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
 
 pub type GetTypeForExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
 
@@ -479,7 +472,7 @@ pub enum PyGeneratorResponseType {
 pub struct PyGeneratorResponse {
   res_type: PyGeneratorResponseType,
   values: HandleBuffer,
-  products: HandleBuffer,
+  products: TypeIdBuffer,
 }
 
 #[derive(Debug)]
@@ -554,6 +547,18 @@ pub struct TypeIdBuffer {
 impl TypeIdBuffer {
   pub fn to_vec(&self) -> Vec<TypeId> {
     with_vec(self.ids_ptr, self.ids_len as usize, |vec| vec.clone())
+  }
+
+  /// Asserts that the TypeIdBuffer contains one TypeId, and returns it.
+  pub fn unwrap_one(&self) -> TypeId {
+    assert!(
+      self.ids_len == 1,
+      "TypeIdBuffer contained more than one value: {}",
+      self.ids_len
+    );
+    with_vec(self.ids_ptr, self.ids_len as usize, |ids_vec| {
+      *ids_vec.iter().next().unwrap()
+    })
   }
 }
 
