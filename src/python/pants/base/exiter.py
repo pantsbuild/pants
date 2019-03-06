@@ -16,8 +16,8 @@ from pants.util.strutil import ensure_binary
 logger = logging.getLogger(__name__)
 
 
-# ???/so we're all on the same page
-PANTS_SUCCESS_EXIT_CODE = 0
+# Centralize integer return codes for the pants process. We just use a single bit for now.
+PANTS_SUCCEEDED_EXIT_CODE = 0
 PANTS_FAILED_EXIT_CODE = 1
 
 
@@ -25,7 +25,8 @@ class Exiter(object):
   """A class that provides standard runtime exit behavior.
 
   `pants.base.exception_sink.ExceptionSink` handles exceptions and fatal signals, delegating to an
-  Exiter instance. Call Exiter.exit() or Exiter.exit_and_fail() when you wish to exit the runtime.
+  Exiter instance which can be set process-globally with ExceptionSink.reset_exiter(). Call
+  .exit() or .exit_and_fail() on an Exiter instance when you wish to exit the runtime.
   """
 
   def __init__(self, exiter=sys.exit):
@@ -43,12 +44,11 @@ class Exiter(object):
     """Map class calls to self.exit() to support sys.exit() fungibility."""
     return self.exit(*args, **kwargs)
 
-  # TODO: add PANTS_SUCCESS_EXIT_CODE and PANTS_FAILED_EXIT_CODE to the docstring!
-  def exit(self, result=PANTS_SUCCESS_EXIT_CODE, msg=None, out=None):
+  def exit(self, result=PANTS_SUCCEEDED_EXIT_CODE, msg=None, out=None):
     """Exits the runtime.
 
-    :param result: The exit status. Typically a 0 indicating success or a 1 indicating failure, but
-                   can be a string as well. (Optional)
+    :param result: The exit status. Typically either PANTS_SUCCEEDED_EXIT_CODE or
+                   PANTS_FAILED_EXIT_CODE, but can be a string as well. (Optional)
     :param msg: A string message to print to stderr or another custom file desciptor before exiting.
                 (Optional)
     :param out: The file descriptor to emit `msg` to. (Optional)

@@ -9,7 +9,7 @@ from builtins import object, str
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCESS_EXIT_CODE, Exiter
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
@@ -35,12 +35,12 @@ class LocalExiter(Exiter):
     self._repro = repro
     super(LocalExiter, self).__init__(*args, **kwargs)
 
-  def exit(self, result=PANTS_SUCCESS_EXIT_CODE, msg=None, *args, **kwargs):
+  def exit(self, result=PANTS_SUCCEEDED_EXIT_CODE, msg=None, *args, **kwargs):
     # This variable is prepended to the existing exit message when calling the superclass .exit().
     additional_message = None
     try:
       if not self._run_tracker.has_ended():
-        if result == PANTS_SUCCESS_EXIT_CODE:
+        if result == PANTS_SUCCEEDED_EXIT_CODE:
           outcome = WorkUnit.SUCCESS
         elif result == PANTS_FAILED_EXIT_CODE:
           outcome = WorkUnit.FAILURE
@@ -240,7 +240,7 @@ class LocalPantsRunner(object):
 
   def _maybe_run_v1(self):
     if not self._global_options.v1:
-      return PANTS_SUCCESS_EXIT_CODE
+      return PANTS_SUCCEEDED_EXIT_CODE
 
     # Setup and run GoalRunner.
     goal_runner_factory = GoalRunner.Factory(
@@ -259,7 +259,7 @@ class LocalPantsRunner(object):
     # N.B. For daemon runs, @console_rules are invoked pre-fork -
     # so this path only serves the non-daemon run mode.
     if self._is_daemon or not self._global_options.v2:
-      return PANTS_SUCCESS_EXIT_CODE
+      return PANTS_SUCCEEDED_EXIT_CODE
 
     # If we're a pure --v2 run, validate goals - otherwise some goals specified
     # may be provided by the --v1 task paths.
@@ -280,7 +280,7 @@ class LocalPantsRunner(object):
                   .format(e))
       return PANTS_FAILED_EXIT_CODE
     else:
-      return PANTS_SUCCESS_EXIT_CODE
+      return PANTS_SUCCEEDED_EXIT_CODE
 
   @staticmethod
   def _compute_final_exit_code(*codes):
@@ -301,7 +301,7 @@ class LocalPantsRunner(object):
       except ValueError as e:
         # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
         logger.exception(e)
-        run_tracker_result = PANTS_SUCCESS_EXIT_CODE
+        run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
 
     final_exit_code = self._compute_final_exit_code(
       engine_result,

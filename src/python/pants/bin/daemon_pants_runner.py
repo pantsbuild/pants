@@ -17,7 +17,7 @@ from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, SignalHandler
-from pants.base.exiter import PANTS_SUCCESS_EXIT_CODE, Exiter
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
@@ -339,4 +339,4 @@ class DaemonPantsRunner(ProcessManager):
       except Exception:
         ExceptionSink._log_unhandled_exception_and_exit()
       else:
-        self._exiter.exit(PANTS_SUCCESS_EXIT_CODE)
+        self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)
