@@ -7,13 +7,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import io
 import os
 import shlex
-import unittest
 import warnings
 from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
 
-from future.utils import PY3, text_type
+from future.utils import text_type
 
 from pants.base.deprecated import CodeRemovedError
 from pants.engine.fs import FileContent
@@ -36,6 +35,7 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.objects import enum
+from pants_test.test_base import TestBase
 
 
 def task(scope):
@@ -50,7 +50,7 @@ def subsystem(scope):
   return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
 
 
-class OptionsTest(unittest.TestCase):
+class OptionsTest(TestBase):
 
   @contextmanager
   def _write_config_to_file(self, fp, config):
@@ -813,13 +813,11 @@ class OptionsTest(unittest.TestCase):
 
   def test_enum_option_type_parse_error(self):
     self.maxDiff = None
-    with self.assertRaises(ParseError) as cm:
+    with self.assertRaisesWithMessageContaining(
+        ParseError,
+        "Error applying type 'SomeEnumOption' to option value 'invalid-value', for option '--some_enum' in scope 'enum-opt'"):
       options = self._parse('./pants enum-opt --some-enum=invalid-value')
       options.for_scope('enum-opt').some_enum
-    self.assertIn("""\
-ParseError: Error applying type 'SomeEnumOption' to option value 'invalid-value', for option '--some_enum' in scope 'enum-opt': type check error in class SomeEnumOption: Value {u}'invalid-value' must be one of: [{u}'a-value', {u}'another-value']."""
-                  .format(u='' if PY3 else 'u'),
-                  str(cm.exception))
 
   def test_deprecated_option_past_removal(self):
     """Ensure that expired options raise CodeRemovedError on attempted use."""
@@ -1401,6 +1399,7 @@ ParseError: Error applying type 'SomeEnumOption' to option value 'invalid-value'
     self.assertEqual('vv', vals1.foo)
 
 
+# TODO: Figure out why this testing is necessary.
 class OptionsTestStringPayloads(OptionsTest):
   """Runs the same tests as OptionsTest, but backed with `Config.loads` vs `Config.load`."""
 
