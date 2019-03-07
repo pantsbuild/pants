@@ -207,6 +207,9 @@ class AntJunitXmlReportListener extends RunListener {
     @XmlAttribute private int errors;
     @XmlAttribute private int failures;
     @XmlAttribute private int skipped;
+    // NB: We hardcode a hostname here because localhost resolution on OSX may take
+    // seconds, and the hostname is not particularly useful.
+    // See: https://bugs.openjdk.java.net/browse/JDK-8170910
     @XmlAttribute private String hostname = "127.0.0.1";
     @XmlAttribute private int tests;
     @XmlAttribute private String time;
