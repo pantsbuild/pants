@@ -134,6 +134,18 @@ class BootstrapOptionsTest(unittest.TestCase):
     self.assertEqual('/qux/baz', opts.for_scope('foo').bar)
     self.assertEqual('/pear/banana', opts.for_scope('fruit').apple)
 
+  def test_bootstrapped_options_ignore_irrelevant_env(self):
+    included = 'PANTS_SUPPORTDIR'
+    excluded = 'NON_PANTS_ENV'
+    bootstrapper = OptionsBootstrapper.create(
+        env={
+          excluded: 'pear',
+          included: 'banana',
+        }
+      )
+    self.assertIn(included, bootstrapper.env)
+    self.assertNotIn(excluded, bootstrapper.env)
+
   def do_test_create_bootstrapped_multiple_config(self, create_options_bootstrapper):
     # check with multiple config files, the latest values always get taken
     # in this case worker_count will be overwritten, while fruit stays the same

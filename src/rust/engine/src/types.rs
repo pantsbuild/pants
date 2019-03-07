@@ -1,4 +1,4 @@
-use crate::core::{Function, TypeConstraint, TypeId};
+use crate::core::{Function, TypeId};
 
 pub struct Types {
   pub construct_directory_digest: Function,
@@ -6,19 +6,19 @@ pub struct Types {
   pub construct_file_content: Function,
   pub construct_files_content: Function,
   pub construct_process_result: Function,
-  pub address: TypeConstraint,
-  pub path_globs: TypeConstraint,
-  pub directory_digest: TypeConstraint,
-  pub snapshot: TypeConstraint,
-  pub merged_directories: TypeConstraint,
-  pub files_content: TypeConstraint,
-  pub dir: TypeConstraint,
-  pub file: TypeConstraint,
-  pub link: TypeConstraint,
-  pub process_request: TypeConstraint,
-  pub process_result: TypeConstraint,
-  pub generator: TypeConstraint,
-  pub url_to_fetch: TypeConstraint,
+  pub address: TypeId,
+  pub path_globs: TypeId,
+  pub directory_digest: TypeId,
+  pub snapshot: TypeId,
+  pub merged_directories: TypeId,
+  pub files_content: TypeId,
+  pub dir: TypeId,
+  pub file: TypeId,
+  pub link: TypeId,
+  pub process_request: TypeId,
+  pub process_result: TypeId,
+  pub generator: TypeId,
+  pub url_to_fetch: TypeId,
   pub string: TypeId,
   pub bytes: TypeId,
 }

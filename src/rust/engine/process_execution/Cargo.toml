@@ -13,7 +13,7 @@ bytes = "0.4.5"
 digest = "0.8"
 fs = { path = "../fs" }
 futures = "^0.1.16"
-grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec"] }
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../hashing" }
 log = "0.4"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }

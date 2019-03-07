@@ -32,6 +32,8 @@
 # WRAPPER_SRCPATH=/src/wrapper/src/main/python \
 #    exec /src/pantsbuild-pants/pants "$@"
 #
+# The script defaults to running with Python 3. To use a specific Python version,
+# such as 3.7, prefix the script with `PY=python3.7`.
 
 set -e
 
@@ -53,8 +55,17 @@ source ${HERE}/build-support/pants_venv
 # + bootstrap_native_code: Builds target-specific native engine binaries.
 source ${HERE}/build-support/bin/native/bootstrap_code.sh
 
-# Default to using Python 2.7 if not otherwise specified.
-export PY="${PY:-python2.7}"
+# Default to using Python 3 if not otherwise specified.
+export PY="${PY:-python3}"
+
+# Set interpreter constraints to exactly match the interpreter used for the venv, if not already set.
+# Note that $PY only impacts which virtualenv we use for the parent Pants process; we must also set
+# PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS to constrain spawned subprocesses such as tests. Without
+# any interpreter constraints, when PY is set to Python 3 we get the _Py_Dealloc exception (#6985) as
+# Pants will try to use Python 2 for subprocesses. Without setting minor version constraints, when using Python 3
+# we could end up using a different Python minor version for subprocesses than we do for Pants.
+py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 

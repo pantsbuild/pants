@@ -15,6 +15,7 @@ from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.engine.objects import Locatable
+from pants.engine.rules import UnionRule, union
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.collections_abc_backport import MutableSequence, MutableSet
@@ -66,13 +67,13 @@ class TargetAdaptor(StructWithDeps):
         globs = Globs(*self.default_sources_globs,
                       spec_path=self.address.spec_path,
                       exclude=self.default_sources_exclude_globs or [])
-        conjunction_globs = GlobsWithConjunction(globs, GlobExpansionConjunction.create('any_match'))
+        conjunction_globs = GlobsWithConjunction(globs, GlobExpansionConjunction.any_match)
       else:
         globs = None
         conjunction_globs = None
     else:
       globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
-      conjunction_globs = GlobsWithConjunction(globs, GlobExpansionConjunction.create('all_match'))
+      conjunction_globs = GlobsWithConjunction(globs, GlobExpansionConjunction.all_match)
 
     return conjunction_globs
 
@@ -127,6 +128,10 @@ class TargetAdaptor(StructWithDeps):
 
 class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
+
+
+@union
+class HydrateableField(object): pass
 
 
 class SourcesField(
@@ -235,7 +240,7 @@ class AppAdaptor(TargetAdaptor):
       # TODO: we want to have this field set from the global option --glob-expansion-failure, or
       # something set on the target. Should we move --glob-expansion-failure to be a bootstrap
       # option? See #5864.
-      path_globs = base_globs.to_path_globs(rel_root, GlobExpansionConjunction.create('all_match'))
+      path_globs = base_globs.to_path_globs(rel_root, GlobExpansionConjunction.all_match)
 
       filespecs_list.append(base_globs.filespecs)
       path_globs_list.append(path_globs)
@@ -263,7 +268,7 @@ class PythonTargetAdaptor(TargetAdaptor):
       if getattr(self, 'resources', None) is None:
         return field_adaptors
       base_globs = BaseGlobs.from_sources_field(self.resources, self.address.spec_path)
-      path_globs = base_globs.to_path_globs(self.address.spec_path, GlobExpansionConjunction.create('all_match'))
+      path_globs = base_globs.to_path_globs(self.address.spec_path, GlobExpansionConjunction.all_match)
       sources_field = SourcesField(self.address,
                                    'resources',
                                    base_globs.filespecs,
@@ -425,4 +430,11 @@ class GlobsWithConjunction(datatype([
 
   @classmethod
   def for_literal_files(cls, file_paths, spec_path):
-    return cls(Files(*file_paths, spec_path=spec_path), GlobExpansionConjunction.create('all_match'))
+    return cls(Files(*file_paths, spec_path=spec_path), GlobExpansionConjunction.all_match)
+
+
+def rules():
+  return [
+    UnionRule(HydrateableField, SourcesField),
+    UnionRule(HydrateableField, BundlesField),
+  ]

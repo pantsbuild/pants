@@ -105,16 +105,16 @@ esac
 export PANTS_DEV=1
 
 # Determine the Python version to use for bootstrapping pants.pex. This would usually not be
-# necessary to set when developing locally, because the `./pants` and `./pants3` scripts set
+# necessary to set when developing locally, because the `./pants` and `./pants2` scripts set
 # these constraints for us already. However, we must set the values here because in
 # non-bootstrap shards we run CI using `./pants.pex` instead of the scripts `./pants`
-# and `./pants3`, so those scripts cannot set the relevant environment variables.
+# and `./pants2`, so those scripts cannot set the relevant environment variables.
 if [[ "${python_two:-false}" == "false" ]]; then
   py_major_minor="3.6"
-  bootstrap_pants_script="./pants3"
+  bootstrap_pants_script="./pants"
 else
   py_major_minor="2.7"
-  bootstrap_pants_script="./pants"
+  bootstrap_pants_script="./pants2"
 fi
 export PY="${PY:-python${py_major_minor}}"
 

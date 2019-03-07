@@ -27,19 +27,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'build_file_address_mapper',
-  sources = ['test_build_file_address_mapper.py'],
-  dependencies = [
-    '3rdparty/python:future',
-    'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/base:project_tree',
-    'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
-  ]
-)
-
-python_tests(
   name = 'subproject_integration',
   sources = ['test_subproject_integration.py'],
   dependencies = [

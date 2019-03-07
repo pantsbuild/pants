@@ -31,6 +31,7 @@ from pants.engine.legacy.structs import (AppAdaptor, JvmBinaryAdaptor, PageAdapt
                                          PantsPluginAdaptor, PythonBinaryAdaptor,
                                          PythonTargetAdaptor, PythonTestsAdaptor,
                                          RemoteSourcesAdaptor, TargetAdaptor)
+from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import RootRule, SingletonRule
@@ -247,7 +248,7 @@ class EngineInitializer(object):
           'could not map goal `{}` to rule `{}`: already claimed by product `{}`'
           .format(goal, rule, goal_map[goal])
         )
-      goal_map[goal] = rule.output_constraint
+      goal_map[goal] = rule.output_type
     return goal_map
 
   @staticmethod
@@ -346,8 +347,7 @@ class EngineInitializer(object):
     rules = (
       [
         RootRule(Console),
-        SingletonRule.from_instance(GlobMatchErrorBehavior.create(glob_match_error_behavior,
-                                                                  none_is_default=True)),
+        SingletonRule.from_instance(glob_match_error_behavior or GlobMatchErrorBehavior.ignore),
         SingletonRule.from_instance(build_configuration),
         SingletonRule(SymbolTable, symbol_table),
       ] +
@@ -356,6 +356,7 @@ class EngineInitializer(object):
       create_process_rules() +
       create_graph_rules(address_mapper) +
       create_options_parsing_rules() +
+      structs_rules() +
       # TODO: This should happen automatically, but most tests (e.g. tests/python/pants_test/auth) fail if it's not here:
       python_test_runner.rules() +
       rules
@@ -363,12 +364,15 @@ class EngineInitializer(object):
 
     goal_map = EngineInitializer._make_goal_map_from_rules(rules)
 
+    union_rules = build_configuration.union_rules()
+
     scheduler = Scheduler(
       native,
       project_tree,
       workdir,
       local_store_dir,
       rules,
+      union_rules,
       execution_options,
       include_trace_on_error=include_trace_on_error,
       visualize_to_dir=bootstrap_options.native_engine_visualize_to,

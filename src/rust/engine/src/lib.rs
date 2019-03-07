@@ -22,11 +22,7 @@
   clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![allow(
-  clippy::new_without_default,
-  clippy::new_without_default_derive,
-  clippy::new_ret_no_self
-)]
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 // We only use unsafe pointer derefrences in our no_mangle exposed API, but it is nicer to list
@@ -54,22 +50,24 @@ use std::mem;
 use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::context::Core;
-use crate::core::{Function, Key, Params, TypeConstraint, TypeId, Value};
+use crate::core::{Function, Key, Params, TypeId, Value};
 use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
-  EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, HandleBuffer,
-  IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
-  SatisfiedByExtern, SatisfiedByTypeExtern, StoreBoolExtern, StoreBytesExtern, StoreF64Extern,
-  StoreI64Extern, StoreTupleExtern, StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
+  EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern,
+  HandleBuffer, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
+  StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
+  StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
 use crate::rule_graph::{GraphMaker, RuleGraph};
 use crate::scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use crate::tasks::Tasks;
 use crate::types::Types;
+use fs::{GlobMatching, MemFS, PathStat};
 use futures::Future;
 use hashing::Digest;
 use log::error;
@@ -105,14 +103,13 @@ pub extern "C" fn externs_set(
   call: CallExtern,
   generator_send: GeneratorSendExtern,
   eval: EvalExtern,
+  get_type_for: GetTypeForExtern,
   identify: IdentifyExtern,
   equals: EqualsExtern,
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
   type_to_str: TypeToStrExtern,
   val_to_str: ValToStrExtern,
-  satisfied_by: SatisfiedByExtern,
-  satisfied_by_type: SatisfiedByTypeExtern,
   store_tuple: StoreTupleExtern,
   store_set: StoreTupleExtern,
   store_dict: StoreTupleExtern,
@@ -124,7 +121,6 @@ pub extern "C" fn externs_set(
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
-  py_str_type: TypeId,
 ) {
   externs::set_externs(Externs {
     context,
@@ -133,14 +129,13 @@ pub extern "C" fn externs_set(
     call,
     generator_send,
     eval,
+    get_type_for,
     identify,
     equals,
     clone_val,
     drop_handles,
     type_to_str,
     val_to_str,
-    satisfied_by,
-    satisfied_by_type,
     store_tuple,
     store_set,
     store_dict,
@@ -152,7 +147,6 @@ pub extern "C" fn externs_set(
     project_ignoring_type,
     project_multi,
     create_exception,
-    py_str_type,
   });
 }
 
@@ -180,19 +174,19 @@ pub extern "C" fn scheduler_create(
   construct_file_content: Function,
   construct_files_content: Function,
   construct_process_result: Function,
-  type_address: TypeConstraint,
-  type_path_globs: TypeConstraint,
-  type_directory_digest: TypeConstraint,
-  type_snapshot: TypeConstraint,
-  type_merge_directories_request: TypeConstraint,
-  type_files_content: TypeConstraint,
-  type_dir: TypeConstraint,
-  type_file: TypeConstraint,
-  type_link: TypeConstraint,
-  type_process_request: TypeConstraint,
-  type_process_result: TypeConstraint,
-  type_generator: TypeConstraint,
-  type_url_to_fetch: TypeConstraint,
+  type_address: TypeId,
+  type_path_globs: TypeId,
+  type_directory_digest: TypeId,
+  type_snapshot: TypeId,
+  type_merge_directories_request: TypeId,
+  type_files_content: TypeId,
+  type_dir: TypeId,
+  type_file: TypeId,
+  type_link: TypeId,
+  type_process_request: TypeId,
+  type_process_result: TypeId,
+  type_generator: TypeId,
+  type_url_to_fetch: TypeId,
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
@@ -377,7 +371,7 @@ pub extern "C" fn execution_add_root_select(
   scheduler_ptr: *mut Scheduler,
   execution_request_ptr: *mut ExecutionRequest,
   param_vals: HandleBuffer,
-  product: TypeConstraint,
+  product: TypeId,
 ) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
@@ -395,13 +389,9 @@ pub extern "C" fn tasks_create() -> *const Tasks {
 }
 
 #[no_mangle]
-pub extern "C" fn tasks_singleton_add(
-  tasks_ptr: *mut Tasks,
-  handle: Handle,
-  output_constraint: TypeConstraint,
-) {
+pub extern "C" fn tasks_singleton_add(tasks_ptr: *mut Tasks, handle: Handle, output_type: TypeId) {
   with_tasks(tasks_ptr, |tasks| {
-    tasks.singleton_add(handle.into(), output_constraint);
+    tasks.singleton_add(handle.into(), output_type);
   })
 }
 
@@ -409,7 +399,7 @@ pub extern "C" fn tasks_singleton_add(
 pub extern "C" fn tasks_task_begin(
   tasks_ptr: *mut Tasks,
   func: Function,
-  output_type: TypeConstraint,
+  output_type: TypeId,
   cacheable: bool,
 ) {
   with_tasks(tasks_ptr, |tasks| {
@@ -418,14 +408,14 @@ pub extern "C" fn tasks_task_begin(
 }
 
 #[no_mangle]
-pub extern "C" fn tasks_add_get(tasks_ptr: *mut Tasks, product: TypeConstraint, subject: TypeId) {
+pub extern "C" fn tasks_add_get(tasks_ptr: *mut Tasks, product: TypeId, subject: TypeId) {
   with_tasks(tasks_ptr, |tasks| {
     tasks.add_get(product, subject);
   })
 }
 
 #[no_mangle]
-pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeConstraint) {
+pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeId) {
   with_tasks(tasks_ptr, |tasks| {
     tasks.add_select(product);
   })
@@ -584,6 +574,7 @@ pub extern "C" fn rule_graph_visualize(
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = PathBuf::from(path_str);
 
+    // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
     let graph = graph_full(scheduler, subject_types.to_vec());
     write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
       println!("Failed to visualize to {}: {:?}", path.display(), e);
@@ -595,13 +586,14 @@ pub extern "C" fn rule_graph_visualize(
 pub extern "C" fn rule_subgraph_visualize(
   scheduler_ptr: *mut Scheduler,
   subject_type: TypeId,
-  product_type: TypeConstraint,
+  product_type: TypeId,
   path_ptr: *const raw::c_char,
 ) {
   with_scheduler(scheduler_ptr, |scheduler| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = PathBuf::from(path_str);
 
+    // TODO(#7117): we want to represent union types in the graph visualizer somehow!!!
     let graph = graph_sub(scheduler, subject_type, product_type);
     write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
       println!("Failed to visualize to {}: {:?}", path.display(), e);
@@ -609,6 +601,8 @@ pub extern "C" fn rule_subgraph_visualize(
   })
 }
 
+// TODO(#4884): This produces "thread panicked while processing panic. aborting." on my linux
+// laptop, requiring me to set RUST_BACKTRACE=1 (or "full") to get the panic message.
 #[no_mangle]
 pub extern "C" fn set_panic_handler() {
   panic::set_hook(Box::new(|panic_info| {
@@ -651,6 +645,36 @@ pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
       Err(err) => error!("{}", &err),
     }
   });
+}
+
+#[no_mangle]
+pub extern "C" fn match_path_globs(path_globs: Handle, paths_buf: BufferBuffer) -> PyResult {
+  let path_globs = match nodes::Snapshot::lift_path_globs(&path_globs.into()) {
+    Ok(path_globs) => path_globs,
+    Err(msg) => {
+      let e: Result<(), _> = Err(msg);
+      return e.into();
+    }
+  };
+
+  let static_fs = Arc::new(MemFS::new(
+    paths_buf
+      .to_os_strings()
+      .into_iter()
+      .map(PathBuf::from)
+      .collect(),
+  ));
+
+  static_fs
+    .expand(path_globs)
+    .wait()
+    .map(|path_stats| {
+      externs::store_bool(path_stats.iter().any(|p| match p {
+        PathStat::File { .. } => true,
+        PathStat::Dir { .. } => false,
+      }))
+    })
+    .into()
 }
 
 #[no_mangle]
@@ -778,13 +802,9 @@ fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
   graph_maker.full_graph()
 }
 
-fn graph_sub(
-  scheduler: &Scheduler,
-  subject_type: TypeId,
-  product_type: TypeConstraint,
-) -> RuleGraph {
+fn graph_sub(scheduler: &Scheduler, subject_type: TypeId, product_type: TypeId) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type]);
-  graph_maker.sub_graph(subject_type, &product_type)
+  graph_maker.sub_graph(subject_type, product_type)
 }
 
 fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {

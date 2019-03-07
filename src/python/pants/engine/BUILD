@@ -55,7 +55,6 @@ python_library(
     ':selectors',
     'src/python/pants/base:project_tree',
     'src/python/pants/option',
-    'src/python/pants/source',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]

@@ -15,9 +15,12 @@ from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var
 
 
-class Platform(enum('normalized_os_name', all_normalized_os_names())):
+class Platform(enum(all_normalized_os_names())):
 
-  default_value = get_normalized_os_name()
+  # TODO: try to turn all of these accesses into v2 dependency injections!
+  @memoized_classproperty
+  def current(cls):
+    return cls(get_normalized_os_name())
 
 
 def _list_field(func):
@@ -155,7 +158,7 @@ class _Executable(_ExtensibleAlgebraic):
     :rtype: list of str
     """
 
-  _platform = Platform.create()
+  _platform = Platform.current
 
   @property
   def invocation_environment_dict(self):
@@ -299,5 +302,5 @@ class HostLibcDev(datatype(['crti_object', 'fingerprint'])): pass
 
 def create_native_environment_rules():
   return [
-    SingletonRule(Platform, Platform.create()),
+    SingletonRule(Platform, Platform.current),
   ]

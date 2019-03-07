@@ -52,16 +52,18 @@ class PathGlobs(datatype([
 
     :param include: A list of filespecs to include.
     :param exclude: A list of filespecs to exclude.
-    :param glob_match_error_behavior: The value to pass to GlobMatchErrorBehavior.create()
+    :param GlobMatchErrorBehavior glob_match_error_behavior: How to respond to globs matching no
+                                                             files.
+    :param GlobExpansionConjunction conjunction: Whether all globs are expected to match at least
+                                                 one file, or if any glob matching is ok.
     :rtype: :class:`PathGlobs`
     """
     return super(PathGlobs, cls).__new__(
       cls,
       include=tuple(include),
       exclude=tuple(exclude),
-      glob_match_error_behavior=GlobMatchErrorBehavior.create(glob_match_error_behavior,
-                                                              none_is_default=True),
-      conjunction=GlobExpansionConjunction.create(conjunction, none_is_default=True))
+      glob_match_error_behavior=(glob_match_error_behavior or GlobMatchErrorBehavior.ignore),
+      conjunction=(conjunction or GlobExpansionConjunction.any_match))
 
 
 class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', int)])):

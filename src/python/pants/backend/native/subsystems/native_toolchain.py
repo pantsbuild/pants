@@ -110,7 +110,7 @@ def select_libc_objects(platform, native_toolchain):
 
 @rule(Assembler, [Select(Platform), Select(NativeToolchain)])
 def select_assembler(platform, native_toolchain):
-  if platform.normalized_os_name == 'darwin':
+  if platform == Platform.darwin:
     assembler = yield Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
     assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
@@ -127,7 +127,7 @@ class BaseLinker(datatype([('linker', Linker)])):
 # TODO: select the appropriate `Platform` in the `@rule` decl using variants!
 @rule(BaseLinker, [Select(Platform), Select(NativeToolchain)])
 def select_base_linker(platform, native_toolchain):
-  if platform.normalized_os_name == 'darwin':
+  if platform == Platform.darwin:
     # TODO(#5663): turn this into LLVM when lld works.
     linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
   else:
@@ -172,7 +172,7 @@ def select_gcc_install_location(gcc):
 def select_llvm_c_toolchain(platform, native_toolchain):
   provided_clang = yield Get(CCompiler, LLVM, native_toolchain._llvm)
 
-  if platform.normalized_os_name == 'darwin':
+  if platform == Platform.darwin:
     xcode_clang = yield Get(CCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
     joined_c_compiler = provided_clang.sequence(xcode_clang)
   else:
@@ -200,9 +200,9 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
 
   # On OSX, we use the libc++ (LLVM) C++ standard library implementation. This is feature-complete
   # for OSX, but not for Linux (see https://libcxx.llvm.org/ for more info).
-  if platform.normalized_os_name == 'darwin':
-    xcode_clang = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
-    joined_cpp_compiler = provided_clangpp.sequence(xcode_clang)
+  if platform == Platform.darwin:
+    xcode_clangpp = yield Get(CppCompiler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+    joined_cpp_compiler = provided_clangpp.sequence(xcode_clangpp)
     extra_llvm_linking_library_dirs = []
     linker_extra_args = []
   else:
@@ -242,7 +242,7 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
 def select_gcc_c_toolchain(platform, native_toolchain):
   provided_gcc = yield Get(CCompiler, GCC, native_toolchain._gcc)
 
-  if platform.normalized_os_name == 'darwin':
+  if platform == Platform.darwin:
     # GCC needs access to some headers that are only provided by the XCode toolchain
     # currently (e.g. "_stdio.h"). These headers are unlikely to change across versions, so this is
     # probably safe.
@@ -267,7 +267,7 @@ def select_gcc_c_toolchain(platform, native_toolchain):
 def select_gcc_cpp_toolchain(platform, native_toolchain):
   provided_gpp = yield Get(CppCompiler, GCC, native_toolchain._gcc)
 
-  if platform.normalized_os_name == 'darwin':
+  if platform == Platform.darwin:
     # GCC needs access to some headers that are only provided by the XCode toolchain
     # currently (e.g. "_stdio.h"). These headers are unlikely to change across versions, so this is
     # probably safe.

@@ -25,7 +25,7 @@ class TargetFilterTaskMixin(Task):
     :raises :class:`TargetFilterTaskMixin.InvalidTargetType`: when no target types correspond to
                                                               the given `alias`.
     """
-    registered_aliases = self.context.build_file_parser.registered_aliases()
+    registered_aliases = self.context.build_configuration.registered_aliases()
     target_types = registered_aliases.target_types_by_alias.get(alias, None)
     if not target_types:
       raise self.InvalidTargetType('Not a target type: {}'.format(alias))

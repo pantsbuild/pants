@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from abc import abstractmethod
 from builtins import filter
 
 from pants.backend.native.config.environment import CppToolchain, CToolchain
@@ -24,6 +25,7 @@ from pants.util.objects import Exactly, SubclassesOf
 class NativeTask(Task):
 
   @classproperty
+  @abstractmethod
   def source_target_constraint(cls):
     """Return a type constraint which is used to filter "source" targets for this task.
 
@@ -33,7 +35,6 @@ class NativeTask(Task):
 
     :return: :class:`pants.util.objects.TypeConstraint`
     """
-    raise NotImplementedError()
 
   @classproperty
   def dependent_target_constraint(cls):

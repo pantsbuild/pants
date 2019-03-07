@@ -116,40 +116,73 @@ pub type Id = u64;
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(pub Id);
+
+impl TypeId {
+  fn pretty_print(self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    if self == ANY_TYPE {
+      write!(f, "Any")
+    } else {
+      write!(f, "{}", externs::type_to_str(self))
+    }
+  }
+}
+
+impl fmt::Debug for TypeId {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    self.pretty_print(f)
+  }
+}
 
 impl fmt::Display for TypeId {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    if *self == ANY_TYPE {
-      write!(f, "Any")
-    } else {
-      write!(f, "{}", externs::type_to_str(*self))
-    }
+    self.pretty_print(f)
   }
 }
 
 // On the python side, the 0th type id is used as an anonymous id
 pub const ANY_TYPE: TypeId = TypeId(0);
 
-// A type constraint, which a TypeId may or may-not satisfy.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct TypeConstraint(pub Key);
-
 // An identifier for a python function.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Function(pub Key);
+
+impl Function {
+  fn pretty_print(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let Function(key) = self;
+    let name = externs::project_str(&externs::val_for(&key), "__name__");
+    write!(f, "{}()", name)
+  }
+}
+
+impl fmt::Display for Function {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    self.pretty_print(f)
+  }
+}
+
+impl fmt::Debug for Function {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    self.pretty_print(f)
+  }
+}
 
 ///
 /// Wraps a type id for use as a key in HashMaps and sets.
 ///
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Key {
   id: Id,
   type_id: TypeId,
+}
+
+impl fmt::Debug for Key {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", externs::key_to_str(self))
+  }
 }
 
 impl Eq for Key {}
