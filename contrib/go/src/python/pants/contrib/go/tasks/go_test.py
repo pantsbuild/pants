@@ -108,6 +108,9 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
 
   def run_tests(self, fail_fast, test_targets, args_by_target):
     self.context.log.debug('test_targets: {}'.format(test_targets))
+    if not test_targets:
+      return TestResult.successful
+
     with self.chroot(test_targets, self._maybe_workdir) as chroot:
       cmdline_args = self._build_and_test_flags + [
         args_by_target[t].import_path for t in test_targets

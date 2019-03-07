@@ -559,8 +559,6 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
       # 1.) output -> output_dir
       # 2.) [iff all == invalid] output_dir -> cache: We do this manually for now.
       # 3.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
-      if not invalid_test_tgts:
-        return TestResult.successful
 
       # 1.) Write all results that will be potentially cached to output_dir.
       result = self.run_tests(fail_fast, invalid_test_tgts, *args).checked()
