@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import unittest
 
 from pex.pex_bootstrapper import get_pex_info
 
@@ -115,6 +116,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertEqual(var_val, pants_run.stdout_data.strip())
 
+  @unittest.skip("pex issue: https://github.com/pantsbuild/pex/issues/655")
   @skip_unless_python27_and_python3
   def test_pants_run_interpreter_selection_with_pexrc(self):
     py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
@@ -136,6 +138,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
         self.assert_success(pants_run_3)
         self.assertIn(py3_path, pants_run_3.stdout_data)
 
+  @unittest.skip("pex issue: https://github.com/pantsbuild/pex/issues/655")
   @skip_unless_python27_and_python3
   def test_pants_binary_interpreter_selection_with_pexrc(self):
     py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
