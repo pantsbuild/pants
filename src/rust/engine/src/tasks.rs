@@ -3,14 +3,14 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::core::{Function, Key, TypeConstraint, TypeId, Value, FNV};
+use crate::core::{Function, Key, TypeId, Value, FNV};
 use crate::externs;
 use crate::selectors::{Get, Select};
 use crate::types::Types;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
-  pub product: TypeConstraint,
+  pub product: TypeId,
   pub clause: Vec<Select>,
   pub gets: Vec<Get>,
   pub func: Function,
@@ -23,11 +23,11 @@ pub struct Task {
 #[derive(Clone, Debug)]
 pub struct Tasks {
   // output product type -> Intrinsic providing it
-  intrinsics: HashMap<TypeConstraint, Vec<Intrinsic>, FNV>,
-  // Singleton Values to be returned for a given TypeConstraint.
-  singletons: HashMap<TypeConstraint, (Key, Value), FNV>,
+  intrinsics: HashMap<TypeId, Vec<Intrinsic>, FNV>,
+  // Singleton Values to be returned for a given TypeId.
+  singletons: HashMap<TypeId, (Key, Value), FNV>,
   // output product type -> list of tasks providing it
-  tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
+  tasks: HashMap<TypeId, Vec<Task>, FNV>,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
 }
@@ -53,7 +53,7 @@ impl Tasks {
     }
   }
 
-  pub fn all_product_types(&self) -> HashSet<TypeConstraint> {
+  pub fn all_product_types(&self) -> HashSet<TypeId> {
     self
       .singletons
       .keys()
@@ -75,16 +75,16 @@ impl Tasks {
       .collect()
   }
 
-  pub fn gen_singleton(&self, product: &TypeConstraint) -> Option<&(Key, Value)> {
-    self.singletons.get(product)
+  pub fn gen_singleton(&self, product: TypeId) -> Option<&(Key, Value)> {
+    self.singletons.get(&product)
   }
 
-  pub fn gen_intrinsic(&self, product: &TypeConstraint) -> Option<&Vec<Intrinsic>> {
-    self.intrinsics.get(product)
+  pub fn gen_intrinsic(&self, product: TypeId) -> Option<&Vec<Intrinsic>> {
+    self.intrinsics.get(&product)
   }
 
-  pub fn gen_tasks(&self, product: &TypeConstraint) -> Option<&Vec<Task>> {
-    self.tasks.get(product)
+  pub fn gen_tasks(&self, product: TypeId) -> Option<&Vec<Task>> {
+    self.tasks.get(&product)
   }
 
   pub fn intrinsics_set(&mut self, types: &Types) {
@@ -121,7 +121,7 @@ impl Tasks {
     }
   }
 
-  pub fn singleton_add(&mut self, value: Value, product: TypeConstraint) {
+  pub fn singleton_add(&mut self, value: Value, product: TypeId) {
     if let Some(&(_, ref existing_value)) = self.singletons.get(&product) {
       panic!(
         "More than one Singleton rule was installed for the product {:?}: {:?} vs {:?}",
@@ -136,7 +136,7 @@ impl Tasks {
   ///
   /// The following methods define the Task registration lifecycle.
   ///
-  pub fn task_begin(&mut self, func: Function, product: TypeConstraint, cacheable: bool) {
+  pub fn task_begin(&mut self, func: Function, product: TypeId, cacheable: bool) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
@@ -151,7 +151,7 @@ impl Tasks {
     });
   }
 
-  pub fn add_get(&mut self, product: TypeConstraint, subject: TypeId) {
+  pub fn add_get(&mut self, product: TypeId, subject: TypeId) {
     self
       .preparing
       .as_mut()
@@ -163,7 +163,7 @@ impl Tasks {
       });
   }
 
-  pub fn add_select(&mut self, product: TypeConstraint) {
+  pub fn add_select(&mut self, product: TypeId) {
     self
       .preparing
       .as_mut()
@@ -194,6 +194,6 @@ impl Tasks {
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub struct Intrinsic {
-  pub product: TypeConstraint,
-  pub input: TypeConstraint,
+  pub product: TypeId,
+  pub input: TypeId,
 }

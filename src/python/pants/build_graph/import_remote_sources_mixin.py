@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from abc import abstractmethod
 from builtins import str
 
 from future.utils import string_types
@@ -28,39 +29,31 @@ class ImportRemoteSourcesMixin(Target, AbstractClass):
     """Thrown if the wrong type of target is encountered."""
 
   @classproperty
+  @abstractmethod
   def expected_target_constraint(cls):
     """
     :returns: A type constraint which is used to validate the targets containing remote sources,
               specified `imported_target_kwargs_field` in a BUILD file.
     :rtype: TypeConstraint
     """
-    # TODO: make a utility in pants.util.meta to register these standard `NotImplementedError`s!
-    raise NotImplementedError(
-      'subclasses of ImportRemoteSourcesMixin must implement an '
-      '`expected_target_constraint` classproperty'
-    )
 
   @classproperty
+  @abstractmethod
   def imported_target_kwargs_field(cls):
     """
     :returns: string representing the keyword argument of an uninitialized target representing
               source target specs to be imported.
+    :rtype: str
     """
-    raise NotImplementedError(
-      'subclasses of ImportRemoteSourcesMixin must implement an '
-      '`imported_target_kwargs_field` classproperty'
-    )
 
   @classproperty
+  @abstractmethod
   def imported_target_payload_field(cls):
     """
     :returns: string representing the payload field of an already-initialized target containing
               source target specs to be imported.
+    :rtype: str
     """
-    raise NotImplementedError(
-      'subclasses of ImportRemoteSourcesMixin must implement an '
-      '`imported_target_payload_field` classproperty'
-    )
 
   @classmethod
   def imported_target_specs(cls, kwargs=None, payload=None):

@@ -23,14 +23,14 @@ from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
 class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTestBase):
 
   @classproperty
-  def _run_before_task_types(cls):
+  def run_before_task_types(cls):
     return [
       CCompile,
       CppCompile,
       LinkSharedLibraries,
-    ] + super(TestBuildLocalDistsWithCtypesNativeSources, cls)._run_before_task_types
+    ] + super(TestBuildLocalDistsWithCtypesNativeSources, cls).run_before_task_types
 
-  _dist_specs = OrderedDict([
+  dist_specs = OrderedDict([
 
     ('src/python/plat_specific_c_dist:ctypes_c_library', {
       'key': 'ctypes_c_library',
@@ -111,7 +111,7 @@ setup(
     self.assertEqual(['platform_specific_ctypes_c_dist==0.0.0+{}'.format(snapshot_version)],
                       [str(x.requirement) for x in synthetic_target.requirements.value])
     local_wheel_products = context.products.get('local_wheels')
-    local_wheel = self._retrieve_single_product_at_target_base(
+    local_wheel = self.retrieve_single_product_at_target_base(
       local_wheel_products, platform_specific_dist)
     self.assertTrue(check_wheel_platform_matches_host(local_wheel))
 
@@ -123,6 +123,6 @@ setup(
                       [str(x.requirement) for x in synthetic_target.requirements.value])
 
     local_wheel_products = context.products.get('local_wheels')
-    local_wheel = self._retrieve_single_product_at_target_base(
+    local_wheel = self.retrieve_single_product_at_target_base(
       local_wheel_products, platform_specific_dist)
     self.assertTrue(check_wheel_platform_matches_host(local_wheel))

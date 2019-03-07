@@ -4,6 +4,63 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.15.0.dev2 (3/02/2019)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+* Add filtering subsystem to permit skipping targets by tags (#7275)
+  `PR #7275 <https://github.com/pantsbuild/pants/pull/7275>`_
+
+* Add junit html-report-error-on-conflict option (#7297)
+  `PR #7297 <https://github.com/pantsbuild/pants/pull/7297>`_
+
+* add checker for accidental constants in boolean operators (#7273)
+  `PR #7273 <https://github.com/pantsbuild/pants/pull/7273>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+* [rsc-compile] bump version; rm metacp jobs; update tests (#7272)
+  `PR #7272 <https://github.com/pantsbuild/pants/pull/7272>`_
+
+Bugfixes
+~~~~~~~~
+* [zinc-compile] fully adopt enum based switches for hermetic/not; test coverage (#7268)
+  `PR #7268 <https://github.com/pantsbuild/pants/pull/7268>`_
+
+* don't do a pants run on osx (#7278)
+  `PR #7278 <https://github.com/pantsbuild/pants/pull/7278>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* enum cleanup (#7269)
+  `PR #7269 <https://github.com/pantsbuild/pants/pull/7269>`_
+
+* filespec matching utility functions use native glob matching. (#7299)
+  `PR #7299 <https://github.com/pantsbuild/pants/pull/7299>`_
+
+* move wheel extraction for UnpackWheels into PexBuilderWrapper and resolve for a single platform only (#7289)
+  `PR #7289 <https://github.com/pantsbuild/pants/pull/7289>`_
+
+* Default to pants devs using Python 3 by renaming `./pants3`->`./pants` and `./pants`->`./pants2` (#7257)
+  `PR #7257 <https://github.com/pantsbuild/pants/pull/7257>`_
+
+* Delete BuildFileAddressMapper. (#7291)
+  `PR #7291 <https://github.com/pantsbuild/pants/pull/7291>`_
+
+* Split out rsc distribution selection into JvmCompile (#7290)
+  `PR #7290 <https://github.com/pantsbuild/pants/pull/7290>`_
+
+* Allow tasks to opt-in to target filtering (#7283)
+  `PR #7283 <https://github.com/pantsbuild/pants/pull/7283>`_
+
+* try defining algebraic Executables in the native backend to compose more readable toolchains (#6855)
+  `PR #6855 <https://github.com/pantsbuild/pants/pull/6855>`_
+
+* Update TargetFiltering args for applying criteria (#7280)
+  `PR #7280 <https://github.com/pantsbuild/pants/pull/7280>`_
+
+
 1.15.0.dev1 (2/22/2019)
 -----------------------
 

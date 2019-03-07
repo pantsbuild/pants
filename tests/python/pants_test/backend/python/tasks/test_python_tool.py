@@ -16,6 +16,7 @@ from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTest
 
 class Tool(PythonToolBase):
   options_scope = 'test-tool'
+  # TODO: make a fake pex tool instead of depending on a real python requirement!
   default_requirements = [
     'pex==1.5.3',
   ]

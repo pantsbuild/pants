@@ -28,10 +28,25 @@ from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
+from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.reporting.report import Report
 from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
+from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import relative_symlink, safe_file_dump
+
+
+class RunTrackerOptionEncoder(CoercingOptionEncoder):
+  """Use the json encoder we use for making options hashable to support datatypes.
+
+  This encoder also explicitly allows OrderedDict inputs, as we accept more than just option values
+  when encoding stats to json.
+  """
+
+  def default(self, o):
+    if isinstance(o, OrderedDict):
+      return o
+    return super(RunTrackerOptionEncoder, self).default(o)
 
 
 class RunTracker(Subsystem):
@@ -341,7 +356,7 @@ class RunTracker(Subsystem):
     # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
     # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
     # But this will first require changing the upload receiver at every shop that uses this.
-    params = {k: json.dumps(v) for (k, v) in stats.items()}
+    params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}
     cookies = Cookies.global_instance()
     auth_provider = auth_provider or '<provider>'
 
@@ -372,12 +387,16 @@ class RunTracker(Subsystem):
       return error('Error: {}'.format(e))
 
   @classmethod
+  def _json_dump_options(cls, stats):
+    return json.dumps(stats, cls=RunTrackerOptionEncoder)
+
+  @classmethod
   def write_stats_to_json(cls, file_name, stats):
     """Write stats to a local json file.
 
     :return: True if successfully written, False otherwise.
     """
-    params = json.dumps(stats)
+    params = cls._json_dump_options(stats)
     if PY2:
       params = params.decode('utf-8')
     try:
@@ -412,7 +431,7 @@ class RunTracker(Subsystem):
     stats_file = os.path.join(get_pants_cachedir(), 'stats',
                               '{}.json'.format(self.run_info.get_info('id')))
     mode = 'w' if PY3 else 'wb'
-    safe_file_dump(stats_file, json.dumps(stats), mode=mode)
+    safe_file_dump(stats_file, self._json_dump_options(stats), mode=mode)
 
     # Add to local stats db.
     StatsDBFactory.global_instance().get_db().insert_stats(stats)

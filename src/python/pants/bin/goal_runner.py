@@ -114,6 +114,7 @@ class GoalRunnerFactory(object):
                         requested_goals=self._options.goals,
                         build_graph=build_graph,
                         build_file_parser=build_file_parser,
+                        build_configuration=self._build_config,
                         address_mapper=address_mapper,
                         invalidation_report=invalidation_report,
                         scheduler=self._graph_session.scheduler_session)

@@ -125,7 +125,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
   @memoized_method
   def _target_type_for_language(self, language):
     alias_for_lang = self._registered_language_aliases()[language]
-    registered_aliases = self.context.build_file_parser.registered_aliases()
+    registered_aliases = self.context.build_configuration.registered_aliases()
     target_types = registered_aliases.target_types_by_alias.get(alias_for_lang, None)
     if not target_types:
       raise TaskError('Registered target type `{0}` for language `{1}` does not exist!'.format(alias_for_lang, language))

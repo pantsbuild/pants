@@ -23,7 +23,7 @@ class TestLibcDirectorySearchFailure(TestBase):
     })
 
     self.libc = global_subsystem_instance(LibcDev)
-    self.platform = Platform.create()
+    self.platform = Platform.current
 
   def test_libc_search_failure(self):
     with self.assertRaises(LibcDev.HostLibcDevResolutionError) as cm:
@@ -44,7 +44,7 @@ class TestLibcSearchDisabled(TestBase):
     })
 
     self.libc = global_subsystem_instance(LibcDev)
-    self.platform = Platform.create()
+    self.platform = Platform.current
 
   def test_libc_disabled_search(self):
     self.assertEqual([], self.libc.get_libc_objects())
@@ -61,7 +61,7 @@ class TestLibcCompilerSearchFailure(TestBase):
     })
 
     self.libc = global_subsystem_instance(LibcDev)
-    self.platform = Platform.create()
+    self.platform = Platform.current
 
   @platform_specific('linux')
   def test_libc_compiler_search_failure(self):
