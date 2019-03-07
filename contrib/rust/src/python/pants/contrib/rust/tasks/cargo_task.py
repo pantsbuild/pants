@@ -119,8 +119,8 @@ class CargoTask(Task):
     self.context.log.debug(
       'Run\n\tCMD: {0}\n\tENV: {1}\n\tCWD: {2}'.format(command, proc_env, current_working_dir))
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, env=proc_env, cwd=current_working_dir)
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=proc_env, cwd=current_working_dir)
 
-    std_output = proc.communicate()
+    std_out, std_err = proc.communicate()
     workunit.set_outcome(3)
-    return std_output[0].decode('utf-8')
+    return std_out.decode('utf-8'), std_err.decode('utf-8')

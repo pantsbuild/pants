@@ -121,7 +121,7 @@ class Build(Workspace):
         'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
       }
 
-      std_output = self.run_command_and_get_output(cmd, target.manifest, env, workunit)
+      std_output, _ = self.run_command_and_get_output(cmd, target.manifest, env, workunit)
       cargo_build_plan = json.loads(std_output)
 
       if workunit.outcome() != WorkUnit.SUCCESS:
@@ -304,6 +304,11 @@ class Build(Workspace):
     output_path = os.path.join(head, 'output')
     return output_path
 
+  def create_build_script_stderr_path(self, out_dir):
+    head, base = os.path.split(out_dir)
+    stderr_path = os.path.join(head, 'stderr')
+    return stderr_path
+
   def create_directories(self, make_dirs):
     build_root = get_buildroot()
     for dir in make_dirs:
@@ -382,12 +387,18 @@ class Build(Workspace):
     return env
 
   def run_custom_build(self, cmd, invocation_cwd, env, target, workunit):
-    std_output = self.run_command_and_get_output(cmd, invocation_cwd, env, workunit)
-    build_script_std_out_dir = self._package_out_dirs[target.address.target_name]
-    self._build_script_output_cache[
-      target.address.target_name] = self.save_and_parse_build_script_output(std_output,
-                                                                            build_script_std_out_dir[
-                                                                              1], target)
+    std_output, std_err = self.run_command_and_get_output(cmd, invocation_cwd, env, workunit)
+
+    build_script_std_out_dir = self._package_out_dirs[target.address.target_name][1]
+    self._build_script_output_cache[target.address.target_name] = \
+      self.save_and_parse_build_script_output(std_output, build_script_std_out_dir, target)
+
+    if len(std_err) > 0:
+      stderr_path = self.create_build_script_stderr_path(build_script_std_out_dir)
+      safe_file_dump(stderr_path, std_err, mode='w')
+      self.context.log.warn(
+      'STD_ERR of {0} saved in: {1}'.format(target.address.target_name, stderr_path))
+
     for warning in self._build_script_output_cache[target.address.target_name]['warning']:
       self.context.log.warn('Warning: {0}'.format(warning))
 
@@ -435,7 +446,7 @@ class Build(Workspace):
         parsed_statements = parse_multiple_cargo_statements(cargo_statements)
         if len(parsed_statements['rerun-if-changed']) != 0 or len(
                 parsed_statements['rerun-if-env-changed']) != 0:
-          self.context.log.debug('Rebuild target: {0}'.format(target_address.target_name))
+          self.context.log.info('Rebuild target: {0}'.format(target_address.target_name))
           self.mark_target_invalid(target_address)
 
   def get_build_index_file_path(self):
