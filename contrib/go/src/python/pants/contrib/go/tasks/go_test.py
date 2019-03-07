@@ -59,7 +59,8 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     reconstructed for spawning test commands regardless of how the targets are partitioned.
     """
     return {
-      t: self._GoTestTargetInfo(import_path=t.import_path, gopath=self.get_gopath(t))
+      t: self._GoTestTargetInfo(import_path=text_type(t.import_path),
+                                gopath=text_type(self.get_gopath(t)))
       for t in targets
     }
 
