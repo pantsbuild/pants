@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from builtins import str
 from contextlib import contextmanager
 
 from future.utils import text_type
@@ -32,9 +33,7 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
   @classmethod
   def register_options(cls, register):
     super(GoTest, cls).register_options(register)
-    # TODO: turn these into a list of individually-shlexed strings and deprecate using a single
-    # string!
-    register('--build-and-test-flags', default='',
+    register('--build-and-test-flags', type=list, member_type=str, default=[],
              fingerprint=True,
              help='Flags to pass in to `go test` tool.')
 
@@ -86,7 +85,10 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
 
   @memoized_property
   def _build_and_test_flags(self):
-    return safe_shlex_split(self.get_options().build_and_test_flags)
+    return [
+      safe_shlex_split(flags_section)
+      for flags_section in self.get_options().build_and_test_flags
+    ]
 
   def _spawn(self, workunit, go_cmd, cwd):
     go_process = go_cmd.spawn(cwd=cwd,
