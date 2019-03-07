@@ -16,7 +16,7 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
   def _c_flag_rules(key_value):
     def _incremental(_):
       new_path = os.path.join(result_dir, 'incremental')
-      make_dirs.append(new_path)
+      make_dirs.add(new_path)
       return new_path
 
     rules = {
@@ -51,7 +51,7 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
 
   def _out_dir_flag_rule(_):
     new_path = os.path.join(result_dir, 'deps')
-    make_dirs.append(new_path)
+    make_dirs.add(new_path)
     return new_path
 
   def _extern_flag_rule(key_value):
@@ -108,9 +108,9 @@ def outputs_rules(invocation_key, result_dir, make_dirs, make_sym_links, **kargs
   def _change_path(path, result_dir):
     file_name = os.path.basename(path)
     new_dir = os.path.join(result_dir, 'deps')
-    make_dirs.append(new_dir)
+    make_dirs.add(new_dir)
     new_file = os.path.join(new_dir, file_name)
-    make_sym_links.append(new_file)
+    make_sym_links.add(new_file)
     return new_file
 
   for index, path in enumerate(invocation_key):

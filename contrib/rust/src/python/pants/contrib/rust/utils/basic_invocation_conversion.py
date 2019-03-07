@@ -26,8 +26,8 @@ def get_default_conversion_rules():
 
 def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_dir):
   pants_invocation = copy.deepcopy(target.cargo_invocation)
-  make_dirs = []
-  make_sym_links = []
+  make_dirs = set()
+  make_sym_links = set()
 
   transformation_rules = get_default_conversion_rules()
 

@@ -13,7 +13,7 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
   def _c_flag_rules(key_value):
     def _incremental(_):
       new_path = os.path.join(result_dir, 'incremental')
-      make_dirs.append(new_path)
+      make_dirs.add(new_path)
       return new_path
 
     rules = {
@@ -49,7 +49,7 @@ def args_rules(invocation_key, target, result_dir, crate_out_dirs, libraries_dir
   def _out_dir_flag_rule(_):
     package_name = "{}{}".format(information['package_name'], information['extra-filename'])
     new_path = os.path.join(result_dir, 'build', package_name)
-    make_dirs.append(new_path)
+    make_dirs.add(new_path)
     return new_path
 
   def _extern_flag_rule(key_value):
@@ -81,7 +81,7 @@ def env_rules(invocation_key, result_dir, libraries_dir, make_dirs, **kwargs):
     head, out = os.path.split(old_path)
     head, package_name = os.path.split(head)
     new_path = os.path.join(result_dir, 'build', package_name, out)
-    make_dirs.append(new_path)
+    make_dirs.add(new_path)
     return new_path
 
   def _dyld_lib_path(old_path):
@@ -105,7 +105,7 @@ def outputs_rules(invocation_key, result_dir, information, make_dirs, **kwargs):
     file_name = os.path.basename(path)
     package_name = "{}{}".format(information['package_name'], information['extra-filename'])
     new_dir = os.path.join(result_dir, 'build', package_name)
-    make_dirs.append(new_dir)
+    make_dirs.add(new_dir)
     return os.path.join(new_dir, file_name)
 
   for index, path in enumerate(invocation_key):

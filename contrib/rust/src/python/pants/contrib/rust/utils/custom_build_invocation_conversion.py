@@ -36,7 +36,7 @@ def get_default_run_conversion_rules():
 def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_dir):
   pants_invocation = copy.deepcopy(target.cargo_invocation)
   information = collect_information(pants_invocation, get_default_information())
-  make_dirs = []
+  make_dirs = set()
 
   compile_mode = pants_invocation["compile_mode"]
 
