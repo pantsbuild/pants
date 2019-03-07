@@ -668,7 +668,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       # Invalidated targets are a subset of relevant targets: get the context for this one.
       compile_target = ivts.target
       invalid_dependencies = self._collect_invalid_compile_dependencies(compile_target,
-                                                                        invalid_target_set)
+                                                                        invalid_target_set,
+                                                                        compile_contexts)
 
       jobs.extend(
         self.create_compile_jobs(compile_target, compile_contexts, invalid_dependencies, ivts,
@@ -745,7 +746,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     record('sources_len', sources_len)
     record('incremental', is_incremental)
 
-  def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set):
+  def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set,
+    compile_contexts):
     # Collects all invalid dependencies that are not dependencies of other invalid dependencies
     # within the closure of compile_target.
     invalid_dependencies = OrderedSet()
@@ -758,13 +760,13 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         return True
       if target in invalid_target_set:
         invalid_dependencies.add(target)
-        return self._on_invalid_compile_dependency(target, compile_target)
+        return self._on_invalid_compile_dependency(target, compile_target, compile_contexts)
       return True
 
     compile_target.walk(work, predicate)
     return invalid_dependencies
 
-  def _on_invalid_compile_dependency(self, dep, compile_target):
+  def _on_invalid_compile_dependency(self, dep, compile_target, compile_contexts):
     """Decide whether to continue searching for invalid targets to use in the execution graph.
 
     By default, don't recurse because once we have an invalid dependency, we can rely on its

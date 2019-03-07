@@ -125,6 +125,16 @@ class _JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
       target_type = None
     return target_type
 
+  @classmethod
+  @property
+  def rsc_then_zinc(cls):
+    return _JvmCompileWorkflowType.create('rsc-then-zinc')
+
+  @classmethod
+  @property
+  def zinc_only(cls):
+    return _JvmCompileWorkflowType.create('zinc-only')
+
 
 class RscCompileContext(CompileContext):
   def __init__(self,
@@ -135,9 +145,11 @@ class RscCompileContext(CompileContext):
                jar_file,
                log_dir,
                zinc_args_file,
-               sources):
+               sources,
+               workflow):
     super(RscCompileContext, self).__init__(target, analysis_file, classes_dir, jar_file,
                                                log_dir, zinc_args_file, sources)
+    self.workflow = workflow
     self.rsc_jar_file = rsc_jar_file
 
   def ensure_output_dirs_exist(self):
@@ -226,9 +238,8 @@ class RscCompile(ZincCompile):
     # Ensure that the jar/rsc jar is on the rsc_classpath.
     for target in targets:
       rsc_cc, compile_cc = compile_contexts[target]
-      target_compile_type = self._classify_compile_target(target)
-      if target_compile_type is not None:
-        cp_entries = target_compile_type.resolve_for_enum_variant({
+      if rsc_cc.workflow is not None:
+        cp_entries = rsc_cc.workflow.resolve_for_enum_variant({
           'zinc-only': lambda : confify([compile_cc.jar_file]),
           'rsc-then-zinc': lambda : confify(
             to_classpath_entries([rsc_cc.rsc_jar_file], self.context._scheduler)),
@@ -253,27 +264,25 @@ class RscCompile(ZincCompile):
   def select(self, target):
     if not isinstance(target, JvmTarget):
       return False
-    if self._classify_compile_target(target) is not None:
-      return True
-    return False
+    return target.has_sources('.java') or target.has_sources('.scala')
 
   def _classify_compile_target(self, target):
     return _JvmCompileWorkflowType.classify_target(target)
 
-  def _key_for_target_as_dep(self, target):
+  def _key_for_target_as_dep(self, target, workflow):
     # used for jobs that are either rsc jobs or zinc jobs run against rsc
-    return self._classify_compile_target(target).resolve_for_enum_variant({
-      'zinc-only': lambda: self._zinc_key_for_target(target),
+    return workflow.resolve_for_enum_variant({
+      'zinc-only': lambda: self._zinc_key_for_target(target, workflow),
       'rsc-then-zinc': lambda: self._rsc_key_for_target(target),
     })()
 
-  def _rsc_key_for_target(self, compile_target):
-    return 'rsc({})'.format(compile_target.address.spec)
+  def _rsc_key_for_target(self, target):
+    return 'rsc({})'.format(target.address.spec)
 
-  def _zinc_key_for_target(self, compile_target):
-    return self._classify_compile_target(compile_target).resolve_for_enum_variant({
-      'zinc-only': lambda: 'zinc({})'.format(compile_target.address.spec),
-      'rsc-then-zinc': lambda: 'zinc_against_rsc({})'.format(compile_target.address.spec),
+  def _zinc_key_for_target(self, target, workflow):
+    return workflow.resolve_for_enum_variant({
+      'zinc-only': lambda: 'zinc({})'.format(target.address.spec),
+      'rsc-then-zinc': lambda: 'zinc_against_rsc({})'.format(target.address.spec),
     })()
 
   def create_compile_jobs(self,
@@ -384,9 +393,10 @@ class RscCompile(ZincCompile):
       for tgt in invalid_deps:
         # None can occur for e.g. JarLibrary deps, which we don't need to compile as they are
         # populated in the resolve goal.
-        if self._classify_compile_target(tgt) is not None:
+        tgt_rsc_cc, tgt_z_cc = compile_contexts[tgt]
+        if tgt_rsc_cc.workflow is not None:
           # Rely on the results of zinc compiles for zinc-compatible targets
-          yield self._key_for_target_as_dep(tgt)
+          yield self._key_for_target_as_dep(tgt, tgt_rsc_cc.workflow)
 
     def make_rsc_job(target, dep_targets):
       return Job(
@@ -403,12 +413,13 @@ class RscCompile(ZincCompile):
 
     def only_zinc_invalid_dep_keys(invalid_deps):
       for tgt in invalid_deps:
-        if self._classify_compile_target(tgt) is not None:
-          yield self._zinc_key_for_target(tgt)
+        rsc_cc_tgt, zinc_cc_tgt = compile_contexts[tgt]
+        if rsc_cc_tgt.workflow is not None:
+          yield self._zinc_key_for_target(tgt, rsc_cc_tgt.workflow)
 
     def make_zinc_job(target, input_product_key, output_products, dep_keys):
       return Job(
-        key=self._zinc_key_for_target(target),
+        key=self._zinc_key_for_target(target, rsc_compile_context.workflow),
         fn=functools.partial(
           self._default_work_for_vts,
           ivts,
@@ -424,7 +435,7 @@ class RscCompile(ZincCompile):
 
     # Create the rsc job.
     # Currently, rsc only supports outlining scala.
-    workflow = self._classify_compile_target(compile_target)
+    workflow = rsc_compile_context.workflow
     workflow.resolve_for_enum_variant({
       'zinc-only': lambda: None,
       'rsc-then-zinc': lambda: rsc_jobs.append(make_rsc_job(compile_target, invalid_dependencies)),
@@ -489,6 +500,7 @@ class RscCompile(ZincCompile):
         rsc_jar_file=os.path.join(rsc_dir, 'm.jar'),
         log_dir=os.path.join(rsc_dir, 'logs'),
         sources=sources,
+        workflow=self._classify_compile_target(target),
       ),
       CompileContext(
         target=target,
@@ -607,17 +619,20 @@ class RscCompile(ZincCompile):
   def _jdk_libs_abs(self, nonhermetic_dist):
     return nonhermetic_dist.find_libs(self._JDK_LIB_NAMES)
 
-  def _on_invalid_compile_dependency(self, dep, compile_target):
+  def _on_invalid_compile_dependency(self, dep, compile_target, contexts):
     """Decide whether to continue searching for invalid targets to use in the execution graph.
 
-    If a necessary dep is a Scala dep and the root is Java, continue to recurse because
-    otherwise we'll drop the path between Zinc compile of the Java target and a Zinc
-    compile of a transitive Scala dependency.
+    If a necessary dep is a Rsc compiled dep and the root is a Zinc one, continue to recurse because
+    otherwise we'll drop the path between Zinc compile of the Zinc target and a Zinc
+    compile of a transitive Rsc dependency.
 
-    This is only an issue for graphs like J -> S1 -> S2, where J is a Java target,
-    S1/2 are Scala targets and S2 must be on the classpath to compile J successfully.
+    This is only an issue for graphs like J -> S1 -> S2, where J is a Zinc target,
+    S1/2 are Rsc targets and S2 must be on the classpath to compile J successfully.
     """
-    if dep.has_sources('.scala') and compile_target.has_sources('.java'):
-      return True
-    else:
-      return False
+    return contexts[compile_target][0].workflow.resolve_for_enum_variant({
+      'zinc-only': lambda : contexts[dep][0].workflow.resolve_for_enum_variant({
+        'rsc-then-zinc': True,
+        'zinc-only': False
+      }),
+      'rsc-then-zinc': lambda : False
+    })()
