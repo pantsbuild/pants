@@ -81,7 +81,8 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     yield iter_partitions
 
   def collect_files(self, *args):
-    pass
+    """This task currently doesn't have any output that it would store in an artifact cache."""
+    return []
 
   @memoized_property
   def _build_and_test_flags(self):
