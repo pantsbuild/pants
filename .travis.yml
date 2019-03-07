@@ -794,7 +794,7 @@ matrix:
       stage: *test
       env:
         - *py27_linux_test_config_env
-        # - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
+        - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
         - CACHE_NAME=integrationshard0.py27blacklist
       script:
         - ./build-support/bin/travis-ci.sh -c2w -i 0/1
