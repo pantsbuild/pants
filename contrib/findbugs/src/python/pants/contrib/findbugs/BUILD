@@ -5,6 +5,7 @@ contrib_plugin(
   name='plugin',
   dependencies=[
     'contrib/findbugs/src/python/pants/contrib/findbugs/tasks',
+    'src/python/pants/base:deprecated',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
