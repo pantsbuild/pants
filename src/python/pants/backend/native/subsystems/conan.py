@@ -20,7 +20,7 @@ class Conan(PythonToolBase):
     'pylint==1.9.3',
   ]
   default_entry_point = 'conans.conan'
-  default_interpreter_constraints = ['CPython>=2.7,<4']
+  # default_interpreter_constraints = ['CPython>=2.7,<4']
 
   @classmethod
   def register_options(cls, register):
