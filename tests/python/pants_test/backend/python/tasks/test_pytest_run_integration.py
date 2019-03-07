@@ -100,7 +100,9 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     # Ensure that we get a message indicating the abnormal exit.
     self.assertIn("FAILURE: Test was killed by signal", pants_run.stdout_data)
 
-  @unittest.skip("pex issue: https://github.com/pantsbuild/pex/issues/655")
+  @unittest.skip(
+    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
+      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   def test_pytest_explicit_coverage(self):
     with temporary_dir() as coverage_dir:
       pants_run = self.run_pants(['clean-all',
@@ -111,7 +113,9 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       self.assertTrue(os.path.exists(os.path.join(coverage_dir, 'coverage.xml')))
 
-  @unittest.skip("pex issue: https://github.com/pantsbuild/pex/issues/655")
+  @unittest.skip(
+    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
+      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   def test_pytest_with_profile(self):
     with temporary_dir() as profile_dir:
       prof = os.path.join(profile_dir, 'pants.prof')
@@ -125,7 +129,9 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       # current process started.
       self.assertTrue(os.path.exists('{}.0'.format(prof)))
 
-  @unittest.skip("pex issue: https://github.com/pantsbuild/pex/issues/655")
+  @unittest.skip(
+    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
+      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   @skip_unless_python27_and_python3
   def test_pants_test_interpreter_selection_with_pexrc(self):
     """Test the pants test goal with intepreters selected from a PEX_PYTHON_PATH
