@@ -43,12 +43,23 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     return True
 
   def _test_target_filter(self):
-    return self.is_local_src
+    """Filter for targets with test files which are specified on the command line.
+
+    Because go libraries have test sources within the same target, we explicitly avoid going through
+    the dependencies of the target roots, or we'd be running tests on every source dependency.
+    """
+    def filt(tgt):
+      is_test_target_on_cmdline = tgt in self.context.target_roots and self.is_test_target(tgt)
+      return is_test_target_on_cmdline
+    return filt
 
   def _validate_target(self, target):
     self.ensure_workspace(target)
 
-  class _GoTestTargetInfo(datatype([('import_path', text_type), ('gopath', text_type)])): pass
+  class _GoTestTargetInfo(datatype([
+      ('import_path', text_type),
+      ('gopath', text_type),
+  ])): pass
 
   def _generate_args_for_targets(self, targets):
     """
@@ -96,6 +107,7 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     return get_buildroot()
 
   def run_tests(self, fail_fast, test_targets, args_by_target):
+    self.context.log.debug('test_targets: {}'.format(test_targets))
     with self.chroot(test_targets, self._maybe_workdir) as chroot:
       cmdline_args = self._build_and_test_flags + [
         args_by_target[t].import_path for t in test_targets
@@ -104,6 +116,8 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
         args_by_target[t].gopath for t in test_targets
       )
       go_cmd = self.go_dist.create_go_cmd('test', gopath=gopath, args=cmdline_args)
+
+      self.context.log.debug('go_cmd: {}'.format(go_cmd))
 
       workunit_labels = [WorkUnitLabel.TOOL, WorkUnitLabel.TEST]
       with self.context.new_workunit(
