@@ -412,7 +412,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci_py27_ucs2:latest
-      sh -c "PEX_VERBOSE=9 ./build-support/bin/ci.sh -2b && RUN_PANTS_FROM_PEX=1 PEX_VERBOSE=9 ./build-support/bin/release.sh -n"
+      sh -c "PEX_VERBOSE=9 ./build-support/bin/ci.sh -2b && RUN_PANTS_FROM_PEX=1 PEX_VERBOSE=9 PY=/pyenv-docker-build/shims/python2.7 ./build-support/bin/release.sh -n"
 
 py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
   <<: *py27_linux_build_wheels_no_ucs
