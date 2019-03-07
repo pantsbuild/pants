@@ -30,8 +30,8 @@ class Toolchain(CargoTask):
     register(
       '--script_fingerprint',
       type=str,
-      default='40328ad8fa5cfc15cdb0446bb812a4bba4c22b5aee195cfb8d64b8ef1de5879c',
-      help='The sha256 hash of the rustup install script.')
+      default='a741519217f27635fe49004764969cfac20fbce744d20b7114600012e6e80796',
+      help='The sha256 hash of the rustup install script (https://sh.rustup.rs).')
 
   @classmethod
   def product_types(cls):
@@ -69,7 +69,7 @@ class Toolchain(CargoTask):
     if current_fingerprint != self.get_options().script_fingerprint:
       raise TaskError(
         'The fingerprint of the rustup script has changed!\nLast known: {0}\ncurrent: {1}'.format(
-          self.LAST_KNOWN_FINGERPRINT, current_fingerprint))
+          self.get_options().script_fingerprint, current_fingerprint))
 
   def save_rustup_install_script(self, install_script):
     save_dir_path = os.path.join(self.versioned_workdir, 'rustup_install_script')
