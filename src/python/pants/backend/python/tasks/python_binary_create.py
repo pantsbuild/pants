@@ -140,7 +140,8 @@ class PythonBinaryCreate(Task):
         if is_python_target(tgt):
           constraint_tgts.append(tgt)
 
-      # Add target's interpreter compatibility constraints to pex info.
+      # Add interpreter compatibility constraints to pex info. This will first check the targets for any
+      # constraints, and if they do not have any will resort to the global constraints.
       pex_builder.add_interpreter_constraints_from(constraint_tgts)
 
       # Dump everything into the builder's chroot.
