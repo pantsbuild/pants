@@ -21,6 +21,10 @@ from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 class PythonRunIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
 
+  @classmethod
+  def hermetic(cls):
+    return True
+
   @skip_unless_python3
   @ensure_daemon
   def test_run_3(self):
