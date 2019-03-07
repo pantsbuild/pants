@@ -24,6 +24,8 @@ build_output = [
   'cargo:warning=mdb_env_get_maxkeysize(MDB_env *env)',
   'cargo:warning=                                ^',
   'cargo:warning=1 warning generated.',
+  'cargo:rerun-if-env-changed=PY',
+  'cargo:rerun-if-changed=cbindgen.toml'
 ]
 
 
@@ -94,6 +96,11 @@ class UtilsTest(unittest.TestCase):
         '                                ^',
         '1 warning generated.'
       ],
+      'rerun-if-env-changed': [
+        'PY'
+      ],
+      'rerun-if-changed': [
+        'cbindgen.toml'
       ]
     }
     statements = parse_multiple_cargo_statements(output)

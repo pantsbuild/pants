@@ -15,7 +15,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.address import Address
-from pants.util.dirutil import absolute_symlink, safe_file_dump, safe_mkdir
+from pants.invalidation.build_invalidator import CacheKeyGenerator
+from pants.util.dirutil import absolute_symlink, read_file, safe_file_dump, safe_mkdir
 
 from pants.contrib.rust.tasks.cargo_workspace import Workspace
 from pants.contrib.rust.utils.basic_invocation_conversion import \
@@ -27,9 +28,11 @@ from pants.contrib.rust.utils.custom_build_output_parsing import (filter_cargo_s
 
 
 class Build(Workspace):
-  _build_script_output = dict()
-  _package_out_dirs = dict()
+  _build_script_output_cache = {}
+  _build_index = {}
+  _package_out_dirs = {}
   _libraries_dir_path = None
+  _build_index_dir_path = None
 
   @classmethod
   def implementation_version(cls):
@@ -64,17 +67,25 @@ class Build(Workspace):
 
     cargo_targets = self.context.build_graph.targets(self.is_cargo_synthetic)
     self.build_targets(cargo_targets)
+    self.write_build_index()
 
   def prepare_task(self):
     self.context.products.safe_create_data('rust_libs', lambda: {})
     self.context.products.safe_create_data('rust_bins', lambda: {})
     self.context.products.safe_create_data('rust_tests', lambda: {})
     self._libraries_dir_path = self.create_libraries_dir()
+    self._build_index_dir_path = self.create_build_index_dir()
+    self.read_build_index()
 
   def create_libraries_dir(self):
     libraries_dir_path = os.path.join(self.versioned_workdir, 'deps')
     safe_mkdir(libraries_dir_path)
     return libraries_dir_path
+
+  def create_build_index_dir(self):
+    build_index_dir_path = os.path.join(self.versioned_workdir, 'build_index')
+    safe_mkdir(build_index_dir_path)
+    return build_index_dir_path
 
   def prepare_cargo_targets(self):
     cargo_targets = self.get_targets(self.is_cargo_original)
@@ -82,6 +93,8 @@ class Build(Workspace):
       cargo_build_plan = self.get_cargo_build_plan(target)
       target_definitions = self.get_target_definitions_out_of_cargo_build_plan(cargo_build_plan)
       self.generate_targets(target_definitions, target)
+
+    self.check_if_build_scripts_are_invalid()
 
   def get_cargo_build_plan(self, target):
     with self.context.new_workunit(name='cargo-build-plan',
@@ -275,12 +288,21 @@ class Build(Workspace):
       else:
         self.context.log.info(workunit.outcome_string(workunit.outcome()))
 
-  def parse_and_save_build_script_output(self, std_output, out_dir):
-    lines = std_output.split('\n')
-    cargo_statements = filter_cargo_statements(lines)
-    head, base = os.path.split(out_dir)
-    safe_file_dump(os.path.join(head, 'output'), '\n'.join(cargo_statements), mode='w')
+  def save_and_parse_build_script_output(self, std_output, out_dir, target):
+    cargo_statements = self.parse_build_script_output(std_output)
+    output_path = self.create_build_script_output_path(out_dir)
+    safe_file_dump(output_path, '\n'.join(cargo_statements), mode='w')
+    self._build_index.update({target.address.spec: output_path})
     return parse_multiple_cargo_statements(cargo_statements)
+
+  def parse_build_script_output(self, output):
+    lines = output.split('\n')
+    return filter_cargo_statements(lines)
+
+  def create_build_script_output_path(self, out_dir):
+    head, base = os.path.split(out_dir)
+    output_path = os.path.join(head, 'output')
+    return output_path
 
   def create_directories(self, make_dirs):
     build_root = get_buildroot()
@@ -319,19 +341,21 @@ class Build(Workspace):
     return self.extend_args_with_cargo_statement(cmd, target)
 
   def extend_args_with_cargo_statement(self, cmd, target):
-    def extend_cmd(cmd, cargo_outputs):
-      for output in cargo_outputs:
-        cmd.extend(output)
+    def extend_cmd(cmd, build_script_output):
+      for output_cmd in build_script_output:
+        cmd.extend(output_cmd)
       return cmd
 
     for dependency in target.dependencies:
-      cargo_outputs = self._build_script_output.get(dependency.address.target_name, None)
-      if cargo_outputs:
-        self.context.log.debug('Custom build outputs:\n{0}'.format(self.stringify(cargo_outputs)))
-        cmd = extend_cmd(cmd, cargo_outputs['rustc-link-lib'])
-        cmd = extend_cmd(cmd, cargo_outputs['rustc-link-search'])
-        cmd = extend_cmd(cmd, cargo_outputs['rustc-flags'])
-        cmd = extend_cmd(cmd, cargo_outputs['rustc-cfg'])
+      build_script_output = self._build_script_output_cache.get(dependency.address.target_name,
+                                                                None)
+      if build_script_output:
+        self.context.log.debug(
+          'Custom build outputs:\n{0}'.format(self.stringify(build_script_output)))
+        cmd = extend_cmd(cmd, build_script_output['rustc-link-lib'])
+        cmd = extend_cmd(cmd, build_script_output['rustc-link-search'])
+        cmd = extend_cmd(cmd, build_script_output['rustc-flags'])
+        cmd = extend_cmd(cmd, build_script_output['rustc-cfg'])
     return cmd
 
   def create_env(self, invocation_env, target):
@@ -346,22 +370,25 @@ class Build(Workspace):
 
   def extend_env_with_cargo_statement(self, env, target):
     for dependency in target.dependencies:
-      cargo_outputs = self._build_script_output.get(dependency.address.target_name, None)
-      if cargo_outputs:
-        self.context.log.debug('Custom build outputs:\n{0}'.format(self.stringify(cargo_outputs)))
-        for rustc_env in cargo_outputs['rustc-env']:
+      build_script_output = self._build_script_output_cache.get(dependency.address.target_name,
+                                                                None)
+      if build_script_output:
+        self.context.log.debug(
+          'Custom build output:\n{0}'.format(self.stringify(build_script_output['rustc-env'])))
+        for rustc_env in build_script_output['rustc-env']:
           # is PATH also possible?
-          self._add_env_var(env, rustc_env[0], rustc_env[1])
+          name, value = rustc_env
+          self._add_env_var(env, name, value)
     return env
 
   def run_custom_build(self, cmd, invocation_cwd, env, target, workunit):
     std_output = self.run_command_and_get_output(cmd, invocation_cwd, env, workunit)
     build_script_std_out_dir = self._package_out_dirs[target.address.target_name]
-    self._build_script_output[
-      target.address.target_name] = self.parse_and_save_build_script_output(std_output,
+    self._build_script_output_cache[
+      target.address.target_name] = self.save_and_parse_build_script_output(std_output,
                                                                             build_script_std_out_dir[
-                                                                              1])
-    for warning in self._build_script_output[target.address.target_name]['warning']:
+                                                                              1], target)
+    for warning in self._build_script_output_cache[target.address.target_name]['warning']:
       self.context.log.warn('Warning: {0}'.format(warning))
 
   def add_rust_products(self, target, pants_invocation):
@@ -385,6 +412,57 @@ class Build(Workspace):
         map(lambda path: (path, cwd_test),
             filter(lambda path: os.path.exists(path), links.keys()))))
       rust_tests.update({target.address.target_name: current})
+
+  def mark_target_invalid(self, address):
+    target = self.context.build_graph.get_target(address)
+    self._build_invalidator.force_invalidate((CacheKeyGenerator().key_for_target(target)))
+
+    def mark_dependee_invalid(dependee):
+      self._build_invalidator.force_invalidate((CacheKeyGenerator().key_for_target(dependee)))
+
+    self.context.build_graph.walk_transitive_dependee_graph(
+      [address],
+      work=lambda dependee: mark_dependee_invalid(dependee),
+    )
+
+  def check_if_build_scripts_are_invalid(self):
+    for target_addr_spec, build_script_output_path in self._build_index.items():
+      target_address = Address.parse(target_addr_spec)
+      if self.context.build_graph.get_target(target_address) and os.path.isfile(
+              build_script_output_path):
+        build_scripts_output = read_file(build_script_output_path, binary_mode='r')
+        cargo_statements = self.parse_build_script_output(build_scripts_output)
+        parsed_statements = parse_multiple_cargo_statements(cargo_statements)
+        if len(parsed_statements['rerun-if-changed']) != 0 or len(
+                parsed_statements['rerun-if-env-changed']) != 0:
+          self.context.log.debug('Rebuild target: {0}'.format(target_address.target_name))
+          self.mark_target_invalid(target_address)
+
+  def get_build_index_file_path(self):
+    return os.path.join(self._build_index_dir_path, 'index.json')
+
+  def read_build_index(self):
+    build_index_path = self.get_build_index_file_path()
+    if not os.path.isfile(build_index_path):
+      self.context.log.debug('No build index was found.')
+      self._build_index = {}
+      self.invalidate()
+    else:
+      self.context.log.debug('Read build index from: {0}'.format(build_index_path))
+      with open(build_index_path, 'r') as build_index_json_file:
+        try:
+          self._build_index = json.load(build_index_json_file)
+        except ValueError as ve:
+          self.context.log.debug(ve)
+          self._build_index = {}
+          self.invalidate()
+
+  def write_build_index(self):
+    build_index_path = self.get_build_index_file_path()
+    self.context.log.debug('Write build index to: {0}'.format(build_index_path))
+    mode = 'w' if PY3 else 'wb'
+    with open(build_index_path, mode) as build_index_json_file:
+      json.dump(self._build_index, build_index_json_file, indent=2, separators=(',', ': '))
 
   def stringify(self, obj):
     return json.dumps(obj, indent=4, separators=(',', ': '))

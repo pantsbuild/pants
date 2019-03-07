@@ -16,8 +16,8 @@ def get_default_converter():
     'rustc-cfg': lambda cfg: ['--cfg', cfg],
     'rustc-env': lambda var_value: spilt_into_key_value(var_value),
     'warning': lambda warning: warning,
-    # 'rerun-if-changed': lambda file: file,
-    # 'rerun-if-env-changed': lambda env: env,
+    'rerun-if-changed': lambda file: file,
+    'rerun-if-env-changed': lambda env: env,
   }
 
 
@@ -59,6 +59,8 @@ def parse_multiple_cargo_statements(cargo_statements):
     'rustc-cfg': [],
     'rustc-env': [],
     'warning': [],
+    'rerun-if-changed': [],
+    'rerun-if-env-changed': [],
   }
 
   cargo_statements_without_prefix = list(

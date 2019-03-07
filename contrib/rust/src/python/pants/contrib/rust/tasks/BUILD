@@ -30,6 +30,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
+    'src/python/pants/invalidation',
     'contrib/rust/src/python/pants/contrib/rust/utils:basic_invocation_conversion',
     'contrib/rust/src/python/pants/contrib/rust/utils:custom_build_invocation_conversion',
     'contrib/rust/src/python/pants/contrib/rust/utils:custom_build_output_parsing',
