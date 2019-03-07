@@ -43,15 +43,8 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     return True
 
   def _test_target_filter(self):
-    """Filter for targets with test files which are specified on the command line.
-
-    Because go libraries have test sources within the same target, we explicitly avoid going through
-    the dependencies of the target roots, or we'd be running tests on every source dependency.
-    """
-    def filt(tgt):
-      is_test_target_on_cmdline = tgt in self.context.target_roots and self.is_test_target(tgt)
-      return is_test_target_on_cmdline
-    return filt
+    """Filter for go library targets (in the target closure) with test files."""
+    return self.is_test_target
 
   def _validate_target(self, target):
     self.ensure_workspace(target)
