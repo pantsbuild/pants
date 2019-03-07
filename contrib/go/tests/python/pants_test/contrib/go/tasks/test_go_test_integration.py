@@ -22,6 +22,14 @@ class GoTestIntegrationTest(PantsRunIntegrationTest):
     assertRegex(self, pants_run.stdout_data, r'ok\s+libA')
     assertRegex(self, pants_run.stdout_data, r'ok\s+libB')
 
+    # Run a second time and see that they are cached.
+    # TODO: this is better done with a unit test, and as noted in #7188, testing interaction with a
+    # remote cache should probably be added somewhere.
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)
+    assertRegex(self, pants_run.stdout_data, r'contrib/go/examples/src/go/libA\s+\.+\s+SUCCESS')
+    assertRegex(self, pants_run.stdout_data, r'contrib/go/examples/src/go/libB\s+\.+\s+SUCCESS')
+
   def test_no_fast(self):
     args = ['test.go',
             '--no-fast',
