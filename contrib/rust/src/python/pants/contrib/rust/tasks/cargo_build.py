@@ -430,7 +430,7 @@ class Build(Workspace):
       target_address = Address.parse(target_addr_spec)
       if self.context.build_graph.get_target(target_address) and os.path.isfile(
               build_script_output_path):
-        build_scripts_output = read_file(build_script_output_path, binary_mode='r')
+        build_scripts_output = read_file(build_script_output_path, binary_mode=False)
         cargo_statements = self.parse_build_script_output(build_scripts_output)
         parsed_statements = parse_multiple_cargo_statements(cargo_statements)
         if len(parsed_statements['rerun-if-changed']) != 0 or len(

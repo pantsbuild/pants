@@ -129,7 +129,7 @@ class Toolchain(CargoTask):
     toolchain_path = os.path.join(get_buildroot(), toolchain_opt, 'rust-toolchain')
     if os.path.isfile(toolchain_path):
       self.context.log.debug('Found rust-toolchain file.')
-      toolchain = read_file(toolchain_path, binary_mode='r')
+      toolchain = read_file(toolchain_path, binary_mode=False)
       return toolchain.strip()
     else:
       return toolchain_opt
