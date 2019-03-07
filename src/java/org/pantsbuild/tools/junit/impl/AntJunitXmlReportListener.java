@@ -207,7 +207,7 @@ class AntJunitXmlReportListener extends RunListener {
     @XmlAttribute private int errors;
     @XmlAttribute private int failures;
     @XmlAttribute private int skipped;
-    @XmlAttribute private String hostname;
+    @XmlAttribute private String hostname = "127.0.0.1";
     @XmlAttribute private int tests;
     @XmlAttribute private String time;
     @XmlAttribute private String timestamp;
@@ -231,13 +231,11 @@ class AntJunitXmlReportListener extends RunListener {
     private TestSuite() {
       name = null;
       testClass = null;
-      hostname = null;
     }
 
-    TestSuite(Description test, String localHostName) {
+    TestSuite(Description test) {
       name = test.getClassName();
       testClass = test.getTestClass();
-      hostname = localHostName;
     }
 
     public int getErrors() {
@@ -334,15 +332,10 @@ class AntJunitXmlReportListener extends RunListener {
 
   private final File outdir;
   private final StreamSource streamSource;
-  // NB: Cache the localhost name as a workaround for an issue where localhost resolution on OSX
-  // may take seconds.
-  // See: https://bugs.openjdk.java.net/browse/JDK-8170910
-  private final String localHostName;
 
   AntJunitXmlReportListener(File outdir, StreamSource streamSource) {
     this.outdir = outdir;
     this.streamSource = streamSource;
-    this.localHostName = getLocalHostName();
   }
 
   @Override
@@ -365,7 +358,7 @@ class AntJunitXmlReportListener extends RunListener {
         String testClass = test.getClassName();
         TestSuite suite = suites.get(testClass);
         if (suite == null) {
-          suite = new TestSuite(test, localHostName);
+          suite = new TestSuite(test);
           suites.put(testClass, suite);
         }
         TestCase testCase = new TestCase(test);
@@ -588,7 +581,7 @@ class AntJunitXmlReportListener extends RunListener {
     }
     TestSuite unknownSuite = getTestSuiteFor(description);
     if (unknownSuite == null) {
-      unknownSuite = new TestSuite(description, localHostName);
+      unknownSuite = new TestSuite(description);
       suites.put(description.getClassName(), unknownSuite);
     }
     unknownSuite.incrementFailures();
@@ -628,13 +621,5 @@ class AntJunitXmlReportListener extends RunListener {
   @VisibleForTesting
   protected Map<String, TestCase> getCases() {
     return cases;
-  }
-
-  private static String getLocalHostName() {
-    try {
-      return InetAddress.getLocalHost().getHostName();
-    } catch (UnknownHostException e) {
-      return "localhost";
-    }
   }
 }
