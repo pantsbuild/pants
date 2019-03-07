@@ -170,6 +170,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     os.remove(py2_pex)
     os.remove(py3_pex)
 
+  @unittest.skip("pex issue: https://github.com/pantsbuild/pex/issues/655")
   @skip_unless_python3
   def test_target_constraints_with_no_sources(self):
     with temporary_dir() as interpreters_cache:
