@@ -551,27 +551,28 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
                           # Re-run tests when the code they test (and depend on) changes.
                           invalidate_dependents=True) as invalidation_check:
 
+      # Processing proceeds through:
+      # 1.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
+      # 2.) output -> output_dir
+      # 3.) [iff all == invalid] output_dir -> cache: We do this manually for now.
+
+      # 1.) The full partition was valid, our results will have been staged for/by caching if not
+      # already local.
+      if not invalidation_check.invalid_vts:
+        return TestResult.successful
+
       invalid_test_tgts = [invalid_test_tgt
                            for vts in invalidation_check.invalid_vts
                            for invalid_test_tgt in vts.targets]
 
-      # Processing proceeds through:
-      # 1.) output -> output_dir
-      # 2.) [iff all == invalid] output_dir -> cache: We do this manually for now.
-      # 3.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
-
-      # 1.) Write all results that will be potentially cached to output_dir.
+      # 2.) Write all results that will be potentially cached to output_dir.
       result = self.run_tests(fail_fast, invalid_test_tgts, *args).checked()
 
       cache_vts = self._vts_for_partition(invalidation_check)
       if invalidation_check.all_vts == invalidation_check.invalid_vts:
-        # 2.) All tests in the partition were invalid, cache successful test results.
+        # 3.) All tests in the partition were invalid, cache successful test results.
         if result.success and self.artifact_cache_writes_enabled():
           self.update_artifact_cache([(cache_vts, self.collect_files(*args))])
-      elif not invalidation_check.invalid_vts:
-        # 3.) The full partition was valid, our results will have been staged for/by caching
-        # if not already local.
-        pass
       else:
         # The partition was partially invalid.
 
