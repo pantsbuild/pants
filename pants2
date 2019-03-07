@@ -9,6 +9,6 @@ export PY="python2.7"
 # Allow spawned subprocesses, such as unit tests, to execute with either Python 2 and Python 3.
 # So long as the target does not have a compatibility constraint that requires only Python 3, the
 # interpreter selection will default to using Python 2 as this is the minimum acceptable interpreter.
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=2.7,<3','CPython>=3.6,<4']"
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython>=2.7,<3','CPython>=3.6,<4']}"
 
 ./pants "$@"
