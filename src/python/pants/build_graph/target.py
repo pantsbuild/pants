@@ -13,7 +13,6 @@ from six import string_types
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -874,13 +873,5 @@ class Target(AbstractTarget):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
                                             .format(key_arg_section, type(sources)))
-    elif not isinstance(sources, EagerFilesetWithSpec):
-      deprecated_conditional(
-        lambda: True,
-        '1.12.0.dev0',
-        ('FilesetWithSpec sources values are deprecated except for EagerFilesetWithSpec values. '
-         'Saw value of type {}').format(type(sources))
-      )
-
 
     return SourcesField(sources=sources)
