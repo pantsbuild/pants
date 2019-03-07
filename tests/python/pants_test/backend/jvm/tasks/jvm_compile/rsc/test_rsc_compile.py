@@ -225,8 +225,16 @@ class RscCompileTest(TaskTestBase):
         }
       }
     )
+    init_subsystem(
+      JUnit,
+    )
     self.make_target(
       '//:scala-library',
+      target_type=JarLibrary,
+      jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
+    )
+    self.make_target(
+      '//:junit-library',
       target_type=JarLibrary,
       jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
     )
