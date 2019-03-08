@@ -23,7 +23,7 @@ RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
     && ${PYENV_ROOT}/bin/pyenv global ${PYTHON_2_VERSION}'
 ENV PATH "${PYENV_ROOT}/shims:${PATH}"
 ENV PY "${PYENV_ROOT}/shims/python2.7"
-ENV PEX_PYTHON "${PYENV_ROOT}/shims/python2.7"
+ENV PEX_PYTHON_PATH "${PYENV_ROOT}/shims/python2.7"
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
