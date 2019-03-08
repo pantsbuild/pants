@@ -446,6 +446,12 @@ class SchedulerSession(object):
     """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
     return self._scheduler._metrics(self._session)
 
+  def metrics_have_engine_workunits(self):
+    return "engine_workunits" in self.metrics()
+
+  def engine_workunits(self):
+    return self.metrics().get("engine_workunits")
+
   def with_fork_context(self, func):
     return self._scheduler.with_fork_context(func)
 

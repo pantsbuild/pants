@@ -18,6 +18,8 @@ use indexmap::IndexMap;
 use log::{debug, info, warn};
 use parking_lot::Mutex;
 use ui::EngineDisplay;
+use rand::thread_rng;
+use rand::Rng;
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
@@ -34,7 +36,7 @@ struct InnerSession {
   // If enabled, the display that will render the progress of the V2 engine.
   display: Option<Mutex<EngineDisplay>>,
   // A place to store info about workunits in rust part
-  workunits: Mutex<Vec<WorkUnit>>,
+  workunits: Option<Mutex<Vec<WorkUnit>>>,
 }
 
 #[derive(Clone)]
@@ -50,15 +52,16 @@ pub struct WorkUnit {
 impl Session {
   pub fn new(
     scheduler: &Scheduler,
-    _should_record_zipkin_spans: bool,
+    should_record_zipkin_spans: bool,
     should_render_ui: bool,
     ui_worker_count: usize,
   ) -> Session {
+    let workunits = if should_record_zipkin_spans {Some(Mutex::new(Vec::new()))} else {None};
     let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
       display: EngineDisplay::create(ui_worker_count, should_render_ui).map(Mutex::new),
-      workunits: Mutex::new(Vec::new()),
+      workunits: workunits,
     };
     Session(Arc::new(inner_session))
   }
@@ -81,13 +84,27 @@ impl Session {
     &self.0.display
   }
 
-  pub fn get_workunits(&self) -> &Mutex<Vec<WorkUnit>> {
+  pub fn get_workunits(&self) -> &Option<Mutex<Vec<WorkUnit>>> {
     &self.0.workunits
   }
 
-  pub fn add_workunit(&self, workunit: WorkUnit) {
-    self.0.workunits.lock().push(workunit);
+  pub fn add_workunit(&self, node_name: String, start_timestamp: f64, end_timestamp: f64) {
+    let w = &self.0.workunits;
+    if let &Some(ref x) = w {
+      let workunit = WorkUnit {
+        name: node_name,
+        start_timestamp: start_timestamp,
+        end_timestamp: end_timestamp,
+        span_id: generate_random_64bit_string(),
+      };
+      x.lock().push(workunit)};
   }
+}
+
+fn generate_random_64bit_string() -> String {
+  let mut rng = thread_rng();
+  let random_u64: u64 = rng.gen();
+  format!("{:16.x}", random_u64)
 }
 
 pub struct ExecutionRequest {

@@ -151,7 +151,9 @@ class Context(object):
     yield
     metrics = self._scheduler.metrics()
     self.run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-    self.run_tracker.report.bulk_record_workunits(metrics)
+    if self._scheduler.metrics_have_engine_workunits():
+      engine_workunits = self._scheduler.engine_workunits()
+      self.run_tracker.report.bulk_record_workunits(engine_workunits)
     self._set_affected_target_count_in_runtracker()
 
   def _set_target_root_count_in_runtracker(self):

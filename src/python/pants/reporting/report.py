@@ -141,7 +141,7 @@ class Report(object):
           for reporter in self._reporters.values():
             reporter.handle_output(workunit, label, s)
 
-  def bulk_record_workunits(self, metrics):
+  def bulk_record_workunits(self, engine_workunits):
     with self._lock:
       for reporter in self._reporters.values():
-        reporter.bulk_record_workunits(metrics)
+        reporter.bulk_record_workunits(engine_workunits)
