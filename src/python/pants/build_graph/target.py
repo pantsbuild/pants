@@ -25,7 +25,7 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec
+from pants.source.wrapped_globs import FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
@@ -112,17 +112,10 @@ class Target(AbstractTarget):
       """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
-      if 'source' in unknown_args and 'sources' in payload.as_dict():
-        unknown_args.pop('source')
-      if 'sources' in unknown_args:
-        if 'sources' in payload.as_dict():
-          deprecated_conditional(
-            lambda: True,
-            '1.11.0.dev0',
-            ('The source argument is deprecated - it gets automatically promoted to sources.'
-             'Target {} should just use a sources argument. No BUILD files need changing. '
-             'The source argument will stop being populated -').format(target.type_alias),
-          )
+      if 'sources' in payload.as_dict():
+        if 'source' in unknown_args:
+          unknown_args.pop('source')
+        if 'sources' in unknown_args:
           unknown_args.pop('sources')
           kwargs.pop('sources')
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
