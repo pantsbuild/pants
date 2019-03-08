@@ -16,7 +16,12 @@ function parse_wheel_abi() {
   # See https://www.python.org/dev/peps/pep-0425/#use for how wheel names are defined.
   wheel_filename="$1"
   IFS='-' read -r -a components <<< "${wheel_filename}"
-  abi="${components[-2]}"
+  # Check if optional build tag
+  if [ ${#components[@]} -eq 6 ]; then
+    abi="${components[4]}"
+  else
+    abi="${components[3]}"
+  fi
   echo "${abi}"
 }
 
@@ -37,8 +42,8 @@ cp "${REPO_ROOT}/pants.pex" "${CHECK_FOLDER}/pants.pex"
 unzip -qq "${CHECK_FOLDER}/pants.pex" -d "${CHECK_FOLDER}"
 
 # Grab wheel filenames
-dependencies_section=$(cat "${CHECK_FOLDER}/PEX-INFO" | sed 's/.*"distributions": {\(.*\)}.*$/\1/')
-IFS=',' read -r -a wheel_filenames_and_shas <<< "${dependencies_section}"
+distributions_section=$(cat "${CHECK_FOLDER}/PEX-INFO" | sed 's/.*"distributions": {\(.*\)},.*$/\1/')
+IFS=' ' read -r -a wheel_filenames_and_shas <<< "${distributions_section}"
 WHEEL_FILENAMES=()
 for filename_or_sha in ${wheel_filenames_and_shas[@]}; do
   if [[ "${filename_or_sha}" = *'.whl":' ]] ; then
