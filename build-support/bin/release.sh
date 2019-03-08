@@ -7,9 +7,18 @@ set -e
 ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 source ${ROOT}/build-support/common.sh
 
-PY=$(which python2.7 || exit 0)
-[[ -n "${PY}" ]] || die "You must have python2.7 installed and on the path to release."
-export PY
+# Set the Python interpreter to be used for the virtualenv. Note we allow the user to
+# predefine this value so that they may point to a specific interpreter, e.g. 2.7.13 vs. 2.7.15.
+py_major_minor="2.7"
+export PY="${PY:-python${py_major_minor}}"
+command -v $PY >/dev/null || die "You must have python2.7 installed and on the path to release."
+
+# Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
+# to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
+# Python 2.7.13 vs. 2.7.15. When running with Python 3, we must also set this constraint to ensure
+# all spawned subprocesses use Python 3 rather than the default of Python 2.
+py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 function run_local_pants() {
   ${ROOT}/pants "$@"
