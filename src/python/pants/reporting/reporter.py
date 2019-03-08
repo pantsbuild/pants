@@ -47,7 +47,7 @@ class Reporter(object):
     """A workunit has finished."""
     pass
 
-  def bulk_record_workunits(self, metrics):
+  def bulk_record_workunits(self, engine_workunits):
     """A collection of workunits from Rust (engine) part"""
     pass
 

@@ -133,9 +133,8 @@ class ZipkinReporter(Reporter):
 
     logger.debug("Zipkin trace may be located at this URL {}/traces/{}".format(endpoint, self.trace_id))
 
-  def bulk_record_workunits(self, metrics):
-    """A collection of workunits from Rust (engine) part"""
-    engine_workunits = metrics["engine_workunits"]
+  def bulk_record_workunits(self, engine_workunits):
+    """A collection of workunits from v2 engine part"""
     for workunit in engine_workunits:
       duration = workunit['end_timestamp'] - workunit['start_timestamp']
 
@@ -147,8 +146,7 @@ class ZipkinReporter(Reporter):
       )
       span.zipkin_attrs = ZipkinAttrs(
         trace_id=self.trace_id,
-        span_id=generate_random_64bit_string(),
-        # span_id=workunit['span_id'],
+        span_id=workunit['span_id'],
         parent_span_id=workunit.get("parent_id", self.parent_id), # TODO change it when we properly pass parent id
         # parent_span_id=workunit.get("parent_id", None),
         flags='0', # flags: stores flags header. Currently unused
