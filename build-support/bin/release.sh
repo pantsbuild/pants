@@ -9,9 +9,14 @@ source ${ROOT}/build-support/common.sh
 
 # Set the Python interpreter to be used for the virtualenv. Note we allow the user to
 # predefine this value so that they may point to a specific interpreter, e.g. 2.7.13 vs. 2.7.15.
-py_major_minor="2.7"
-export PY="${PY:-python${py_major_minor}}"
-command -v $PY >/dev/null || die "You must have python2.7 installed and on the path to release."
+export PY="${PY:-python2.7}"
+if ! which "${PY}" >/dev/null; then
+  die "Python interpreter ${PY} not discoverable on your PATH."
+fi
+py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
+if [[ "${py_major_minor}" != "2.7" ]]; then
+  die "Invalid interpreter. The release script requires python2.7, and you are using python${py_major_minor}."
+fi
 
 # Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
 # to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
