@@ -668,6 +668,10 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
 
 matrix:
   include:
+    - <<: *py27_linux_build_engine
+    # - <<: *py36_linux_build_engine
+    - <<: *py27_osx_build_engine
+    # - <<: *py36_osx_build_engine
 
     - <<: *py27_lint
     - <<: *py36_lint
@@ -693,11 +697,9 @@ matrix:
         - ./build-support/bin/travis-ci.sh -lp
 
     - <<: *py27_linux_build_wheels_ucs2
-      stage: *bootstrap
     - <<: *py27_linux_build_wheels_ucs4
     - <<: *py27_osx_build_wheels_ucs2
     - <<: *py27_osx_build_wheels_ucs4
-      stage: *bootstrap
 
     - <<: *py36_linux_test_config
       name: "Integration tests for pants - shard 0 (Py3.6 PEX)"
