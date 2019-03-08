@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package build.bazel.remote.execution.v2;
 
+import "build/bazel/semver/semver.proto";
 import "google/api/annotations.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/duration.proto";
@@ -92,6 +93,9 @@ service Execution {
   // * `INTERNAL`: An internal error occurred in the execution engine or the
   //   worker.
   // * `DEADLINE_EXCEEDED`: The execution timed out.
+  // * `CANCELLED`: The operation was cancelled by the client. This status is
+  //   only possible if the server implements the Operations API CancelOperation
+  //   method, and it was called for the current execution.
   //
   // In the case of a missing input or command, the server SHOULD additionally
   // send a [PreconditionFailure][google.rpc.PreconditionFailure] error detail
@@ -156,7 +160,7 @@ service ActionCache {
   // `ContentAddressableStorage`.
   //
   // Errors:
-  // * `NOT_IMPLEMENTED`: This method is not supported by the server.
+  // * `UNIMPLEMENTED`: This method is not supported by the server.
   // * `RESOURCE_EXHAUSTED`: There is insufficient storage space to add the
   //   entry to the cache.
   rpc UpdateActionResult(UpdateActionResultRequest) returns (ActionResult) {
@@ -180,8 +184,8 @@ service ActionCache {
 // hierarchy, which must also each be uploaded on their own.
 //
 // For small file uploads the client should group them together and call
-// [BatchUpdateBlobs][build.bazel.remote.execution.v2.ContentAddressableStorage.BatchUpdateBlobs]
-// on chunks of no more than 10 MiB. For large uploads, the client must use the
+// [BatchUpdateBlobs][build.bazel.remote.execution.v2.ContentAddressableStorage.BatchUpdateBlobs].
+// For large uploads, the client must use the
 // [Write method][google.bytestream.ByteStream.Write] of the ByteStream API. The
 // `resource_name` is `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}`,
 // where `instance_name` is as described in the next paragraph, `uuid` is a
@@ -242,18 +246,20 @@ service ContentAddressableStorage {
 
   // Upload many blobs at once.
   //
-  // The client MUST NOT upload blobs with a combined total size of more than 10
-  // MiB using this API. Such requests should either be split into smaller
+  // The server may enforce a limit of the combined total size of blobs
+  // to be uploaded using this API. This limit may be obtained using the
+  // [Capabilities][build.bazel.remote.execution.v2.Capabilities] API.
+  // Requests exceeding the limit should either be split into smaller
   // chunks or uploaded using the
   // [ByteStream API][google.bytestream.ByteStream], as appropriate.
   //
-  // This request is equivalent to calling a hypothetical `UpdateBlob` request
+  // This request is equivalent to calling a Bytestream `Write` request
   // on each individual blob, in parallel. The requests may succeed or fail
   // independently.
   //
   // Errors:
-  // * `INVALID_ARGUMENT`: The client attempted to upload more than 10 MiB of
-  //   data.
+  // * `INVALID_ARGUMENT`: The client attempted to upload more than the
+  //   server supported limit.
   //
   // Individual requests may return the following errors, additionally:
   // * `RESOURCE_EXHAUSTED`: There is insufficient disk quota to store the blob.
@@ -262,6 +268,29 @@ service ContentAddressableStorage {
   // provided data.
   rpc BatchUpdateBlobs(BatchUpdateBlobsRequest) returns (BatchUpdateBlobsResponse) {
     option (google.api.http) = { post: "/v2/{instance_name=**}/blobs:batchUpdate" body: "*" };
+  }
+
+  // Download many blobs at once.
+  //
+  // The server may enforce a limit of the combined total size of blobs
+  // to be downloaded using this API. This limit may be obtained using the
+  // [Capabilities][build.bazel.remote.execution.v2.Capabilities] API.
+  // Requests exceeding the limit should either be split into smaller
+  // chunks or downloaded using the
+  // [ByteStream API][google.bytestream.ByteStream], as appropriate.
+  //
+  // This request is equivalent to calling a Bytestream `Read` request
+  // on each individual blob, in parallel. The requests may succeed or fail
+  // independently.
+  //
+  // Errors:
+  // * `INVALID_ARGUMENT`: The client attempted to read more than the
+  //   server supported limit.
+  //
+  // Every error on individual read will be returned in the corresponding digest
+  // status.
+  rpc BatchReadBlobs(BatchReadBlobsRequest) returns (BatchReadBlobsResponse) {
+    option (google.api.http) = { post: "/v2/{instance_name=**}/blobs:batchRead" body: "*" };
   }
 
   // Fetch the entire directory tree rooted at a node.
@@ -400,7 +429,8 @@ message Command {
   // A list of the output files that the client expects to retrieve from the
   // action. Only the listed files, as well as directories listed in
   // `output_directories`, will be returned to the client as output.
-  // Other files that may be created during command execution are discarded.
+  // Other files or directories that may be created during command execution
+  // are discarded.
   //
   // The paths are relative to the working directory of the action execution.
   // The paths are specified using a single forward slash (`/`) as a path
@@ -412,16 +442,17 @@ message Command {
   // MUST be sorted lexicographically by code point (or, equivalently, by UTF-8
   // bytes).
   //
-  // An output file cannot be duplicated, be a parent of another output file, be
-  // a child of a listed output directory, or have the same path as any of the
-  // listed output directories.
+  // An output file cannot be duplicated, be a parent of another output file, or
+  // have the same path as any of the listed output directories.
   repeated string output_files = 3;
 
   // A list of the output directories that the client expects to retrieve from
-  // the action. Only the contents of the indicated directories (recursively
-  // including the contents of their subdirectories) will be
-  // returned, as well as files listed in `output_files`. Other files that may
-  // be created during command execution are discarded.
+  // the action. Only the listed directories will be returned (an entire
+  // directory structure will be returned as a
+  // [Tree][build.bazel.remote.execution.v2.Tree] message digest, see
+  // [OutputDirectory][build.bazel.remote.execution.v2.OutputDirectory]), as
+  // well as files listed in `output_files`. Other files or directories that
+  // may be created during command execution are discarded.
   //
   // The paths are relative to the working directory of the action execution.
   // The paths are specified using a single forward slash (`/`) as a path
@@ -435,9 +466,8 @@ message Command {
   // MUST be sorted lexicographically by code point (or, equivalently, by UTF-8
   // bytes).
   //
-  // An output directory cannot be duplicated, be a parent of another output
-  // directory, be a parent of a listed output file, or have the same path as
-  // any of the listed output files.
+  // An output directory cannot be duplicated or have the same path as any of
+  // the listed output files.
   repeated string output_directories = 4;
 
   // The platform requirements for the execution environment. The server MAY
@@ -491,11 +521,12 @@ message Platform {
 }
 
 // A `Directory` represents a directory node in a file tree, containing zero or
-// more children [FileNodes][build.bazel.remote.execution.v2.FileNode]
-// and [DirectoryNodes][build.bazel.remote.execution.v2.DirectoryNode].
-// Each `Node` contains its name in the directory, the digest of its content
-// (either a file blob or a `Directory` proto), as well as possibly some
-// metadata about the file or directory.
+// more children [FileNodes][build.bazel.remote.execution.v2.FileNode],
+// [DirectoryNodes][build.bazel.remote.execution.v2.DirectoryNode] and
+// [SymlinkNodes][build.bazel.remote.execution.v2.SymlinkNode].
+// Each `Node` contains its name in the directory, either the digest of its
+// content (either a file blob or a `Directory` proto) or a symlink target, as
+// well as possibly some metadata about the file or directory.
 //
 // In order to ensure that two equivalent directory trees hash to the same
 // value, the following restrictions MUST be obeyed when constructing a
@@ -503,8 +534,8 @@ message Platform {
 //   - Every child in the directory must have a path of exactly one segment.
 //     Multiple levels of directory hierarchy may not be collapsed.
 //   - Each child in the directory must have a unique path segment (file name).
-//   - The files and directories in the directory must each be sorted in
-//     lexicographical order by path. The path strings must be sorted by code
+//   - The files, directories and symlinks in the directory must each be sorted
+//     in lexicographical order by path. The path strings must be sorted by code
 //     point, equivalently, by UTF-8 bytes.
 //
 // A `Directory` that obeys the restrictions is said to be in canonical form.
@@ -556,6 +587,9 @@ message Directory {
 
   // The subdirectories in the directory.
   repeated DirectoryNode directories = 2;
+
+  // The symlinks in the directory.
+  repeated SymlinkNode symlinks = 3;
 }
 
 // A `FileNode` represents a single file and associated metadata.
@@ -584,6 +618,20 @@ message DirectoryNode {
   // represented. See [Digest][build.bazel.remote.execution.v2.Digest]
   // for information about how to take the digest of a proto message.
   Digest digest = 2;
+}
+
+// A `SymlinkNode` represents a symbolic link.
+message SymlinkNode {
+  // The name of the symlink.
+  string name = 1;
+
+  // The target path of the symlink. The path separator is a forward slash `/`.
+  // The target path can be relative to the parent directory of the symlink or
+  // it can be an absolute path starting with `/`. Support for absolute paths
+  // can be checked using the [Capabilities][build.bazel.remote.execution.v2.Capabilities]
+  // API. The canonical form forbids the substrings `/./` and `//` in the target
+  // path. `..` components are allowed anywhere in the target path.
+  string target = 2;
 }
 
 // A content digest. A digest for a given blob consists of the size of the blob
@@ -666,13 +714,30 @@ message ActionResult {
 
   // The output files of the action. For each output file requested in the
   // `output_files` field of the Action, if the corresponding file existed after
-  // the action completed, a single entry will be present in the output list.
+  // the action completed, a single entry will be present either in this field,
+  // or in the output_file_symlinks field, if the file was a symbolic link to
+  // another file.
   //
   // If the action does not produce the requested output, or produces a
   // directory where a regular file is expected or vice versa, then that output
   // will be omitted from the list. The server is free to arrange the output
   // list as desired; clients MUST NOT assume that the output list is sorted.
   repeated OutputFile output_files = 2;
+
+  // The output files of the action that are symbolic links to other files. Those
+  // may be links to other output files, or input files, or even absolute paths
+  // outside of the working directory, if the server supports
+  // [SymlinkAbsolutePathStrategy.ALLOWED][build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy].
+  // For each output file requested in the `output_files` field of the Action,
+  // if the corresponding file existed after
+  // the action completed, a single entry will be present either in this field,
+  // or in the `output_files` field, if the file was not a symbolic link.
+  //
+  // If the action does not produce the requested output, or produces a
+  // directory where a regular file is expected or vice versa, then that output
+  // will be omitted from the list. The server is free to arrange the output
+  // list as desired; clients MUST NOT assume that the output list is sorted.
+  repeated OutputSymlink output_file_symlinks = 10;
 
   // The output directories of the action. For each output directory requested
   // in the `output_directories` field of the Action, if the corresponding
@@ -735,6 +800,22 @@ message ActionResult {
   // ```
   repeated OutputDirectory output_directories = 3;
 
+  // The output directories of the action that are symbolic links to other
+  // directories. Those may be links to other output directories, or input
+  // directories, or even absolute paths outside of the working directory,
+  // if the server supports
+  // [SymlinkAbsolutePathStrategy.ALLOWED][build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy].
+  // For each output directory requested in the `output_directories` field of
+  // the Action, if the directory file existed after
+  // the action completed, a single entry will be present either in this field,
+  // or in the `output_directories` field, if the directory was not a symbolic link.
+  //
+  // If the action does not produce the requested output, or produces a
+  // file where a directory is expected or vice versa, then that output
+  // will be omitted from the list. The server is free to arrange the output
+  // list as desired; clients MUST NOT assume that the output list is sorted.
+  repeated OutputSymlink output_directory_symlinks = 11;
+
   // The exit code of the command.
   int32 exit_code = 4;
 
@@ -777,7 +858,7 @@ message ActionResult {
 //
 // `OutputFile` is binary-compatible with `FileNode`.
 message OutputFile {
-  // The full path of the file relative to the input root, including the
+  // The full path of the file relative to the working directory, including the
   // filename. The path separator is a forward slash `/`. Since this is a
   // relative path, it MUST NOT begin with a leading forward slash.
   string path = 1;
@@ -820,6 +901,26 @@ message OutputDirectory {
   // [Tree][build.bazel.remote.execution.v2.Tree] proto containing the
   // directory's contents.
   Digest tree_digest = 3;
+}
+
+// An `OutputSymlink` is similar to a
+// [Symlink][build.bazel.remote.execution.v2.SymlinkNode], but it is used as an
+// output in an `ActionResult`.
+//
+// `OutputSymlink` is binary-compatible with `SymlinkNode`.
+message OutputSymlink {
+  // The full path of the symlink relative to the working directory, including the
+  // filename. The path separator is a forward slash `/`. Since this is a
+  // relative path, it MUST NOT begin with a leading forward slash.
+  string path = 1;
+
+  // The target path of the symlink. The path separator is a forward slash `/`.
+  // The target path can be relative to the parent directory of the symlink or
+  // it can be an absolute path starting with `/`. Support for absolute paths
+  // can be checked using the [Capabilities][build.bazel.remote.execution.v2.Capabilities]
+  // API. The canonical form forbids the substrings `/./` and `//` in the target
+  // path. `..` components are allowed anywhere in the target path.
+  string target = 2;
 }
 
 // An `ExecutionPolicy` can be used to control the scheduling of the action.
@@ -926,6 +1027,10 @@ message ExecuteResponse {
   // phase. The keys SHOULD be human readable so that a client can display them
   // to a user.
   map<string, LogFile> server_logs = 4;
+
+  // Freeform informational message with details on the execution of the action
+  // that may be displayed to the user upon failure or when requested explicitly.
+  string message = 5;
 }
 
 // Metadata about an ongoing
@@ -1036,19 +1141,18 @@ message FindMissingBlobsResponse {
   repeated Digest missing_blob_digests = 2;
 }
 
-// A single request message for
-// [ContentAddressableStorage.BatchUpdateBlobs][build.bazel.remote.execution.v2.ContentAddressableStorage.BatchUpdateBlobs].
-message UpdateBlobRequest {
-  // The digest of the blob. This MUST be the digest of `data`.
-  Digest content_digest = 1;
-
-  // The raw binary data.
-  bytes data = 2;
-}
-
 // A request message for
 // [ContentAddressableStorage.BatchUpdateBlobs][build.bazel.remote.execution.v2.ContentAddressableStorage.BatchUpdateBlobs].
 message BatchUpdateBlobsRequest {
+  // A request corresponding to a single blob that the client wants to upload.
+  message Request {
+    // The digest of the blob. This MUST be the digest of `data`.
+    Digest digest = 1;
+
+    // The raw binary data.
+    bytes data = 2;
+  }
+
   // The instance of the execution system to operate against. A server may
   // support multiple instances of the execution system (with their own workers,
   // storage, caches, etc.). The server MAY require use of this field to select
@@ -1057,7 +1161,7 @@ message BatchUpdateBlobsRequest {
   string instance_name = 1;
 
   // The individual upload requests.
-  repeated UpdateBlobRequest requests = 2;
+  repeated Request requests = 2;
 }
 
 // A response message for
@@ -1065,11 +1169,44 @@ message BatchUpdateBlobsRequest {
 message BatchUpdateBlobsResponse {
   // A response corresponding to a single blob that the client tried to upload.
   message Response {
-    // The digest to which this response corresponds.
-    Digest blob_digest = 1;
+    // The blob digest to which this response corresponds.
+    Digest digest = 1;
 
     // The result of attempting to upload that blob.
     google.rpc.Status status = 2;
+  }
+
+  // The responses to the requests.
+  repeated Response responses = 1;
+}
+
+// A request message for
+// [ContentAddressableStorage.BatchReadBlobs][build.bazel.remote.execution.v2.ContentAddressableStorage.BatchReadBlobs].
+message BatchReadBlobsRequest {
+  // The instance of the execution system to operate against. A server may
+  // support multiple instances of the execution system (with their own workers,
+  // storage, caches, etc.). The server MAY require use of this field to select
+  // between them in an implementation-defined fashion, otherwise it can be
+  // omitted.
+  string instance_name = 1;
+
+  // The individual blob digests.
+  repeated Digest digests = 2;
+}
+
+// A response message for
+// [ContentAddressableStorage.BatchReadBlobs][build.bazel.remote.execution.v2.ContentAddressableStorage.BatchReadBlobs].
+message BatchReadBlobsResponse {
+  // A response corresponding to a single blob that the client tried to upload.
+  message Response {
+    // The digest to which this response corresponds.
+    Digest digest = 1;
+
+    // The raw binary data.
+    bytes data = 2;
+
+    // The result of attempting to download that blob.
+    google.rpc.Status status = 3;
   }
 
   // The responses to the requests.
@@ -1136,6 +1273,15 @@ message ServerCapabilities {
 
   // Capabilities of the remote execution system.
   ExecutionCapabilities execution_capabilities = 2;
+
+  // Earliest RE API version supported, including deprecated versions.
+  build.bazel.semver.SemVer deprecated_api_version = 3;
+
+  // Earliest non-deprecated RE API version supported.
+  build.bazel.semver.SemVer low_api_version = 4;
+
+  // Latest RE API version supported.
+  build.bazel.semver.SemVer high_api_version = 5;
 }
 
 // The digest function used for converting values into keys for CAS and Action
@@ -1166,6 +1312,20 @@ message PriorityCapabilities {
 
 // Capabilities of the remote cache system.
 message CacheCapabilities {
+  // Describes how the server treats absolute symlink targets.
+  enum SymlinkAbsolutePathStrategy {
+    UNKNOWN = 0;
+
+    // Server will return an INVALID_ARGUMENT on input symlinks with absolute targets.
+    // If an action tries to create an output symlink with an absolute target, a
+    // FAILED_PRECONDITION will be returned.
+    DISALLOWED = 1;
+
+    // Server will allow symlink targets to escape the input root tree, possibly
+    // resulting in non-hermetic builds.
+    ALLOWED = 2;
+  }
+
   // All the digest functions supported by the remote cache.
   // Remote cache may support multiple digest functions simultaneously.
   repeated DigestFunction digest_function = 1;
@@ -1175,6 +1335,15 @@ message CacheCapabilities {
 
   // Supported cache priority range for both CAS and ActionCache.
   PriorityCapabilities cache_priority_capabilities = 3;
+
+  // Maximum total size of blobs to be uploaded/downloaded using
+  // batch methods. A value of 0 means no limit is set, although
+  // in practice there will always be a message size limitation
+  // of the protocol in use, e.g. GRPC.
+  int64 max_batch_total_size_bytes = 4;
+
+  // Whether absolute symlink targets are supported.
+  SymlinkAbsolutePathStrategy symlink_absolute_path_strategy = 5;
 }
 
 // Capabilities of the remote execution system.
