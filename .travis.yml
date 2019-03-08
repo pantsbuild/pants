@@ -669,9 +669,9 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
 matrix:
   include:
     - <<: *py27_linux_build_engine
-    # - <<: *py36_linux_build_engine
+    - <<: *py36_linux_build_engine
     - <<: *py27_osx_build_engine
-    # - <<: *py36_osx_build_engine
+    - <<: *py36_osx_build_engine
 
     - <<: *py27_lint
     - <<: *py36_lint
