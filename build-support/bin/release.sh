@@ -15,8 +15,7 @@ command -v $PY >/dev/null || die "You must have python2.7 installed and on the p
 
 # Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
 # to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
-# Python 2.7.13 vs. 2.7.15. When running with Python 3, we must also set this constraint to ensure
-# all spawned subprocesses use Python 3 rather than the default of Python 2.
+# Python 2.7.13 vs. 2.7.15.
 py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
