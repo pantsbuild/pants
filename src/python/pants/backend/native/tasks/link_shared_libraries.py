@@ -64,7 +64,7 @@ class LinkSharedLibraries(NativeTask):
   @memoized_property
   def platform(self):
     # TODO: convert this to a v2 engine dependency injection.
-    return Platform.create()
+    return Platform.current
 
   def execute(self):
     targets_providing_artifacts = self.context.targets(NativeLibrary.produces_ctypes_native_library)

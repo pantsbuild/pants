@@ -1763,20 +1763,20 @@ mod remote {
     ) -> Result<ByteStore, String> {
       let env = Arc::new(grpcio::Environment::new(thread_count));
 
-      let channels = cas_addresses.iter().map(|cas_address| {
-        let builder = grpcio::ChannelBuilder::new(env.clone());
-        if let Some(ref _root_ca_certs) = root_ca_certs {
-          panic!("Sorry, we dropped secure grpc support until we can either make openssl link properly, or switch to tower");
-          /*
+      let channels = cas_addresses
+        .iter()
+        .map(|cas_address| {
+          let builder = grpcio::ChannelBuilder::new(env.clone());
+          if let Some(ref root_ca_certs) = root_ca_certs {
             let creds = grpcio::ChannelCredentialsBuilder::new()
-              .root_cert(root_ca_certs)
+              .root_cert(root_ca_certs.clone())
               .build();
             builder.secure_connect(cas_address, creds)
-            */
-        } else {
-          builder.connect(cas_address)
-        }
-      }).collect();
+          } else {
+            builder.connect(cas_address)
+          }
+        })
+        .collect();
 
       let serverset = Serverset::new(channels, backoff_config, futures_timer_thread)?;
 

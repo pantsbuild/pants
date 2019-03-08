@@ -110,6 +110,28 @@ class TargetTest(TestBase):
     target = self.make_target('foo:bar', Target, foobar='barfoo')
     self.assertFalse(hasattr(target, 'foobar'))
 
+  def test_tags_applied_from_configured_dict(self):
+    options = {Target.TagAssignments.options_scope: {
+      'tag_targets_mappings': {
+        'special_tag': ['foo:bar', 'path/to/target:foo', 'path/to/target'],
+        'special_tag2': ['path/to/target:target', '//base:foo'],
+        'nonextant_target_tag': ['i/dont/exist'],
+      }
+    }}
+
+    init_subsystem(Target.TagAssignments, options)
+    target1 = self.make_target('foo:bar', Target, tags=['tag1', 'tag2'])
+    target2 = self.make_target('path/to/target:foo', Target, tags=['tag1'])
+    target3 = self.make_target('path/to/target', Target, tags=['tag2'])
+    target4 = self.make_target('//base:foo', Target, tags=['tag3'])
+    target5 = self.make_target('baz:qux', Target, tags=['tag3'])
+
+    self.assertEqual({'tag1', 'tag2', 'special_tag'}, target1.tags)
+    self.assertEqual({'tag1', 'special_tag'}, target2.tags)
+    self.assertEqual({'tag2', 'special_tag', 'special_tag2'}, target3.tags)
+    self.assertEqual({'tag3', 'special_tag2'}, target4.tags)
+    self.assertEqual({'tag3'}, target5.tags)
+
   def test_target_id_long(self):
     long_path = 'dummy'
     for i in range(1,30):

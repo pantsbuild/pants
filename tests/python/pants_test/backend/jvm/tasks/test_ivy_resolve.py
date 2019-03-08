@@ -21,6 +21,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
@@ -45,7 +46,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(IvyResolveTest, self).setUp()
-    self.set_options(execution_strategy='subprocess')
+    self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.subprocess)
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)

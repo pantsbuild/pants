@@ -6,18 +6,16 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 from builtins import object, str
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated
 from pants.base.parse_context import ParseContext
 from pants.build_graph.addressable import AddressableCallProxy
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.engine.rules import RuleIndex
 from pants.option.optionable import Optionable
-from pants.subsystem.subsystem import Subsystem
 from pants.util.collections_abc_backport import Iterable
 from pants.util.memo import memoized_method
 
@@ -40,6 +38,7 @@ class BuildConfiguration(object):
     self._exposed_context_aware_object_factory_by_alias = {}
     self._optionables = OrderedSet()
     self._rules = OrderedSet()
+    self._union_rules = OrderedDict()
 
   def registered_aliases(self):
     """Return the registered aliases exposed in BUILD files.
@@ -114,10 +113,6 @@ class BuildConfiguration(object):
 
     self._exposed_context_aware_object_factory_by_alias[alias] = context_aware_object_factory
 
-  @deprecated('1.15.0.dev1', hint_message='Use self.register_optionables().')
-  def register_subsystems(self, subsystems):
-    return self.register_optionables(subsystems)
-
   def register_optionables(self, optionables):
     """Registers the given subsystem types.
 
@@ -147,14 +142,6 @@ class BuildConfiguration(object):
     """
     return self._optionables
 
-  @deprecated('1.15.0.dev1', hint_message='Use self.optionables().')
-  def subsystems(self):
-    """Returns the registered Subsystem types.
-
-    :rtype set
-    """
-    return {o for o in self._optionables if issubclass(o, Subsystem)}
-
   def register_rules(self, rules):
     """Registers the given rules.
 
@@ -166,10 +153,13 @@ class BuildConfiguration(object):
       raise TypeError('The rules must be an iterable, given {!r}'.format(rules))
 
     # "Index" the rules to normalize them and expand their dependencies.
-    indexed_rules = RuleIndex.create(rules).normalized_rules()
+    normalized_rules = RuleIndex.create(rules).normalized_rules()
+    indexed_rules = normalized_rules.rules
+    union_rules = normalized_rules.union_rules
 
     # Store the rules and record their dependency Optionables.
     self._rules.update(indexed_rules)
+    self._union_rules.update(union_rules)
     dependency_optionables = {do
                               for rule in indexed_rules
                               for do in rule.dependency_optionables
@@ -179,9 +169,16 @@ class BuildConfiguration(object):
   def rules(self):
     """Returns the registered rules.
 
-    :rtype list
+    :rtype: list
     """
     return list(self._rules)
+
+  def union_rules(self):
+    """Returns a mapping of registered union base types -> [a list of union member types].
+
+    :rtype: OrderedDict
+    """
+    return self._union_rules
 
   @memoized_method
   def _get_addressable_factory(self, target_type, alias):

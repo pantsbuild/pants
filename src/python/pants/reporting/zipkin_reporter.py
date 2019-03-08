@@ -16,7 +16,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.reporting.reporter import Reporter
 
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class HTTPTransportHandler(BaseTransportHandler):
@@ -34,7 +34,7 @@ class HTTPTransportHandler(BaseTransportHandler):
         headers={'Content-Type': 'application/x-thrift'},
       )
     except Exception as err:
-      log.error("Failed to post the payload to zipkin server. Error {}".format(err))
+      logger.error("Failed to post the payload to zipkin server. Error {}".format(err))
 
 
 class ZipkinReporter(Reporter):
@@ -63,6 +63,7 @@ class ZipkinReporter(Reporter):
     self.trace_id = trace_id
     self.parent_id = parent_id
     self.sample_rate = float(sample_rate)
+    self.endpoint = endpoint
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -89,6 +90,8 @@ class ZipkinReporter(Reporter):
         zipkin_attrs =  create_attrs_for_span(
           sample_rate=self.sample_rate, # Value between 0.0 and 100.0
         )
+        self.trace_id = zipkin_attrs.trace_id
+
 
       span = zipkin_span(
         service_name=service_name,
@@ -115,3 +118,9 @@ class ZipkinReporter(Reporter):
     if workunit in self._workunits_to_spans:
       span = self._workunits_to_spans.pop(workunit)
       span.stop()
+
+  def close(self):
+    """End the report."""
+    endpoint = self.endpoint.replace("/api/v1/spans", "")
+
+    logger.debug("Zipkin trace may be located at this URL {}/traces/{}".format(endpoint, self.trace_id))

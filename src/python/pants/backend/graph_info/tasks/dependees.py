@@ -57,7 +57,7 @@ class ReverseDepmap(ConsoleTask):
       if self._closed:
         # N.B. Sorting is necessary because `roots` is a set, and in Python 3 sets
         # are no longer consistently sorted (even though dictionaries are in 3.6+).
-        # Without this sort, the output of `./pants3 dependees` will vary every run.
+        # Without this sort, the output of `./pants dependees` will vary every run.
         for root in sorted(roots):
           yield root.address.spec
 

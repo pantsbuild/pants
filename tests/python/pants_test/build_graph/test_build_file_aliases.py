@@ -11,6 +11,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class BuildFileAliasesTest(unittest.TestCase):
@@ -19,6 +20,7 @@ class BuildFileAliasesTest(unittest.TestCase):
     pass
 
   def setUp(self):
+    init_subsystem(Target.TagAssignments)
     self.target_macro_factory = TargetMacro.Factory.wrap(
       lambda ctx: ctx.create_object(self.BlueTarget,
                                     type_alias='jill',

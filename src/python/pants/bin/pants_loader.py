@@ -39,6 +39,8 @@ class PantsLoader(object):
     # TODO: Eric-Arellano has emailed the author to see if he is willing to accept a PR fixing the deprecation warnings
     # and to release the fix. If he says yes, remove this once fixed.
     warnings.filterwarnings('ignore', category=DeprecationWarning, module="ansicolors")
+    # TODO(7186): remove as part of work to land this PR.
+    warnings.filterwarnings('ignore', category=DeprecationWarning, module="pex")
 
   @classmethod
   def ensure_locale(cls):

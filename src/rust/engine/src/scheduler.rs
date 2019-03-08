@@ -10,7 +10,7 @@ use std::time::Duration;
 use futures::future::{self, Future};
 
 use crate::context::{Context, Core};
-use crate::core::{Failure, Params, TypeConstraint, Value};
+use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use crate::selectors;
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
@@ -107,7 +107,7 @@ impl Scheduler {
     &self,
     request: &mut ExecutionRequest,
     params: Params,
-    product: TypeConstraint,
+    product: TypeId,
   ) -> Result<(), String> {
     let edges = self
       .core

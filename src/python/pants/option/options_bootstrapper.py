@@ -96,7 +96,8 @@ class OptionsBootstrapper(datatype([
     :param env: An environment dictionary, or None to use `os.environ`.
     :param args: An args array, or None to use `sys.argv`.
     """
-    env = os.environ.copy() if env is None else env
+    env = {k: v for k, v in (os.environ if env is None else env).items()
+           if k.startswith('PANTS_')}
     args = tuple(sys.argv if args is None else args)
 
     flags = set()

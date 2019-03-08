@@ -17,6 +17,7 @@ from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
+from pants.util.strutil import ensure_binary
 
 
 logger = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ class NailgunClientSession(NailgunProtocol):
     """Write a payload to a given fd (if provided) and flush the fd."""
     try:
       if payload:
-        fd.write(payload)
+        fd.write(ensure_binary(payload))
       fd.flush()
     except (IOError, OSError) as e:
       # If a `Broken Pipe` is encountered during a stdio fd write, we're headless - bail.

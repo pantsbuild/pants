@@ -6,7 +6,7 @@ use std::io;
 
 use itertools::Itertools;
 
-use crate::core::{Function, Key, Params, TypeConstraint, TypeId, Value};
+use crate::core::{Key, Params, TypeId};
 use crate::externs;
 use crate::selectors::{Get, Select};
 use crate::tasks::{Intrinsic, Task, Tasks};
@@ -116,7 +116,7 @@ impl EntryWithDeps {
 pub enum Entry {
   Param(TypeId),
   WithDeps(EntryWithDeps),
-  Singleton(Key, TypeConstraint),
+  Singleton(Key, TypeId),
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -227,7 +227,7 @@ impl<'t> GraphMaker<'t> {
     }
   }
 
-  pub fn sub_graph(&self, param_type: TypeId, product_type: &TypeConstraint) -> RuleGraph {
+  pub fn sub_graph(&self, param_type: TypeId, product_type: TypeId) -> RuleGraph {
     // TODO: Update to support rendering a subgraph given a set of ParamTypes.
     let param_types = vec![param_type].into_iter().collect();
 
@@ -402,7 +402,7 @@ impl<'t> GraphMaker<'t> {
       let fulfillable_candidates = fulfillable_candidates_by_key
         .entry(select_key.clone())
         .or_insert_with(Vec::new);
-      for candidate in rhs(&self.tasks, &params, &product) {
+      for candidate in rhs(&self.tasks, &params, product) {
         match candidate {
           Entry::WithDeps(c) => match self.construct_graph_helper(
             rule_dependency_edges,
@@ -455,13 +455,12 @@ impl<'t> GraphMaker<'t> {
           reason: if params.is_empty() {
             format!(
               "No rule was available to compute {}. Maybe declare it as a RootRule({})?",
-              type_constraint_str(product),
-              type_constraint_str(product),
+              product, product,
             )
           } else {
             format!(
               "No rule was available to compute {} with parameter type{} {}",
-              type_constraint_str(product),
+              product,
               if params.len() > 1 { "s" } else { "" },
               params_str(&params),
             )
@@ -735,25 +734,21 @@ impl<'t> GraphMaker<'t> {
     })
   }
 
-  fn gen_root_entries(&self, product_types: &HashSet<TypeConstraint>) -> Vec<RootEntry> {
+  fn gen_root_entries(&self, product_types: &HashSet<TypeId>) -> Vec<RootEntry> {
     product_types
       .iter()
-      .filter_map(|product_type| self.gen_root_entry(&self.root_param_types, product_type))
+      .filter_map(|product_type| self.gen_root_entry(&self.root_param_types, *product_type))
       .collect()
   }
 
-  fn gen_root_entry(
-    &self,
-    param_types: &ParamTypes,
-    product_type: &TypeConstraint,
-  ) -> Option<RootEntry> {
+  fn gen_root_entry(&self, param_types: &ParamTypes, product_type: TypeId) -> Option<RootEntry> {
     let candidates = rhs(&self.tasks, param_types, product_type);
     if candidates.is_empty() {
       None
     } else {
       Some(RootEntry {
         params: param_types.clone(),
-        clause: vec![Select::new(*product_type)],
+        clause: vec![Select::new(product_type)],
         gets: vec![],
       })
     }
@@ -783,40 +778,12 @@ pub struct RuleGraph {
   unreachable_rules: Vec<UnreachableError>,
 }
 
-// TODO: Take by reference.
-fn type_constraint_str(type_constraint: TypeConstraint) -> String {
-  let str_val = externs::call_method(&to_val(type_constraint), "graph_str", &[])
-    .expect("string from calling repr");
-  externs::val_to_str(&str_val)
-}
-
-fn to_val(type_constraint: TypeConstraint) -> Value {
-  externs::val_for(&type_constraint.0)
-}
-
-fn to_val_from_func(func: &Function) -> Value {
-  externs::val_for(&func.0)
-}
-
-fn function_str(func: &Function) -> String {
-  let as_val = to_val_from_func(func);
-  val_name(&as_val)
-}
-
-pub fn type_str(type_id: TypeId) -> String {
-  format!("{}", type_id)
-}
-
 pub fn params_str(params: &ParamTypes) -> String {
   let param_names = params
     .iter()
-    .map(|type_id| type_str(*type_id))
+    .map(|type_id| format!("{}", *type_id))
     .collect::<Vec<_>>();
   Params::display(param_names)
-}
-
-fn val_name(val: &Value) -> String {
-  externs::project_str(val, "__name__")
 }
 
 pub fn select_key_str(select_key: &SelectKey) -> String {
@@ -827,15 +794,11 @@ pub fn select_key_str(select_key: &SelectKey) -> String {
 }
 
 pub fn select_str(select: &Select) -> String {
-  format!("Select({})", type_constraint_str(select.product)).to_string() // TODO variant key
+  format!("Select({})", select.product).to_string() // TODO variant key
 }
 
 fn get_str(get: &Get) -> String {
-  format!(
-    "Get({}, {})",
-    type_constraint_str(get.product),
-    type_str(get.subject)
-  )
+  format!("Get({}, {})", get.product, get.subject)
 }
 
 ///
@@ -844,12 +807,10 @@ fn get_str(get: &Get) -> String {
 pub fn entry_str(entry: &Entry) -> String {
   match entry {
     &Entry::WithDeps(ref e) => entry_with_deps_str(e),
-    &Entry::Param(type_id) => format!("Param({})", type_str(type_id)),
-    &Entry::Singleton(value, product) => format!(
-      "Singleton({}, {})",
-      externs::key_to_str(&value),
-      type_constraint_str(product)
-    ),
+    &Entry::Param(type_id) => format!("Param({})", type_id),
+    &Entry::Singleton(value, product) => {
+      format!("Singleton({}, {})", externs::key_to_str(&value), product)
+    }
   }
 }
 
@@ -864,8 +825,8 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
       ref params,
     }) => format!(
       "({}, ({},) for {}",
-      type_constraint_str(intrinsic.product),
-      type_constraint_str(intrinsic.input),
+      intrinsic.product,
+      intrinsic.input,
       params_str(params)
     ),
     &EntryWithDeps::Root(ref root) => format!(
@@ -882,7 +843,7 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
 }
 
 fn task_display(task: &Task) -> String {
-  let product = type_constraint_str(task.product);
+  let product = format!("{}", task.product);
   let mut clause_portion = task
     .clause
     .iter()
@@ -901,10 +862,9 @@ fn task_display(task: &Task) -> String {
   } else {
     format!("[{}], ", get_portion)
   };
-  let function_name = function_str(&&task.func);
   format!(
     "({}, {}, {}{})",
-    product, clause_portion, get_portion, function_name
+    product, clause_portion, get_portion, task.func,
   )
   .to_string()
 }
@@ -1060,7 +1020,7 @@ impl RuleGraph {
     let mut root_subject_type_strs = self
       .root_param_types
       .iter()
-      .map(|&t| type_str(t))
+      .map(|&t| format!("{}", t))
       .collect::<Vec<String>>();
     root_subject_type_strs.sort();
     writeln!(f, "digraph {{")?;
@@ -1151,28 +1111,26 @@ impl RuleEdges {
 ///
 /// Select Entries that can provide the given product type with the given parameters.
 ///
-fn rhs(tasks: &Tasks, params: &ParamTypes, product_type: &TypeConstraint) -> Vec<Entry> {
+fn rhs(tasks: &Tasks, params: &ParamTypes, product_type: TypeId) -> Vec<Entry> {
   if let Some(&(ref key, _)) = tasks.gen_singleton(product_type) {
-    return vec![Entry::Singleton(*key, *product_type)];
+    return vec![Entry::Singleton(*key, product_type)];
   }
 
   let mut entries = Vec::new();
-  if let Some(type_id) = params
-    .iter()
-    .find(|&&type_id| externs::satisfied_by_type(product_type, type_id))
-  {
-    // TODO: We only match the first param type here that satisfies the constraint although it's
-    // possible that multiple parameters could. Would be nice to be able to remove TypeConstraint.
+  // If the params can provide the type directly, add that.
+  if let Some(type_id) = params.get(&product_type) {
     entries.push(Entry::Param(*type_id));
   }
+  // If there are any intrinsics which can produce the desired type, add them.
   if let Some(matching_intrinsics) = tasks.gen_intrinsic(product_type) {
-    for matching_intrinsic in matching_intrinsics {
-      entries.push(Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
+    entries.extend(matching_intrinsics.iter().map(|matching_intrinsic| {
+      Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
         params: params.clone(),
         rule: Rule::Intrinsic(*matching_intrinsic),
-      })));
-    }
+      }))
+    }));
   }
+  // If there are any tasks which can produce the desired type, add those.
   if let Some(matching_tasks) = tasks.gen_tasks(product_type) {
     entries.extend(matching_tasks.iter().map(|task_rule| {
       Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {

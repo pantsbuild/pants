@@ -9,12 +9,14 @@ import os
 from builtins import open
 
 from future.utils import PY3
+from pex.executor import Executor
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -81,8 +83,10 @@ class SelectInterpreter(Task):
       else:
         if self._detect_and_purge_invalid_interpreter(interpreter_path_file):
           self._create_interpreter_path_file(interpreter_path_file, python_tgts)
-
     interpreter = self._get_interpreter(interpreter_path_file)
+    if not interpreter:
+      raise TaskError(
+        'Pants could not load interpreter from path file: {}'.format(interpreter_path_file))
     self.context.products.register_data(PythonInterpreter, interpreter)
 
   def _create_interpreter_path_file(self, interpreter_path_file, targets):
@@ -100,9 +104,9 @@ class SelectInterpreter(Task):
 
   def _detect_and_purge_invalid_interpreter(self, interpreter_path_file):
     interpreter = self._get_interpreter(interpreter_path_file)
-    if not os.path.exists(interpreter.binary):
-      self.context.log.info('Stale interpreter reference detected: {}, removing reference and '
-                            'selecting a new interpreter.'.format(interpreter.binary))
+    if not interpreter:
+      self.context.log.debug('Stale interpreter reference detected: {}, removing reference and '
+                            'selecting a new interpreter.'.format(interpreter_path_file))
       os.remove(interpreter_path_file)
       return True
     return False
@@ -112,7 +116,10 @@ class SelectInterpreter(Task):
     with open(interpreter_path_file, 'r') as infile:
       lines = infile.readlines()
       binary = lines[0].strip()
-      interpreter = PythonInterpreter.from_binary(binary, include_site_extras=False)
+      try:
+        interpreter = PythonInterpreter.from_binary(binary, include_site_extras=False)
+      except Executor.ExecutableNotFound:
+        return None
       for line in lines[1:]:
         dist_name, dist_version, location = line.strip().split('\t')
         interpreter = interpreter.with_extra(dist_name, dist_version, location)

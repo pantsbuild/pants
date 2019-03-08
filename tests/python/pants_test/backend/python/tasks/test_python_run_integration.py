@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import unittest
 
 from pex.pex_bootstrapper import get_pex_info
 
@@ -20,6 +21,10 @@ from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 class PythonRunIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
+
+  @classmethod
+  def hermetic(cls):
+    return True
 
   @skip_unless_python3
   @ensure_daemon
@@ -115,6 +120,9 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertEqual(var_val, pants_run.stdout_data.strip())
 
+  @unittest.skip(
+    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
+      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   @skip_unless_python27_and_python3
   def test_pants_run_interpreter_selection_with_pexrc(self):
     py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
@@ -136,6 +144,9 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
         self.assert_success(pants_run_3)
         self.assertIn(py3_path, pants_run_3.stdout_data)
 
+  @unittest.skip(
+    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
+      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   @skip_unless_python27_and_python3
   def test_pants_binary_interpreter_selection_with_pexrc(self):
     py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
@@ -167,6 +178,9 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     os.remove(py2_pex)
     os.remove(py3_pex)
 
+  @unittest.skip(
+    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
+      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   @skip_unless_python3
   def test_target_constraints_with_no_sources(self):
     with temporary_dir() as interpreters_cache:
