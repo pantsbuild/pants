@@ -34,7 +34,8 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
   def register_options(cls, register):
     super(GoTest, cls).register_options(register)
     register('--build-and-test-flags', type=str, default='', fingerprint=True,
-             removal_version='1.17.0.dev0', hint='Use --shlexed-build-and-test-flags instead!',
+             removal_version='1.17.0.dev0',
+             removal_hint='Use --shlexed-build-and-test-flags instead!',
              help='Flags to pass in to `go test` tool.')
     # TODO: make a shlexed flags option type!
     register('--shlexed-build-and-test-flags', type=list, member_type=str, fingerprint=True,
