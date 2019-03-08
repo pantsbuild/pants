@@ -2,6 +2,11 @@
 
 # Check that the ./pants.pex was built using the passed abi specification.
 
+EXPECTED_ABI="$1"
+if [ -z "${EXPECTED_ABI}" ]; then
+  die "Must pass the expected abi as an argument. E.g. 'abi3' or 'cp27mu'."
+fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 source ${REPO_ROOT}/build-support/common.sh
 CHECK_FOLDER="${REPO_ROOT}/pants_pex_abi_check"
@@ -26,13 +31,6 @@ function parse_wheel_abi() {
 function cleanup() {
   rm -rf "${CHECK_FOLDER}"
 }
-
-# Determine expected abi
-EXPECTED_ABI="$1"
-if [ -z "${EXPECTED_ABI}" ]; then
-  cleanup
-  die "Must pass the expected abi as an argument. E.g. 'abi3' or 'cp27mu'."
-fi
 
 # Extract pex
 mkdir "${CHECK_FOLDER}"
