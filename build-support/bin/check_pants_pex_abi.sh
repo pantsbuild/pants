@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# set -x
+set -x
 
 # Check that the ./pants.pex was built using the passed abi specification.
 
