@@ -678,6 +678,7 @@ matrix:
     - <<: *py27_linux_build_wheels_ucs4
     - <<: *py27_osx_build_wheels_ucs2
     - <<: *py27_osx_build_wheels_ucs4
+      stage: *bootstrap
 
 {{#py3_integration_shards}}
     - <<: *py36_linux_test_config

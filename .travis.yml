@@ -697,6 +697,7 @@ matrix:
     - <<: *py27_linux_build_wheels_ucs4
     - <<: *py27_osx_build_wheels_ucs2
     - <<: *py27_osx_build_wheels_ucs4
+      stage: *bootstrap
 
     - <<: *py36_linux_test_config
       name: "Integration tests for pants - shard 0 (Py3.6 PEX)"
