@@ -9,9 +9,9 @@ FROM pantsbuild/centos6:latest
 
 # Note we use 2.7.15, rather than 2.7.13, as the centos6 image already comes with 2.7.13
 # installed, which uses UCS4 instead of UCS2. This allows us to disambiguate which Python 2
-# interpreter to use when `ci.sh` sets the interpreter constraints for Pants and PEX. We
-# set $PY to the exact Python 2.7 version we want to ensure the PEX is bootstrapped
-# with UCS 2.
+# interpreter to use when `ci.sh` and `release.sh` set the interpreter constraints for
+# Pants, and thus for the built ./pants.pex. We set $PY to the exact Python 2.7 version we want
+# to ensure the PEX is bootstrapped with UCS 2.
 ARG PYTHON_2_VERSION=2.7.15
 RUN yum install sqlite-devel -y
 ENV PYENV_ROOT /pyenv-docker-build
