@@ -13,7 +13,7 @@ FROM pantsbuild/centos6:latest
 # Pants, and thus for the built ./pants.pex. We set $PY to the exact Python 2.7 version we want
 # to ensure the PEX is bootstrapped with UCS 2.
 ARG PYTHON_2_VERSION=2.7.15
-RUN yum install sqlite-devel unzip -y
+RUN yum install sqlite-devel -y
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}

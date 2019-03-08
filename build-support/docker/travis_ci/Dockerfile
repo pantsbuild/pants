@@ -8,7 +8,7 @@ FROM pantsbuild/centos6:latest
 # have Py3 available and also avoid the cost of rebuilding Python 3 every time in CI. However,
 # this requires publishing an updated image to Docker hub, so we copy the code here until then.
 ARG PYTHON_3_VERSION=3.6.8
-RUN yum install sqlite-devel unzip -y
+RUN yum install sqlite-devel -y
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
