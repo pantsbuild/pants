@@ -2,14 +2,14 @@
 
 # Check that the ./pants.pex was built using the passed abi specification.
 
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+source ${REPO_ROOT}/build-support/common.sh
+CHECK_FOLDER="${REPO_ROOT}/pants_pex_abi_check"
+
 EXPECTED_ABI="$1"
 if [ -z "${EXPECTED_ABI}" ]; then
   die "Must pass the expected abi as an argument. E.g. 'abi3' or 'cp27mu'."
 fi
-
-REPO_ROOT="$(git rev-parse --show-toplevel)"
-source ${REPO_ROOT}/build-support/common.sh
-CHECK_FOLDER="${REPO_ROOT}/pants_pex_abi_check"
 
 if [ ! -f "${REPO_ROOT}/pants.pex" ]; then
   die "pants.pex not found in the repository root! Run './build-support/bin/ci.sh -b'."
