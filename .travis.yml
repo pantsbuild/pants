@@ -412,9 +412,9 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci_py27_ucs2:latest
-      sh -c "PEX_VERBOSE=9 ./build-support/bin/ci.sh -2b
+      sh -c "./build-support/bin/ci.sh -2b
              && ./build-support/bin/check_pants_pex_abi.sh cp27m
-             && RUN_PANTS_FROM_PEX=1 PEX_VERBOSE=9 ./build-support/bin/release.sh -n"
+             && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
 
 py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
   <<: *py27_linux_build_wheels_no_ucs
@@ -433,7 +433,7 @@ py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest
       sh -c "./build-support/bin/check_pants_pex_abi.sh cp27mu
-             && RUN_PANTS_FROM_PEX=1 PEX_VERBOSE=9 ./build-support/bin/release.sh -n"
+             && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
 
 py27_osx_build_wheels_no_ucs: &py27_osx_build_wheels_no_ucs
   <<: *base_build_wheels
@@ -449,7 +449,7 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
     - CACHE_NAME=osxwheelsbuild.ucs2
   script:
     - ./build-support/bin/check_pants_pex_abi.sh cp27m
-    - RUN_PANTS_FROM_PEX=1 PEX_VERBOSE=9 ./build-support/bin/release.sh -n
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *py27_osx_config
@@ -476,9 +476,9 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - ${PYENV_ROOT}/bin/pyenv install 2.7.13
     - ${PYENV_ROOT}/bin/pyenv global 2.7.13
   script:
-    - PEX_VERBOSE=9 ./build-support/bin/ci.sh -2b
+    - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.sh cp27mu
-    - RUN_PANTS_FROM_PEX=1 PEX_VERBOSE=9 ./build-support/bin/release.sh -n
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 # -------------------------------------------------------------------------
 # Rust tests
@@ -669,9 +669,9 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
 matrix:
   include:
     - <<: *py27_linux_build_engine
-    # - <<: *py36_linux_build_engine
+    - <<: *py36_linux_build_engine
     - <<: *py27_osx_build_engine
-    # - <<: *py36_osx_build_engine
+    - <<: *py36_osx_build_engine
 
     - <<: *py27_lint
     - <<: *py36_lint

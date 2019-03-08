@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -x
-
 # Check that the ./pants.pex was built using the passed abi specification.
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
