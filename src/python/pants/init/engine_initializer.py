@@ -60,6 +60,7 @@ from pants.option.global_options import (
   GlobMatchErrorBehavior,
 )
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.scm.subsystems.changed import rules as changed_rules
 
 
 logger = logging.getLogger(__name__)
@@ -414,6 +415,7 @@ class EngineInitializer:
       create_graph_rules(address_mapper) +
       create_options_parsing_rules() +
       structs_rules() +
+      changed_rules() +
       rules
     )
 

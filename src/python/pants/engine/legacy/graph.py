@@ -31,6 +31,7 @@ from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
+from pants.scm.subsystems.changed import ChangedFilesResult, ChangedRequest, IncludeDependees
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 
@@ -386,10 +387,8 @@ class HydratedTargets(Collection[HydratedTarget]):
 @dataclass(frozen=True)
 class OwnersRequest:
   """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
-  sources: Tuple
-  # TODO: `include_dependees` should become an `enum` of the choices from the
-  # `--changed-include-dependees` global option.
-  include_dependees: str
+  sources: Tuple[str, ...]
+  include_dependees: IncludeDependees
 
 
 @rule
@@ -428,7 +427,8 @@ async def find_owners(
                            owns_any_source(ht))
 
   # If the OwnersRequest does not require dependees, then we're done.
-  if owners_request.include_dependees == 'none':
+  # TODO(#5933): make an enum exhaustiveness checking method that works with `await Get(...)`!
+  if owners_request.include_dependees == IncludeDependees.none:
     return BuildFileAddresses(direct_owners)
   else:
     # Otherwise: find dependees.
@@ -442,12 +442,20 @@ async def find_owners(
     graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
                                           address_mapper,
                                           all_structs)
-    if owners_request.include_dependees == 'direct':
+
+    if owners_request.include_dependees == IncludeDependees.direct:
       return BuildFileAddresses(tuple(graph.dependents_of_addresses(direct_owners)))
     else:
-      assert owners_request.include_dependees == 'transitive'
+      assert owners_request.include_dependees == IncludeDependees.transitive
       return BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
 
+
+@rule
+async def changed_file_owners(changed_request: ChangedRequest) -> OwnersRequest:
+  """Convert a description of changed files via an SCM into an owners request for those files."""
+  result = await Get(ChangedFilesResult, ChangedRequest, changed_request)
+  return OwnersRequest(sources=result.changed_files,
+                       include_dependees=changed_request.include_dependees)
 
 @rule
 async def transitive_hydrated_targets(
@@ -586,6 +594,7 @@ def create_legacy_graph_tasks():
     hydrated_targets,
     hydrate_target,
     find_owners,
+    changed_file_owners,
     hydrate_sources,
     hydrate_bundles,
     RootRule(OwnersRequest),

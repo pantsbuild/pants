@@ -290,3 +290,6 @@ class Specs:
 
   def __iter__(self) -> Iterator[Spec]:
     return iter(self.dependencies)
+
+  def __bool__(self):
+    return bool(self.dependencies)
