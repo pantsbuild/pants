@@ -17,6 +17,22 @@ class PyThriftNamespaceClashCheckTest(TaskTestBase, DeclarativeTaskTestMixin):
     return PyThriftNamespaceClashCheck
 
   _target_specs = {
+    'src/py-thrift:with-comments-and-other-namespaces' : {
+      'target_type': PythonThriftLibrary,
+      'sources': ['with-header.thrift'],
+      'filemap': {
+        'with-header.thrift': """\
+// Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+namespace java org.pantsbuild.whatever
+namespace py org.pantsbuild.py_whatever
+
+struct A {}
+""",
+      },
+    },
+
     'src/py-thrift:no-py-namespace': {
       'target_type': PythonThriftLibrary,
       'sources': ['bad.thrift'],
@@ -78,7 +94,7 @@ struct B {}
   def test_no_py_namespace(self):
     no_py_namespace_target = self.target_dict()['no-py-namespace']
     with self.assertRaisesWithMessage(PyThriftNamespaceClashCheck.NamespaceParseError, """\
-no python namespace (matching the pattern '^namespace py ([^\\s]+)') \
+no python namespace (matching the pattern '^namespace\s+py\s+([^\s]+)$') \
 found in thrift source src/py-thrift/bad.thrift from target src/py-thrift:no-py-namespace!"""):
       self.invoke_tasks(target_roots=[no_py_namespace_target])
 
@@ -96,3 +112,14 @@ org.pantsbuild.namespace: [(src/py-thrift:clashing-namespace, src/py-thrift/a.th
 clashing namespaces for python thrift library sources detected in build graph:
 org.pantsbuild.namespace: [(src/py-thrift-clashing:clashingA, src/py-thrift-clashing/a.thrift), (src/py-thrift-clashing:clashingB, src/py-thrift-clashing/b.thrift)]"""):
       self.invoke_tasks(target_roots=clashing_targets)
+
+  def test_accepts_py_namespace_with_comments_above(self):
+    commented_thrift_source_target = self.target_dict()['with-comments-and-other-namespaces']
+    result = self.invoke_tasks(target_roots=[commented_thrift_source_target])
+    # Check that the file was correctly mapped to the namespace parsed out of its file content.
+    namespaces_by_files = result.context.products.get_data('_py_thrift_namespaces_by_files')
+    self.assertEqual(
+      [('org.pantsbuild.py_whatever', [
+        (commented_thrift_source_target, 'src/py-thrift/with-header.thrift'),
+      ])],
+      list(namespaces_by_files.items()))

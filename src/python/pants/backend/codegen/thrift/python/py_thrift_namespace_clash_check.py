@@ -30,13 +30,19 @@ class PyThriftNamespaceClashCheck(Task, HasSkipOptionMixin):
     register('--skip', type=bool, default=False, fingerprint=True, recursive=True,
              help='Skip task.')
 
-  _py_namespace_pattern = re.compile(r'^namespace py ([^\s]+)')
+  @classmethod
+  def product_types(cls):
+    """Populate a dict mapping thrift sources to their namespaces and owning targets for testing."""
+    return ['_py_thrift_namespaces_by_files']
+
+  _py_namespace_pattern = re.compile(r'^namespace\s+py\s+([^\s]+)$', flags=re.MULTILINE)
 
   class NamespaceParseError(TaskError): pass
 
   def _extract_py_namespace_from_content(self, target, thrift_filename, thrift_source_content):
-    py_namespace_match = self._py_namespace_pattern.match(thrift_source_content.decode('utf-8'))
+    py_namespace_match = self._py_namespace_pattern.search(thrift_source_content)
     if py_namespace_match is None:
+      self.context.log.debug('failing thrift content is:\n{}'.format(thrift_source_content))
       raise self.NamespaceParseError(
         "no python namespace (matching the pattern '{}') found in thrift source {} from target {}!"
         .format(self._py_namespace_pattern.pattern,
@@ -65,7 +71,8 @@ class PyThriftNamespaceClashCheck(Task, HasSkipOptionMixin):
     # Extract the python namespace from each thrift source file.
     py_namespaces_by_target = OrderedDict(
       (t, [
-        (path, self._extract_py_namespace_from_content(t, path, content))
+        # File content is provided as a binary string, so we have to decode it.
+        (path, self._extract_py_namespace_from_content(t, path, content.decode('utf-8')))
         for (path, content) in all_content
       ])
       for t, all_content in thrift_file_sources_by_target.items()
@@ -82,7 +89,6 @@ class PyThriftNamespaceClashCheck(Task, HasSkipOptionMixin):
       for namespace, all_paths in namespaces_by_files.items()
       if len(all_paths) > 1
     }
-
     if clashing_namespaces:
       pretty_printed_clashing = '\n'.join(
         '{}: [{}]'
@@ -95,3 +101,5 @@ class PyThriftNamespaceClashCheck(Task, HasSkipOptionMixin):
       raise self.ClashingNamespaceError(
         'clashing namespaces for python thrift library sources detected in build graph:\n{}'
         .format(pretty_printed_clashing))
+    else:
+      self.context.products.register_data('_py_thrift_namespaces_by_files', namespaces_by_files)
