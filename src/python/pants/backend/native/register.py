@@ -20,7 +20,7 @@ from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.conan_fetch import ConanFetch
 from pants.backend.native.tasks.conan_prep import ConanPrep
 from pants.backend.native.tasks.cpp_compile import CppCompile
-from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
+from pants.backend.native.tasks.link_object_files import LinkBinaries, LinkSharedLibraries
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -52,6 +52,7 @@ def register_goals():
   task(name='c-for-ctypes', action=CCompile).install('native-compile')
   task(name='cpp-for-ctypes', action=CppCompile).install('native-compile')
   task(name='shared-libraries', action=LinkSharedLibraries).install('link')
+  task(name='binaries', action=LinkBinaries).install('binary')
 
 
 def rules():

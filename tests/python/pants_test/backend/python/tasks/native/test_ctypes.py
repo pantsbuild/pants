@@ -12,7 +12,7 @@ from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.targets.native_library import CLibrary, CppLibrary
 from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.cpp_compile import CppCompile
-from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
+from pants.backend.native.tasks.link_object_files import LinkSharedLibraries
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.util.meta import classproperty
 from pants_test.backend.python.tasks.python_task_test_base import check_wheel_platform_matches_host

@@ -8,7 +8,7 @@ import os
 
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.backend.native.tasks.cpp_compile import CppCompile
-from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
+from pants.backend.native.tasks.link_object_files import LinkSharedLibraries
 from pants_test.backend.native.tasks.native_task_test_base import (NativeCompileTestMixin,
                                                                    NativeTaskTestBase)
 
