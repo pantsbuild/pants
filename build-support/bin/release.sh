@@ -127,13 +127,11 @@ function run_pex() {
 function run_packages_script() {
   (
     cd "${ROOT}"
-    requirements=("$(requirement future)" "$(requirement beautifulsoup4)")
     args=("$@")
     if [[ "${python_three-false}" == "true" ]]; then
       args=("--py3" ${args[@]})
-    else
-      requirements+=("$(requirement configparser)" "$(requirement subprocess32)")
     fi
+    requirements=("$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)")
     run_pex "${requirements[@]}" -- "${ROOT}/src/python/pants/releases/packages.py" "${args[@]}"
   )
 }
