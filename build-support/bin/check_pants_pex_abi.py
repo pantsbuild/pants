@@ -12,8 +12,6 @@ import json
 import os.path
 import zipfile
 
-from io import open
-
 
 def main():
   if not os.path.isfile("pants.pex"):

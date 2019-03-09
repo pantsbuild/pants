@@ -428,7 +428,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
       --build-arg "TRAVIS_GROUP=$(id -gn)"
       --build-arg "TRAVIS_GID=$(id -g)"
       build-support/docker/${docker_image_name}/
-    - &docker_dry_run_release docker run --rm -t
+    - docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       ${docker_image_name}:latest

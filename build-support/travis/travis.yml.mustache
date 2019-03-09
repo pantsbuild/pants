@@ -381,7 +381,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
   script:
     - >
       {{>launch_docker_image}}
-    - &docker_dry_run_release docker run --rm -t
+    - docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       ${docker_image_name}:latest
