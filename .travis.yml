@@ -225,14 +225,14 @@ travis_docker_image: &travis_docker_image
   before_script:
     - ulimit -c unlimited
   script:
-    # NB: This script definition is very likely to be overridden in a consumer, so we alias it
-    # for re-inclusion.
-    - &travis_docker_image_launch docker build --rm -t travis_ci
+    - >
+      docker build
+      --rm -t ${docker_image_name}
       --build-arg "TRAVIS_USER=$(id -un)"
       --build-arg "TRAVIS_UID=$(id -u)"
       --build-arg "TRAVIS_GROUP=$(id -gn)"
       --build-arg "TRAVIS_GID=$(id -g)"
-      build-support/docker/travis_ci/
+      build-support/docker/${docker_image_name}/
 
 # -------------------------------------------------------------------------
 # Bootstrap engine shards
@@ -243,14 +243,21 @@ base_linux_build_engine: &base_linux_build_engine
   <<: *travis_docker_image
   stage: *bootstrap
   script:
-    - *travis_docker_image_launch
+    - >
+      docker build
+      --rm -t ${docker_image_name}
+      --build-arg "TRAVIS_USER=$(id -un)"
+      --build-arg "TRAVIS_UID=$(id -u)"
+      --build-arg "TRAVIS_GROUP=$(id -gn)"
+      --build-arg "TRAVIS_GID=$(id -g)"
+      build-support/docker/${docker_image_name}/
     # Note that:
     # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
     # * We also build fs_util, to take advantage of the rust code built during bootstrapping.
     - docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest
+      ${docker_image_name}:latest
       sh -c "./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
 
@@ -259,6 +266,7 @@ py27_linux_build_engine: &py27_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2.7 PEX)"
   env:
+    - docker_image_name=travis_ci
     # NB: Only the Py2.7 shard sets PREPARE_DEPLOY to cause the fs_util binary to be uploaded to S3:
     # either linux shard could upload this binary, since it does not depend on python at all.
     - PREPARE_DEPLOY=1
@@ -271,6 +279,7 @@ py36_linux_build_engine: &py36_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
+    - docker_image_name=travis_ci
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - BOOTSTRAP_ARGS='-b'
@@ -400,18 +409,21 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
   name: "Build wheels - Linux and cp27m (UCS2)"
   env:
     - *base_build_wheels_env
+    - docker_image_name=travis_ci_py27_ucs2
     - CACHE_NAME=linuxwheelsbuild.ucs2
   script:
-    - docker build --rm -t travis_ci_py27_ucs2
+    - >
+      docker build
+      --rm -t ${docker_image_name}
       --build-arg "TRAVIS_USER=$(id -un)"
       --build-arg "TRAVIS_UID=$(id -u)"
       --build-arg "TRAVIS_GROUP=$(id -gn)"
       --build-arg "TRAVIS_GID=$(id -g)"
-      build-support/docker/travis_ci_py27_ucs2/
+      build-support/docker/${docker_image_name}/
     - &docker_dry_run_release docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci_py27_ucs2:latest
+      ${docker_image_name}:latest
       sh -c "./build-support/bin/ci.sh -2b
              && ./build-support/bin/check_pants_pex_abi.py cp27m
              && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
@@ -425,13 +437,21 @@ py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
   env:
     - *py27_linux_test_config_env
     - *base_build_wheels_env
+    - docker_image_name=travis_ci
     - CACHE_NAME=linuxwheelsbuild.ucs4
   script:
-    - *travis_docker_image_launch
+    - >
+      docker build
+      --rm -t ${docker_image_name}
+      --build-arg "TRAVIS_USER=$(id -un)"
+      --build-arg "TRAVIS_UID=$(id -u)"
+      --build-arg "TRAVIS_GROUP=$(id -gn)"
+      --build-arg "TRAVIS_GID=$(id -g)"
+      build-support/docker/${docker_image_name}/
     - docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest
+      ${docker_image_name}:latest
       sh -c "./build-support/bin/check_pants_pex_abi.py cp27mu
              && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
 
