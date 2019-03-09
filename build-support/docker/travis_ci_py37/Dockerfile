@@ -6,8 +6,9 @@ FROM pantsbuild/centos6:latest
 
 # ----------------------------------------------------------
 # TODO(7064) These changes belong in centos6/Dockerfile, because we always want that image to
-# have Py3.7 available and also avoid the cost of rebuilding both OpenSSL and Python 3.7 every time in CI. However,
-# this requires publishing an updated image to Docker hub, so we copy the code here until then.
+# have Py3.7 available and also avoid the cost of rebuilding both OpenSSL and Python 3.7 every
+# time in CI. However, this requires publishing an updated image to Docker hub, so we copy the
+# code here until then.
 
 # This also copies `travis_ci/Dockerfile` quite a bit. Once these changes are merged into centos6,
 # delete this file entirely and only use travis_ci.
@@ -19,9 +20,10 @@ RUN yum install -y \
     readline-devel \
     sqlite{,-devel}
 
-# Install custom OpenSSL as Python 3.7 requires at least OpenSSL 1.0.2: https://docs.python.org/3/whatsnew/3.7.html#platform-support-removals.
-# Centos6's system OpenSSL is too outdated for this.
-# Note solution is adapted from PEX's Tox setup: https://github.com/pantsbuild/pex/blob/1b9e509ae36303d222445611420879bd4edcb1b1/.travis.yml#L46-L86.
+# Install custom OpenSSL as Python 3.7 requires at least OpenSSL 1.0.2:
+# https://docs.python.org/3/whatsnew/3.7.html#platform-support-removals.
+# Centos6's system OpenSSL is too outdated for this. Note solution is adapted
+# from PEX's Tox setup: https://github.com/pantsbuild/pex/blob/1b9e509ae36303d222445611420879bd4edcb1b1/.travis.yml#L46-L86.
 ENV OPENSSL_VERSION=1.0.2p
 ENV OPENSSL_DIR=/.pyenv_openssl
 ENV LD_LIBRARY_PATH="${OPENSSL_DIR}/lib"
@@ -34,7 +36,7 @@ RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
     && make install --quiet \
     && touch "${OPENSSL_DIR}/installed-${OPENSSL_VERSION}"'
 
-# Install Pythonn 3.7.
+# Install Python 3.7.
 ARG PYTHON_37_VERSION=3.7.2
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}
