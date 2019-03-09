@@ -10,7 +10,6 @@ python_library(
     }
   ),
   dependencies=[
-    '3rdparty/python:asttokens',
     '3rdparty/python:future',
     '3rdparty/python:pycodestyle',
     '3rdparty/python:pyflakes',
