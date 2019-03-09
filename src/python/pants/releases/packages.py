@@ -170,6 +170,10 @@ def contrib_packages():
       "pantsbuild.pants.contrib.googlejavaformat",
       "//contrib/googlejavaformat/src/python/pants/contrib/googlejavaformat:plugin",
     ),
+    Package(
+      "pantsbuild.pants.contrib.awslambda_python",
+      "//contrib/awslambda/python/src/python/pants/contrib/awslambda/python:plugin",
+    ),
   }
 
 
