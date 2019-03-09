@@ -9,14 +9,7 @@ FROM pantsbuild/centos6:latest
 # have Py3 available and also avoid the cost of rebuilding Python 3.6 every time in CI. However,
 # this requires publishing an updated image to Docker hub, so we copy the code here until then.
 
-# Install dependencies to build Python.
-RUN yum install -y \
-    zlib-devel \
-    bzip2{,-devel} \
-    readline-devel \
-    sqlite{,-devel}
-
-# Install Python 3.6.
+RUN yum install sqlite-devel -y
 ARG PYTHON_36_VERSION=3.6.8
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}

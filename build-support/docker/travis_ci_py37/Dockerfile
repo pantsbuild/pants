@@ -9,8 +9,8 @@ FROM pantsbuild/centos6:latest
 # have Py3.7 available and also avoid the cost of rebuilding both OpenSSL and Python 3.7 every time in CI. However,
 # this requires publishing an updated image to Docker hub, so we copy the code here until then.
 
-# This also copies `travis_ci/Dockerfile` quite a bit, which is bad. Rather, this entire
-# file should be deleted and merged into centos6.
+# This also copies `travis_ci/Dockerfile` quite a bit. Once these changes are merged into centos6,
+# delete this file entirely and only use travis_ci.
 
 # Install dependencies to build Python and OpenSSL.
 RUN yum install -y \
