@@ -10,11 +10,12 @@ from builtins import zip
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.base.exceptions import TaskError
 from pants.engine.fs import FilesContent
+from pants.task.target_restriction_mixins import HasSkipOptionMixin
 from pants.task.task import Task
 from pants.util.collections_abc_backport import OrderedDict, defaultdict
 
 
-class PyThriftNamespaceClashCheck(Task):
+class PyThriftNamespaceClashCheck(Task, HasSkipOptionMixin):
   """Check that no python thrift libraries in the build graph have files with clashing namespaces.
 
   This is a temporary workaround for https://issues.apache.org/jira/browse/THRIFT-515. A real fix
@@ -22,6 +23,12 @@ class PyThriftNamespaceClashCheck(Task):
   solution would be to check all *thrift* libraries in the build graph, but there is currently no
   "ThriftLibraryMixin" or other way to identify targets containing thrift code generically.
   """
+
+  @classmethod
+  def register_options(cls, register):
+    super(PyThriftNamespaceClashCheck, cls).register_options(register)
+    register('--skip', type=bool, default=False, fingerprint=True, recursive=True,
+             help='Skip task.')
 
   _py_namespace_pattern = re.compile(r'^namespace py ([^\s]+)')
 
@@ -40,6 +47,9 @@ class PyThriftNamespaceClashCheck(Task):
   class ClashingNamespaceError(TaskError): pass
 
   def execute(self):
+    if self.skip_execution:
+      return
+
     # Get file contents for python thrift library targets.
     py_thrift_targets = self.get_targets(lambda tgt: isinstance(tgt, PythonThriftLibrary))
     target_snapshots = OrderedDict(
