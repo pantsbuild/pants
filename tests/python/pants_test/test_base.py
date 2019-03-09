@@ -740,7 +740,8 @@ class TestBase(unittest.TestCase, AbstractClass):
       # Ensure any dependencies exist in the target dict (`target_map` must then be an
       # OrderedDict).
       # The 'key' is used to access the target in `target_dict`, and defaults to `target_spec`.
-      key = unprocessed_kwargs.pop('key', target_spec)
+      target_address = Address.parse(target_spec)
+      key = unprocessed_kwargs.pop('key', target_address.target_name)
       dep_targets = []
       for dep_spec in unprocessed_kwargs.pop('dependencies', []):
         existing_tgt_key = target_map[dep_spec]['key']
