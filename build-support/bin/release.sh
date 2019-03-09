@@ -51,22 +51,30 @@ while getopts "${_OPTS}"  opt; do
   esac
 done
 
-py_version_number="2.7"
-if [[ "${python_three}" == "true" ]]; then
-  py_version_number="3.6"
-  # N.B. We must set this to constrain spawned subprocesses to also use Python 3.
-  export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6','CPython<4']"
+# Set the Python interpreter to be used for the virtualenv. Note we allow the user to
+# predefine this value so that they may point to a specific interpreter, e.g. 2.7.13 vs. 2.7.15.
+default_interpreter="python2.7";
+if [[ "${python_three=false}" == "true" ]]; then
+  default_interpreter="python3.6"
 fi
-PY=$(which "python${py_version_number}" || exit 0)
-[[ -n "${PY}" ]] || die "You must have python2.7 or python3.6 installed and on the path to release."
-export PY
+export PY="${PY:-${default_interpreter}}"
+if ! which "${PY}" >/dev/null; then
+  die "Python interpreter ${PY} not discoverable on your PATH."
+fi
+py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
+if [[ "${py_major_minor}" != "2.7" ]] && [[ "${py_major_minor}" != "3.6" ]]; then
+  die "Invalid interpreter. The release script requires python2.7 or python3.6, and you are using python${py_major_minor}."
+fi
+
+# Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
+# to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
+# Python 2.7.13 vs. 2.7.15. We must also set this when running with Python 3 to ensure
+# that spawned subprocesses use Python 3.
+py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 function run_local_pants() {
-  pants_script="${ROOT}/pants"
-  if [[ "${python_three}" == "true" ]]; then
-    pants_script="${ROOT}/pants3"
-  fi
-  ${pants_script} "$@"
+  ${ROOT}/pants "$@"
 }
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
@@ -101,7 +109,7 @@ function run_pex() {
   (
     PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
     PEX_PEX=pex27
-    if [[ "${python_three}" == "true" ]]; then
+    if [[ "${python_three-false}" == "true" ]]; then
       PEX_PEX=pex36
     fi
 
@@ -112,7 +120,7 @@ function run_pex() {
 
     curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" > "${pex}"
     chmod +x "${pex}"
-    "${pex}" -vvvvvvvvv "$@"
+    "${pex}" "$@"
   )
 }
 
@@ -121,7 +129,7 @@ function run_packages_script() {
     cd "${ROOT}"
     requirements=("$(requirement future)" "$(requirement beautifulsoup4)")
     args=("$@")
-    if [[ "${python_three}" == "true" ]]; then
+    if [[ "${python_three-false}" == "true" ]]; then
       args=("--py3" ${args[@]})
     else
       requirements+=("$(requirement configparser)" "$(requirement subprocess32)")

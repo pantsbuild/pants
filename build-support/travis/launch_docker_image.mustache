@@ -1,0 +1,7 @@
+docker build
+--rm -t ${docker_image_name}
+--build-arg "TRAVIS_USER=$(id -un)"
+--build-arg "TRAVIS_UID=$(id -u)"
+--build-arg "TRAVIS_GROUP=$(id -gn)"
+--build-arg "TRAVIS_GID=$(id -g)"
+build-support/docker/${docker_image_name}/

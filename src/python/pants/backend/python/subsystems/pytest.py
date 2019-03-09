@@ -14,9 +14,7 @@ class PyTest(Subsystem):
   def register_options(cls, register):
     super(PyTest, cls).register_options(register)
     # TODO: This is currently bounded below `3.7` due to #6282.
-    # TODO: Additionally, this is temporarily pinned to 3.0.7 due to more-itertools 6.0.0 dropping
-    # Python 2 support: https://github.com/pytest-dev/pytest/issues/4770.
-    register('--requirements', advanced=True, default='pytest==3.0.7',
+    register('--requirements', advanced=True, default='pytest>=3.0.7,<3.7',
              help='Requirements string for the pytest library.')
     register('--timeout-requirements', advanced=True, default='pytest-timeout>=1.2,<1.3',
              help='Requirements string for the pytest-timeout library.')
@@ -32,7 +30,9 @@ class PyTest(Subsystem):
     Make sure the requirements are satisfied in any environment used for running tests.
     """
     opts = self.get_options()
+    # TODO(6282): once we can upgrade Pytest to 4.2.1+, we can remove the more-itertools requirement
     return (
+      "more-itertools<6.0.0 ; python_version<'3'",
       opts.requirements,
       opts.timeout_requirements,
       opts.cov_requirements,

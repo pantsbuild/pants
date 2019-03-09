@@ -36,7 +36,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       },
     })
 
-    self.platform = Platform.create()
+    self.platform = Platform.current
     self.toolchain = global_subsystem_instance(NativeToolchain)
     self.rules = native_backend_rules()
 

@@ -12,6 +12,8 @@ future==0.17.1
 futures==3.0.5 ; python_version<'3'
 Markdown==2.1.1
 mock==2.0.0
+# TODO(6282): once we can upgrade Pytest to 4.2.1+, we can remove the more-itertools requirement
+more-itertools<6.0.0 ; python_version<'3'
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.9

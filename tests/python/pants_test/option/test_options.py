@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import io
 import os
 import shlex
-import unittest
 import warnings
 from builtins import open, str
 from contextlib import contextmanager
@@ -35,6 +34,8 @@ from pants.option.scope import ScopeInfo
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
+from pants.util.objects import enum
+from pants_test.test_base import TestBase
 
 
 def task(scope):
@@ -49,7 +50,7 @@ def subsystem(scope):
   return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
 
 
-class OptionsTest(unittest.TestCase):
+class OptionsTest(TestBase):
 
   @contextmanager
   def _write_config_to_file(self, fp, config):
@@ -85,7 +86,11 @@ class OptionsTest(unittest.TestCase):
                         task('scoped.a.bit'),
                         task('scoped.and-dashed'),
                         task('fromfile'),
-                        task('fingerprinting')]
+                        task('fingerprinting'),
+                        task('enum-opt'),
+                        task('separate-enum-opt-scope')]
+
+  class SomeEnumOption(enum(['a-value', 'another-value'])): pass
 
   def _register(self, options):
     def register_global(*args, **kwargs):
@@ -184,6 +189,13 @@ class OptionsTest(unittest.TestCase):
     options.register('fingerprinting', '--definitely-not-inverted', daemon=False)
     options.register('fingerprinting', '--fingerprinted', fingerprint=True)
     options.register('fingerprinting', '--definitely-not-fingerprinted', fingerprint=False)
+
+    # For enum tests
+    options.register('enum-opt', '--some-enum',
+                     type=self.SomeEnumOption)
+    # For testing the default value
+    options.register('separate-enum-opt-scope', '--some-enum-with-default',
+                     default=self.SomeEnumOption.a_value, type=self.SomeEnumOption)
 
   def test_env_type_int(self):
     options = Options.create(env={'PANTS_FOO_BAR': "['123','456']"},
@@ -768,9 +780,11 @@ class OptionsTest(unittest.TestCase):
     check_scoped_spam('scoped.and-dashed', 'value', {'PANTS_SCOPED_AND_DASHED_SPAM': 'value'})
 
   def test_drop_flag_values(self):
-    options = self._parse('./pants --bar-baz=fred -n33 --pants-foo=red simple -n1',
-                          env={'PANTS_FOO': 'BAR'},
-                          config={'simple': {'num': 42}})
+    options = self._parse(
+      './pants --bar-baz=fred -n33 --pants-foo=red enum-opt --some-enum=another-value simple -n1',
+      env={'PANTS_FOO': 'BAR'},
+      config={'simple': {'num': 42},
+              'enum-opt': {'some-enum': 'a-value'}})
     defaulted_only_options = options.drop_flag_values()
 
     # No option value supplied in any form.
@@ -788,6 +802,22 @@ class OptionsTest(unittest.TestCase):
     # An env var specified option value.
     self.assertEqual('red', options.for_global_scope().pants_foo)
     self.assertEqual('BAR', defaulted_only_options.for_global_scope().pants_foo)
+
+    # Overriding an enum option value.
+    self.assertEqual(self.SomeEnumOption.another_value, options.for_scope('enum-opt').some_enum)
+
+    # Getting the default value for an enum option.
+    self.assertEqual(
+      self.SomeEnumOption.a_value,
+      defaulted_only_options.for_scope('separate-enum-opt-scope').some_enum_with_default)
+
+  def test_enum_option_type_parse_error(self):
+    self.maxDiff = None
+    with self.assertRaisesWithMessageContaining(
+        ParseError,
+        "Error applying type 'SomeEnumOption' to option value 'invalid-value', for option '--some_enum' in scope 'enum-opt'"):
+      options = self._parse('./pants enum-opt --some-enum=invalid-value')
+      options.for_scope('enum-opt').some_enum
 
   def test_deprecated_option_past_removal(self):
     """Ensure that expired options raise CodeRemovedError on attempted use."""
@@ -1369,6 +1399,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual('vv', vals1.foo)
 
 
+# TODO: Figure out why this testing is necessary.
 class OptionsTestStringPayloads(OptionsTest):
   """Runs the same tests as OptionsTest, but backed with `Config.loads` vs `Config.load`."""
 

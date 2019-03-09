@@ -49,7 +49,7 @@ class OptionableFactory(AbstractClass):
         output_type=cls.optionable_cls,
         input_selectors=tuple(),
         func=partial_construct_optionable,
-        input_gets=(Get(ScopedOptions, Scope),),
+        input_gets=(Get.create_statically_for_rule_graph(ScopedOptions, Scope),),
         dependency_optionables=(cls.optionable_cls,),
       )
 

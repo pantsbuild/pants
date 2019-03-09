@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 bytes = "0.4.5"
 futures = "^0.1.16"
-grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec"] }
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../../hashing" }
 prost = "0.4"
 prost-derive = "0.4"

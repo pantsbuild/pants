@@ -8,7 +8,7 @@ import itertools
 import logging
 import os
 import unittest
-from builtins import object, open
+from builtins import object, open, str
 from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
@@ -23,7 +23,6 @@ from pants.base.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.engine.legacy.graph import HydratedField
@@ -35,10 +34,12 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_file_dump, safe_mkdir,
                                 safe_mkdtemp, safe_open, safe_rmtree)
 from pants.util.memo import memoized_method
+from pants.util.meta import AbstractClass
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
@@ -60,6 +61,8 @@ class TestGenerator(object):
       ThingTest.generate_tests()
 
     """
+    # This would be an @abstractmethod, but making TestGenerator extend AbstractClass causes an
+    # error as it gets instantiated directly somehow in testing.
     raise NotImplementedError()
 
   @classmethod
@@ -77,7 +80,7 @@ class TestGenerator(object):
     setattr(cls, method_name, method)
 
 
-class TestBase(unittest.TestCase):
+class TestBase(unittest.TestCase, AbstractClass):
   """A baseclass useful for tests requiring a temporary buildroot.
 
   :API: public
@@ -319,9 +322,8 @@ class TestBase(unittest.TestCase):
     }
 
     self._build_configuration = self.build_config()
-    self._build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
-
     self._inited_target = False
+    subsystem_util.init_subsystem(Target.TagAssignments)
 
   def buildroot_files(self, relpath=None):
     """Returns the set of all files under the test build root.
@@ -362,10 +364,6 @@ class TestBase(unittest.TestCase):
   @property
   def build_root(self):
     return self._build_root()
-
-  @property
-  def build_file_parser(self):
-    return self._build_file_parser
 
   @property
   def pants_workdir(self):
@@ -498,7 +496,7 @@ class TestBase(unittest.TestCase):
     context = create_context_from_options(fake_options,
                                           target_roots=target_roots,
                                           build_graph=self.build_graph,
-                                          build_file_parser=self._build_file_parser,
+                                          build_configuration=self._build_configuration,
                                           address_mapper=address_mapper,
                                           console_outstream=console_outstream,
                                           workspace=workspace,
@@ -616,6 +614,31 @@ class TestBase(unittest.TestCase):
       content = f.read()
       self.assertIn(string, content, '"{}" is not in the file {}:\n{}'.format(string, f.name, content))
 
+  @contextmanager
+  def assertRaisesWithMessage(self, exception_type, error_text):
+    """Verifies than an exception message is equal to `error_text`.
+
+    :param type exception_type: The exception type which is expected to be raised within the body.
+    :param str error_text: Text that the exception message should match exactly with
+                           `self.assertEqual()`.
+    :API: public
+    """
+    with self.assertRaises(exception_type) as cm:
+      yield cm
+    self.assertEqual(error_text, str(cm.exception))
+
+  @contextmanager
+  def assertRaisesWithMessageContaining(self, exception_type, error_text):
+    """Verifies that the string `error_text` appears in an exception message.
+
+    :param type exception_type: The exception type which is expected to be raised within the body.
+    :param str error_text: Text that the exception message should contain with `self.assertIn()`.
+    :API: public
+    """
+    with self.assertRaises(exception_type) as cm:
+      yield cm
+    self.assertIn(error_text, str(cm.exception))
+
   def get_bootstrap_options(self, cli_options=()):
     """Retrieves bootstrap options.
 
@@ -674,3 +697,58 @@ class TestBase(unittest.TestCase):
     finally:
       root_logger.setLevel(old_level)
       root_logger.removeHandler(handler)
+
+  def retrieve_single_product_at_target_base(self, product_mapping, target):
+    mapping_for_target = product_mapping.get(target)
+    single_base_dir = assert_single_element(list(mapping_for_target.keys()))
+    single_product = assert_single_element(mapping_for_target[single_base_dir])
+    return single_product
+
+  def populate_target_dict(self, target_map):
+    """Return a dict containing targets with files generated according to `target_map`.
+
+    The keys of `target_map` are target address strings, while the values of `target_map` should be
+    a dict which contains keyword arguments fed into `self.make_target()`, along with a few special
+    keys. Special keys are:
+    - 'key': used to access the target in the returned dict. Defaults to the target address spec.
+    - 'filemap': creates files at the specified relative paths to the target.
+
+    An `OrderedDict` of 2-tuples must be used with the targets topologically ordered, if
+    they have dependencies on each other. Note that dependency cycles are not currently supported
+    with this method.
+
+    :param target_map: Dict mapping each target address to generate -> kwargs for
+                       `self.make_target()`, along with a 'key' and optionally a 'filemap' argument.
+    :return: Dict mapping the required 'key' argument -> target instance for each element of
+             `target_map`.
+    :rtype: dict
+    """
+    target_dict = {}
+
+    # Create a target from each specification and insert it into `target_dict`.
+    for target_spec, target_kwargs in target_map.items():
+      unprocessed_kwargs = target_kwargs.copy()
+
+      target_base = Address.parse(target_spec).spec_path
+
+      # Populate the target's owned files from the specification.
+      filemap = unprocessed_kwargs.pop('filemap', {})
+      for rel_path, content in filemap.items():
+        buildroot_path = os.path.join(target_base, rel_path)
+        self.create_file(buildroot_path, content)
+
+      # Ensure any dependencies exist in the target dict (`target_map` must then be an
+      # OrderedDict).
+      # The 'key' is used to access the target in `target_dict`, and defaults to `target_spec`.
+      key = unprocessed_kwargs.pop('key', target_spec)
+      dep_targets = []
+      for dep_spec in unprocessed_kwargs.pop('dependencies', []):
+        existing_tgt_key = target_map[dep_spec]['key']
+        dep_targets.append(target_dict[existing_tgt_key])
+
+      # Register the generated target.
+      generated_target = self.make_target(
+        spec=target_spec, dependencies=dep_targets, **unprocessed_kwargs)
+      target_dict[key] = generated_target
+
+    return target_dict

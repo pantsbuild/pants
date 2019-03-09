@@ -12,6 +12,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.util.contextutil import open_zip, temporary_dir
@@ -52,7 +53,7 @@ class IvyImportsTest(NailgunTaskTestBase):
                                     libraries=[jar_library.address.spec],
                                     include_patterns=['a/b/c/*.proto'])
 
-      self.set_options(execution_strategy='subprocess')
+      self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.subprocess)
       ivy_imports_task = self.execute(self.context(target_roots=[foo_target]))
 
       # Make sure the product is properly populated

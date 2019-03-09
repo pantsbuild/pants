@@ -32,7 +32,6 @@ from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
-from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_open
 from pants.util.memo import memoized_method, memoized_property
@@ -93,8 +92,12 @@ class BaseZincCompile(JvmCompile):
     while arg_index < len(args):
       arg_index += validate(arg_index)
 
+  def _get_zinc_arguments(self, settings):
+    distribution = self._get_jvm_distribution()
+    return self._format_zinc_arguments(settings, distribution)
+
   @staticmethod
-  def _get_zinc_arguments(settings):
+  def _format_zinc_arguments(settings, distribution):
     """Extracts and formats the zinc arguments given in the jvm platform settings.
 
     This is responsible for the symbol substitution which replaces $JAVA_HOME with the path to an
@@ -110,10 +113,6 @@ class BaseZincCompile(JvmCompile):
     if settings.args:
       settings_args = settings.args
       if any('$JAVA_HOME' in a for a in settings.args):
-        try:
-          distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=True)
-        except DistributionLocator.Error:
-          distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=False)
         logger.debug('Substituting "$JAVA_HOME" with "{}" in jvm-platform args.'
                      .format(distribution.home))
         settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)

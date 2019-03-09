@@ -4,7 +4,11 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import glob
 import os
+
+from pex.executor import Executor
+from pex.interpreter import PythonInterpreter
 
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
@@ -90,3 +94,51 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
         ]
     command = ['binary', binary_target] + args
     return self.run_pants(command=command, config=config)
+
+  def test_stale_interpreter_purge_integration(self):
+    target = '{}:{}'.format(self.testproject, 'echo_interpreter_version')
+    config = {
+      'python-setup': {
+        'interpreter_constraints': ['CPython>=2.7,<4'],
+      }
+    }
+    with self.temporary_workdir() as workdir:
+      pants_run = self.run_pants_with_workdir(
+        ["run", target],
+        workdir=workdir,
+        config=config
+      )
+      self.assert_success(pants_run)
+
+      def _prepend_bad_interpreter_to_interpreter_path_file(path):
+        with open(path, 'r') as fp:
+          file_data = fp.readlines()
+          file_data[0] = '/my/bogus/interpreter/python2.7'
+        with open(path, 'w') as fp:
+          fp.writelines(file_data)
+
+      def _validate_good_interpreter_path_file(path):
+        with open(path, 'r') as fp:
+          lines = fp.readlines()
+          binary = lines[0].strip()
+          try:
+            interpreter = PythonInterpreter.from_binary(binary)
+            return True if interpreter else False
+          except Executor.ExecutableNotFound:
+            return False
+
+      # Mangle interpreter.info.
+      for path in glob.glob(os.path.join(workdir, 'pyprep/interpreter/*/interpreter.info')):
+        _prepend_bad_interpreter_to_interpreter_path_file(path)
+
+      pants_run = self.run_pants_with_workdir(
+        ["run", target],
+        workdir=workdir,
+        config=config
+      )
+      self.assert_success(pants_run)
+      for path in glob.glob(os.path.join(workdir, 'pyprep/interpreter/*/interpreter.info')):
+        self.assertTrue(
+          _validate_good_interpreter_path_file(path),
+          'interpreter.info was not purged and repopulated properly: {}'.format(path)
+        )

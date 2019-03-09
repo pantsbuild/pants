@@ -119,8 +119,8 @@ class TestContext(Context):
 
 
 def create_context_from_options(options, target_roots=None, build_graph=None,
-                                build_file_parser=None, address_mapper=None, console_outstream=None,
-                                workspace=None, scheduler=None):
+                                build_configuration=None, address_mapper=None,
+                                console_outstream=None, workspace=None, scheduler=None):
   """Creates a ``Context`` with the given options and no targets by default.
 
   :param options: An :class:`pants.option.options.Option`-alike object that supports read methods.
@@ -130,6 +130,6 @@ def create_context_from_options(options, target_roots=None, build_graph=None,
   run_tracker = TestContext.DummyRunTracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
   return TestContext(options=options, run_tracker=run_tracker, target_roots=target_roots,
-                     build_graph=build_graph, build_file_parser=build_file_parser,
+                     build_graph=build_graph, build_configuration=build_configuration,
                      address_mapper=address_mapper, console_outstream=console_outstream,
                      workspace=workspace, scheduler=scheduler)

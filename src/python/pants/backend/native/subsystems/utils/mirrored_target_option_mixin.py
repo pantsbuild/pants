@@ -4,24 +4,24 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import object
+from abc import abstractmethod
 
-from pants.util.meta import classproperty
+from pants.util.meta import AbstractClass, classproperty
 
 
 # TODO: consider coalescing existing methods of mirroring options between a target and a subsystem
 # -- see pants.backend.jvm.subsystems.dependency_context.DependencyContext#defaulted_property()!
-class MirroredTargetOptionMixin(object):
+class MirroredTargetOptionMixin(AbstractClass):
   """Get option values which may be set in this subsystem or in a Target's keyword argument."""
 
   @classproperty
+  @abstractmethod
   def mirrored_option_to_kwarg_map(cls):
     """Subclasses should override and return a dict of (subsystem option name) -> (target kwarg).
 
     This classproperty should return a dict mapping this subsystem's options attribute name (with
     underscores) to the corresponding target's keyword argument name.
     """
-    raise NotImplementedError()
 
   def get_target_mirrored_option(self, option_name, target):
     field_name = self.mirrored_option_to_kwarg_map[option_name]

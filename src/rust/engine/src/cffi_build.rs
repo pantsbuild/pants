@@ -22,11 +22,7 @@
   clippy::too_many_arguments
 )]
 // Default isn't as big a deal as people seem to think it is.
-#![allow(
-  clippy::new_without_default,
-  clippy::new_without_default_derive,
-  clippy::new_ret_no_self
-)]
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
@@ -133,6 +129,9 @@ fn main() -> Result<(), CffiBuildError> {
   let cffi_bootstrapper = build_root.join("build-support/bin/native/bootstrap_cffi.sh");
   mark_for_change_detection(&cffi_bootstrapper);
 
+  // TODO: bootstrap_c_source() is used to generate C source code from @_extern_decl methods in
+  // native.py. It would be very useful to be able to detect when those /declarations/ haven't
+  // changed and avoid rebuilding the engine crate if we are just iterating on the implementations.
   mark_for_change_detection(&build_root.join("src/python/pants/engine/native.py"));
 
   // N.B. The filename of this source code - at generation time - must line up 1:1 with the

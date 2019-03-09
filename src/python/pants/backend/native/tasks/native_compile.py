@@ -43,11 +43,16 @@ class NativeCompile(NativeTask, AbstractClass):
   # NB: `source_target_constraint` must be overridden.
   source_target_constraint = None
 
-  # `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
-  # compiler process. `workunit_label` must be set to a string.
   @classproperty
+  @abstractmethod
   def workunit_label(cls):
-    raise NotImplementedError('subclasses of NativeCompile must override workunit_label!')
+    """A string describing the work being done during compilation.
+
+    `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
+    compiler process.
+
+    :rtype: str
+    """
 
   @classmethod
   def product_types(cls):

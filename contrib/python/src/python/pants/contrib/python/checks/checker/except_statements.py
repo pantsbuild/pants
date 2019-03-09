@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import ast
 
-from six import PY3
+from future.utils import PY3
 
 from pants.contrib.python.checks.checker.common import CheckstylePlugin
 
