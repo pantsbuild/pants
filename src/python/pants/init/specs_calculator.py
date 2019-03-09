@@ -14,8 +14,16 @@ from pants.base.specs import (
     SingleAddress,
     Specs,
 )
+from pants.engine.addresses import Addresses
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.scheduler import SchedulerSession
-from pants.engine.query import QueryAddresses, QueryComponentWrapper, QueryParseInput
+from pants.engine.query import (
+    QueryAddresses,
+    QueryComponentWrapper,
+    QueryParseInput,
+    QueryPipeline,
+    QueryPipelineRequest,
+)
 from pants.engine.selectors import Params
 from pants.option.options import Options
 from pants.scm.subsystems.changed import (
@@ -101,7 +109,7 @@ class SpecsCalculator:
         logger.debug("query exprs are: %s (%s)", exprs, bool(exprs))
         targets_specified = sum(
             1
-            for item in (changed_options.is_actionable(), specs.provided_specs.dependencies, exprs)
+            for item in (changed_options.is_actionable(), specs.provided_specs.dependencies)
             if item
         )
 
@@ -147,26 +155,30 @@ class SpecsCalculator:
                 filesystem_specs=FilesystemSpecs([]),
             )
 
+        # TODO(#7346): deprecate --owner-of and --changed-* in favor of --query versions, allow
+        # pipelining of successive query expressions with the command-line target specs as the initial
+        # input!
         if exprs:
             # TODO: this should only be necessary for the `changed-since`/etc queries! This can be done by
             # returning a dummy ScmWrapper if no `changed-*` queries are used!
             scm = scm("The --query option")
-            # TODO(#7346): deprecate --owner-of and --changed-* in favor of --query versions, allow
-            # pipelining of successive query expressions with the command-line target specs as the initial
-            # input!
-            if len(exprs) > 1:
-                raise ValueError(
-                    "Only one --query argument is currently supported! Received: {}.".format(exprs)
-                )
 
-            scm_wrapper = UncachedScmWrapper.create(scm)
-            (expr_addresses,) = session.product_request(
-                QueryAddresses, [Params(scm_wrapper, exprs[0])]
+            (input_addresses,) = session.product_request(Addresses, [specs.provided_specs])
+            (query_output,) = session.product_request(
+                QueryAddresses,
+                [
+                    Params(
+                        UncachedScmWrapper.create(scm),
+                        QueryPipelineRequest(
+                            pipeline=QueryPipeline(tuple(exprs)), input_addresses=input_addresses,
+                        ),
+                    )
+                ],
             )
+
+            expr_addresses = query_output.addresses
             logger.debug("expr addresses: %s", expr_addresses)
-            dependencies = tuple(
-                SingleAddress(a.spec_path, a.target_name) for a in expr_addresses.addresses
-            )
+            dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in expr_addresses)
             return Specs(
                 address_specs=AddressSpecs(
                     dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags

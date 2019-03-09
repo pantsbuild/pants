@@ -182,6 +182,34 @@ python_library(
     ':collection',
     ':fs',
     ':rules',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:specs',
+  ],
+  tags = {"partially_type_checked"},
+)
+
+python_library(
+  name='query',
+  sources=['query.py'],
+  dependencies=[
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/scm/subsystems:changed',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
+    'src/python/pants/util:strutil',
+  ],
+)
+
+python_library(
+  name='native',
+  sources=['native.py'],
+  dependencies=[
+    ':native_engine_shared_library',
+    ':fs',
+    ':interactive_runner',
+    ':isolated_process',
     ':selectors',
     ':unions',
     '3rdparty/python:typing-extensions',

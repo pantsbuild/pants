@@ -770,13 +770,19 @@ impl Task {
                     "non_member_error_message",
                     &[externs::val_for(&get.subject)],
                   ) {
-                    Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
+                    Ok(err_msg) => throw(&format!(
+                      "err: {}, task: {:?}, edges: {:?}",
+                      externs::val_to_str(&err_msg),
+                      entry,
+                      edges
+                    )),
                     // If the non_member_error_message() call failed for any reason,
                     // fall back to a generic message.
                     Err(_e) => throw(&format!(
-                      "Type {} is not a member of the {} @union",
+                      "Type {} is not a member of the {} @union (entry: {:?})",
                       get.subject.type_id(),
-                      ty
+                      ty,
+                      entry
                     )),
                   }
                 }

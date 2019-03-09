@@ -11,6 +11,8 @@ from pants.engine.internals.scheduler import ExecutionTimeoutError
 from pants.init.engine_initializer import LegacyGraphScheduler
 from pants.pantsd.service.pants_service import PantsService
 
+logger = logging.getLogger(__name__)
+
 
 class SchedulerService(PantsService):
     """The pantsd scheduler service.

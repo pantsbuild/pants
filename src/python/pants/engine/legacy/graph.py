@@ -28,6 +28,7 @@ from pants.engine.legacy.structs import (
     BundlesField,
     HydrateableField,
     SourcesField,
+    TagsField,
     TargetAdaptor,
 )
 from pants.engine.rules import rule
@@ -529,6 +530,11 @@ def _eager_fileset_with_spec(
 
 
 @rule
+def hydrate_tags(tags_field: TagsField) -> HydratedField:
+    return HydratedField(name="tags", value=tags_field.tags)
+
+
+@rule
 async def hydrate_sources(
     sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior,
 ) -> HydratedField:
@@ -599,11 +605,12 @@ async def hydrate_bundles(
 def create_legacy_graph_tasks():
     """Create tasks to recursively parse the legacy graph."""
     return [
-        transitive_hydrated_target,
-        transitive_hydrated_targets,
-        legacy_transitive_hydrated_targets,
+        hydrate_bundles,
+        hydrate_sources,
+        hydrate_tags,
         hydrate_target,
         hydrated_targets,
-        hydrate_sources,
-        hydrate_bundles,
+        legacy_transitive_hydrated_targets,
+        transitive_hydrated_target,
+        transitive_hydrated_targets,
     ]
