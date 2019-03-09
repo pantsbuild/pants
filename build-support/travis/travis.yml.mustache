@@ -438,7 +438,8 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   env:
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs4
-    - {{>env_osx_with_pyenv}}
+    - >
+      {{>env_osx_with_pyenv}}
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
     # We set $PY to ensure the UCS4 interpreter is used when bootstrapping the PEX.
     - PY=${PYENV_ROOT}/shims/python2.7
