@@ -245,14 +245,8 @@ travis_docker_image: &travis_docker_image
   before_script:
     - ulimit -c unlimited
   script:
-    # NB: This script definition is very likely to be overridden in a consumer, so we alias it
-    # for re-inclusion.
-    - &travis_docker_image_launch docker build --rm -t travis_ci
-      --build-arg "TRAVIS_USER=$(id -un)"
-      --build-arg "TRAVIS_UID=$(id -u)"
-      --build-arg "TRAVIS_GROUP=$(id -gn)"
-      --build-arg "TRAVIS_GID=$(id -g)"
-      build-support/docker/travis_ci/
+    - >
+      {{>launch_docker_image}}
 
 # -------------------------------------------------------------------------
 # Bootstrap engine shards
@@ -263,14 +257,15 @@ base_linux_build_engine: &base_linux_build_engine
   <<: *travis_docker_image
   stage: *bootstrap
   script:
-    - *travis_docker_image_launch
+    - >
+      {{>launch_docker_image}}
     # Note that:
     # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
     # * We also build fs_util, to take advantage of the rust code built during bootstrapping.
     - docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest
+      ${docker_image_name}:latest
       sh -c "./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
 
@@ -279,6 +274,7 @@ py27_linux_build_engine: &py27_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2.7 PEX)"
   env:
+    - docker_image_name=travis_ci
     # NB: Only the Py2.7 shard sets PREPARE_DEPLOY to cause the fs_util binary to be uploaded to S3:
     # either linux shard could upload this binary, since it does not depend on python at all.
     - PREPARE_DEPLOY=1
@@ -291,6 +287,7 @@ py36_linux_build_engine: &py36_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
+    - docker_image_name=travis_ci
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - BOOTSTRAP_ARGS='-b'
@@ -301,22 +298,10 @@ py37_linux_build_engine: &py37_linux_build_engine
   stage: *bootstrap_cron
   name: "Build Linux native engine and pants.pex (Py3.7 PEX)"
   env:
+    - docker_image_name=travis_ci_py37
     - CACHE_NAME=linuxpexbuild.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - BOOTSTRAP_ARGS='-7b'
-  script:
-  - docker build --rm -t travis_ci_py37
-      --build-arg "TRAVIS_USER=$(id -un)"
-      --build-arg "TRAVIS_UID=$(id -u)"
-      --build-arg "TRAVIS_GROUP=$(id -gn)"
-      --build-arg "TRAVIS_GID=$(id -g)"
-      build-support/docker/travis_ci_py37/
-  - docker run --rm -t
-      -v "${HOME}:/travis/home"
-      -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci_py37:latest
-      sh -c "./build-support/bin/ci.sh -7b && ./build-support/bin/release.sh -f"
-  - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
@@ -436,41 +421,110 @@ cargo_audit: &cargo_audit
 # Build wheels
 # -------------------------------------------------------------------------
 
+# N.B. With Python 2, we must build pantsbuild.pants with both UCS2 and UCS4 to provide full
+# compatibility for end users. This is because we constrain our ABI due to the native engine.
+# See https://www.python.org/dev/peps/pep-0513/#ucs-2-vs-ucs-4-builds. Note this distinction is
+# not necessary with Python 3.3+ due to flexible storage of Unicode strings (https://www.python.org/dev/peps/pep-0393/).
+#
+# We treat both Linux UCS4 and OSX UCS2 normally, as these are the defaults for those environments.
+# The Linux UCS2 and OSX UCS4 shards, however, must rebuild Python with
+# `PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs{2,4}` set, along with bootstrapping Pants again rather
+# than pulling the PEX from AWS.
+
 base_build_wheels: &base_build_wheels
   stage: *test
   env:
-    - &base_build_wheels_env RUN_PANTS_FROM_PEX=1 PREPARE_DEPLOY=1
+    - &base_build_wheels_env PREPARE_DEPLOY=1
 
-linux_build_wheels: &linux_build_wheels
+py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
   # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize
   # compatibility. This is a Py2.7 shard, so it is not subject to #6985.
   <<: *travis_docker_image
-  <<: *py27_linux_test_config
   <<: *base_build_wheels
-  name: "Build Linux wheels (No PEX)"
+
+py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
+  <<: *py27_linux_config
+  <<: *py27_linux_build_wheels_no_ucs
+  <<: *native_engine_cache_config
+  name: "Build wheels - Linux and cp27m (UCS2)"
   env:
-    - *py27_linux_test_config_env
     - *base_build_wheels_env
-    - CACHE_NAME=linuxwheelsbuild
+    - docker_image_name=travis_ci_py27_ucs2
+    - CACHE_NAME=linuxwheelsbuild.ucs2
   script:
-    - *travis_docker_image_launch
+    - >
+      {{>launch_docker_image}}
     - docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest
-      sh -c "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
+      ${docker_image_name}:latest
+      sh -c "./build-support/bin/ci.sh -2b
+             && ./build-support/bin/check_pants_pex_abi.py cp27m
+             && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
 
-osx_build_wheels: &osx_build_wheels
-  <<: *py27_osx_test_config
+py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
+  <<: *py27_linux_build_wheels_no_ucs
+  <<: *py27_linux_test_config
+  # `py27_linux_test_config` overrides the stage set by `base_build_wheels`, so we re-override it.
+  stage: *test
+  name: "Build wheels - Linux and cp27mu (UCS4)"
+  env:
+    - *py27_linux_test_config_env
+    - *base_build_wheels_env
+    - docker_image_name=travis_ci
+    - CACHE_NAME=linuxwheelsbuild.ucs4
+  script:
+    - >
+      {{>launch_docker_image}}
+    - docker run --rm -t
+      -v "${HOME}:/travis/home"
+      -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      ${docker_image_name}:latest
+      sh -c "./build-support/bin/check_pants_pex_abi.py cp27mu
+             && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
+
+py27_osx_build_wheels_no_ucs: &py27_osx_build_wheels_no_ucs
   <<: *base_build_wheels
-  name: "Build OSX wheels (No PEX)"
   osx_image: xcode8
+
+py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
+  <<: *py27_osx_test_config
+  <<: *py27_osx_build_wheels_no_ucs
+  name: "Build wheels - OSX and cp27m (UCS2)"
   env:
     - *py27_osx_test_config_env
     - *base_build_wheels_env
-    - CACHE_NAME=osxwheelsbuild
+    - CACHE_NAME=osxwheelsbuild.ucs2
   script:
-    - ./build-support/bin/release.sh -n
+    - ./build-support/bin/check_pants_pex_abi.py cp27m
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
+
+py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
+  <<: *py27_osx_config
+  <<: *py27_osx_build_wheels_no_ucs
+  <<: *native_engine_cache_config
+  name: "Build wheels - OSX and cp27mu (UCS4)"
+  addons:
+    brew:
+      packages:
+      - openssl
+  env:
+    - *base_build_wheels_env
+    - CACHE_NAME=osxwheelsbuild.ucs4
+    - >
+      {{>env_osx_with_pyenv}}
+    - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
+    # We set $PY to ensure the UCS4 interpreter is used when bootstrapping the PEX.
+    - PY=${PYENV_ROOT}/shims/python2.7
+  before_install:
+    {{>before_install_osx}}
+    - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
+    - ${PYENV_ROOT}/bin/pyenv install 2.7.13
+    - ${PYENV_ROOT}/bin/pyenv global 2.7.13
+  script:
+    - ./build-support/bin/ci.sh -2b
+    - ./build-support/bin/check_pants_pex_abi.py cp27mu
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 # -------------------------------------------------------------------------
 # Rust tests
@@ -714,9 +768,6 @@ matrix:
     - <<: *linux_rust_clippy
     - <<: *cargo_audit
 
-    - <<: *linux_build_wheels
-    - <<: *osx_build_wheels
-
     - <<: *py27_linux_test_config
       name: "Unit tests for pants and pants-plugins (Py2.7 PEX)"
       stage: *test
@@ -741,6 +792,11 @@ matrix:
         - CACHE_NAME=linuxunittests.py37
       script:
         - ./build-support/bin/travis-ci.sh -7lp
+
+    - <<: *py27_linux_build_wheels_ucs2
+    - <<: *py27_linux_build_wheels_ucs4
+    - <<: *py27_osx_build_wheels_ucs2
+    - <<: *py27_osx_build_wheels_ucs4
 
 {{#py3_integration_shards}}
     - <<: *py36_linux_test_config
