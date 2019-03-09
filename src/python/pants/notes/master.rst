@@ -8,6 +8,11 @@ not undergone the vetting associated with ``stable`` releases.
 1.15.0.dev3 (3/9/2019)
 ----------------------
 
+API Changes
+~~~~~~~~~~~
+* Propagate global interpreter constraints when building PEXes with interpreter constraints requested (#7285)
+  `PR #7285 <https://github.com/pantsbuild/pants/pull/7285>`_
+
 New Features
 ~~~~~~~~~~~~
 * Publish the awslambda contrib to PyPI. (#7343)
@@ -37,9 +42,6 @@ Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Specify ABI for pantsbuild.pants wheel and build with both UCS2 and UCS4 (#7235)
   `PR #7235 <https://github.com/pantsbuild/pants/pull/7235>`_
-
-* Propagate global interpreter constraints when building PEXes with interpreter constraints requested (#7285)
-  `PR #7285 <https://github.com/pantsbuild/pants/pull/7285>`_
 
 * Have extern::generator_send directly produce TypeIds for product types (#7318)
   `PR #7318 <https://github.com/pantsbuild/pants/pull/7318>`_
@@ -90,7 +92,6 @@ Deprecations
 
 * Deprecate Context.build_file_parser. (#7295)
   `PR #7295 <https://github.com/pantsbuild/pants/pull/7295>`_
-
 
 Documentation
 ~~~~~~~~~~~~~
