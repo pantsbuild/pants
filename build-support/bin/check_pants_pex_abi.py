@@ -13,10 +13,16 @@ import os.path
 import zipfile
 
 
+RED = "\033[31m"
+BLUE = "\033[34m"
+RESET = "\033[0m"
+
+
 def main():
   if not os.path.isfile("pants.pex"):
-    die("pants.pex not found! Ensure you are in the repository root and run " \
-        "'./build-support/bin/ci.sh -b' to bootstrap a pants.pex.")
+    die("pants.pex not found! Ensure you are in the repository root, then run " \
+        "'./build-support/bin/ci.sh -b' to bootstrap pants.pex with Python 3 or " \
+        "'./build-support/bin/ci.sh -2b' to bootstrap pants.pex with Python 2.")
   expected_abi = create_parser().parse_args().abi
   with zipfile.ZipFile("pants.pex", "r") as pex:
     with pex.open("PEX-INFO", "r") as pex_info:
@@ -33,6 +39,7 @@ def main():
   found_abi = list(parsed_abis)[0]
   if found_abi != expected_abi:
     die("pants.pex was built with the incorrect ABI. Expected: {}, found: {}.".format(expected_abi, found_abi))
+  success("Success. As expected, pants.pex was built with the ABI {}.".format(expected_abi))
 
 
 def create_parser():
@@ -51,10 +58,12 @@ def parse_abi_from_filename(filename):
   return filename.split("-")[-2]
 
 
+def success(message):
+  print("{}{}{}".format(BLUE, message, RESET))
+
+
 def die(message):
-  red = "\033[31m"
-  reset = "\033[0m"
-  raise SystemExit("{}{}{}".format(red, message, reset))
+  raise SystemExit("{}{}{}".format(RED, message, RESET))
 
 
 if __name__ == "__main__":
