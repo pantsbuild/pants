@@ -26,12 +26,19 @@ ARG PYTHON_36_VERSION=3.6.8
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
+
 # Install python 2.7 and 3.6, and set python 3.6 as the default interpreter.
+# We don't *need* to persistently set this in the environment, but it means any later python builds
+# we want to do will by default have this option so we don't get surprised.
+ENV PYTHON_CONFIGURE_OPTS '--enable-shared'
 # `scl enable devtoolset-7` puts the gcc we just installed on the PATH for that command.
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_ROOT}/bin/pyenv install ${PYTHON_27_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_ROOT}/bin/pyenv install ${PYTHON_36_VERSION}
 RUN ${PYENV_ROOT}/bin/pyenv global ${PYTHON_27_VERSION} ${PYTHON_36_VERSION}
 ENV PATH "${PYENV_ROOT}/shims:${PATH}"
+
+# Expose the installed gcc to the invoking shell.
+ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-7",  "--"]
 
 ARG TRAVIS_HOME_DIR_PATH=/travis/home
 ARG TRAVIS_WORK_DIR_PATH=/travis/workdir
