@@ -544,9 +544,8 @@ function fetch_and_check_prebuilt_wheels() {
       fi
     done
 
-    # N.B. For platform-specific wheels, we expect 4 wheels: {linux,osx} * {cp27m,cp27mu}.
-    # Once we release Python 3 wheels, we will expect 6 wheels: {linux,osx} * {cp27m,cp27mu,abi3}.
-    if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 4 ]; then
+    # N.B. For platform-specific wheels, we expect 6 wheels: {linux,osx} * {cp27m,cp27mu,abi3}.
+    if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 6 ]; then
       missing+=("${NAME} (expected whls for each platform: had only ${packages[@]})")
       continue
     fi
