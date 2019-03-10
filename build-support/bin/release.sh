@@ -34,7 +34,7 @@ if ! which "${PY}" >/dev/null; then
 fi
 py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
 if [[ "${py_major_minor}" != "2.7" ]] && [[ "${py_major_minor}" != "3.6" ]]; then
-  die "Invalid interpreter. The release script requires python2.7 or python3.6, and you are using python${py_major_minor}."
+  die "Invalid interpreter. The release script requires Python 2.7 or 3.6 (you are using ${py_major_minor})."
 fi
 
 # Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
