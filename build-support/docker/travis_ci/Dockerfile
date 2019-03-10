@@ -8,18 +8,28 @@ FROM pantsbuild/centos6:latest
 # have Py3 available and also avoid the cost of rebuilding Python 3 every time in CI. However,
 # this requires publishing an updated image to Docker hub, so we copy the code here until then.
 # Install the desired versions of python 2 and 3.
-ARG PYTHON_2_VERSION=2.7.13
-ARG PYTHON_3_VERSION=3.6.8
+RUN yum -y update
+# TODO: figure out why this needs to be installed first for /usr/bin/scl to work!
+RUN yum install -y centos-release-scl
+RUN yum install -y devtoolset-7-gcc{,-c++} \
+  git \
+  java-1.8.0-openjdk-devel \
+  libffi{,-devel} \
+  openssl-devel \
+  sqlite-devel
+
+ARG PYTHON_27_VERSION=2.7.13
+ARG PYTHON_36_VERSION=3.6.8
 # NB: PYENV_ROOT must be set in the environment for `pyenv install` to work, otherwise it will
 # mysteriously fail to find the `install` command.
 ENV PYENV_ROOT /pyenv-docker-build
 RUN mkdir ${PYENV_ROOT}
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
-# Install python 2 and 3, and set python 2 as the default interpreter.
-RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
-    ${PYENV_ROOT}/bin/pyenv install --keep --skip-existing ${PYTHON_2_VERSION} \
-    && ${PYENV_ROOT}/bin/pyenv install --keep --skip-existing ${PYTHON_3_VERSION} \
-    && ${PYENV_ROOT}/bin/pyenv global ${PYTHON_2_VERSION}'
+# Install python 2.7 and 3.6, and set python 3.6 as the default interpreter.
+# `scl enable devtoolset-7` puts the gcc we just installed on the PATH for that command.
+RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_ROOT}/bin/pyenv install ${PYTHON_27_VERSION}
+RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_ROOT}/bin/pyenv install ${PYTHON_36_VERSION}
+RUN ${PYENV_ROOT}/bin/pyenv global ${PYTHON_36_VERSION}
 ENV PATH "${PYENV_ROOT}/shims:${PATH}"
 
 # By default, execute in an environment with python27 enabled.
