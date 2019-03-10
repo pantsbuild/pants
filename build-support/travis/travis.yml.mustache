@@ -19,13 +19,13 @@ env:
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
   - name: &bootstrap Bootstrap Pants
-    if: type = cron
+    if: type != cron
   - name: &bootstrap_cron Bootstrap Pants (Cron)
-    if: type != cron
-  - name: &test Test Pants
     if: type = cron
-  - name: &test_cron Test Pants (Cron)
+  - name: &test Test Pants
     if: type != cron
+  - name: &test_cron Test Pants (Cron)
+    if: type = cron
   - name: &build_stable Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
   - name: &build_unstable Deploy Pants Pex Unstable
