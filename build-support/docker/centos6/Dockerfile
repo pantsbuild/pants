@@ -17,20 +17,5 @@ RUN yum install -y devtoolset-7-gcc{,-c++} \
   openssl-devel \
   sqlite-devel
 
-# Install the desired versions of python 2 and 3.
-ARG PYTHON_2_VERSION=2.7.13
-ARG PYTHON_3_VERSION=3.6.8
-# NB: PYENV_ROOT must be set in the environment for `pyenv install` to work, otherwise it will
-# mysteriously fail to find the `install` command.
-ENV PYENV_ROOT /pyenv-docker-build
-RUN mkdir ${PYENV_ROOT}
-RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
-# Install python 2 and 3, and set python 2 as the default interpreter.
-RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
-    ${PYENV_ROOT}/bin/pyenv install --keep --skip-existing ${PYTHON_2_VERSION} \
-    && ${PYENV_ROOT}/bin/pyenv install --keep --skip-existing ${PYTHON_3_VERSION} \
-    && ${PYENV_ROOT}/bin/pyenv global ${PYTHON_2_VERSION}'
-ENV PATH "${PYENV_ROOT}/shims:${PATH}"
-
 # By default, execute in an environment with python27 enabled.
 ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-7",  "--"]
