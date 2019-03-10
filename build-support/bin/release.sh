@@ -7,42 +7,10 @@ set -e
 ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 source ${ROOT}/build-support/common.sh
 
-# Note we define all options here, but only parse some at the top of the script and parse the rest
-# at the bottom of the script. This is due to execution order. If the option must be used right away,
-# we parse at the top of the script, whereas if it depends on functions defined later in the script,
-# we parse at the end.
+# Note we parse some options here, but parse most at the bottom. This is due to execution order.
+# If the option must be used right away, we parse at the top of the script, whereas if it
+# depends on functions defined later in the script, we parse at the end.
 _OPTS="hdnftcloepqw3"
-function usage() {
-  echo "With no options all packages are built, smoke tested and published to"
-  echo "PyPi.  Credentials are needed for this as described in the"
-  echo "release docs: http://pantsbuild.org/release.html"
-  echo
-  echo "Usage: $0 [-d] [-c] [-3] (-h|-n|-f|-t|-l|-o|-e|-p)"
-  echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
-  echo " -h  Prints out this help message."
-  echo " -3  Release any non-universal wheels (i.e. pantsbuild.pants) as Python 3. Defaults to Python 2."
-  echo " -n  Performs a release dry run."
-  echo "       All package distributions will be built, installed locally in"
-  echo "       an ephemeral virtualenv and exercised to validate basic"
-  echo "       functioning."
-  echo " -f  Build the fs_util binary."
-  echo " -t  Tests a live release."
-  echo "       Ensures the latest packages have been propagated to PyPi"
-  echo "       and can be installed in an ephemeral virtualenv."
-  echo " -l  Lists all pantsbuild packages that this script releases."
-  echo " -o  Lists all pantsbuild package owners."
-  echo " -e  Check that wheels are prebuilt for this release."
-  echo " -p  Build a pex from prebuilt wheels for this release."
-  echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
-  echo
-  echo "All options (except for '-d' and '-3') are mutually exclusive."
-
-  if (( $# > 0 )); then
-    die "$@"
-  else
-    exit 0
-  fi
-}
 
 while getopts "${_OPTS}"  opt; do
   case ${opt} in
@@ -690,6 +658,38 @@ function publish_packages() {
     "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
 
   end_travis_section
+}
+
+function usage() {
+  echo "With no options all packages are built, smoke tested and published to"
+  echo "PyPi.  Credentials are needed for this as described in the"
+  echo "release docs: http://pantsbuild.org/release.html"
+  echo
+  echo "Usage: $0 [-d] [-c] [-3] (-h|-n|-f|-t|-l|-o|-e|-p)"
+  echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
+  echo " -h  Prints out this help message."
+  echo " -3  Release any non-universal wheels (i.e. pantsbuild.pants) as Python 3. Defaults to Python 2."
+  echo " -n  Performs a release dry run."
+  echo "       All package distributions will be built, installed locally in"
+  echo "       an ephemeral virtualenv and exercised to validate basic"
+  echo "       functioning."
+  echo " -f  Build the fs_util binary."
+  echo " -t  Tests a live release."
+  echo "       Ensures the latest packages have been propagated to PyPi"
+  echo "       and can be installed in an ephemeral virtualenv."
+  echo " -l  Lists all pantsbuild packages that this script releases."
+  echo " -o  Lists all pantsbuild package owners."
+  echo " -e  Check that wheels are prebuilt for this release."
+  echo " -p  Build a pex from prebuilt wheels for this release."
+  echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
+  echo
+  echo "All options (except for '-d' and '-3') are mutually exclusive."
+
+  if (( $# > 0 )); then
+    die "$@"
+  else
+    exit 0
+  fi
 }
 
 while getopts "${_OPTS}" opt; do
