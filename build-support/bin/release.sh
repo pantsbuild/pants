@@ -51,6 +51,9 @@ while getopts "${_OPTS}"  opt; do
   esac
 done
 
+# Reset opt parsing's position to start
+OPTIND=0
+
 # Set the Python interpreter to be used for the virtualenv. Note we allow the user to
 # predefine this value so that they may point to a specific interpreter, e.g. 2.7.13 vs. 2.7.15.
 default_interpreter="python2.7";
@@ -689,8 +692,6 @@ function publish_packages() {
   end_travis_section
 }
 
-# Reset opt parsing's position to start
-OPTIND=0
 while getopts "${_OPTS}" opt; do
   case ${opt} in
     h) usage ;;
