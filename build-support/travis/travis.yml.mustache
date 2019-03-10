@@ -425,7 +425,7 @@ py36_linux_build_wheels: &py36_linux_build_wheels
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       ${docker_image_name}:latest
-      sh -c "./build-support/bin/check_pants_pex_abi.py abi3
+      sh -c "./build-support/bin/check_pants_pex_abi.py cp36m
              && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n"
 
 base_osx_build_wheels: &base_osx_build_wheels
@@ -480,7 +480,7 @@ py36_osx_build_wheels: &py36_osx_build_wheels
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.abi3
   script:
-    - ./build-support/bin/check_pants_pex_abi.py abi3
+    - ./build-support/bin/check_pants_pex_abi.py cp36m
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n
 
 # -------------------------------------------------------------------------
