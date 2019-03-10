@@ -20,7 +20,7 @@ env:
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
     - LC_ALL="en_US.UTF-8"
     # TODO(#7152): this tells the ./pants runner script to avoid trying to clean the workspace when
-    # changing python versions. Remove this after the python 3 migration!
+    # changing python versions. Remove all instances of this after the python 3 migration!
     - ONLY_USING_SINGLE_PYTHON_VERSION='true'
     - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
     - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
@@ -465,7 +465,7 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
     - CACHE_NAME=osxwheelsbuild.ucs2
   script:
     - ./build-support/bin/check_pants_pex_abi.py cp27m
-    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
+    - RUN_PANTS_FROM_PEX=1 ONLY_USING_SINGLE_PYTHON_VERSION='true' ./build-support/bin/release.sh -n
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *py27_osx_config
@@ -498,7 +498,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   script:
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu
-    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
+    - RUN_PANTS_FROM_PEX=1 ONLY_USING_SINGLE_PYTHON_VERSION='true' ./build-support/bin/release.sh -n
 
 # -------------------------------------------------------------------------
 # Rust tests
