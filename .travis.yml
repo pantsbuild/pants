@@ -28,7 +28,7 @@ stages:
   - &bootstrap Bootstrap Pants
   - name: &test Test Pants
     if: type != cron
-  - name: &cron Cron
+  - name: &test_cron Test Pants (Cron)
     if: type = cron
   - name: &build_stable Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
@@ -141,7 +141,7 @@ base_linux_test_config: &base_linux_test_config
 py27_linux_test_config: &py27_linux_test_config
   <<: *py27_linux_config
   <<: *base_linux_test_config
-  stage: *cron
+  stage: *test_cron
   env:
     - &py27_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
@@ -196,7 +196,7 @@ base_osx_test_config: &base_osx_test_config
 py27_osx_test_config: &py27_osx_test_config
   <<: *py27_osx_config
   <<: *base_osx_test_config
-  stage: *cron
+  stage: *test_cron
   env:
     - &py27_osx_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
 
@@ -381,7 +381,7 @@ cargo_audit: &cargo_audit
   os: linux
   dist: xenial
   sudo: required
-  stage: *cron
+  stage: *test_cron
   script:
     - ./build-support/bin/travis-ci.sh -a
 
