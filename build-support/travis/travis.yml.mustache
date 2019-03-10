@@ -246,7 +246,7 @@ py36_linux_build_engine: &py36_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
-    - docker_image_name=travis_ci
+    - docker_image_name=travis_ci_py36
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - BOOTSTRAP_ARGS='-b'
