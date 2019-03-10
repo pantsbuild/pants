@@ -5,41 +5,33 @@
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
 
 # TODO(#7152): remove this after the python 3 migration!
-function pants3_maybe_clean() {
-  _PYTHON_VERSION_TO_RUN='3'
-  if [[ "$_PANTS_USING_PYTHON2" == 'true' ]]; then
-    _PYTHON_VERSION_TO_RUN='2'
-  fi
+function clean_if_interpreter_changed() {
+  _python_version_to_run="$1"
 
-  _PYTHON_VERSION_FILE="${REPO_ROOT}/.pants-python-version"
+  _python_version_file="${REPO_ROOT}/.pants-python-version"
 
-  if [[ -z "$_RECURSIVE_PANTS_SHELL_SCRIPT_INVOCATION" ]]; then
-    if [[ -f "$_PYTHON_VERSION_FILE" ]]; then
-      _PREV_RUN_PYTHON_VERSION="$(cat "$_PYTHON_VERSION_FILE")"
+  if [[ -z "$_recursive_pants_shell_script_invocation" ]]; then
+    if [[ -f "$_python_version_file" ]]; then
+      _prev_run_python_version="$(cat "$_python_version_file")"
     else
       cat >&2 <<EOF
-${_PYTHON_VERSION_FILE} not found. Forcing an initial clean-all...
+${_python_version_file} not found. Forcing an initial clean-all...
 EOF
-      _PREV_RUN_PYTHON_VERSION=''
+      _prev_run_python_version=''
     fi
 
-    if [[ "$_PYTHON_VERSION_TO_RUN" != "$_PREV_RUN_PYTHON_VERSION" ]]; then
-      export _RECURSIVE_PANTS_SHELL_SCRIPT_INVOCATION='y'
+    if [[ "$_python_version_to_run" != "$_prev_run_python_version" ]]; then
+      export _recursive_pants_shell_script_invocation='y'
       cat >&2 <<EOF
 Caches must be cleared before switching pants Python versions in this repo.
-Preparing a Python ${_PYTHON_VERSION_TO_RUN} invocation...
+Preparing a Python ${_python_version_to_run} invocation...
 EOF
       ./pants clean-all
-      echo "$_PYTHON_VERSION_TO_RUN" > "$_PYTHON_VERSION_FILE"
-      unset _RECURSIVE_PANTS_SHELL_SCRIPT_INVOCATION
+      echo "$_python_version_to_run" > "$_python_version_file"
+      unset _recursive_pants_shell_script_invocation
     fi
   fi
 }
-
-# We can currently assume the CI environment does not switch python versions within a shard.
-if [[ "$ONLY_USING_SINGLE_PYTHON_VERSION" != 'true' ]]; then
-  pants3_maybe_clean
-fi
 
 # This bootstrap script runs pants from the live sources in this repo.
 #
@@ -104,6 +96,12 @@ export PY="${PY:-python3}"
 # Pants will try to use Python 2 for subprocesses. Without setting minor version constraints, when using Python 3
 # we could end up using a different Python minor version for subprocesses than we do for Pants.
 py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
+
+# We can currently assume the CI environment does not switch python versions within a shard.
+if [[ "$ONLY_USING_SINGLE_PYTHON_VERSION" != 'true' ]]; then
+  clean_if_interpreter_changed "$py_major_minor_patch"
+fi
+
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
