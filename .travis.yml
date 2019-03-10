@@ -232,15 +232,6 @@ travis_docker_image: &travis_docker_image
     - docker
   before_script:
     - ulimit -c unlimited
-  script:
-    - >
-      docker build
-      --rm -t ${docker_image_name}
-      --build-arg "TRAVIS_USER=$(id -un)"
-      --build-arg "TRAVIS_UID=$(id -u)"
-      --build-arg "TRAVIS_GROUP=$(id -gn)"
-      --build-arg "TRAVIS_GID=$(id -g)"
-      build-support/docker/${docker_image_name}/
 
 # -------------------------------------------------------------------------
 # Bootstrap engine shards

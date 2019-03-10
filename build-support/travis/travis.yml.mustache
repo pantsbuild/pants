@@ -203,9 +203,6 @@ travis_docker_image: &travis_docker_image
     - docker
   before_script:
     - ulimit -c unlimited
-  script:
-    - >
-      {{>launch_docker_image}}
 
 # -------------------------------------------------------------------------
 # Bootstrap engine shards
