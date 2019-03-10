@@ -33,6 +33,7 @@ def generate_travis_yml():
   before_install_osx = get_mustache_file('before_install_osx.mustache')
   env_osx_with_pyenv = get_mustache_file('env_osx_with_pyenv.mustache')
   docker_build_image = get_mustache_file('docker_build_image.mustache')
+  docker_run_image = get_mustache_file('docker_run_image.mustache')
 
   context = {
     'header': HEADER,
@@ -47,6 +48,7 @@ def generate_travis_yml():
     'before_install_linux': before_install_linux,
     'before_install_osx': before_install_osx,
     'env_osx_with_pyenv': env_osx_with_pyenv,
-    'docker_build_image': docker_build_image
+    'docker_build_image': docker_build_image,
+    'docker_run_image': docker_run_image
   })
   print(renderer.render(template, context))

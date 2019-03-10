@@ -1,0 +1,6 @@
+docker run
+--rm -t
+-v "${HOME}:/travis/home"
+-v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+${docker_image_name}:latest
+sh -c "${docker_run_command}"
