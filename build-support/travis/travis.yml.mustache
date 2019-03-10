@@ -214,7 +214,7 @@ base_linux_build_engine: &base_linux_build_engine
   stage: *bootstrap
   script:
     - >
-      {{>launch_docker_image}}
+      {{>docker_build_image}}
     # Note that:
     # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
     # * We also build fs_util, to take advantage of the rust code built during bootstrapping.
@@ -377,7 +377,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
     - CACHE_NAME=linuxwheelsbuild.ucs2
   script:
     - >
-      {{>launch_docker_image}}
+      {{>docker_build_image}}
     - docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
@@ -399,7 +399,7 @@ py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
     - CACHE_NAME=linuxwheelsbuild.ucs4
   script:
     - >
-      {{>launch_docker_image}}
+      {{>docker_build_image}}
     - docker run --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
