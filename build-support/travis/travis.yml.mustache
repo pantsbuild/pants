@@ -212,6 +212,8 @@ base_linux_build_engine: &base_linux_build_engine
   <<: *native_engine_cache_config
   <<: *travis_docker_image
   stage: *bootstrap
+  # Callers of this anchor are expected to provide values in their `env` for
+  # `docker_image_name` and `docker_run_command` (i.e. the bash command(s) to run).
   script:
     - >
       {{>docker_build_image}}
@@ -363,6 +365,8 @@ py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
   # compatibility. This is a Py2.7 shard, so it is not subject to #6985.
   <<: *travis_docker_image
   <<: *base_build_wheels
+  # Callers of this anchor are expected to provide values in their `env` for
+  # `docker_image_name` and `docker_run_command` (i.e. the bash command(s) to run).
   script:
     - >
       {{>docker_build_image}}
