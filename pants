@@ -8,29 +8,31 @@ REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
 function clean_if_interpreter_changed() {
   _python_version_to_run="$1"
 
+  if [[ -n "${_recursive_pants_shell_script_invocation:-}" ]]; then
+    return 0
+  fi
+
   _python_version_file="${REPO_ROOT}/.pants-python-version"
 
-  if [[ -z "$_recursive_pants_shell_script_invocation" ]]; then
-    if [[ -f "$_python_version_file" ]]; then
-      _prev_run_python_version="$(cat "$_python_version_file")"
-    else
-      cat >&2 <<EOF
+  if [[ -f "$_python_version_file" ]]; then
+    _prev_run_python_version="$(cat "$_python_version_file")"
+    if [[ "$_python_version_to_run" == "$_prev_run_python_version" ]]; then
+      return 0
+    fi
+  else
+    cat >&2 <<EOF
 ${_python_version_file} not found. Forcing an initial clean-all...
 EOF
-      _prev_run_python_version=''
-    fi
+  fi
 
-    if [[ "$_python_version_to_run" != "$_prev_run_python_version" ]]; then
-      export _recursive_pants_shell_script_invocation='y'
-      cat >&2 <<EOF
+  export _recursive_pants_shell_script_invocation='y'
+  cat >&2 <<EOF
 Caches must be cleared before switching pants Python versions in this repo.
 Preparing a Python ${_python_version_to_run} invocation...
 EOF
-      ./pants clean-all
-      echo "$_python_version_to_run" > "$_python_version_file"
-      unset _recursive_pants_shell_script_invocation
-    fi
-  fi
+  ./pants clean-all
+  echo "$_python_version_to_run" > "$_python_version_file"
+  unset _recursive_pants_shell_script_invocation
 }
 
 # This bootstrap script runs pants from the live sources in this repo.
@@ -98,7 +100,7 @@ export PY="${PY:-python3}"
 py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
 
 # We can currently assume the CI environment does not switch python versions within a shard.
-if [[ "$ONLY_USING_SINGLE_PYTHON_VERSION" != 'true' ]]; then
+if [[ "${ONLY_USING_SINGLE_PYTHON_VERSION:-false}" != 'true' ]]; then
   clean_if_interpreter_changed "$py_major_minor_patch"
 fi
 
