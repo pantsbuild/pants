@@ -8,12 +8,18 @@ from builtins import str
 
 from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import \
   PyThriftNamespaceClashCheck
+from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import \
+  rules as namespace_clash_rules
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.util.dirutil import read_file
 from pants_test.task_test_base import DeclarativeTaskTestMixin, TaskTestBase
 
 
 class PyThriftNamespaceClashCheckTest(TaskTestBase, DeclarativeTaskTestMixin):
+
+  @classmethod
+  def rules(cls):
+    return super(PyThriftNamespaceClashCheckTest, cls).rules() + namespace_clash_rules()
 
   @classmethod
   def task_type(cls):

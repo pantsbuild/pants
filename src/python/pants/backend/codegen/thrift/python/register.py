@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThriftPyGen
 from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import \
   PyThriftNamespaceClashCheck
+from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import \
+  rules as namespace_clash_rules
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -23,3 +25,7 @@ def build_file_aliases():
 def register_goals():
   task(name='thrift-py', action=ApacheThriftPyGen).install('gen')
   task(name='py-thrift-namespace-clash-check', action=PyThriftNamespaceClashCheck).install('gen')
+
+
+def rules():
+  return namespace_clash_rules()
