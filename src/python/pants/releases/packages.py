@@ -98,7 +98,7 @@ def core_packages(py3):
   # `src/rust/engine/src/cffi/native_engine.c` we set up `Py_LIMITED_API` and in `src/python/pants/BUILD` we
   # set ext_modules, which together allows us to mark the abi tag. See https://docs.python.org/3/c-api/stable.html
   # for documentation and https://bitbucket.org/pypa/wheel/commits/1f63b534d74b00e8c2e8809f07914f6da4502490?at=default#Ldocs/index.rstT121
-  # for how to mark the ABI through the wheel program.
+  # for how to mark the ABI through bdist_wheel.
   bdist_wheel_flags = ("--py-limited-api", "cp36") if py3 else ("--python-tag", "cp27", "--plat-name", find_platform_name())
   return {
     Package("pantsbuild.pants", "//src/python/pants:pants-packaged", bdist_wheel_flags=bdist_wheel_flags),
