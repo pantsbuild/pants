@@ -25,7 +25,7 @@ py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 function run_local_pants() {
-  ${ROOT}/pants2 "$@"
+  ${ROOT}/pants "$@"
 }
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
@@ -483,6 +483,8 @@ function fetch_and_check_prebuilt_wheels() {
       fi
     done
 
+    # N.B. For platform-specific wheels, we expect 4 wheels: {linux,osx} * {cp27m,cp27mu}.
+    # Once we release Python 3 wheels, we will expect 6 wheels: {linux,osx} * {cp27m,cp27mu,abi3}.
     if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 4 ]; then
       missing+=("${NAME} (expected whls for each platform: had only ${packages[@]})")
       continue
@@ -590,7 +592,7 @@ function build_pex() {
 
   execute_pex \
     -o "${dest}" \
-    --script=pants2 \
+    --script=pants \
     "${platform_flags[@]}" \
     "${requirements[@]}"
 
