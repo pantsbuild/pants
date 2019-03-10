@@ -35,7 +35,7 @@ function usage() {
   echo " -p  Build a pex from prebuilt wheels for this release."
   echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
   echo
-  echo "All options (except for '-d') are mutually exclusive."
+  echo "All options (except for '-d' and '-3') are mutually exclusive."
 
   if (( $# > 0 )); then
     die "$@"
