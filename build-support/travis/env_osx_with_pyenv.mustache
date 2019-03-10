@@ -1,5 +1,9 @@
+{{! These flags are necessary to get OpenSSL working.
+See https://github.com/pyenv/pyenv/wiki/Common-build-problems#error-the-python-ssl-extension-was-not-compiled-missing-the-openssl-lib. }}
 PATH="/usr/local/opt/openssl/bin:$PATH"
 LDFLAGS="-L/usr/local/opt/openssl/lib"
 CPPFLAGS="-I/usr/local/opt/openssl/include"
+{{! We directly will clone Pyenv as some older OSX image shards have too outdated of pyenv
+to work as we need. So, we must explicitly add its entries to PATH. }}
 PYENV_ROOT="${HOME}/.pyenv"
 PATH="${PYENV_ROOT}/shims:${PATH}"
