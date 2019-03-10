@@ -212,9 +212,6 @@ base_linux_build_engine: &base_linux_build_engine
   <<: *native_engine_cache_config
   <<: *travis_docker_image
   stage: *bootstrap
-  env:
-    # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
-    - &build_engine_docker_run_command docker_run_command="./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f"
   script:
     - >
       {{>docker_build_image}}
@@ -228,7 +225,8 @@ py27_linux_build_engine: &py27_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2.7 PEX)"
   env:
     - docker_image_name=travis_ci
-    - *build_engine_docker_run_command
+    # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
+    - docker_run_command="./build-support/bin/ci.sh -2b && ./build-support/bin/release.sh -f"
     # NB: Only the Py2.7 shard sets PREPARE_DEPLOY to cause the fs_util binary to be uploaded to S3:
     # either linux shard could upload this binary, since it does not depend on python at all.
     - PREPARE_DEPLOY=1
@@ -242,7 +240,8 @@ py36_linux_build_engine: &py36_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
     - docker_image_name=travis_ci
-    - *build_engine_docker_run_command
+    # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
+    - docker_run_command="./build-support/bin/ci.sh -b && ./build-support/bin/release.sh -f"
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - BOOTSTRAP_ARGS='-b'
