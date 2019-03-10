@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 # Use our custom Centos6 image for binary compatibility with old linux distros.
-FROM pantsbuild/centos6:latest
+ARG BASE_IMAGE=pantsbuild/centos6:latest
+FROM ${BASE_IMAGE}
 
 # TODO(7064) These changes belong in centos6/Dockerfile, because we always want that image to
 # have Py3 available and also avoid the cost of rebuilding Python 3 every time in CI. However,
@@ -29,15 +30,14 @@ RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
 # `scl enable devtoolset-7` puts the gcc we just installed on the PATH for that command.
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_ROOT}/bin/pyenv install ${PYTHON_27_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_ROOT}/bin/pyenv install ${PYTHON_36_VERSION}
-RUN ${PYENV_ROOT}/bin/pyenv global ${PYTHON_36_VERSION}
+RUN ${PYENV_ROOT}/bin/pyenv global ${PYTHON_27_VERSION} ${PYTHON_36_VERSION}
 ENV PATH "${PYENV_ROOT}/shims:${PATH}"
 
-# By default, execute in an environment with python27 enabled.
-ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-7",  "--"]
+ARG TRAVIS_HOME_DIR_PATH=/travis/home
+ARG TRAVIS_WORK_DIR_PATH=/travis/workdir
 
-# Setup mount points for the travis ci user & workdir.
-VOLUME /travis/home
-VOLUME /travis/workdir
+RUN mkdir -p ${TRAVIS_HOME_DIR_PATH}
+RUN mkdir -p ${TRAVIS_WORK_DIR_PATH}
 
 # Setup a non-root user to execute the build under (avoids problems with npm install).
 ARG TRAVIS_USER=travis_ci
@@ -46,7 +46,11 @@ ARG TRAVIS_GROUP=root
 ARG TRAVIS_GID=0
 
 RUN groupadd --gid ${TRAVIS_GID} ${TRAVIS_GROUP} || true
-RUN useradd -d /travis/home -g ${TRAVIS_GROUP} --uid ${TRAVIS_UID} ${TRAVIS_USER}
+RUN useradd -d ${TRAVIS_HOME_DIR_PATH} -g ${TRAVIS_GROUP} --uid ${TRAVIS_UID} ${TRAVIS_USER}
+
+RUN chown -R ${TRAVIS_USER} ${TRAVIS_HOME_DIR_PATH}
+RUN chown -R ${TRAVIS_USER} ${TRAVIS_WORK_DIR_PATH}
+
 USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 
 # Our newly created user is unlikely to have a sane environment: set a locale at least.
@@ -57,4 +61,7 @@ ENV LC_ALL="en_US.UTF-8"
 # clean-all without this env var.
 ENV ONLY_USING_SINGLE_PYTHON_VERSION 'true'
 
-WORKDIR /travis/workdir
+# Expose the installed gcc to the invoking shell.
+ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-7",  "--"]
+
+WORKDIR ${TRAVIS_WORK_DIR_PATH}
