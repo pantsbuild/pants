@@ -345,7 +345,9 @@ py27_linux_build_engine: &py27_linux_build_engine
   env:
     - docker_image_name=travis_ci
     # We also build fs_util.
-    - docker_run_command="./build-support/bin/ci.sh -2b
+    # NB: The '-x' is necessary here to avoid errors about not being able to find the python shared
+    # library. It's not clear why this is happening just in this shard.
+    - docker_run_command="./build-support/bin/ci.sh -2bx
                           && ./build-support/bin/release.sh -f"
     - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py27
