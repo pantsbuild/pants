@@ -112,6 +112,12 @@ class Target(AbstractTarget):
       """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
+      if 'sources' in payload.as_dict():
+        if 'source' in unknown_args:
+          unknown_args.pop('source')
+        if 'sources' in unknown_args:
+          unknown_args.pop('sources')
+          kwargs.pop('sources')
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:
         logger.debug('{target} ignoring the unimplemented arguments: {args}'
