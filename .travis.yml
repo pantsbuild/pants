@@ -270,7 +270,6 @@ py27_linux_build_engine: &py27_linux_build_engine
     - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
-    - BOOTSTRAP_ARGS='-2b'
 
 py36_linux_build_engine: &py36_linux_build_engine
   <<: *py36_linux_config
@@ -282,7 +281,6 @@ py36_linux_build_engine: &py36_linux_build_engine
     - docker_run_command="./build-support/bin/ci.sh -b && ./build-support/bin/release.sh -f"
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - BOOTSTRAP_ARGS='-b'
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
