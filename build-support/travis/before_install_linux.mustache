@@ -1,6 +1,6 @@
 - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
 - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-# Increase the max number of user watches to ensure that watchman is able to watch all
-# files in the working copy.
+{{! Increase the max number of user watches to ensure that watchman is able to watch all
+# files in the working copy. }}
 - sudo sysctl fs.inotify.max_user_watches=524288
 - ./build-support/bin/install_aws_cli_for_ci.sh
