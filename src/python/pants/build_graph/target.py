@@ -112,6 +112,7 @@ class Target(AbstractTarget):
       """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
+      # TODO(#7357) Remove these checks once test issues are resolved.
       if 'sources' in payload.as_dict():
         if 'source' in unknown_args:
           unknown_args.pop('source')
