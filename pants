@@ -4,6 +4,8 @@
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
 
+_interpreter_version_sentinel_filename='.pants-python-version'
+
 # TODO(#7152): remove this after the python 3 migration!
 function clean_if_interpreter_changed() {
   _python_version_to_run="$1"
@@ -12,7 +14,7 @@ function clean_if_interpreter_changed() {
     return 0
   fi
 
-  _python_version_file="${REPO_ROOT}/.pants-python-version"
+  _python_version_file="${REPO_ROOT}/${_interpreter_version_sentinel_filename}"
 
   if [[ -f "$_python_version_file" ]]; then
     _prev_run_python_version="$(cat "$_python_version_file")"
@@ -21,14 +23,14 @@ function clean_if_interpreter_changed() {
     fi
   else
     cat >&2 <<EOF
-${_python_version_file} not found. Forcing an initial clean-all...
+${_interpreter_version_sentinel_filename} not found in the buildroot. Forcing an initial clean-all...
 EOF
   fi
 
   export _recursive_pants_shell_script_invocation='y'
   cat >&2 <<EOF
-Caches must be cleared before switching pants Python versions in this repo.
-Preparing a Python ${_python_version_to_run} invocation...
+Different Python interpreter version detected compared to the previous Pants run.
+Clearing the cache and preparing a Python ${_python_version_to_run} run...
 EOF
   ./pants clean-all
   echo "$_python_version_to_run" > "$_python_version_file"
