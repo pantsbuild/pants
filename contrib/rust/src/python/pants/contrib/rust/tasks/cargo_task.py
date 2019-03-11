@@ -5,7 +5,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import pprint
 
+from pants.base.build_environment import get_buildroot
+from pants.base.workunit import WorkUnit
 from pants.task.task import Task
 from pants.util.process_handler import subprocess
 
@@ -25,6 +28,8 @@ from pants.contrib.rust.targets.synthetic.cargo_synthetic_proc_macro import Carg
 
 
 class CargoTask(Task):
+
+  pp = pprint.PrettyPrinter(indent=2)
 
   @staticmethod
   def manifest_name():
@@ -97,30 +102,63 @@ class CargoTask(Task):
         current_env[name] = env_value.encode('utf-8')
     return current_env
 
-  def run_command(self, command, current_working_dir, env_vars, workunit):
-    std_out = workunit.output('stdout')
-    std_err = workunit.output('stderr')
+  def execute_command(self, command, workunit_name, workunit_labels, current_working_dir=None,
+                      env_vars=None):
 
-    proc_env = self._set_env_vars(env_vars)
+    current_working_dir = current_working_dir or get_buildroot()
+    env_vars = env_vars or {}
 
-    self.context.log.debug(
-      'Run\n\tCMD: {0}\n\tENV: {1}\n\tCWD: {2}'.format(command, proc_env, current_working_dir))
+    with self.context.new_workunit(name=workunit_name,
+                                   labels=workunit_labels,
+                                   cmd=str(command)) as workunit:
 
-    try:
-      subprocess.check_call(command, stdout=std_out, stderr=std_err, cwd=current_working_dir,
-                            env=proc_env)
-    except subprocess.CalledProcessError:
-      workunit.set_outcome(1)
-    workunit.set_outcome(3)
+      proc_env = self._set_env_vars(env_vars)
 
-  def run_command_and_get_output(self, command, current_working_dir, env_vars, workunit):
-    proc_env = self._set_env_vars(env_vars)
+      self.context.log.debug(
+        'Run\n\tCMD: {0}\n\tENV: {1}\n\tCWD: {2}'.format(self.pretty(command),
+                                                         self.pretty(proc_env),
+                                                         current_working_dir))
 
-    self.context.log.debug(
-      'Run\n\tCMD: {0}\n\tENV: {1}\n\tCWD: {2}'.format(command, proc_env, current_working_dir))
+      try:
+        subprocess.check_call(command,
+                              env=proc_env,
+                              cwd=current_working_dir,
+                              stdout=workunit.output('stdout'),
+                              stderr=workunit.output('stderr'))
+      except subprocess.CalledProcessError:
+        workunit.set_outcome(WorkUnit.FAILURE)
+      workunit.set_outcome(WorkUnit.SUCCESS)
 
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=proc_env, cwd=current_working_dir)
+    return workunit.outcome()
 
-    std_out, std_err = proc.communicate()
-    workunit.set_outcome(3)
-    return std_out.decode('utf-8'), std_err.decode('utf-8')
+  def execute_command_and_get_output(self, command, workunit_name, workunit_labels, env_vars=None,
+                                     current_working_dir=None):
+
+    current_working_dir = current_working_dir or get_buildroot()
+    env_vars = env_vars or {}
+
+    with self.context.new_workunit(name=workunit_name,
+                                   labels=workunit_labels,
+                                   cmd=str(command)) as workunit:
+      proc_env = self._set_env_vars(env_vars)
+
+      self.context.log.debug(
+        'Run\n\tCMD: {0}\n\tENV: {1}\n\tCWD: {2}'.format(self.pretty(command),
+                                                         self.pretty(proc_env),
+                                                         current_working_dir))
+
+      proc = subprocess.Popen(command,
+                              env=proc_env,
+                              cwd=current_working_dir,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE)
+
+      std_out, std_err = proc.communicate()
+
+      returncode = proc.returncode
+      workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
+
+    return workunit.outcome(), std_out.decode('utf-8'), std_err.decode('utf-8')
+
+  def pretty(self, obj):
+    return self.pp.pformat(obj)

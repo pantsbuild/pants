@@ -48,17 +48,16 @@ class Toolchain(CargoTask):
     install_script_dir_path, install_script_file_path = self.save_rustup_install_script(
       install_script.text)
 
-    with self.context.new_workunit(name='setup-rustup',
-                                   labels=[WorkUnitLabel.BOOTSTRAP]) as workunit:
+    cmd = [install_script_file_path, '-y']  # -y Disable confirmation prompt.
 
-      cmd = [install_script_file_path, '-y']  # -y Disable confirmation prompt.
+    outcome = self.execute_command(cmd, 'setup-rustup', [WorkUnitLabel.BOOTSTRAP],
+                                   current_working_dir=install_script_dir_path)
 
-      self.run_command(cmd, install_script_dir_path, {}, workunit)
-
-      if workunit.outcome() != WorkUnit.SUCCESS:
-        self.context.log.error(workunit.outcome_string(workunit.outcome()))
-      else:
-        self.context.log.info(workunit.outcome_string(workunit.outcome()))
+    if outcome != WorkUnit.SUCCESS:
+      self.context.log.error(WorkUnit.outcome_string(outcome))
+      raise TaskError('Cannot install rustup.')
+    else:
+      self.context.log.debug(WorkUnit.outcome_string(outcome))
 
   def download_rustup_install_script(self):
     return requests.get('https://sh.rustup.rs')
@@ -82,20 +81,21 @@ class Toolchain(CargoTask):
 
   def install_rust_toolchain(self, toolchain):
     self.context.log.debug('Installing toolchain: {0}'.format(toolchain))
-    with self.context.new_workunit(name='install-rustup-toolchain',
-                                   labels=[WorkUnitLabel.BOOTSTRAP]) as workunit:
-      cmd = ['rustup', 'install', toolchain]
 
-      env = {
-        'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-      }
+    cmd = ['rustup', 'install', toolchain]
 
-      self.run_command(cmd, get_buildroot(), env, workunit)
+    env = {
+      'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
+    }
 
-      if workunit.outcome() != WorkUnit.SUCCESS:
-        self.context.log.error(workunit.outcome_string(workunit.outcome()))
-      else:
-        self.context.log.debug(workunit.outcome_string(workunit.outcome()))
+    outcome = self.execute_command(cmd, 'install-rustup-toolchain', [WorkUnitLabel.BOOTSTRAP],
+                                   env_vars=env)
+
+    if outcome != WorkUnit.SUCCESS:
+      self.context.log.error(WorkUnit.outcome_string(outcome))
+      raise TaskError('Cannot install toolchain: {}'.format(toolchain))
+    else:
+      self.context.log.debug(WorkUnit.outcome_string(outcome))
 
   def check_if_rustup_exist(self):
     # If the rustup executable can't be find via the path variable, try to find it in the default location.

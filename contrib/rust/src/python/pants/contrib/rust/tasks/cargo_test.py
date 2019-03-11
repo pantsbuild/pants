@@ -36,13 +36,14 @@ class Test(CargoTask):
         shutil.copy(test_path, result_dir)
 
   def run_test(self, test_path, cwd):
-    with self.context.new_workunit(name='run-test', labels=[WorkUnitLabel.TEST]) as workunit:
-      self.run_command(test_path, cwd, {}, workunit)
+    outcome = self.execute_command(test_path, 'run-test',
+                                   [WorkUnitLabel.TEST],
+                                   current_working_dir=cwd)
 
-      if workunit.outcome() != WorkUnit.SUCCESS:
-        self.context.log.error(workunit.outcome_string(workunit.outcome()))
-      else:
-        self.context.log.info(workunit.outcome_string(workunit.outcome()))
+    if outcome != WorkUnit.SUCCESS:
+      self.context.log.error(WorkUnit.outcome_string(outcome))
+    else:
+      self.context.log.info(WorkUnit.outcome_string(outcome))
 
   def run_tests(self, test_definitions):
     result_dir = self.versioned_workdir

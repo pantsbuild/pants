@@ -97,37 +97,43 @@ class Build(Workspace):
     self.check_if_build_scripts_are_invalid()
 
   def get_cargo_build_plan(self, target):
-    with self.context.new_workunit(name='cargo-build-plan',
-                                   labels=[WorkUnitLabel.COMPILER]) as workunit:
-      abs_manifest_path = os.path.join(target.manifest, self.manifest_name())
+    abs_manifest_path = os.path.join(target.manifest, self.manifest_name())
 
-      self.context.log.info(
-        'Getting cargo build plan for manifest: {0}\nAdditional cargo options: {1}'.format(
-          abs_manifest_path, self.get_options().cargo_opt))
+    self.context.log.info(
+      'Getting cargo build plan for manifest: {0}\nAdditional cargo options: {1}'.format(
+        abs_manifest_path, self.get_options().cargo_opt))
 
-      toolchain = "+{}".format(self.context.products.get_data('cargo_toolchain'))
+    toolchain = "+{}".format(self.context.products.get_data('cargo_toolchain'))
 
-      cmd = ['cargo', toolchain, 'build',
-             '--manifest-path', abs_manifest_path,
-             '--build-plan', '-Z', 'unstable-options']
+    cmd = ['cargo', toolchain, 'build',
+           '--manifest-path', abs_manifest_path,
+           '--build-plan', '-Z', 'unstable-options']
 
-      if self.include_compiling_tests():
-        cmd.extend(['--tests'])
+    if self.include_compiling_tests():
+      cmd.extend(['--tests'])
 
-      cmd.extend(self.get_options().cargo_opt)
+    cmd.extend(self.get_options().cargo_opt)
 
-      env = {
-        'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),
-        'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-      }
+    env = {
+      'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),
+      'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
+    }
 
-      std_output, _ = self.run_command_and_get_output(cmd, target.manifest, env, workunit)
-      cargo_build_plan = json.loads(std_output)
+    outcome, std_output, std_error = self.execute_command_and_get_output(cmd,
+                                                                         'cargo-build-plan',
+                                                                         [WorkUnitLabel.COMPILER],
+                                                                         env_vars=env,
+                                                                         current_working_dir=target.manifest)
 
-      if workunit.outcome() != WorkUnit.SUCCESS:
-        self.context.log.error(workunit.outcome_string(workunit.outcome()))
-      else:
-        self.context.log.info(workunit.outcome_string(workunit.outcome()))
+    if outcome != WorkUnit.SUCCESS:
+      self.context.log.error(WorkUnit.outcome_string(outcome))
+      self.context.log.error('==== stderr ====\n{0}'.format(std_error))
+      self.context.log.error('==== stdour ====\n{0}'.format(std_output))
+      raise TaskError('Cannot create build plan for: {}'.format(abs_manifest_path))
+    else:
+      self.context.log.info(WorkUnit.outcome_string(outcome))
+
+    cargo_build_plan = json.loads(std_output)
 
     return cargo_build_plan
 
@@ -261,32 +267,31 @@ class Build(Workspace):
     return pants_invocation
 
   def build_target(self, target, pants_invocation):
-    with self.context.new_workunit(name=pants_invocation['compile_mode'],
-                                   labels=[WorkUnitLabel.COMPILER]) as workunit:
-      self.context.log.info(
-        '{0} v{1}'.format(pants_invocation['package_name'], pants_invocation['package_version']))
+    self.context.log.info(
+      '{0} v{1}'.format(pants_invocation['package_name'], pants_invocation['package_version']))
 
-      self.create_directories(pants_invocation['pants_make_dirs'])
+    self.create_directories(pants_invocation['pants_make_dirs'])
 
-      cmd = self.create_command(pants_invocation['program'], pants_invocation['args'], target)
+    cmd = self.create_command(pants_invocation['program'], pants_invocation['args'], target)
 
-      env = self.create_env(pants_invocation['env'], target)
+    env = self.create_env(pants_invocation['env'], target)
 
-      if pants_invocation['program'] == 'rustc':
-        self.run_command(cmd, pants_invocation['cwd'], env, workunit)
-      else:
-        self.run_custom_build(cmd, pants_invocation['cwd'], env, target, workunit)
+    if pants_invocation['program'] == 'rustc':
+      self.execute_rustc(pants_invocation['package_name'],
+                         cmd, pants_invocation['compile_mode'],
+                         env, pants_invocation['cwd'])
+    else:
+      self.execute_custom_build(cmd,
+                                pants_invocation['compile_mode'],
+                                env, pants_invocation['cwd'], target)
 
-      self.create_copies(pants_invocation['links'])
+    self.create_copies(pants_invocation['links'])
 
-      if 'pants_make_sym_links' in pants_invocation:
-        self.create_library_symlink(pants_invocation['pants_make_sym_links'],
-                                    self._libraries_dir_path)
+    if 'pants_make_sym_links' in pants_invocation:
+      self.create_library_symlink(pants_invocation['pants_make_sym_links'],
+                                  self._libraries_dir_path)
 
-      if workunit.outcome() != WorkUnit.SUCCESS:
-        self.context.log.error(workunit.outcome_string(workunit.outcome()))
-      else:
-        self.context.log.info(workunit.outcome_string(workunit.outcome()))
+    self.context.log.info(WorkUnit.outcome_string(3))
 
   def save_and_parse_build_script_output(self, std_output, out_dir, target):
     cargo_statements = self.parse_build_script_output(std_output)
@@ -356,7 +361,7 @@ class Build(Workspace):
                                                                 None)
       if build_script_output:
         self.context.log.debug(
-          'Custom build outputs:\n{0}'.format(self.stringify(build_script_output)))
+          'Custom build outputs:\n{0}'.format(self.pretty(build_script_output)))
         cmd = extend_cmd(cmd, build_script_output['rustc-link-lib'])
         cmd = extend_cmd(cmd, build_script_output['rustc-link-search'])
         cmd = extend_cmd(cmd, build_script_output['rustc-flags'])
@@ -379,28 +384,49 @@ class Build(Workspace):
                                                                 None)
       if build_script_output:
         self.context.log.debug(
-          'Custom build output:\n{0}'.format(self.stringify(build_script_output['rustc-env'])))
+          'Custom build output:\n{0}'.format(self.pretty(build_script_output['rustc-env'])))
         for rustc_env in build_script_output['rustc-env']:
           # is PATH also possible?
           name, value = rustc_env
           self._add_env_var(env, name, value)
     return env
 
-  def run_custom_build(self, cmd, invocation_cwd, env, target, workunit):
-    std_output, std_err = self.run_command_and_get_output(cmd, invocation_cwd, env, workunit)
+  def execute_custom_build(self, cmd, workunit_name, env, cwd, target):
+    outcome, std_output, std_error = self.execute_command_and_get_output(cmd,
+                                                                         workunit_name,
+                                                                         [WorkUnitLabel.COMPILER],
+                                                                         env_vars=env,
+                                                                         current_working_dir=cwd)
+
+    if outcome != WorkUnit.SUCCESS:
+      self.context.log.error(WorkUnit.outcome_string(outcome))
+      self.context.log.error('==== stderr ====\n{0}'.format(std_error))
+      self.context.log.error('==== stdour ====\n{0}'.format(std_output))
+      raise TaskError('Cannot execute build script for: {}'.format(cwd))
 
     build_script_std_out_dir = self._package_out_dirs[target.address.target_name][1]
     self._build_script_output_cache[target.address.target_name] = \
       self.save_and_parse_build_script_output(std_output, build_script_std_out_dir, target)
 
-    if len(std_err) > 0:
+    if len(std_error) > 0:
       stderr_path = self.create_build_script_stderr_path(build_script_std_out_dir)
-      safe_file_dump(stderr_path, std_err, mode='w')
+      safe_file_dump(stderr_path, std_error, mode='w')
       self.context.log.warn(
-      'STD_ERR of {0} saved in: {1}'.format(target.address.target_name, stderr_path))
+        'STD_ERR of {0} saved in: {1}'.format(target.address.target_name, stderr_path))
 
     for warning in self._build_script_output_cache[target.address.target_name]['warning']:
       self.context.log.warn('Warning: {0}'.format(warning))
+
+  def execute_rustc(self, package_name, cmd, workunit_name, env, cwd):
+    outcome = self.execute_command(cmd,
+                                   workunit_name,
+                                   [WorkUnitLabel.COMPILER],
+                                   env_vars=env,
+                                   current_working_dir=cwd)
+
+    if outcome != WorkUnit.SUCCESS:
+      self.context.log.error(WorkUnit.outcome_string(outcome))
+      raise TaskError('Cannot build target: {}'.format(package_name))
 
   def add_rust_products(self, target, pants_invocation):
     name = pants_invocation['package_name']
@@ -474,6 +500,3 @@ class Build(Workspace):
     mode = 'w' if PY3 else 'wb'
     with open(build_index_path, mode) as build_index_json_file:
       json.dump(self._build_index, build_index_json_file, indent=2, separators=(',', ': '))
-
-  def stringify(self, obj):
-    return json.dumps(obj, indent=4, separators=(',', ': '))

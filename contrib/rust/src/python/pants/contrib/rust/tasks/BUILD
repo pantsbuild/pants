@@ -45,6 +45,7 @@ python_library(
     '3rdparty/python:future',
     'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
+    'src/python/pants/base:exceptions',
     ':cargo_task',
   ]
 )
@@ -56,6 +57,8 @@ python_library(
     '3rdparty/python:future',
     'src/python/pants/task:task',
     'src/python/pants/util:process_handler',
+    'src/python/pants/base:workunit',
+    'src/python/pants/base:build_environment',
     'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_base',
     'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_binary',
     'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_library',

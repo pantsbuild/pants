@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
@@ -30,26 +31,27 @@ class Fetch(CargoTask):
     return cargo_home_path
 
   def fetch(self, target):
-    with self.context.new_workunit(name='fetch', labels=[WorkUnitLabel.TOOL]) as workunit:
-      abs_manifest_path = os.path.join(target.manifest, self.manifest_name())
+    abs_manifest_path = os.path.join(target.manifest, self.manifest_name())
 
-      self.context.log.debug('Fetching dependencies for {0}'.format(abs_manifest_path))
+    self.context.log.debug('Fetching dependencies for: {0}'.format(abs_manifest_path))
 
-      toolchain = "+{}".format(self.context.products.get_data('cargo_toolchain'))
+    toolchain = "+{}".format(self.context.products.get_data('cargo_toolchain'))
 
-      cmd = ['cargo', toolchain, 'fetch', '--manifest-path', abs_manifest_path]
+    cmd = ['cargo', toolchain, 'fetch', '--manifest-path', abs_manifest_path]
 
-      env = {
-        'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),
-        'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-      }
+    env = {
+      'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),
+      'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
+    }
 
-      self.run_command(cmd, target.manifest, env, workunit)
+    outcome = self.execute_command(cmd, 'fetch', [WorkUnitLabel.TOOL], env_vars=env,
+                                   current_working_dir=target.manifest)
 
-      if workunit.outcome() != WorkUnit.SUCCESS:
-        self.context.log.error(workunit.outcome_string(workunit.outcome()))
-      else:
-        self.context.log.debug(workunit.outcome_string(workunit.outcome()))
+    if outcome != WorkUnit.SUCCESS:
+      self.context.log.error(WorkUnit.outcome_string(outcome))
+      raise TaskError('Cannot fetch dependencies for: {}'.format(abs_manifest_path))
+    else:
+      self.context.log.info(WorkUnit.outcome_string(outcome))
 
   def set_cargo_home(self, cargo_home):
     cargo_env = self.context.products.get_data('cargo_env')
