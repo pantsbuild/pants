@@ -28,6 +28,7 @@ from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterial
                              PathGlobsAndRoot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
+from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
@@ -149,16 +150,40 @@ class RscCompileContext(CompileContext):
 class RscCompile(ZincCompile):
   """Compile Scala and Java code to classfiles using Rsc."""
 
-  _name = 'rsc' # noqa
+  _compiler_lookup = {
+    # NB It is set up this way to simplify the tag names, but it would be more precise to have the
+    # tags use the workflow names directly
+    'rsc': 'rsc-then-zinc',
+    'zinc': 'zinc-only'
+  }
+
+  _name = 'mixed' # noqa
   compiler_name = 'rsc'
 
   @classmethod
   def implementation_version(cls):
     return super(RscCompile, cls).implementation_version() + [('RscCompile', 172)]
 
+  def __init__(self, *args, **kwargs):
+    super(RscCompile, self).__init__(*args, **kwargs)
+
+    self._rsc_compat_tag = self.get_options().force_compiler_tag_prefix
+    self._compiler_tags = {'{}:{}'.format(self._rsc_compat_tag, k): v for k,v in self._compiler_lookup.items()}
+    self._default_workflow = self.get_options().default_workflow
+
+    # If the default workflow is conveyed through a flag, override tag values.
+    default_workflow_rank = self.get_options().get_rank('default_workflow')
+    self._ignore_tags_when_calculating_workflow = default_workflow_rank in RankedValue.CLI_RANKS
+
   @classmethod
   def register_options(cls, register):
     super(RscCompile, cls).register_options(register)
+    register('--force-compiler-tag-prefix', default='use-compiler', metavar='<tag>',
+      help='Always compile targets marked with this tag with rsc, unless the workflow is '
+           'specified on the cli.')
+    register('--default-workflow', type=str, choices=['zinc-only', 'guess'], default='guess',
+      metavar='<workflow>',
+      help='Defines how a compile workflow is chosen when a tag is not present.')
 
     cls.register_jvm_tool(
       register,
@@ -257,7 +282,21 @@ class RscCompile(ZincCompile):
     return self._classify_compile_target(target) is not None
 
   def _classify_compile_target(self, target):
-    return _JvmCompileWorkflowType.classify_target(target)
+    if not target.has_sources('.java') and not target.has_sources('.scala'):
+      return None
+
+    if not self._ignore_tags_when_calculating_workflow:
+      for t in target.tags:
+        flow = self._compiler_tags.get(t)
+        if flow:
+          return _JvmCompileWorkflowType(flow)
+
+    if self._default_workflow == 'zinc-only':
+      return _JvmCompileWorkflowType.zinc_only
+    elif self._default_workflow == 'guess':
+      return _JvmCompileWorkflowType.classify_target(target)
+    else:
+      raise ValueError('Unknown default workflow: {}'.format(self._default_workflow))
 
   def _key_for_target_as_dep(self, target, workflow):
     # used for jobs that are either rsc jobs or zinc jobs run against rsc

@@ -42,6 +42,46 @@ class RscCompileTest(TaskTestBase):
   def task_type(cls):
     return RscCompile
 
+  def test_force_compiler_tags(self):
+    self.init_dependencies_for_scala_libraries()
+
+    java_target = self.make_target(
+      'java/classpath:java_lib',
+      target_type=JavaLibrary,
+      sources=['com/example/Foo.java'],
+      dependencies=[],
+      tags={'use-compiler:rsc'}
+    )
+    scala_target = self.make_target(
+      'scala/classpath:scala_lib',
+      target_type=ScalaLibrary,
+      sources=['com/example/Foo.scala'],
+      dependencies=[],
+      tags={'use-compiler:zinc'}
+    )
+
+    with temporary_dir() as tmp_dir:
+      invalid_targets = [java_target, scala_target]
+      task = self.create_task_with_target_roots(
+        target_roots=[java_target]
+      )
+
+      jobs = task._create_compile_jobs(
+        compile_contexts=self.create_compile_contexts([java_target, scala_target], task, tmp_dir),
+        invalid_targets=invalid_targets,
+        invalid_vts=self.wrap_in_vts(invalid_targets),
+        classpath_product=None)
+
+      dependee_graph = self.construct_dependee_graph_str(jobs, task)
+      print(dependee_graph)
+      self.assertEqual(dedent("""
+                     rsc(java/classpath:java_lib) -> {
+                       zinc_against_rsc(java/classpath:java_lib)
+                     }
+                     zinc_against_rsc(java/classpath:java_lib) -> {}
+                     zinc(scala/classpath:scala_lib) -> {}""").strip(),
+        dependee_graph)
+
   def test_no_dependencies_between_scala_and_java_targets(self):
     self.init_dependencies_for_scala_libraries()
 
@@ -239,8 +279,13 @@ class RscCompileTest(TaskTestBase):
       jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
     )
 
-  def create_task_with_target_roots(self, target_roots):
-    context = self.context(target_roots=target_roots)
+  def create_task_with_target_roots(self, target_roots, default_workflow=None):
+    if default_workflow:
+      context = self.context(
+        target_roots=target_roots,
+        options={'compile.mixed':{'default_workflow': default_workflow}})
+    else:
+      context = self.context(target_roots=target_roots)
     self.init_products(context)
     task = self.create_task(context)
     # tried for options, but couldn't get it to reconfig
