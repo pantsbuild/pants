@@ -464,16 +464,15 @@ Signal {signum} (SIGTERM) was raised\\. Exiting with failure\\. \\(backtrace omi
         config,
       )
 
+      checker.assert_started(timeout=12)
+
       # TODO: There is a race condition here, where if the waiter run is killed before it starts the
       # remote client, it will display the PantsRunnerSignalHandler message, but if it is signalled
       # after switching control to the remote client, it will display a message about being
-      # interrupted via the pailgun client (which is what we check here). This means we aren't
-      # necessarily testing that the remote client is handling signals correctly, but it does mean
-      # the test won't flake until we can figure out a better method than relying on timeouts. This
-      # 16-second sleep is longer than the timeout we wait for the process to start, and is
-      # *hopefully* long enough to have pants transition to the remote client phase.
-      time.sleep(16)
-      checker.assert_started(timeout=12)
+      # interrupted via the pailgun client (which is what we check here). We shouldn't be using
+      # timeouts here, and this may cause flakiness. This 4-second sleep is *hopefully* long enough
+      # to have pants transition to the remote client phase.
+      time.sleep(4)
 
       # Get all the pantsd-runner processes while they're still around.
       pantsd_runner_processes = checker.runner_process_context.current_processes()
