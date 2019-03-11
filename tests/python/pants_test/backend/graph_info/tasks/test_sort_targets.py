@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from textwrap import dedent
 
-from pants.backend.graph_info.tasks.sorttargets import SortTargets
+from pants.backend.graph_info.tasks.sort_targets import SortTargets
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.task_test_base import ConsoleTaskTestBase

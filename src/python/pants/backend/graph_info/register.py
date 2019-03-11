@@ -8,10 +8,10 @@ from pants.backend.graph_info.tasks.cloc import CountLinesOfCode
 from pants.backend.graph_info.tasks.dependees import ReverseDepmap
 from pants.backend.graph_info.tasks.filemap import Filemap
 from pants.backend.graph_info.tasks.filter import Filter
-from pants.backend.graph_info.tasks.listtargets import ListTargets
+from pants.backend.graph_info.tasks.list_targets import ListTargets
 from pants.backend.graph_info.tasks.minimal_cover import MinimalCover
 from pants.backend.graph_info.tasks.paths import Path, Paths
-from pants.backend.graph_info.tasks.sorttargets import SortTargets
+from pants.backend.graph_info.tasks.sort_targets import SortTargets
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
