@@ -125,15 +125,8 @@ class _JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
       target_type = None
     return target_type
 
-  @classmethod
-  @property
-  def rsc_then_zinc(cls):
-    return _JvmCompileWorkflowType.create('rsc-then-zinc')
-
-  @classmethod
-  @property
-  def zinc_only(cls):
-    return _JvmCompileWorkflowType.create('zinc-only')
+_JvmCompileWorkflowType.rsc_then_zinc = _JvmCompileWorkflowType('rsc-then-zinc')
+_JvmCompileWorkflowType.zinc_only = _JvmCompileWorkflowType('zinc-only')
 
 
 class RscCompileContext(CompileContext):
