@@ -113,7 +113,7 @@ Tags can be configured for targets in three ways:
 - Directly in the `BUILD` file (as above)
 - In `pants.ini`:
 
-```
+```ini
 [target-tag-assignments]
 tag_targets_mappings: {
     'tag1': ['path/to/target:', 'path/to/another/target:bar'],
