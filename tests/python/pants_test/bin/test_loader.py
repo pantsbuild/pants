@@ -29,5 +29,5 @@ class LoaderTest(TestCase):
         self.assertIn("unsupported Python interpreter", str(e))
         self.assertIn(current_interpreter_version, str(e))
         self.assertIn(bypass_env, str(e))
-      with mock.patch.dict(os.environ, {bypass_env: "1"}) as e:
+      with mock.patch.dict(os.environ, {bypass_env: "1"}):
         PantsLoader.ensure_valid_interpreter()
