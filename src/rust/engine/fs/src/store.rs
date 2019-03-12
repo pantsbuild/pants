@@ -384,24 +384,55 @@ impl Store {
   ///
   pub fn ensure_local_has_recursive_directory(&self, dir_digest: Digest) -> BoxFuture<(), String> {
     let store = self.clone();
+    let remote = if let Some(ref remote) = self.remote {
+      remote
+    } else {
+      return future::err("Cannot ensure local has dir without a remote".to_owned()).to_boxed();
+    };
+    let remote = remote.clone();
     self
       .load_directory(dir_digest)
       .and_then(move |directory_opt| {
         directory_opt.ok_or_else(|| format!("Could not read dir with digest {:?}", dir_digest))
       })
       .and_then(move |directory| {
+
         // Traverse the files within directory
-        let file_futures = directory
-          .get_files()
-          .iter()
-          .map(|file_node| {
-            let file_digest = try_future!(file_node.get_digest().into());
-            store.load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
-          })
-          .collect::<Vec<_>>();
+        let mut file_futures = Vec::new();
+        let mut digests_to_batch = Vec::new();
+        for file_node in directory.get_files() {
+          let file_digest = try_future!(file_node.get_digest().into());
+          if file_digest.1 > 30000000 {
+            digests_to_batch.push(file_digest);
+          }
+          else {
+            file_futures.push(store.load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(())));
+          }
+
+        }
+
+        // Start with one empty batch
+        // for each digest:
+        // if it fits into a batch, add it
+        // else make a new batch for it
+        let mut batches = vec![vec![]];
+        let mut current_batch_size = 0;
+        let limit = 5;
+        for req in digests_to_batch {
+          if current_batch_size + req.1 < limit {
+            batches[0].push(req);
+            current_batch_size += req.1;
+          }  else {
+            current_batch_size = 0;
+            batches.push(vec![req]);
+          }
+        }
+
+        let batches_futures = batches.iter().map(|digests_batch| {
+          remote.batch_download(digests_batch)
+        }).collect::<Vec<_>>();
 
         // Recursively call with sub-directories
-
         let directory_futures = directory
           .get_directories()
           .iter()
@@ -410,9 +441,11 @@ impl Store {
             store.ensure_local_has_recursive_directory(child_digest)
           })
           .collect::<Vec<_>>();
+
         future::join_all(file_futures)
+          .join(future::join_all(batches_futures))
           .join(future::join_all(directory_futures))
-          .map(|_| ())
+          .map(|_| ()).to_boxed()
       })
       .to_boxed()
   }
@@ -491,21 +524,21 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
   ) -> BoxFuture<(), String> {
-
-    // Warm up local store with the directory digest and its contents from remote, if necessary.
-    self
-      .ensure_local_has_recursive_directory(digest)
-      .map_err(|e| format!("Error warming up local store with digest: {:?}", e))
-      .to_boxed();
-
     // Create an empty local directory on disk, if needed
     try_future!(super::safe_create_dir_all(&destination));
-
-    // Load directory digest and its contents from the local store and materialize on disk
+    let store = self.clone();
+    // Warm up local store with the directory digest and its contents from remote, if necessary.
     self
-      .materialize_directory_helper(destination, digest)
-      .map_err(|e| format!("Error materializing directory with digest: {:?}", e))
-      .to_boxed()
+        .ensure_local_has_recursive_directory(digest)
+        .map_err(|e| format!("Error warming up local store with digest: {:?}", e))
+        .to_boxed()
+        .and_then(move |()| {
+        // Load directory digest and its contents from the local store and materialize on disk
+        store
+            .materialize_directory_helper(destination, digest)
+            .map_err(|e| format!("Error materializing directory with digest: {:?}", e))
+            .to_boxed()
+      }).to_boxed()
   }
 
   fn materialize_directory_helper(
@@ -771,8 +804,8 @@ mod local {
       {
         let (env, directory_database, _) = self.inner.directory_dbs.clone()?.get(fingerprint);
         let txn = env
-          .begin_ro_txn()
-          .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
+            .begin_ro_txn()
+            .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
         match txn.get(directory_database, &fingerprint.as_ref()) {
           Ok(_) => return Ok(Some(EntryType::Directory)),
           Err(NotFound) => {}
@@ -786,8 +819,8 @@ mod local {
       }
       let (env, file_database, _) = self.inner.file_dbs.clone()?.get(fingerprint);
       let txn = env
-        .begin_ro_txn()
-        .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
+          .begin_ro_txn()
+          .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
       match txn.get(file_database, &fingerprint.as_ref()) {
         Ok(_) => return Ok(Some(EntryType::File)),
         Err(NotFound) => {}
@@ -801,7 +834,7 @@ mod local {
       Ok(None)
     }
 
-    pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(
+    pub fn lease_all<'a, Ds: Iterator<Item=&'a Digest>>(
       &self,
       digests: Ds,
     ) -> Result<(), String> {
@@ -809,17 +842,17 @@ mod local {
       for digest in digests {
         let (env, _, lease_database) = self.inner.file_dbs.clone()?.get(&digest.0);
         env
-          .begin_rw_txn()
-          .and_then(|mut txn| self.lease(lease_database, &digest.0, until, &mut txn))
-          .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
+            .begin_rw_txn()
+            .and_then(|mut txn| self.lease(lease_database, &digest.0, until, &mut txn))
+            .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
       }
       Ok(())
     }
 
     fn default_lease_until_secs_since_epoch() -> u64 {
       let now_since_epoch = time::SystemTime::now()
-        .duration_since(time::UNIX_EPOCH)
-        .expect("Surely you're not before the unix epoch?");
+          .duration_since(time::UNIX_EPOCH)
+          .expect("Surely you're not before the unix epoch?");
       (now_since_epoch + time::Duration::from_secs(2 * 60 * 60)).as_secs()
     }
 
@@ -868,8 +901,8 @@ mod local {
       )?;
       while used_bytes > target_bytes {
         let aged_fingerprint = fingerprints_by_expired_ago
-          .pop()
-          .expect("lmdb corruption detected, sum of size of blobs exceeded stored blobs");
+            .pop()
+            .expect("lmdb corruption detected, sum of size of blobs exceeded stored blobs");
         if aged_fingerprint.expired_seconds_ago == 0 {
           // Ran out of expired blobs - everything remaining is leased and cannot be collected.
           return Ok(used_bytes);
@@ -881,20 +914,20 @@ mod local {
         let (env, database, lease_database) = lmdbs.clone()?.get(&aged_fingerprint.fingerprint);
         {
           env
-            .begin_rw_txn()
-            .and_then(|mut txn| {
-              txn.del(database, &aged_fingerprint.fingerprint.as_ref(), None)?;
+              .begin_rw_txn()
+              .and_then(|mut txn| {
+                txn.del(database, &aged_fingerprint.fingerprint.as_ref(), None)?;
 
-              txn
-                .del(lease_database, &aged_fingerprint.fingerprint.as_ref(), None)
-                .or_else(|err| match err {
-                  NotFound => Ok(()),
-                  err => Err(err),
-                })?;
-              used_bytes -= aged_fingerprint.size_bytes;
-              txn.commit()
-            })
-            .map_err(|err| format!("Error garbage collecting: {}", err))?;
+                txn
+                    .del(lease_database, &aged_fingerprint.fingerprint.as_ref(), None)
+                    .or_else(|err| match err {
+                      NotFound => Ok(()),
+                      err => Err(err),
+                    })?;
+                used_bytes -= aged_fingerprint.size_bytes;
+                txn.commit()
+              })
+              .map_err(|err| format!("Error garbage collecting: {}", err))?;
         }
       }
 
@@ -918,11 +951,11 @@ mod local {
 
       for &(ref env, ref database, ref lease_database) in &database?.all_lmdbs() {
         let txn = env
-          .begin_ro_txn()
-          .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
+            .begin_ro_txn()
+            .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
         let mut cursor = txn
-          .open_ro_cursor(*database)
-          .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
+            .open_ro_cursor(*database)
+            .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
         for (key, bytes) in cursor.iter() {
           *used_bytes += bytes.len();
 
@@ -931,25 +964,25 @@ mod local {
           // here (either to populate leases into pre-populated AgedFingerprints, or to read sizes
           // when we delete from lmdb to track how much we've freed).
           let lease_until_unix_timestamp = txn
-            .get(*lease_database, &key)
-            .map(|b| {
-              let mut array = [0_u8; 8];
-              array.copy_from_slice(b);
-              u64::from_le_bytes(array)
-            })
-            .unwrap_or_else(|e| match e {
-              NotFound => 0,
-              e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),
-            });
+              .get(*lease_database, &key)
+              .map(|b| {
+                let mut array = [0_u8; 8];
+                array.copy_from_slice(b);
+                u64::from_le_bytes(array)
+              })
+              .unwrap_or_else(|e| match e {
+                NotFound => 0,
+                e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),
+              });
 
           let leased_until =
-            time::UNIX_EPOCH + time::Duration::from_secs(lease_until_unix_timestamp);
+              time::UNIX_EPOCH + time::Duration::from_secs(lease_until_unix_timestamp);
 
           let expired_seconds_ago = time::SystemTime::now()
-            .duration_since(leased_until)
-            .map(|t| t.as_secs())
-            // 0 indicates unleased.
-            .unwrap_or(0);
+              .duration_since(leased_until)
+              .map(|t| t.as_secs())
+              // 0 indicates unleased.
+              .unwrap_or(0);
 
           fingerprints_by_expired_ago.push(AgedFingerprint {
             expired_seconds_ago: expired_seconds_ago,
@@ -975,42 +1008,42 @@ mod local {
 
       let bytestore = self.clone();
       self
-        .inner
-        .pool
-        .spawn_fn(move || {
-          let fingerprint = {
-            let mut hasher = Sha256::default();
-            hasher.input(&bytes);
-            Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-          };
-          let digest = Digest(fingerprint, bytes.len());
+          .inner
+          .pool
+          .spawn_fn(move || {
+            let fingerprint = {
+              let mut hasher = Sha256::default();
+              hasher.input(&bytes);
+              Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
+            };
+            let digest = Digest(fingerprint, bytes.len());
 
-          let (env, content_database, lease_database) = dbs.clone()?.get(&fingerprint);
-          let put_res = env.begin_rw_txn().and_then(|mut txn| {
-            txn.put(
-              content_database,
-              &fingerprint,
-              &bytes,
-              WriteFlags::NO_OVERWRITE,
-            )?;
-            if initial_lease {
-              bytestore.lease(
-                lease_database,
+            let (env, content_database, lease_database) = dbs.clone()?.get(&fingerprint);
+            let put_res = env.begin_rw_txn().and_then(|mut txn| {
+              txn.put(
+                content_database,
                 &fingerprint,
-                Self::default_lease_until_secs_since_epoch(),
-                &mut txn,
+                &bytes,
+                WriteFlags::NO_OVERWRITE,
               )?;
-            }
-            txn.commit()
-          });
+              if initial_lease {
+                bytestore.lease(
+                  lease_database,
+                  &fingerprint,
+                  Self::default_lease_until_secs_since_epoch(),
+                  &mut txn,
+                )?;
+              }
+              txn.commit()
+            });
 
-          match put_res {
-            Ok(()) => Ok(digest),
-            Err(KeyExist) => Ok(digest),
-            Err(err) => Err(format!("Error storing digest {:?}: {}", digest, err)),
-          }
-        })
-        .to_boxed()
+            match put_res {
+              Ok(()) => Ok(digest),
+              Err(KeyExist) => Ok(digest),
+              Err(err) => Err(format!("Error storing digest {:?}: {}", digest, err)),
+            }
+          })
+          .to_boxed()
     }
 
     pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
@@ -1032,29 +1065,28 @@ mod local {
       };
 
       self
-        .inner
-        .pool
-        .spawn_fn(move || {
-          let (env, db, _) = dbs.clone()?.get(&digest.0);
-          let ro_txn = env
-            .begin_ro_txn()
-            .map_err(|err| format!("Failed to begin read transaction: {}", err));
-          ro_txn.and_then(|txn| match txn.get(db, &digest.0) {
-            Ok(bytes) => {
-              if bytes.len() == digest.1 {
-                Ok(Some(f(Bytes::from(bytes))))
-              } else {
-                error!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes);
-                Ok(None)
+          .inner
+          .pool
+          .spawn_fn(move || {
+            let (env, db, _) = dbs.clone()?.get(&digest.0);
+            let ro_txn = env
+                .begin_ro_txn()
+                .map_err(|err| format!("Failed to begin read transaction: {}", err));
+            ro_txn.and_then(|txn| match txn.get(db, &digest.0) {
+              Ok(bytes) => {
+                if bytes.len() == digest.1 {
+                  Ok(Some(f(Bytes::from(bytes))))
+                } else {
+                  error!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes);
+                  Ok(None)
+                }
               }
-            }
-            Err(NotFound) => Ok(None),
-            Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err,)),
-          })
-        }).to_boxed()
+              Err(NotFound) => Ok(None),
+              Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err, )),
+            })
+          }).to_boxed()
     }
   }
-
   // Each LMDB directory can have at most one concurrent writer.
   // We use this type to shard storage into 16 LMDB directories, based on the first 4 bits of the
   // fingerprint being stored, so that we can write to them in parallel.
@@ -2061,7 +2093,49 @@ mod remote {
       }
       request
     }
+
+    //
+    /// Given a collection of Digests (digests),
+    /// returns the set of digests from that collection not present in the CAS.
+    ///
+    pub fn batch_download(&self, digests_batch: &Vec<Digest>)
+      -> impl future::Future<Item=HashSet<Digest>, Error=String> {
+      let request = self.create_batch_request(digests_batch);
+      let store = self.clone();
+      self.with_cas_client(move |client| {
+        client
+            .batch_read_blobs_opt(&request, store.call_option())
+            .map_err(|err| {
+              format!(
+                "Error from server in response to batch_read_blobs_request: {:?}",
+                err
+              )
+            })
+            .and_then(|response| {
+              response
+                  .get_responses()
+                  .iter()
+                  .map(|response| response.get_digest().into())
+                  .collect()
+            })
+      })
+    }
+
+    fn create_batch_request(&self, digests_batch: &Vec<Digest>)
+      -> bazel_protos::remote_execution::BatchReadBlobsRequest {
+      let mut request = bazel_protos::remote_execution::BatchReadBlobsRequest::new();
+      if let Some(ref instance_name) = self.instance_name {
+        request.set_instance_name(instance_name.clone());
+      }
+      for digest in digests_batch {
+        request.mut_digests().push(digest.into());
+      }
+      request
+    }
+
   }
+
+
 
   #[cfg(test)]
   mod tests {

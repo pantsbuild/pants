@@ -44,6 +44,7 @@ fn generate_for_grpcio(thirdpartyprotobuf: &Path, gen_dir: &Path) {
   protoc_grpcio::compile_grpc_protos(
     &[
       "build/bazel/remote/execution/v2/remote_execution.proto",
+      "build/bazel/semver/semver.proto",
       "google/bytestream/bytestream.proto",
       "google/rpc/code.proto",
       "google/rpc/error_details.proto",
