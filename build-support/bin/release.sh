@@ -25,7 +25,7 @@ OPTIND=0
 # Set the Python interpreter to be used for the virtualenv. Note we allow the user to
 # predefine this value so that they may point to a specific interpreter, e.g. 2.7.13 vs. 2.7.15.
 default_interpreter="python2.7";
-if [[ "${python_three=false}" == "true" ]]; then
+if [[ "${python_three:-false}" == "true" ]]; then
   default_interpreter="python3.6"
 fi
 export PY="${PY:-${default_interpreter}}"
@@ -80,7 +80,7 @@ function run_pex() {
   (
     PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
     PEX_PEX=pex27
-    if [[ "${python_three-false}" == "true" ]]; then
+    if [[ "${python_three:-false}" == "true" ]]; then
       PEX_PEX=pex36
     fi
 
@@ -99,7 +99,7 @@ function run_packages_script() {
   (
     cd "${ROOT}"
     args=("$@")
-    if [[ "${python_three-false}" == "true" ]]; then
+    if [[ "${python_three:-false}" == "true" ]]; then
       args=("--py3" ${args[@]})
     fi
     requirements=("$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)")
