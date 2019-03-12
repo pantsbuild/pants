@@ -97,7 +97,10 @@ class ZipkinReporter(Reporter):
           sample_rate=self.sample_rate, # Value between 0.0 and 100.0
         )
         self.trace_id = zipkin_attrs.trace_id
-        self.parent_id = zipkin_attrs.span_id # temporary code
+        # TODO delete this line when parent_id will be passed in v2 engine:
+        #  - with ExecutionRequest when Nodes from v2 engine are called by a workunit;
+        #  - when a v2 engine Node is called by another v2 engine Node.
+        self.parent_id = zipkin_attrs.span_id
 
       span = zipkin_span(
         service_name=service_name,
