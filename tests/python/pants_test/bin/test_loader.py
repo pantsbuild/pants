@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 import sys
 from builtins import map, str
 from unittest import TestCase, mock
@@ -21,8 +22,12 @@ class LoaderTest(TestCase):
 
   def test_ensure_valid_interpreter(self):
     current_interpreter_version = '.'.join(map(str, sys.version_info[0:2]))
+    bypass_env = PantsLoader.INTERPRETER_IGNORE_ENV_VAR
     with mock.patch.object(PantsLoader, 'is_supported_interpreter', return_value=False):
       with self.assertRaises(PantsLoader.InvalidInterpreter) as e:
         PantsLoader.ensure_valid_interpreter()
         self.assertIn("unsupported Python interpreter", str(e))
         self.assertIn(current_interpreter_version, str(e))
+        self.assertIn(bypass_env, str(e))
+      with mock.patch.dict(os.environ, {bypass_env: "1"}) as e:
+        PantsLoader.ensure_valid_interpreter()

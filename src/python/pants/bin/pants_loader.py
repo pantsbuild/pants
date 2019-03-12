@@ -20,6 +20,7 @@ class PantsLoader(object):
   DEFAULT_ENTRYPOINT = 'pants.bin.pants_exe:main'
 
   ENCODING_IGNORE_ENV_VAR = 'PANTS_IGNORE_UNRECOGNIZED_ENCODING'
+  INTERPRETER_IGNORE_ENV_VAR = 'PANTS_IGNORE_UNSUPPORTED_PYTHON_INTERPRETER'
 
   class InvalidLocaleError(Exception):
     """Raised when a valid locale can't be found."""
@@ -76,7 +77,7 @@ class PantsLoader(object):
     """Runtime check that user is using a supported Python version."""
     py_major, py_minor = sys.version_info[0:2]
     current_version = '.'.join(map(str, sys.version_info[0:2]))
-    if not PantsLoader.is_supported_interpreter(py_major, py_minor):
+    if not PantsLoader.is_supported_interpreter(py_major, py_minor) and os.environ.get(cls.INTERPRETER_IGNORE_ENV_VAR, None) is None:
       raise cls.InvalidInterpreter(dedent("""
         You are trying to run Pants with Python {}, which is unsupported.
         Pants requires a Python 2.7 or a Python 3.6+ interpreter to be
@@ -87,7 +88,11 @@ class PantsLoader(object):
         (e.g. `./pants`) to properly set up a virtual environment with the correct
         interpreter. We recommend following our setup guide and using our setup script
         as a starting point: https://www.pantsbuild.org/setup_repo.html.
-        """.format(current_version)))
+
+        Alternatively, you may bypass this error by setting the below environment variable.
+          {}=1
+        Note: we cannot guarantee consistent behavior with this bypass enabled.
+        """.format(current_version, cls.INTERPRETER_IGNORE_ENV_VAR)))
 
   @staticmethod
   def determine_entrypoint(env_var, default):
