@@ -22,10 +22,11 @@ PY_37 = '3.7'
 PY_38 = '3.8'
 
 
-def find_all_pythons_present():
-  """Return set of all Python versions present on the system."""
-  likely_versions_present = {PY_26, PY_27, PY_34, PY_35, PY_36, PY_37, PY_38}
-  return {version for version in likely_versions_present if has_python_version(version)}
+def find_all_pythons_present(*versions):
+  """Return sorted list of all Python versions present on the system."""
+  if not versions:
+    versions = {PY_26, PY_27, PY_34, PY_35, PY_36, PY_37, PY_38}
+  return sorted(version for version in versions if has_python_version(version))
 
 
 def has_python_version(version):
