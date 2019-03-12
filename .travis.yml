@@ -344,11 +344,13 @@ py27_linux_build_engine: &py27_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2.7 PEX)"
   env:
     - docker_image_name=travis_ci
-    # We also build fs_util.
-    # NB: The '-x' is necessary here to avoid errors about not being able to find the python shared
-    # library. It's not clear why this is happening just in this shard.
-    - docker_run_command="./build-support/bin/ci.sh -2bx
-                          && ./build-support/bin/release.sh -f"
+    # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
+    # TODO: While this image shouldn't have any cache to fetch anything from, it fails to find
+    # libpython2.7.so.1 during the cargo build, despite the image being built with --enable-shared,
+    # unless the -x argument is added. This isn't expected to affect build time too much.
+    - docker_run_command="./build-support/bin/ci.sh -2bx && ./build-support/bin/release.sh -f"
+    # NB: Only the Py2.7 shard sets PREPARE_DEPLOY to cause the fs_util binary to be uploaded to S3:
+    # either linux shard could upload this binary, since it does not depend on python at all.
     - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
