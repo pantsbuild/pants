@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-from builtins import object, str
+from builtins import object
 
 from twitter.common.collections import OrderedSet
 
@@ -16,7 +16,7 @@ from pants.base.target_roots import TargetRoots
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import OwnersRequest
 from pants.goal.workspace import ScmWorkspace
-from pants.scm.subsystems.changed import ChangedRequest
+from pants.scm.subsystems.changed import ChangedRequest, IncludeDependees
 
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ class TargetRootsCalculator(object):
       # We've been provided no spec roots (e.g. `./pants list`) AND a changed request. Compute
       # alternate target roots.
       request = OwnersRequest(sources=tuple(changed_files),
-                              include_dependees=str(changed_request.include_dependees))
+                              include_dependees=changed_request.include_dependees)
       changed_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('changed addresses: %s', changed_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
@@ -118,7 +118,7 @@ class TargetRootsCalculator(object):
     if owned_files:
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
       # alternate target roots.
-      request = OwnersRequest(sources=tuple(owned_files), include_dependees=str('none'))
+      request = OwnersRequest(sources=tuple(owned_files), include_dependees=IncludeDependees.none)
       owner_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('owner addresses: %s', owner_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)
