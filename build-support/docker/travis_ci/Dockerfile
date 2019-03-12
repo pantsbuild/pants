@@ -5,6 +5,7 @@
 ARG BASE_IMAGE=pantsbuild/centos6:latest
 FROM ${BASE_IMAGE}
 
+### BEGIN CENTOS6 DOCKERFILE CHANGES
 # TODO(7064) These changes belong in centos6/Dockerfile, because we always want that image to
 # have Py3 available and also avoid the cost of rebuilding Python 3 every time in CI. However,
 # this requires publishing an updated image to Docker hub, so we copy the code here until then.
@@ -39,6 +40,8 @@ ENV PATH "${PYENV_ROOT}/shims:${PATH}"
 
 # Expose the installed gcc to the invoking shell.
 ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-7",  "--"]
+
+### END CENTOS6 DOCKERFILE CHANGES
 
 ARG TRAVIS_HOME_DIR_PATH=/travis/home
 ARG TRAVIS_WORK_DIR_PATH=/travis/workdir
