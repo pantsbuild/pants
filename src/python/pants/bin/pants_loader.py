@@ -58,7 +58,7 @@ class PantsLoader(object):
     # libraries called by Pants may fail with more obscure errors.
     encoding = locale.getpreferredencoding()
     if encoding.lower() != 'utf-8' and os.environ.get(cls.ENCODING_IGNORE_ENV_VAR, None) is None:
-      raise cls.InvalidLocaleError(dedent("""\
+      raise cls.InvalidLocaleError(dedent("""
         Your system's preferred encoding is `{}`, but Pants requires `UTF-8`.
         Specifically, Python's `locale.getpreferredencoding()` must resolve to `UTF-8`.
 
@@ -76,14 +76,16 @@ class PantsLoader(object):
     """Runtime check that user is using a supported Python version."""
     py_major, py_minor = sys.version_info[0:2]
     if not cls._is_supported_interpreter(py_major, py_minor):
-      raise cls.InvalidInterpreter(dedent("""\
-        You are trying to run Pants with an unsupported Python interpreter.
-        Pants requires a Python 2.7 or a Python 3.6+ interpreter to be discoverable on your PATH to run.
+      raise cls.InvalidInterpreter(dedent("""
+        You are trying to run Pants with an unsupported Python interpreter. Pants
+        requires a Python 2.7 or a Python 3.6+ interpreter to be discoverable on
+        your PATH to run.
 
-        Please ensure you have one of these interpreter versions discoverable on your PATH. If you still are
-        getting this error, you may need to modify your build script (e.g. `./pants`) to properly set up a
-        virtual environment with the correct interpreter. We recommend following our setup guide and using
-        our setup script as a starting point: https://www.pantsbuild.org/setup_repo.html.
+        If you still get this error after ensuring at least one of these interpreters
+        is discoverable on your PATH, you may need to modify your build script
+        (e.g. `./pants`) to properly set up a virtual environment with the correct
+        interpreter. We recommend following our setup guide and using our setup script
+        as a starting point: https://www.pantsbuild.org/setup_repo.html.
         """))
 
   @staticmethod
