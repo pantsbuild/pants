@@ -18,10 +18,13 @@ env:
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
-  - &bootstrap Bootstrap Pants
+  - name: &bootstrap Bootstrap Pants
+    if: type != cron
+  - name: &bootstrap_cron Bootstrap Pants (Cron)
+    if: type = cron
   - name: &test Test Pants
     if: type != cron
-  - name: &cron Cron
+  - name: &test_cron Test Pants (Cron)
     if: type = cron
   - name: &build_stable Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
@@ -129,7 +132,7 @@ base_linux_test_config: &base_linux_test_config
 py27_linux_test_config: &py27_linux_test_config
   <<: *py27_linux_config
   <<: *base_linux_test_config
-  stage: *cron
+  stage: *test_cron
   env:
     - &py27_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
@@ -176,7 +179,7 @@ base_osx_test_config: &base_osx_test_config
 py27_osx_test_config: &py27_osx_test_config
   <<: *py27_osx_config
   <<: *base_osx_test_config
-  stage: *cron
+  stage: *test_cron
   env:
     - &py27_osx_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
 
@@ -234,19 +237,17 @@ py27_linux_build_engine: &py27_linux_build_engine
     - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
-    - BOOTSTRAP_ARGS='-2b'
 
 py36_linux_build_engine: &py36_linux_build_engine
   <<: *py36_linux_config
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
-    - docker_image_name=travis_ci
+    - docker_image_name=travis_ci_py36
     # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
     - docker_run_command="./build-support/bin/ci.sh -b && ./build-support/bin/release.sh -f"
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - BOOTSTRAP_ARGS='-b'
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
@@ -337,7 +338,7 @@ cargo_audit: &cargo_audit
   os: linux
   dist: xenial
   sudo: required
-  stage: *cron
+  stage: *test_cron
   script:
     - ./build-support/bin/travis-ci.sh -a
 
@@ -655,8 +656,13 @@ deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
 matrix:
   include:
     - <<: *py27_linux_build_engine
+    - <<: *py27_linux_build_engine
+      stage: *bootstrap_cron
     - <<: *py36_linux_build_engine
+
     - <<: *py27_osx_build_engine
+    - <<: *py27_osx_build_engine
+      stage: *bootstrap_cron
     - <<: *py36_osx_build_engine
 
     - <<: *py27_lint
