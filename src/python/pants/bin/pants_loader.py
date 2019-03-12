@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import importlib
 import locale
 import os
+import sys
 import warnings
 from builtins import object
 from textwrap import dedent
@@ -22,6 +23,14 @@ class PantsLoader(object):
 
   class InvalidLocaleError(Exception):
     """Raised when a valid locale can't be found."""
+
+  class InvalidInterpreter(Exception):
+    """Raised when trying to run Pants with an unsupported Python version."""
+
+  @staticmethod
+  def _is_supported_interpreter(major_version, minor_version):
+    return (major_version == 2 and minor_version == 7) \
+      or (major_version == 3 and minor_version >= 6)
 
   @staticmethod
   def setup_warnings():
@@ -62,6 +71,21 @@ class PantsLoader(object):
         """.format(encoding, cls.ENCODING_IGNORE_ENV_VAR)
       ))
 
+  @classmethod
+  def ensure_valid_interpreter(cls):
+    """Runtime check that user is using a supported Python version."""
+    py_major, py_minor = sys.version_info[0:2]
+    if not cls._is_supported_interpreter(py_major, py_minor):
+      raise cls.InvalidInterpreter(dedent("""\
+        You are trying to run Pants with an unsupported Python interpreter.
+        Pants requires a Python 2.7 or a Python 3.6+ interpreter to be discoverable on your PATH to run.
+
+        Please ensure you have one of these interpreter versions discoverable on your PATH. If you still are
+        getting this error, you may need to modify your build script (e.g. `./pants`) to properly set up a
+        virtual environment with the correct interpreter. We recommend following our setup guide and using
+        our setup script as a starting point: https://www.pantsbuild.org/setup_repo.html.
+        """))
+
   @staticmethod
   def determine_entrypoint(env_var, default):
     return os.environ.pop(env_var, default)
@@ -78,6 +102,7 @@ class PantsLoader(object):
   @classmethod
   def run(cls):
     cls.setup_warnings()
+    cls.ensure_valid_interpreter()
     cls.ensure_locale()
     entrypoint = cls.determine_entrypoint(cls.ENTRYPOINT_ENV_VAR, cls.DEFAULT_ENTRYPOINT)
     cls.load_and_execute(entrypoint)
