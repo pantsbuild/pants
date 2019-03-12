@@ -11,6 +11,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import SingleAddress, Specs
 from pants.base.target_roots import TargetRoots
 from pants.engine.addressable import BuildFileAddresses
@@ -74,12 +75,20 @@ class TargetRootsCalculator(object):
       exclude_patterns=exclude_patterns,
       tags=tags)
 
-    # Whether to include dependee targets in --changed-* or --owner-of options.
-    include_dependees = options.for_global_scope().include_dependees
+    global_include_dependees = options.for_global_scope().include_dependees_behavior
 
     # Determine `Changed` arguments directly from options to support pre-`Subsystem`
     # initialization paths.
     changed_options = options.for_scope('changed')
+    # Determine --include-dependees from the global or scoped option, for now.
+    if 'include_dependees' in changed_options.get_explicit_keys():
+      warn_or_error('1.17.0.dev0',
+                    'The --include-dependees option in the Changed subsystem.',
+                    'Use the --include-dependees-behavior global option instead!')
+      include_dependees = changed_options.include_dependees
+    else:
+      include_dependees = global_include_dependees
+
     changed_request = ChangedRequest.from_options(
       changed_options,
       include_dependees=include_dependees)
@@ -123,7 +132,7 @@ class TargetRootsCalculator(object):
     if owned_files:
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
       # alternate target roots.
-      request = OwnersRequest(sources=tuple(owned_files), include_dependees=include_dependees)
+      request = OwnersRequest(sources=tuple(owned_files), include_dependees=global_include_dependees)
       owner_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('owner addresses: %s', owner_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)

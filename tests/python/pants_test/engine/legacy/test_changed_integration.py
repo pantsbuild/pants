@@ -268,7 +268,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
             # Mutate the working copy so we can do `--changed-parent=HEAD` deterministically.
             with mutated_working_copy([os.path.join(worktree, filename)]):
               stdout = self.run_list(
-                ['--include-dependees={}'.format(dependee_type), '--changed-parent=HEAD'],
+                ['--include-dependees-behavior={}'.format(dependee_type), '--changed-parent=HEAD'],
               )
 
               self.assertEqual(
@@ -282,7 +282,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
         )
 
   def run_list(self, extra_args, success=True):
-    list_args = ['-q', 'list'] + extra_args
+    list_args = ['-q'] + extra_args + ['list']
     pants_run = self.do_command(*list_args, success=success)
     return pants_run.stdout_data
 
@@ -300,7 +300,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
           '-ldebug',   # This ensures the changed target names show up in the pants output.
           '--exclude-target-regexp={}'.format(exclude_target_regexp),
           '--changed-parent=HEAD',
-          '--include-dependees=transitive',
+          '--include-dependees-behavior=transitive',
           'test',
         ])
 
@@ -325,7 +325,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
           '-ldebug',   # This ensures the changed target names show up in the pants output.
           '--exclude-target-regexp={}'.format(exclude_target_regexp),
           '--changed-parent=HEAD',
-          '--include-dependees=transitive',
+          '--include-dependees-behavior=transitive',
           'test',
         ])
 
@@ -367,7 +367,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
   def test_changed_with_deleted_target_transitive(self):
     with create_isolated_git_repo() as worktree:
       safe_delete(os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/BUILD'))
-      pants_run = self.run_pants(['list', '--changed-parent=HEAD', '--include-dependees=transitive'])
+      pants_run = self.run_pants(['--changed-parent=HEAD', '--include-dependees-behavior=transitive', 'list'])
       self.assert_failure(pants_run)
       assertRegex(self, pants_run.stderr_data, 'src/resources/org/pantsbuild/resourceonly:.*did not exist')
 

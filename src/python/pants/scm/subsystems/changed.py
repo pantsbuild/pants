@@ -47,3 +47,8 @@ class Changed(Subsystem):
              help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
     register('--fast', type=bool,
              help='Stop searching for owners once a source is mapped to at least one owning target.')
+    register('--include-dependees', type=IncludeDependees, default=IncludeDependees.none,
+             help='Include direct or transitive dependees of targets specified via --changed-* or '
+                  '--owner-of.',
+             removal_version='1.17.0.dev0',
+             removal_hint='Use the --include-dependees-behavior global option instead.')

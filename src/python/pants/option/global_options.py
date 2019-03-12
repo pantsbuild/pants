@@ -333,7 +333,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')
 
-    register('--include-dependees', type=IncludeDependees, default=IncludeDependees.none,
+    # TODO: rename this to --include-dependees when the corresponding --changed-include-dependees is
+    # fully deprecated!
+    register('--include-dependees-behavior', type=IncludeDependees, default=IncludeDependees.none,
              help='Include direct or transitive dependees of targets specified via --changed-* or '
                   '--owner-of.')
 
