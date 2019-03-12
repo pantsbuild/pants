@@ -5,7 +5,7 @@ There are a few ways to get a runnable version of pants set up for your workspac
 beginning, make sure your machine fits the requirements. At a minimum, pants requires the following to run properly:
 
 * Linux or Mac OS X.
-* Python 2.7.x (the latest stable version of 2.7 is recommended).
+* Python 2.7, 3.6, or 3.7.
 * A C compiler, system headers, Python headers (to compile native Python modules) and the libffi
   library and headers (to compile and link modules that use CFFI to access native code).
 * OpenJDK or Oracle JDK 7 or greater.
@@ -23,19 +23,29 @@ in the root (ie, "buildroot") of your repo:
     :::bash
     curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants && touch pants.ini
 
+Before running the new `./pants` script, you should pin the Python version you want to run Pants with.
+To do this, add an entry like so to `pants.ini`, choosing between `2.7`, `3.6`, or `3.7`.
+
+    :::ini
+    [GLOBAL]
+    pants_engine_python_version: 3.6
+
+If you'd like to change which Python version Pants uses, just edit the entry in `pants.ini`.
+
 The first time you run the new `./pants` script it will install the latest version of pants (using
 virtualenv) and then run it.  It's recommended though, that you pin the version of pants.  To do
 this, first find out the version of pants you just installed:
 
     :::bash
     ./pants -V
-    1.0.0
+    1.14.0
 
 Then add an entry like so to `pants.ini` with that version:
 
     :::ini
     [GLOBAL]
-    pants_version: 1.0.0
+    pants_engine_python_version: 3.6
+    pants_version: 1.14.0
 
 When you'd like to upgrade pants, just edit the version in `pants.ini` and pants will self-update on
 the next run.  This script stores the various pants versions you use centrally in
@@ -47,7 +57,7 @@ follows:
 
     :::ini
     [GLOBAL]
-    pants_version: 1.0.0
+    pants_version: 1.14.0
 
     plugins: [
         'pantsbuild.pants.contrib.go==%(pants_version)s',

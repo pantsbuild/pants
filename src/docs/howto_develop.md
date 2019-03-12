@@ -84,9 +84,9 @@ You'll need to setup some files one-time in your own repo:
         'linux-x86_64',
         'macosx-10.4-x86_64',
       ],
-      # You may want to adjust the python interpreter constraints, but note that pants requires
-      # python2.7 currently.
-      compatibility='CPython>=2.7,<3',
+      # You may want to adjust the python interpreter constraints. Note that Pants requires
+      # Python 2.7 or 3.6+ currently.
+      compatibility=['CPython>=2.7,<3', 'CPython>=3.6,<4'],
       dependencies=[
         ':pantsbuild.pants',
         # List any other pants backend local or remote deps here, ie:
