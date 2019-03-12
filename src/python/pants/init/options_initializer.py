@@ -110,7 +110,7 @@ class OptionsInitializer(object):
 
     pants_engine_python_version = global_bootstrap_options.pants_engine_python_version
     current_python_version = '.'.join(map(str, sys.version_info[0:2]))
-    if (pants_engine_python_version and pants_engine_python_version != current_python_version):
+    if pants_engine_python_version and pants_engine_python_version != current_python_version:
       raise BuildConfigurationError(
         'Running Pants with a different Python interpreter version than requested. '
         'You requested {}, but are running with {}.\n\n'
