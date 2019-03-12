@@ -5,11 +5,14 @@
 ARG BASE_IMAGE=pantsbuild/centos6:latest
 FROM ${BASE_IMAGE}
 
-### BEGIN CENTOS6 DOCKERFILE CHANGES
 # TODO(7064) These changes belong in centos6/Dockerfile, because we always want that image to
 # have Py3 available and also avoid the cost of rebuilding Python 3 every time in CI. However,
 # this requires publishing an updated image to Docker hub, so we copy the code here until then.
-# Install the desired versions of python 2 and 3.
+
+### BEGIN CENTOS6 DOCKERFILE CHANGES
+# Install a (more) modern gcc, and a JDK.
+# Also install sqlite-devel because python 3 errors on startup if not -- see
+# https://stackoverflow.com/a/39907500/2518889.
 RUN yum -y update
 # TODO: figure out why this needs to be installed first for /usr/bin/scl to work!
 RUN yum install -y centos-release-scl
@@ -40,6 +43,7 @@ RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
     && make install --quiet \
     && touch "${OPENSSL_DIR}/installed-${OPENSSL_VERSION}"'
 
+# Install the desired versions of python 2.7 and 3.6.
 ARG PYTHON_27_VERSION=2.7.13
 ARG PYTHON_36_VERSION=3.6.8
 # NB: PYENV_ROOT must be set in the environment for `pyenv install` to work, otherwise it will
