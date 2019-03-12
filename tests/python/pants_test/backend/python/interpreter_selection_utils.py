@@ -10,9 +10,22 @@ from unittest import skipIf
 from pants.util.process_handler import subprocess
 
 
-PY_27 = '2.7'
+PY_2 = '2'
 PY_3 = '3'
+
+PY_26 = '2.6'
+PY_27 = '2.7'
+PY_34 = '3.4'
+PY_35 = '3.5'
 PY_36 = '3.6'
+PY_37 = '3.7'
+PY_38 = '3.8'
+
+
+def find_all_pythons_present():
+  """Return set of all Python versions present on the system."""
+  likely_versions_present = {PY_26, PY_27, PY_34, PY_35, PY_36, PY_37, PY_38}
+  return {version for version in likely_versions_present if has_python_version(version)}
 
 
 def has_python_version(version):
@@ -36,12 +49,22 @@ def python_interpreter_path(version):
     command = ['python{}'.format(version), '-c', 'import sys; print(sys.executable)']
     py_path = subprocess.check_output(command).decode('utf-8').strip()
     return os.path.realpath(py_path)
-  except subprocess.CalledProcessError:
+  except (subprocess.CalledProcessError, FileNotFoundError):
     return None
 
 
+def skip_unless_any_pythons_present(*versions):
+  """A decorator that only runs the decorated test method if any of the specified pythons are present.
+
+  :param string *versions: Python version strings, such as 2.7, 3.
+  """
+  if any(v for v in versions if has_python_version(v)):
+    return skipIf(False, 'At least one of the expected python versions found.')
+  return skipIf(True, 'Could not find at least one of the required pythons from {} on the system. Skipping.'.format(versions))
+
+
 def skip_unless_pythons(*versions):
-  """A decorator that only runs the decorated test method if the specified pythons are present.
+  """A decorator that only runs the decorated test method if all of the specified pythons are present.
 
   :param string *versions: Python version strings, such as 2.7, 3.
   """
