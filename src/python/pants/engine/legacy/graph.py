@@ -31,8 +31,7 @@ from pants.engine.objects import Collection
 from pants.engine.parser import SymbolTable, TargetAdaptorContainer
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Select
-from pants.option.global_options import GlobMatchErrorBehavior
-from pants.scm.subsystems.changed import IncludeDependees
+from pants.option.global_options import GlobMatchErrorBehavior, IncludeDependees
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.objects import Exactly, TypedCollection, datatype

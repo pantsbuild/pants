@@ -27,6 +27,10 @@ class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
   """
 
 
+class IncludeDependees(enum(['none', 'direct', 'transitive'])):
+  """Describe how to include the dependees of targets specified via --changed-* or --owner-of."""
+
+
 class ExecutionOptions(datatype([
   'remote_store_server',
   'remote_store_thread_count',
@@ -328,6 +332,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--process-execution-cleanup-local-dirs', type=bool, default=True, advanced=True,
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')
+
+    register('--include-dependees', type=IncludeDependees, default=IncludeDependees.none,
+             help='Include direct or transitive dependees of targets specified via --changed-* or '
+                  '--owner-of.')
 
   @classmethod
   def register_options(cls, register):

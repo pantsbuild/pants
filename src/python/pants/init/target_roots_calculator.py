@@ -16,7 +16,7 @@ from pants.base.target_roots import TargetRoots
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.legacy.graph import OwnersRequest
 from pants.goal.workspace import ScmWorkspace
-from pants.scm.subsystems.changed import ChangedRequest, IncludeDependees
+from pants.scm.subsystems.changed import ChangedRequest
 
 
 logger = logging.getLogger(__name__)
@@ -74,10 +74,15 @@ class TargetRootsCalculator(object):
       exclude_patterns=exclude_patterns,
       tags=tags)
 
+    # Whether to include dependee targets in --changed-* or --owner-of options.
+    include_dependees = options.for_global_scope().include_dependees
+
     # Determine `Changed` arguments directly from options to support pre-`Subsystem`
     # initialization paths.
     changed_options = options.for_scope('changed')
-    changed_request = ChangedRequest.from_options(changed_options)
+    changed_request = ChangedRequest.from_options(
+      changed_options,
+      include_dependees=include_dependees)
 
     # Determine the `--owner-of=` arguments provided from the global options
     owned_files = options.for_global_scope().owner_of
@@ -118,7 +123,7 @@ class TargetRootsCalculator(object):
     if owned_files:
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
       # alternate target roots.
-      request = OwnersRequest(sources=tuple(owned_files), include_dependees=IncludeDependees.none)
+      request = OwnersRequest(sources=tuple(owned_files), include_dependees=include_dependees)
       owner_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('owner addresses: %s', owner_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)

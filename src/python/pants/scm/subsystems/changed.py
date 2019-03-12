@@ -6,11 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from future.utils import text_type
 
+from pants.option.global_options import IncludeDependees
 from pants.subsystem.subsystem import Subsystem
-from pants.util.objects import Exactly, datatype, enum
-
-
-class IncludeDependees(enum(['none', 'direct', 'transitive'])): pass
+from pants.util.objects import Exactly, datatype
 
 
 class ChangedRequest(datatype([
@@ -21,12 +19,12 @@ class ChangedRequest(datatype([
   """Parameters required to compute a changed file/target set."""
 
   @classmethod
-  def from_options(cls, options):
+  def from_options(cls, options, include_dependees):
     """Given an `Options` object, produce a `ChangedRequest`."""
     return cls(options.changes_since,
                options.diffspec,
-               options.include_dependees,
-               options.fast or False)
+               include_dependees=include_dependees,
+               fast=options.fast or False)
 
   def is_actionable(self):
     return bool(self.changes_since or self.diffspec)
@@ -47,7 +45,5 @@ class Changed(Subsystem):
              help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')
     register('--diffspec',
              help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
-    register('--include-dependees', type=IncludeDependees, default=IncludeDependees.none,
-             help='Include direct or transitive dependees of changed targets.')
     register('--fast', type=bool,
              help='Stop searching for owners once a source is mapped to at least one owning target.')
