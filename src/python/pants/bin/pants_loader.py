@@ -76,10 +76,9 @@ class PantsLoader(object):
   def ensure_valid_interpreter(cls):
     """Runtime check that user is using a supported Python version."""
     py_major, py_minor = sys.version_info[0:2]
-    current_version = '.'.join(map(str, sys.version_info[0:2]))
     if not PantsLoader.is_supported_interpreter(py_major, py_minor) and os.environ.get(cls.INTERPRETER_IGNORE_ENV_VAR, None) is None:
       raise cls.InvalidInterpreter(dedent("""
-        You are trying to run Pants with Python {}, which is unsupported.
+        You are trying to run Pants with Python {}.{}, which is unsupported.
         Pants requires a Python 2.7 or a Python 3.6+ interpreter to be
         discoverable on your PATH to run.
 
@@ -92,7 +91,7 @@ class PantsLoader(object):
         Alternatively, you may bypass this error by setting the below environment variable.
           {}=1
         Note: we cannot guarantee consistent behavior with this bypass enabled.
-        """.format(current_version, cls.INTERPRETER_IGNORE_ENV_VAR)))
+        """.format(py_major, py_minor, cls.INTERPRETER_IGNORE_ENV_VAR)))
 
   @staticmethod
   def determine_entrypoint(env_var, default):
