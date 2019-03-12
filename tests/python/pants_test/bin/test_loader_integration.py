@@ -26,11 +26,11 @@ class LoaderIntegrationTest(PantsRunIntegrationTest):
 
   @skip_unless_any_pythons_present(PY_26, PY_34, PY_35)
   def test_invalid_interpreter(self):
-    invalid_versions = [version for version in find_all_pythons_present()
-                        if not PantsLoader._is_supported_interpreter(
-                          *[int(version_component) for version_component in version.split(".")]
-                        )]
-    pants_run = self.run_pants(command=['help'], extra_env={'PY': "python{}".format(invalid_versions[0])})
+    invalid_versions_present = [version for version in find_all_pythons_present()
+                                if not PantsLoader._is_supported_interpreter(
+                                  *[int(version_component) for version_component in version.split(".")]
+                                )]
+    pants_run = self.run_pants(command=['help'], extra_env={'PY': "python{}".format(invalid_versions_present[0])})
     self.assert_failure(pants_run)
     self.assertIn('unsupported Python interpreter', pants_run.stderr_data)
 
