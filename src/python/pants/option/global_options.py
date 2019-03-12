@@ -115,18 +115,23 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
              help='Set whether log messages are displayed in color.')
 
-    # Pants code uses this only to verify that we are of the requested version. However
-    # setup scripts, runner scripts, IDE plugins, etc., may grep this out of pants.ini
-    # and use it to select the right version.
-    # Note that to print the version of the pants instance you're running, use -v, -V or --version.
     register('--pants-version', advanced=True, default=pants_version(),
-             help='Use this pants version.')
+             help='Use this pants version. Note Pants code only uses this to verify that you are '
+                  'using the requested version, as Pants cannot dynamically change the version it '
+                  'is using once the program is already running. This option is useful to set in '
+                  'your pants.ini, however, and then you can grep the value to select which '
+                  'version to use for setup scripts (e.g. `./pants`), runner scripts, IDE plugins, '
+                  'etc. You may find the version of the pants instance you are running using -v, '
+                  '-V, or --version.')
 
-    # Like `--pants-version`, Pants code uses this only to verify that the user is using the requested interpreter
-    # version. It too may be grepped out of pants.ini to be used by things like setup scripts,
-    # runner scripts, IDE plugins, etc. in order to select which interpreter to use.
     register('--pants-engine-python-version', advanced=True,
-             help='Use this Python version to run Pants. Valid values: 2.7, 3.6, or 3.7.')
+             help='Use this Python version to run Pants. The option expects the major and minor '
+                  'version, e.g. 2.7 or 3.6. Note Pants code only uses this to verify that you are '
+                  'using the requested interpreter, as Pants cannot dynamically change the '
+                  'interpreter it is using once the program is already running. This option is '
+                  'useful to set in your pants.ini, however, and then you can grep the value to '
+                  'select which interpreter to use for setup scripts (e.g. `./pants`), runner '
+                  'scripts, IDE plugins, etc.')
 
     register('--plugins', advanced=True, type=list, help='Load these plugins.')
     register('--plugin-cache-dir', advanced=True,
