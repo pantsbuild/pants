@@ -2105,8 +2105,7 @@ mod remote {
     }
 
     //
-    /// Given a collection of Digests (digests),
-    /// returns the set of digests from that collection not present in the CAS.
+    /// Given a pre-created vector of digest(s), batch download then from Remote Store
     ///
     pub fn batch_download(&self, digests_batch: &Vec<Digest>)
       -> impl future::Future<Item=HashSet<Digest>, Error=String> {
