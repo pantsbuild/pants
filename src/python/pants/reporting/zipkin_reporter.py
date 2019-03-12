@@ -147,8 +147,10 @@ class ZipkinReporter(Reporter):
       span.zipkin_attrs = ZipkinAttrs(
         trace_id=self.trace_id,
         span_id=workunit['span_id'],
-        parent_span_id=workunit.get("parent_id", self.parent_id), # TODO change it when we properly pass parent id
-        # parent_span_id=workunit.get("parent_id", None),
+        # TODO change it when we properly pass parent_id to the v2 engine Nodes
+        # TODO Pass parent_id with ExecutionRequest when v2 engine is called by a workunit
+        # TODO pass parent_id when v2 engine Node is called by another v2 engine Node
+        parent_span_id=workunit.get("parent_id", self.parent_id),
         flags='0', # flags: stores flags header. Currently unused
         is_sampled=True,
       )
