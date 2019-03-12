@@ -5,6 +5,7 @@ python_tests(
   sources='test_loader.py',
   dependencies=[
     'src/python/pants/bin',
+    '3rdparty/python:future',
   ],
 )
 

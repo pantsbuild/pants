@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
+from builtins import map, str
 from unittest import TestCase, mock
 
 from pants.bin.pants_loader import PantsLoader
