@@ -6,6 +6,7 @@ use bytes::Bytes;
 use dirs;
 use futures::{future, Future};
 use hashing::Digest;
+use log::debug;
 use protobuf::Message;
 use serde_derive::Serialize;
 use std::collections::HashMap;
@@ -23,6 +24,11 @@ use parking_lot::Mutex;
 // It doesn't reflect space allocated on disk, or RAM allocated (it may be reflected in VIRT but
 // not RSS). There is no practical upper bound on this number, so we set it ridiculously high.
 const MAX_LOCAL_STORE_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024 / 10;
+
+
+// This is the maximum size any particular file within a directory, for it to be considered
+// for batch downloading from Remote Store.
+const MAX_DOWNLOAD_BATCH_SIZE_BYTES: usize = 4;
 
 // This is the target number of bytes which should be present in all combined LMDB store files
 // after garbage collection. We almost certainly want to make this configurable.
@@ -387,7 +393,10 @@ impl Store {
     let remote = if let Some(ref remote) = self.remote {
       remote
     } else {
+      // TODO: Remote isn't configured, implement proceeding without one
+      debug!("Remote isn't configured, proceeding without one");
       return future::err("Cannot ensure local has dir without a remote".to_owned()).to_boxed();
+
     };
     let remote = remote.clone();
     self
@@ -397,40 +406,41 @@ impl Store {
       })
       .and_then(move |directory| {
 
-        // Traverse the files within directory
+        // Traverse the files within a directory and split them into batches or not depending on the
+        // size of the files and/or if Remote is configured.
         let mut file_futures = Vec::new();
         let mut digests_to_batch = Vec::new();
         for file_node in directory.get_files() {
           let file_digest = try_future!(file_node.get_digest().into());
-          if file_digest.1 > 30000000 {
+          // collect all the digests that will benefit from batching (small) only if remote
+          // is configured
+          if file_digest.1 <= MAX_DOWNLOAD_BATCH_SIZE_BYTES { //&& remote.is_some() {
             digests_to_batch.push(file_digest);
-          }
-          else {
+          } else {
             file_futures.push(store.load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(())));
           }
-
         }
 
-        // Start with one empty batch
-        // for each digest:
-        // if it fits into a batch, add it
-        // else make a new batch for it
-        let mut batches = vec![vec![]];
-        let mut current_batch_size = 0;
-        let limit = 5;
-        for req in digests_to_batch {
-          if current_batch_size + req.1 < limit {
-            batches[0].push(req);
-            current_batch_size += req.1;
-          }  else {
-            current_batch_size = 0;
-            batches.push(vec![req]);
+        let batched_futures = {
+          if digests_to_batch.len() > 0 {
+            let mut batches = vec![vec![]];
+            let mut current_batch_size = 0;
+            for req in digests_to_batch {
+              if current_batch_size + req.1 < MAX_DOWNLOAD_BATCH_SIZE_BYTES {
+                batches[0].push(req);
+                current_batch_size += req.1;
+              } else {
+                current_batch_size = 0;
+                batches.push(vec![req]);
+              }
+            }
+            batches.iter().map(|digests_batch| {
+              remote.batch_download(digests_batch)
+            }).collect::<Vec<_>>()
+          } else {
+            vec![]
           }
-        }
-
-        let batched_futures = batches.iter().map(|digests_batch| {
-          remote.batch_download(digests_batch)
-        }).collect::<Vec<_>>();
+        };
 
         // Recursively call with sub-directories
         let directory_futures = directory
@@ -442,8 +452,8 @@ impl Store {
           })
           .collect::<Vec<_>>();
 
-        future::join_all(batched_futures)
-          .join(future::join_all(file_futures))
+        future::join_all(file_futures)
+          .join(future::join_all(batched_futures))
           .join(future::join_all(directory_futures))
           .map(|_| ()).to_boxed()
       })
@@ -2729,7 +2739,7 @@ mod tests {
     new_store(dir.path(), cas.address())
       .ensure_local_has_recursive_directory(recursive_testdir_digest)
       .wait()
-      .expect("Downloading recursive directory should have succeeded.");
+      .expect("Downloading directory recursively should have succeeded.");
 
     assert_eq!(
       load_file_bytes(&new_local_store(dir.path()), roland.digest()),
