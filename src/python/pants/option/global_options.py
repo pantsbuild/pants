@@ -122,6 +122,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--pants-version', advanced=True, default=pants_version(),
              help='Use this pants version.')
 
+    # Like `--pants-version`, Pants code uses this only to verify that the user is using the requested interpreter
+    # version. It too may be grepped out of pants.ini to be used by things like setup scripts,
+    # runner scripts, IDE plugins, etc. in order to select which interpreter to use.
+    register('--pants-engine-python-version', advanced=True,
+             help='Use this Python version to run Pants.')
+
     register('--plugins', advanced=True, type=list, help='Load these plugins.')
     register('--plugin-cache-dir', advanced=True,
              default=os.path.join(get_pants_cachedir(), 'plugins'),
