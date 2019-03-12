@@ -520,6 +520,18 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
       None,
     ));
   }
+
+  fn batch_read_blobs(
+    &self,
+    _ctx: grpcio::RpcContext<'_>,
+    _req: bazel_protos::remote_execution::BatchReadBlobsRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::BatchReadBlobsResponse>,) {
+    sink.fail(grpcio::RpcStatus::new(
+      grpcio::RpcStatusCode::Unimplemented,
+      None,
+    ));
+  }
+
   fn get_tree(
     &self,
     _ctx: grpcio::RpcContext<'_>,

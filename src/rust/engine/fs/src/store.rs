@@ -428,7 +428,7 @@ impl Store {
           }
         }
 
-        let batches_futures = batches.iter().map(|digests_batch| {
+        let batched_futures = batches.iter().map(|digests_batch| {
           remote.batch_download(digests_batch)
         }).collect::<Vec<_>>();
 
@@ -442,8 +442,8 @@ impl Store {
           })
           .collect::<Vec<_>>();
 
-        future::join_all(file_futures)
-          .join(future::join_all(batches_futures))
+        future::join_all(batched_futures)
+          .join(future::join_all(file_futures))
           .join(future::join_all(directory_futures))
           .map(|_| ()).to_boxed()
       })
