@@ -396,6 +396,11 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     finally:
       rm_rf(test_path)
 
+  # TODO(#7330): Determine why pantsd takes so long to start!
+  def _wait_for_waiter_run(self, checker):
+    """Letting pantsd start for the waiter testproject python_binary() takes a while."""
+    checker.assert_started(16)
+
   def test_pantsd_multiple_parallel_runs(self):
     with self.pantsd_test_context() as (workdir, config, checker):
       file_to_make = os.path.join(workdir, 'some_magic_file')
@@ -405,10 +410,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         config,
       )
 
-      # Wait for the python run to be running
-      time.sleep(15)
-
-      checker.assert_started()
+      self._wait_for_waiter_run(checker)
 
       creator_handle = self.run_pants_with_workdir_without_waiting(
         ['run', 'testprojects/src/python/coordinated_runs:creator', '--', file_to_make],
@@ -464,7 +466,7 @@ Signal {signum} (SIGTERM) was raised\\. Exiting with failure\\. \\(backtrace omi
         config,
       )
 
-      checker.assert_started(timeout=12)
+      self._wait_for_waiter_run(checker)
 
       # TODO: There is a race condition here, where if the waiter run is killed before it starts the
       # remote client, it will display the PantsRunnerSignalHandler message, but if it is signalled
