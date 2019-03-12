@@ -66,8 +66,8 @@ python_tests(
 )
 
 python_tests(
-  name = 'listtargets',
-  sources = ['test_listtargets.py'],
+  name = 'list_targets',
+  sources = ['test_list_targets.py'],
   dependencies = [
     '3rdparty/python:future',
     'src/python/pants/backend/graph_info/tasks',
@@ -113,8 +113,8 @@ python_tests(
 )
 
 python_tests(
-  name = 'sorttargets',
-  sources = ['test_sorttargets.py'],
+  name = 'sort_targets',
+  sources = ['test_sort_targets.py'],
   dependencies = [
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/python/targets:python',

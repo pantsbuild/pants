@@ -99,5 +99,5 @@ A trailing double colon specifies a recursive glob of targets at the specified l
     tests/python/pants_test:test_maven_layout
     tests/python/pants_test/base:base
     ...
-    tests/python/pants_test/tasks:sorttargets
+    tests/python/pants_test/tasks:sort_targets
     tests/python/pants_test/testutils:testutils
