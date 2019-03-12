@@ -28,7 +28,10 @@ use fs::{
 use hashing;
 use process_execution::{self, CommandRunner};
 
+use crate::scheduler::WorkUnit;
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
+use rand::thread_rng;
+use rand::Rng;
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -1039,10 +1042,16 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    let start_timestamp = std::time::SystemTime::now()
+    let node_name_and_start_timestamp = if context.session.should_record_zipkin_spans() {
+      let node_name = format!("{}", self);
+      let start_timestamp_duration = std::time::SystemTime::now()
         .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as f64;
+        .unwrap();
+      let start_timestamp = duration_as_float_secs(&start_timestamp_duration);
+      Some((node_name, start_timestamp))
+    } else {
+      None
+    };
     let context2 = context.clone();
     match self {
       NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
@@ -1055,12 +1064,19 @@ impl Node for NodeKey {
       NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
     }
     .inspect(move |_: &NodeResult| {
-      let end_timestamp = std::time::SystemTime::now()
-          .duration_since(std::time::SystemTime::UNIX_EPOCH)
-          .unwrap()
-          .as_secs() as f64;
-      let node_name = "Node".to_string();
-      context2.session.add_workunit(node_name, start_timestamp, end_timestamp);
+      if context2.session.should_record_zipkin_spans() {
+        let end_timestamp_duration = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap();
+        let end_timestamp = duration_as_float_secs(&end_timestamp_duration);
+        let (node_name, start_timestamp) = node_name_and_start_timestamp.expect("If flag --reporting-zipkin-trace-v2 is enabled (should_record_zipkin_spans returns true) a node_name and a start_timestamp should be recorded before running a NodeKey.");
+        let workunit = WorkUnit {
+          name: node_name,
+          start_timestamp: start_timestamp,
+          end_timestamp: end_timestamp,
+          span_id: generate_random_64bit_string(),
+        };
+        context2.session.add_workunit(workunit)};
     })
     .to_boxed()
   }
@@ -1084,6 +1100,21 @@ impl Node for NodeKey {
       _ => true,
     }
   }
+}
+
+fn duration_as_float_secs(duration: &Duration) -> f64 {
+  //  Returning value is formed by representing duration as a hole number of seconds (u64) plus
+  //  a hole number of microseconds (u32) turned into a f64 type.
+  //  Reverting time from duration to f64 decrease precision.
+  let whole_secs_in_duration = duration.as_secs() as f64;
+  let fract_part_of_duration_in_micros = f64::from(duration.subsec_micros());
+  whole_secs_in_duration + fract_part_of_duration_in_micros / 1_000_000.0
+}
+
+fn generate_random_64bit_string() -> String {
+  let mut rng = thread_rng();
+  let random_u64: u64 = rng.gen();
+  format!("{:16.x}", random_u64)
 }
 
 impl Display for NodeKey {

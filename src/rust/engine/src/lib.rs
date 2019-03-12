@@ -319,27 +319,28 @@ pub extern "C" fn scheduler_metrics(
         .flat_map(|(metric, value)| vec![externs::store_utf8(metric), externs::store_i64(value)])
         .collect::<Vec<_>>();
       let values_ref = &mut values;
-      let workunits_option = session.get_workunits();
-      if let &Some(ref workunits_mutex) = workunits_option {
-        let workunits = workunits_mutex.lock()
-            .iter()
-            .map(|workunit| {
-              let workunit_zipkin_trace_info = vec![
-                externs::store_utf8("name"),
-                externs::store_utf8(&workunit.name),
-                externs::store_utf8("start_timestamp"),
-                externs::store_f64(workunit.start_timestamp),
-                externs::store_utf8("end_timestamp"),
-                externs::store_f64(workunit.end_timestamp),
-                externs::store_utf8("span_id"),
-                externs::store_utf8(&workunit.span_id),
-              ];
-              externs::store_dict(&workunit_zipkin_trace_info)
-            })
-            .collect::<Vec<_>>();
+      if session.should_record_zipkin_spans() {
+        let workunits = &session
+          .get_workunits()
+          .lock()
+          .iter()
+          .map(|workunit| {
+            let workunit_zipkin_trace_info = vec![
+              externs::store_utf8("name"),
+              externs::store_utf8(&workunit.name),
+              externs::store_utf8("start_timestamp"),
+              externs::store_f64(workunit.start_timestamp),
+              externs::store_utf8("end_timestamp"),
+              externs::store_f64(workunit.end_timestamp),
+              externs::store_utf8("span_id"),
+              externs::store_utf8(&workunit.span_id),
+            ];
+            externs::store_dict(&workunit_zipkin_trace_info)
+          })
+          .collect::<Vec<_>>();
         values_ref.push(externs::store_utf8("engine_workunits"));
         values_ref.push(externs::store_tuple(&workunits));
-      }
+      };
       externs::store_dict(&values).into()
     })
   })
