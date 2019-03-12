@@ -27,7 +27,7 @@ from pants.fs.archive import TGZ
 from pants.util.collections_abc_backport import OrderedDict
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants_test.backend.python.interpreter_selection_utils import skip_unless_python36
+from pants_test.backend.python.interpreter_selection_utils import skip_unless_python36_present
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 
@@ -704,7 +704,7 @@ class TestSetupPyFindPackages(SetupPyTestBase):
   def test_find_packages(self):
     self.assert_find_packages(py36=False)
 
-  @skip_unless_python36
+  @skip_unless_python36_present
   def test_find_packages_py3(self):
     self.assert_find_packages(py36=True)
 

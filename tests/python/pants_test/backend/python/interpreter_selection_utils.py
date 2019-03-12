@@ -63,7 +63,7 @@ def skip_unless_any_pythons_present(*versions):
   return skipIf(True, 'Could not find at least one of the required pythons from {} on the system. Skipping.'.format(versions))
 
 
-def skip_unless_pythons(*versions):
+def skip_unless_all_pythons_present(*versions):
   """A decorator that only runs the decorated test method if all of the specified pythons are present.
 
   :param string *versions: Python version strings, such as 2.7, 3.
@@ -79,26 +79,26 @@ def skip_unless_pythons(*versions):
     return skipIf(False, 'All required pythons present, continuing with test!')
 
 
-def skip_unless_python27(func):
+def skip_unless_python27_present(func):
   """A test skip decorator that only runs a test method if python2.7 is present."""
-  return skip_unless_pythons(PY_27)(func)
+  return skip_unless_all_pythons_present(PY_27)(func)
 
 
-def skip_unless_python3(func):
+def skip_unless_python3_present(func):
   """A test skip decorator that only runs a test method if python3 is present."""
-  return skip_unless_pythons(PY_3)(func)
+  return skip_unless_all_pythons_present(PY_3)(func)
 
 
-def skip_unless_python36(func):
+def skip_unless_python36_present(func):
   """A test skip decorator that only runs a test method if python3.6 is present."""
-  return skip_unless_pythons(PY_36)(func)
+  return skip_unless_all_pythons_present(PY_36)(func)
 
 
-def skip_unless_python27_and_python3(func):
+def skip_unless_python27_and_python3_present(func):
   """A test skip decorator that only runs a test method if python2.7 and python3 are present."""
-  return skip_unless_pythons(PY_27, PY_3)(func)
+  return skip_unless_all_pythons_present(PY_27, PY_3)(func)
 
 
-def skip_unless_python27_and_python36(func):
+def skip_unless_python27_and_python36_present(func):
   """A test skip decorator that only runs a test method if python2.7 and python3.6 are present."""
-  return skip_unless_pythons(PY_27, PY_36)(func)
+  return skip_unless_all_pythons_present(PY_27, PY_36)(func)

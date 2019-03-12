@@ -21,7 +21,7 @@ from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_mkdir
 from pants_test.backend.python.interpreter_selection_utils import (PY_27, PY_36,
                                                                    python_interpreter_path,
-                                                                   skip_unless_python27_and_python36)
+                                                                   skip_unless_python27_and_python36_present)
 from pants_test.test_base import TestBase
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 from pants_test.testutils.py2_compat import assertRegex
@@ -151,7 +151,7 @@ class TestInterpreterCache(TestBase):
       self.assertFalse('.tmp.' in ' '.join(os.listdir(cache_path)),
                        'interpreter cache path contains tmp dirs!')
 
-  @skip_unless_python27_and_python36
+  @skip_unless_python27_and_python36_present
   def test_interpereter_cache_setup_using_pex_python_paths(self):
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
     py27_path, py36_path = python_interpreter_path(PY_27), python_interpreter_path(PY_36)
