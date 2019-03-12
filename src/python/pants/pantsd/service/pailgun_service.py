@@ -15,7 +15,7 @@ from pants.pantsd.service.pants_service import PantsService
 class PailgunService(PantsService):
   """A service that runs the Pailgun server."""
 
-  def __init__(self, bind_addr, runner_class, scheduler_service):
+  def __init__(self, bind_addr, runner_class, scheduler_service, shutdown_after_run):
     """
     :param tuple bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
     :param class runner_class: The `PantsRunner` class to be used for Pailgun runs. Generally this
@@ -31,6 +31,7 @@ class PailgunService(PantsService):
 
     self._logger = logging.getLogger(__name__)
     self._pailgun = None
+    self._shutdown_after_run = shutdown_after_run
 
   @property
   def pailgun(self):
@@ -62,7 +63,11 @@ class PailgunService(PantsService):
       with self.services.lifecycle_lock:
         yield
 
-    return PailgunServer(self._bind_addr, runner_factory, lifecycle_lock)
+    def request_complete():
+      if self._shutdown_after_run:
+        self.terminate()
+
+    return PailgunServer(self._bind_addr, runner_factory, lifecycle_lock, request_complete)
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""

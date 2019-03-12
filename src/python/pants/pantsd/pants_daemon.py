@@ -181,6 +181,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
       :returns: A PantsServices instance.
       """
+      should_shutdown_after_run = bootstrap_options.shutdown_pantsd_after_run
       fs_event_service = FSEventService(
         watchman,
         build_root,
@@ -208,7 +209,8 @@ class PantsDaemon(FingerprintedProcessManager):
       pailgun_service = PailgunService(
         (bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
         DaemonPantsRunner,
-        scheduler_service
+        scheduler_service,
+        should_shutdown_after_run
       )
 
       store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)

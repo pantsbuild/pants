@@ -222,6 +222,13 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
+    # Shutdown pantsd after the current run.
+    # This needs to be accessed at the same time as enable_pantsd,
+    # so we register it at bootstrap time.
+    register('--shutdown-pantsd-after-run', advanced=True, type=bool, default=False,
+      help='Shutdown pantsd after the current run.'
+           'Will fail if pantsd was running before this invocation (Beta)')
+
     # These facilitate configuring the native engine.
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
