@@ -28,7 +28,7 @@ class PantsLoader(object):
     """Raised when trying to run Pants with an unsupported Python version."""
 
   @staticmethod
-  def _is_supported_interpreter(major_version, minor_version):
+  def is_supported_interpreter(major_version, minor_version):
     return (major_version == 2 and minor_version == 7) \
       or (major_version == 3 and minor_version >= 6)
 
@@ -75,18 +75,19 @@ class PantsLoader(object):
   def ensure_valid_interpreter(cls):
     """Runtime check that user is using a supported Python version."""
     py_major, py_minor = sys.version_info[0:2]
-    if not cls._is_supported_interpreter(py_major, py_minor):
+    current_version = '.'.join(map(str, sys.version_info[0:2]))
+    if not PantsLoader.is_supported_interpreter(py_major, py_minor):
       raise cls.InvalidInterpreter(dedent("""
-        You are trying to run Pants with an unsupported Python interpreter. Pants
-        requires a Python 2.7 or a Python 3.6+ interpreter to be discoverable on
-        your PATH to run.
+        You are trying to run Pants with Python {}, which is unsupported.
+        Pants requires a Python 2.7 or a Python 3.6+ interpreter to be
+        discoverable on your PATH to run.
 
         If you still get this error after ensuring at least one of these interpreters
         is discoverable on your PATH, you may need to modify your build script
         (e.g. `./pants`) to properly set up a virtual environment with the correct
         interpreter. We recommend following our setup guide and using our setup script
         as a starting point: https://www.pantsbuild.org/setup_repo.html.
-        """))
+        """.format(current_version)))
 
   @staticmethod
   def determine_entrypoint(env_var, default):
