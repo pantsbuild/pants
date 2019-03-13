@@ -6,13 +6,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
+import unittest
 from builtins import map, str
-from unittest import TestCase, mock
+
+import mock
 
 from pants.bin.pants_loader import PantsLoader
 
 
-class LoaderTest(TestCase):
+class LoaderTest(unittest.TestCase):
 
   def test_is_supported_interpreter(self):
     unsupported_versions = {(2, 6), (3, 3), (3, 4), (3, 5), (4, 0)}

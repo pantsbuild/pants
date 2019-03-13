@@ -6,6 +6,7 @@ python_tests(
   dependencies=[
     'src/python/pants/bin',
     '3rdparty/python:future',
+    '3rdparty/python:mock',
   ],
 )
 
