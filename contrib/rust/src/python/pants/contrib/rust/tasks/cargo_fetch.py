@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.rust.tasks.cargo_task import CargoTask
@@ -44,14 +44,11 @@ class Fetch(CargoTask):
       'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
     }
 
-    outcome = self.execute_command(cmd, 'fetch', [WorkUnitLabel.TOOL], env_vars=env,
+    returncode = self.execute_command(cmd, 'fetch', [WorkUnitLabel.TOOL], env_vars=env,
                                    current_working_dir=target.manifest)
 
-    if outcome != WorkUnit.SUCCESS:
-      self.context.log.error(WorkUnit.outcome_string(outcome))
+    if returncode != 0:
       raise TaskError('Cannot fetch dependencies for: {}'.format(abs_manifest_path))
-    else:
-      self.context.log.info(WorkUnit.outcome_string(outcome))
 
   def set_cargo_home(self, cargo_home):
     cargo_env = self.context.products.get_data('cargo_env')

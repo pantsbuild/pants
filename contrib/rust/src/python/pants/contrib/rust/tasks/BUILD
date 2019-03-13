@@ -70,7 +70,6 @@ python_library(
     'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_library',
     'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_binary',
     'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_custom_build',
-    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_proc_macro',
   ]
 )
 
@@ -112,7 +111,6 @@ python_library(
     'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_library',
     'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_binary',
     'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_custom_build',
-    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_proc_macro',
     ':cargo_task',
   ]
 )

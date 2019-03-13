@@ -24,11 +24,9 @@ from pants.contrib.rust.targets.synthetic.cargo_synthetic_binary import CargoSyn
 from pants.contrib.rust.targets.synthetic.cargo_synthetic_custom_build import \
   CargoSyntheticCustomBuild
 from pants.contrib.rust.targets.synthetic.cargo_synthetic_library import CargoSyntheticLibrary
-from pants.contrib.rust.targets.synthetic.cargo_synthetic_proc_macro import CargoSyntheticProcMacro
 
 
 class CargoTask(Task):
-
   pp = pprint.PrettyPrinter(indent=2)
 
   @staticmethod
@@ -66,10 +64,6 @@ class CargoTask(Task):
   @staticmethod
   def is_cargo_synthetic_custom_build(target):
     return isinstance(target, CargoSyntheticCustomBuild)
-
-  @staticmethod
-  def is_cargo_synthetic_proc_macro(target):
-    return isinstance(target, CargoSyntheticProcMacro)
 
   @staticmethod
   def is_cargo_project_binary(target):
@@ -111,25 +105,21 @@ class CargoTask(Task):
     with self.context.new_workunit(name=workunit_name,
                                    labels=workunit_labels,
                                    cmd=str(command)) as workunit:
-
       proc_env = self._set_env_vars(env_vars)
 
       self.context.log.debug(
         'Run\n\tCMD: {0}\n\tENV: {1}\n\tCWD: {2}'.format(self.pretty(command),
                                                          self.pretty(proc_env),
                                                          current_working_dir))
+      returncode = subprocess.call(command,
+                                   env=proc_env,
+                                   cwd=current_working_dir,
+                                   stdout=workunit.output('stdout'),
+                                   stderr=workunit.output('stderr'))
 
-      try:
-        subprocess.check_call(command,
-                              env=proc_env,
-                              cwd=current_working_dir,
-                              stdout=workunit.output('stdout'),
-                              stderr=workunit.output('stderr'))
-      except subprocess.CalledProcessError:
-        workunit.set_outcome(WorkUnit.FAILURE)
-      workunit.set_outcome(WorkUnit.SUCCESS)
+      workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
 
-    return workunit.outcome()
+    return returncode
 
   def execute_command_and_get_output(self, command, workunit_name, workunit_labels, env_vars=None,
                                      current_working_dir=None):
@@ -158,7 +148,7 @@ class CargoTask(Task):
       returncode = proc.returncode
       workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
 
-    return workunit.outcome(), std_out.decode('utf-8'), std_err.decode('utf-8')
+    return returncode, std_out.decode('utf-8'), std_err.decode('utf-8')
 
   def pretty(self, obj):
     return self.pp.pformat(obj)

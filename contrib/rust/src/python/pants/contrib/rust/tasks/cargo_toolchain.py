@@ -12,7 +12,7 @@ import requests
 from future.utils import PY3
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import chmod_plus_x, read_file, safe_file_dump, safe_mkdir
 
 from pants.contrib.rust.tasks.cargo_task import CargoTask
@@ -50,14 +50,11 @@ class Toolchain(CargoTask):
 
     cmd = [install_script_file_path, '-y']  # -y Disable confirmation prompt.
 
-    outcome = self.execute_command(cmd, 'setup-rustup', [WorkUnitLabel.BOOTSTRAP],
+    returncode = self.execute_command(cmd, 'setup-rustup', [WorkUnitLabel.BOOTSTRAP],
                                    current_working_dir=install_script_dir_path)
 
-    if outcome != WorkUnit.SUCCESS:
-      self.context.log.error(WorkUnit.outcome_string(outcome))
+    if returncode != 0:
       raise TaskError('Cannot install rustup.')
-    else:
-      self.context.log.debug(WorkUnit.outcome_string(outcome))
 
   def download_rustup_install_script(self):
     return requests.get('https://sh.rustup.rs')
@@ -88,14 +85,11 @@ class Toolchain(CargoTask):
       'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
     }
 
-    outcome = self.execute_command(cmd, 'install-rustup-toolchain', [WorkUnitLabel.BOOTSTRAP],
+    returncode = self.execute_command(cmd, 'install-rustup-toolchain', [WorkUnitLabel.BOOTSTRAP],
                                    env_vars=env)
 
-    if outcome != WorkUnit.SUCCESS:
-      self.context.log.error(WorkUnit.outcome_string(outcome))
+    if returncode != 0:
       raise TaskError('Cannot install toolchain: {}'.format(toolchain))
-    else:
-      self.context.log.debug(WorkUnit.outcome_string(outcome))
 
   def check_if_rustup_exist(self):
     # If the rustup executable can't be find via the path variable, try to find it in the default location.

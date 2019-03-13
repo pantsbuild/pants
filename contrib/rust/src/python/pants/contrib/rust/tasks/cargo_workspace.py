@@ -16,7 +16,6 @@ from pants.contrib.rust.targets.synthetic.cargo_synthetic_binary import CargoSyn
 from pants.contrib.rust.targets.synthetic.cargo_synthetic_custom_build import \
   CargoSyntheticCustomBuild
 from pants.contrib.rust.targets.synthetic.cargo_synthetic_library import CargoSyntheticLibrary
-from pants.contrib.rust.targets.synthetic.cargo_synthetic_proc_macro import CargoSyntheticProcMacro
 from pants.contrib.rust.tasks.cargo_task import CargoTask
 
 
@@ -26,14 +25,21 @@ class Workspace(CargoTask):
     'bin': CargoSyntheticBinary,
     'lib': CargoSyntheticLibrary,
     'cdylib': CargoSyntheticLibrary,
+    'rlib': CargoSyntheticLibrary,
+    'proc-macro': CargoSyntheticLibrary,
+    'dylib': CargoSyntheticLibrary,
+    'staticlib': CargoSyntheticLibrary,
     'custom-build': CargoSyntheticCustomBuild,
-    'proc-macro': CargoSyntheticProcMacro,
   }
 
   _project_target_kind = {
     'bin': CargoProjectBinary,
     'lib': CargoProjectLibrary,
     'cdylib': CargoProjectLibrary,
+    'rlib': CargoProjectLibrary,
+    'proc-macro': CargoProjectLibrary,
+    'dylib': CargoProjectLibrary,
+    'staticlib': CargoProjectLibrary,
     'test': CargoProjectTest,
   }
 
@@ -60,7 +66,13 @@ class Workspace(CargoTask):
 
   @staticmethod
   def is_lib_or_bin_target(target_definition):
-    if target_definition.kind == 'lib' or target_definition.kind == 'bin' or target_definition.kind == 'cdylib':
+    if target_definition.kind == 'lib' or \
+            target_definition.kind == 'bin' or \
+            target_definition.kind == 'cdylib' or \
+            target_definition.kind == 'rlib' or \
+            target_definition.kind == 'dylib' or \
+            target_definition.kind == 'staticlib' or \
+            target_definition.kind == 'proc-macro':
       return True
     else:
       return False

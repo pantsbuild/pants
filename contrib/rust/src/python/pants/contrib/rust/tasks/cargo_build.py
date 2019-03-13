@@ -13,7 +13,7 @@ import shutil
 from future.utils import PY3
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.invalidation.build_invalidator import CacheKeyGenerator
 from pants.util.dirutil import absolute_symlink, read_file, safe_file_dump, safe_mkdir
@@ -119,19 +119,16 @@ class Build(Workspace):
       'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
     }
 
-    outcome, std_output, std_error = self.execute_command_and_get_output(cmd,
+    returncode, std_output, std_error = self.execute_command_and_get_output(cmd,
                                                                          'cargo-build-plan',
                                                                          [WorkUnitLabel.COMPILER],
                                                                          env_vars=env,
                                                                          current_working_dir=target.manifest)
 
-    if outcome != WorkUnit.SUCCESS:
-      self.context.log.error(WorkUnit.outcome_string(outcome))
+    if returncode != 0:
       self.context.log.error('==== stderr ====\n{0}'.format(std_error))
       self.context.log.error('==== stdour ====\n{0}'.format(std_output))
       raise TaskError('Cannot create build plan for: {}'.format(abs_manifest_path))
-    else:
-      self.context.log.info(WorkUnit.outcome_string(outcome))
 
     cargo_build_plan = json.loads(std_output)
 
@@ -237,12 +234,6 @@ class Build(Workspace):
       pants_invocation = convert_basic_into_pants_invocation(vt.target, vt.results_dir,
                                                              self._package_out_dirs,
                                                              self._libraries_dir_path)
-    elif self.is_cargo_synthetic_proc_macro(vt.target):
-      self.context.log.debug(
-        'Convert pro macro invocation for: {0}'.format(vt.target.address.target_name))
-      pants_invocation = convert_basic_into_pants_invocation(vt.target, vt.results_dir,
-                                                             self._package_out_dirs,
-                                                             self._libraries_dir_path)
     elif self.is_cargo_synthetic_binary(vt.target):
       self.context.log.debug(
         'Convert binary invocation for: {0}'.format(vt.target.address.target_name))
@@ -290,8 +281,6 @@ class Build(Workspace):
     if 'pants_make_sym_links' in pants_invocation:
       self.create_library_symlink(pants_invocation['pants_make_sym_links'],
                                   self._libraries_dir_path)
-
-    self.context.log.info(WorkUnit.outcome_string(3))
 
   def save_and_parse_build_script_output(self, std_output, out_dir, target):
     cargo_statements = self.parse_build_script_output(std_output)
@@ -388,18 +377,17 @@ class Build(Workspace):
         for rustc_env in build_script_output['rustc-env']:
           # is PATH also possible?
           name, value = rustc_env
-          self._add_env_var(env, name, value)
+          env = self._add_env_var(env, name, value)
     return env
 
   def execute_custom_build(self, cmd, workunit_name, env, cwd, target):
-    outcome, std_output, std_error = self.execute_command_and_get_output(cmd,
+    returncode, std_output, std_error = self.execute_command_and_get_output(cmd,
                                                                          workunit_name,
                                                                          [WorkUnitLabel.COMPILER],
                                                                          env_vars=env,
                                                                          current_working_dir=cwd)
 
-    if outcome != WorkUnit.SUCCESS:
-      self.context.log.error(WorkUnit.outcome_string(outcome))
+    if returncode != 0:
       self.context.log.error('==== stderr ====\n{0}'.format(std_error))
       self.context.log.error('==== stdour ====\n{0}'.format(std_output))
       raise TaskError('Cannot execute build script for: {}'.format(cwd))
@@ -418,14 +406,13 @@ class Build(Workspace):
       self.context.log.warn('Warning: {0}'.format(warning))
 
   def execute_rustc(self, package_name, cmd, workunit_name, env, cwd):
-    outcome = self.execute_command(cmd,
+    returncode = self.execute_command(cmd,
                                    workunit_name,
                                    [WorkUnitLabel.COMPILER],
                                    env_vars=env,
                                    current_working_dir=cwd)
 
-    if outcome != WorkUnit.SUCCESS:
-      self.context.log.error(WorkUnit.outcome_string(outcome))
+    if returncode != 0:
       raise TaskError('Cannot build target: {}'.format(package_name))
 
   def add_rust_products(self, target, pants_invocation):
@@ -442,11 +429,12 @@ class Build(Workspace):
       current.extend(list(filter(lambda path: os.path.exists(path), links.keys())))
       rust_bins.update({name: current})
     elif self.is_cargo_project_test(target):
+      env = pants_invocation['env']
       cwd_test = pants_invocation['cwd_test']
       rust_tests = self.context.products.get_data('rust_tests')
       current = rust_tests.get(target.address.target_name, [])
       current.extend(list(
-        map(lambda path: (path, cwd_test),
+        map(lambda path: (path, cwd_test, env),
             filter(lambda path: os.path.exists(path), links.keys()))))
       rust_tests.update({target.address.target_name: current})
 

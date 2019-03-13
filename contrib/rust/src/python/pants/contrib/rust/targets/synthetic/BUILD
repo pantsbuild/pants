@@ -7,7 +7,6 @@ target(
     ':cargo_synthetic_binary',
     ':cargo_synthetic_library',
     ':cargo_synthetic_custom_build',
-    ':cargo_synthetic_proc_macro',
   ]
 )
 
@@ -78,16 +77,3 @@ python_library(
     ':cargo_synthetic_base',
   ]
 )
-
-python_library(
-  name='cargo_synthetic_proc_macro',
-  sources=['cargo_synthetic_proc_macro.py'],
-  dependencies=[
-    '3rdparty/python:future',
-    ':cargo_synthetic_base',
-  ]
-)
-
-
-
-
