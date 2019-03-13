@@ -668,28 +668,25 @@ impl<'t> GraphMaker<'t> {
     }) {
       vec![*param]
     } else {
-      // Group by the simplified version of each rule: if exactly one, we're finished. We prefer
-      // the non-ambiguous rule with the smallest set of Params, as that minimizes Node identities
-      // in the graph and biases toward receiving values from dependencies (which do not affect our
-      // identity) rather than dependents.
-      let mut rules_by_kind: HashMap<EntryWithDeps, (usize, &Entry)> = HashMap::new();
-      for satisfiable_entry in &satisfiable_entries {
+      // We prefer the non-ambiguous rule with the smallest set of Params, as that minimizes Node
+      // identities in the graph and biases toward receiving values from dependencies (which do not
+      // affect our identity) rather than dependents.
+      let mut minimum_param_set_size = ::std::usize::MAX;
+      let mut rules = Vec::new();
+      for satisfiable_entry in satisfiable_entries {
         if let &Entry::WithDeps(ref wd) = satisfiable_entry {
-          rules_by_kind
-            .entry(wd.simplified(BTreeSet::new()))
-            .and_modify(|e| {
-              if e.0 > wd.params().len() {
-                *e = (wd.params().len(), satisfiable_entry);
-              }
-            })
-            .or_insert((wd.params().len(), satisfiable_entry));
+          let param_set_size = wd.params().len();
+          if param_set_size < minimum_param_set_size {
+            rules.clear();
+            rules.push(satisfiable_entry);
+            minimum_param_set_size = param_set_size;
+          } else if param_set_size == minimum_param_set_size {
+            rules.push(satisfiable_entry);
+          }
         }
       }
 
-      rules_by_kind
-        .into_iter()
-        .map(|(_, (_, rule))| rule)
-        .collect::<Vec<_>>()
+      rules
     }
   }
 
