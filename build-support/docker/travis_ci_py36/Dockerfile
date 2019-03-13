@@ -43,8 +43,9 @@ USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 # Our newly created user is unlikely to have a sane environment: set a locale at least.
 ENV LC_ALL="en_US.UTF-8"
 
-# TODO(#7152): this tells the ./pants runner script to avoid trying to clean the workspace when
-# changing python versions. Remove all instances of this after the python 3 migration!
+# This tells the ./pants runner script to avoid trying to clean the workspace when changing python
+# versions. CI starts off without the .pants-python-version file, so it would otherwise run a
+# clean-all without this env var.
 ENV ONLY_USING_SINGLE_PYTHON_VERSION 'true'
 
 WORKDIR /travis/workdir

@@ -12,8 +12,9 @@ env:
     - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
     - LC_ALL="en_US.UTF-8"
-    # TODO(#7152): this tells the ./pants runner script to avoid trying to clean the workspace when
-    # changing python versions. Remove all instances of this after the python 3 migration!
+    # This tells the ./pants runner script to avoid trying to clean the workspace when changing
+    # python versions. CI starts off without the .pants-python-version file, so it would otherwise
+    # run a clean-all without this env var.
     - ONLY_USING_SINGLE_PYTHON_VERSION='true'
     - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
     - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex

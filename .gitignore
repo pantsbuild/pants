@@ -53,5 +53,5 @@ GRTAGS
 GSYMS
 GTAGS
 .mypy_cache/
-# TODO(#7152): remove this after the python 3 migration!
+# Stores the version of python last used to run pants. See ./pants.
 /.pants-python-version

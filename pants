@@ -6,7 +6,6 @@ REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
 
 _interpreter_version_sentinel_filename='.pants-python-version'
 
-# TODO(#7152): remove this after the python 3 migration!
 function clean_if_interpreter_changed() {
   _python_version_to_run="$1"
 
