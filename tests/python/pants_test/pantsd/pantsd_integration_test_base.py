@@ -37,7 +37,10 @@ class PantsDaemonMonitor(ProcessManager):
       'PantsDaemonMonitor: pid is {} is_alive={}'.format(self._pid, self.is_alive()))
     )
 
-  def assert_started(self, timeout=12):
+  # TODO(#7330): Determine why pantsd takes so long to start! Waiting for
+  # 'testprojects/src/python/coordinated_runs:waiter' specifically seems to require this 16-second
+  # timeout.
+  def assert_started(self, timeout=16):
     self._process = None
     self._pid = self.await_pid(timeout)
     self._check_pantsd_is_alive()
