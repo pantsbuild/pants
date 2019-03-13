@@ -107,7 +107,7 @@ advantages come into play when you have many fine-grained dependencies.
 
 ### tags
 
-Tags are a set of strings used to describe or categorize targets. They can be consumed by subsystems during a build to allow for features such as filtering task targets (ex. skip linting targets with a particular tag) or focused testing (ex. running only unit tests by excluding targets with a `integration` tag).
+Tags are a set of strings used to describe or categorize targets. They can be inspected during a build to allow for features such as filtering task targets (ex. skip linting targets with a particular tag) or focused testing (ex. running only unit tests by excluding targets with a `integration` tag).
 
 Tags can be configured for targets in three ways:
 - Directly in the `BUILD` file (`tags={'common'}` in the example above)
