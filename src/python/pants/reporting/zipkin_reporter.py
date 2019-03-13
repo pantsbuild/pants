@@ -77,9 +77,11 @@ class ZipkinReporter(Reporter):
     # Check if it is the first workunit
     first_span = not self._workunits_to_spans
     if first_span:
-      # If trace_id and parent_id are given create zipkin_attrs
+      # If trace_id and parent_id are given as flags create zipkin_attrs
       if self.trace_id is not None and self.parent_id is not None:
         zipkin_attrs = ZipkinAttrs(
+          # trace_id and parent_id are passed to Pants by another process that collects
+          # Zipkin trace
           trace_id=self.trace_id,
           span_id=generate_random_64bit_string(),
           parent_span_id=self.parent_id,
@@ -88,7 +90,9 @@ class ZipkinReporter(Reporter):
         )
       else:
         zipkin_attrs =  create_attrs_for_span(
-          trace_id=self.trace_id, # use UUID from run_id as trace id
+          # trace_id is the same as run_uuid that is created in run_tracker and is the part of
+          # pants_run id
+          trace_id=self.trace_id,
           sample_rate=self.sample_rate, # Value between 0.0 and 100.0
         )
         self.trace_id = zipkin_attrs.trace_id
