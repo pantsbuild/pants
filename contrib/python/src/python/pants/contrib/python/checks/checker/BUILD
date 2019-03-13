@@ -10,7 +10,8 @@ python_library(
     }
   ),
   dependencies=[
-    '3rdparty/python:future',
+    # NB: See https://github.com/pantsbuild/pants/issues/7158 before introducing additional
+    # dependencies here.
     '3rdparty/python:pycodestyle',
     '3rdparty/python:pyflakes',
     '3rdparty/python:six',
