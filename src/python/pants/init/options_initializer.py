@@ -108,18 +108,19 @@ class OptionsInitializer(object):
         .format(global_bootstrap_options.pants_version, pants_version())
       )
 
-    pants_engine_python_version = global_bootstrap_options.pants_engine_python_version
+    pants_runtime_python_version = global_bootstrap_options.pants_runtime_python_version
     current_python_version = '.'.join(map(str, sys.version_info[0:2]))
-    if pants_engine_python_version and pants_engine_python_version != current_python_version:
+    if pants_runtime_python_version and pants_runtime_python_version != current_python_version:
       raise BuildConfigurationError(
         'Running Pants with a different Python interpreter version than requested. '
         'You requested {}, but are running with {}.\n\n'
         'Note that Pants cannot use the value you give for `--pants-engine-python-version` to '
         'dynamically change the interpreter it uses, as it is too late for it to change once the program '
         'is already running. Instead, your setup script (e.g. `./pants`) must configure which Python '
-        'interpreter and virtualenv to use.'.format(pants_engine_python_version, current_python_version)
-        # TODO(setup#30): Once the setup script is modified to parse pants.ini to grab the requested interpreter version,
-        # add a link to the script as an example for how people might want to do this.
+        'interpreter and virtualenv to use. For example, the setup script we distribute '
+        'at https://www.pantsbuild.org/install.html#recommended-installation will read the '
+        '`pants_runtime_python_version` defined in your pants.ini to determine which Python '
+        'version to run with.'.format(pants_runtime_python_version, current_python_version)
       )
 
     # Parse and register options.

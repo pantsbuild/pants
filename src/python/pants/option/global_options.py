@@ -121,17 +121,23 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'is using once the program is already running. This option is useful to set in '
                   'your pants.ini, however, and then you can grep the value to select which '
                   'version to use for setup scripts (e.g. `./pants`), runner scripts, IDE plugins, '
-                  'etc. You may find the version of the pants instance you are running using -v, '
-                  '-V, or --version.')
+                  'etc. For example, the setup script we distribute at https://www.pantsbuild.org/install.html#recommended-installation '
+                  'uses this value to determine which Python version to run with. You may find the '
+                  'version of the pants instance you are running using -v, -V, or --version.')
 
-    register('--pants-engine-python-version', advanced=True,
+    register('--pants-runtime-python-version', advanced=True,
              help='Use this Python version to run Pants. The option expects the major and minor '
                   'version, e.g. 2.7 or 3.6. Note Pants code only uses this to verify that you are '
                   'using the requested interpreter, as Pants cannot dynamically change the '
                   'interpreter it is using once the program is already running. This option is '
                   'useful to set in your pants.ini, however, and then you can grep the value to '
                   'select which interpreter to use for setup scripts (e.g. `./pants`), runner '
-                  'scripts, IDE plugins, etc.')
+                  'scripts, IDE plugins, etc. For example, the setup script we distribute at '
+                  'https://www.pantsbuild.org/install.html#recommended-installation uses this '
+                  'value to determine which Python version to run with. Also note this does not mean '
+                  'your own code must use this Python version. See '
+                  'https://www.pantsbuild.org/python_readme.html#configure-the-python-version '
+                  'for how to configure your code\'s compatibility.')
 
     register('--plugins', advanced=True, type=list, help='Load these plugins.')
     register('--plugin-cache-dir', advanced=True,
