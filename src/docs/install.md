@@ -23,29 +23,19 @@ in the root (ie, "buildroot") of your repo:
     :::bash
     curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants && touch pants.ini
 
-Before running the new `./pants` script, you should pin the Python version you want to run Pants with.
-To do this, add an entry like so to `pants.ini`, choosing between `2.7`, `3.6`, or `3.7`.
-
-    :::ini
-    [GLOBAL]
-    pants_engine_python_version: 3.6
-
-If you'd like to change which Python version Pants uses, just edit the entry in `pants.ini`.
-
 The first time you run the new `./pants` script it will install the latest version of pants (using
 virtualenv) and then run it.  It's recommended though, that you pin the version of pants.  To do
 this, first find out the version of pants you just installed:
 
     :::bash
     ./pants -V
-    1.14.0
+    1.15.0.dev4
 
 Then add an entry like so to `pants.ini` with that version:
 
     :::ini
     [GLOBAL]
-    pants_engine_python_version: 3.6
-    pants_version: 1.14.0
+    pants_version: 1.15.0.dev4
 
 When you'd like to upgrade pants, just edit the version in `pants.ini` and pants will self-update on
 the next run.  This script stores the various pants versions you use centrally in
@@ -57,7 +47,7 @@ follows:
 
     :::ini
     [GLOBAL]
-    pants_version: 1.14.0
+    pants_version: 1.15.0.dev4
 
     plugins: [
         'pantsbuild.pants.contrib.go==%(pants_version)s',
@@ -68,6 +58,24 @@ Pants notices you changed your plugins and it installs them.
 NB: The formatting of the plugins list is important; all lines below the `plugins:` line must be
 indented by at least one white space to form logical continuation lines. This is standard for python
 ini files, see [[Options|pants('src/docs:options')]].
+
+Pants' runtime Python interpreter
+---------------------------------
+Pants may be ran with Python 2.7, 3.6, or 3.7. The `./pants` script defaults to using Python 2.7. It's recommeded, though, that you pin the version you'd like to use.
+
+To do this, add an entry like so to `pants.ini`, choosing between `2.7`, `3.6`, or `3.7`.
+
+    :::ini
+    [GLOBAL]
+    pants_version: 1.15.0.dev4
+    pants_runtime_python_version: 3.6
+
+If you'd like to change which Python version Pants uses, just edit the entry in `pants.ini` and `./pants` will setup the new virtual environment for you.
+
+Some considerations when choosing which interpreter to run Pants with:
+* This does not mean your Python code has to use this same Python version. See https://www.pantsbuild.org/python_readme.html#configure-the-python-version for how to configure your code's compatibility.
+* Ensure you have the pinned Python version accessible on your PATH everywhere Pants is used in your organization.
+* Pants will require Python 3.6+ to run as of release 1.17.0.
 
 The ./pants Runner Script
 -------------------------
