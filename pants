@@ -4,7 +4,7 @@
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
 
-_interpreter_version_sentinel_filename='.pants-python-version'
+_interpreter_version_sentinel_file_path='.pants.d/.pants-python-version'
 
 function clean_if_interpreter_changed() {
   _python_version_to_run="$1"
@@ -13,7 +13,7 @@ function clean_if_interpreter_changed() {
     return 0
   fi
 
-  _python_version_file="${REPO_ROOT}/${_interpreter_version_sentinel_filename}"
+  _python_version_file="${REPO_ROOT}/${_interpreter_version_sentinel_file_path}"
 
   if [[ -f "$_python_version_file" ]]; then
     _prev_run_python_version="$(cat "$_python_version_file")"
@@ -22,7 +22,8 @@ function clean_if_interpreter_changed() {
     fi
   else
     cat >&2 <<EOF
-${_interpreter_version_sentinel_filename} not found in the buildroot. Forcing an initial clean-all...
+${_interpreter_version_sentinel_file_path} not found in the buildroot.
+Forcing an initial clean-all.
 EOF
   fi
 
