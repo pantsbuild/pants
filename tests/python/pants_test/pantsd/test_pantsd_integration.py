@@ -515,3 +515,21 @@ Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
       result = pantsd_run(['help'])
       checker.assert_started()
       self.assert_success(result)
+
+  def test_daemon_auto_shutdown_after_first_run(self):
+    config = {'GLOBAL': {'shutdown_pantsd_after_run': True}}
+    with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
+      wait_handle = self.run_pants_with_workdir_without_waiting(
+        ['list'],
+        workdir,
+        config,
+      )
+
+      # TODO(#6574, #7330): We might have a new default timeout after these are resolved.
+      checker.assert_started(timeout=16)
+      pantsd_runner_processes = checker.runner_process_context.current_processes()
+      pants_run = wait_handle.join()
+      self.assert_success(pants_run)
+
+      for process in pantsd_runner_processes:
+        self.assertFalse(process.is_running())
