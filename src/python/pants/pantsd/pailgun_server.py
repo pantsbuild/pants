@@ -111,6 +111,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
                                            execution thread during handling. All pailgun request handling
                                            will take place under care of this lock, which would be shared with
                                            a `PailgunServer`-external lifecycle manager to guard teardown.
+    :param function request_complete_callback: A callback that will be called whenever a pailgun request is completed.
     :param class handler_class: The request handler class to use for each request. (Optional)
     :param bool bind_and_activate: If True, binds and activates networking at __init__ time.
                                    (Optional)

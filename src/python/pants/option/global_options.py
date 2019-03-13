@@ -226,8 +226,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # This needs to be accessed at the same time as enable_pantsd,
     # so we register it at bootstrap time.
     register('--shutdown-pantsd-after-run', advanced=True, type=bool, default=False,
-      help='Shutdown pantsd after the current run.'
-           'Will fail if pantsd was running before this invocation (Beta)')
+      help='Create a new pantsd server, and use it, and shut it down immediately after. '
+           'If pantsd is already running, it will shut it down and spawn a new instance (Beta)')
 
     # These facilitate configuring the native engine.
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,

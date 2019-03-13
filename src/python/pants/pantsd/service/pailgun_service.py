@@ -23,6 +23,7 @@ class PailgunService(PantsService):
       `pants.bin` packages.
     :param SchedulerService scheduler_service: The SchedulerService instance for access to the
                                                resident scheduler.
+    :param bool shutdown_after_run: PailgunService should shut down after running the first request.
     """
     super(PailgunService, self).__init__()
     self._bind_addr = bind_addr
@@ -42,6 +43,10 @@ class PailgunService(PantsService):
   @property
   def pailgun_port(self):
     return self.pailgun.server_port
+
+  def _request_complete_callback(self):
+    if self._shutdown_after_run:
+      self.terminate()
 
   def _setup_pailgun(self):
     """Sets up a PailgunServer instance."""
@@ -63,11 +68,7 @@ class PailgunService(PantsService):
       with self.services.lifecycle_lock:
         yield
 
-    def request_complete():
-      if self._shutdown_after_run:
-        self.terminate()
-
-    return PailgunServer(self._bind_addr, runner_factory, lifecycle_lock, request_complete)
+    return PailgunServer(self._bind_addr, runner_factory, lifecycle_lock, self._request_complete_callback)
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
