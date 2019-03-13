@@ -89,7 +89,7 @@ class CompositeProductAdder(object):
       product.add_for_target(*args, **kwargs)
 
 
-class _JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
+class _JvmCompileWorkflowType(enum(['zinc_only', 'rsc_then_zinc'])):
   """Target classifications used to correctly schedule Zinc and Rsc jobs.
 
   There are some limitations we have to work around before we can compile everything through Rsc
@@ -103,10 +103,10 @@ class _JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
   As we work on improving our Rsc integration, we'll need to create more workflows to more closely
   map the supported features of Rsc. This enum class allows us to do that.
 
-    - zinc-only: compiles targets just with Zinc and uses the Zinc products of their dependencies.
-    - rsc-then-zinc: compiles targets with Rsc to create "header" jars, then runs Zinc against the
+    - zinc_only: compiles targets just with Zinc and uses the Zinc products of their dependencies.
+    - rsc_then_zinc: compiles targets with Rsc to create "header" jars, then runs Zinc against the
       Rsc products of their dependencies. The Rsc compile uses the Rsc products of Rsc compatible
-      targets and the Zinc products of zinc-only targets.
+      targets and the Zinc products of zinc_only targets.
   """
 
   @classmethod
@@ -124,9 +124,6 @@ class _JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
     else:
       target_type = None
     return target_type
-
-_JvmCompileWorkflowType.rsc_then_zinc = _JvmCompileWorkflowType('rsc-then-zinc')
-_JvmCompileWorkflowType.zinc_only = _JvmCompileWorkflowType('zinc-only')
 
 
 class RscCompileContext(CompileContext):
@@ -233,8 +230,8 @@ class RscCompile(ZincCompile):
       rsc_cc, compile_cc = compile_contexts[target]
       if rsc_cc.workflow is not None:
         cp_entries = rsc_cc.workflow.resolve_for_enum_variant({
-          'zinc-only': lambda : confify([compile_cc.jar_file]),
-          'rsc-then-zinc': lambda : confify(
+          'zinc_only': lambda : confify([compile_cc.jar_file]),
+          'rsc_then_zinc': lambda : confify(
             to_classpath_entries([rsc_cc.rsc_jar_file], self.context._scheduler)),
         })()
         self.context.products.get_data('rsc_classpath').add_for_target(
@@ -257,7 +254,7 @@ class RscCompile(ZincCompile):
   def select(self, target):
     if not isinstance(target, JvmTarget):
       return False
-    return target.has_sources('.java') or target.has_sources('.scala')
+    return self._classify_compile_target(target) is not None
 
   def _classify_compile_target(self, target):
     return _JvmCompileWorkflowType.classify_target(target)
@@ -265,8 +262,8 @@ class RscCompile(ZincCompile):
   def _key_for_target_as_dep(self, target, workflow):
     # used for jobs that are either rsc jobs or zinc jobs run against rsc
     return workflow.resolve_for_enum_variant({
-      'zinc-only': lambda: self._zinc_key_for_target(target, workflow),
-      'rsc-then-zinc': lambda: self._rsc_key_for_target(target),
+      'zinc_only': lambda: self._zinc_key_for_target(target, workflow),
+      'rsc_then_zinc': lambda: self._rsc_key_for_target(target),
     })()
 
   def _rsc_key_for_target(self, target):
@@ -274,8 +271,8 @@ class RscCompile(ZincCompile):
 
   def _zinc_key_for_target(self, target, workflow):
     return workflow.resolve_for_enum_variant({
-      'zinc-only': lambda: 'zinc({})'.format(target.address.spec),
-      'rsc-then-zinc': lambda: 'zinc_against_rsc({})'.format(target.address.spec),
+      'zinc_only': lambda: 'zinc({})'.format(target.address.spec),
+      'rsc_then_zinc': lambda: 'zinc_against_rsc({})'.format(target.address.spec),
     })()
 
   def create_compile_jobs(self,
@@ -430,8 +427,8 @@ class RscCompile(ZincCompile):
     # Currently, rsc only supports outlining scala.
     workflow = rsc_compile_context.workflow
     workflow.resolve_for_enum_variant({
-      'zinc-only': lambda: None,
-      'rsc-then-zinc': lambda: rsc_jobs.append(make_rsc_job(compile_target, invalid_dependencies)),
+      'zinc_only': lambda: None,
+      'rsc_then_zinc': lambda: rsc_jobs.append(make_rsc_job(compile_target, invalid_dependencies)),
     })()
 
     # Create the zinc compile jobs.
@@ -439,8 +436,8 @@ class RscCompile(ZincCompile):
     # - Java zinc compile jobs depend on the zinc compiles of their dependencies, because we can't
     #   generate jars that make javac happy at this point.
     workflow.resolve_for_enum_variant({
-      # NB: zinc-only zinc jobs run zinc and depend on zinc compile outputs.
-      'zinc-only': lambda: zinc_jobs.append(
+      # NB: zinc_only zinc jobs run zinc and depend on zinc compile outputs.
+      'zinc_only': lambda: zinc_jobs.append(
         make_zinc_job(
           compile_target,
           input_product_key='runtime_classpath',
@@ -448,8 +445,8 @@ class RscCompile(ZincCompile):
             runtime_classpath_product,
             self.context.products.get_data('rsc_classpath')],
           dep_keys=only_zinc_invalid_dep_keys(invalid_dependencies))),
-      'rsc-then-zinc': lambda: zinc_jobs.append(
-        # NB: rsc-then-zinc jobs run zinc and depend on both rsc and zinc compile outputs.
+      'rsc_then_zinc': lambda: zinc_jobs.append(
+        # NB: rsc_then_zinc jobs run zinc and depend on both rsc and zinc compile outputs.
         make_zinc_job(
           compile_target,
           input_product_key='rsc_classpath',
@@ -615,17 +612,14 @@ class RscCompile(ZincCompile):
   def _on_invalid_compile_dependency(self, dep, compile_target, contexts):
     """Decide whether to continue searching for invalid targets to use in the execution graph.
 
-    If a necessary dep is a Rsc compiled dep and the root is a Zinc one, continue to recurse because
-    otherwise we'll drop the path between Zinc compile of the Zinc target and a Zinc
-    compile of a transitive Rsc dependency.
+    If a necessary dep is a rsc_then_zinc dep and the root is a zinc_only one, continue to recurse
+    because otherwise we'll drop the path between Zinc compile of the zinc_only target and a Zinc
+    compile of a transitive rsc_then_zinc dependency.
 
-    This is only an issue for graphs like J -> S1 -> S2, where J is a Zinc target,
-    S1/2 are Rsc targets and S2 must be on the classpath to compile J successfully.
+    This is only an issue for graphs like J -> S1 -> S2, where J is a zinc_only target,
+    S1/2 are rsc_then_zinc targets and S2 must be on the classpath to compile J successfully.
     """
     return contexts[compile_target][0].workflow.resolve_for_enum_variant({
-      'zinc-only': lambda : contexts[dep][0].workflow.resolve_for_enum_variant({
-        'rsc-then-zinc': True,
-        'zinc-only': False
-      }),
-      'rsc-then-zinc': lambda : False
+      'zinc_only': lambda : contexts[dep][0].workflow == _JvmCompileWorkflowType.rsc_then_zinc,
+      'rsc_then_zinc': lambda : False
     })()
