@@ -119,6 +119,16 @@ pub enum Entry {
   Singleton(Key, TypeId),
 }
 
+impl Entry {
+  fn params(&self) -> Vec<TypeId> {
+    match self {
+      &Entry::WithDeps(ref e) => e.params().iter().cloned().collect(),
+      &Entry::Param(ref type_id) => vec![*type_id],
+      &Entry::Singleton { .. } => vec![],
+    }
+  }
+}
+
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct RootEntry {
   params: ParamTypes,
@@ -384,8 +394,8 @@ impl<'t> GraphMaker<'t> {
     let dependency_keys = entry.dependency_keys();
 
     for select_key in dependency_keys {
-      let (params, product) = match &select_key {
-        &SelectKey::JustSelect(ref s) => (entry.params().clone(), s.product),
+      let (params, product, provided_param) = match &select_key {
+        &SelectKey::JustSelect(ref s) => (entry.params().clone(), s.product, None),
         &SelectKey::JustGet(ref g) => {
           // Unlike Selects, Gets introduce new parameter values into a subgraph.
           let get_params = {
@@ -393,7 +403,7 @@ impl<'t> GraphMaker<'t> {
             p.insert(g.subject);
             p
           };
-          (get_params, g.product)
+          (get_params, g.product, Some(g.subject))
         }
       };
 
@@ -415,6 +425,15 @@ impl<'t> GraphMaker<'t> {
               fulfillable_candidates.push(
                 simplified_entries
                   .into_iter()
+                  .filter(|e| {
+                    // Only entries that actually consume a provided (Get) parameter are eligible
+                    // for consideration.
+                    if let Some(pp) = provided_param {
+                      e.params().contains(&pp)
+                    } else {
+                      true
+                    }
+                  })
                   .map(Entry::WithDeps)
                   .collect::<Vec<_>>(),
               );
@@ -484,9 +503,6 @@ impl<'t> GraphMaker<'t> {
     }
 
     // No dependencies were completely unfulfillable (although some may have been cyclic).
-    //
-    // If this is an Aggregration, flatten the candidates by duplicating the SelectKey to treat
-    // each concrete rule as a group of candidates. Otherwise, flatten each group of candidates.
     let flattened_fulfillable_candidates_by_key = fulfillable_candidates_by_key
       .into_iter()
       .map(|(k, candidate_group)| (k, Itertools::flatten(candidate_group.into_iter()).collect()))
@@ -558,8 +574,17 @@ impl<'t> GraphMaker<'t> {
     let params_powerset: Vec<Vec<TypeId>> = {
       let mut all_used_params = BTreeSet::new();
       for (key, inputs) in deps {
+        let provided_param = match &key {
+          &SelectKey::JustSelect(_) => None,
+          &SelectKey::JustGet(ref g) => Some(&g.subject),
+        };
         for input in inputs {
-          all_used_params.extend(Self::used_params(key, input));
+          all_used_params.extend(
+            input
+              .params()
+              .into_iter()
+              .filter(|p| Some(p) != provided_param),
+          );
         }
       }
       // Compute the powerset ordered by ascending set size.
@@ -620,12 +645,17 @@ impl<'t> GraphMaker<'t> {
   ) -> Result<Option<Vec<(&'a SelectKey, &'a Entry)>>, Diagnostic> {
     let mut combination = Vec::new();
     for (key, input_entries) in deps {
+      let provided_param = match &key {
+        &SelectKey::JustSelect(_) => None,
+        &SelectKey::JustGet(ref g) => Some(&g.subject),
+      };
       let satisfiable_entries = input_entries
         .iter()
         .filter(|input_entry| {
-          Self::used_params(key, input_entry)
+          input_entry
+            .params()
             .iter()
-            .all(|p| available_params.contains(p))
+            .all(|p| available_params.contains(p) || Some(p) == provided_param)
         })
         .collect::<Vec<_>>();
 
@@ -687,29 +717,6 @@ impl<'t> GraphMaker<'t> {
       }
 
       rules
-    }
-  }
-
-  ///
-  /// Computes the parameters used by the given SelectKey and Entry.
-  ///
-  fn used_params(key: &SelectKey, entry: &Entry) -> Vec<TypeId> {
-    // `Get`s introduce new Params to a subgraph, so using a Param provided by a Get does not
-    // count toward an Entry's used params.
-    let provided_param = match &key {
-      &SelectKey::JustSelect(_) => None,
-      &SelectKey::JustGet(ref g) => Some(&g.subject),
-    };
-
-    match &entry {
-      &Entry::WithDeps(ref e) => e
-        .params()
-        .iter()
-        .filter(|&type_id| Some(type_id) != provided_param)
-        .cloned()
-        .collect(),
-      &Entry::Param(ref type_id) if Some(type_id) != provided_param => vec![*type_id],
-      &Entry::Singleton { .. } | &Entry::Param(_) => vec![],
     }
   }
 
