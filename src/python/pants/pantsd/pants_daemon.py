@@ -181,6 +181,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
       :returns: A PantsServices instance.
       """
+      should_shutdown_after_run = bootstrap_options.shutdown_pantsd_after_run
       fs_event_service = FSEventService(
         watchman,
         build_root,
@@ -208,7 +209,8 @@ class PantsDaemon(FingerprintedProcessManager):
       pailgun_service = PailgunService(
         (bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
         DaemonPantsRunner,
-        scheduler_service
+        scheduler_service,
+        should_shutdown_after_run
       )
 
       store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
@@ -440,6 +442,17 @@ class PantsDaemon(FingerprintedProcessManager):
     super(PantsDaemon, self).terminate()
     if include_watchman:
       self.watchman_launcher.terminate()
+
+  def needs_restart(self, option_fingerprint):
+    """
+    Overrides ProcessManager.needs_restart, to account for the case where pantsd is running
+    but we want to shutdown after this run.
+    :param option_fingerprint: A fingeprint of the global bootstrap options.
+    :return: True if the daemon needs to restart.
+    """
+    should_shutdown_after_run = self._bootstrap_options.for_global_scope().shutdown_pantsd_after_run
+    return super(PantsDaemon, self).needs_restart(option_fingerprint) or \
+           (self.is_alive() and should_shutdown_after_run)
 
 
 def launch():

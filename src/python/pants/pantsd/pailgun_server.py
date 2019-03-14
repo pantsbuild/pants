@@ -99,7 +99,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
   # Override the ThreadingMixIn default, to minimize the chances of zombie pailgun processes.
   daemon_threads = True
 
-  def __init__(self, server_address, runner_factory, lifecycle_lock,
+  def __init__(self, server_address, runner_factory, lifecycle_lock, request_complete_callback,
                handler_class=None, bind_and_activate=True):
     """Override of TCPServer.__init__().
 
@@ -111,6 +111,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
                                            execution thread during handling. All pailgun request handling
                                            will take place under care of this lock, which would be shared with
                                            a `PailgunServer`-external lifecycle manager to guard teardown.
+    :param function request_complete_callback: A callback that will be called whenever a pailgun request is completed.
     :param class handler_class: The request handler class to use for each request. (Optional)
     :param bool bind_and_activate: If True, binds and activates networking at __init__ time.
                                    (Optional)
@@ -122,6 +123,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     self.lifecycle_lock = lifecycle_lock
     self.allow_reuse_address = True           # Allow quick reuse of TCP_WAIT sockets.
     self.server_port = None                   # Set during server_bind() once the port is bound.
+    self.request_complete_callback = request_complete_callback
 
     if bind_and_activate:
       try:
@@ -167,6 +169,8 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     try:
       # Attempt to handle a request with the handler.
       handler.handle_request()
+      self.request_complete_callback()
+
     except Exception as e:
       # If that fails, (synchronously) handle the error with the error handler sans-fork.
       try:
