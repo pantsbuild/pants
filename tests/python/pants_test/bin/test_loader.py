@@ -28,8 +28,7 @@ class LoaderTest(unittest.TestCase):
     with mock.patch.object(PantsLoader, 'is_supported_interpreter', return_value=False):
       with self.assertRaises(PantsLoader.InvalidInterpreter) as e:
         PantsLoader.ensure_valid_interpreter()
-        self.assertIn("unsupported Python interpreter", str(e))
-        self.assertIn(current_interpreter_version, str(e))
-        self.assertIn(bypass_env, str(e))
+      self.assertIn(current_interpreter_version, str(e.exception))
+      self.assertIn(bypass_env, str(e.exception))
       with mock.patch.dict(os.environ, {bypass_env: "1"}):
         PantsLoader.ensure_valid_interpreter()
