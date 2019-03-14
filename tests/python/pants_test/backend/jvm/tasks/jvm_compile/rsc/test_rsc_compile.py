@@ -50,14 +50,14 @@ class RscCompileTest(TaskTestBase):
       target_type=JavaLibrary,
       sources=['com/example/Foo.java'],
       dependencies=[],
-      tags={'use-compiler:rsc_then_zinc'}
+      tags={'use-compiler:rsc-then-zinc'}
     )
     scala_target = self.make_target(
       'scala/classpath:scala_lib',
       target_type=ScalaLibrary,
       sources=['com/example/Foo.scala'],
       dependencies=[],
-      tags={'use-compiler:zinc_only'}
+      tags={'use-compiler:zinc-only'}
     )
 
     with temporary_dir() as tmp_dir:
