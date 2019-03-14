@@ -397,9 +397,8 @@ base_build_wheels: &base_build_wheels
   env:
     - &base_build_wheels_env PREPARE_DEPLOY=1
 
-py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
-  # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize
-  # compatibility. This is a Py2.7 shard, so it is not subject to #6985.
+base_linux_build_wheels: &base_linux_build_wheels
+  # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize compatibility.
   <<: *travis_docker_image
   <<: *base_build_wheels
   # Callers of this anchor are expected to provide values in their `env` for
@@ -423,7 +422,7 @@ py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
 
 py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
   <<: *py27_linux_config
-  <<: *py27_linux_build_wheels_no_ucs
+  <<: *base_linux_build_wheels
   <<: *native_engine_cache_config
   name: "Build wheels - Linux and cp27m (UCS2)"
   env:
@@ -435,7 +434,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
     - CACHE_NAME=linuxwheelsbuild.ucs2
 
 py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
-  <<: *py27_linux_build_wheels_no_ucs
+  <<: *base_linux_build_wheels
   <<: *py27_linux_test_config
   # `py27_linux_test_config` overrides the stage set by `base_build_wheels`, so we re-override it.
   stage: *test
@@ -448,13 +447,25 @@ py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
                           && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
     - CACHE_NAME=linuxwheelsbuild.ucs4
 
-py27_osx_build_wheels_no_ucs: &py27_osx_build_wheels_no_ucs
+py36_linux_build_wheels: &py36_linux_build_wheels
+  <<: *base_linux_build_wheels
+  <<: *py36_linux_test_config
+  name: "Build wheels - Linux and abi3 (Py3.6+)"
+  env:
+    - *py36_linux_test_config_env
+    - *base_build_wheels_env
+    - docker_image_name=travis_ci_py36
+    - docker_run_command="./build-support/bin/check_pants_pex_abi.py cp36m
+                          && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n"
+    - CACHE_NAME=linuxwheelsbuild.abi3
+
+base_osx_build_wheels: &base_osx_build_wheels
   <<: *base_build_wheels
   osx_image: xcode8
 
 py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
   <<: *py27_osx_test_config
-  <<: *py27_osx_build_wheels_no_ucs
+  <<: *base_osx_build_wheels
   name: "Build wheels - OSX and cp27m (UCS2)"
   env:
     - *py27_osx_test_config_env
@@ -466,7 +477,7 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *py27_osx_config
-  <<: *py27_osx_build_wheels_no_ucs
+  <<: *base_osx_build_wheels
   <<: *native_engine_cache_config
   name: "Build wheels - OSX and cp27mu (UCS4)"
   addons:
@@ -496,6 +507,18 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
+
+py36_osx_build_wheels: &py36_osx_build_wheels
+  <<: *py36_osx_test_config
+  <<: *base_osx_build_wheels
+  name: "Build wheels - OSX and abi3 (Py3.6+)"
+  env:
+    - *py36_osx_test_config_env
+    - *base_build_wheels_env
+    - CACHE_NAME=osxwheelsbuild.abi3
+  script:
+    - ./build-support/bin/check_pants_pex_abi.py cp36m
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n
 
 # -------------------------------------------------------------------------
 # Rust tests
@@ -720,8 +743,11 @@ matrix:
 
     - <<: *py27_linux_build_wheels_ucs2
     - <<: *py27_linux_build_wheels_ucs4
+    - <<: *py36_linux_build_wheels
+
     - <<: *py27_osx_build_wheels_ucs2
     - <<: *py27_osx_build_wheels_ucs4
+    - <<: *py36_osx_build_wheels
 
     - <<: *py36_linux_test_config
       name: "Integration tests for pants - shard 0 (Py3.6 PEX)"
