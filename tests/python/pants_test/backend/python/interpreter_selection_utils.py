@@ -7,6 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from unittest import skipIf
 
+from future.utils import PY2
+
 from pants.util.process_handler import subprocess
 
 
@@ -46,6 +48,8 @@ def python_interpreter_path(version):
   :returns: the normalized path to the interpreter binary if found; otherwise `None`
   :rtype: string
   """
+  if PY2:
+    FileNotFoundError = IOError
   try:
     command = ['python{}'.format(version), '-c', 'import sys; print(sys.executable)']
     py_path = subprocess.check_output(command).decode('utf-8').strip()
