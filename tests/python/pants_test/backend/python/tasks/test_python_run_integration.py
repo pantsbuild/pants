@@ -12,9 +12,9 @@ from pex.pex_bootstrapper import get_pex_info
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27,
                                                                    python_interpreter_path,
-                                                                   skip_unless_python3,
-                                                                   skip_unless_python27,
-                                                                   skip_unless_python27_and_python3)
+                                                                   skip_unless_python3_present,
+                                                                   skip_unless_python27_and_python3_present,
+                                                                   skip_unless_python27_present)
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
@@ -26,12 +26,12 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   def hermetic(cls):
     return True
 
-  @skip_unless_python3
+  @skip_unless_python3_present
   @ensure_daemon
   def test_run_3(self):
     self._run_version(PY_3)
 
-  @skip_unless_python27
+  @skip_unless_python27_present
   @ensure_daemon
   def test_run_27(self):
     self._run_version(PY_27)
@@ -59,7 +59,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
     return pants_run.stdout_data.splitlines()[0].strip()
 
-  @skip_unless_python27_and_python3
+  @skip_unless_python27_and_python3_present
   def test_run_27_and_then_3(self):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
@@ -76,7 +76,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       )
       self.assert_success(pants_run_3)
 
-  @skip_unless_python3
+  @skip_unless_python3_present
   def test_run_3_by_option(self):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {'interpreter_constraints': ["CPython>=2.7,<3.7"],
@@ -88,7 +88,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       )
       self.assert_success(pants_run_3)
 
-  @skip_unless_python27
+  @skip_unless_python27_present
   def test_run_2_by_option(self):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {'interpreter_constraints': ["CPython>=2.7,<3.7"],
@@ -123,7 +123,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   @unittest.skip(
     "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
       NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
-  @skip_unless_python27_and_python3
+  @skip_unless_python27_and_python3_present
   def test_pants_run_interpreter_selection_with_pexrc(self):
     py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
     with setup_pexrc_with_pex_python_path([py27_path, py3_path]):
@@ -147,7 +147,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   @unittest.skip(
     "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
       NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
-  @skip_unless_python27_and_python3
+  @skip_unless_python27_and_python3_present
   def test_pants_binary_interpreter_selection_with_pexrc(self):
     py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
     with setup_pexrc_with_pex_python_path([py27_path, py3_path]):
@@ -181,7 +181,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   @unittest.skip(
     "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
       NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
-  @skip_unless_python3
+  @skip_unless_python3_present
   def test_target_constraints_with_no_sources(self):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {
