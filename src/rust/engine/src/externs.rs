@@ -3,6 +3,7 @@
 
 use std::ffi::OsStr;
 use std::ffi::OsString;
+use std::fmt;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
@@ -484,6 +485,17 @@ pub struct PyGeneratorResponse {
 pub struct Get {
   pub product: TypeId,
   pub subject: Key,
+}
+
+impl fmt::Display for Get {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+    write!(
+      f,
+      "Get({}, {})",
+      type_to_str(self.product),
+      key_to_str(&self.subject)
+    )
+  }
 }
 
 pub enum GeneratorResponse {

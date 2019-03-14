@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
-import unittest
 from builtins import object, str
 from contextlib import contextmanager
 from textwrap import dedent
@@ -14,8 +13,7 @@ from pants.engine.rules import RootRule, UnionRule, rule, union
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Params, Select
 from pants.util.objects import datatype
-from pants_test.engine.util import (assert_equal_with_printing, create_scheduler,
-                                    remove_locations_from_traceback)
+from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.test_base import TestBase
 
 
@@ -116,6 +114,13 @@ def a_typecheck_fail_test(wrapper):
   yield supposedly_a
 
 
+@contextmanager
+def assert_execution_error(test_case, expected_msg):
+  with test_case.assertRaises(ExecutionError) as cm:
+    yield
+  test_case.assertIn(expected_msg, remove_locations_from_traceback(str(cm.exception)))
+
+
 class SchedulerTest(TestBase):
 
   @classmethod
@@ -136,8 +141,6 @@ class SchedulerTest(TestBase):
       RootRule(UnionB),
       select_union_b,
       a_union_test,
-      a_typecheck_fail_test,
-      RootRule(TypeCheckFailWrapper),
     ]
 
   def test_use_params(self):
@@ -173,9 +176,8 @@ class SchedulerTest(TestBase):
 
   @contextmanager
   def _assert_execution_error(self, expected_msg):
-    with self.assertRaises(ExecutionError) as cm:
+    with assert_execution_error(self, expected_msg):
       yield
-    self.assertIn(expected_msg, remove_locations_from_traceback(str(cm.exception)))
 
   def test_union_rules(self):
     a, = self.scheduler.product_request(A, [Params(UnionWrapper(UnionA()))])
@@ -190,36 +192,33 @@ Exception: WithDeps(Inner(InnerEntry { params: {UnionWrapper}, rule: Task(Task {
     with self._assert_execution_error(expected_msg):
       self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
 
+
+class SchedulerWithNestedRaiseTest(TestBase):
+
+  @classmethod
+  def rules(cls):
+    return super(SchedulerWithNestedRaiseTest, cls).rules() + [
+      RootRule(B),
+      RootRule(TypeCheckFailWrapper),
+      a_typecheck_fail_test,
+      nested_raise,
+    ]
+
   def test_get_type_match_failure(self):
     """Test that Get(...)s are now type-checked during rule execution, to allow for union types."""
     expected_msg = """\
 Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { product: A, clause: [Select { product: TypeCheckFailWrapper }], gets: [Get { product: A, subject: B }], func: a_typecheck_fail_test(), cacheable: true }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })
 """
-    with self._assert_execution_error(expected_msg):
+    with assert_execution_error(self, expected_msg):
       # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
       self.scheduler.product_request(A, [Params(TypeCheckFailWrapper(A()))])
 
-
-class SchedulerTraceTest(unittest.TestCase):
-  assert_equal_with_printing = assert_equal_with_printing
-
   def test_trace_includes_rule_exception_traceback(self):
-    rules = [
-      RootRule(B),
-      nested_raise,
-    ]
+    # Execute a request that will trigger the nested raise, and then directly inspect its trace.
+    request = self.scheduler.execution_request([A], [B()])
+    self.scheduler.execute(request)
 
-    scheduler = create_scheduler(rules)
-    request = scheduler._native.new_execution_request()
-    subject = B()
-    scheduler.add_root_selection(request, subject, A)
-    session = scheduler.new_session()
-    scheduler._run_and_return_roots(session._session, request)
-
-    trace = '\n'.join(scheduler.graph_trace(request))
-    # NB removing location info to make trace repeatable
-    trace = remove_locations_from_traceback(trace)
-
+    trace = remove_locations_from_traceback('\n'.join(self.scheduler.trace(request)))
     assert_equal_with_printing(self, dedent('''
                      Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A)
                        Computing Task(nested_raise(), <pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A, true)
