@@ -66,22 +66,6 @@ class PythonSetup(Subsystem):
                   '"<PATH>" (the contents of the PATH env var), '
                   '"<PEXRC>" (paths in the PEX_PYTHON_PATH variable in a pexrc file), '
                   '"<PYENV>" (all python versions under $(pyenv root)/versions).')
-    register('--resolver-blacklist', advanced=True, type=dict, default={},
-             removal_version='1.13.0.dev2',
-             removal_hint='Now unused. Pants, via PEX, handles blacklisting automatically via '
-                          'PEP-508 environment markers anywhere Python requirements are specified '
-                          '(e.g. `requirements.txt` and `python_requirement(...)` in BUILD files): '
-                          'https://www.python.org/dev/peps/pep-0508/#environment-markers',
-             metavar='<blacklist>',
-             help='A blacklist dict (str->str) that maps package name to an interpreter '
-              'constraint. If a package name is in the blacklist and its interpreter '
-              'constraint matches the target interpreter, skip the requirement. This is needed '
-              'to ensure that universal requirement resolves for a target interpreter version do '
-              'not error out on interpreter specific requirements such as backport libs like '
-              '`functools32`. For example, a valid blacklist is {"functools32": "CPython>3"}. '
-              'NOTE: this keyword is a temporary fix and will be reverted per: '
-              'https://github.com/pantsbuild/pants/issues/5696. The long term '
-              'solution is tracked by: https://github.com/pantsbuild/pex/issues/456.')
     register('--resolver-use-manylinux', advanced=True, type=bool, default=True, fingerprint=True,
              help='Whether to consider manylinux wheels when resolving requirements for linux '
                   'platforms.')
