@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
+import re
 import token
 import tokenize
 from io import StringIO
@@ -29,7 +30,35 @@ class ImplicitStringConcatenation(CheckstylePlugin):
 
   @classmethod
   def string_node_token_names(cls, str_node_text):
-    for tok in tokenize.generate_tokens(StringIO(str_node_text).readline):
+    """Get the individual tokens of the source text of the string ast node.
+
+    In Python 3, strings with this implicit concatenation across multiple lines with inconsistent
+    indentation can be tokenized as incorrect, even though Python 3 accepts it, since we don't
+    capture the containing pair of parentheses which allows the string to be parsed
+    correctly. For example, this source text can be parsed correctly when Python 3 executes it:
+
+        ("$(if [ -e ./{0} -a -e ./{1} ]; then echo 'mark_success'; "
+         "elif [ -e ./{1} ]; then echo 'mark_failed'; "
+        "else echo 'no_op'; fi)")
+
+    but since the text of the string node that we get from asttokens always begins with zero
+    indentation, this lint would raise:
+
+          File "<tokenize>", line 3
+          "else echo 'no_op'; fi)"
+          ^
+        IndentationError: unindent does not match any outer indentation level
+
+    Stripping leading whitespace from each line of the string node avoids this error when it occurs,
+    and doesn't change the resulting tokenization. We can rely on the Python 3 interpreter to raise
+    an error beforehand if the syntax is truly incorrect.
+    """
+    try:
+      tokens = list(tokenize.generate_tokens(StringIO(str_node_text).readline))
+    except IndentationError:
+      unindented_string = re.sub(r'^\s+', '', str_node_text, flags=re.MULTILINE)
+      tokens = list(tokenize.generate_tokens(StringIO(unindented_string).readline))
+    for tok in tokens:
       token_type = tok.type if PY3 else tok[0]
       yield token.tok_name[token_type]
 
