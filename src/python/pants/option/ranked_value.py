@@ -57,8 +57,6 @@ class RankedValue(object):
     FLAG: 'FLAG'
   }
 
-  CLI_RANKS = {FLAG, ENVIRONMENT}
-
   @classmethod
   def get_rank_name(cls, rank):
     """Returns the string name for the given rank integer.
