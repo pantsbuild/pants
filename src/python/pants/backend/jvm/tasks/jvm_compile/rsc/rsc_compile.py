@@ -28,7 +28,6 @@ from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterial
                              PathGlobsAndRoot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
-from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
