@@ -31,7 +31,7 @@ stages:
     if: type != cron
   - name: &test Test Pants
     if: type = cron
-  - name: &cron Cron
+  - name: &test_cron Test Pants (Cron)
     if: type != cron
   - name: &build_stable Deploy Pants Pex
     if: tag IS present AND tag =~ ^release_.*$
@@ -140,8 +140,6 @@ base_linux_test_config: &base_linux_test_config
   before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    # Increase the max number of user watches to ensure that watchman is able to watch all
-    # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
   before_script:
@@ -150,7 +148,7 @@ base_linux_test_config: &base_linux_test_config
 py27_linux_test_config: &py27_linux_test_config
   <<: *py27_linux_config
   <<: *base_linux_test_config
-  stage: *cron
+  stage: *test_cron
   env:
     - &py27_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
@@ -235,7 +233,7 @@ base_osx_test_config: &base_osx_test_config
 py27_osx_test_config: &py27_osx_test_config
   <<: *py27_osx_config
   <<: *base_osx_test_config
-  stage: *cron
+  stage: *test_cron
   env:
     - &py27_osx_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
 
@@ -269,8 +267,6 @@ linux_with_fuse: &linux_with_fuse
   before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    # Increase the max number of user watches to ensure that watchman is able to watch all
-    # files in the working copy.
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - sudo apt-get install -y pkg-config fuse libfuse-dev
@@ -283,15 +279,6 @@ travis_docker_image: &travis_docker_image
     - docker
   before_script:
     - ulimit -c unlimited
-  script:
-    - >
-      docker build
-      --rm -t ${docker_image_name}
-      --build-arg "TRAVIS_USER=$(id -un)"
-      --build-arg "TRAVIS_UID=$(id -u)"
-      --build-arg "TRAVIS_GROUP=$(id -gn)"
-      --build-arg "TRAVIS_GID=$(id -g)"
-      build-support/docker/${docker_image_name}/
 
 # -------------------------------------------------------------------------
 # Bootstrap engine shards
@@ -301,6 +288,8 @@ base_linux_build_engine: &base_linux_build_engine
   <<: *native_engine_cache_config
   <<: *travis_docker_image
   stage: *bootstrap
+  # Callers of this anchor are expected to provide values in their `env` for
+  # `docker_image_name` and `docker_run_command` (i.e. the bash command(s) to run).
   script:
     - >
       docker build
@@ -310,14 +299,13 @@ base_linux_build_engine: &base_linux_build_engine
       --build-arg "TRAVIS_GROUP=$(id -gn)"
       --build-arg "TRAVIS_GID=$(id -g)"
       build-support/docker/${docker_image_name}/
-    # Note that:
-    # * We mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain.
-    # * We also build fs_util, to take advantage of the rust code built during bootstrapping.
-    - docker run --rm -t
+    - >
+      docker run
+      --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       ${docker_image_name}:latest
-      sh -c "./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f"
+      sh -c "${docker_run_command}"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
 
 py27_linux_build_engine: &py27_linux_build_engine
@@ -326,22 +314,24 @@ py27_linux_build_engine: &py27_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2.7 PEX)"
   env:
     - docker_image_name=travis_ci
+    # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
+    - docker_run_command="./build-support/bin/ci.sh -2b && ./build-support/bin/release.sh -f"
     # NB: Only the Py2.7 shard sets PREPARE_DEPLOY to cause the fs_util binary to be uploaded to S3:
     # either linux shard could upload this binary, since it does not depend on python at all.
     - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
-    - BOOTSTRAP_ARGS='-2b'
 
 py36_linux_build_engine: &py36_linux_build_engine
   <<: *py36_linux_config
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
-    - docker_image_name=travis_ci
+    - docker_image_name=travis_ci_py36
+    # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
+    - docker_run_command="./build-support/bin/ci.sh -b && ./build-support/bin/release.sh -f"
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - BOOTSTRAP_ARGS='-b'
 
 py37_linux_build_engine: &py37_linux_build_engine
   <<: *py37_linux_config
@@ -350,9 +340,10 @@ py37_linux_build_engine: &py37_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.7 PEX)"
   env:
     - docker_image_name=travis_ci_py37
+      # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
+    - docker_run_command="./build-support/bin/ci.sh -7b && ./build-support/bin/release.sh -f"
     - CACHE_NAME=linuxpexbuild.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - BOOTSTRAP_ARGS='-7b'
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
@@ -464,7 +455,7 @@ cargo_audit: &cargo_audit
   os: linux
   dist: xenial
   sudo: required
-  stage: *cron
+  stage: *test_cron
   script:
     - ./build-support/bin/travis-ci.sh -a
 
@@ -492,16 +483,8 @@ py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
   # compatibility. This is a Py2.7 shard, so it is not subject to #6985.
   <<: *travis_docker_image
   <<: *base_build_wheels
-
-py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
-  <<: *py27_linux_config
-  <<: *py27_linux_build_wheels_no_ucs
-  <<: *native_engine_cache_config
-  name: "Build wheels - Linux and cp27m (UCS2)"
-  env:
-    - *base_build_wheels_env
-    - docker_image_name=travis_ci_py27_ucs2
-    - CACHE_NAME=linuxwheelsbuild.ucs2
+  # Callers of this anchor are expected to provide values in their `env` for
+  # `docker_image_name` and `docker_run_command` (i.e. the bash command(s) to run).
   script:
     - >
       docker build
@@ -511,13 +494,26 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
       --build-arg "TRAVIS_GROUP=$(id -gn)"
       --build-arg "TRAVIS_GID=$(id -g)"
       build-support/docker/${docker_image_name}/
-    - docker run --rm -t
+    - >
+      docker run
+      --rm -t
       -v "${HOME}:/travis/home"
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       ${docker_image_name}:latest
-      sh -c "./build-support/bin/ci.sh -2b
-             && ./build-support/bin/check_pants_pex_abi.py cp27m
-             && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
+      sh -c "${docker_run_command}"
+
+py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
+  <<: *py27_linux_config
+  <<: *py27_linux_build_wheels_no_ucs
+  <<: *native_engine_cache_config
+  name: "Build wheels - Linux and cp27m (UCS2)"
+  env:
+    - *base_build_wheels_env
+    - docker_image_name=travis_ci_py27_ucs2
+    - docker_run_command="./build-support/bin/ci.sh -2b
+                          && ./build-support/bin/check_pants_pex_abi.py cp27m
+                          && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
+    - CACHE_NAME=linuxwheelsbuild.ucs2
 
 py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
   <<: *py27_linux_build_wheels_no_ucs
@@ -529,22 +525,9 @@ py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
     - *py27_linux_test_config_env
     - *base_build_wheels_env
     - docker_image_name=travis_ci
+    - docker_run_command="./build-support/bin/check_pants_pex_abi.py cp27mu
+                          && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
     - CACHE_NAME=linuxwheelsbuild.ucs4
-  script:
-    - >
-      docker build
-      --rm -t ${docker_image_name}
-      --build-arg "TRAVIS_USER=$(id -un)"
-      --build-arg "TRAVIS_UID=$(id -u)"
-      --build-arg "TRAVIS_GROUP=$(id -gn)"
-      --build-arg "TRAVIS_GID=$(id -g)"
-      build-support/docker/${docker_image_name}/
-    - docker run --rm -t
-      -v "${HOME}:/travis/home"
-      -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      ${docker_image_name}:latest
-      sh -c "./build-support/bin/check_pants_pex_abi.py cp27mu
-             && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
 
 py27_osx_build_wheels_no_ucs: &py27_osx_build_wheels_no_ucs
   <<: *base_build_wheels

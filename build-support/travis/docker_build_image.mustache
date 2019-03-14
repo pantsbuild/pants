@@ -4,4 +4,6 @@ docker build
 --build-arg "TRAVIS_UID=$(id -u)"
 --build-arg "TRAVIS_GROUP=$(id -gn)"
 --build-arg "TRAVIS_GID=$(id -g)"
+{{! $docker_image_name is an environment variable with an expected value like `travis_ci`.
+It should be set in the env section.}}
 build-support/docker/${docker_image_name}/

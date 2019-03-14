@@ -8,7 +8,7 @@ import os
 from builtins import object
 from textwrap import dedent
 
-from pants.backend.graph_info.tasks.listtargets import ListTargets
+from pants.backend.graph_info.tasks.list_targets import ListTargets
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.scala_artifact import ScalaArtifact

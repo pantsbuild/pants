@@ -122,6 +122,13 @@ function pkg_avro_install_test() {
     --explain gen | grep "avro-java" &> /dev/null
 }
 
+function pkg_awslambda_python_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.awslambda_python==${version}']" \
+    --explain bundle | grep "lambdex" &> /dev/null
+}
+
 function pkg_thrifty_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \

@@ -9,7 +9,6 @@ import logging
 import os
 import shutil
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_tool import NativeTool
 from pants.option.custom_types import dir_option, file_option
@@ -82,25 +81,6 @@ class NodeDistribution(NativeTool):
           package_manager, list(NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys())
       ))
     return package_manager_obj
-
-  @memoized_method
-  def version(self, context=None):
-    # The versions reported by node and embedded in distribution package names are 'vX.Y.Z'.
-    # TODO: After the deprecation cycle is over we'll expect the values of the version option
-    # to already include the 'v' prefix, so there will be no need to normalize, and we can
-    # delete this entire method override.
-    version = super(NodeDistribution, self).version(context)
-    deprecated_conditional(
-      lambda: not version.startswith('v'), entity_description='', removal_version='1.7.0.dev0',
-      hint_message='value of --version in scope {} must be of the form '
-                   'vX.Y.Z'.format(self.options_scope))
-    return version if version.startswith('v') else 'v' + version
-
-  @classmethod
-  def _normalize_version(cls, version):
-    # The versions reported by node and embedded in distribution package names are 'vX.Y.Z' and not
-    # 'X.Y.Z'.
-    return version if version.startswith('v') else 'v' + version
 
   @memoized_property
   def eslint_setupdir(self):
