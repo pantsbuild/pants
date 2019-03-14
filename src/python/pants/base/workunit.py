@@ -146,9 +146,12 @@ class WorkUnit(object):
   def end(self):
     """Mark the time at which this workunit ended."""
     self.end_time = time.time()
+
+    return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnitLabel.TOOL)
+
+  def close_outputs(self):
     for output in self._outputs.values():
       output.close()
-    return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnitLabel.TOOL)
 
   def outcome(self):
     """Returns the outcome of this workunit.
