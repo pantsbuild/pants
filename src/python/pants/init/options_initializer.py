@@ -114,7 +114,7 @@ class OptionsInitializer(object):
       raise BuildConfigurationError(
         'Running Pants with a different Python interpreter version than requested. '
         'You requested {}, but are running with {}.\n\n'
-        'Note that Pants cannot use the value you give for `--pants-engine-python-version` to '
+        'Note that Pants cannot use the value you give for `--pants-runtime-python-version` to '
         'dynamically change the interpreter it uses, as it is too late for it to change once the program '
         'is already running. Instead, your setup script (e.g. `./pants`) must configure which Python '
         'interpreter and virtualenv to use. For example, the setup script we distribute '
