@@ -1,0 +1,54 @@
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+python_tests(
+  name='test_cargo_task',
+  sources=['test_cargo_task.py'],
+  dependencies=[
+    '3rdparty/python:future',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/base:workunit',
+    'tests/python/pants_test:task_test_base',
+    'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_base',
+    'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_binary',
+    'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_library',
+    'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_workspace',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_project_binary',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_project_library',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_project_test',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_base',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_library',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_binary',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_custom_build',
+    'contrib/rust/src/python/pants/contrib/rust/tasks:cargo_task',
+  ]
+)
+
+python_tests(
+  name='test_cargo_toolchain',
+  sources=['test_cargo_toolchain.py'],
+  dependencies=[
+    '3rdparty/python:future',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test:task_test_base',
+    'contrib/rust/src/python/pants/contrib/rust/tasks:cargo_toolchain',
+  ]
+)
+
+python_tests(
+  name='test_cargo_fetch',
+  sources=['test_cargo_fetch.py'],
+  dependencies=[
+    '3rdparty/python:future',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test:task_test_base',
+    'contrib/rust/src/python/pants/contrib/rust/tasks:cargo_fetch',
+    'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_library',
+  ]
+)
