@@ -104,7 +104,10 @@ def run_python_test(transitive_hydrated_target, pytest):
     input_files=merged_input_files,
     description='Run pytest for {}'.format(target_root.address.reference()),
     # TODO: This should not be necessary
-    env={'PATH': os.path.dirname(python_binary)}
+    env={
+      'PATH': os.path.dirname(python_binary),
+      'PEX_PYTHON_PATH': python_binary,
+    }
   )
 
   result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
