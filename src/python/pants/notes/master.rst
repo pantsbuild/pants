@@ -5,6 +5,84 @@ This document describes development releases which occur weekly from master, and
 not undergone the vetting associated with ``stable`` releases.
 
 
+1.15.0.dev4 (3/15/2019)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Drop old deprecated options / conditionals (#7332)
+  `PR #7332 <https://github.com/pantsbuild/pants/pull/7332>`_
+
+New Features
+~~~~~~~~~~~~
+
+*  Add runtime check for valid Python interpreter (#7365)
+  `PR #7365 <https://github.com/pantsbuild/pants/pull/7365>`_
+
+* Add support for releasing Python 3 wheels (#7197)
+  `Issue #654 <https://github.com/pantsbuild/pex/issues/654>`_
+  `PR #7197 <https://github.com/pantsbuild/pants/pull/7197>`_
+
+* [pantsd] Implement auto-shutdown after runs (#7341)
+  `PR #7341 <https://github.com/pantsbuild/pants/pull/7341>`_
+
+*  Add pants_runtime_python_version global option (#7363)
+  `Issue #30, <https://github.com/pantsbuild/setup/issues/30,>`_
+  `PR #7363 <https://github.com/pantsbuild/pants/pull/7363>`_
+
+Bugfixes
+~~~~~~~~
+
+* When building a pex in release.sh, build it for all supported ABIs. (#7393)
+  `PR #7393 <https://github.com/pantsbuild/pants/pull/7393>`_
+
+* [rsc-compile] define workflow in context instead of on fly (#7324)
+  `PR #7324 <https://github.com/pantsbuild/pants/pull/7324>`_
+
+* Fix rule graph nondeterminism due to undetected ambiguity (#7379)
+  `PR #7379 <https://github.com/pantsbuild/pants/pull/7379>`_
+
+* Hotfix Python 2 regression from #7366 using FileNotFoundError (#7381)
+  `PR #7381 <https://github.com/pantsbuild/pants/pull/7381>`_
+
+* Replace `future` with `six` in the python style checker. (#7374)
+  `PR #7374 <https://github.com/pantsbuild/pants/pull/7374>`_
+
+* Hardcode the junit xml hostname to avoid doing DNS lookups in tests (#7329)
+  `PR #7329 <https://github.com/pantsbuild/pants/pull/7329>`_
+
+* Fix use of legacy venv folder names from #7187 (#7359)
+  `PR #7359 <https://github.com/pantsbuild/pants/pull/7359>`_
+
+* Fixes to release script post-#7235. (#7349)
+  `PR #7349 <https://github.com/pantsbuild/pants/pull/7349>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use UUID from run_id as trace_id if trace_id isn't set by a flag (#7319)
+  `PR #7319 <https://github.com/pantsbuild/pants/pull/7319>`_
+
+* Refactor test code's interpreter_selection_utils.py for better naming of util functions (#7366)
+  `PR #7366 <https://github.com/pantsbuild/pants/pull/7366>`_
+
+* Update docs re: target tag usage (#7360)
+  `PR #7360 <https://github.com/pantsbuild/pants/pull/7360>`_
+
+* Create dedicated Dockerfile with Python 3.6 to reduce CI time (#7352)
+  `PR #7352 <https://github.com/pantsbuild/pants/pull/7352>`_
+
+* Add dedicated cron bootstrap stage to CI to avoid unnecessarily building Python 3 (#7353)
+  `PR #7353 <https://github.com/pantsbuild/pants/pull/7353>`_
+
+* Fix names of listtargets and sorttargets files (#7358)
+  `PR #7358 <https://github.com/pantsbuild/pants/pull/7358>`_
+
+* Refactor .travis.yml to deduplicate uses of Docker and use Mustache comments (#7351)
+  `PR #7351 <https://github.com/pantsbuild/pants/pull/7351>`_
+
+
 1.15.0.dev3 (3/9/2019)
 ----------------------
 
