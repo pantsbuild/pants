@@ -237,6 +237,27 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       num_of_traces = len(ZipkinHandler.traces)
       self.assertEqual(num_of_traces, 0)
 
+  def test_zipkin_reporter_for_v2_engine(self):
+    ZipkinHandler = zipkin_handler()
+    with http_server(ZipkinHandler) as port:
+      endpoint = "http://localhost:{}".format(port)
+      command = [
+        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        '--reporting-zipkin-trace-v2',
+        'cloc',
+        'src/python/pants:version'
+      ]
+
+      pants_run = self.run_pants(command)
+      self.assert_success(pants_run)
+
+      num_of_traces = len(ZipkinHandler.traces)
+      self.assertEqual(num_of_traces, 1)
+
+      trace = ZipkinHandler.traces[-1]
+      self.assertTrue(any("Scandir" in span['name'] for span in trace),
+        "There is no span that contains 'Scandir' in it's name. The trace:  {}".format(trace))
+
   @staticmethod
   def find_spans_by_name(trace, name):
     return [span for span in trace if span['name'] == name]
