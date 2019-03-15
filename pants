@@ -7,8 +7,6 @@ REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
 _interpreter_version_sentinel_file_path='.pants.d/.pants-python-version'
 
 function clean_if_interpreter_changed() {
-  _python_version_to_run="$1"
-
   if [[ -n "${_recursive_pants_shell_script_invocation:-}" ]]; then
     return 0
   fi
@@ -17,7 +15,7 @@ function clean_if_interpreter_changed() {
 
   if [[ -f "$_python_version_file" ]]; then
     _prev_run_python_version="$(cat "$_python_version_file")"
-    if [[ "$_python_version_to_run" == "$_prev_run_python_version" ]]; then
+    if [[ "$PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS" == "$_prev_run_python_version" ]]; then
       return 0
     fi
   else
@@ -29,11 +27,11 @@ EOF
 
   export _recursive_pants_shell_script_invocation='y'
   cat >&2 <<EOF
-Different Python interpreter version detected compared to the previous Pants run.
-Clearing the cache and preparing a Python ${_python_version_to_run} run...
+Different \$PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS were set compared to the previous Pants run.
+Clearing the cache and preparing a Python environment for ${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}...
 EOF
   ./pants clean-all
-  echo "$_python_version_to_run" > "$_python_version_file"
+  echo "$PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS" > "$_python_version_file"
   unset _recursive_pants_shell_script_invocation
 }
 
@@ -101,12 +99,12 @@ export PY="${PY:-python3}"
 # we could end up using a different Python minor version for subprocesses than we do for Pants.
 py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
 
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
+
 # We can currently assume the CI environment does not switch python versions within a shard.
 if [[ "${ONLY_USING_SINGLE_PYTHON_VERSION:-false}" != 'true' ]]; then
   clean_if_interpreter_changed "$py_major_minor_patch"
 fi
-
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 

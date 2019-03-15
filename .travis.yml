@@ -399,7 +399,7 @@ cargo_audit: &cargo_audit
 base_build_wheels: &base_build_wheels
   stage: *test
   env:
-    - &base_build_wheels_env PREPARE_DEPLOY=1 ONLY_USING_SINGLE_PYTHON_VERSION='true'
+    - &base_build_wheels_env PREPARE_DEPLOY=1
 
 py27_linux_build_wheels_no_ucs: &py27_linux_build_wheels_no_ucs
   # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize
@@ -466,7 +466,7 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
     - CACHE_NAME=osxwheelsbuild.ucs2
   script:
     - ./build-support/bin/check_pants_pex_abi.py cp27m
-    - RUN_PANTS_FROM_PEX=1 ONLY_USING_SINGLE_PYTHON_VERSION='true' ./build-support/bin/release.sh -n
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *py27_osx_config
@@ -499,7 +499,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   script:
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu
-    - RUN_PANTS_FROM_PEX=1 ONLY_USING_SINGLE_PYTHON_VERSION='true' ./build-support/bin/release.sh -n
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 # -------------------------------------------------------------------------
 # Rust tests
