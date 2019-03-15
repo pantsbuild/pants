@@ -592,6 +592,8 @@ function build_pex() {
       local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.pex"
       ;;
     fetch)
+      # NB: We do not include Python 3 wheels, as we cannot release a Python 3 compatible PEX
+      # until https://github.com/pantsbuild/pex/issues/654 is fixed.
       local platforms=()
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "cp-27-mu" "cp-27-m"; do
