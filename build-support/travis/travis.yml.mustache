@@ -136,6 +136,7 @@ py27_linux_test_config: &py27_linux_test_config
   env:
     - &py27_linux_test_config_env >
       PANTS_ENABLE_PANTSD="true"
+      PANTS_SHUTDOWN_PANTSD_AFTER_RUN="true"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
 py36_linux_test_config: &py36_linux_test_config
@@ -145,6 +146,7 @@ py36_linux_test_config: &py36_linux_test_config
   env:
     - &py36_linux_test_config_env >
       PANTS_ENABLE_PANTSD="true"
+      PANTS_SHUTDOWN_PANTSD_AFTER_RUN="true"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
 base_osx_config: &base_osx_config
@@ -187,6 +189,7 @@ py27_osx_test_config: &py27_osx_test_config
   env:
     - &py27_osx_test_config_env >
       PANTS_ENABLE_PANTSD="true"
+      PANTS_SHUTDOWN_PANTSD_AFTER_RUN="true"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
 
 py36_osx_test_config: &py36_osx_test_config
@@ -198,6 +201,7 @@ py36_osx_test_config: &py36_osx_test_config
     - &py36_osx_test_config_env >
       {{>env_osx_with_pyenv}}
       PANTS_ENABLE_PANTSD="true"
+      PANTS_SHUTDOWN_PANTSD_AFTER_RUN="true"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
 
 linux_with_fuse: &linux_with_fuse
