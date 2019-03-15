@@ -40,7 +40,6 @@ python_tests(
   sources = ['test_json_reporter.py'],
   dependencies = [
     '3rdparty/python:future',
-    'src/python/pants/util:contextutil',
     'src/python/pants/base:workunit',
     'src/python/pants/reporting',
     'tests/python/pants_test:test_base',

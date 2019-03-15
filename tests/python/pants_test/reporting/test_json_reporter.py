@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
-from contextlib import contextmanager
 
 from pants.base.workunit import WorkUnit
 from pants.reporting.report import Report
@@ -16,32 +15,18 @@ from pants_test.test_base import TestBase
 
 
 class FakeRunTracker(object):
-  reporter = None
 
   class FakeCacheStats(object):
     def get_all(self):
       return []
 
-  def __init__(self):
-    self.artifact_cache_stats = self.FakeCacheStats()
-
-  def start(self):
-    self.reporter.open()
-
-  def end(self):
-    self.reporter.close()
-
-  @contextmanager
-  def new_workunit(self, workunit):
-    self.reporter.start_workunit(workunit)
-    yield workunit
-    self.reporter.end_workunit(workunit)
+  artifact_cache_stats = FakeCacheStats()
 
 
 class FakeWorkUnit(object):
-  def __init__(self, parent, name, **kwargs):
-    self.name = name
-    self.id = '{}_id'.format(name)
+  def __init__(self, parent, **kwargs):
+    self.name = kwargs['name']
+    self.id = '{}_id'.format(self.name)
     self.parent = parent
     self.cmd = ''
     self.labels = kwargs.get('labels', [])
@@ -57,9 +42,6 @@ class FakeWorkUnit(object):
       ret = ret.parent
     return ret
 
-  def outputs(self):
-    return {}
-
   def outcome(self):
     return WorkUnit.SUCCESS
 
@@ -67,94 +49,183 @@ class FakeWorkUnit(object):
     return WorkUnit.outcome_string(outcome)
 
 
+def generate_callbacks(workunit_data, reporter, parent=None):
+  workunit = FakeWorkUnit(parent, **workunit_data)
+  reporter.start_workunit(workunit)
+  for child_workunit in workunit_data['children']:
+    generate_callbacks(child_workunit, reporter, workunit)
+  reporter.end_workunit(workunit)
+
+
 class JsonReporterTest(TestBase):
 
-  def test_reporter_output(self):
+  def _check_callbacks(self, root_workunit_dict, reporter):
+    reporter.open()
+    generate_callbacks(root_workunit_dict, reporter)
+    reporter.close()
+    result = json.loads(open(os.path.join(reporter.report_path())).read())
+    self.assertDictEqual(root_workunit_dict, result['workunits'][root_workunit_dict['id']])
+
+  def test_nested_grandchild(self):
     expected = {
-      'workunits': {
-        'root_id': {
-          'name': 'root',
-          'id': 'root_id',
-          'parent_name': '',
-          'parent_id': '',
-          'labels': [
-            'IAMROOT'
-          ],
+      'name': 'root',
+      'id': 'root_id',
+      'parent_name': '',
+      'parent_id': '',
+      'labels': [
+        'IAMROOT'
+      ],
+      'cmd': '',
+      'start_time': -5419800.0,
+      'outputs': {},
+      'children': [
+        {
+          'name': 'child1',
+          'id': 'child1_id',
+          'parent_name': 'root',
+          'parent_id': 'root_id',
+          'labels': [],
           'cmd': '',
-          'start_time': -5419800.0,
+          'start_time': 31564800.0,
           'outputs': {},
           'children': [
             {
-              'name': 'child1',
-              'id': 'child1_id',
-              'parent_name': 'root',
-              'parent_id': 'root_id',
-              'labels': [],
-              'cmd': '',
-              'start_time': 31564800.0,
-              'outputs': {},
-              'children': [
-                {
-                  'name': 'grandchild',
-                  'id': 'grandchild_id',
-                  'parent_name': 'child1',
-                  'parent_id': 'child1_id',
-                  'labels': [
-                    'LABEL1'
-                  ],
-                  'cmd': '',
-                  'start_time': 479721600.0,
-                  'outputs': {},
-                  'children': [],
-                  'log_entries': [],
-                  'outcome': 'SUCCESS',
-                  'end_time': 479721610.0,
-                  'unaccounted_time': 0
-                }
+              'name': 'grandchild',
+              'id': 'grandchild_id',
+              'parent_name': 'child1',
+              'parent_id': 'child1_id',
+              'labels': [
+                'LABEL1'
               ],
-              'log_entries': [],
-              'outcome': 'SUCCESS',
-              'end_time': 31564810.0,
-              'unaccounted_time': 0
-            },
-            {
-              'name': 'child2',
-              'id': 'child2_id',
-              'parent_name': 'root',
-              'parent_id': 'root_id',
-              'labels': [],
               'cmd': '',
-              'start_time': 684140400.0,
+              'start_time': 479721600.0,
               'outputs': {},
               'children': [],
               'log_entries': [],
               'outcome': 'SUCCESS',
-              'end_time': 684140410.0,
+              'end_time': 479721610.0,
               'unaccounted_time': 0
             }
           ],
           'log_entries': [],
           'outcome': 'SUCCESS',
-          'end_time': -5419790.0,
+          'end_time': 31564810.0,
           'unaccounted_time': 0
         },
-      },
-      'artifact_cache_stats': []
+        {
+          'name': 'child2',
+          'id': 'child2_id',
+          'parent_name': 'root',
+          'parent_id': 'root_id',
+          'labels': [],
+          'cmd': '',
+          'start_time': 684140400.0,
+          'outputs': {},
+          'children': [],
+          'log_entries': [],
+          'outcome': 'SUCCESS',
+          'end_time': 684140410.0,
+          'unaccounted_time': 0
+        }
+      ],
+      'log_entries': [],
+      'outcome': 'SUCCESS',
+      'end_time': -5419790.0,
+      'unaccounted_time': 0
     }
 
     with temporary_dir() as temp_dir:
-      run_tracker = FakeRunTracker()
-      reporter = JsonReporter(run_tracker, JsonReporter.Settings(log_level=Report.INFO, json_dir=temp_dir))
-      run_tracker.reporter = reporter
+      reporter = JsonReporter(FakeRunTracker(), JsonReporter.Settings(
+          log_level=Report.INFO, json_dir=temp_dir))
 
-      run_tracker.start()
+      self._check_callbacks(expected, reporter)
 
-      with run_tracker.new_workunit(FakeWorkUnit(None, 'root', labels=['IAMROOT'], start_time=-5419800.0)) as root_workunit:
-        with run_tracker.new_workunit(FakeWorkUnit(root_workunit, 'child1', start_time=31564800.0)) as child1:
-          with run_tracker.new_workunit(FakeWorkUnit(child1, 'grandchild', labels=['LABEL1'], start_time=479721600.0)): pass
-        with run_tracker.new_workunit(FakeWorkUnit(root_workunit, 'child2', start_time=684140400.0)): pass
+  def test_nested_great_grandchilden(self):
+    expected = {
+      'name': 'root',
+      'id': 'root_id',
+      'parent_name': '',
+      'parent_id': '',
+      'labels': [],
+      'cmd': '',
+      'start_time': -5419800.0,
+      'outputs': {},
+      'children': [
+        {
+          'name': 'child',
+          'id': 'child_id',
+          'parent_name': 'root',
+          'parent_id': 'root_id',
+          'labels': [],
+          'cmd': '',
+          'start_time': 31564800.0,
+          'outputs': {},
+          'children': [
+            {
+              'name': 'grandchild',
+              'id': 'grandchild_id',
+              'parent_name': 'child',
+              'parent_id': 'child_id',
+              'labels': [
+                'LABEL1'
+              ],
+              'cmd': '',
+              'start_time': 479721600.0,
+              'outputs': {},
+              'children': [
+                {
+                  'name': 'great_grandchild1',
+                  'id': 'great_grandchild1_id',
+                  'parent_name': 'grandchild',
+                  'parent_id': 'grandchild_id',
+                  'labels': [],
+                  'cmd': '',
+                  'start_time': 684140400.0,
+                  'outputs': {},
+                  'children': [],
+                  'log_entries': [],
+                  'outcome': 'SUCCESS',
+                  'end_time': 684140410.0,
+                  'unaccounted_time': 0
+                },
+                {
+                  'name': 'great_grandchild2',
+                  'id': 'great_grandchild2_id',
+                  'parent_name': 'grandchild',
+                  'parent_id': 'grandchild_id',
+                  'labels': [
+                    'TURTLES'
+                  ],
+                  'cmd': '',
+                  'start_time': 1234.0,
+                  'outputs': {},
+                  'children': [],
+                  'log_entries': [],
+                  'outcome': 'SUCCESS',
+                  'end_time': 1244.0,
+                  'unaccounted_time': 0
+                }
+              ],
+              'log_entries': [],
+              'outcome': 'SUCCESS',
+              'end_time': 479721610.0,
+              'unaccounted_time': 0
+            }
+          ],
+          'log_entries': [],
+          'outcome': 'SUCCESS',
+          'end_time': 31564810.0,
+          'unaccounted_time': 0
+        },
+      ],
+      'log_entries': [],
+      'outcome': 'SUCCESS',
+      'end_time': -5419790.0,
+      'unaccounted_time': 0
+    }
 
-      run_tracker.end()
+    with temporary_dir() as temp_dir:
+      reporter = JsonReporter(FakeRunTracker(), JsonReporter.Settings(
+          log_level=Report.INFO, json_dir=temp_dir))
 
-      result = json.loads(open(os.path.join(reporter.report_path())).read())
-      self.assertDictEqual(expected, result)
+      self._check_callbacks(expected, reporter)
