@@ -329,6 +329,7 @@ py36_osx_build_engine: &py36_osx_build_engine
 py27_lint: &py27_lint
   <<: *py27_linux_test_config
   name: "Self-checks and lint (Py2.7 PEX)"
+  stage: *test
   env:
     - *py27_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py27
