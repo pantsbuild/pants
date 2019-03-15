@@ -39,7 +39,6 @@ class JsonReporter(Reporter):
 
     self._buildroot = get_buildroot()
     self._report_file = None
-    self._output_files = defaultdict(dict)
 
     # Results of the state of the build
     self._results = {}
@@ -69,9 +68,6 @@ class JsonReporter(Reporter):
       ))
       self._report_file.flush()
     self._report_file.close()
-    for files in self._output_files.values():
-      for f in files.values():
-        f.close()
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -111,9 +107,6 @@ class JsonReporter(Reporter):
 
     self._stack_per_thread[root_id][-1].update(additional_data)
     self._stack_per_thread[root_id].pop()
-
-    for f in self._output_files[workunit.id].values():
-      f.close()
 
   def handle_output(self, workunit, label, stream):
     """Implementation of Reporter callback."""
