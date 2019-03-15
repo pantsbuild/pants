@@ -399,7 +399,7 @@ class TestBase(unittest.TestCase, AbstractClass):
       options_bootstrapper=OptionsBootstrapper.create(args=['--pants-config-files=[]']),
       build_configuration=cls.build_config(),
       build_ignore_patterns=None,
-    ).new_session()
+    ).new_session(zipkin_trace_v2=False)
     cls._scheduler = graph_session.scheduler_session
     cls._build_graph, cls._address_mapper = graph_session.create_build_graph(
         TargetRoots([]), cls._build_root()
