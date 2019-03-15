@@ -13,7 +13,7 @@ env:
     - PYTEST_PASSTHRU_ARGS="-v --duration=3"
     - LC_ALL="en_US.UTF-8"
     # This tells the ./pants runner script to avoid trying to clean the workspace when changing
-    # python versions. CI starts off without the .pants-python-version file, so it would otherwise
+    # python versions. CI starts off without the .python-interpreter-constraints file, so it would otherwise
     # run a clean-all without this env var.
     - ONLY_USING_SINGLE_PYTHON_VERSION='true'
     - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org

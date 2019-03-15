@@ -4,35 +4,36 @@
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
 
-_interpreter_version_sentinel_file_path='.pants.d/.pants-python-version'
+interpreter_constraints_sentinel_file_path='.pants.d/.python-interpreter-constraints'
 
-function clean_if_interpreter_changed() {
-  if [[ -n "${_recursive_pants_shell_script_invocation:-}" ]]; then
+function clean_if_interpreter_constraints_changed() {
+  if [[ -n "${recursive_pants_shell_script_invocation:-}" ]]; then
     return 0
   fi
 
-  _python_version_file="${REPO_ROOT}/${_interpreter_version_sentinel_file_path}"
+  interpreter_constraints_file="${REPO_ROOT}/${interpreter_constraints_sentinel_file_path}"
 
-  if [[ -f "$_python_version_file" ]]; then
-    _prev_run_python_version="$(cat "$_python_version_file")"
-    if [[ "$PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS" == "$_prev_run_python_version" ]]; then
+  if [[ -f "${interpreter_constraints_file}" ]]; then
+    previous_interpreter_constraints="$(cat "${interpreter_constraints_file}")"
+    if [[ "${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}" == "${previous_interpreter_constraints}" ]]; then
       return 0
     fi
   else
     cat >&2 <<EOF
-${_interpreter_version_sentinel_file_path} not found in the buildroot.
+${interpreter_constraints_sentinel_file_path} not found in the buildroot.
 Forcing an initial clean-all.
 EOF
   fi
 
-  export _recursive_pants_shell_script_invocation='y'
+  export recursive_pants_shell_script_invocation='y'
   cat >&2 <<EOF
-Different \$PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS were set compared to the previous Pants run.
-Clearing the cache and preparing a Python environment for ${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}...
+Different interpreter constraints were set than were used in the previous Pants run.
+Clearing the cache and preparing a Python environment with these interpreter constraints:
+${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}
 EOF
   ./pants clean-all
-  echo "$PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS" > "$_python_version_file"
-  unset _recursive_pants_shell_script_invocation
+  echo "${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}" > "${interpreter_constraints_file}"
+  unset recursive_pants_shell_script_invocation
 }
 
 # This bootstrap script runs pants from the live sources in this repo.
@@ -98,12 +99,11 @@ export PY="${PY:-python3}"
 # Pants will try to use Python 2 for subprocesses. Without setting minor version constraints, when using Python 3
 # we could end up using a different Python minor version for subprocesses than we do for Pants.
 py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
-
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 # We can currently assume the CI environment does not switch python versions within a shard.
 if [[ "${ONLY_USING_SINGLE_PYTHON_VERSION:-false}" != 'true' ]]; then
-  clean_if_interpreter_changed "$py_major_minor_patch"
+  clean_if_interpreter_constraints_changed
 fi
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
