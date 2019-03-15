@@ -17,7 +17,7 @@ API Changes
 New Features
 ~~~~~~~~~~~~
 
-*  Add runtime check for valid Python interpreter (#7365)
+* Add runtime check for valid Python interpreter (#7365)
   `PR #7365 <https://github.com/pantsbuild/pants/pull/7365>`_
 
 * Add support for releasing Python 3 wheels (#7197)
@@ -27,7 +27,7 @@ New Features
 * [pantsd] Implement auto-shutdown after runs (#7341)
   `PR #7341 <https://github.com/pantsbuild/pants/pull/7341>`_
 
-*  Add pants_runtime_python_version global option (#7363)
+* Add pants_runtime_python_version global option (#7363)
   `Issue #30, <https://github.com/pantsbuild/setup/issues/30,>`_
   `PR #7363 <https://github.com/pantsbuild/pants/pull/7363>`_
 
