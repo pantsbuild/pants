@@ -7,9 +7,42 @@ set -e
 ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 source ${ROOT}/build-support/common.sh
 
-PY=$(which python2.7 || exit 0)
-[[ -n "${PY}" ]] || die "You must have python2.7 installed and on the path to release."
-export PY
+# Note we parse some options here, but parse most at the bottom. This is due to execution order.
+# If the option must be used right away, we parse at the top of the script, whereas if it
+# depends on functions defined later in the script, we parse at the end.
+_OPTS="hdnftcloepqw3"
+
+while getopts "${_OPTS}"  opt; do
+  case ${opt} in
+    3) python_three="true" ;;
+    *) ;;  # skip over other args to be parsed later
+  esac
+done
+
+# Reset opt parsing's position to start
+OPTIND=0
+
+# Set the Python interpreter to be used for the virtualenv. Note we allow the user to
+# predefine this value so that they may point to a specific interpreter, e.g. 2.7.13 vs. 2.7.15.
+default_interpreter="python2.7";
+if [[ "${python_three:-false}" == "true" ]]; then
+  default_interpreter="python3.6"
+fi
+export PY="${PY:-${default_interpreter}}"
+if ! which "${PY}" >/dev/null; then
+  die "Python interpreter ${PY} not discoverable on your PATH."
+fi
+py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
+if [[ "${py_major_minor}" != "2.7" ]] && [[ "${py_major_minor}" != "3.6" ]]; then
+  die "Invalid interpreter. The release script requires Python 2.7 or 3.6 (you are using ${py_major_minor})."
+fi
+
+# Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
+# to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
+# Python 2.7.13 vs. 2.7.15. We must also set this when running with Python 3 to ensure
+# that spawned subprocesses use Python 3.
+py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 function run_local_pants() {
   ${ROOT}/pants "$@"
@@ -42,11 +75,14 @@ function requirement() {
   grep "^${package}[^A-Za-z0-9]" "${ROOT}/3rdparty/python/requirements.txt" || die "Could not find requirement for ${package}"
 }
 
-function run_pex27() {
+function run_pex() {
   # TODO: Cache this in case we run pex multiple times
   (
     PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
     PEX_PEX=pex27
+    if [[ "${python_three:-false}" == "true" ]]; then
+      PEX_PEX=pex36
+    fi
 
     pexdir="$(mktemp -d -t build_pex.XXXXX)"
     trap "rm -rf ${pexdir}" EXIT
@@ -62,7 +98,12 @@ function run_pex27() {
 function run_packages_script() {
   (
     cd "${ROOT}"
-    run_pex27 "$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)" -- "${ROOT}/src/python/pants/releases/packages.py" "$@"
+    args=("$@")
+    if [[ "${python_three:-false}" == "true" ]]; then
+      args=("--py3" ${args[@]})
+    fi
+    requirements=("$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)")
+    run_pex "${requirements[@]}" -- "${ROOT}/src/python/pants/releases/packages.py" "${args[@]}"
   )
 }
 
@@ -407,12 +448,16 @@ from __future__ import print_function
 import sys
 import urllib
 import xml.etree.ElementTree as ET
+try:
+  from urllib.parse import quote_plus
+except ImportError:
+  from urllib import quote_plus
 root = ET.parse("${wheel_listing}")
 ns = {'s3': 'http://s3.amazonaws.com/doc/2006-03-01/'}
 for key in root.findall('s3:Contents/s3:Key', ns):
   # Because filenames may contain characters that have different meanings
   # in URLs (namely '+'), # print the key both as url-encoded and as a file path.
-  print('{}\t{}'.format(key.text, urllib.quote_plus(key.text)))
+  print('{}\t{}'.format(key.text, quote_plus(key.text)))
 EOF
  done
 }
@@ -470,7 +515,8 @@ function fetch_and_check_prebuilt_wheels() {
       fi
     done
 
-    if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 2 ]; then
+    # N.B. For platform-specific wheels, we expect 6 wheels: {linux,osx} * {cp27m,cp27mu,abi3}.
+    if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 6 ]; then
       missing+=("${NAME} (expected whls for each platform: had only ${packages[@]})")
       continue
     fi
@@ -508,7 +554,7 @@ function activate_twine() {
 }
 
 function execute_pex() {
-  run_pex27 \
+  run_pex \
       --no-build \
       --no-pypi \
       --disable-cache \
@@ -619,9 +665,10 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] [-c] (-h|-n|-f|-t|-l|-o|-e|-p)"
+  echo "Usage: $0 [-d] [-c] [-3] (-h|-n|-f|-t|-l|-o|-e|-p)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
+  echo " -3  Release any non-universal wheels (i.e. pantsbuild.pants) as Python 3. Defaults to Python 2."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
   echo "       an ephemeral virtualenv and exercised to validate basic"
@@ -636,7 +683,7 @@ function usage() {
   echo " -p  Build a pex from prebuilt wheels for this release."
   echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
   echo
-  echo "All options (except for '-d') are mutually exclusive."
+  echo "All options (except for '-d' and '-3') are mutually exclusive."
 
   if (( $# > 0 )); then
     die "$@"
@@ -645,7 +692,7 @@ function usage() {
   fi
 }
 
-while getopts "hdnftcloepqw" opt; do
+while getopts "${_OPTS}" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
@@ -658,6 +705,7 @@ while getopts "hdnftcloepqw" opt; do
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;
     w) list_prebuilt_wheels ; exit $? ;;
+    3) ;;  # already parsed at top of file
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done

@@ -4,6 +4,112 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+
+1.15.0.dev3 (3/9/2019)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+* Propagate global interpreter constraints when building PEXes with interpreter constraints requested (#7285)
+  `PR #7285 <https://github.com/pantsbuild/pants/pull/7285>`_
+
+New Features
+~~~~~~~~~~~~
+* Publish the awslambda contrib to PyPI. (#7343)
+  `PR #7343 <https://github.com/pantsbuild/pants/pull/7343>`_
+
+* Add subsystem for appending tags to targets from a single source (#7315)
+  `PR #7315 <https://github.com/pantsbuild/pants/pull/7315>`_
+
+Bugfixes
+~~~~~~~~
+* Revert "add a lint to warn on implicit string concatenation (#7286)" (#7340)
+  `PR #7286 <https://github.com/pantsbuild/pants/pull/7286>`_
+
+* Fix ./pants2 overriding desired $PY interpreter (#7338)
+  `PR #7338 <https://github.com/pantsbuild/pants/pull/7338>`_
+
+* Fix regression to python interpreter selection test from #7257 (#7333)
+  `PR #7333 <https://github.com/pantsbuild/pants/pull/7333>`_
+
+* Fix ./pants2 overriding preset interpreter constraints (#7334)
+  `PR #7334 <https://github.com/pantsbuild/pants/pull/7334>`_
+
+* Bugfix for stale interpreter.info purging when binary exe is no longer on the filesystem (#7292)
+  `PR #7292 <https://github.com/pantsbuild/pants/pull/7292>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Specify ABI for pantsbuild.pants wheel and build with both UCS2 and UCS4 (#7235)
+  `PR #7235 <https://github.com/pantsbuild/pants/pull/7235>`_
+
+* Have extern::generator_send directly produce TypeIds for product types (#7318)
+  `PR #7318 <https://github.com/pantsbuild/pants/pull/7318>`_
+
+* use `type=` to register enum options (#7304)
+  `PR #7304 <https://github.com/pantsbuild/pants/pull/7304>`_
+
+* Skip GraphIntegrationTest.test_error_message as it's flaky in CI. (#7309)
+  `PR #7309 <https://github.com/pantsbuild/pants/pull/7309>`_
+
+* Re-enable https for grpc connections (#7317)
+  `PR #7317 <https://github.com/pantsbuild/pants/pull/7317>`_
+
+* convert usages of TypeConstraint to TypeId for rule products in the engine (#7114)
+  `PR #7114 <https://github.com/pantsbuild/pants/pull/7114>`_
+
+* Print trace id to console and possible URL with the zipkin trace (#7313)
+  `PR #7313 <https://github.com/pantsbuild/pants/pull/7313>`_
+
+* @union / UnionRule for letting the engine figure out paths to products not known in advance (#7116)
+  `PR #7116 <https://github.com/pantsbuild/pants/pull/7116>`_
+
+* Filter out irrelevant env vars in OptionsBootstrapper. (#7312)
+  `PR #7312 <https://github.com/pantsbuild/pants/pull/7312>`_
+
+* Revert 7238 and add requirement for more-itertools that works on python 2 (#7296)
+  `PR #7296 <https://github.com/pantsbuild/pants/pull/7296>`_
+
+* convert many manual NotImplementedError() calls to use @abstractmethod (#7310)
+  `PR #7310 <https://github.com/pantsbuild/pants/pull/7310>`_
+
+* [rsc-compile] extract helper methods for tests (#7294)
+  `PR #7294 <https://github.com/pantsbuild/pants/pull/7294>`_
+
+* add a lint to warn on implicit string concatenation (#7286)
+  `PR #7286 <https://github.com/pantsbuild/pants/pull/7286>`_
+
+* add self.assertRaisesWithMessageContaining() to TestBase and use it to clean up test_objects.py (#7303)
+  `PR #7303 <https://github.com/pantsbuild/pants/pull/7303>`_
+
+* move the declarative task stuff out of the python backend testing (#7279)
+  `PR #7279 <https://github.com/pantsbuild/pants/pull/7279>`_
+
+Deprecations
+~~~~~~~~~~~~
+* Remove deprecated RunTracker url option (#7325)
+  `PR #7325 <https://github.com/pantsbuild/pants/pull/7325>`_
+
+* Deprecate Context.build_file_parser. (#7295)
+  `PR #7295 <https://github.com/pantsbuild/pants/pull/7295>`_
+
+Documentation
+~~~~~~~~~~~~~
+* Prepare 1.14.0 (#7328)
+  `PR #7328 <https://github.com/pantsbuild/pants/pull/7328>`_
+
+* Update README.md (#7321)
+  `PR #7321 <https://github.com/pantsbuild/pants/pull/7321>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+* Update rust deps (#7308)
+  `PR #7308 <https://github.com/pantsbuild/pants/pull/7308>`_
+
+* Update to rust 1.33.0 (#7305)
+  `PR #7305 <https://github.com/pantsbuild/pants/pull/7305>`_
+
+
 1.15.0.dev2 (3/02/2019)
 -----------------------
 

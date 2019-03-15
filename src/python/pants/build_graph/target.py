@@ -13,7 +13,6 @@ from six import string_types
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -26,9 +25,9 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
-from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec
+from pants.source.wrapped_globs import FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
 logger = logging.getLogger(__name__)
@@ -113,17 +112,11 @@ class Target(AbstractTarget):
       """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
-      if 'source' in unknown_args and 'sources' in payload.as_dict():
-        unknown_args.pop('source')
-      if 'sources' in unknown_args:
-        if 'sources' in payload.as_dict():
-          deprecated_conditional(
-            lambda: True,
-            '1.11.0.dev0',
-            ('The source argument is deprecated - it gets automatically promoted to sources.'
-             'Target {} should just use a sources argument. No BUILD files need changing. '
-             'The source argument will stop being populated -').format(target.type_alias),
-          )
+      # TODO(#7357) Remove these checks once test issues are resolved.
+      if 'sources' in payload.as_dict():
+        if 'source' in unknown_args:
+          unknown_args.pop('source')
+        if 'sources' in unknown_args:
           unknown_args.pop('sources')
           kwargs.pop('sources')
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
@@ -139,9 +132,32 @@ class Target(AbstractTarget):
           args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
         ))
 
+  class TagAssignments(Subsystem):
+    """Tags to add to targets in addition to any defined in their BUILD files."""
+
+    options_scope = 'target-tag-assignments'
+
+    @classmethod
+    def register_options(cls, register):
+      register('--tag-targets-mappings', type=dict, default=None, fromfile=True, fingerprint=True,
+               help='Dict with tag assignments for targets. Ex: { "tag1": ["path/to/target:foo"] }')
+
+    @classmethod
+    def tags_for(cls, target_address):
+      return cls.global_instance()._invert_tag_targets_mappings().get(target_address, [])
+
+    @memoized_method
+    def _invert_tag_targets_mappings(self):
+      result = {}
+      for tag, targets in (self.get_options().tag_targets_mappings or {}).items():
+        for target in targets:
+          target_tags = result.setdefault(Address.parse(target).spec, []) 
+          target_tags.append(tag)
+      return result
+
   @classmethod
   def subsystems(cls):
-    return super(Target, cls).subsystems() + (cls.Arguments,)
+    return super(Target, cls).subsystems() + (cls.Arguments, cls.TagAssignments)
 
   @classmethod
   def get_addressable_type(target_cls):
@@ -312,7 +328,7 @@ class Target(AbstractTarget):
     self.address = address
     self._build_graph = build_graph
     self._type_alias = type_alias
-    self._tags = set(tags or [])
+    self._tags = set(tags or []).union(self.TagAssignments.tags_for(address.spec))
     self.description = description
 
     self._cached_fingerprint_map = {}
@@ -851,13 +867,5 @@ class Target(AbstractTarget):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
                                             .format(key_arg_section, type(sources)))
-    elif not isinstance(sources, EagerFilesetWithSpec):
-      deprecated_conditional(
-        lambda: True,
-        '1.12.0.dev0',
-        ('FilesetWithSpec sources values are deprecated except for EagerFilesetWithSpec values. '
-         'Saw value of type {}').format(type(sources))
-      )
-
 
     return SourcesField(sources=sources)

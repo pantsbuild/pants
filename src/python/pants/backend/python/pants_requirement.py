@@ -50,14 +50,7 @@ class PantsRequirement(object):
                                       msg='The {} target only works for pantsbuild.pants '
                                           'distributions, given {}'.format(self.alias, dist))
 
-    # Update the environment marker in lockstep with other changes as described in
-    #   https://github.com/pantsbuild/pants/issues/6450
-    env_marker = "python_version>='2.7' and python_version<'3'"
-
-    requirement = PythonRequirement(requirement="{key}=={version} ; {env_marker}"
-                                    .format(key=dist,
-                                            version=pants_version(),
-                                            env_marker=env_marker))
+    requirement = PythonRequirement(requirement="{key}=={version}".format(key=dist, version=pants_version()))
 
     self._parse_context.create_object('python_requirement_library',
                                       name=name,

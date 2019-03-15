@@ -41,6 +41,7 @@ python_tests(
   sources = ['test_build_file_aliases.py'],
   dependencies = [
     'src/python/pants/build_graph',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

@@ -44,7 +44,8 @@ SDK".
 ![image](images/intellij-new-pythonsdk.png)
 
 This will be a "local" interpreter and you'll need to select the virtual
-environment bootstrapped above; it's in `build-support/pants_dev_deps.py2.venv` if you want to use Python 2 or `build-support/pants_dev_deps.py3.venv` if you want to use Python 3 for the underlying Pants engine.
+environment bootstrapped above, along with choosing the Python version
+you want IntelliJ to use. For Python 2.7, it's in `build-support/pants_dev_deps.py27.venv`; for Python 3.6, in `build-support/pants_dev_deps.py36.venv`; and for Python 3.7, in `pants_dev_deps.py37.venv`.
 
 ![image](images/intellij-select-venv.png)
 

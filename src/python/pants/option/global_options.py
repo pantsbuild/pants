@@ -115,12 +115,29 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
              help='Set whether log messages are displayed in color.')
 
-    # Pants code uses this only to verify that we are of the requested version. However
-    # setup scripts, runner scripts, IDE plugins, etc., may grep this out of pants.ini
-    # and use it to select the right version.
-    # Note that to print the version of the pants instance you're running, use -v, -V or --version.
     register('--pants-version', advanced=True, default=pants_version(),
-             help='Use this pants version.')
+             help='Use this pants version. Note Pants code only uses this to verify that you are '
+                  'using the requested version, as Pants cannot dynamically change the version it '
+                  'is using once the program is already running. This option is useful to set in '
+                  'your pants.ini, however, and then you can grep the value to select which '
+                  'version to use for setup scripts (e.g. `./pants`), runner scripts, IDE plugins, '
+                  'etc. For example, the setup script we distribute at https://www.pantsbuild.org/install.html#recommended-installation '
+                  'uses this value to determine which Python version to run with. You may find the '
+                  'version of the pants instance you are running using -v, -V, or --version.')
+
+    register('--pants-runtime-python-version', advanced=True,
+             help='Use this Python version to run Pants. The option expects the major and minor '
+                  'version, e.g. 2.7 or 3.6. Note Pants code only uses this to verify that you are '
+                  'using the requested interpreter, as Pants cannot dynamically change the '
+                  'interpreter it is using once the program is already running. This option is '
+                  'useful to set in your pants.ini, however, and then you can grep the value to '
+                  'select which interpreter to use for setup scripts (e.g. `./pants`), runner '
+                  'scripts, IDE plugins, etc. For example, the setup script we distribute at '
+                  'https://www.pantsbuild.org/install.html#recommended-installation uses this '
+                  'value to determine which Python version to run with. Also note this does not mean '
+                  'your own code must use this Python version. See '
+                  'https://www.pantsbuild.org/python_readme.html#configure-the-python-version '
+                  'for how to configure your code\'s compatibility.')
 
     register('--plugins', advanced=True, type=list, help='Load these plugins.')
     register('--plugin-cache-dir', advanced=True,
@@ -222,6 +239,13 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
+    # Shutdown pantsd after the current run.
+    # This needs to be accessed at the same time as enable_pantsd,
+    # so we register it at bootstrap time.
+    register('--shutdown-pantsd-after-run', advanced=True, type=bool, default=False,
+      help='Create a new pantsd server, and use it, and shut it down immediately after. '
+           'If pantsd is already running, it will shut it down and spawn a new instance (Beta)')
+
     # These facilitate configuring the native engine.
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
@@ -254,10 +278,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='The port to bind the pants nailgun server to. Defaults to a random port.')
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
-    register('--pantsd-fs-event-workers', advanced=True, type=int, default=4,
-             removal_version='1.14.0.dev2',
-             removal_hint='Filesystem events are now handled by a single dedicated thread.',
-             help='The number of workers to use for the filesystem event service executor pool.')
     register('--pantsd-invalidation-globs', advanced=True, type=list, fromfile=True, default=[],
              help='Filesystem events matching any of these globs will trigger a daemon restart.')
 

@@ -69,7 +69,7 @@ class Reporting(Subsystem):
     TODO: See `RunTracker.start`.
     """
 
-    run_id = run_tracker.initialize(all_options)
+    run_id, run_uuid = run_tracker.initialize(all_options)
     run_dir = os.path.join(self.get_options().reports_dir, run_id)
 
     html_dir = os.path.join(run_dir, 'html')
@@ -112,6 +112,11 @@ class Reporting(Subsystem):
       raise ValueError(
         "Flags zipkin-trace-id and zipkin-parent-id must both either be set or not set."
       )
+
+    # If trace_id isn't set by a flag, use UUID from run_id
+    if trace_id is None:
+      trace_id = run_uuid
+
     if trace_id and (len(trace_id) != 16 and len(trace_id) != 32 or not is_hex_string(trace_id)):
       raise ValueError(
         "Value of the flag zipkin-trace-id must be a 16-character or 32-character hex string. "

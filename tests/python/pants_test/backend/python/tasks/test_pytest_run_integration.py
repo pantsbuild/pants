@@ -6,13 +6,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import time
+import unittest
 
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27,
                                                                    python_interpreter_path,
-                                                                   skip_unless_python3,
-                                                                   skip_unless_python27,
-                                                                   skip_unless_python27_and_python3)
+                                                                   skip_unless_python3_present,
+                                                                   skip_unless_python27_and_python3_present,
+                                                                   skip_unless_python27_present)
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
@@ -99,6 +100,9 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     # Ensure that we get a message indicating the abnormal exit.
     self.assertIn("FAILURE: Test was killed by signal", pants_run.stdout_data)
 
+  @unittest.skip(
+    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
+      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   def test_pytest_explicit_coverage(self):
     with temporary_dir() as coverage_dir:
       pants_run = self.run_pants(['clean-all',
@@ -109,6 +113,9 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       self.assertTrue(os.path.exists(os.path.join(coverage_dir, 'coverage.xml')))
 
+  @unittest.skip(
+    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
+      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   def test_pytest_with_profile(self):
     with temporary_dir() as profile_dir:
       prof = os.path.join(profile_dir, 'pants.prof')
@@ -122,7 +129,10 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       # current process started.
       self.assertTrue(os.path.exists('{}.0'.format(prof)))
 
-  @skip_unless_python27_and_python3
+  @unittest.skip(
+    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
+      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
+  @skip_unless_python27_and_python3_present
   def test_pants_test_interpreter_selection_with_pexrc(self):
     """Test the pants test goal with intepreters selected from a PEX_PYTHON_PATH
     defined in a pexrc file on disk.
@@ -149,7 +159,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
         )
         self.assert_success(pants_run_3)
 
-  @skip_unless_python27
+  @skip_unless_python27_present
   def test_pants_test_interpreter_selection_with_option_2(self):
     """
     Test that the pants test goal properly constrains the SelectInterpreter task to Python 2
@@ -172,7 +182,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       )
       self.assert_success(pants_run_2)
 
-  @skip_unless_python3
+  @skip_unless_python3_present
   def test_pants_test_interpreter_selection_with_option_3(self):
     """
     Test that the pants test goal properly constrains the SelectInterpreter task to Python 3

@@ -83,9 +83,6 @@ class RunTracker(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    register('--stats-upload-url', advanced=True, default=None,
-             removal_version='1.13.0.dev2', removal_hint='Use --stats-upload-urls instead.',
-             help='Upload stats to this URL on run completion.')
     register('--stats-upload-urls', advanced=True, type=dict, default={},
              help='Upload stats to these URLs on run completion.  Value is a map from URL to the '
                   'name of the auth provider the user must auth against in order to upload stats '
@@ -199,10 +196,12 @@ class RunTracker(Subsystem):
 
     # Select a globally unique ID for the run, that sorts by time.
     millis = int((self._run_timestamp * 1000) % 1000)
+    # run_uuid is used as a part of run_id and also as a trace_id for Zipkin tracing
+    run_uuid = uuid.uuid4().hex
     run_id = 'pants_run_{}_{}_{}'.format(
       time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp)),
       millis,
-      uuid.uuid4().hex
+      run_uuid
     )
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
@@ -232,7 +231,7 @@ class RunTracker(Subsystem):
 
     self._all_options = all_options
 
-    return run_id
+    return (run_id, run_uuid)
 
   def start(self, report, run_start_time=None):
     """Start tracking this pants run using the given Report.
@@ -438,9 +437,6 @@ class RunTracker(Subsystem):
 
     # Upload to remote stats db.
     stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)
-    deprecated_stats_url = self.get_options().stats_upload_url
-    if deprecated_stats_url:
-      stats_upload_urls[deprecated_stats_url] = None
     timeout = self.get_options().stats_upload_timeout
     for stats_url, auth_provider in stats_upload_urls.items():
       self.post_stats(stats_url, stats, timeout=timeout, auth_provider=auth_provider)
