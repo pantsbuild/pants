@@ -18,7 +18,7 @@ from pants.util.dirutil import safe_mkdir
 
 
 class JsonReporter(Reporter):
-  """Json reporting to files."""
+  """A reporter to capture workunit data into a JSON structure."""
 
   _log_level_str = [
     'FATAL',
@@ -29,7 +29,7 @@ class JsonReporter(Reporter):
   ]
 
   # JSON reporting settings.
-  #   json_dir: Where the report files go.
+  #   json_dir: Where the report file goes.
   Settings = namedtuple('Settings', Reporter.Settings._fields + ('json_dir',))
 
   def __init__(self, run_tracker, settings):
@@ -40,10 +40,10 @@ class JsonReporter(Reporter):
     self._buildroot = get_buildroot()
     self._report_file = None
 
-    # Results of the state of the build
+    # Results of the state of the build.
     self._results = {}
-    # Workunit stacks partitioned by thread
-    self._stack_per_thread = defaultdict(list)
+    # We use a stack to track the nested workunit traversal of each root
+    self._root_id_to_workunit_stack = defaultdict(list)
 
   def report_path(self):
     """The path to the main report file."""
@@ -87,12 +87,12 @@ class JsonReporter(Reporter):
 
     root_id = str(workunit.root().id)
 
-    if not root_id in self._stack_per_thread:
-      self._stack_per_thread[root_id].append(workunit_data)
+    if not root_id in self._root_id_to_workunit_stack:
+      self._root_id_to_workunit_stack[root_id].append(workunit_data)
       self._results[root_id] = workunit_data
     else:
-      self._stack_per_thread[root_id][-1]['children'].append(workunit_data)
-      self._stack_per_thread[root_id].append(workunit_data)
+      self._root_id_to_workunit_stack[root_id][-1]['children'].append(workunit_data)
+      self._root_id_to_workunit_stack[root_id].append(workunit_data)
 
   def end_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -105,13 +105,18 @@ class JsonReporter(Reporter):
 
     root_id = str(workunit.root().id)
 
-    self._stack_per_thread[root_id][-1].update(additional_data)
-    self._stack_per_thread[root_id].pop()
+    # We update the last workunit in the stack, which is always the
+    # youngest workunit currently open, and then pop it off. The
+    # last workunit serves as a pointer to the child workunit under
+    # it's parent (the parent of the youngest workunit currently
+    # open is always the one immediately above it in the stack).
+    self._root_id_to_workunit_stack[root_id][-1].update(additional_data)
+    self._root_id_to_workunit_stack[root_id].pop()
 
   def handle_output(self, workunit, label, stream):
     """Implementation of Reporter callback."""
 
-    self._stack_per_thread[str(workunit.root().id)][-1]['outputs'][label] += stream
+    self._root_id_to_workunit_stack[str(workunit.root().id)][-1]['outputs'][label] += stream
 
   def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""
@@ -121,11 +126,12 @@ class JsonReporter(Reporter):
       'messages': self._render_messages(*msg_elements),
     }
 
-    current_stack = self._stack_per_thread[str(workunit.root().id)]
+    root_id = str(workunit.root().id)
+    current_stack = self._root_id_to_workunit_stack[root_id]
     if current_stack:
       current_stack[-1]['log_entries'].append(entry_info)
     else:
-      self._results[str(workunit.root().id)]['log_entries'].append(entry_info)
+      self._results[root_id]['log_entries'].append(entry_info)
 
   def _render_messages(self, *msg_elements):
     def _message_details(element):
