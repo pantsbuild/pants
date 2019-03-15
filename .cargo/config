@@ -1,3 +1,8 @@
+# Strip the binary; on Linux this drops our .so from ~125MB to ~10MB.
+
+[build]
+rustflags = ["-C", "link-arg=-s"]
+
 # N.B. On OSX, we force weak linking by passing the param `-undefined dynamic_lookup` to
 # the underlying linker used by cargo/rustc via RUSTFLAGS. This avoids "missing symbol"
 # errors for Python symbols (e.g. `_PyImport_ImportModule`) at build time when bundling
