@@ -569,29 +569,37 @@ function build_pex() {
   # If $1 == "fetch", fetches the linux and OSX wheels which were built on travis.
   local mode="$1"
 
-  local linux_platform="linux_x86_64"
-  local osx_platform="macosx_10.11_x86_64"
+  local linux_platform_noabi="linux_x86_64"
+  local osx_platform_noabi="macosx_10.11_x86_64"
 
   case "${mode}" in
     build)
       case "$(uname)" in
-	Darwin)
-	  local platform="${osx_platform}"
-	  ;;
-	Linux)
-	  local platform="${linux_platform}"
-	  ;;
-	*)
-	  echo >&2 "Unknown uname"
-	  exit 1
-	  ;;
+        # NB: When building locally, we use a platform that does not refer to the ABI version, to
+        # avoid needing to introspect the python ABI for this machine.
+        Darwin)
+          local platforms=("${osx_platform_noabi}")
+          ;;
+        Linux)
+          local platforms=("${linux_platform_noabi}")
+          ;;
+        *)
+          echo >&2 "Unknown uname"
+          exit 1
+          ;;
       esac
-      local platforms=("${platform}")
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
       local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.pex"
       ;;
     fetch)
-      local platforms=("${linux_platform}" "${osx_platform}")
+      # NB: We do not include Python 3 wheels, as we cannot release a Python 3 compatible PEX
+      # until https://github.com/pantsbuild/pex/issues/654 is fixed.
+      local platforms=()
+      for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
+        for abi in "cp-27-mu" "cp-27-m"; do
+          platforms=("${platforms[@]}" "${platform}-${abi}")
+        done
+      done
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
       local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
       ;;
