@@ -214,27 +214,9 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
       self.scheduler.product_request(A, [Params(TypeCheckFailWrapper(A()))])
 
   def test_trace_includes_rule_exception_traceback(self):
-<<<<<<< Updated upstream
     # Execute a request that will trigger the nested raise, and then directly inspect its trace.
     request = self.scheduler.execution_request([A], [B()])
     self.scheduler.execute(request)
-=======
-    rules = [
-      RootRule(B),
-      nested_raise,
-    ]
-
-    scheduler = create_scheduler(rules)
-    request = scheduler._native.new_execution_request()
-    subject = B()
-    scheduler.add_root_selection(request, subject, A)
-    session = scheduler.new_session(zipkin_trace_v2=False)
-    scheduler._run_and_return_roots(session._session, request)
-
-    trace = '\n'.join(scheduler.graph_trace(request))
-    # NB removing location info to make trace repeatable
-    trace = remove_locations_from_traceback(trace)
->>>>>>> Stashed changes
 
     trace = remove_locations_from_traceback('\n'.join(self.scheduler.trace(request)))
     assert_equal_with_printing(self, dedent('''
