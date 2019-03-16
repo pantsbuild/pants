@@ -4,9 +4,11 @@
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
 
-interpreter_constraints_sentinel_file_path='.pants.d/.python-interpreter-constraints'
+interpreter_constraints_sentinel_file_path='.python-interpreter-constraints'
 
 function clean_if_interpreter_constraints_changed() {
+  new_interpreter_constraints="$1"
+
   if [[ -n "${recursive_pants_shell_script_invocation:-}" ]]; then
     return 0
   fi
@@ -15,7 +17,7 @@ function clean_if_interpreter_constraints_changed() {
 
   if [[ -f "${interpreter_constraints_file}" ]]; then
     previous_interpreter_constraints="$(cat "${interpreter_constraints_file}")"
-    if [[ "${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}" == "${previous_interpreter_constraints}" ]]; then
+    if [[ "${new_interpreter_constraints}" == "${previous_interpreter_constraints}" ]]; then
       return 0
     fi
   else
@@ -29,10 +31,10 @@ EOF
   cat >&2 <<EOF
 Different interpreter constraints were set than were used in the previous Pants run.
 Clearing the cache and preparing a Python environment with these interpreter constraints:
-${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}
+${new_interpreter_constraints}
 EOF
   ./pants clean-all
-  echo "${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}" > "${interpreter_constraints_file}"
+  echo "${new_interpreter_constraints}" > "${interpreter_constraints_file}"
   unset recursive_pants_shell_script_invocation
 }
 
@@ -103,7 +105,7 @@ export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRE
 
 # We can currently assume the CI environment does not switch python versions within a shard.
 if [[ "${ONLY_USING_SINGLE_PYTHON_VERSION:-false}" != 'true' ]]; then
-  clean_if_interpreter_constraints_changed
+  clean_if_interpreter_constraints_changed "${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}"
 fi
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
