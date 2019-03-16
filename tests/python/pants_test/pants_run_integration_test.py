@@ -101,6 +101,25 @@ def ensure_resolver(f):
   return wrapper
 
 
+def daemon_blacklist(_unused_msg_for_documentation_purposes=None):
+  """A decorator to ensure that pantsd is not used (via env vars) for an integration test.
+
+  NB: pantsd is not yet enabled by default (via #4438), but it will be used temporarily
+  in pants' integration test environment via environment variables. This decorator will mark
+  tests that fail in that environment.
+  """
+  def decorator(f):
+    def wrapper(self, *args, **kwargs):
+      env = {
+          'PANTS_ENABLE_PANTSD': 'false',
+          'PANTS_SHUTDOWN_PANTSD_AFTER_RUN': 'false',
+      }
+      with environment_as(**env):
+        f(self, *args, **kwargs)
+    return wrapper
+  return decorator
+
+
 def ensure_daemon(f):
   """A decorator for running an integration test with and without the daemon enabled."""
   def wrapper(self, *args, **kwargs):

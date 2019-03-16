@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
 
 
 class TestIntegrationTest(PantsRunIntegrationTest):
@@ -60,6 +60,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
 
     return pants_run
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_passing_python_test(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:passing_target',
@@ -80,6 +81,7 @@ testprojects/tests/python/pants/dummies:passing_target                          
 """,
     )
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_failing_python_test(self):
     pants_run = self.run_failing_pants_test([
       'testprojects/tests/python/pants/dummies:failing_target',
@@ -108,6 +110,7 @@ testprojects/tests/python/pants/dummies:failing_target                          
 """,
     )
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_source_dep(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:target_with_source_dep',
@@ -126,6 +129,7 @@ testprojects/tests/python/pants/dummies/test_with_source_dep.py .        [100%]
 testprojects/tests/python/pants/dummies:target_with_source_dep                  .....   SUCCESS
 """)
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_thirdparty_dep(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:target_with_thirdparty_dep',

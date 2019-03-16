@@ -72,6 +72,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         pantsd_config = {
           'GLOBAL': {
             'enable_pantsd': True,
+            'shutdown_pantsd_after_run': False,
             # The absolute paths in CI can exceed the UNIX socket path limitation
             # (>104-108 characters), so we override that here with a shorter path.
             'watchman_socket_path': '/tmp/watchman.{}.sock'.format(os.getpid()),
@@ -81,7 +82,6 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         }
         if extra_config:
           recursively_update(pantsd_config, extra_config)
-        print('>>> config: \n{}\n'.format(pantsd_config))
         checker = PantsDaemonMonitor(runner_process_context, pid_dir)
         # TODO(#6574): this should be 1, but when we kill pantsd with a signal it doesn't make sure
         # to close the run tracker -- we can easily address this by moving that cleanup into the

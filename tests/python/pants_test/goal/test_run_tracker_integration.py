@@ -9,10 +9,11 @@ import os
 from builtins import open
 
 from pants.util.contextutil import temporary_file_path
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
 
 
 class RunTrackerIntegrationTest(PantsRunIntegrationTest):
+  @daemon_blacklist('TODO: See #7320.')
   def test_stats_local_json_file(self):
     with temporary_file_path() as tmpfile:
       pants_run = self.run_pants([

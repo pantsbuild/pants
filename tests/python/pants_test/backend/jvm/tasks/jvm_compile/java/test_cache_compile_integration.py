@@ -13,6 +13,7 @@ from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open, safe_rmtree
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
+from pants_test.pants_run_integration_test import daemon_blacklist
 
 
 class Compile(namedtuple('Compile', ['srcfiles', 'config', 'artifact_count'])):
@@ -164,6 +165,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.assertEqual(sorted(classfiles(w) for w in target_workdirs if w != 'current'),
                         sorted([['A.class', 'Main.class'], ['A.class', 'NotMain.class']]))
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_analysis_portability(self):
     # Tests that analysis can be relocated between workdirs and still result in incremental
     # compile.

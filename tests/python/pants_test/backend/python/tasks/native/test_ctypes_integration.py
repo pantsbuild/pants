@@ -18,7 +18,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable, read_file, safe_file_dump
 from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import name_and_platform
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
 
 
 def invoke_pex_for_output(pex_file_to_run):
@@ -114,6 +114,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       binary_run_output = invoke_pex_for_output(pex)
       self.assertEqual(b'x=3, f(x)=17\n', binary_run_output)
 
+  @daemon_blacklist('TODO: See #7320.')
   @_toolchain_variants
   def test_ctypes_native_language_interop(self, toolchain_variant):
     # TODO: consider making this mock_buildroot/run_pants_with_workdir into a
