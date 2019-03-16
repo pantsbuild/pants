@@ -15,9 +15,8 @@ from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import ExecutionGraph
-from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile,\
-  _create_desandboxify_fn, \
-  _CompileWorkflowChoice
+from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import (RscCompile, _CompileWorkflowChoice,
+                                                                 _create_desandboxify_fn)
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import temporary_dir
 from pants_test.subsystem.subsystem_util import init_subsystem
