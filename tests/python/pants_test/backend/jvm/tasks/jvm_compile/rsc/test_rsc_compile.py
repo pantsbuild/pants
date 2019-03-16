@@ -15,7 +15,8 @@ from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import ExecutionGraph
-from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile, _create_desandboxify_fn
+from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import (RscCompile, _CompileWorkflowChoice,
+                                                                 _create_desandboxify_fn)
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import temporary_dir
 from pants_test.subsystem.subsystem_util import init_subsystem
@@ -41,6 +42,46 @@ class RscCompileTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return RscCompile
+
+  def test_force_compiler_tags(self):
+    self.init_dependencies_for_scala_libraries()
+
+    java_target = self.make_target(
+      'java/classpath:java_lib',
+      target_type=JavaLibrary,
+      sources=['com/example/Foo.java'],
+      dependencies=[],
+      tags={'use-compiler:rsc-then-zinc'}
+    )
+    scala_target = self.make_target(
+      'scala/classpath:scala_lib',
+      target_type=ScalaLibrary,
+      sources=['com/example/Foo.scala'],
+      dependencies=[],
+      tags={'use-compiler:zinc-only'}
+    )
+
+    with temporary_dir() as tmp_dir:
+      invalid_targets = [java_target, scala_target]
+      task = self.create_task_with_target_roots(
+        target_roots=[java_target]
+      )
+
+      jobs = task._create_compile_jobs(
+        compile_contexts=self.create_compile_contexts([java_target, scala_target], task, tmp_dir),
+        invalid_targets=invalid_targets,
+        invalid_vts=self.wrap_in_vts(invalid_targets),
+        classpath_product=None)
+
+      dependee_graph = self.construct_dependee_graph_str(jobs, task)
+      print(dependee_graph)
+      self.assertEqual(dedent("""
+                     rsc(java/classpath:java_lib) -> {
+                       zinc_against_rsc(java/classpath:java_lib)
+                     }
+                     zinc_against_rsc(java/classpath:java_lib) -> {}
+                     zinc(scala/classpath:scala_lib) -> {}""").strip(),
+        dependee_graph)
 
   def test_no_dependencies_between_scala_and_java_targets(self):
     self.init_dependencies_for_scala_libraries()
@@ -78,6 +119,35 @@ class RscCompileTest(TaskTestBase):
                        zinc_against_rsc(scala/classpath:scala_lib)
                      }
                      zinc_against_rsc(scala/classpath:scala_lib) -> {}""").strip(),
+        dependee_graph)
+
+  def test_default_workflow_of_zinc_only_zincs_scala(self):
+    self.init_dependencies_for_scala_libraries()
+
+    scala_target = self.make_target(
+      'scala/classpath:scala_lib',
+      target_type=ScalaLibrary,
+      sources=['com/example/Foo.scala'],
+      dependencies=[]
+    )
+
+    with temporary_dir() as tmp_dir:
+      invalid_targets = [scala_target]
+      task = self.create_task_with_target_roots(
+        target_roots=[scala_target],
+        default_workflow='zinc-only',
+      )
+
+      jobs = task._create_compile_jobs(
+        compile_contexts=self.create_compile_contexts([scala_target], task, tmp_dir),
+        invalid_targets=invalid_targets,
+        invalid_vts=self.wrap_in_vts(invalid_targets),
+        classpath_product=None)
+
+      dependee_graph = self.construct_dependee_graph_str(jobs, task)
+      print(dependee_graph)
+      self.assertEqual(dedent("""
+                    zinc(scala/classpath:scala_lib) -> {}""").strip(),
         dependee_graph)
 
   def test_rsc_dep_for_scala_java_and_test_targets(self):
@@ -239,7 +309,9 @@ class RscCompileTest(TaskTestBase):
       jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
     )
 
-  def create_task_with_target_roots(self, target_roots):
+  def create_task_with_target_roots(self, target_roots, default_workflow=None):
+    if default_workflow:
+      self.set_options(default_workflow=_CompileWorkflowChoice( default_workflow))
     context = self.context(target_roots=target_roots)
     self.init_products(context)
     task = self.create_task(context)

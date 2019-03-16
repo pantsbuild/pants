@@ -89,6 +89,13 @@ class CompositeProductAdder(object):
       product.add_for_target(*args, **kwargs)
 
 
+class _CompileWorkflowChoice(enum(['zinc-only', 'guess'])):
+  """Enum covering the values for the default workflow option.
+
+  guess - Try to classify compile targets based on whether they are Scala/Java or test targets.
+  zinc-only - Always use zinc."""
+
+
 class _JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
   """Target classifications used to correctly schedule Zinc and Rsc jobs.
 
@@ -149,16 +156,33 @@ class RscCompileContext(CompileContext):
 class RscCompile(ZincCompile):
   """Compile Scala and Java code to classfiles using Rsc."""
 
-  _name = 'rsc' # noqa
+  _name = 'mixed' # noqa
   compiler_name = 'rsc'
 
   @classmethod
   def implementation_version(cls):
     return super(RscCompile, cls).implementation_version() + [('RscCompile', 172)]
 
+  def __init__(self, *args, **kwargs):
+    super(RscCompile, self).__init__(*args, **kwargs)
+
+    self._rsc_compat_tag = self.get_options().force_compiler_tag_prefix
+    self._compiler_tags = {'{}:{}'.format(self._rsc_compat_tag, workflow.value): workflow
+      for workflow in _JvmCompileWorkflowType.all_variants}
+    self._default_workflow = self.get_options().default_workflow
+
+    # If the default workflow is conveyed through a flag, override tag values.
+    self._ignore_tags_when_calculating_workflow = self.get_options().is_flagged('default_workflow')
+
   @classmethod
   def register_options(cls, register):
     super(RscCompile, cls).register_options(register)
+    register('--force-compiler-tag-prefix', default='use-compiler', metavar='<tag>',
+      help='Always compile targets marked with this tag with rsc, unless the workflow is '
+           'specified on the cli.')
+    register('--default-workflow', type=_CompileWorkflowChoice,
+      default=_CompileWorkflowChoice.guess, metavar='<workflow>',
+      help='Defines how a compile workflow is chosen when a tag is not present.')
 
     cls.register_jvm_tool(
       register,
@@ -257,7 +281,19 @@ class RscCompile(ZincCompile):
     return self._classify_compile_target(target) is not None
 
   def _classify_compile_target(self, target):
-    return _JvmCompileWorkflowType.classify_target(target)
+    if not target.has_sources('.java') and not target.has_sources('.scala'):
+      return None
+
+    if not self._ignore_tags_when_calculating_workflow:
+      for t in target.tags:
+        flow = self._compiler_tags.get(t)
+        if flow:
+          return _JvmCompileWorkflowType(flow)
+
+    return self._default_workflow.resolve_for_enum_variant({
+      'zinc-only': _JvmCompileWorkflowType.zinc_only,
+      'guess': _JvmCompileWorkflowType.classify_target(target)
+    })
 
   def _key_for_target_as_dep(self, target, workflow):
     # used for jobs that are either rsc jobs or zinc jobs run against rsc
