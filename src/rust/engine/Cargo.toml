@@ -95,7 +95,14 @@ reqwest = { version = "0.9.10", default_features = false, features = ["rustls-tl
 resettable = { path = "resettable" }
 smallvec = "0.6"
 tokio = "0.1"
+tokio-trace = { git = "https://github.com/tokio-rs/tokio", rev = "92d51202ef5e6b99004d77300de1aba0f8835513" }
+tokio-trace-log = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "ee38e0030e3b249b09f0432f4d9140d15048a926" }
+tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "ee38e0030e3b249b09f0432f4d9140d15048a926" }
+tokio-trace-macros = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "ee38e0030e3b249b09f0432f4d9140d15048a926" }
 tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
 tar_api = { path = "tar_api" }
+
+[patch.crates-io]
+tokio-trace = { git = "https://github.com/tokio-rs/tokio" }

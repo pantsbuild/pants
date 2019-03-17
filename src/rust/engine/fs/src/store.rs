@@ -691,7 +691,6 @@ mod local {
     self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
     RwTransaction, Transaction, WriteFlags,
   };
-  use log::{debug, error};
   use sha2::Sha256;
   use std;
   use std::collections::{BinaryHeap, HashMap};

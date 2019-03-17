@@ -11,7 +11,6 @@ use futures::future;
 use futures::Future;
 use glob::Pattern;
 use indexmap::{map::Entry::Occupied, IndexMap, IndexSet};
-use log::warn;
 
 use crate::{
   Dir, GitignoreStyleExcludes, GlobExpansionConjunction, GlobParsedSource, GlobSource,

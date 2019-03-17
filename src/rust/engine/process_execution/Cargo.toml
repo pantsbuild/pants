@@ -15,7 +15,6 @@ fs = { path = "../fs" }
 futures = "^0.1.16"
 grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../hashing" }
-log = "0.4"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
 resettable = { path = "../resettable" }
 sha2 = "0.8"
@@ -25,6 +24,10 @@ futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b
 time = "0.1.40"
 tokio-codec = "0.1"
 tokio-process = "0.2.1"
+tokio-trace = { git = "https://github.com/tokio-rs/tokio", rev = "92d51202ef5e6b99004d77300de1aba0f8835513" }
+tokio-trace-log = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "ee38e0030e3b249b09f0432f4d9140d15048a926" }
+tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "ee38e0030e3b249b09f0432f4d9140d15048a926" }
+tokio-trace-macros = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "ee38e0030e3b249b09f0432f4d9140d15048a926" }
 
 [dev-dependencies]
 mock = { path = "../testutil/mock" }

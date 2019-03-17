@@ -13,7 +13,6 @@ use futures::{future, Future, Stream};
 use futures_timer::Delay;
 use grpcio;
 use hashing::{Digest, Fingerprint};
-use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 use time;

@@ -22,7 +22,6 @@ use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
 use fs::{self, safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
-use log::debug;
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;

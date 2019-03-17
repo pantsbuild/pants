@@ -26,6 +26,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+#[macro_use]
+extern crate tokio_trace;
+
 use bazel_protos;
 use clap;
 use dirs;
@@ -44,7 +47,6 @@ use time;
 
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
-use log::{debug, error, warn};
 use parking_lot::Mutex;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;

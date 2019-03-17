@@ -15,7 +15,6 @@ use crate::nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
 use crate::selectors;
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use indexmap::IndexMap;
-use log::{debug, info, warn};
 use parking_lot::Mutex;
 use ui::EngineDisplay;
 

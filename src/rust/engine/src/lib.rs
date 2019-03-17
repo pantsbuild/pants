@@ -30,6 +30,9 @@
 // other unsafeness.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
+#[macro_use]
+extern crate tokio_trace;
+
 pub mod cffi_externs;
 mod context;
 mod core;
@@ -70,7 +73,6 @@ use crate::types::Types;
 use fs::{GlobMatching, MemFS, PathStat};
 use futures::Future;
 use hashing::Digest;
-use log::error;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]

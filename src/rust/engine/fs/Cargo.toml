@@ -23,7 +23,6 @@ indexmap = "1.0.2"
 itertools = "0.7.2"
 lazy_static = "1"
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
-log = "0.4"
 parking_lot = "0.6"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
 serverset = { path = "../serverset" }
@@ -31,6 +30,10 @@ sha2 = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
 tempfile = "3"
+tokio-trace = { git = "https://github.com/tokio-rs/tokio", rev = "92d51202ef5e6b99004d77300de1aba0f8835513" }
+tokio-trace-log = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "ee38e0030e3b249b09f0432f4d9140d15048a926" }
+tokio-trace-futures = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "ee38e0030e3b249b09f0432f4d9140d15048a926" }
+tokio-trace-macros = { git = "https://github.com/tokio-rs/tokio-trace-nursery", rev = "ee38e0030e3b249b09f0432f4d9140d15048a926" }
 uuid = { version = "0.7.1", features = ["v4"] }
 
 [dev-dependencies]

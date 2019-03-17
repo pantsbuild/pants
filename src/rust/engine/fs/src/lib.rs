@@ -26,6 +26,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+#[macro_use]
+extern crate tokio_trace;
+
 mod glob_matching;
 pub use crate::glob_matching::GlobMatching;
 mod snapshot;

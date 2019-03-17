@@ -13,9 +13,10 @@ use crate::core::{Failure, Function, Key, TypeId, Value};
 use crate::handles::{DroppingHandle, Handle};
 use crate::interning::Interns;
 use lazy_static::lazy_static;
-use log;
+use log::{Level, LevelFilter, Log, Metadata, Record};
 use num_enum::CustomTryInto;
 use parking_lot::RwLock;
+use tokio_trace_log::LogTracer;
 
 pub fn eval(python: &str) -> Result<Value, Failure> {
   with_externs(|e| (e.eval)(e.context, python.as_ptr(), python.len() as u64)).into()
@@ -294,9 +295,7 @@ lazy_static! {
 // would need to be acquired for every single logging statement).
 // Please don't mutate it.
 // Please.
-static mut LOGGER: FfiLogger = FfiLogger {
-  level_filter: log::LevelFilter::Off,
-};
+static mut LOGGER: FfiLogger = FfiLogger { log_tracer: None };
 
 ///
 /// Set the static Externs for this process. All other methods of this module will fail
@@ -702,29 +701,29 @@ enum PythonLogLevel {
   Critical = 50,
 }
 
-impl From<log::Level> for PythonLogLevel {
-  fn from(level: log::Level) -> Self {
+impl From<Level> for PythonLogLevel {
+  fn from(level: Level) -> Self {
     match level {
-      log::Level::Error => PythonLogLevel::Error,
-      log::Level::Warn => PythonLogLevel::Warn,
-      log::Level::Info => PythonLogLevel::Info,
-      log::Level::Debug => PythonLogLevel::Debug,
-      log::Level::Trace => PythonLogLevel::Trace,
+      Level::Error => PythonLogLevel::Error,
+      Level::Warn => PythonLogLevel::Warn,
+      Level::Info => PythonLogLevel::Info,
+      Level::Debug => PythonLogLevel::Debug,
+      Level::Trace => PythonLogLevel::Trace,
     }
   }
 }
 
-impl From<PythonLogLevel> for log::LevelFilter {
+impl From<PythonLogLevel> for LevelFilter {
   fn from(level: PythonLogLevel) -> Self {
     match level {
-      PythonLogLevel::NotSet => log::LevelFilter::Off,
-      PythonLogLevel::Trace => log::LevelFilter::Trace,
-      PythonLogLevel::Debug => log::LevelFilter::Debug,
-      PythonLogLevel::Info => log::LevelFilter::Info,
-      PythonLogLevel::Warn => log::LevelFilter::Warn,
-      PythonLogLevel::Error => log::LevelFilter::Error,
+      PythonLogLevel::NotSet => LevelFilter::Off,
+      PythonLogLevel::Trace => LevelFilter::Trace,
+      PythonLogLevel::Debug => LevelFilter::Debug,
+      PythonLogLevel::Info => LevelFilter::Info,
+      PythonLogLevel::Warn => LevelFilter::Warn,
+      PythonLogLevel::Error => LevelFilter::Error,
       // Rust doesn't have a Critical, so treat them like Errors.
-      PythonLogLevel::Critical => log::LevelFilter::Error,
+      PythonLogLevel::Critical => LevelFilter::Error,
     }
   }
 }
@@ -733,7 +732,7 @@ impl From<PythonLogLevel> for log::LevelFilter {
 /// FfiLogger is an implementation of log::Log which asks the Python logging system to log via cffi.
 ///
 struct FfiLogger {
-  level_filter: log::LevelFilter,
+  log_tracer: Option<LogTracer>,
 }
 
 impl FfiLogger {
@@ -741,28 +740,33 @@ impl FfiLogger {
   // If either of the above are violated, expect a panic.
   pub fn init(&'static mut self, max_level: u8) {
     let max_python_level = max_level.try_into_PythonLogLevel();
-    self.level_filter = {
+
+    let level_filter = {
       match max_python_level {
         Ok(python_level) => {
-          let level: log::LevelFilter = python_level.into();
+          let level: LevelFilter = python_level.into();
           level
         }
         Err(err) => panic!("Unrecognised log level from python: {}: {}", max_level, err),
       }
     };
+    self.log_tracer = Some(LogTracer::with_filter(level_filter));
 
-    log::set_max_level(self.level_filter);
+    log::set_max_level(level_filter);
     log::set_logger(self)
       .expect("Failed to set logger (maybe you tried to call init multiple times?)");
   }
 }
 
-impl log::Log for FfiLogger {
-  fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
-    metadata.level() <= self.level_filter
+impl Log for FfiLogger {
+  fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+    match &self.log_tracer {
+      Some(tracer) => tracer.enabled(metadata),
+      None => false,
+    }
   }
 
-  fn log(&self, record: &log::Record<'_>) {
+  fn log(&self, record: &Record<'_>) {
     if !self.enabled(record.metadata()) {
       return;
     }
@@ -775,8 +779,16 @@ impl log::Log for FfiLogger {
         message.as_ptr(),
         message.len() as u64,
       )
-    })
+    });
+    /* TODO: extract the above python log from the trace! */
+    if let Some(tracer) = &self.log_tracer {
+      tracer.log(record);
+    }
   }
 
-  fn flush(&self) {}
+  fn flush(&self) {
+    if let Some(tracer) = &self.log_tracer {
+      tracer.flush();
+    }
+  }
 }
