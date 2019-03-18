@@ -576,6 +576,8 @@ function build_pex() {
   if [[ "${python_three:-false}" == "true" ]]; then
     dest_suffix="py36.pex"
   fi
+  local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
+  local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${dest_suffix}"
 
   case "${mode}" in
     build)
@@ -593,8 +595,6 @@ function build_pex() {
           exit 1
           ;;
       esac
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
       ;;
     fetch)
       local platforms=()
@@ -604,11 +604,11 @@ function build_pex() {
             platforms=("${platforms[@]}" "${platform}-${abi}")
           done
         else
-          platforms=("${platforms[@]}" "${platform}-abi3")
+          for abi in "cp-36-abi3" "cp-36-m"; do
+            platforms=("${platforms[@]}" "${platform}-${abi}")
+          done
         fi
       done
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${dest_suffix}"
       ;;
     *)
       echo >&2 "Bad build_pex mode ${mode}"
