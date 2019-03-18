@@ -567,7 +567,7 @@ py36_linux_build_wheels: &py36_linux_build_wheels
   env:
     - *py36_linux_test_config_env
     - *base_build_wheels_env
-    - docker_image_name=travis_ci_py36
+    - docker_image_name=travis_ci
     - docker_run_command="./build-support/bin/check_pants_pex_abi.py cp36m
                           && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n"
     - CACHE_NAME=linuxwheelsbuild.abi3
