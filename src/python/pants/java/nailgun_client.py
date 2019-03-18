@@ -18,6 +18,7 @@ from future.utils import PY3
 from pants.base.exception_sink import ExceptionSink
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.util.dirutil import safe_file_dump
 from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
 from pants.util.strutil import ensure_binary
@@ -194,7 +195,7 @@ class NailgunClient(object):
   DEFAULT_NG_PORT = 2113
 
   def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
-               workdir=None, exit_on_broken_pipe=False, expects_pid=False):
+               workdir=None, exit_on_broken_pipe=False, metadata_base_dir=None):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to '127.0.0.1')
@@ -206,6 +207,7 @@ class NailgunClient(object):
     :param file err: a stream to write command standard error to (defaults to stderr)
     :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
     :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are encountered
+    # TODO: fix docstring!
     :param bool expects_pid: Whether or not to expect a PID from the server (only true for pantsd)
     """
     self._host = host
@@ -217,17 +219,32 @@ class NailgunClient(object):
     self._stderr = err or (sys.stderr.buffer if PY3 else sys.stderr)
     self._workdir = workdir or os.path.abspath(os.path.curdir)
     self._exit_on_broken_pipe = exit_on_broken_pipe
-    self._expects_pid = expects_pid
+    self._metadata_base_dir = metadata_base_dir
     # Mutable session state.
     self._session = None
     self._current_remote_pid = None
     self._current_remote_pgrp = None
 
+  # TODO: inject the '.pids' dir into the NailgunClient constructor!
+  def _get_remote_pid_file_path(self, pid):
+    return os.path.join(
+      self._metadata_base_dir,
+      'nailgun-client',
+      str(pid))
+
+  # TODO(#6579): this should be done within a contextmanager for RAII!
+  def _maybe_write_pid_file(self):
+    if self._current_remote_pid and self._current_remote_pgrp:
+      remote_pid_file_path = self._get_remote_pid_file_path(os.getpid())
+      safe_file_dump(remote_pid_file_path, str(self._current_remote_pid), mode='w')
+
   def _receive_remote_pid(self, pid):
     self._current_remote_pid = pid
+    self._maybe_write_pid_file()
 
   def _receive_remote_pgrp(self, pgrp):
     self._current_remote_pgrp = pgrp
+    self._maybe_write_pid_file()
 
   def _maybe_last_pid(self):
     return self._current_remote_pid

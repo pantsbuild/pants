@@ -46,6 +46,14 @@ class PantsDaemonMonitor(ProcessManager):
     self._check_pantsd_is_alive()
     return self._pid
 
+  def assert_pantsd_runner_started(self, client_pid, timeout=4):
+    return self.await_metadata_by_name(
+      name='nailgun-client',
+      metadata_key=str(client_pid),
+      timeout=timeout,
+      caster=int,
+    )
+
   def _check_pantsd_is_alive(self):
     self._log()
     assert self._pid is not None and self.is_alive(), 'cannot assert that pantsd is running. Try calling assert_started before calling this method.'

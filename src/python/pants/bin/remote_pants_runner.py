@@ -134,7 +134,7 @@ class RemotePantsRunner(object):
         .format(pantsd_handle.port, attempt, retries)
       )
       try:
-        return self._connect_and_execute(pantsd_handle.port)
+        return self._connect_and_execute(pantsd_handle)
       except self.RECOVERABLE_EXCEPTIONS as e:
         if attempt > retries:
           raise self.Fallback(e)
@@ -157,7 +157,8 @@ class RemotePantsRunner(object):
         logger.fatal('lost active connection to pantsd!')
         raise_with_traceback(self._extract_remote_exception(pantsd_handle.pid, e))
 
-  def _connect_and_execute(self, port):
+  def _connect_and_execute(self, pantsd_handle):
+    port = pantsd_handle.port
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
     ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
     modified_env = combined_dict(self._env, ng_env)
@@ -171,15 +172,13 @@ class RemotePantsRunner(object):
                            out=self._stdout,
                            err=self._stderr,
                            exit_on_broken_pipe=True,
-                           expects_pid=True)
+                           metadata_base_dir=pantsd_handle.metadata_base_dir)
 
     with self._trapped_signals(client, timeout=1), STTYSettings.preserved():
       # Execute the command on the pailgun.
       try:
         result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
-        ExceptionSink.log_exception('wtf: {}'.format(result))
       except Exception as e:
-        ExceptionSink.log_exception('???????????: {}'.format(e))
         raise e
 
     # Exit.
