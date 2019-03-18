@@ -170,8 +170,8 @@ py36_osx_config: &py36_osx_config
     # Clone pyenv directly from GitHub. For multiple osx images, brew's version of pyenv is too old to get
     # modern Python 3.6. Pulling from GitHub instead allows us to use the same Python 3 version accross every OSX shard.
     - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
-    - ${PYENV_ROOT}/bin/pyenv install 3.6.8
-    - ${PYENV_ROOT}/bin/pyenv global 3.6.8
+    - ${PYENV_BIN} install 3.6.8
+    - ${PYENV_BIN} global 3.6.8
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
@@ -452,8 +452,8 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   before_install:
     {{>before_install_osx}}
     - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
-    - ${PYENV_ROOT}/bin/pyenv install 2.7.13
-    - ${PYENV_ROOT}/bin/pyenv global 2.7.13
+    - ${PYENV_BIN} install 2.7.13
+    - ${PYENV_BIN} global 2.7.13
   script:
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu

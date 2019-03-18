@@ -6,5 +6,6 @@ CPPFLAGS="-I/usr/local/opt/openssl/include"
 {{! OSX shards that use Pyenv do so by directly cloning the repository, as several OSX images
 have outdated versions of pyenv that don't include the Python versions we need.
 So, we set these environment variables here to get this solution working. }}
-PYENV_ROOT="${HOME}/.pyenv"
+PYENV_ROOT="${HOME}/.pants_pyenv"
+PYENV_BIN="${HOME}/.pants_pyenv/bin/pyenv"
 PATH="${PYENV_ROOT}/shims:${PATH}"
