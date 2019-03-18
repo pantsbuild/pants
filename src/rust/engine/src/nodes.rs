@@ -1064,20 +1064,19 @@ impl Node for NodeKey {
       NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
     }
     .inspect(move |_: &NodeResult| {
-      if context2.session.should_record_zipkin_spans() {
-        let end_timestamp_duration = std::time::SystemTime::now()
-            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let end_timestamp = duration_as_float_secs(&end_timestamp_duration);
-        let (node_name, start_timestamp) = node_name_and_start_timestamp.expect("If flag --reporting-zipkin-trace-v2 is enabled (should_record_zipkin_spans returns true) a node_name and a start_timestamp should be recorded before running a NodeKey.");
-        let workunit = WorkUnit {
-          name: node_name,
-          start_timestamp: start_timestamp,
-          end_timestamp: end_timestamp,
-          span_id: generate_random_64bit_string(),
-        };
-        context2.session.add_workunit(workunit)};
-    })
+      if let Some((node_name, start_timestamp)) = node_name_and_start_timestamp {
+          let end_timestamp_duration = std::time::SystemTime::now()
+              .duration_since(std::time::SystemTime::UNIX_EPOCH)
+              .unwrap();
+          let end_timestamp = duration_as_float_secs(&end_timestamp_duration);
+          let workunit = WorkUnit {
+            name: node_name,
+            start_timestamp: start_timestamp,
+            end_timestamp: end_timestamp,
+            span_id: generate_random_64bit_string(),
+          };
+          context2.session.add_workunit(workunit)};
+      })
     .to_boxed()
   }
 
