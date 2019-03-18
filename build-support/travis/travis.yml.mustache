@@ -316,7 +316,6 @@ py27_osx_build_engine: &py27_osx_build_engine
   <<: *base_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py2.7 PEX)"
   env:
-    - *base_osx_build_engine_env
     - PREPARE_DEPLOY=1
     - CACHE_NAME=osxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
@@ -331,7 +330,6 @@ py36_osx_build_engine: &py36_osx_build_engine
   <<: *base_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py3.6 PEX)"
   env:
-    - *base_osx_build_engine_env
     - *py36_osx_config_env
     - CACHE_NAME=osxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
