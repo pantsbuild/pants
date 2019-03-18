@@ -25,8 +25,8 @@ from pants.util.dirutil import maybe_read_file
 logger = logging.getLogger(__name__)
 
 
-# TODO: we should be seeing this in .pants.d/logs/exceptions.log!! we are not!! where is it going???
 def _make_interrupted_by_user_error():
+  """???/used in the signal handler and raised upon a socket timeout error!"""
   return KeyboardInterrupt('Interrupted by user over pailgun client!')
 
 
@@ -45,7 +45,6 @@ class PailgunClientSignalHandler(SignalHandler):
     self._pailgun_client.maybe_send_signal(signum)
 
   def handle_sigint(self, signum, frame):
-    raise KeyboardInterrupt('???')
     self._ferry_signal_with_timeout(signum)
 
   def handle_sigquit(self, signum, frame):

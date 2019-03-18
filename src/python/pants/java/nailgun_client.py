@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import errno
 import logging
 import os
+import signal
 import socket
 import sys
 import time
@@ -95,6 +96,7 @@ class NailgunClientSession(NailgunProtocol):
     """Process the outputs of the nailgun session."""
     try:
       for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True,
+                                                  # TODO: make `timeout_object` into its own class?
                                                   timeout_object=self):
         # TODO(#6579): assert that we have at this point received all the chunk types in
         # ChunkType.REQUEST_TYPES, then require PID and PGRP (exactly once?), and then allow any of
@@ -106,9 +108,6 @@ class NailgunClientSession(NailgunProtocol):
         elif chunk_type == ChunkType.EXIT:
           self._write_flush(self._stdout)
           self._write_flush(self._stderr)
-          if self._exit_reason:
-            logger.error('OMG: {}'.format(self._exit_reason))
-            raise self._exit_reason
           return int(payload)
         elif chunk_type == ChunkType.PID:
           self.remote_pid = int(payload)
@@ -126,6 +125,15 @@ class NailgunClientSession(NailgunProtocol):
       # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
       # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamWriter is always stopped.
       self._maybe_stop_input_writer()
+      # If an asynchronous error was set at any point (such as in a signal handler), we want to make
+      # sure we clean up the remote process before exiting with error.
+      # TODO: test this!
+      if self._exit_reason:
+        if self.remote_pgrp:
+          safe_kill(self.remote_pgrp, signal.SIGKILL)
+        if self.remote_pid:
+          safe_kill(self.remote_pid, signal.SIGKILL)
+        raise self._exit_reason
 
   def execute(self, working_dir, main_class, *arguments, **environment):
     # Send the nailgun request.

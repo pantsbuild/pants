@@ -9,21 +9,12 @@ import os
 import sys
 from builtins import object
 
-from pants.base.exception_sink import ExceptionSink, SignalHandler
+from pants.base.exception_sink import ExceptionSink
 from pants.bin.remote_pants_runner import RemotePantsRunner
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 logger = logging.getLogger(__name__)
-
-
-class PantsRunnerSignalHandler(SignalHandler):
-
-  def handle_sigint(self, signum, frame):
-    raise KeyboardInterrupt('User interrupted execution with control-c!')
-
-  def handle_sigquit(self, signum, frame):
-    raise KeyboardInterrupt('A SIGQUIT was received.')
 
 
 class PantsRunner(object):
@@ -51,7 +42,6 @@ class PantsRunner(object):
 
     ExceptionSink.reset_should_print_backtrace_to_terminal(global_bootstrap_options.print_exception_stacktrace)
     ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
-    ExceptionSink.reset_signal_handler(PantsRunnerSignalHandler())
 
     if global_bootstrap_options.enable_pantsd:
       try:
