@@ -77,3 +77,8 @@ page(
   name='notes-1.14.x',
   source='1.14.x.rst'
 )
+
+page(
+  name='notes-1.15.x',
+  source='1.15.x.rst'
+)
