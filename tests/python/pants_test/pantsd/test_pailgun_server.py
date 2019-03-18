@@ -31,13 +31,19 @@ class TestPailgunServer(unittest.TestCase):
       with self.lock:
         yield
 
+    self.after_request_callback_calls = 0
+
+    def after_request_callback():
+      self.after_request_callback_calls += 1
+
     with mock.patch.object(PailgunServer, 'server_bind'), \
          mock.patch.object(PailgunServer, 'server_activate'):
       self.server = PailgunServer(
         server_address=('0.0.0.0', 0),
         runner_factory=self.mock_runner_factory,
         handler_class=self.mock_handler_class,
-        lifecycle_lock=lock
+        lifecycle_lock=lock,
+        request_complete_callback=after_request_callback
       )
 
   @mock.patch.object(TCPServer, 'server_bind', **PATCH_OPTS)
@@ -55,6 +61,13 @@ class TestPailgunServer(unittest.TestCase):
     self.server.process_request_thread(mock_request, ('1.2.3.4', 31338))
     self.assertIs(self.mock_handler_inst.handle_request.called, True)
     mock_close_request.assert_called_once_with(self.server, mock_request)
+
+  @mock.patch.object(PailgunServer, 'close_request', **PATCH_OPTS)
+  def test_process_request_calls_callback(self, mock_close_request):
+    mock_request = mock.Mock()
+    self.server.process_request_thread(mock_request, ('1.2.3.4', 31338))
+    self.assertIs(self.mock_handler_inst.handle_request.called, True)
+    assert(self.after_request_callback_calls == 1)
 
   @mock.patch.object(PailgunServer, 'shutdown_request', **PATCH_OPTS)
   def test_process_request_thread_error(self, mock_shutdown_request):

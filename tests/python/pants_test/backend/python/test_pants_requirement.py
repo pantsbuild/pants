@@ -31,15 +31,6 @@ class PantsRequirementTest(TestBase):
     self.assertEqual([key(expected)],
                      [key(pr) for pr in python_requirement_library.payload.requirements])
 
-    req = list(python_requirement_library.payload.requirements)[0]
-    self.assertIsNotNone(req.requirement.marker)
-
-    def evaluate_version(version):
-      return req.requirement.marker.evaluate({'python_version': version})
-
-    self.assertTrue(evaluate_version('2.7'))
-    self.assertFalse(all(evaluate_version(v) for v in ('2.6', '3.4', '3.5', '3.6', '3.7')))
-
   def test_default_name(self):
     self.add_to_build_file('3rdparty/python/pants', 'pants_requirement()')
 

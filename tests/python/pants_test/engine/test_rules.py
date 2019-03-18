@@ -81,7 +81,7 @@ Rule entry A() had an unexpected type: <class 'pants_test.engine.test_rules.A'>.
       RuleIndex.create([A()])
 
 
-class RulesetValidatorTest(unittest.TestCase):
+class RuleGraphTest(unittest.TestCase):
   def test_ruleset_with_missing_product_type(self):
     @rule(A, [Select(B)])
     def a_from_b_noop(b):
@@ -240,12 +240,6 @@ class RulesetValidatorTest(unittest.TestCase):
                       """).strip(),
         str(cm.exception))
 
-  assert_equal_with_printing = assert_equal_with_printing
-
-
-class RuleGraphMakerTest(unittest.TestCase):
-  # TODO HasProducts?
-
   def test_smallest_full_test(self):
     @rule(A, [Select(SubA)])
     def a_from_suba(suba):
@@ -384,6 +378,50 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "(B, [], b()) for ()" -> {}
                      }""").strip(),
       subgraph)
+
+  def test_potentially_ambiguous_get(self):
+    # In this case, we validate that a Get is satisfied by a rule that actually consumes its
+    # parameter, rather than by having the same dependency rule consume a parameter that was
+    # already in the context.
+    #
+    # This accounts for the fact that when someone uses Get (rather than Select), it's because
+    # they intend for the Get's parameter to be consumed in the subgraph. Anything else would
+    # be surprising.
+    @rule(A, [Select(SubA)])
+    def a(sub_a):
+      _ = yield Get(B, C())  # noqa: F841
+
+    @rule(B, [Select(SubA)])
+    def b_from_suba(suba):
+      pass
+
+    @rule(SubA, [Select(C)])
+    def suba_from_c(c):
+      pass
+
+    rules = [
+      a,
+      b_from_suba,
+      suba_from_c,
+    ]
+
+    subgraph = self.create_subgraph(A, rules, SubA())
+    self.assert_equal_with_printing(
+        dedent("""
+            digraph {
+              // root subject types: SubA
+              // root entries
+                "Select(A) for SubA" [color=blue]
+                "Select(A) for SubA" -> {"(A, [Select(SubA)], [Get(B, C)], a()) for SubA"}
+              // internal entries
+                "(A, [Select(SubA)], [Get(B, C)], a()) for SubA" -> {"(B, [Select(SubA)], b_from_suba()) for C" "Param(SubA)"}
+                "(B, [Select(SubA)], b_from_suba()) for C" -> {"(SubA, [Select(C)], suba_from_c()) for C"}
+                "(B, [Select(SubA)], b_from_suba()) for SubA" -> {"Param(SubA)"}
+                "(SubA, [Select(C)], suba_from_c()) for C" -> {"Param(C)"}
+            }
+        """).strip(),
+        subgraph,
+      )
 
   def test_one_level_of_recursion(self):
     @rule(A, [Select(B)])

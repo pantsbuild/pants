@@ -183,6 +183,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
         # Ensure that the underlying ./pants invocation doesn't run from sources
         # (and therefore bootstrap) if we don't want it to.
         'RUN_PANTS_FROM_PEX',
+        # This tells the ./pants runner script to avoid trying to clean the workspace when changing
+        # python versions. CI starts off without the .python-interpreter-constraints file, so it
+        # would otherwise run a clean-all without this env var.
+        'ONLY_USING_SINGLE_PYTHON_VERSION',
       ]
 
   def setUp(self):

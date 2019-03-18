@@ -196,10 +196,12 @@ class RunTracker(Subsystem):
 
     # Select a globally unique ID for the run, that sorts by time.
     millis = int((self._run_timestamp * 1000) % 1000)
+    # run_uuid is used as a part of run_id and also as a trace_id for Zipkin tracing
+    run_uuid = uuid.uuid4().hex
     run_id = 'pants_run_{}_{}_{}'.format(
       time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp)),
       millis,
-      uuid.uuid4().hex
+      run_uuid
     )
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
@@ -229,7 +231,7 @@ class RunTracker(Subsystem):
 
     self._all_options = all_options
 
-    return run_id
+    return (run_id, run_uuid)
 
   def start(self, report, run_start_time=None):
     """Start tracking this pants run using the given Report.

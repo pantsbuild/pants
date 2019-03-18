@@ -10,7 +10,10 @@ python_tests(
 
 python_library(
   name = 'example_lib',
-  sources = 'example_source.py',
+  sources = [
+    'example_source.py',
+    '__init__.py',
+  ],
 )
 
 python_tests(

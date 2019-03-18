@@ -180,10 +180,10 @@ python_tests(
   sources=['test_rules.py'],
   coverage=['pants.engine.rules'],
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':util',
+    '3rdparty/python:future',
     ':scheduler_test_base',
+    ':util',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:console',
     'src/python/pants/engine:rules',
@@ -192,6 +192,7 @@ python_tests(
     'tests/python/pants_test/engine/examples:parsers',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/testutils:py2_compat',
+    'tests/python/pants_test:test_base',
   ]
 )
 

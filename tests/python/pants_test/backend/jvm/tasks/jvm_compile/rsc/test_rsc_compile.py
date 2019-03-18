@@ -7,13 +7,16 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from textwrap import dedent
 
+from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import ExecutionGraph
-from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile, _create_desandboxify_fn
+from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import (RscCompile, _CompileWorkflowChoice,
+                                                                 _create_desandboxify_fn)
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import temporary_dir
 from pants_test.subsystem.subsystem_util import init_subsystem
@@ -39,6 +42,46 @@ class RscCompileTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return RscCompile
+
+  def test_force_compiler_tags(self):
+    self.init_dependencies_for_scala_libraries()
+
+    java_target = self.make_target(
+      'java/classpath:java_lib',
+      target_type=JavaLibrary,
+      sources=['com/example/Foo.java'],
+      dependencies=[],
+      tags={'use-compiler:rsc-then-zinc'}
+    )
+    scala_target = self.make_target(
+      'scala/classpath:scala_lib',
+      target_type=ScalaLibrary,
+      sources=['com/example/Foo.scala'],
+      dependencies=[],
+      tags={'use-compiler:zinc-only'}
+    )
+
+    with temporary_dir() as tmp_dir:
+      invalid_targets = [java_target, scala_target]
+      task = self.create_task_with_target_roots(
+        target_roots=[java_target]
+      )
+
+      jobs = task._create_compile_jobs(
+        compile_contexts=self.create_compile_contexts([java_target, scala_target], task, tmp_dir),
+        invalid_targets=invalid_targets,
+        invalid_vts=self.wrap_in_vts(invalid_targets),
+        classpath_product=None)
+
+      dependee_graph = self.construct_dependee_graph_str(jobs, task)
+      print(dependee_graph)
+      self.assertEqual(dedent("""
+                     rsc(java/classpath:java_lib) -> {
+                       zinc_against_rsc(java/classpath:java_lib)
+                     }
+                     zinc_against_rsc(java/classpath:java_lib) -> {}
+                     zinc(scala/classpath:scala_lib) -> {}""").strip(),
+        dependee_graph)
 
   def test_no_dependencies_between_scala_and_java_targets(self):
     self.init_dependencies_for_scala_libraries()
@@ -78,7 +121,36 @@ class RscCompileTest(TaskTestBase):
                      zinc_against_rsc(scala/classpath:scala_lib) -> {}""").strip(),
         dependee_graph)
 
-  def test_scala_dep_for_scala_and_java_targets(self):
+  def test_default_workflow_of_zinc_only_zincs_scala(self):
+    self.init_dependencies_for_scala_libraries()
+
+    scala_target = self.make_target(
+      'scala/classpath:scala_lib',
+      target_type=ScalaLibrary,
+      sources=['com/example/Foo.scala'],
+      dependencies=[]
+    )
+
+    with temporary_dir() as tmp_dir:
+      invalid_targets = [scala_target]
+      task = self.create_task_with_target_roots(
+        target_roots=[scala_target],
+        default_workflow='zinc-only',
+      )
+
+      jobs = task._create_compile_jobs(
+        compile_contexts=self.create_compile_contexts([scala_target], task, tmp_dir),
+        invalid_targets=invalid_targets,
+        invalid_vts=self.wrap_in_vts(invalid_targets),
+        classpath_product=None)
+
+      dependee_graph = self.construct_dependee_graph_str(jobs, task)
+      print(dependee_graph)
+      self.assertEqual(dedent("""
+                    zinc(scala/classpath:scala_lib) -> {}""").strip(),
+        dependee_graph)
+
+  def test_rsc_dep_for_scala_java_and_test_targets(self):
     self.init_dependencies_for_scala_libraries()
 
     scala_dep = self.make_target(
@@ -99,10 +171,17 @@ class RscCompileTest(TaskTestBase):
       dependencies=[scala_dep]
     )
 
+    test_target = self.make_target(
+      'scala/classpath:scala_test',
+      target_type=JUnitTests,
+      sources=['com/example/Test.scala'],
+      dependencies=[scala_target]
+    )
+
     with temporary_dir() as tmp_dir:
-      invalid_targets = [java_target, scala_target, scala_dep]
+      invalid_targets = [java_target, scala_target, scala_dep, test_target]
       task = self.create_task_with_target_roots(
-        target_roots=[java_target, scala_target]
+        target_roots=[java_target, scala_target, test_target]
       )
 
       jobs = task._create_compile_jobs(
@@ -118,15 +197,19 @@ class RscCompileTest(TaskTestBase):
                      rsc(scala/classpath:scala_lib) -> {
                        zinc_against_rsc(scala/classpath:scala_lib)
                      }
-                     zinc_against_rsc(scala/classpath:scala_lib) -> {}
+                     zinc_against_rsc(scala/classpath:scala_lib) -> {
+                       zinc(scala/classpath:scala_test)
+                     }
                      rsc(scala/classpath:scala_dep) -> {
                        rsc(scala/classpath:scala_lib),
                        zinc_against_rsc(scala/classpath:scala_lib),
                        zinc_against_rsc(scala/classpath:scala_dep)
                      }
                      zinc_against_rsc(scala/classpath:scala_dep) -> {
-                       zinc(java/classpath:java_lib)
-                     }""").strip(),
+                       zinc(java/classpath:java_lib),
+                       zinc(scala/classpath:scala_test)
+                     }
+                     zinc(scala/classpath:scala_test) -> {}""").strip(),
         dependee_graph)
 
   def test_scala_lib_with_java_sources_not_passed_to_rsc(self):
@@ -175,12 +258,6 @@ class RscCompileTest(TaskTestBase):
                      zinc(scala/classpath:scala_with_indirect_java_sources) -> {}""").strip(),
         dependee_graph)
 
-  def construct_dependee_graph_str(self, jobs, task):
-    exec_graph = ExecutionGraph(jobs, task.get_options().print_exception_stacktrace)
-    dependee_graph = exec_graph.format_dependee_graph()
-    print(dependee_graph)
-    return dependee_graph
-
   def test_desandbox_fn(self):
     # TODO remove this after https://github.com/scalameta/scalameta/issues/1791 is released
     desandbox = _create_desandboxify_fn(['.pants.d/cool/beans.*', '.pants.d/c/r/c/.*'])
@@ -199,6 +276,12 @@ class RscCompileTest(TaskTestBase):
     self.assertEqual(desandbox('/some/path/.pants.d/exec-location/.pants.d/tmp.pants.d/cool/beans'),
                                '.pants.d/tmp.pants.d/cool/beans')
 
+  def construct_dependee_graph_str(self, jobs, task):
+    exec_graph = ExecutionGraph(jobs, task.get_options().print_exception_stacktrace)
+    dependee_graph = exec_graph.format_dependee_graph()
+    print(dependee_graph)
+    return dependee_graph
+
   def wrap_in_vts(self, invalid_targets):
     return [LightWeightVTS(t) for t in invalid_targets]
 
@@ -212,13 +295,23 @@ class RscCompileTest(TaskTestBase):
         }
       }
     )
+    init_subsystem(
+      JUnit,
+    )
     self.make_target(
       '//:scala-library',
       target_type=JarLibrary,
       jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
     )
+    self.make_target(
+      '//:junit-library',
+      target_type=JarLibrary,
+      jars=[JarDependency(org='com.example', name='scala', rev='0.0.0')]
+    )
 
-  def create_task_with_target_roots(self, target_roots):
+  def create_task_with_target_roots(self, target_roots, default_workflow=None):
+    if default_workflow:
+      self.set_options(default_workflow=_CompileWorkflowChoice( default_workflow))
     context = self.context(target_roots=target_roots)
     self.init_products(context)
     task = self.create_task(context)
