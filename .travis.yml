@@ -333,17 +333,20 @@ py36_linux_build_engine: &py36_linux_build_engine
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
+# NB: we do not use Docker for Py37 because Centos6 has too outdated of OpenSSL. Since we only use Py37 for
+# CI and do not release wheels with it, we are okay with using Ubuntu to bootstrap the PEX, even though that
+# means the PEX will be compatible with fewer environments.
 py37_linux_build_engine: &py37_linux_build_engine
   <<: *py37_linux_config
-  <<: *base_linux_build_engine
+  <<: *native_engine_cache_config
   stage: *bootstrap_cron
   name: "Build Linux native engine and pants.pex (Py3.7 PEX)"
   env:
-    - docker_image_name=travis_ci_py37
-      # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
-    - docker_run_command="./build-support/bin/ci.sh -7b && ./build-support/bin/release.sh -f"
     - CACHE_NAME=linuxpexbuild.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
+  script:
+    - ./build-support/bin/ci.sh -7b
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
