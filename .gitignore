@@ -53,3 +53,5 @@ GRTAGS
 GSYMS
 GTAGS
 .mypy_cache/
+# Stores the version of python last used to run pants. See ./pants.
+/.python-interpreter-constraints
