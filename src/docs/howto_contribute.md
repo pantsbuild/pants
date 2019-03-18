@@ -117,6 +117,16 @@ the `pantsbuild/pants` repo's master branch, use these commands:
     $ git fetch upstream
     $ git checkout master && git reset --hard upstream/master
 
+**Mac users:** Pants requires a more modern OpenSSL version than the one that comes with macOS.
+To get all dependencies to resolve correctly, run the following commands the first time you
+set up Pants.
+
+    :::bash
+    $ brew install openssl
+    $ echo 'export PATH="/usr/local/opt/openssl/bin:$PATH"' >> ~/.bashrc
+    $ echo 'export LDFLAGS="-L/usr/local/opt/openssl/lib"' >> ~/.bashrc
+    $ echo 'export CPPFLAGS="-I/usr/local/opt/openssl/include"' >> ~/.bashrc
+
 ### Making the Change
 
 You might want to familiarize yourself with the
