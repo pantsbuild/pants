@@ -12,7 +12,6 @@ from collections import defaultdict, namedtuple
 from future.moves.itertools import zip_longest
 from six import string_types
 
-from pants.base.build_environment import get_buildroot
 from pants.reporting.reporter import Reporter
 from pants.util.dirutil import safe_mkdir
 
@@ -34,40 +33,31 @@ class JsonReporter(Reporter):
 
   def __init__(self, run_tracker, settings):
     super(JsonReporter, self).__init__(run_tracker, settings)
-    # The main report, and associated tool outputs, go under this dir.
-    self._json_dir = settings.json_dir
 
-    self._buildroot = get_buildroot()
-    self._report_file = None
+    # The main report output.
+    self.report_path = os.path.join(settings.json_dir, 'build.json')
 
     # Results of the state of the build.
     self._results = {}
-    # We use a stack to track the nested workunit traversal of each root
+
+    # We use a stack to track the nested workunit traversal of each root.
     self._root_id_to_workunit_stack = defaultdict(list)
-
-  def report_path(self):
-    """The path to the main report file."""
-
-    return os.path.join(self._json_dir, 'build.json')
 
   def open(self):
     """Implementation of Reporter callback."""
 
-    safe_mkdir(os.path.dirname(self._json_dir))
-    self._report_file = open(self.report_path(), 'w')
+    safe_mkdir(os.path.dirname(self.report_path))
 
   def close(self):
     """Implementation of Reporter callback."""
 
-    if os.path.exists(self._json_dir):
-      self._report_file.write(json.dumps(
+    with open(self.report_path, 'w+') as fp:
+      fp.write(json.dumps(
         {
           'workunits': self._results,
           'artifact_cache_stats': self.run_tracker.artifact_cache_stats.get_all(),
         }
       ))
-      self._report_file.flush()
-    self._report_file.close()
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""

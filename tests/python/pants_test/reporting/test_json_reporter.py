@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
-import os
 
 from pants.base.workunit import WorkUnit
 from pants.reporting.report import Report
@@ -63,7 +62,7 @@ class JsonReporterTest(TestBase):
     reporter.open()
     generate_callbacks(root_workunit_dict, reporter)
     reporter.close()
-    result = json.loads(open(os.path.join(reporter.report_path())).read())
+    result = json.loads(open(reporter.report_path).read())
     self.assertDictEqual(root_workunit_dict, result['workunits'][root_workunit_dict['id']])
 
   def test_nested_grandchild(self):
@@ -135,8 +134,8 @@ class JsonReporterTest(TestBase):
     }
 
     with temporary_dir() as temp_dir:
-      reporter = JsonReporter(FakeRunTracker(), JsonReporter.Settings(
-          log_level=Report.INFO, json_dir=temp_dir))
+      reporter = JsonReporter(FakeRunTracker(),
+        JsonReporter.Settings(log_level=Report.INFO, json_dir=temp_dir))
 
       self._check_callbacks(expected, reporter)
 
@@ -225,7 +224,7 @@ class JsonReporterTest(TestBase):
     }
 
     with temporary_dir() as temp_dir:
-      reporter = JsonReporter(FakeRunTracker(), JsonReporter.Settings(
-          log_level=Report.INFO, json_dir=temp_dir))
+      reporter = JsonReporter(FakeRunTracker(),
+        JsonReporter.Settings(log_level=Report.INFO, json_dir=temp_dir))
 
       self._check_callbacks(expected, reporter)
