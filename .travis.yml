@@ -131,6 +131,20 @@ pyenv_osx_openssl_env: &pyenv_osx_openssl_env >
   CPPFLAGS="-I/usr/local/opt/openssl/include"
 
 # -------------------------------------------------------------------------
+# AWS
+# -------------------------------------------------------------------------
+
+# We use AWS S3 to avoid unnecessary work in CI. Specifically, the bootstrap
+# shards create a pants.pex, and then upload it to S3 for all of the test
+# shards to pull down.
+
+aws_deploy_pants_pex: &aws_deploy_pants_pex >
+  aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+
+aws_get_pants_pex: &aws_get_pants_pex >
+  ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+
+# -------------------------------------------------------------------------
 # Generic shard setups
 # -------------------------------------------------------------------------
 
@@ -173,7 +187,7 @@ base_linux_test_config: &base_linux_test_config
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
   before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - *aws_get_pants_pex
 
 py27_linux_test_config: &py27_linux_test_config
   <<: *py27_linux_config
@@ -224,7 +238,7 @@ base_osx_test_config: &base_osx_test_config
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - *aws_get_pants_pex
 
 py27_osx_test_config: &py27_osx_test_config
   <<: *py27_osx_config
@@ -288,7 +302,7 @@ base_linux_build_engine: &base_linux_build_engine
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       ${docker_image_name}:latest
       sh -c "${docker_run_command}"
-    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - *aws_deploy_pants_pex
 
 py27_linux_build_engine: &py27_linux_build_engine
   <<: *py27_linux_config
@@ -327,7 +341,7 @@ base_osx_build_engine: &base_osx_build_engine
   script:
     # We also build fs_util, to take advantage of the rust code built during bootstrapping.
     - ./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f
-    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - *aws_deploy_pants_pex
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
