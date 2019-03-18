@@ -4,12 +4,12 @@ Pants Daemon
 ProcessManager
 --------------
 
-`ProcessManager` is a class designed to keep track of processes. Besides changing their state (paused, terminating...), it allows a process to fork in different ways. Classes that extend `ProcessManager` can (and often do) inject code to be run before and after forking by overriding the functions `pre_fork`, `post_fork_child`, `post_fork_parent`. Some examples of usage of these functions are `DaemonPantsRunner` invoking a `LocalPantsRunner` in its `post_fork_child`, to fulfill a request to `PailgunServer`.
+[`ProcessManager`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/process_manager.py#223) is a class designed to keep track of processes. Besides changing their state (paused, terminating...), it allows a process to fork in different ways. Classes that extend `ProcessManager` can (and often do) inject code to be run before and after forking by overriding the functions `pre_fork`, `post_fork_child`, `post_fork_parent`. Some examples of usage of these functions are [`DaemonPantsRunner`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/bin/daemon_pants_runner.py#74) invoking a [`LocalPantsRunner`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/bin/local_pants_runner.py#28) in its `post_fork_child`, to fulfill a request to [`PailgunServer`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/pailgun_server.py#91).
 
 The `PantsDaemon` Class
 -----------------------
 
-The [`PantsDaemon`]() class is responsible for managing the lifetime of the pantsd process and the services associated with it. A `PantsDaemon` is created with the inner class `Factory`, and it has two modes of initialization:
+The [`PantsDaemon`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/pants_daemon.py#81) class is responsible for managing the lifetime of the pantsd process and the services associated with it. A `PantsDaemon` is created with the inner class [`Factory`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/pants_daemon.py#100), and it has two modes of initialization:
 
 - Stub initialization, which parses options, launches watchman, and not much else. This mode is used to determine whether it needs to fully initialize the daemon or not.
 - Full initialization, which spawns the daemon process, initializes all the services, the legacy engine and the native code.
@@ -22,18 +22,18 @@ Initialization is encapsulated in the `PantsDaemon.Factory.create()` method.
 Pailgun
 -------
 
-The [Nailgun Protocol]() is a protocol designed to allow clients to make command-line requests to a [Nailgun Server](). It supports an interface similar to [`ExecuteProcessRequest`](), except for it having no concern about making operations hermetic. Pailgun is an extension of the Nailgun Protocol, which is clients use to ask the Pants Daemon to spawn pants invocations.
+The [Nailgun Protocol](http://www.martiansoftware.com/nailgun/protocol.html) is a protocol designed to allow clients to make command-line requests to a [Nailgun Server](http://www.martiansoftware.com/nailgun/index.html). It supports an interface similar to [`ExecuteProcessRequest`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/engine/isolated_process.py#22), except for it having no concern about making operations hermetic. Pailgun is an extension of the Nailgun Protocol, which is clients use to ask the Pants Daemon to spawn pants invocations.
 
-The protocol is subject to slight change slightly in [#6579](https://github.com/pantsbuild/pants/pull/6579).
+The protocol is subject to change slightly in [#6579](https://github.com/pantsbuild/pants/pull/6579).
 
-In Pantsd, `PailgunServer` is the class responsible for reading Pailgun requests and handling them, by spawning a `PailgunHandler`.
+In Pantsd, [`PailgunServer`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/pailgun_server.py#91) is the class responsible for reading Pailgun requests and handling them, by spawning a [`PailgunHandler`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/pailgun_server.py#52).
 
 Services
 --------
 
 A Pants Daemon process has several services that it polls in order. Every service runs in a separate thread, and can be paused, resumed or terminated. Services can communicate with each other.
 
-Examples of services are [`FSEventService`](), which takes care of listening for watchman events, [`SchedulerService`](), which takes care of listening responding to those events to keep a warm `Graph`, and [`PailgunService`](), which listens to `SchedulerService` and manages the lifetime of a `PailgunServer` responsible for spawning pants runs when requested by clients, it takes a `DaemonPantsRunner` as one of its arguments, to use as a template to spawn pants runs when requested by the clients.
+Examples of services are [`FSEventService`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/service/fs_event_service.py#14), which takes care of listening for watchman events, [`SchedulerService`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/service/scheduler_service.py#21), which takes care of listening responding to those events to keep a warm `Graph`, and [`PailgunService`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/service/pailgun_service.py#15), which listens to `SchedulerService` and manages the lifetime of a `PailgunServer` responsible for spawning pants runs when requested by clients, it takes a `DaemonPantsRunner` as one of its arguments, to use as a template to spawn pants runs when requested by the clients.
 
 ### PailgunService
   
