@@ -1,6 +1,11 @@
 Pants Daemon
 ============
 
+The Pants Daemon (pantsd) is a system introduced to enable Pants to keep information about the build warm in memory between runs.
+It consists of a process running in the background (currently, one for each buildroot), which listens to filesystem events and keeps a build graph warm. It then passes that graph to subsequent runs that request it.
+
+This document outlines all the moving pieces of pantsd, and explains how it works through an end-to-end run.
+
 ProcessManager
 --------------
 
