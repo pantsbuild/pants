@@ -53,7 +53,10 @@ function run_local_pants() {
 readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
 PANTS_STABLE_VERSION="$(cat "${VERSION_FILE}")"
 HEAD_SHA=$(git rev-parse --verify HEAD)
-readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
+# We add a non-numeric prefix 'git' before the sha in order to avoid a hex sha which happens to
+# contain only [0-9] being parsed as a number -- see #7399.
+# TODO(#7399): mix in the timestamp before the sha instead of 'git' to get monotonic ordering!
+readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+git${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
 readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}"
@@ -123,7 +126,7 @@ function pkg_pants_install_test() {
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
   [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
-     == "${version}" ]] || die "Installed version of pants does match requested version!"
+     == "${version}" ]] || die "Installed version of pants does not match requested version!"
 }
 
 function pkg_testinfra_install_test() {
