@@ -7,18 +7,16 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import errno
 import logging
 import os
-import signal
 import socket
 import sys
 import time
 from builtins import object, str
 
-import psutil
 from future.utils import PY3
 
+from pants.base.exception_sink import ExceptionSink
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
-from pants.util.objects import enum
 from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
 from pants.util.strutil import ensure_binary
@@ -53,6 +51,23 @@ class NailgunClientSession(NailgunProtocol):
     self.remote_pgrp = None
     self._remote_pid_callback = remote_pid_callback
     self._remote_pgrp_callback = remote_pgrp_callback
+    # NB: These variables are set in a signal handler to implement graceful shutdown.
+    self._exit_timeout_start_time = None
+    self._exit_timeout = None
+    self._exit_reason = None
+
+  def _set_exit_timeout(self, timeout, reason):
+    """???"""
+    self._exit_timeout_start_time = time.time()
+    self._exit_timeout = timeout
+    self._exit_reason = reason
+
+  def maybe_timeout_options(self):
+    """???"""
+    if self._exit_timeout_start_time:
+      return (self._exit_timeout_start_time, self._exit_timeout)
+    else:
+      return None
 
   def _maybe_start_input_writer(self):
     if self._input_writer and not self._input_writer.is_alive():
@@ -79,7 +94,8 @@ class NailgunClientSession(NailgunProtocol):
   def _process_session(self):
     """Process the outputs of the nailgun session."""
     try:
-      for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True):
+      for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True,
+                                                  timeout_object=self):
         # TODO(#6579): assert that we have at this point received all the chunk types in
         # ChunkType.REQUEST_TYPES, then require PID and PGRP (exactly once?), and then allow any of
         # ChunkType.EXECUTION_TYPES.
@@ -90,6 +106,9 @@ class NailgunClientSession(NailgunProtocol):
         elif chunk_type == ChunkType.EXIT:
           self._write_flush(self._stdout)
           self._write_flush(self._stderr)
+          if self._exit_reason:
+            logger.error('OMG: {}'.format(self._exit_reason))
+            raise self._exit_reason
           return int(payload)
         elif chunk_type == ChunkType.PID:
           self.remote_pid = int(payload)
@@ -230,29 +249,10 @@ class NailgunClient(object):
     else:
       return sock
 
-  class RemoteClientStatus(enum(['before-started', 'started', 'completed'])): pass
-
-  def remote_client_status(self):
-    remote_pid = self._maybe_last_pid()
-    if remote_pid is None:
-      return self.RemoteClientStatus('before-started')
-    else:
-      if psutil.pid_exists(remote_pid):
-        return self.RemoteClientStatus.started
-      else:
-        return self.RemoteClientStatus.completed
-
-  def shutdown_gracefully(self, interval_sec=1):
-    # TODO: raise if the client hasn't started yet!
-    if self.remote_client_status() != self.RemoteClientStatus.started:
-      return
-    self.maybe_send_signal(signal.SIGINT)
-    time.sleep(interval_sec)
-    if self.remote_client_status() != self.RemoteClientStatus.started:
-      return
-    self.maybe_send_signal(signal.SIGTERM)
-    time.sleep(interval_sec)
-    self.maybe_send_signal(signal.SIGKILL)
+  def set_exit_timeout(self, timeout, reason):
+    """???"""
+    ExceptionSink.log_exception('timeout: {}, reason: {}'.format(timeout, reason))
+    self._session._set_exit_timeout(timeout, reason)
 
   # TODO: make all invocations of this method instead require that the process is alive via the
   # result of .remote_client_status() before sending a signal! safe_kill() should probably be

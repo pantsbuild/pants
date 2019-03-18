@@ -5,8 +5,11 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import socket
 import struct
+import time
 from builtins import bytes, object, str, zip
+from contextlib import contextmanager
 
 from pants.util.osutil import IntegerForPid
 
@@ -210,14 +213,53 @@ class NailgunProtocol(object):
 
     return chunk_type, payload
 
+  class ProcessStreamTimeout(Exception):
+    """???"""
+
   @classmethod
-  def iter_chunks(cls, sock, return_bytes=False):
+  @contextmanager
+  def _set_socket_timeout(cls, sock, timeout=None):
+    """???"""
+    if timeout is not None:
+      # NB: this is only set if provided a timeout!
+      prev_timeout = sock.gettimeout()
+    try:
+      if timeout is not None:
+        sock.settimeout(timeout)
+      yield
+    except socket.timeout:
+      raise cls.ProcessStreamTimeout("socket read timed out with timeout {}".format(timeout))
+    finally:
+      if timeout is not None:
+        sock.settimeout(prev_timeout)
+
+  @classmethod
+  def iter_chunks(cls, sock, return_bytes=False, timeout_object=None):
     """Generates chunks from a connected socket until an Exit chunk is sent."""
+    orig_timeout_time = None
+    timeout_interval = None
     while 1:
-      chunk_type, payload = cls.read_chunk(sock, return_bytes)
-      yield chunk_type, payload
-      if chunk_type == ChunkType.EXIT:
-        break
+      if orig_timeout_time is not None:
+        remaining_time = time.time() - (orig_timeout_time + timeout_interval)
+        if remaining_time < 0:
+          raise cls.ProcessStreamTimeout(
+            "iterating over bytes timed out with timeout interval {} starting at {}, "
+            "overtime seconds: {}"
+            .format(timeout_interval, orig_timeout_time, (-1 * remaining_time)))
+      elif timeout_object is not None:
+        opts = timeout_object.maybe_timeout_options()
+        remaining_time = None
+        if opts:
+          orig_timeout_time, timeout_interval = opts
+          continue
+      else:
+        remaining_time = None
+
+      with cls._set_socket_timeout(sock, timeout=remaining_time):
+        chunk_type, payload = cls.read_chunk(sock, return_bytes)
+        yield chunk_type, payload
+        if chunk_type == ChunkType.EXIT:
+          break
 
   @classmethod
   def send_start_reading_input(cls, sock):
