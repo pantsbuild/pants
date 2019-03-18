@@ -572,6 +572,11 @@ function build_pex() {
   local linux_platform_noabi="linux_x86_64"
   local osx_platform_noabi="macosx_10.11_x86_64"
 
+  dest_suffix="py27.pex"
+  if [[ "${python_three:-false}" == "true" ]]; then
+    dest_suffix="py36.pex"
+  fi
+
   case "${mode}" in
     build)
       case "$(uname)" in
@@ -588,20 +593,22 @@ function build_pex() {
           exit 1
           ;;
       esac
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.pex"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
       ;;
     fetch)
-      # NB: We do not include Python 3 wheels, as we cannot release a Python 3 compatible PEX
-      # until https://github.com/pantsbuild/pex/issues/654 is fixed.
       local platforms=()
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
-        for abi in "cp-27-mu" "cp-27-m"; do
-          platforms=("${platforms[@]}" "${platform}-${abi}")
-        done
+        if [[ "${python_three:-false}" == "false" ]]; then
+          for abi in "cp-27-mu" "cp-27-m"; do
+            platforms=("${platforms[@]}" "${platform}-${abi}")
+          done
+        else
+          platforms=("${platforms[@]}" "${platform}-abi3")
+        fi
       done
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${dest_suffix}"
       ;;
     *)
       echo >&2 "Bad build_pex mode ${mode}"
