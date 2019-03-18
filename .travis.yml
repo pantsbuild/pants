@@ -280,6 +280,12 @@ travis_docker_image: &travis_docker_image
 # Bootstrap engine shards
 # -------------------------------------------------------------------------
 
+# Note for each platform, we have the Python 2.7 shard also create fs_util and
+# upload to S3, to take advantage of the Rust code built during
+# bootstrapping. We must use the Python 2.7 shard, as it is the only Build Engine
+# shard to run during both daily and nightly CI. This requires setting
+# PREPARE_DEPLOY=1.
+
 base_linux_build_engine: &base_linux_build_engine
   <<: *native_engine_cache_config
   <<: *travis_docker_image
@@ -310,10 +316,9 @@ py27_linux_build_engine: &py27_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2.7 PEX)"
   env:
     - docker_image_name=travis_ci
-    # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
-    - docker_run_command="./build-support/bin/ci.sh -2b && ./build-support/bin/release.sh -f"
-    # NB: Only the Py2.7 shard sets PREPARE_DEPLOY to cause the fs_util binary to be uploaded to S3:
-    # either linux shard could upload this binary, since it does not depend on python at all.
+    # We also build fs_util.
+    - docker_run_command="./build-support/bin/ci.sh -2b
+                          && ./build-support/bin/release.sh -f"
     - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
@@ -324,8 +329,7 @@ py36_linux_build_engine: &py36_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
     - docker_image_name=travis_ci_py36
-    # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
-    - docker_run_command="./build-support/bin/ci.sh -b && ./build-support/bin/release.sh -f"
+    - docker_run_command="./build-support/bin/ci.sh -b"
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
@@ -336,12 +340,6 @@ base_osx_build_engine: &base_osx_build_engine
   # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
   # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
   osx_image: xcode8
-  env:
-    - &base_osx_build_engine_env PREPARE_DEPLOY=1  # To deploy fs_util.
-  script:
-    # We also build fs_util, to take advantage of the rust code built during bootstrapping.
-    - ./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f
-    - *aws_deploy_pants_pex
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
@@ -351,9 +349,14 @@ py27_osx_build_engine: &py27_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py2.7 PEX)"
   env:
     - *base_osx_build_engine_env
+    - PREPARE_DEPLOY=1
     - CACHE_NAME=osxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
-    - BOOTSTRAP_ARGS='-2b'
+  script:
+    - ./build-support/bin/ci.sh -2b
+    #  Also build fs_util.
+    - ./build-support/bin/release.sh -f
+    - *aws_deploy_pants_pex
 
 py36_osx_build_engine: &py36_osx_build_engine
   <<: *py36_osx_config
@@ -364,7 +367,9 @@ py36_osx_build_engine: &py36_osx_build_engine
     - *py36_osx_config_env
     - CACHE_NAME=osxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
-    - BOOTSTRAP_ARGS='-b'
+  script:
+    - ./build-support/bin/ci.sh -b
+    - *aws_deploy_pants_pex
 
 # -------------------------------------------------------------------------
 # Lint
