@@ -131,6 +131,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
       )
     )
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_idea_plugin_long_project_name(self):
     list_run = self.run_pants(['-q', 'list', 'testprojects/tests/java/org/pantsbuild/testproject/::'])
     self.assert_success(list_run)

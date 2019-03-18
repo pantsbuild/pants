@@ -62,6 +62,10 @@ class PantsDaemonMonitor(ProcessManager):
 
 
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
+  @classmethod
+  def hermetic(cls):
+    return True
+
   @contextmanager
   def pantsd_test_context(self, log_level='info', extra_config=None, expected_runs=1):
     with no_lingering_process_by_command('pantsd-runner') as runner_process_context:

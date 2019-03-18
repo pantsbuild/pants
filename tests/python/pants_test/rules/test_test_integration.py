@@ -148,6 +148,7 @@ testprojects/tests/python/pants/dummies/test_with_thirdparty_dep.py .    [100%]
 testprojects/tests/python/pants/dummies:target_with_thirdparty_dep              .....   SUCCESS
 """)
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_mixed_python_tests(self):
     pants_run = self.run_failing_pants_test([
       'testprojects/tests/python/pants/dummies:failing_target',

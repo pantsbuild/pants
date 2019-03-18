@@ -239,6 +239,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       join()
 
   def test_pantsd_client_env_var_is_inherited_by_pantsd_runner_children(self):
+    EXPECTED_KEY = 'TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST'
     EXPECTED_VALUE = '333'
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
       # First, launch the daemon without any local env vars set.
@@ -246,13 +247,19 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_started()
 
       # Then, set an env var on the secondary call.
-      with environment_as(TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST=EXPECTED_VALUE):
+      # We additionally set the `HERMETIC_ENV` env var to allow the integration test harness
+      # to pass this variable through.
+      env = {
+          EXPECTED_KEY: EXPECTED_VALUE,
+          'HERMETIC_ENV': EXPECTED_KEY,
+        }
+      with environment_as(**env):
         result = pantsd_run(
           ['-q',
            'run',
            'testprojects/src/python/print_env',
            '--',
-           'TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST']
+           EXPECTED_KEY]
         )
         checker.assert_running()
 

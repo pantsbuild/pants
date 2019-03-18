@@ -9,6 +9,7 @@ import os
 from pants.base.build_environment import get_buildroot
 from pants_test.backend.python.pants_requirement_integration_test_base import \
   PantsRequirementIntegrationTestBase
+from pants_test.pants_run_integration_test import daemon_blacklist
 
 
 class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
@@ -32,6 +33,7 @@ class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
     command = pre_cmd_args + cmd
     return self.run_pants(command=command)
 
+  @daemon_blacklist('TODO: See #7320.')
   def test_pants_requirement(self):
     self.maxDiff = None
 
