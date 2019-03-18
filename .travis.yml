@@ -164,7 +164,7 @@ py36_linux_test_config: &py36_linux_test_config
 py37_linux_test_config: &py37_linux_test_config
   <<: *py37_linux_config
   <<: *base_linux_test_config
-  stage: *cron
+  stage: *test_cron
   env:
     - &py37_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
 
@@ -255,7 +255,7 @@ py36_osx_test_config: &py36_osx_test_config
 py37_osx_test_config: &py37_osx_test_config
   <<: *py37_osx_config
   <<: *base_osx_test_config
-  stage: *cron
+  stage: *test_cron
   env:
     - &py37_osx_test_config_env >
       PATH="/usr/local/opt/openssl/bin:$PATH"
