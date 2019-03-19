@@ -20,6 +20,7 @@ env:
     - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
     - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
     - PYENV_PY36_VERSION=3.6.8
+    - PYENV_PY37_VERSION=3.7.2
     - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
     - PYENV_BIN="${PYENV_ROOT}/bin/pyenv"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
@@ -112,8 +113,14 @@ pyenv_setup: &pyenv_setup >
 pyenv_install_py36: &pyenv_install_py36 >
   "${PYENV_BIN}" install "${PYENV_PY36_VERSION}"
 
+pyenv_install_py37: &pyenv_install_py37 >
+  "${PYENV_BIN}" install "${PYENV_PY37_VERSION}"
+
 pyenv_global_py36: &pyenv_global_py36 >
   "${PYENV_BIN}" global "${PYENV_PY36_VERSION}"
+
+pyenv_global_py37: &pyenv_global_py37 >
+  "${PYENV_BIN}" global "${PYENV_PY37_VERSION}"
 
 # -------------------------------------------------------------------------
 # AWS
@@ -231,11 +238,9 @@ py37_osx_config: &py37_osx_config
       {{>env_osx_with_pyenv}}
   before_install:
     {{>before_install_osx}}
-    # Clone pyenv directly from GitHub. For multiple osx images, brew's version of pyenv is too old to get
-    # modern Python 3.7. Pulling from GitHub instead allows us to use the same Python 3 version accross every OSX shard.
-    - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
-    - ${PYENV_ROOT}/bin/pyenv install 3.7.2
-    - ${PYENV_ROOT}/bin/pyenv global 3.7.2
+    - *pyenv_setup
+    - *pyenv_install_py37
+    - *pyenv_global_py37
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
@@ -386,11 +391,12 @@ py37_osx_build_engine: &py37_osx_build_engine
   stage: *bootstrap_cron
   name: "Build OSX native engine and pants.pex (Py3.7 PEX)"
   env:
-    - *base_osx_build_engine_env
     - *py37_osx_config_env
     - CACHE_NAME=osxpexbuild.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
-    - BOOTSTRAP_ARGS='-7b'
+  script:
+    - ./build-support/bin/ci.sh -7b
+    - *aws_deploy_pants_pex
 
 # -------------------------------------------------------------------------
 # Lint
