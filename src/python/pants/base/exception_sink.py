@@ -74,7 +74,7 @@ class ExceptionSink(object):
   _should_print_backtrace_to_terminal = True
   # An instance of `SignalHandler` which is invoked to handle a static set of specific
   # nonfatal signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they
-  # don't need to immediately).
+  # don't need to exit immediately).
   _signal_handler = None
 
   # These persistent open file descriptors are kept so the signal handler can do almost no work
@@ -162,8 +162,6 @@ class ExceptionSink(object):
     This method registers a SIGUSR2 handler, which permits a non-fatal `kill -31 <pants pid>` for
     stacktrace retrieval. This is also where the the error message on fatal exit will be printed to.
     """
-    logger.debug('registering a SIGUSR2 handler')
-
     try:
       # NB: mutate process-global state!
       # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
@@ -390,9 +388,6 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
     """Signal handler for non-fatal signals which raises or logs an error and exits with failure.
 
     The `_frame` argument is currently unused.
-
-    NB: Ensure this method remains registered for all the signals supported by SignalHandler
-    in reset_signal_handler()!
     """
     # Extract the stack, and format an entry to be written to the exception log.
     traceback_lines = traceback.format_stack()

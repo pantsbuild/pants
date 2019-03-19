@@ -454,7 +454,6 @@ class RunTracker(Subsystem):
   def has_ended(self):
     return self._end_memoized_result is not None
 
-  # TODO: memoize this with a decorator!
   def end(self):
     """This pants run is over, so stop tracking it.
 

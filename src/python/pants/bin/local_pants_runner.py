@@ -36,8 +36,8 @@ class LocalExiter(Exiter):
     super(LocalExiter, self).__init__(*args, **kwargs)
 
   def exit(self, result=PANTS_SUCCEEDED_EXIT_CODE, msg=None, *args, **kwargs):
-    # This variable is prepended to the existing exit message when calling the superclass .exit().
-    additional_message = None
+    # These strings are prepended to the existing exit message when calling the superclass .exit().
+    additional_messages = []
     try:
       if not self._run_tracker.has_ended():
         if result == PANTS_SUCCEEDED_EXIT_CODE:
@@ -51,7 +51,7 @@ class LocalExiter(Exiter):
           # Log the unrecognized exit code to the fatal exception log.
           ExceptionSink.log_exception(run_tracker_msg)
           # Ensure the unrecognized exit code message is also logged to the terminal.
-          additional_message = run_tracker_msg
+          additional_messages.push(run_tracker_msg)
           outcome = WorkUnit.FAILURE
 
         self._run_tracker.set_root_outcome(outcome)
@@ -62,7 +62,7 @@ class LocalExiter(Exiter):
       # so we just log that fact here and keep going.
       exception_string = str(e)
       ExceptionSink.log_exception(exception_string)
-      additional_message = exception_string
+      additional_messages.push(exception_string)
     finally:
       if self._repro:
         # TODO: Have Repro capture the 'after' state (as a diff) as well? (in reference to the below
@@ -71,8 +71,9 @@ class LocalExiter(Exiter):
         # a signal.
         self._repro.log_location_of_repro_file()
 
-    if additional_message:
-      msg = '{}\n\n{}'.format(additional_message, msg or '')
+    if additional_messages:
+      msg = '{}\n\n{}'.format('\n'.join(additional_messages),
+                              msg or '')
 
     super(LocalExiter, self).exit(result=result, msg=msg, *args, **kwargs)
 
@@ -215,24 +216,20 @@ class LocalPantsRunner(object):
 
   def set_start_time(self, start_time):
     # Launch RunTracker as early as possible (before .run() is called).
-    run_tracker = RunTracker.global_instance()
-    reporting = Reporting.global_instance()
-    reporting.initialize(run_tracker, self._options, start_time=self._run_start_time)
-
-    # Capture a repro of the 'before' state for this build, if needed.
-    repro = Reproducer.global_instance().create_repro()
-    if repro:
-      repro.capture(run_tracker.run_info.get_as_dict())
-
-    # The __call__ method of the Exiter allows for the prototype pattern.
-    new_exiter = LocalExiter(run_tracker, repro, exiter=self._exiter)
-    ExceptionSink.reset_exiter(new_exiter)
-    self._exiter = new_exiter
+    self._run_tracker = RunTracker.global_instance()
+    self._reporting = Reporting.global_instance()
 
     self._run_start_time = start_time
-    self._run_tracker = run_tracker
-    self._reporting = reporting
-    self._repro = repro
+    self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
+
+    # Capture a repro of the 'before' state for this build, if needed.
+    self._repro = Reproducer.global_instance().create_repro()
+    if self._repro:
+      self._repro.capture(self._run_tracker.run_info.get_as_dict())
+
+    # The __call__ method of the Exiter allows for the prototype pattern.
+    self._exiter = LocalExiter(self._run_tracker, self._repro, exiter=self._exiter)
+    ExceptionSink.reset_exiter(self._exiter)
 
   def run(self):
     with maybe_profiled(self._profile_path):

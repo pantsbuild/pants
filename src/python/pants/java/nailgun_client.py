@@ -15,7 +15,6 @@ from builtins import object, str
 
 from future.utils import PY3
 
-from pants.base.exception_sink import ExceptionSink
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.dirutil import safe_file_dump
@@ -27,7 +26,7 @@ from pants.util.strutil import ensure_binary
 logger = logging.getLogger(__name__)
 
 
-class NailgunClientSession(NailgunProtocol):
+class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutObject):
   """Handles a single nailgun client session."""
 
   def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False,
@@ -59,13 +58,23 @@ class NailgunClientSession(NailgunProtocol):
     self._exit_reason = None
 
   def _set_exit_timeout(self, timeout, reason):
-    """???"""
+    """Set a timeout for the remainder of the session, along with an exception to raise.
+    which is implemented by NailgunProtocol.
+
+    This method may be called by a signal handler to set a timeout for the remainder of the
+    session. If the session completes before the timeout does, the exception in `reason` is
+    raised. Otherwise, `NailgunProtocol.ProcessStreamTimeout` is raised.
+
+    :param float timeout: The length of time to time out, in seconds.
+    :param Exception reason: The exception to raise if the session completes before the timeout
+                             occurs.
+    """
     self._exit_timeout_start_time = time.time()
     self._exit_timeout = timeout
     self._exit_reason = reason
 
   def maybe_timeout_options(self):
-    """???"""
+    """Implements the NailgunProtocol.TimeoutObject interface."""
     if self._exit_timeout_start_time:
       return (self._exit_timeout_start_time, self._exit_timeout)
     else:
@@ -94,10 +103,14 @@ class NailgunClientSession(NailgunProtocol):
       raise
 
   def _process_session(self):
-    """Process the outputs of the nailgun session."""
+    """Process the outputs of the nailgun session.
+
+    :raises: :class:`NailgunProtocol.ProcessStreamTimeout` if a timeout set from a signal handler
+                                                           with .set_exit_timeout() completes.
+    :raises: :class:`Exception` if the session completes before the timeout, the `reason` argument
+                                to .set_exit_timeout() will be raised."""
     try:
       for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True,
-                                                  # TODO: make `timeout_object` into its own class?
                                                   timeout_object=self):
         # TODO(#6579): assert that we have at this point received all the chunk types in
         # ChunkType.REQUEST_TYPES, then require PID and PGRP (exactly once?), and then allow any of
@@ -275,8 +288,7 @@ class NailgunClient(object):
       return sock
 
   def set_exit_timeout(self, timeout, reason):
-    """???"""
-    ExceptionSink.log_exception('timeout: {}, reason: {}'.format(timeout, reason))
+    """Expose the inner session object's exit timeout setter."""
     self._session._set_exit_timeout(timeout, reason)
 
   # TODO: make all invocations of this method instead require that the process is alive via the

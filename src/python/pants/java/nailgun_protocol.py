@@ -8,9 +8,11 @@ import os
 import socket
 import struct
 import time
+from abc import abstractmethod
 from builtins import bytes, object, str, zip
 from contextlib import contextmanager
 
+from pants.util.meta import AbstractClass
 from pants.util.osutil import IntegerForPid
 
 
@@ -214,14 +216,13 @@ class NailgunProtocol(object):
     return chunk_type, payload
 
   class ProcessStreamTimeout(Exception):
-    """???"""
+    """Raised after a timeout completes when a timeout is set on the stream during iteration."""
 
   @classmethod
   @contextmanager
   def _set_socket_timeout(cls, sock, timeout=None):
-    """???"""
+    """Temporarily set a socket timeout in order to respect a timeout provided to .iter_chunks()."""
     if timeout is not None:
-      # NB: this is only set if provided a timeout!
       prev_timeout = sock.gettimeout()
     try:
       if timeout is not None:
@@ -233,9 +234,34 @@ class NailgunProtocol(object):
       if timeout is not None:
         sock.settimeout(prev_timeout)
 
+  class TimeoutObject(AbstractClass):
+
+    @abstractmethod
+    def maybe_timeout_options(self):
+      """Called on every stream iteration to obtain a possible specification for a timeout.
+
+      If this method returns non-None, it should return a 2-tuple of the time the timeout began, and
+      the length of the timeout, both as positive floats.
+
+      :returns: a 2-tuple of (timeout_start_time, timeout_interval), or None
+      :rtype: tuple of float
+      """
+
   @classmethod
   def iter_chunks(cls, sock, return_bytes=False, timeout_object=None):
-    """Generates chunks from a connected socket until an Exit chunk is sent."""
+    """Generates chunks from a connected socket until an Exit chunk is sent or a timeout occurs.
+
+    After this method returns non-None once, the .iter_chunks() method will then check the time on
+    every iteration, raising `cls.ProcessStreamTimeout` if the time runs out before the iteration is
+    complete.
+
+    :param sock: the socket to read from.
+    :param bool return_bytes: If False, decode the payload into a utf-8 string.
+    :param cls.TimeoutObject timeout_object: If provided, will be checked every iteration for a
+                                             possible timeout.
+    :raises: :class:`cls.ProcessStreamTimeout`
+    """
+    assert(timeout_object is None or isinstance(timeout_object, cls.TimeoutObject))
     orig_timeout_time = None
     timeout_interval = None
     while 1:
@@ -248,10 +274,10 @@ class NailgunProtocol(object):
             .format(timeout_interval, orig_timeout_time, (-1 * remaining_time)))
       elif timeout_object is not None:
         opts = timeout_object.maybe_timeout_options()
-        remaining_time = None
         if opts:
           orig_timeout_time, timeout_interval = opts
           continue
+        remaining_time = None
       else:
         remaining_time = None
 

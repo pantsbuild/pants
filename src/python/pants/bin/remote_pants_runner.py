@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def _make_interrupted_by_user_error():
-  """???/used in the signal handler and raised upon a socket timeout error!"""
+  """Create an exception which is set by the signal handler and/or a socket timeout!"""
   return KeyboardInterrupt('Interrupted by user over pailgun client!')
 
 

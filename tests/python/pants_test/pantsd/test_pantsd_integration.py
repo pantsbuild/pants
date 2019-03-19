@@ -405,6 +405,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       )
 
       checker.assert_started()
+      checker.assert_pantsd_runner_started(waiter_handle.process.pid)
 
       creator_handle = self.run_pants_with_workdir_without_waiting(
         ['run', 'testprojects/src/python/coordinated_runs:creator', '--', file_to_make],
