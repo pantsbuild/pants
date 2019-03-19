@@ -52,12 +52,12 @@ class JsonReporter(Reporter):
     """Implementation of Reporter callback."""
 
     with open(self.report_path, 'w+') as fp:
-      fp.write(str(json.dumps(
+      fp.write(json.dumps(
         {
           'workunits': self._results,
           'artifact_cache_stats': self.run_tracker.artifact_cache_stats.get_all(),
         }
-      )))
+      ))
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
