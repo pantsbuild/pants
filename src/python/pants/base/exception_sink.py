@@ -49,14 +49,30 @@ class SignalHandler(object):
       signal.SIGTERM: self.handle_sigterm,
     }
 
-  def handle_sigint(self, signum, frame):
+  def handle_sigint(self, signum, _frame):
     raise KeyboardInterrupt('User interrupted execution with control-c!')
 
-  def handle_sigquit(self, signum, frame):
-    ExceptionSink._handle_signal_gracefully(signum, 'SIGQUIT', frame)
+  # TODO(#7406): figure out how to let sys.exit work in a signal handler instead of having to raise
+  # this exception!
+  class SignalHandledNonLocalExit(Exception):
+    """Raised in handlers for non-fatal signals to overcome Python limitations.
 
-  def handle_sigterm(self, signum, frame):
-    ExceptionSink._handle_signal_gracefully(signum, 'SIGTERM', frame)
+    When waiting on a subprocess and in a signal handler, sys.exit appears to be ignored, and causes
+    the signal handler to return. We want to (eventually) exit after these signals, not ignore them,
+    so we raise this exception instead and check it in our sys.excepthook override.
+    """
+
+    def __init__(self, signum, signame):
+      self.signum = signum
+      self.signame = signame
+      self.traceback_lines = traceback.format_stack()
+      super(SignalHandler.SignalHandledNonLocalExit, self).__init__()
+
+  def handle_sigquit(self, signum, _frame):
+    raise self.SignalHandledNonLocalExit(signum, 'SIGQUIT')
+
+  def handle_sigterm(self, signum, _frame):
+    raise self.SignalHandledNonLocalExit(signum, 'SIGTERM')
 
 
 class ExceptionSink(object):
@@ -360,6 +376,10 @@ timestamp: {timestamp}
     exc = exc or sys.exc_info()[1]
     tb = tb or sys.exc_info()[2]
 
+    # This exception was raised by a signal handler with the intent to exit the program.
+    if exc_class == SignalHandler.SignalHandledNonLocalExit:
+      return cls._handle_signal_gracefully(exc.signum, exc.signame, exc.traceback_lines)
+
     extra_err_msg = None
     try:
       # Always output the unhandled exception details into a log file, including the traceback.
@@ -384,13 +404,9 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 """
 
   @classmethod
-  def _handle_signal_gracefully(cls, signum, signame, _frame):
-    """Signal handler for non-fatal signals which raises or logs an error and exits with failure.
-
-    The `_frame` argument is currently unused.
-    """
+  def _handle_signal_gracefully(cls, signum, signame, traceback_lines):
+    """Signal handler for non-fatal signals which raises or logs an error and exits with failure."""
     # Extract the stack, and format an entry to be written to the exception log.
-    traceback_lines = traceback.format_stack()
     formatted_traceback = cls._format_traceback(traceback_lines=traceback_lines,
                                                 should_print_backtrace=True)
     signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(

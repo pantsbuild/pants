@@ -38,20 +38,20 @@ class PailgunClientSignalHandler(SignalHandler):
     self._timeout = timeout
     super(PailgunClientSignalHandler, self).__init__(*args, **kwargs)
 
-  def _ferry_signal_with_timeout(self, signum):
+  def _forward_signal_with_timeout(self, signum):
     self._pailgun_client.set_exit_timeout(
       timeout=self._timeout,
       reason=_make_interrupted_by_user_error())
     self._pailgun_client.maybe_send_signal(signum)
 
-  def handle_sigint(self, signum, frame):
-    self._ferry_signal_with_timeout(signum)
+  def handle_sigint(self, signum, _frame):
+    self._forward_signal_with_timeout(signum)
 
-  def handle_sigquit(self, signum, frame):
-    self._ferry_signal_with_timeout(signum)
+  def handle_sigquit(self, signum, _frame):
+    self._forward_signal_with_timeout(signum)
 
-  def handle_sigterm(self, signum, frame):
-    self._ferry_signal_with_timeout(signum)
+  def handle_sigterm(self, signum, _frame):
+    self._forward_signal_with_timeout(signum)
 
 
 class RemotePantsRunner(object):

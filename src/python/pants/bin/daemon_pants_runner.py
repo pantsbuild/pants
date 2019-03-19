@@ -30,7 +30,7 @@ from pants.util.socket import teardown_socket
 
 class DaemonSignalHandler(SignalHandler):
 
-  def handle_sigint(self, signum, frame):
+  def handle_sigint(self, signum, _frame):
     raise KeyboardInterrupt('remote client sent control-c!')
 
 

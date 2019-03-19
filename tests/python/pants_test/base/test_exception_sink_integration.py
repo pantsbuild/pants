@@ -31,6 +31,10 @@ Exception caught: \\(pants\\.build_graph\\.address_lookup_error\\.AddressLookupE
 Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
   ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
 """.format(pid=pid))
+    # Ensure we write all output such as stderr and reporting files before closing any streams.
+    self.assertNotIn(
+      'Exception message: I/O operation on closed file.',
+      file_contents)
 
   def _get_log_file_paths(self, workdir, pants_run):
     pid_specific_log_file = ExceptionSink.exceptions_log_path(for_pid=pants_run.pid, in_dir=workdir)
@@ -71,6 +75,7 @@ sys\\.argv: ([^\n]+)
 pid: {pid}
 Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
 """.format(pid=pid, signum=signum, signame=signame))
+    # Ensure we write all output such as stderr and reporting files before closing any streams.
     self.assertNotIn(
       'Exception message: I/O operation on closed file.',
       contents)
