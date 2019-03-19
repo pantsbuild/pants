@@ -6,14 +6,15 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
-from builtins import list, open, str
+from builtins import list, str
 from collections import defaultdict, namedtuple
 
 from future.moves.itertools import zip_longest
+from future.utils import PY3
 from six import string_types
 
 from pants.reporting.reporter import Reporter
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_file_dump, safe_mkdir
 
 
 class JsonReporter(Reporter):
@@ -35,13 +36,17 @@ class JsonReporter(Reporter):
     super(JsonReporter, self).__init__(run_tracker, settings)
 
     # The main report output.
-    self.report_path = os.path.join(settings.json_dir, 'build.json')
+    self._report_path = os.path.join(settings.json_dir, 'build.json')
 
-    # Results of the state of the build.
+    # We accumulate build state into this dict.
     self._results = {}
 
     # We use a stack to track the nested workunit traversal of each root.
     self._root_id_to_workunit_stack = defaultdict(list)
+
+  @property
+  def report_path(self):
+    return self._report_path
 
   def open(self):
     """Implementation of Reporter callback."""
@@ -51,13 +56,15 @@ class JsonReporter(Reporter):
   def close(self):
     """Implementation of Reporter callback."""
 
-    with open(self.report_path, 'w+') as fp:
-      fp.write(json.dumps(
-        {
-          'workunits': self._results,
-          'artifact_cache_stats': self.run_tracker.artifact_cache_stats.get_all(),
-        }
-      ))
+    mode = 'w' if PY3 else 'wb'
+
+    safe_file_dump(
+      self.report_path,
+      json.dumps({
+        'workunits': self._results,
+        'artifact_cache_stats': self.run_tracker.artifact_cache_stats.get_all(),
+      }),
+      mode=mode)
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
