@@ -385,7 +385,7 @@ py37_linux_build_engine: &py37_linux_build_engine
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
   script:
     - ./build-support/bin/ci.sh -7b
-    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - *aws_deploy_pants_pex
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
