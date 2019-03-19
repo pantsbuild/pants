@@ -121,7 +121,7 @@ class PantsDaemon(FingerprintedProcessManager):
           return PantsDaemon.Handle(
               stub_pantsd.await_pid(10),
               stub_pantsd.read_named_socket('pailgun', int),
-              stub_pantsd._metadata_base_dir,
+              text_type(stub_pantsd._metadata_base_dir),
           )
 
     @classmethod
@@ -437,7 +437,7 @@ class PantsDaemon(FingerprintedProcessManager):
     listening_port = self.read_named_socket('pailgun', int)
     self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
                        .format(self.pid, listening_port))
-    return self.Handle(pantsd_pid, listening_port, self._metadata_base_dir)
+    return self.Handle(pantsd_pid, listening_port, text_type(self._metadata_base_dir))
 
   def terminate(self, include_watchman=True):
     """Terminates pantsd and watchman.

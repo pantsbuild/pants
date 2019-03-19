@@ -63,14 +63,17 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
       self._assert_unhandled_exception_log_matches(
         pants_run.pid, read_file(shared_log_file, binary_mode=False))
 
-  def _assert_graceful_signal_log_matches(self, pid, signum, contents):
+  def _assert_graceful_signal_log_matches(self, pid, signum, signame, contents):
     assertRegex(self, contents, """\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
-Signal {signum} ({signame}) was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
-""".format(pid=pid, signum=signum, signame=ExceptionSink._SIGNAL_NAMES[signum]))
+Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
+""".format(pid=pid, signum=signum, signame=signame))
+    self.assertNotIn(
+      'Exception message: I/O operation on closed file.',
+      contents)
 
   @contextmanager
   def _make_waiter_handle(self):
@@ -107,19 +110,24 @@ Signal {signum} ({signame}) was raised\\. Exiting with failure\\. \\(backtrace o
       # Return the (failed) pants execution result.
       yield (workdir, waiter_run)
 
-  def test_dumps_logs_on_terminate(self):
-    # Send a SIGTERM to the local pants process.
-    with self._send_signal_to_waiter_handle(signal.SIGTERM) as (workdir, waiter_run):
-      assertRegex(self, waiter_run.stderr_data, """\
+  def test_dumps_logs_on_signal(self):
+    """Send signals which are handled, but don't get converted into a KeyboardInterrupt."""
+    signal_names = {
+      signal.SIGQUIT: 'SIGQUIT',
+      signal.SIGTERM: 'SIGTERM',
+    }
+    for (signum, signame) in signal_names.items():
+      with self._send_signal_to_waiter_handle(signum) as (workdir, waiter_run):
+        assertRegex(self, waiter_run.stderr_data, """\
 timestamp: ([^\n]+)
-Signal {signum} (SIGTERM) was raised. Exiting with failure. \\(backtrace omitted\\)
-""".format(signum=signal.SIGTERM))
-      # Check that the logs show a graceful exit by SIGTERM.
-      pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
-      self._assert_graceful_signal_log_matches(
-        waiter_run.pid, signal.SIGTERM, read_file(pid_specific_log_file, binary_mode=False))
-      self._assert_graceful_signal_log_matches(
-          waiter_run.pid, signal.SIGTERM, read_file(shared_log_file, binary_mode=False))
+Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
+""".format(signum=signum, signame=signame))
+        # Check that the logs show a graceful exit by SIGTERM.
+        pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
+        self._assert_graceful_signal_log_matches(
+          waiter_run.pid, signum, signame, read_file(pid_specific_log_file, binary_mode=False))
+        self._assert_graceful_signal_log_matches(
+          waiter_run.pid, signum, signame, read_file(shared_log_file, binary_mode=False))
 
   def test_dumps_traceback_on_sigabrt(self):
     # SIGABRT sends a traceback to the log file for the current process thanks to
@@ -147,15 +155,11 @@ Thread [^\n]+ \\(most recent call first\\):
 Current thread [^\n]+ \\(most recent call first\\):
 """)
 
-  def test_keyboardinterrupt_signals(self):
-    signal_messages = {
-      signal.SIGINT: 'User interrupted execution with control-c!',
-      signal.SIGQUIT: 'A SIGQUIT was received.',
-    }
-    for interrupt_signal, signal_msg in signal_messages.items():
-      with self._send_signal_to_waiter_handle(interrupt_signal) as (workdir, waiter_run):
-        self.assertIn('Interrupted by user:\n{}'.format(signal_msg),
-                      waiter_run.stderr_data)
+  def test_keyboardinterrupt(self):
+    with self._send_signal_to_waiter_handle(signal.SIGINT) as (_, waiter_run):
+      self.assertIn(
+        'Interrupted by user:\nUser interrupted execution with control-c!',
+        waiter_run.stderr_data)
 
   def _lifecycle_stub_cmdline(self):
     # Load the testprojects pants-plugins to get some testing tasks and subsystems.
