@@ -149,7 +149,7 @@ class WorkUnit(object):
 
     return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnitLabel.TOOL)
 
-  def close_outputs(self):
+  def cleanup(self):
     """Cleanup by closing all output streams."""
     for output in self._outputs.values():
       output.close()
