@@ -141,7 +141,6 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutObject):
       self._maybe_stop_input_writer()
       # If an asynchronous error was set at any point (such as in a signal handler), we want to make
       # sure we clean up the remote process before exiting with error.
-      # TODO: test this!
       if self._exit_reason:
         if self.remote_pgrp:
           safe_kill(self.remote_pgrp, signal.SIGKILL)
@@ -219,9 +218,12 @@ class NailgunClient(object):
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
     :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
-    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are encountered
-    # TODO: fix docstring!
-    :param bool expects_pid: Whether or not to expect a PID from the server (only true for pantsd)
+    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
+                                     encountered
+    :param string metadata_base_dir: If a PID and PGRP are received from the server (only for
+                                     pailgun connections), a file with the remote pid will be
+                                     written under this directory. For non-pailgun connections this
+                                     may be None.
     """
     self._host = host
     self._port = port
@@ -238,7 +240,6 @@ class NailgunClient(object):
     self._current_remote_pid = None
     self._current_remote_pgrp = None
 
-  # TODO: inject the '.pids' dir into the NailgunClient constructor!
   def _get_remote_pid_file_path(self, pid):
     return os.path.join(
       self._metadata_base_dir,
@@ -291,8 +292,8 @@ class NailgunClient(object):
     """Expose the inner session object's exit timeout setter."""
     self._session._set_exit_timeout(timeout, reason)
 
-  # TODO: make all invocations of this method instead require that the process is alive via the
-  # result of .remote_client_status() before sending a signal! safe_kill() should probably be
+  # TODO(#6579): make all invocations of this method instead require that the process is alive via
+  # the result of .remote_client_status() before sending a signal! safe_kill() should probably be
   # removed as well.
   def maybe_send_signal(self, signum, include_pgrp=True):
     """Send the signal `signum` send if the PID and/or PGRP chunks have been received.
