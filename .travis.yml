@@ -728,7 +728,7 @@ base_deploy_unstable_multiplatform_pex: &base_deploy_unstable_multiplatform_pex
     - mv dist/pants*.pex dist/deploy/pex/
 
 py27_deploy_unstable_multiplatform_pex: &py27_deploy_unstable_multiplatform_pex
-  <<: *base_deploy_unstable_muliplatform_pex
+  <<: *base_deploy_unstable_multiplatform_pex
   name: "Deploy unstable multiplatform pants.pex (Py2.7 PEX)"
   python: 2.7
   env:
@@ -738,7 +738,7 @@ py27_deploy_unstable_multiplatform_pex: &py27_deploy_unstable_multiplatform_pex
     - CACHE_NAME=linuxpexdeployunstable.py27
 
 py36_deploy_unstable_multiplatform_pex: &py36_deploy_unstable_multiplatform_pex
-  <<: *base_deploy_unstable_muliplatform_pex
+  <<: *base_deploy_unstable_multiplatform_pex
   name: "Deploy unstable multiplatform pants.pex (Py3.6 PEX)"
   python: 3.6
   env:
