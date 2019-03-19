@@ -91,6 +91,10 @@ pants_run_cache_config: &pants_run_cache_config
 # Generic shard setups
 # -------------------------------------------------------------------------
 
+pantsd_enable_env: &pantsd_enable_env >
+  PANTS_ENABLE_PANTSD="true"
+  PANTS_SHUTDOWN_PANTSD_AFTER_RUN="true"
+
 base_linux_config: &base_linux_config
   os: linux
   dist: xenial
@@ -135,8 +139,6 @@ py27_linux_test_config: &py27_linux_test_config
   stage: *test_cron
   env:
     - &py27_linux_test_config_env >
-      PANTS_ENABLE_PANTSD="true"
-      PANTS_SHUTDOWN_PANTSD_AFTER_RUN="true"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
 py36_linux_test_config: &py36_linux_test_config
@@ -145,8 +147,6 @@ py36_linux_test_config: &py36_linux_test_config
   stage: *test
   env:
     - &py36_linux_test_config_env >
-      PANTS_ENABLE_PANTSD="true"
-      PANTS_SHUTDOWN_PANTSD_AFTER_RUN="true"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
 base_osx_config: &base_osx_config
@@ -188,8 +188,6 @@ py27_osx_test_config: &py27_osx_test_config
   stage: *test_cron
   env:
     - &py27_osx_test_config_env >
-      PANTS_ENABLE_PANTSD="true"
-      PANTS_SHUTDOWN_PANTSD_AFTER_RUN="true"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
 
 py36_osx_test_config: &py36_osx_test_config
@@ -200,8 +198,6 @@ py36_osx_test_config: &py36_osx_test_config
     # Must duplicate py36_osx_config's env because it cannot be merged into a new anchor
     - &py36_osx_test_config_env >
       {{>env_osx_with_pyenv}}
-      PANTS_ENABLE_PANTSD="true"
-      PANTS_SHUTDOWN_PANTSD_AFTER_RUN="true"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
 
 linux_with_fuse: &linux_with_fuse
@@ -712,6 +708,7 @@ matrix:
       name: "Integration tests for pants - shard {{.}} (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_enable_env
         - CACHE_NAME=integrationshard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -c -i {{.}}/{{py3_integration_shards_length}}
@@ -723,6 +720,7 @@ matrix:
       stage: *test
       env:
         - *py27_linux_test_config_env
+        - *pantsd_enable_env
         - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']"
         - CACHE_NAME=integrationshard{{.}}.py27blacklist
       script:
@@ -734,6 +732,7 @@ matrix:
       name: "Integration tests for pants - shard {{.}} (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
+        - *pantsd_enable_env
         - CACHE_NAME=cronshard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i {{.}}/{{cron_integration_shards_length}}
@@ -748,6 +747,7 @@ matrix:
       stage: *test
       env:
         - *py27_linux_test_config_env
+        - *pantsd_enable_env
         - CACHE_NAME=linuxcontribtests.py27
       script:
         - ./build-support/bin/travis-ci.sh -2n
@@ -756,6 +756,7 @@ matrix:
       name: "Python contrib tests (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
+        - *pantsd_enable_env
         - CACHE_NAME=linuxcontribtests.py36
       script:
         - ./build-support/bin/travis-ci.sh -n
