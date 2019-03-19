@@ -13,6 +13,7 @@ import sys
 import time
 from builtins import object, str
 
+import psutil
 from future.utils import PY3
 
 from pants.java.nailgun_io import NailgunStreamWriter
@@ -20,13 +21,13 @@ from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.dirutil import safe_file_dump
 from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
-from pants.util.strutil import ensure_binary
+from pants.util.strutil import ensure_binary, safe_shlex_join
 
 
 logger = logging.getLogger(__name__)
 
 
-class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutObject):
+class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
   """Handles a single nailgun client session."""
 
   def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False,
@@ -49,6 +50,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutObject):
     self._stderr = err_file
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self.remote_pid = None
+    self.remote_process_cmdline = None
     self.remote_pgrp = None
     self._remote_pid_callback = remote_pid_callback
     self._remote_pgrp_callback = remote_pgrp_callback
@@ -74,9 +76,9 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutObject):
     self._exit_reason = reason
 
   def maybe_timeout_options(self):
-    """Implements the NailgunProtocol.TimeoutObject interface."""
+    """Implements the NailgunProtocol.TimeoutProvider interface."""
     if self._exit_timeout_start_time:
-      return (self._exit_timeout_start_time, self._exit_timeout)
+      return NailgunProtocol.TimeoutOptions(self._exit_timeout_start_time, self._exit_timeout)
     else:
       return None
 
@@ -102,6 +104,9 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutObject):
       # Otherwise, re-raise.
       raise
 
+  class ExitTimedOut(Exception):
+    """Raised when a timeout for the remote client exit was breached."""
+
   def _process_session(self):
     """Process the outputs of the nailgun session.
 
@@ -125,6 +130,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutObject):
           return int(payload)
         elif chunk_type == ChunkType.PID:
           self.remote_pid = int(payload)
+          self.remote_process_cmdline = psutil.Process(self.remote_pid).cmdline()
           if self._remote_pid_callback:
             self._remote_pid_callback(self.remote_pid)
         elif chunk_type == ChunkType.PGRP:
@@ -135,6 +141,17 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutObject):
           self._maybe_start_input_writer()
         else:
           raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
+    except NailgunProtocol.ProcessStreamTimeout as e:
+      assert(self.remote_pid is not None)
+      # NB: We overwrite the process title in the pantsd-runner process, which causes it to have an
+      # argv with lots of empty spaces for some reason. We filter those out and pretty-print the
+      # rest here.
+      filtered_remote_cmdline = safe_shlex_join(
+        arg for arg in self.remote_process_cmdline if arg != '')
+      logger.warning(
+        "timed out when attempting to gracefully shut down the remote client executing \"{}\". "
+        "sending SIGKILL to the remote client at pid: {}. message: {}"
+        .format(filtered_remote_cmdline, self.remote_pid, e))
     finally:
       # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
       # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamWriter is always stopped.

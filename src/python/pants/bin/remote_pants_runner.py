@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-import signal
 import sys
 import time
 from builtins import object, str
@@ -25,11 +24,6 @@ from pants.util.dirutil import maybe_read_file
 logger = logging.getLogger(__name__)
 
 
-def _make_interrupted_by_user_error():
-  """Create an exception which is set by the signal handler and/or a socket timeout!"""
-  return KeyboardInterrupt('Interrupted by user over pailgun client!')
-
-
 class PailgunClientSignalHandler(SignalHandler):
 
   def __init__(self, pailgun_client, timeout=1, *args, **kwargs):
@@ -41,7 +35,7 @@ class PailgunClientSignalHandler(SignalHandler):
   def _forward_signal_with_timeout(self, signum):
     self._pailgun_client.set_exit_timeout(
       timeout=self._timeout,
-      reason=_make_interrupted_by_user_error())
+      reason=KeyboardInterrupt('Interrupted by user over pailgun client!'))
     self._pailgun_client.maybe_send_signal(signum)
 
   def handle_sigint(self, signum, _frame):
@@ -90,19 +84,13 @@ class RemotePantsRunner(object):
     self._stderr = stderr or (sys.stderr.buffer if PY3 else sys.stderr)
 
   @contextmanager
-  def _trapped_signals(self, client, timeout=None):
+  def _trapped_signals(self, client):
     """A contextmanager that handles SIGINT (control-c) and SIGQUIT (control-\\) remotely."""
-    signal_handler = PailgunClientSignalHandler(client, timeout=timeout)
+    signal_handler = PailgunClientSignalHandler(
+      client,
+      timeout=self._bootstrap_options.for_global_scope().pantsd_pailgun_quit_timeout)
     with ExceptionSink.trapped_signals(signal_handler):
-      try:
-        yield
-      except NailgunProtocol.ProcessStreamTimeout as e:
-        logger.warn("timed out when attempting to gracefully shut down the remote client. "
-                    "sending SIGKILL to the remote client at pid: {}. "
-                    "original timeout seconds: {}, message: {}"
-                    .format(client._maybe_last_pid(), timeout, e))
-        client.maybe_send_signal(signal.SIGKILL)
-        raise _make_interrupted_by_user_error()
+      yield
 
   def _setup_logging(self):
     """Sets up basic stdio logging for the thin client."""
@@ -174,7 +162,7 @@ class RemotePantsRunner(object):
                            exit_on_broken_pipe=True,
                            metadata_base_dir=pantsd_handle.metadata_base_dir)
 
-    with self._trapped_signals(client, timeout=1), STTYSettings.preserved():
+    with self._trapped_signals(client), STTYSettings.preserved():
       # Execute the command on the pailgun.
       try:
         result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)

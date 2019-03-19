@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import datetime
 import os
 import socket
 import struct
@@ -13,6 +14,7 @@ from builtins import bytes, object, str, zip
 from contextlib import contextmanager
 
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 from pants.util.osutil import IntegerForPid
 
 
@@ -234,17 +236,18 @@ class NailgunProtocol(object):
       if timeout is not None:
         sock.settimeout(prev_timeout)
 
-  class TimeoutObject(AbstractClass):
+  class TimeoutOptions(datatype([('start_time', float), ('interval', float)])): pass
+
+  class TimeoutProvider(AbstractClass):
 
     @abstractmethod
     def maybe_timeout_options(self):
       """Called on every stream iteration to obtain a possible specification for a timeout.
 
-      If this method returns non-None, it should return a 2-tuple of the time the timeout began, and
-      the length of the timeout, both as positive floats.
+      If this method returns non-None, it should return an instance of `cls.TimeoutOptions`, which
+      then initiates a timeout after which the stream will raise `cls.ProcessStreamTimeout`.
 
-      :returns: a 2-tuple of (timeout_start_time, timeout_interval), or None
-      :rtype: tuple of float
+      :rtype: :class:`cls.TimeoutOptions`, or None
       """
 
   @classmethod
@@ -257,25 +260,27 @@ class NailgunProtocol(object):
 
     :param sock: the socket to read from.
     :param bool return_bytes: If False, decode the payload into a utf-8 string.
-    :param cls.TimeoutObject timeout_object: If provided, will be checked every iteration for a
+    :param cls.TimeoutProvider timeout_object: If provided, will be checked every iteration for a
                                              possible timeout.
     :raises: :class:`cls.ProcessStreamTimeout`
     """
-    assert(timeout_object is None or isinstance(timeout_object, cls.TimeoutObject))
+    assert(timeout_object is None or isinstance(timeout_object, cls.TimeoutProvider))
     orig_timeout_time = None
     timeout_interval = None
     while 1:
       if orig_timeout_time is not None:
         remaining_time = time.time() - (orig_timeout_time + timeout_interval)
-        if remaining_time < 0:
+        if remaining_time > 0:
+          original_timestamp = datetime.datetime.fromtimestamp(orig_timeout_time).isoformat()
           raise cls.ProcessStreamTimeout(
-            "iterating over bytes timed out with timeout interval {} starting at {}, "
+            "iterating over bytes from nailgun timed out with timeout interval {} starting at {}, "
             "overtime seconds: {}"
-            .format(timeout_interval, orig_timeout_time, (-1 * remaining_time)))
+            .format(timeout_interval, original_timestamp, remaining_time))
       elif timeout_object is not None:
         opts = timeout_object.maybe_timeout_options()
         if opts:
-          orig_timeout_time, timeout_interval = opts
+          orig_timeout_time = opts.start_time
+          timeout_interval = opts.interval
           continue
         remaining_time = None
       else:

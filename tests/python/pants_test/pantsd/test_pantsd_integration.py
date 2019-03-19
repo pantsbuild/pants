@@ -4,8 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import datetime
 import itertools
 import os
+import re
 import signal
 import threading
 import time
@@ -416,17 +418,22 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
-  def _assert_pantsd_keyboardinterrupt_signal(self, signum, message):
+  def _assert_pantsd_keyboardinterrupt_signal(self, signum, messages, regexps=[],
+                                              quit_timeout=None):
     # TODO: This tests that pantsd-runner processes actually die after the thin client receives the
     # specified signal.
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
       file_to_make = os.path.join(workdir, 'some_magic_file')
-      waiter_handle = self.run_pants_with_workdir_without_waiting(
-        ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
-        workdir,
-        config,
-      )
+
+      if quit_timeout is not None:
+        timeout_args = ['--pantsd-pailgun-quit-timeout={}'.format(quit_timeout)]
+      else:
+        timeout_args = []
+      argv = timeout_args + [
+        'run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make
+      ]
+      waiter_handle = self.run_pants_with_workdir_without_waiting(argv, workdir, config)
       client_pid = waiter_handle.process.pid
 
       checker.assert_started()
@@ -434,12 +441,15 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
       # Get all the pantsd-runner processes while they're still around.
       pantsd_runner_processes = checker.runner_process_context.current_processes()
-      # This should kill the pantsd-runner processes through the RemotePantsRunner SIGINT handler.
+      # This should kill the pantsd-runner processes through the RemotePantsRunner signal handler.
       os.kill(client_pid, signum)
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
 
-      self.assertIn(message, waiter_run.stderr_data)
+      for msg in messages:
+        self.assertIn(msg, waiter_run.stderr_data)
+      for regexp in regexps:
+        assertRegex(self, waiter_run.stderr_data, regexp)
 
       time.sleep(1)
       for proc in pantsd_runner_processes:
@@ -451,12 +461,23 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
   def test_pantsd_sigterm(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGTERM,
-      'Signal {signum} (SIGTERM) was raised. Exiting with failure.'.format(signum=signal.SIGTERM))
+      ['Signal {signum} (SIGTERM) was raised. Exiting with failure.'.format(signum=signal.SIGTERM)])
 
   def test_keyboardinterrupt_signals_with_pantsd(self):
     for interrupt_signal in [signal.SIGINT, signal.SIGQUIT]:
-      self._assert_pantsd_keyboardinterrupt_signal(interrupt_signal,
-                                                   '\nInterrupted by user over pailgun client!\n')
+      self._assert_pantsd_keyboardinterrupt_signal(
+        interrupt_signal,
+        ['\nInterrupted by user over pailgun client!\n'])
+
+  def test_signal_pailgun_stream_timeout(self):
+    today = datetime.date.today().isoformat()
+    self._assert_pantsd_keyboardinterrupt_signal(
+      signal.SIGINT,
+      messages=['\nInterrupted by user over pailgun client!\n'],
+      regexps=["""WARN\\] timed out when attempting to gracefully shut down the remote client executing "'pantsd-runner.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, overtime seconds: [^\n]+"""
+               .format(today=re.escape(today))],
+      quit_timeout=0.01,
+    )
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
