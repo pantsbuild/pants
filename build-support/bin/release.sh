@@ -609,8 +609,12 @@ function build_pex() {
       ;;
     fetch)
       local platforms=()
+      # TODO(pex#654): once Pex can release flexible binaries, consolidate all 4 binaries into the same entry
+      # to build a Pex that works with cp27mu, cp27m, and cp36m.
       abis=("cp-27-mu" "cp-27-m")
       if [[ "${python_three:-false}" == "true" ]]; then
+        # Note if we want to start releasing a Pex that works with Py37, we will need to
+        # add "cp-37-m" here.
         abis=("cp-36-m")
       fi
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
