@@ -416,10 +416,13 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
-# TODO: Read this value from some environment variable! This will be overridden by bootstrap options
-# in PantsRunner, so this setting is only for errors occurring during import time (which is
-# nontrivial). Most users won't want a full stacktrace upon pressing control-c!
-ExceptionSink.reset_should_print_backtrace_to_terminal(should_print_backtrace=True)
+# Set whether to print stacktraces on exceptions or signals during import time.
+# NB: This will be overridden by bootstrap options in PantsRunner, so we avoid printing out a full
+# stacktrace when a user presses control-c during import time unless the environment variable is set
+# to explicitly request it. The exception log will have any stacktraces regardless so this should
+# not hamper debugging.
+ExceptionSink.reset_should_print_backtrace_to_terminal(
+  should_print_backtrace=os.environ.get('PANTS_PRINT_EXCEPTION_STACKTRACE') == 'True')
 # Sets fatal signal handlers with reasonable defaults to catch errors early in startup.
 ExceptionSink.reset_log_location(os.path.join(get_buildroot(), '.pants.d'))
 # Sets except hook.
