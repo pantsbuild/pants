@@ -598,16 +598,14 @@ function build_pex() {
       ;;
     fetch)
       local platforms=()
+      abis=("cp-27-mu" "cp-27-m")
+      if [[ "${python_three:-false}" == "true" ]]; then
+        abis=("cp-36-m" "cp-36-abi3")
+      fi
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
-        if [[ "${python_three:-false}" == "false" ]]; then
-          for abi in "cp-27-mu" "cp-27-m"; do
-            platforms=("${platforms[@]}" "${platform}-${abi}")
-          done
-        else
-          for abi in "cp-36-abi3" "cp-36-m"; do
-            platforms=("${platforms[@]}" "${platform}-${abi}")
-          done
-        fi
+        for abi in "${abis[@]}"; do
+          platforms=("${platforms[@]}" "${platform}-${abi}")
+        done
       done
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
       local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${dest_suffix}"
