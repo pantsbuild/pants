@@ -600,7 +600,7 @@ function build_pex() {
       local platforms=()
       abis=("cp-27-mu" "cp-27-m")
       if [[ "${python_three:-false}" == "true" ]]; then
-        abis=("cp-36-m" "cp-36-abi3")
+        abis=("cp-36-abi3")
       fi
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
