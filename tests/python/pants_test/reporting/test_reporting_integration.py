@@ -255,8 +255,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assertEqual(num_of_traces, 1)
 
       trace = ZipkinHandler.traces[-1]
-      self.assertTrue(any("Scandir" in span['name'] for span in trace),
-        "There is no span that contains 'Scandir' in it's name. The trace:  {}".format(trace))
+      v2_span_name_part = "Scandir"
+      self.assertTrue(any(v2_span_name_part in span['name'] for span in trace),
+        "There is no span that contains '{}' in it's name. The trace:{}".format(
+        v2_span_name_part, trace
+        ))
 
   @staticmethod
   def find_spans_by_name(trace, name):

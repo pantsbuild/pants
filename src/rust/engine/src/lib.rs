@@ -318,9 +318,8 @@ pub extern "C" fn scheduler_metrics(
         .into_iter()
         .flat_map(|(metric, value)| vec![externs::store_utf8(metric), externs::store_i64(value)])
         .collect::<Vec<_>>();
-      let values_ref = &mut values;
       if session.should_record_zipkin_spans() {
-        let workunits = &session
+        let workunits = session
           .get_workunits()
           .lock()
           .iter()
@@ -338,8 +337,8 @@ pub extern "C" fn scheduler_metrics(
             externs::store_dict(&workunit_zipkin_trace_info)
           })
           .collect::<Vec<_>>();
-        values_ref.push(externs::store_utf8("engine_workunits"));
-        values_ref.push(externs::store_tuple(&workunits));
+        values.push(externs::store_utf8("engine_workunits"));
+        values.push(externs::store_tuple(&workunits));
       };
       externs::store_dict(&values).into()
     })

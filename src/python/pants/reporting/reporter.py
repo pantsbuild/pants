@@ -48,7 +48,7 @@ class Reporter(object):
     pass
 
   def bulk_record_workunits(self, engine_workunits):
-    """A collection of workunits from Rust (engine) part"""
+    """A collection of workunits from v2 engine part"""
     pass
 
   def handle_log(self, workunit, level, *msg_elements):
