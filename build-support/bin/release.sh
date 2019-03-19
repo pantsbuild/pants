@@ -609,12 +609,14 @@ function build_pex() {
       ;;
     fetch)
       local platforms=()
-      # TODO(pex#654): once Pex can release flexible binaries, consolidate all 4 binaries into the same entry
-      # to build a Pex that works with cp27mu, cp27m, and cp36m.
+      # Note once Pex can release flexible binaries (#654), we could too release our Pants as one big flexible Pex
+      # by consolidating the below ABIs into one entry. At the moment, we do not want to do this, as we expect
+      # organizations to want to pin their Python version, and do not want the Pex to default to Py27 when the user
+      # would rather use Py3. This may be worth revisiting once we drop Py2 support to release one universal Pex
+      # that works with any Python 3.6+ version.
       abis=("cp-27-mu" "cp-27-m")
       if [[ "${python_three:-false}" == "true" ]]; then
-        # Note if we want to start releasing a Pex that works with Py37, we will need to
-        # add "cp-37-m" here as well.
+        # Note in order to add Py37 support to the Pex, we will need to add "cp-37-m" here.
         abis=("cp-36-m")
       fi
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
