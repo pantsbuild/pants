@@ -115,13 +115,6 @@ pyenv_install_py36: &pyenv_install_py36 >
 pyenv_global_py36: &pyenv_global_py36 >
   "${PYENV_BIN}" global "${PYENV_PY36_VERSION}"
 
-pyenv_osx_openssl_env: &pyenv_osx_openssl_env >
-  # These flags are necessary to get OpenSSL working on OSX. See
-  # https://github.com/pyenv/pyenv/wiki/Common-build-problems#error-the-python-ssl-extension-was-not-compiled-missing-the-openssl-lib.
-  PATH="/usr/local/opt/openssl/bin:$PATH"
-  LDFLAGS="-L/usr/local/opt/openssl/lib"
-  CPPFLAGS="-I/usr/local/opt/openssl/include"
-
 # -------------------------------------------------------------------------
 # AWS
 # -------------------------------------------------------------------------
