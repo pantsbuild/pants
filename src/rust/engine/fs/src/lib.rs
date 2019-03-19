@@ -217,20 +217,6 @@ pub struct PathGlobIncludeEntry {
   pub globs: Vec<PathGlob>,
 }
 
-impl PathGlobIncludeEntry {
-  fn to_sourced_globs(&self) -> Vec<GlobWithSource> {
-    self
-      .globs
-      .clone()
-      .into_iter()
-      .map(|path_glob| GlobWithSource {
-        path_glob,
-        source: GlobSource::ParsedInput(self.input.clone()),
-      })
-      .collect()
-  }
-}
-
 impl PathGlob {
   fn wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Pattern) -> PathGlob {
     PathGlob::Wildcard {
