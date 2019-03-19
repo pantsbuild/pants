@@ -614,7 +614,7 @@ function build_pex() {
       abis=("cp-27-mu" "cp-27-m")
       if [[ "${python_three:-false}" == "true" ]]; then
         # Note if we want to start releasing a Pex that works with Py37, we will need to
-        # add "cp-37-m" here.
+        # add "cp-37-m" here as well.
         abis=("cp-36-m")
       fi
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
