@@ -205,7 +205,18 @@ function build_3rdparty_packages() {
   start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[@]}"
   activate_tmp_venv
 
-  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" ${req_args}
+  wheel_args=("--wheel-dir=${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}")
+
+  # TODO(pex#539): This code hacks around Pex's issue in resolving abi3 values with an abi
+  # from an earlier Python 3 version. Specifically, the cryptography wheel is normally marked as cp34-abi3,
+  # meaning it supports any Python >= 3.4. But when running `release.sh -3p`, Pex will fail to
+  # resolve the cryptography wheel we have. So, we work around this by building our own cryptography
+  # wheel with `cp36-cp36m`.
+  if [[ "${python_three:-false}" == "true" ]]; then
+    wheel_args=("--no-binary=cryptography" "${wheel_args[@]}")
+  fi
+
+  pip wheel "${wheel_args[@]}" ${req_args}
 
   deactivate
   end_travis_section
@@ -600,7 +611,7 @@ function build_pex() {
       local platforms=()
       abis=("cp-27-mu" "cp-27-m")
       if [[ "${python_three:-false}" == "true" ]]; then
-        abis=("cp-36-abi3")
+        abis=("cp-36-m")
       fi
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
