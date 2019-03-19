@@ -492,8 +492,9 @@ class RunTracker(Subsystem):
     return 1 if outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED] else 0
 
   def end_workunit(self, workunit):
-    self.report.end_workunit(workunit)
     path, duration, self_time, is_tool = workunit.end()
+    self.report.end_workunit(workunit)
+    workunit.cleanup()
 
     # These three operations may not be thread-safe, and workunits may run in separate threads
     # and thus end concurrently, so we want to lock these operations.
