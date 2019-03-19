@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import signal
 import time
-import unittest
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -108,7 +107,6 @@ Signal {signum} ({signame}) was raised\\. Exiting with failure\\. \\(backtrace o
       # Return the (failed) pants execution result.
       yield (workdir, waiter_run)
 
-  @unittest.skip('Flaky: https://github.com/pantsbuild/pants/issues/6708')
   def test_dumps_logs_on_terminate(self):
     # Send a SIGTERM to the local pants process.
     with self._send_signal_to_waiter_handle(signal.SIGTERM) as (workdir, waiter_run):
@@ -123,7 +121,6 @@ Signal {signum} (SIGTERM) was raised. Exiting with failure. \\(backtrace omitted
       self._assert_graceful_signal_log_matches(
           waiter_run.pid, signal.SIGTERM, read_file(shared_log_file, binary_mode=False))
 
-  @unittest.skip('Hangs a lot: https://github.com/pantsbuild/pants/issues/7199')
   def test_dumps_traceback_on_sigabrt(self):
     # SIGABRT sends a traceback to the log file for the current process thanks to
     # faulthandler.enable().
