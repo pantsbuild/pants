@@ -313,11 +313,33 @@ pub extern "C" fn scheduler_metrics(
 ) -> Handle {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      let values = scheduler
+      let mut values = scheduler
         .metrics(session)
         .into_iter()
         .flat_map(|(metric, value)| vec![externs::store_utf8(metric), externs::store_i64(value)])
         .collect::<Vec<_>>();
+      if session.should_record_zipkin_spans() {
+        let workunits = session
+          .get_workunits()
+          .lock()
+          .iter()
+          .map(|workunit| {
+            let workunit_zipkin_trace_info = vec![
+              externs::store_utf8("name"),
+              externs::store_utf8(&workunit.name),
+              externs::store_utf8("start_timestamp"),
+              externs::store_f64(workunit.start_timestamp),
+              externs::store_utf8("end_timestamp"),
+              externs::store_f64(workunit.end_timestamp),
+              externs::store_utf8("span_id"),
+              externs::store_utf8(&workunit.span_id),
+            ];
+            externs::store_dict(&workunit_zipkin_trace_info)
+          })
+          .collect::<Vec<_>>();
+        values.push(externs::store_utf8("engine_workunits"));
+        values.push(externs::store_tuple(&workunits));
+      };
       externs::store_dict(&values).into()
     })
   })
@@ -530,12 +552,14 @@ pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 #[no_mangle]
 pub extern "C" fn session_create(
   scheduler_ptr: *mut Scheduler,
+  should_record_zipkin_spans: bool,
   should_render_ui: bool,
   ui_worker_count: u64,
 ) -> *const Session {
   with_scheduler(scheduler_ptr, |scheduler| {
     Box::into_raw(Box::new(Session::new(
       scheduler,
+      should_record_zipkin_spans,
       should_render_ui,
       ui_worker_count as usize,
     )))
