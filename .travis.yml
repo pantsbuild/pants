@@ -26,6 +26,10 @@ env:
     - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
     - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
     - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
+    - PYENV_PY36_VERSION=3.6.8
+    - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
+    - PYENV_BIN="${PYENV_ROOT}/bin/pyenv"
+    - PATH="${PYENV_ROOT}/shims:${PATH}"
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
@@ -99,6 +103,40 @@ pants_run_cache_config: &pants_run_cache_config
       - ${HOME}/.npm
 
 # -------------------------------------------------------------------------
+# Pyenv
+# -------------------------------------------------------------------------
+
+# On several shards, the system installed Pyenv is too outdated so does not
+# have the Python versions we need, like Python 3.7. To get around this
+# we directly clone the Pyenv repo.
+
+pyenv_setup: &pyenv_setup >
+  if [ ! -d "${PYENV_BIN}" ]; then
+  rm -rf "${PYENV_ROOT}";
+  git clone https://github.com/pyenv/pyenv "${PYENV_ROOT}";
+  fi
+
+pyenv_install_py36: &pyenv_install_py36 >
+  "${PYENV_BIN}" install "${PYENV_PY36_VERSION}"
+
+pyenv_global_py36: &pyenv_global_py36 >
+  "${PYENV_BIN}" global "${PYENV_PY36_VERSION}"
+
+# -------------------------------------------------------------------------
+# AWS
+# -------------------------------------------------------------------------
+
+# We use AWS S3 to avoid unnecessary work in CI. Specifically, the bootstrap
+# shards create a pants.pex, and then upload it to S3 for all of the test
+# shards to pull down.
+
+aws_deploy_pants_pex: &aws_deploy_pants_pex >
+  aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+
+aws_get_pants_pex: &aws_get_pants_pex >
+  ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+
+# -------------------------------------------------------------------------
 # Generic shard setups
 # -------------------------------------------------------------------------
 
@@ -141,7 +179,7 @@ base_linux_test_config: &base_linux_test_config
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
   before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - *aws_get_pants_pex
 
 py27_linux_test_config: &py27_linux_test_config
   <<: *py27_linux_config
@@ -179,24 +217,20 @@ py36_osx_config: &py36_osx_config
       PATH="/usr/local/opt/openssl/bin:$PATH"
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    # Clone pyenv directly from GitHub. For multiple osx images, brew's version of pyenv is too old to get
-    # modern Python 3.6. Pulling from GitHub instead allows us to use the same Python 3 version accross every OSX shard.
-    - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
-    - ${PYENV_ROOT}/bin/pyenv install 3.6.8
-    - ${PYENV_ROOT}/bin/pyenv global 3.6.8
+    - *pyenv_setup
+    - *pyenv_install_py36
+    - *pyenv_global_py36
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - *aws_get_pants_pex
 
 py27_osx_test_config: &py27_osx_test_config
   <<: *py27_osx_config
@@ -215,8 +249,6 @@ py36_osx_test_config: &py36_osx_test_config
       PATH="/usr/local/opt/openssl/bin:$PATH"
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
 
 linux_with_fuse: &linux_with_fuse
@@ -240,6 +272,12 @@ travis_docker_image: &travis_docker_image
 # Bootstrap engine shards
 # -------------------------------------------------------------------------
 
+# Note for each platform, we have the Python 2.7 shard also create fs_util and
+# upload to S3, to take advantage of the Rust code built during
+# bootstrapping. We must use the Python 2.7 shard, as it is the only Build Engine
+# shard to run during both daily and nightly CI. This requires setting
+# PREPARE_DEPLOY=1.
+
 base_linux_build_engine: &base_linux_build_engine
   <<: *native_engine_cache_config
   <<: *travis_docker_image
@@ -262,7 +300,7 @@ base_linux_build_engine: &base_linux_build_engine
       -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       ${docker_image_name}:latest
       sh -c "${docker_run_command}"
-    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - *aws_deploy_pants_pex
 
 py27_linux_build_engine: &py27_linux_build_engine
   <<: *py27_linux_config
@@ -270,10 +308,9 @@ py27_linux_build_engine: &py27_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2.7 PEX)"
   env:
     - docker_image_name=travis_ci
-    # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
-    - docker_run_command="./build-support/bin/ci.sh -2b && ./build-support/bin/release.sh -f"
-    # NB: Only the Py2.7 shard sets PREPARE_DEPLOY to cause the fs_util binary to be uploaded to S3:
-    # either linux shard could upload this binary, since it does not depend on python at all.
+    # We also build fs_util.
+    - docker_run_command="./build-support/bin/ci.sh -2b
+                          && ./build-support/bin/release.sh -f"
     - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
@@ -284,8 +321,7 @@ py36_linux_build_engine: &py36_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
     - docker_image_name=travis_ci_py36
-    # Note that we also build fs_util, to take advantage of the rust code built during bootstrapping.
-    - docker_run_command="./build-support/bin/ci.sh -b && ./build-support/bin/release.sh -f"
+    - docker_run_command="./build-support/bin/ci.sh -b"
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
@@ -296,12 +332,6 @@ base_osx_build_engine: &base_osx_build_engine
   # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
   # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
   osx_image: xcode8
-  env:
-    - &base_osx_build_engine_env PREPARE_DEPLOY=1  # To deploy fs_util.
-  script:
-    # We also build fs_util, to take advantage of the rust code built during bootstrapping.
-    - ./build-support/bin/ci.sh ${BOOTSTRAP_ARGS} && ./build-support/bin/release.sh -f
-    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
@@ -310,21 +340,26 @@ py27_osx_build_engine: &py27_osx_build_engine
   <<: *base_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py2.7 PEX)"
   env:
-    - *base_osx_build_engine_env
+    - PREPARE_DEPLOY=1
     - CACHE_NAME=osxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
-    - BOOTSTRAP_ARGS='-2b'
+  script:
+    - ./build-support/bin/ci.sh -2b
+    #  Also build fs_util.
+    - ./build-support/bin/release.sh -f
+    - *aws_deploy_pants_pex
 
 py36_osx_build_engine: &py36_osx_build_engine
   <<: *py36_osx_config
   <<: *base_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py3.6 PEX)"
   env:
-    - *base_osx_build_engine_env
     - *py36_osx_config_env
     - CACHE_NAME=osxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
-    - BOOTSTRAP_ARGS='-b'
+  script:
+    - ./build-support/bin/ci.sh -b
+    - *aws_deploy_pants_pex
 
 # -------------------------------------------------------------------------
 # Lint
@@ -496,8 +531,6 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
       PATH="/usr/local/opt/openssl/bin:$PATH"
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
-      PYENV_ROOT="${HOME}/.pyenv"
-      PATH="${PYENV_ROOT}/shims:${PATH}"
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
     # We set $PY to ensure the UCS4 interpreter is used when bootstrapping the PEX.
     - PY=${PYENV_ROOT}/shims/python2.7
@@ -505,9 +538,9 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
-    - ${PYENV_ROOT}/bin/pyenv install 2.7.13
-    - ${PYENV_ROOT}/bin/pyenv global 2.7.13
+    - *pyenv_setup
+    - ${PYENV_BIN} install 2.7.13
+    - ${PYENV_BIN} global 2.7.13
   script:
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu

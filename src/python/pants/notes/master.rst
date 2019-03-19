@@ -5,6 +5,25 @@ This document describes development releases which occur weekly from master, and
 not undergone the vetting associated with ``stable`` releases.
 
 
+1.15.0rc0 (3/18/2019)
+---------------------
+
+New Features
+~~~~~~~~~~~~
+
+* [rsc-compile] support explicit tagging of targets in rsc compile (#7362)
+  `PR #7362 <https://github.com/pantsbuild/pants/pull/7362>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* run clean-all before switching pants python version runner scripts (#7151)
+  `PR #7151 <https://github.com/pantsbuild/pants/pull/7151>`_
+
+* Run lint shard with Python 2 during daily CI instead of nightly cron job (#7391)
+  `PR #7391 <https://github.com/pantsbuild/pants/pull/7391>`_
+
+
 1.15.0.dev4 (3/15/2019)
 -----------------------
 
