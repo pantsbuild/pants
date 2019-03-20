@@ -656,17 +656,19 @@ py36_jvm_tests: &py36_jvm_tests
 # Deploy
 # -------------------------------------------------------------------------
 
-deploy_stable_multiplatform_pex: &deploy_stable_multiplatform_pex
-  name: "Deploy stable multiplatform pants.pex"
+base_deploy: &base_deploy
   os: linux
   language: python
+  env:
+    - &base_deploy_env RUN_PANTS_FROM_PEX=1
+
+base_deploy_stable_muliplatform_pex: &base_deploy_stable_muliplatform_pex
+  <<: *base_deploy
   stage: *build_stable
   env:
-    - CACHE_NAME=linuxpexdeploystable
-    - RUN_PANTS_FROM_PEX=1
-    - PANTS_PEX_RELEASE=stable
+    - &base_deploy_stable_env PANTS_PEX_RELEASE=stable
   script:
-    - ./build-support/bin/release.sh -p
+    - ./build-support/bin/release.sh -p ${RELEASE_ARGS}
   deploy:
     # See https://docs.travis-ci.com/user/deployment/releases/
     provider: releases
@@ -681,17 +683,55 @@ deploy_stable_multiplatform_pex: &deploy_stable_multiplatform_pex
       tags: true
       repo: pantsbuild/pants
 
-deploy_unstable_multiplatform_pex: &deploy_unstable_multiplatform_pex
-  name: "Deploy unstable multiplatform pants.pex"
-  os: linux
-  language: python
+py27_deploy_stable_multiplatform_pex: &py27_deploy_stable_multiplatform_pex
+  <<: *base_deploy_stable_muliplatform_pex
+  name: "Deploy stable multiplatform pants.pex (Py2.7 PEX)"
+  python: 2.7
+  env:
+    - *base_deploy_env
+    - *base_deploy_stable_env
+    - RELEASE_ARGS=""
+    - CACHE_NAME=linuxpexdeploystable.py27
+
+py36_deploy_stable_multiplatform_pex: &py36_deploy_stable_multiplatform_pex
+  <<: *base_deploy_stable_muliplatform_pex
+  name: "Deploy stable multiplatform pants.pex (Py3.6 PEX)"
+  python: 3.6
+  env:
+    - *base_deploy_env
+    - *base_deploy_stable_env
+    - RELEASE_ARGS="-3"
+    - CACHE_NAME=linuxpexdeploystable.py36
+
+base_deploy_unstable_multiplatform_pex: &base_deploy_unstable_multiplatform_pex
+  <<: *base_deploy_unstable_multiplatform_pex
   stage: *build_unstable
   env:
-    - CACHE_NAME=linuxpexdeployunstable
-    - RUN_PANTS_FROM_PEX=1
-    - PREPARE_DEPLOY=1
+    - &base_deploy_unstable_env PREPARE_DEPLOY=1
   script:
-    - ./build-support/bin/release.sh -p && mkdir -p dist/deploy/pex/ && mv dist/pants*.pex dist/deploy/pex/
+    - ./build-support/bin/release.sh -p ${RELEASE_ARGS}
+    - mkdir -p dist/deploy/pex/
+    - mv dist/pants*.pex dist/deploy/pex/
+
+py27_deploy_unstable_multiplatform_pex: &py27_deploy_unstable_multiplatform_pex
+  <<: *base_deploy_unstable_multiplatform_pex
+  name: "Deploy unstable multiplatform pants.pex (Py2.7 PEX)"
+  python: 2.7
+  env:
+    - *base_deploy_env
+    - *base_deploy_unstable_env
+    - RELEASE_ARGS=""
+    - CACHE_NAME=linuxpexdeployunstable.py27
+
+py36_deploy_unstable_multiplatform_pex: &py36_deploy_unstable_multiplatform_pex
+  <<: *base_deploy_unstable_multiplatform_pex
+  name: "Deploy unstable multiplatform pants.pex (Py3.6 PEX)"
+  python: 3.6
+  env:
+    - *base_deploy_env
+    - *base_deploy_unstable_env
+    - RELEASE_ARGS="-3"
+    - CACHE_NAME=linuxpexdeployunstable.py36
 
 # -------------------------------------------------------------------------
 # Test matrix
@@ -805,8 +845,11 @@ matrix:
     - <<: *py27_jvm_tests
     - <<: *py36_jvm_tests
 
-    - <<: *deploy_stable_multiplatform_pex
-    - <<: *deploy_unstable_multiplatform_pex
+    - <<: *py27_deploy_stable_multiplatform_pex
+    - <<: *py36_deploy_stable_multiplatform_pex
+
+    - <<: *py27_deploy_unstable_multiplatform_pex
+    - <<: *py36_deploy_unstable_multiplatform_pex
 
 deploy:
   # Deploy whatever a previous stage has left in dist/deploy.
