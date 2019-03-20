@@ -6,6 +6,7 @@ python_tests(
   sources = ['test_filespec.py'],
   dependencies = [
     'src/python/pants/source',
+    'tests/python/pants_test:test_base',
   ]
 )
 
