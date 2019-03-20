@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 # Centralize integer return codes for the pants process. We just use a single bit for now.
+# TODO: make these into an enum!
 PANTS_SUCCEEDED_EXIT_CODE = 0
 PANTS_FAILED_EXIT_CODE = 1
 
