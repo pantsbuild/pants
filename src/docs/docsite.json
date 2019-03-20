@@ -9,6 +9,8 @@
     "build_dictionary": "dist/reference/build_dictionary_body.html",
     "build_files": "dist/markdown/html/src/docs/build_files.html",
     "alias": "dist/markdown/html/src/docs/common_tasks/alias.html",
+    "architecture": "dist/markdown/html/src/docs/architecture.html",
+    "architecture_pantsd": "dist/markdown/html/src/docs/architecture_pantsd.html",
     "bundle": "dist/markdown/html/src/docs/common_tasks/bundle.html",
     "changelog": "dist/markdown/html/src/python/pants/CHANGELOG.html",
     "clean": "dist/markdown/html/src/docs/common_tasks/clean.html",
@@ -213,7 +215,8 @@
        {"heading": "Developer"},
        {"pages" : [
                     "dev",
-                    "export"
+                    "export",
+                    "architecture"
                 ]
        },
        {"heading": "Blogs"},

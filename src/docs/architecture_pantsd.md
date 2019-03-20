@@ -27,7 +27,7 @@ Initialization is encapsulated in the `PantsDaemon.Factory.create()` method.
 Pailgun
 -------
 
-The [Nailgun Protocol](http://www.martiansoftware.com/nailgun/protocol.html) is a protocol designed to allow clients to make command-line requests to a [Nailgun Server](http://www.martiansoftware.com/nailgun/index.html). It supports an interface similar to [`ExecuteProcessRequest`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/engine/isolated_process.py#22), except for it having no concern about making operations hermetic. Pailgun is an extension of the Nailgun Protocol, which is clients use to ask the Pants Daemon to spawn pants invocations.
+The [Nailgun Protocol](http://www.martiansoftware.com/nailgun/protocol.html) is a protocol designed to allow clients to make command-line requests to a [Nailgun Server](http://www.martiansoftware.com/nailgun/index.html). It supports an interface similar to [`ExecuteProcessRequest`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/engine/isolated_process.py#22), except for it having no concern about making operations hermetic, and the Nailgun Protocol supports streaming access to stdin/stdout. Pailgun is an extension of the Nailgun Protocol, which is clients use to ask the Pants Daemon to spawn pants invocations.
 
 The protocol is subject to change slightly in [#6579](https://github.com/pantsbuild/pants/pull/6579).
 
