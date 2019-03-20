@@ -594,16 +594,17 @@ function build_pex() {
         # NB: When building locally, we use a platform that does not refer to the ABI version, to
         # avoid needing to introspect the python ABI for this machine.
         Darwin)
-          local platforms=("${osx_platform_noabi}")
+          local platform=("${osx_platform_noabi}")
           ;;
         Linux)
-          local platforms=("${linux_platform_noabi}")
+          local platform=("${linux_platform_noabi}")
           ;;
         *)
           echo >&2 "Unknown uname"
           exit 1
           ;;
       esac
+      local platforms=("${platform}")
       local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
       local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
       ;;
