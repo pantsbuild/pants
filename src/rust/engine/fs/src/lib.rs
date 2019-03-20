@@ -512,9 +512,10 @@ impl PathGlobs {
   ///
   /// Matches these PathGlobs against the given paths.
   ///
-  /// NB: This implementation is independent from VFS::expand, and must be kept in sync via unit
-  /// tests. The lazy filesystem traversal in VFS::expand is (currently) too expensive to use for
-  /// in-memory matching (such as via MemFS).
+  /// NB: This implementation is independent from GlobMatchingImplementation::expand, and must be
+  /// kept in sync via unit tests in order to allow for owners detection of deleted files (see
+  /// #6790 and #5636 for more info). The lazy filesystem traversal in expand is (currently) too
+  /// expensive to use for that in-memory matching (such as via MemFS).
   ///
   pub fn matches(&self, paths: &[PathBuf]) -> Result<bool, String> {
     let patterns = self
@@ -522,10 +523,7 @@ impl PathGlobs {
       .iter()
       .map(|pattern| {
         PathGlob::normalize_pattern(&pattern.input.0).and_then(|components| {
-          let mut normalized_pattern = PathBuf::new();
-          for component in components {
-            normalized_pattern.push(component);
-          }
+          let normalized_pattern: PathBuf = components.into_iter().collect();
           Pattern::new(normalized_pattern.to_str().unwrap())
             .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", pattern.input.0, e))
         })
@@ -873,9 +871,10 @@ mod posixfs_test {
 
   use super::{
     Dir, DirectoryListing, File, GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat,
-    PathStatGetter, PosixFS, ResettablePool, Stat, StrictGlobMatching,
+    PathStatGetter, PosixFS, ResettablePool, Stat, StrictGlobMatching, VFS,
   };
-  use futures::Future;
+  use boxfuture::{BoxFuture, Boxable};
+  use futures::future::{self, Future};
   use std;
   use std::collections::HashMap;
   use std::path::{Components, Path, PathBuf};
