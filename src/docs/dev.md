@@ -19,6 +19,7 @@ how to get your change committed.
 + [[How to Ask|pants('src/docs:howto_ask')]]
 + [[Pants Developers Guide|pants('src/docs:howto_develop')]]
 + [[Developing a Task|pants('src/docs:dev_tasks')]]
++ [[Architecture|pants('src/docs:architecture')]]
 + [[Publishing Extra Artifacts|pants('src/docs:dev_tasks_publish_extras')]]
 + [[Developing a Plugin|pants('src/docs:howto_plugin')]]
 + [[Pants Development with IntelliJ IDEA|pants('src/docs:intellij')]]
