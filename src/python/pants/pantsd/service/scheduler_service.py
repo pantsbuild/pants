@@ -14,6 +14,7 @@ from builtins import open
 from future.utils import PY3
 from twitter.common.dirutil import Fileset
 
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.pantsd.service.pants_service import PantsService
 
@@ -65,6 +66,14 @@ class SchedulerService(PantsService):
   def _combined_invalidating_fileset_from_globs(glob_strs, root):
     return set.union(*(Fileset.globs(glob_str, root=root)() for glob_str in glob_strs))
 
+  def _get_invalidation_globs_snapsots(self):
+    """Returns a Snapshot of the files watched under self._invalidation_globs"""
+    if self._invalidation_globs:
+      return self._scheduler.capture_snapshots(
+        (PathGlobsAndRoot(
+          PathGlobs(self._invalidation_globs),
+          self._build_root), ))
+
   def setup(self, services):
     """Service setup."""
     super(SchedulerService, self).setup(services)
@@ -73,11 +82,19 @@ class SchedulerService(PantsService):
 
     # N.B. We compute this combined set eagerly at launch with an assumption that files
     # that exist at startup are the only ones that can affect the running daemon.
+
+    # Re: 5567, a solution would be to:
+    # - Request a snapshot for the output of _combined_invalidating_fileset_from_globs,
+    #   at startup time.
+    # - We store it in what currently is self._invalidating_files.
+    # - Every time we have an fs event, in _maybe_invalidate_scheduler_batch,
+    #   We recompute the snapshot, and compare its digest with the one we stored at startup.
     if self._invalidation_globs:
       self._invalidating_files = self._combined_invalidating_fileset_from_globs(
         self._invalidation_globs,
         self._build_root
       )
+      self._invalidating_files_snapshot = self._get_invalidation_globs_snapsots()
     self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
 
     if self._pantsd_pidfile:
