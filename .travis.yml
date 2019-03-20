@@ -774,6 +774,8 @@ py36_deploy_unstable_multiplatform_pex: &py36_deploy_unstable_multiplatform_pex
   <<: *base_deploy_unstable_multiplatform_pex
   name: "Deploy unstable multiplatform pants.pex (Py3.6 PEX)"
   python: 3.6
+  before_install:
+    - pyenv global 3.6.3
   env:
     - *base_deploy_env
     - *base_deploy_unstable_env
