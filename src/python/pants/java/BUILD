@@ -21,8 +21,10 @@ python_library(
   sources = ['nailgun_client.py'],
   dependencies = [
     '3rdparty/python:future',
+    '3rdparty/python:psutil',
     ':nailgun_io',
     ':nailgun_protocol',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:socket'
   ]
 )
@@ -43,6 +45,9 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python:six',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
+    'src/python/pants/util:osutil',
   ]
 )
 

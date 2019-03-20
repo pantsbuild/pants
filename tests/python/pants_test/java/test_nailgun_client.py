@@ -74,7 +74,9 @@ class TestNailgunClientSession(unittest.TestCase):
     self.nailgun_client_session._maybe_start_input_writer()
     self.nailgun_client_session._maybe_stop_input_writer()
 
-  def test_process_session(self):
+  @mock.patch('psutil.Process', **PATCH_OPTS)
+  def test_process_session(self, mock_psutil_process):
+    mock_psutil_process.cmdline.return_value = ['mock', 'process']
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b'31337')
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.START_READING_INPUT)
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDOUT, self.TEST_PAYLOAD)
@@ -90,7 +92,9 @@ class TestNailgunClientSession(unittest.TestCase):
     self.mock_stdin_reader.stop.assert_called_once_with()
     self.assertEqual(self.nailgun_client_session.remote_pid, 31337)
 
-  def test_process_session_bad_chunk(self):
+  @mock.patch('psutil.Process', **PATCH_OPTS)
+  def test_process_session_bad_chunk(self, mock_psutil_process):
+    mock_psutil_process.cmdline.return_value = ['mock', 'process']
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b'31337')
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.START_READING_INPUT)
     NailgunProtocol.write_chunk(self.server_sock, self.BAD_CHUNK_TYPE, '')
