@@ -17,7 +17,6 @@ from contextlib import contextmanager
 import setproctitle
 from future.utils import PY3
 
-from pants.base.build_environment import get_buildroot
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.osutil import IntegerForPid
@@ -432,6 +431,15 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
+# TODO: add testing for fatal errors at import-time, which may occur if there are errors in plugins.
+# Set the initial log location, for fatal errors during import time.
+ExceptionSink.reset_log_location(os.path.join(os.getcwd(), '.pants.d'))
+# Sets except hook for exceptions at import time.
+ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
+# Sets a SIGUSR2 handler.
+ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
+# Sets a handler that logs nonfatal signals to the exception sink before exiting.
+ExceptionSink.reset_signal_handler(SignalHandler())
 # Set whether to print stacktraces on exceptions or signals during import time.
 # NB: This will be overridden by bootstrap options in PantsRunner, so we avoid printing out a full
 # stacktrace when a user presses control-c during import time unless the environment variable is set
@@ -439,11 +447,3 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 # not hamper debugging.
 ExceptionSink.reset_should_print_backtrace_to_terminal(
   should_print_backtrace=os.environ.get('PANTS_PRINT_EXCEPTION_STACKTRACE') == 'True')
-# Sets fatal signal handlers with reasonable defaults to catch errors early in startup.
-ExceptionSink.reset_log_location(os.path.join(get_buildroot(), '.pants.d'))
-# Sets except hook.
-ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
-# Sets a SIGUSR2 handler.
-ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
-# Sets a handler that logs nonfatal signals to the exception sink before exiting.
-ExceptionSink.reset_signal_handler(SignalHandler())
