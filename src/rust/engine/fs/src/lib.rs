@@ -513,9 +513,10 @@ impl PathGlobs {
   /// Matches these PathGlobs against the given paths.
   ///
   /// NB: This implementation is independent from GlobMatchingImplementation::expand, and must be
-  /// kept in sync via unit tests in order to allow for owners detection of deleted files (see
-  /// #6790 and #5636 for more info). The lazy filesystem traversal in expand is (currently) too
-  /// expensive to use for that in-memory matching (such as via MemFS).
+  /// kept in sync via unit tests (in particular: the python FilespecTest) in order to allow for
+  /// owners detection of deleted files (see #6790 and #5636 for more info). The lazy filesystem
+  /// traversal in expand is (currently) too expensive to use for that in-memory matching (such as
+  /// via MemFS).
   ///
   pub fn matches(&self, paths: &[PathBuf]) -> Result<bool, String> {
     let patterns = self

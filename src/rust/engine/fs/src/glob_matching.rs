@@ -10,7 +10,6 @@ use boxfuture::{BoxFuture, Boxable};
 use futures::future;
 use futures::Future;
 use glob::Pattern;
-use indexmap::IndexSet;
 use log::warn;
 use parking_lot::Mutex;
 
@@ -125,7 +124,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
       return future::ok(vec![]).to_boxed();
     }
 
-    let result = Arc::new(Mutex::new(IndexSet::default()));
+    let result = Arc::new(Mutex::new(Vec::new()));
 
     let mut sources = Vec::new();
     let mut roots = Vec::new();
@@ -190,20 +189,21 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
           }
         }
 
-        future::ok(
-          Arc::try_unwrap(result)
-            .unwrap_or_else(|_| panic!("expand violated its contract."))
-            .into_inner()
-            .into_iter()
-            .collect::<Vec<_>>(),
-        )
+        let mut path_stats = Arc::try_unwrap(result)
+          .unwrap_or_else(|_| panic!("expand violated its contract."))
+          .into_inner()
+          .into_iter()
+          .collect::<Vec<_>>();
+        path_stats.sort_by(|a, b| a.path().cmp(b.path()));
+        path_stats.dedup_by(|a, b| a.path() == b.path());
+        future::ok(path_stats)
       })
       .to_boxed()
   }
 
   fn expand_single(
     &self,
-    result: Arc<Mutex<IndexSet<PathStat>>>,
+    result: Arc<Mutex<Vec<PathStat>>>,
     exclude: Arc<GitignoreStyleExcludes>,
     path_glob: PathGlob,
   ) -> BoxFuture<bool, E> {
@@ -237,7 +237,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
 
   fn expand_wildcard(
     &self,
-    result: Arc<Mutex<IndexSet<PathStat>>>,
+    result: Arc<Mutex<Vec<PathStat>>>,
     exclude: Arc<GitignoreStyleExcludes>,
     canonical_dir: Dir,
     symbolic_path: PathBuf,
@@ -257,7 +257,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
 
   fn expand_dir_wildcard(
     &self,
-    result: Arc<Mutex<IndexSet<PathStat>>>,
+    result: Arc<Mutex<Vec<PathStat>>>,
     exclude: Arc<GitignoreStyleExcludes>,
     canonical_dir: Dir,
     symbolic_path: PathBuf,
