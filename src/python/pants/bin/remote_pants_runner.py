@@ -164,10 +164,7 @@ class RemotePantsRunner(object):
 
     with self._trapped_signals(client), STTYSettings.preserved():
       # Execute the command on the pailgun.
-      try:
-        result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
-      except Exception as e:
-        raise e
+      result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
 
     # Exit.
     self._exiter.exit(result)

@@ -254,14 +254,10 @@ class NailgunProtocol(object):
   def iter_chunks(cls, sock, return_bytes=False, timeout_object=None):
     """Generates chunks from a connected socket until an Exit chunk is sent or a timeout occurs.
 
-    After this method returns non-None once, the .iter_chunks() method will then check the time on
-    every iteration, raising `cls.ProcessStreamTimeout` if the time runs out before the iteration is
-    complete.
-
     :param sock: the socket to read from.
     :param bool return_bytes: If False, decode the payload into a utf-8 string.
     :param cls.TimeoutProvider timeout_object: If provided, will be checked every iteration for a
-                                             possible timeout.
+                                               possible timeout.
     :raises: :class:`cls.ProcessStreamTimeout`
     """
     assert(timeout_object is None or isinstance(timeout_object, cls.TimeoutProvider))
