@@ -53,7 +53,10 @@ function run_local_pants() {
 readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
 PANTS_STABLE_VERSION="$(cat "${VERSION_FILE}")"
 HEAD_SHA=$(git rev-parse --verify HEAD)
-readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
+# We add a non-numeric prefix 'git' before the sha in order to avoid a hex sha which happens to
+# contain only [0-9] being parsed as a number -- see #7399.
+# TODO(#7399): mix in the timestamp before the sha instead of 'git' to get monotonic ordering!
+readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+git${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
 readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}"
@@ -123,7 +126,7 @@ function pkg_pants_install_test() {
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
   [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
-     == "${version}" ]] || die "Installed version of pants does match requested version!"
+     == "${version}" ]] || die "Installed version of pants does not match requested version!"
 }
 
 function pkg_testinfra_install_test() {
@@ -205,7 +208,18 @@ function build_3rdparty_packages() {
   start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[@]}"
   activate_tmp_venv
 
-  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" ${req_args}
+  wheel_args=("--wheel-dir=${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}")
+
+  # TODO(pex#539): This code hacks around Pex's issue in resolving abi3 values with an abi
+  # from an earlier Python 3 version. Specifically, the cryptography wheel is normally marked as cp34-abi3,
+  # meaning it supports any Python >= 3.4. But when running `release.sh -3p`, Pex will fail to
+  # resolve the cryptography wheel we have. So, we work around this by building our own cryptography
+  # wheel with `cp36-cp36m`.
+  if [[ "${python_three:-false}" == "true" ]]; then
+    wheel_args=("--no-binary=cryptography" "${wheel_args[@]}")
+  fi
+
+  pip wheel "${wheel_args[@]}" ${req_args}
 
   deactivate
   end_travis_section
@@ -572,36 +586,51 @@ function build_pex() {
   local linux_platform_noabi="linux_x86_64"
   local osx_platform_noabi="macosx_10.11_x86_64"
 
+  dest_suffix="py27.pex"
+  if [[ "${python_three:-false}" == "true" ]]; then
+    dest_suffix="py36.pex"
+  fi
+
   case "${mode}" in
     build)
       case "$(uname)" in
         # NB: When building locally, we use a platform that does not refer to the ABI version, to
         # avoid needing to introspect the python ABI for this machine.
         Darwin)
-          local platforms=("${osx_platform_noabi}")
+          local platform=("${osx_platform_noabi}")
           ;;
         Linux)
-          local platforms=("${linux_platform_noabi}")
+          local platform=("${linux_platform_noabi}")
           ;;
         *)
           echo >&2 "Unknown uname"
           exit 1
           ;;
       esac
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.pex"
+      local platforms=("${platform}")
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
       ;;
     fetch)
-      # NB: We do not include Python 3 wheels, as we cannot release a Python 3 compatible PEX
-      # until https://github.com/pantsbuild/pex/issues/654 is fixed.
       local platforms=()
+      # Note once Pex can release flexible binaries (#654), we could release Pants as one big flexible Pex
+      # by consolidating the below ABIs into one entry. At the moment, we do not want to do this, as we expect
+      # organizations to pin their Python version. We also do not want the Pex to default to Py27 when the user
+      # would rather use Py3, as it will default to using the minimum acceptable interpreter discoverable.
+      # This decision may be worth revisiting once we drop Py2 support so that we instead release one universal
+      # Pex that works with any Python 3.6+ version.
+      abis=("cp-27-mu" "cp-27-m")
+      if [[ "${python_three:-false}" == "true" ]]; then
+        # To add Py37 support to the Pex, we will need to ensure we have Py37 wheels built and then add "cp-37-m" here.
+        abis=("cp-36-m")
+      fi
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
-        for abi in "cp-27-mu" "cp-27-m"; do
+        for abi in "${abis[@]}"; do
           platforms=("${platforms[@]}" "${platform}-${abi}")
         done
       done
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${dest_suffix}"
       ;;
     *)
       echo >&2 "Bad build_pex mode ${mode}"

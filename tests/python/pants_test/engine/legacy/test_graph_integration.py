@@ -23,9 +23,9 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     'missing-rglobs': ("rglobs('*.a')", ['**/*.a']),
     'missing-zglobs': ("zglobs('**/*.a')", ['**/*.a']),
     'missing-literal-files': (
-      "['nonexistent_test_file.txt', 'another_nonexistent_file.txt']", [
-      'nonexistent_test_file.txt',
+      "['another_nonexistent_file.txt', 'nonexistent_test_file.txt']", [
       'another_nonexistent_file.txt',
+      'nonexistent_test_file.txt',
     ]),
   }
 
