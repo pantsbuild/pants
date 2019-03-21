@@ -111,12 +111,12 @@ export PANTS_DEV=1
 # these constraints for us already. However, we must set the values here because in
 # non-bootstrap shards we run CI using `./pants.pex` instead of the scripts `./pants`
 # and `./pants2`, so those scripts cannot set the relevant environment variables.
-if [[ "${python_three_seven:-false}" == "true" ]]; then
-  py_major_minor="3.7"
-elif [[ "${python_two:-false}" == "false" ]]; then
-  py_major_minor="3.6"
-else
+if [[ "${python_two:-false}" == "true" ]]; then
   py_major_minor="2.7"
+elif [[ "${python_three_seven:-false}" == "true" ]]; then
+  py_major_minor="3.7"
+else
+  py_major_minor="3.6"
 fi
 export PY="${PY:-python${py_major_minor}}"
 
