@@ -55,7 +55,7 @@ class ResolveRequirementsTest(TaskTestBase):
     self.assertTrue(path.startswith(os.path.realpath(get_buildroot())))
 
   def test_resolve_multiplatform_requirements(self):
-    cffi_tgt = self._fake_target('cffi', ['cffi==1.9.1'])
+    cffi_tgt = self._fake_target('cffi', ['cffi==1.12.2'])
 
     pex = self._resolve_requirements([cffi_tgt], {
       'python-setup': {
