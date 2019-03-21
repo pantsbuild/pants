@@ -5,13 +5,56 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+from hashlib import sha1
 
+from future.utils import PY3
 from pants.base.build_environment import get_buildroot
+from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_graph import sort_targets
 
 from pants.contrib.node.tasks.node_paths import NodePaths, NodePathsLocal
 from pants.contrib.node.tasks.node_task import NodeTask
+
+
+class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
+  """
+  Fingerprint package lockfiles (e.g. package.json, yarn.lock...),
+  so that we don't automatically run this if none of those have changed.
+
+  We read every file and add its contents to the hash.
+  """
+
+  def __init__(self, node_paths):
+    """
+    :param node_paths NodePathsBase:
+        Collection of resolved paths, which may be relative to the working dir.
+        Particularly, it offers per-target querying of those paths.
+        Used to guess the location of the _files_to_watch
+    """
+    self.node_paths = node_paths
+
+  _files_to_watch = [
+    "package.json",
+    "yarn.lock"
+  ]
+
+  def _get_path_base(self, target):
+    if self.node_paths.node_path(target) is not None:
+      return self.node_paths.node_path(target)
+    else:
+      return target.address.spec_path
+
+  def compute_fingerprint(self, target):
+    if NodeResolve.can_resolve_target(target):
+      hasher = sha1()
+      for file_name in self._files_to_watch:
+        full_path = os.path.join(self._get_path_base(target), file_name)
+        with open(full_path, 'r') as lockfile:
+          contents = lockfile.read().encode('utf-8')
+          hasher.update(contents)
+      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return None
 
 
 class NodeResolve(NodeTask):
@@ -75,13 +118,14 @@ class NodeResolve(NodeTask):
     """
     return cls._resolver_by_type.get(type(target))
 
-  def _can_resolve_target(self, target):
-    """Returns whether this is a NodePackage and there a resolver registerd for its subtype.
+  @classmethod
+  def can_resolve_target(cls, target):
+    """Returns whether this is a NodePackage and there a resolver registered for its subtype.
 
     :param target: A Target
     :rtype: Boolean
     """
-    return self.is_node_package(target) and self._resolver_for_target(target) != None
+    return cls.is_node_package(target) and cls._resolver_for_target(target) != None
 
   def _topological_sort(self, targets):
     """Topologically order a list of targets"""
@@ -90,7 +134,7 @@ class NodeResolve(NodeTask):
     return [t for t in reversed(sort_targets(targets)) if t in target_set]
 
   def execute(self):
-    targets = self.context.targets(predicate=self._can_resolve_target)
+    targets = self.context.targets(predicate=self.can_resolve_target)
     if not targets:
       return
     if self.context.products.is_required_data(NodePaths):
@@ -99,7 +143,8 @@ class NodeResolve(NodeTask):
       # internal dependencies before installing dependees, so `topological_order=True` is critical.
       with self.invalidated(targets,
                             topological_order=True,
-                            invalidate_dependents=True) as invalidation_check:
+                            invalidate_dependents=True,
+                            fingerprint_strategy=NodeResolveFingerprintStrategy(node_paths)) as invalidation_check:
         with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
           for vt in invalidation_check.all_vts:
             target = vt.target
