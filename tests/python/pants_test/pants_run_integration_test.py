@@ -519,7 +519,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       file_original_content = f.read()
 
     try:
-      if temporary_content:
+      if temporary_content is not None:
         with open(file_path, 'w') as f:
           f.write(temporary_content)
       yield
