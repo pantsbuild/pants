@@ -11,13 +11,18 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class LoaderIntegrationTest(PantsRunIntegrationTest):
   def test_invalid_locale(self):
     bypass_env = PantsLoader.ENCODING_IGNORE_ENV_VAR
-    pants_run = self.run_pants(command=['help'], extra_env={'LC_ALL': 'iNvALiD-lOcALe'})
+    pants_run = self.run_pants(
+      command=['help'],
+      extra_env={'LC_ALL': 'iNvALiD-lOcALe', "PYTHONUTF8": "0"}
+    )
     self.assert_failure(pants_run)
     self.assertIn('Pants requires', pants_run.stderr_data)
     self.assertIn(bypass_env, pants_run.stderr_data)
 
-    pants_run = self.run_pants(command=['help'], extra_env={'LC_ALL': 'iNvALiD-lOcALe',
-                                                            bypass_env: '1'})
+    pants_run = self.run_pants(
+      command=['help'],
+      extra_env={'LC_ALL': 'iNvALiD-lOcALe', "PYTHONUTF8": "0", bypass_env: '1'}
+    )
     self.assert_success(pants_run)
 
   def test_alternate_entrypoint(self):
