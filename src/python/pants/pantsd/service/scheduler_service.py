@@ -174,9 +174,8 @@ class SchedulerService(PantsService):
     if graph_len > 0:
       self._logger.debug('graph len was {}, waiting for initial watchman event'.format(graph_len))
       self._watchman_is_running.wait()
-    v2_ui = options.for_global_scope().v2_ui
-    zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
-    session = self._graph_helper.new_session(zipkin_trace_v2, v2_ui)
+
+    session = self._graph_helper.new_session(options.for_global_scope().v2_ui)
     if options.for_global_scope().loop:
       return session, self._prefork_loop(session, options, options_bootstrapper)
     else:
