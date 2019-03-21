@@ -99,12 +99,17 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
 
       # Wait for the loop to stabilize.
       time.sleep(10)
-      checker.assert_started()
+      try:
+        checker.assert_started()
+      except Exception:
+        time.sleep(10)
+        checker.assert_started()
 
       # Replace the BUILD file content twice.
       dump('target(name="two")')
       time.sleep(5)
       dump('target(name="three")')
+      time.sleep(5)
 
       # Verify that the three different target states were listed, and that the process exited.
       pants_result = handle.join()
