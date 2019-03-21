@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from textwrap import dedent
 
+from pants.util.contextutil import temporary_file_path
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -95,3 +96,28 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
         )
         self.assert_success(fingerprinted_run)
         assert "yarn install" in fingerprinted_run.stdout_data
+
+  def test_specify_custom_monitored_lockfiles(self):
+    with self.temporary_workdir() as workdir:
+      root = 'contrib/node/examples/src/node/hello'
+      target = root + ':pantsbuild-hello-node'
+      with temporary_file_path(root_dir=root, suffix='js') as mock_lockfile:
+        command = [
+          'run',
+          '--resolve-node-install-invalidating-files=+["{}"]'.format(os.path.basename(mock_lockfile)),
+          target
+        ]
+        install_run = self.run_pants_with_workdir(
+          command=command,
+          workdir=workdir
+        )
+        self.assert_success(install_run)
+        assert "yarn install" in install_run.stdout_data
+
+        with self.with_overwritten_file_content(mock_lockfile, temporary_content="Roland"):
+          fingerprinted_run = self.run_pants_with_workdir(
+            command=command,
+            workdir=workdir
+          )
+          self.assert_success(fingerprinted_run)
+          assert "yarn install" in fingerprinted_run.stdout_data
