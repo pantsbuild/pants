@@ -11,7 +11,6 @@ from builtins import open, str
 
 import mock
 
-from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
 from pants.util.osutil import get_normalized_os_name
@@ -21,17 +20,19 @@ from pants_test.testutils.py2_compat import assertRegex
 
 class TestExceptionSink(TestBase):
 
-  _default_log_dir = os.path.join(get_buildroot(), '.pants.d')
-
   def _gen_sink_subclass(self):
     # Avoid modifying global state by generating a subclass.
     class AnonymousSink(ExceptionSink): pass
     return AnonymousSink
 
   def test_default_log_location(self):
-    # NB: get_buildroot() returns the temporary buildroot used for running this test, so we cheat
-    # and assume we are being run from the buildroot.
-    self.assertEqual(ExceptionSink._log_dir, self._default_log_dir)
+    """Test that the global singleton ExceptionSink's log dir is relative to the original buildroot.
+
+    Assert that the global singleton ExceptionSink had its log dir set relative to the workdir upon
+    pants initialization, and when pants runs this test, it won't have been reset to the fake
+    buildroot we use for tests.
+    """
+    self.assertEqual(ExceptionSink._log_dir, os.path.join(os.getcwd(), '.pants.d'))
 
   def test_reset_log_location(self):
     sink = self._gen_sink_subclass()
