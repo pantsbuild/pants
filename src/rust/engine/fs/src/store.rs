@@ -1974,6 +1974,10 @@ mod remote {
                     status: grpcio::RpcStatusCode::NotFound,
                     ..
                   }) => Ok(None),
+                  // TODO: This may be a race condition that deserves respect, but right now it's
+                  // not clear it's an error. See #6344 for a case where we override this behavior
+                  // by forking gprcio.
+                  grpcio::Error::RpcFinished(None) => Ok(None),
                   _ => Err(format!(
                     "Error from server in response to CAS read request: {:?}",
                     e
