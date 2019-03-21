@@ -11,7 +11,7 @@ from unittest import skipIf
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants.util.contextutil import temporary_dir, with_overwritten_file_content
+from pants.util.contextutil import temporary_dir
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 
@@ -369,7 +369,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           path = os.path.join(compile_dir, path_suffix)
           self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
 
-        with with_overwritten_file_content(file_abs_path):
+        with self.with_overwritten_file_content(file_abs_path):
 
           new_temp_test = '''package org.pantsbuild.example.hello.exe
                               

@@ -506,6 +506,29 @@ class PantsRunIntegrationTest(unittest.TestCase):
       os.unlink(path)
 
   @contextmanager
+  def with_overwritten_file_content(self, file_path, temporary_content=None):
+    """A helper that resets a file after the method runs.
+
+     It will read a file, save the content, maybe write temporary_content to it, yield, then write the
+     original content to the file.
+
+    :param file_path: Absolute path to the file to be reset after the method runs.
+    :param temporary_content: Optional content to write into the file.
+    """
+    with open(file_path, 'r') as f:
+      file_original_content = f.read()
+
+    try:
+      if temporary_content is not None:
+        with open(file_path, 'w') as f:
+          f.write(temporary_content)
+      yield
+
+    finally:
+      with open(file_path, 'w') as f:
+        f.write(file_original_content)
+
+  @contextmanager
   def mock_buildroot(self, dirs_to_copy=None):
     """Construct a mock buildroot and return a helper object for interacting with it."""
     class Manager(datatype(['write_file', 'pushd', 'new_buildroot'])): pass
