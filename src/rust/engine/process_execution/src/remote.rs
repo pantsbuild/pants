@@ -279,7 +279,7 @@ impl super::CommandRunner for CommandRunner {
               attempts += &format!("\nAttempt {}: {:?}", i, attempt);
             }
             debug!(
-              "Finished remote exceution of {} after {} attempts: Stats: {}",
+              "Finished remote execution of {} after {} attempts: Stats: {}",
               description2,
               resp.execution_attempts.len(),
               attempts

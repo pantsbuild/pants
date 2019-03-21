@@ -38,7 +38,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 mod retry;
-pub use crate::retry::Retry;
+pub use crate::retry::{Retry, RetryParameters};
 
 ///
 /// A collection of resources which are observed to be healthy or unhealthy.

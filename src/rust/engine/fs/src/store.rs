@@ -1729,7 +1729,7 @@ mod remote {
   use futures::{self, future, Future, IntoFuture, Sink, Stream};
   use grpcio;
   use hashing::{Digest, Fingerprint};
-  use serverset::{Retry, Serverset};
+  use serverset::{Retry, RetryParameters, Serverset};
   use sha2::Sha256;
   use std::cmp::min;
   use std::collections::HashSet;
@@ -1746,6 +1746,16 @@ mod remote {
     env: Arc<grpcio::Environment>,
     serverset: Serverset<grpcio::Channel>,
     authorization_header: Option<String>,
+  }
+
+  struct ContentRequestMetadata {
+    description: String,
+  }
+
+  impl ContentRequestMetadata {
+    fn new(description: String) -> Self {
+      ContentRequestMetadata { description }
+    }
   }
 
   impl ByteStore {
@@ -1803,14 +1813,19 @@ mod remote {
     >(
       &self,
       f: F,
+      metadata: ContentRequestMetadata,
     ) -> impl Future<Item = Value, Error = String> {
+      let ContentRequestMetadata { description } = metadata;
       Retry(self.serverset.clone()).all_errors_immediately(
         move |channel| {
           f(bazel_protos::bytestream_grpc::ByteStreamClient::new(
             channel,
           ))
         },
-        self.rpc_attempts,
+        RetryParameters::new(
+          self.rpc_attempts,
+          format!("byte stream client request for {}", description),
+        ),
       )
     }
 
@@ -1826,12 +1841,17 @@ mod remote {
     >(
       &self,
       f: F,
+      metadata: ContentRequestMetadata,
     ) -> impl Future<Item = Value, Error = String> {
+      let ContentRequestMetadata { description } = metadata;
       Retry(self.serverset.clone()).all_errors_immediately(
         move |channel| {
           f(bazel_protos::remote_execution_grpc::ContentAddressableStorageClient::new(channel))
         },
-        self.rpc_attempts,
+        RetryParameters::new(
+          self.rpc_attempts,
+          format!("cas client request for {}", description),
+        ),
       )
     }
 
@@ -1862,8 +1882,8 @@ mod remote {
       );
       let store = self.clone();
       self
-        .with_byte_stream_client(move |client| {
-          match client
+        .with_byte_stream_client(
+          move |client| match client
             .write_opt(store.call_option().timeout(store.upload_timeout))
             .map(|v| (v, client))
           {
@@ -1924,8 +1944,9 @@ mod remote {
                 })
                 .to_boxed()
             }
-          }
-        })
+          },
+          ContentRequestMetadata::new(format!("storing bytes for digest {:?}", digest)),
+        )
         .to_boxed()
     }
 
@@ -1937,58 +1958,61 @@ mod remote {
     ) -> BoxFuture<Option<T>, String> {
       let store = self.clone();
       self
-        .with_byte_stream_client(move |client| {
-          match client
-            .read_opt(
-              &{
-                let mut req = bazel_protos::bytestream::ReadRequest::new();
-                req.set_resource_name(format!(
-                  "{}/blobs/{}/{}",
-                  store.instance_name.clone().unwrap_or_default(),
-                  digest.0,
-                  digest.1
-                ));
-                req.set_read_offset(0);
-                // 0 means no limit.
-                req.set_read_limit(0);
-                req
-              },
-              store.call_option(),
-            )
-            .map(|stream| (stream, client))
-          {
-            Ok((stream, client)) => {
-              let f = f.clone();
-              // We shouldn't have to pass around the client here, it's a workaround for
-              // https://github.com/pingcap/grpc-rs/issues/123
-              future::ok(client)
-                .join(
-                  stream.fold(BytesMut::with_capacity(digest.1), move |mut bytes, r| {
-                    bytes.extend_from_slice(&r.data);
-                    future::ok::<_, grpcio::Error>(bytes)
-                  }),
-                )
-                .map(|(_client, bytes)| Some(bytes.freeze()))
-                .or_else(|e| match e {
-                  grpcio::Error::RpcFailure(grpcio::RpcStatus {
-                    status: grpcio::RpcStatusCode::NotFound,
-                    ..
-                  }) => Ok(None),
-                  _ => Err(format!(
-                    "Error from server in response to CAS read request: {:?}",
-                    e
-                  )),
-                })
-                .map(move |maybe_bytes| maybe_bytes.map(f))
-                .to_boxed()
+        .with_byte_stream_client(
+          move |client| {
+            match client
+              .read_opt(
+                &{
+                  let mut req = bazel_protos::bytestream::ReadRequest::new();
+                  req.set_resource_name(format!(
+                    "{}/blobs/{}/{}",
+                    store.instance_name.clone().unwrap_or_default(),
+                    digest.0,
+                    digest.1
+                  ));
+                  req.set_read_offset(0);
+                  // 0 means no limit.
+                  req.set_read_limit(0);
+                  req
+                },
+                store.call_option(),
+              )
+              .map(|stream| (stream, client))
+            {
+              Ok((stream, client)) => {
+                let f = f.clone();
+                // We shouldn't have to pass around the client here, it's a workaround for
+                // https://github.com/pingcap/grpc-rs/issues/123
+                future::ok(client)
+                  .join(
+                    stream.fold(BytesMut::with_capacity(digest.1), move |mut bytes, r| {
+                      bytes.extend_from_slice(&r.data);
+                      future::ok::<_, grpcio::Error>(bytes)
+                    }),
+                  )
+                  .map(|(_client, bytes)| Some(bytes.freeze()))
+                  .or_else(|e| match e {
+                    grpcio::Error::RpcFailure(grpcio::RpcStatus {
+                      status: grpcio::RpcStatusCode::NotFound,
+                      ..
+                    }) => Ok(None),
+                    _ => Err(format!(
+                      "Error from server in response to CAS read request: {:?}",
+                      e
+                    )),
+                  })
+                  .map(move |maybe_bytes| maybe_bytes.map(f))
+                  .to_boxed()
+              }
+              Err(err) => future::err(format!(
+                "Error making CAS read request for {:?}: {:?}",
+                digest, err
+              ))
+              .to_boxed(),
             }
-            Err(err) => future::err(format!(
-              "Error making CAS read request for {:?}: {:?}",
-              digest, err
-            ))
-            .to_boxed(),
-          }
-        })
+          },
+          ContentRequestMetadata::new(format!("loading bytes from CAS for digest {:?}", digest)),
+        )
         .to_boxed()
     }
 
@@ -2001,23 +2025,28 @@ mod remote {
       request: bazel_protos::remote_execution::FindMissingBlobsRequest,
     ) -> impl Future<Item = HashSet<Digest>, Error = String> {
       let store = self.clone();
-      self.with_cas_client(move |client| {
-        client
-          .find_missing_blobs_opt(&request, store.call_option())
-          .map_err(|err| {
-            format!(
-              "Error from server in response to find_missing_blobs_request: {:?}",
-              err
-            )
-          })
-          .and_then(|response| {
-            response
-              .get_missing_blob_digests()
-              .iter()
-              .map(|digest| digest.into())
-              .collect()
-          })
-      })
+      let metadata =
+        ContentRequestMetadata::new(format!("finding missing blobs for {:?}", request));
+      self.with_cas_client(
+        move |client| {
+          client
+            .find_missing_blobs_opt(&request, store.call_option())
+            .map_err(|err| {
+              format!(
+                "Error from server in response to find_missing_blobs_request: {:?}",
+                err
+              )
+            })
+            .and_then(|response| {
+              response
+                .get_missing_blob_digests()
+                .iter()
+                .map(|digest| digest.into())
+                .collect()
+            })
+        },
+        metadata,
+      )
     }
 
     pub(super) fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(

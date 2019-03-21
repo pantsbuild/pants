@@ -1,7 +1,30 @@
 use crate::{Health, Serverset};
+use chrono::prelude::DateTime;
+use chrono::Utc;
 use futures::{self, Future, IntoFuture};
+use log::debug;
+use std::time::SystemTime;
 
 pub struct Retry<T>(pub Serverset<T>);
+
+fn now() -> String {
+  let sys_time = SystemTime::now();
+  let date_time = DateTime::<Utc>::from(sys_time);
+  date_time
+    .format("%Y-%m-%d %H:%M:%S.%f +0000 UTC")
+    .to_string()
+}
+
+pub struct RetryParameters {
+  times: usize,
+  description: String,
+}
+
+impl RetryParameters {
+  pub fn new(times: usize, description: String) -> Self {
+    RetryParameters { times, description }
+  }
+}
 
 impl<T: Clone + Send + Sync + 'static> Retry<T> {
   ///
@@ -18,11 +41,14 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
   >(
     &self,
     f: F,
-    times: usize,
+    retry_params: RetryParameters,
   ) -> impl Future<Item = Value, Error = String> {
     let serverset = self.0.clone();
+    let RetryParameters { times, description } = retry_params;
     futures::future::loop_fn(0_usize, move |i| {
       let serverset = serverset.clone();
+      let description = description.clone();
+      let description2 = description.clone();
       let f = f.clone();
       serverset
         .next()
@@ -30,16 +56,32 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
           futures::future::ok(server).and_then(f).then(move |result| {
             let health = match &result {
               &Ok(_) => Health::Healthy,
-              &Err(_) => Health::Unhealthy,
+              Err(err) => {
+                debug!(
+                  "({}) Attempt {} for {} failed with error {:?}",
+                  now(),
+                  i,
+                  description,
+                  err
+                );
+                Health::Unhealthy
+              }
             };
             serverset.report_health(token, health);
+            debug!("({}) Attempt {} for {} succeeded!", now(), i, description);
             result
           })
         })
         .map(futures::future::Loop::Break)
         .or_else(move |err| {
           if i >= times {
-            Err(format!("Failed after {} retries; last failure: {}", i, err))
+            Err(format!(
+              "({}) Failed after {} retries for {}; last failure: {}",
+              now(),
+              i,
+              description2,
+              err
+            ))
           } else {
             Ok(futures::future::Loop::Continue(i + 1))
           }
@@ -50,7 +92,7 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
 
 #[cfg(test)]
 mod tests {
-  use crate::{BackoffConfig, Retry, Serverset};
+  use crate::{BackoffConfig, Retry, RetryParameters, Serverset};
   use futures::Future;
   use futures_timer::TimerHandle;
   use std::time::Duration;
@@ -67,7 +109,7 @@ mod tests {
     for _ in 0..3 {
       v.push(
         Retry(s.clone())
-          .all_errors_immediately(|v| v, 1)
+          .all_errors_immediately(|v| v, RetryParameters::new(1, "identity".to_string()))
           .wait()
           .unwrap(),
       );
@@ -84,9 +126,14 @@ mod tests {
     )
     .unwrap();
     assert_eq!(
-      Err(format!("Failed after 5 retries; last failure: bad")),
+      Err(format!(
+        "Failed after 5 retries for identity; last failure: bad"
+      )),
       Retry(s)
-        .all_errors_immediately(|v: Result<u8, _>| v, 5)
+        .all_errors_immediately(
+          |v: Result<u8, _>| v,
+          RetryParameters::new(5, "identity".to_string())
+        )
         .wait()
     );
   }

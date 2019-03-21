@@ -214,7 +214,8 @@ class BaseZincCompile(JvmCompile):
       # hermetically https://github.com/pantsbuild/pants/issues/6517
       if self.get_options().incremental:
         raise TaskError("Hermetic zinc execution does not currently support incremental compiles. "
-                        "Please use --no-compile-zinc-incremental.")
+                        "Please use --no-{}-incremental."
+                        .format(self.get_options_scope_equivalent_flag_component()))
       try:
         fast_relpath(self.get_options().pants_workdir, get_buildroot())
       except ValueError:
@@ -230,7 +231,9 @@ class BaseZincCompile(JvmCompile):
         # TODO: Make this work by capturing the correct Digest and passing them around the
         # right places.
         # See https://github.com/pantsbuild/pants/issues/6432
-        raise TaskError("Hermetic zinc execution currently doesn't work with classpath jars")
+        raise TaskError("Hermetic zinc execution currently doesn't work with classpath jars. "
+                        "Please no --no-{}-use-classpath-jars."
+                        .format(self.get_options_scope_equivalent_flag_component()))
 
   def select(self, target):
     raise NotImplementedError()
