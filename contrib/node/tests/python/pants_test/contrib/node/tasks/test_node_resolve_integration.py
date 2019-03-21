@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from textwrap import dedent
 
-from pants.util.contextutil import temporary_file_path
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -39,8 +38,8 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_no_reinstall_with_unchanged_lockfiles(self):
     with self.temporary_workdir() as workdir:
-      root = 'contrib/node/examples/src/node/hello'
-      target = root + ':pantsbuild-hello-node'
+      root = 'contrib/node/examples/src/node/lockfile-invalidation'
+      target = root + ':custom-lockfile'
       index_file = os.path.join(root, 'index.js')
       command = ['run', target]
       install_run = self.run_pants_with_workdir(
@@ -60,8 +59,8 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_changing_lockfiles_triggers_reinstall(self):
     with self.temporary_workdir() as workdir:
-      root = 'contrib/node/examples/src/node/hello'
-      target = root + ':pantsbuild-hello-node'
+      root = 'contrib/node/examples/src/node/lockfile-invalidation'
+      target = root + ':custom-lockfile'
       package_file = os.path.join(root, 'package.json')
       new_package_contents = dedent("""
       {
@@ -99,25 +98,42 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_specify_custom_monitored_lockfiles(self):
     with self.temporary_workdir() as workdir:
-      root = 'contrib/node/examples/src/node/hello'
-      target = root + ':pantsbuild-hello-node'
-      with temporary_file_path(root_dir=root, suffix='js') as mock_lockfile:
-        command = [
-          'run',
-          '--resolve-node-install-invalidating-files=+["{}"]'.format(os.path.basename(mock_lockfile)),
-          target
-        ]
-        install_run = self.run_pants_with_workdir(
+      root = 'contrib/node/examples/src/node/lockfile-invalidation'
+      target = root + ':custom-lockfile'
+      custom_lockfile_basename = 'custom_lockfile'
+      custom_lockfile_path = os.path.join(root, custom_lockfile_basename)
+      command = [
+        'run',
+        '--resolve-node-install-invalidating-files=+["{}"]'.format(custom_lockfile_basename),
+        target
+      ]
+      install_run = self.run_pants_with_workdir(
+        command=command,
+        workdir=workdir
+      )
+      self.assert_success(install_run)
+      assert "yarn install" in install_run.stdout_data
+
+      with self.with_overwritten_file_content(custom_lockfile_path, temporary_content="Roland"):
+        fingerprinted_run = self.run_pants_with_workdir(
           command=command,
           workdir=workdir
         )
-        self.assert_success(install_run)
-        assert "yarn install" in install_run.stdout_data
+        self.assert_success(fingerprinted_run)
+        assert "yarn install" in fingerprinted_run.stdout_data
 
-        with self.with_overwritten_file_content(mock_lockfile, temporary_content="Roland"):
-          fingerprinted_run = self.run_pants_with_workdir(
-            command=command,
-            workdir=workdir
-          )
-          self.assert_success(fingerprinted_run)
-          assert "yarn install" in fingerprinted_run.stdout_data
+  def test_monitoring_lockfile_outside_of_sources_throws(self):
+    with self.temporary_workdir() as workdir:
+      root = 'contrib/node/examples/src/node/lockfile-invalidation'
+      target = root + ':custom-lockfile'
+      custom_lockfile_basename = 'custom_lockfile_not_in_sources'
+      command = [
+        'run',
+        '--resolve-node-install-invalidating-files=+["{}"]'.format(custom_lockfile_basename),
+        target
+      ]
+      install_run = self.run_pants_with_workdir(
+        command=command,
+        workdir=workdir
+      )
+      self.assert_failure(install_run)

@@ -35,18 +35,20 @@ class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprint
     self.node_paths = node_paths
     self._files_to_watch = files_to_watch
 
-  def _get_path_base(self, target):
-    if self.node_paths.node_path(target) is not None:
-      return self.node_paths.node_path(target)
+  def _get_file_from_target_sources(self, basename, target):
+    full_path = os.path.join(target.address.spec_path, basename)
+    if full_path in target.sources_relative_to_buildroot():
+      return full_path
     else:
-      return target.address.spec_path
+      raise ValueError("Trying to watch a file ({}) which is not in the sources of target {}".format(
+        basename, target.address
+      ))
 
   def compute_fingerprint(self, target):
     if NodeResolve.can_resolve_target(target):
       hasher = sha1()
       for file_name in self._files_to_watch:
-        full_path = os.path.join(self._get_path_base(target), file_name)
-        # TODO We may want to check that the file is in the `sources` field of the target
+        full_path = self._get_file_from_target_sources(file_name, target)
         with open(full_path, 'r') as lockfile:
           contents = lockfile.read().encode('utf-8')
           hasher.update(contents)
@@ -86,7 +88,7 @@ class NodeResolve(NodeTask):
   @classmethod
   def register_options(cls, register):
     super(NodeResolve, cls).register_options(register)
-    register('--install-invalidating-files', type=list,
+    register('--install-invalidating-files', type=list, advanced=True,
       help='Files that invalidate the node_modules installation. '
            'Changing any of these files will trigger resolution again.',
       default=[
