@@ -94,7 +94,10 @@ class SchedulerService(PantsService):
         self._invalidation_globs,
         self._build_root
       )
+      print('*'*10)
+      print(self._invalidating_files)
       self._invalidating_files_snapshot = self._get_invalidation_globs_snapsots()
+      print(self._invalidating_files_snapshot)
     self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
 
     if self._pantsd_pidfile:
