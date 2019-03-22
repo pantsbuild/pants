@@ -187,6 +187,7 @@ impl<N: Node> Entry<N> {
         let context = context_factory.clone_for(entry_id);
         let node = n.clone();
 
+
         context_factory.spawn(future::lazy(move || {
           // If we have previous result generations, compare them to all current dependency
           // generations (which, if they are dirty, will cause recursive cleaning). If they
@@ -196,9 +197,16 @@ impl<N: Node> Entry<N> {
             context
               .graph()
               .dep_generations(entry_id, &context)
-              .then(move |generation_res| match generation_res {
+              .then(move |generation_res|{
+                match generation_res {
                 Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
                   // Dependencies have not changed: Node is clean.
+                  let mut inner = context2.graph().inner.lock();
+                  for dep in inner.dirty_edges.remove(&entry_id).expect("Dirty node being cleaned should have a dirty edges list") {
+                    inner.pg.add_edge(entry_id, dep, ());
+                    // TODO: Cycle detect
+                  }
+
                   Ok(true)
                 }
                 _ => {
@@ -207,7 +215,7 @@ impl<N: Node> Entry<N> {
                   context2.graph().clear_deps(entry_id, run_token);
                   Ok(false)
                 }
-              })
+              }})
               .to_boxed()
           } else {
             future::ok(false).to_boxed()
@@ -276,6 +284,7 @@ impl<N: Node> Entry<N> {
     {
       let mut state = self.state.lock();
 
+
       // First check whether the Node is already complete, or is currently running: in both of these
       // cases we don't swap the state of the Node.
       match &mut *state {
@@ -311,15 +320,17 @@ impl<N: Node> Entry<N> {
           run_token,
           generation,
           previous_result,
-        } => Self::run(
-          context,
-          &self.node,
-          entry_id,
-          run_token,
-          generation,
-          None,
-          previous_result,
-        ),
+        } => {
+          Self::run(
+            context,
+            &self.node,
+            entry_id,
+            run_token,
+            generation,
+            None,
+            previous_result,
+          )
+        },
         EntryState::Completed {
           run_token,
           generation,
@@ -344,6 +355,7 @@ impl<N: Node> Entry<N> {
           // Note that if the node is uncacheable, we avoid storing a previous result, which will
           // transitively invalidate every node that depends on us. This works because, in practice,
           // the only uncacheable nodes are Select nodes and @console_rule Task nodes. See #6146 and #6598
+          // TODO(dwh): Check dep generations here?
           Self::run(
             context,
             &self.node,

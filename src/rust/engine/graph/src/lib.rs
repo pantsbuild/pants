@@ -1,7 +1,7 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
+//#![deny(warnings)]
 // Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
 #![deny(
   clippy::all,
@@ -72,6 +72,7 @@ type Nodes<N> = HashMap<EntryKey<N>, EntryId>;
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
   pg: PGraph<N>,
+  dirty_edges: HashMap<EntryId, Vec<EntryId>>,
   /// A Graph that is marked `draining:True` will not allow the creation of new `Nodes`. But
   /// while draining, any Nodes that exist in the Graph will continue to run until/unless they
   /// attempt to get/create new Nodes.
@@ -195,6 +196,7 @@ impl<N: Node> InnerGraph<N> {
       if let Some(entry) = self.pg.node_weight_mut(*id) {
         entry.clear();
       }
+      self.dirty_edges.remove(id);
     }
     self.pg.retain_edges(|pg, edge| {
       if let Some((src, _)) = pg.edge_endpoints(edge) {
@@ -210,6 +212,11 @@ impl<N: Node> InnerGraph<N> {
     for id in &transitive_ids {
       if let Some(mut entry) = self.pg.node_weight_mut(*id).cloned() {
         entry.dirty(self);
+        let mut neighbors = self.pg.neighbors_directed(*id, Direction::Outgoing).detach();
+        while let Some((edge, dep)) = neighbors.next(&self.pg) {
+          self.dirty_edges.entry(*id).or_insert_with(Vec::new).push(dep);
+          self.pg.remove_edge(edge);
+        }
       }
     }
 
@@ -230,7 +237,7 @@ impl<N: Node> InnerGraph<N> {
       "  node[colorscheme={}];\n",
       visualizer.color_scheme()
     ))?;
-    f.write_all(b"  concentrate=true;\n")?;
+    //f.write_all(b"  concentrate=true;\n")?;
     f.write_all(b"  rankdir=TB;\n")?;
 
     let mut format_color = |entry: &Entry<N>| visualizer.color(entry);
@@ -257,7 +264,15 @@ impl<N: Node> InnerGraph<N> {
 
         // Write an entry per edge.
         let dep_str = dep_entry.format();
-        f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str))?;
+        f.write_fmt(format_args!("    \"{}\" -> \"{}\" [style=solid];\n", node_str, dep_str))?;
+      }
+    }
+
+    for (dirty_root, dirty_deps) in self.dirty_edges.iter() {
+      let dependee = self.unsafe_entry_for_id(*dirty_root).format();
+      for dirty_dep in dirty_deps {
+        let dependency = self.unsafe_entry_for_id(*dirty_dep).format();
+        f.write_fmt(format_args!("  \"{}\" -> \"{}\" [style=dotted];\n", dependee, dependency))?;
       }
     }
 
@@ -485,6 +500,7 @@ impl<N: Node> Graph<N> {
       draining: false,
       nodes: HashMap::default(),
       pg: DiGraph::new(),
+      dirty_edges: HashMap::default(),
     };
     Graph {
       inner: Mutex::new(inner),
@@ -579,15 +595,23 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     let mut inner = self.inner.lock();
-    let dep_ids = inner
-      .pg
-      .neighbors_directed(entry_id, Direction::Outgoing)
-      .collect::<Vec<_>>();
+    let dep_ids = if let Some(deps) = inner.dirty_edges.get(&entry_id) {
+        deps.clone()
+    } else {
+      inner
+          .pg
+          .neighbors_directed(entry_id, Direction::Outgoing)
+          .collect::<Vec<_>>()
+    };
+
 
     future::join_all(
       dep_ids
         .into_iter()
         .map(|dep_id| {
+          if inner.detect_cycle(entry_id, dep_id) {
+            return future::err(N::Error::cyclic()).to_boxed()
+          }
           let entry = inner
             .entry_for_id_mut(dep_id)
             .unwrap_or_else(|| panic!("Dependency not present in Graph."));
@@ -596,9 +620,8 @@ impl<N: Node> Graph<N> {
             .map(|(_, generation)| generation)
             .to_boxed()
         })
-        .collect::<Vec<_>>(),
-    )
-    .to_boxed()
+    .collect::<Vec<_>>()
+    ).to_boxed()
   }
 
   ///
@@ -606,6 +629,9 @@ impl<N: Node> Graph<N> {
   ///
   fn clear_deps(&self, entry_id: EntryId, run_token: RunToken) {
     let mut inner = self.inner.lock();
+
+    inner.dirty_edges.remove(&entry_id);
+
     // If the RunToken mismatches, return.
     if let Some(entry) = inner.entry_for_id(entry_id) {
       if entry.run_token() != run_token {
@@ -649,7 +675,8 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     let (entry, entry_id, dep_generations) = {
-      let inner = self.inner.lock();
+      let mut inner = self.inner.lock();
+
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
@@ -790,7 +817,6 @@ mod tests {
 
   use std::cmp;
   use std::collections::{HashMap, HashSet};
-  use std::path::Path;
   use std::sync::{mpsc, Arc};
   use std::thread;
   use std::time::Duration;
@@ -805,6 +831,7 @@ mod tests {
   use super::{
     Entry, EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError, NodeVisualizer,
   };
+  use std::path::Path;
 
   #[test]
   fn create() {
@@ -1054,7 +1081,7 @@ mod tests {
     // Request with a context that creates a path downward.
     let context_down = TContext::new(0, graph.clone());
     assert_eq!(
-      graph.create(initial_top, &context_down).wait(),
+      graph.create(initial_top.clone(), &context_down).wait(),
       Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
     );
 
@@ -1069,17 +1096,13 @@ mod tests {
       graph.clone(),
     );
 
-    let res = graph.create(initial_bot, &context_up);
-    thread::sleep(Duration::from_millis(100));
-    graph
-      .visualize(
-        EmptyVisualizer,
-        &[TNode(2), TNode(1), TNode(0)],
-        Path::new("/Users/stuhood/src/pants/dest.dot"),
-      )
-      .unwrap();
+    let res = graph.create(initial_bot, &context_up).wait();
 
-    assert_eq!(res.wait(), Ok(vec![T(2, 1), T(1, 1), T(0, 1)]));
+    assert_eq!(res, Ok(vec![T(1, 1), T(0, 1)]));
+
+    let res = graph.create(initial_top, &context_up).wait();
+
+    assert_eq!(res, Ok(vec![T(1, 1), T(2, 1)]));
   }
 
   ///
@@ -1323,7 +1346,7 @@ mod tests {
       "set312"
     }
 
-    fn color(&mut self, entry: &Entry<TNode>) -> String {
+    fn color(&mut self, _entry: &Entry<TNode>) -> String {
       "white".to_owned()
     }
   }
