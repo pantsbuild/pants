@@ -73,7 +73,7 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_no_reinstall_with_unchanged_lockfiles(self):
     with self.temporary_workdir() as workdir:
-      root = 'contrib/node/examples/src/node/lockfile-invalidation'
+      root = 'contrib/node/testprojects/lockfile-invalidation'
       target = root + ':default_lockfiles'
       index_file = os.path.join(root, 'index.js')
       command = ['run', target]
@@ -84,7 +84,7 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_changing_lockfiles_triggers_reinstall(self):
     with self.temporary_workdir() as workdir:
-      root = 'contrib/node/examples/src/node/lockfile-invalidation'
+      root = 'contrib/node/testprojects/lockfile-invalidation'
       target = root + ':default_lockfiles'
       package_file = os.path.join(root, 'package.json')
       new_package_contents = self._modified_package_json_content()
@@ -97,7 +97,7 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_specify_custom_monitored_lockfiles(self):
     with self.temporary_workdir() as workdir:
-      root = 'contrib/node/examples/src/node/lockfile-invalidation'
+      root = 'contrib/node/testprojects/lockfile-invalidation'
       target = root + ':custom_lockfile'
       custom_lockfile_basename = 'custom_lockfile'
       custom_lockfile_path = os.path.join(root, custom_lockfile_basename)
@@ -110,7 +110,7 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
   def test_specifying_custom_lockfiles_overrides_default_list(self):
     """Change package.json in a target that overrides package_lockfiles."""
     with self.temporary_workdir() as workdir:
-      root = 'contrib/node/examples/src/node/lockfile-invalidation'
+      root = 'contrib/node/testprojects/lockfile-invalidation'
       target = root + ':custom_lockfile'
       package_file = os.path.join(root, 'package.json')
       new_package_contents = self._modified_package_json_content()
@@ -123,7 +123,7 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_monitoring_lockfile_outside_of_sources_throws(self):
     with self.temporary_workdir() as workdir:
-      root = 'contrib/node/examples/src/node/lockfile-invalidation'
+      root = 'contrib/node/testprojects/lockfile-invalidation'
       target = root + ':custom_lockfile_outside_sources'
       command = ['run', target]
       install_run = self.run_pants_with_workdir(
