@@ -25,31 +25,36 @@ class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprint
   We read every file and add its contents to the hash.
   """
 
-  def __init__(self, node_paths, files_to_watch):
-    """
-    :param node_paths NodePathsBase:
-        Collection of resolved paths, which may be relative to the working dir.
-        Particularly, it offers per-target querying of those paths.
-        Used to guess the location of the _files_to_watch
-    """
-    self.node_paths = node_paths
-    self._files_to_watch = files_to_watch
-
-  def _get_file_from_target_sources(self, basename, target):
-    full_path = os.path.join(target.address.spec_path, basename)
-    if full_path in target.sources_relative_to_buildroot():
+  def validate_lockfile_in_sources(self, full_path, target_sources, target_address):
+    if full_path in target_sources:
       return full_path
     else:
       raise ValueError("Trying to watch a file ({}) which is not in the sources of target {}".format(
-        basename, target.address
+        full_path, target_address
       ))
+
+  def _get_files_to_watch(self, target):
+    target_sources = target.sources_relative_to_buildroot()
+
+    lockfiles = target.payload.get_field_value("package_lockfiles")
+    if lockfiles is None:
+      package_manager = target.payload.get_field_value("package_manger")
+      if package_manager == 'yarn':
+        lockfiles = ['package.json', 'yarn.lock']
+      else:
+        lockfiles = ['package.json']
+
+    paths = [os.path.join(target.address.spec_path, name) for name in lockfiles]
+    for path in paths:
+      self.validate_lockfile_in_sources(path, target_sources, target.address)
+
+    return paths
 
   def compute_fingerprint(self, target):
     if NodeResolve.can_resolve_target(target):
       hasher = sha1()
-      for file_name in self._files_to_watch:
-        full_path = self._get_file_from_target_sources(file_name, target)
-        with open(full_path, 'r') as lockfile:
+      for lockfile_path in self._get_files_to_watch(target):
+        with open(lockfile_path, 'r') as lockfile:
           contents = lockfile.read().encode('utf-8')
           hasher.update(contents)
       return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
@@ -84,18 +89,6 @@ class NodeResolve(NodeTask):
     super(NodeResolve, cls).prepare(options, round_manager)
     for resolver in cls._resolver_by_type.values():
       resolver.prepare(options, round_manager)
-
-  @classmethod
-  def register_options(cls, register):
-    super(NodeResolve, cls).register_options(register)
-    register('--install-invalidating-files', type=list, advanced=True,
-      help='Files that invalidate the node_modules installation. '
-           'Changing any of these files will trigger resolution again.',
-      default=[
-        'package.json',
-        'yarn.lock',
-      ]
-    )
 
   @property
   def cache_target_dirs(self):
@@ -144,12 +137,6 @@ class NodeResolve(NodeTask):
     target_set = set(targets)
     return [t for t in reversed(sort_targets(targets)) if t in target_set]
 
-  def _create_fingerprinting_strategy(self, node_paths):
-    return NodeResolveFingerprintStrategy(
-      node_paths=node_paths,
-      files_to_watch=self.get_options().install_invalidating_files
-    )
-
   def execute(self):
     targets = self.context.targets(predicate=self.can_resolve_target)
     if not targets:
@@ -161,7 +148,7 @@ class NodeResolve(NodeTask):
       with self.invalidated(targets,
                             topological_order=True,
                             invalidate_dependents=True,
-                            fingerprint_strategy=self._create_fingerprinting_strategy(node_paths)
+                            fingerprint_strategy=NodeResolveFingerprintStrategy()
            ) as invalidation_check:
         with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
           for vt in invalidation_check.all_vts:
