@@ -17,6 +17,6 @@ class ZeroOutTest(tf.test.TestCase):
 
   @unittest.skipIf(sys.version_info[0:2] == (3, 7), "See https://github.com/pantsbuild/pants/issues/7417.")
   def test_zero_out(self):
-    with self.test_session():
+    with self.cached_session():
       result = zero_out_module().zero_out([5, 4, 3, 2, 1])
       self.assertAllEqual(result.eval(), [5, 0, 0, 0, 0])
