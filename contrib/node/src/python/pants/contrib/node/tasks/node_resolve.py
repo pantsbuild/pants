@@ -54,7 +54,8 @@ class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprint
     if NodeResolve.can_resolve_target(target):
       hasher = sha1()
       for lockfile_path in self._get_files_to_watch(target):
-        with open(lockfile_path, 'r') as lockfile:
+        absolute_lockfile_path = os.path.join(get_buildroot(), lockfile_path)
+        with open(absolute_lockfile_path, 'r') as lockfile:
           contents = lockfile.read().encode('utf-8')
           hasher.update(contents)
       return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
