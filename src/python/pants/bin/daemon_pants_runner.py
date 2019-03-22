@@ -16,8 +16,8 @@ from future.utils import PY3, raise_with_traceback
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import Exiter
+from pants.base.exception_sink import ExceptionSink, SignalHandler
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
@@ -26,6 +26,12 @@ from pants.pantsd.process_manager import ProcessManager
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
+
+
+class DaemonSignalHandler(SignalHandler):
+
+  def handle_sigint(self, signum, _frame):
+    raise KeyboardInterrupt('remote client sent control-c!')
 
 
 class DaemonExiter(Exiter):
@@ -283,6 +289,7 @@ class DaemonPantsRunner(ProcessManager):
     ExceptionSink.reset_exiter(self._exiter)
 
     ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
+    ExceptionSink.reset_signal_handler(DaemonSignalHandler())
 
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
@@ -332,4 +339,4 @@ class DaemonPantsRunner(ProcessManager):
       except Exception:
         ExceptionSink._log_unhandled_exception_and_exit()
       else:
-        self._exiter.exit(0)
+        self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)

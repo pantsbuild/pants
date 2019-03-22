@@ -84,6 +84,9 @@ python_library(
 python_library(
   name = 'exceptions',
   sources = ['exceptions.py'],
+  dependencies = [
+    ':exiter',
+  ],
 )
 
 python_library(
