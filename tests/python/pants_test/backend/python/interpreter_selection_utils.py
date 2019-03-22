@@ -129,20 +129,20 @@ def skip_if_interpreter_is_any_python_version(*versions):
 
 
 def skip_if_python27(func):
-  """A test skip decorator that skips if the current interpreter is Python 2.7"""
+  """A test skip decorator that skips if the current interpreter is Python 2.7."""
   return skip_if_interpreter_is_any_python_version(PY_27)(func)
 
 
 def skip_if_python3(func):
-  """A test skip decorator that skips if the current interpreter is Python 3"""
+  """A test skip decorator that skips if the current interpreter is Python 3."""
   return skip_if_interpreter_is_any_python_version(PY_3)(func)
 
 
 def skip_if_python36(func):
-  """A test skip decorator that skips if the current interpreter is Python 3.6"""
+  """A test skip decorator that skips if the current interpreter is Python 3.6."""
   return skip_if_interpreter_is_any_python_version(PY_36)(func)
 
 
 def skip_if_python37(func):
-  """A test skip decorator that skips if the current interpreter is Python 3.7"""
+  """A test skip decorator that skips if the current interpreter is Python 3.7."""
   return skip_if_interpreter_is_any_python_version(PY_37)(func)
