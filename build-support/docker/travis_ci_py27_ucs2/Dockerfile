@@ -15,13 +15,14 @@ FROM pantsbuild/centos6:latest
 # interpreter to use when `ci.sh` and `release.sh` set the interpreter constraints for
 # Pants, and thus for the built ./pants.pex. We set $PY to the exact Python 2.7 version we want
 # to ensure the PEX is bootstrapped with UCS 2.
-#
-# We also must use pyenv's versions folder, rather than the shims folders, to ensure we use the exact
-# version in the case the base image uses Pyenv to install Python 2.7.
 ARG PYTHON_27_VERSION=2.7.15
 # TODO(7064): remove this yum install line once we update the base Centos6 image to include this dependency.
 RUN yum install sqlite-devel -y
-ENV PYENV_ROOT /pyenv-docker-build
+# NB: we use a different PYENV_ROOT than we normally use in the other Dockerfiles to ensure
+# that we do not conflict with any Pyenv-installed interpreters already on the image. Specifically,
+# with https://github.com/pantsbuild/pants/pull/7064 we install Python 2.7 already onto the Centos6
+# image and must ensure that we do not accidently use that UCS4 interpreter.
+ENV PYENV_ROOT /pyenv-docker-build-ucs2
 ENV PYENV_BIN ${PYENV_ROOT}/bin/pyenv
 RUN mkdir ${PYENV_ROOT}
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
@@ -29,9 +30,9 @@ ENV PYTHON_CONFIGURE_OPTS --enable-unicode=ucs2
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
     ${PYENV_BIN} install ${PYTHON_27_VERSION} \
     && ${PYENV_BIN} global ${PYTHON_27_VERSION}'
-ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION}:${PATH}"
-ENV PY "${PYENV_ROOT}/versions/${PYTHON_27_VERSION}/python2.7"
-ENV PEX_PYTHON_PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION}/python2.7"
+ENV PATH "${PYENV_ROOT}/shims:${PATH}"
+ENV PY "${PYENV_ROOT}/shims/python2.7"
+ENV PEX_PYTHON_PATH "${PYENV_ROOT}/shims/python2.7"
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
