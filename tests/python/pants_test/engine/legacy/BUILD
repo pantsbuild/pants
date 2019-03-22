@@ -70,7 +70,6 @@ python_tests(
   name = 'console_rule_integration',
   sources = [ 'test_console_rule_integration.py' ],
   dependencies = [
-    'src/python/pants/pantsd:process_manager',
     'tests/python/pants_test/pantsd:pantsd_integration_test_base',
   ],
   tags = {'integration'},

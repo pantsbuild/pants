@@ -8,7 +8,6 @@ import os
 import time
 
 from pants.base.build_environment import get_buildroot
-from pants.pantsd.process_manager import ProcessMetadataManager
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_file_dump
 from pants_test.pants_run_integration_test import ensure_daemon
@@ -102,8 +101,8 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
       time.sleep(10)
       try:
         checker.assert_started()
-      except ProcessMetadataManager.Timeout:
-        time.sleep(15)
+      except Exception:
+        time.sleep(10)
         checker.assert_started()
 
       # Replace the BUILD file content twice.
