@@ -16,16 +16,18 @@ from pants.util.strutil import ensure_binary
 logger = logging.getLogger(__name__)
 
 
+# Centralize integer return codes for the pants process. We just use a single bit for now.
+# TODO: make these into an enum!
+PANTS_SUCCEEDED_EXIT_CODE = 0
+PANTS_FAILED_EXIT_CODE = 1
+
+
 class Exiter(object):
-  """A class that provides standard runtime exit and global exception handling behavior.
+  """A class that provides standard runtime exit behavior.
 
-  The expected method call order of this class is as follows:
-
-   1) Call Exiter.set_except_hook() to set sys.excepthook to the internal exception hook. This
-      should happen as early as possible to ensure any/all exceptions are handled by the hook.
-   2) Call Exiter.apply_options() to set traceback printing behavior via an Options object.
-   3) Perform other operations as normal.
-   4) Call Exiter.exit(), Exiter.exit_and_fail() or exiter_inst() when you wish to exit the runtime.
+  `pants.base.exception_sink.ExceptionSink` handles exceptions and fatal signals, delegating to an
+  Exiter instance which can be set process-globally with ExceptionSink.reset_exiter(). Call
+  .exit() or .exit_and_fail() on an Exiter instance when you wish to exit the runtime.
   """
 
   def __init__(self, exiter=sys.exit):
@@ -43,11 +45,11 @@ class Exiter(object):
     """Map class calls to self.exit() to support sys.exit() fungibility."""
     return self.exit(*args, **kwargs)
 
-  def exit(self, result=0, msg=None, out=None):
+  def exit(self, result=PANTS_SUCCEEDED_EXIT_CODE, msg=None, out=None):
     """Exits the runtime.
 
-    :param result: The exit status. Typically a 0 indicating success or a 1 indicating failure, but
-                   can be a string as well. (Optional)
+    :param result: The exit status. Typically either PANTS_SUCCEEDED_EXIT_CODE or
+                   PANTS_FAILED_EXIT_CODE, but can be a string as well. (Optional)
     :param msg: A string message to print to stderr or another custom file desciptor before exiting.
                 (Optional)
     :param out: The file descriptor to emit `msg` to. (Optional)
@@ -71,9 +73,11 @@ class Exiter(object):
         logger.exception(e)
     self._exit(result)
 
-  def exit_and_fail(self, msg=None):
-    """Exits the runtime with an exit code of 1, indicating failure.
+  def exit_and_fail(self, msg=None, out=None):
+    """Exits the runtime with a nonzero exit code, indicating failure.
 
-    :param str msg: A string message to print to stderr before exiting. (Optional)
+    :param msg: A string message to print to stderr or another custom file desciptor before exiting.
+                (Optional)
+    :param out: The file descriptor to emit `msg` to. (Optional)
     """
-    self.exit(result=1, msg=msg)
+    self.exit(result=PANTS_FAILED_EXIT_CODE, msg=msg, out=out)

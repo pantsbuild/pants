@@ -37,11 +37,22 @@ class PantsDaemonMonitor(ProcessManager):
       'PantsDaemonMonitor: pid is {} is_alive={}'.format(self._pid, self.is_alive()))
     )
 
-  def assert_started(self, timeout=.1):
+  # TODO(#7330): Determine why pantsd takes so long to start! Waiting for
+  # 'testprojects/src/python/coordinated_runs:waiter' specifically seems to require this 16-second
+  # timeout.
+  def assert_started(self, timeout=16):
     self._process = None
     self._pid = self.await_pid(timeout)
     self._check_pantsd_is_alive()
     return self._pid
+
+  def assert_pantsd_runner_started(self, client_pid, timeout=4):
+    return self.await_metadata_by_name(
+      name='nailgun-client',
+      metadata_key=str(client_pid),
+      timeout=timeout,
+      caster=int,
+    )
 
   def _check_pantsd_is_alive(self):
     self._log()
@@ -63,7 +74,7 @@ class PantsDaemonMonitor(ProcessManager):
 
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
   @contextmanager
-  def pantsd_test_context(self, log_level='info', extra_config=None, expected_runs=1):
+  def pantsd_test_context(self, log_level='info', extra_config=None):
     with no_lingering_process_by_command('pantsd-runner') as runner_process_context:
       with self.temporary_workdir() as workdir_base:
         pid_dir = os.path.join(workdir_base, '.pids')
@@ -83,9 +94,6 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
           recursively_update(pantsd_config, extra_config)
         print('>>> config: \n{}\n'.format(pantsd_config))
         checker = PantsDaemonMonitor(runner_process_context, pid_dir)
-        # TODO(#6574): this should be 1, but when we kill pantsd with a signal it doesn't make sure
-        # to close the run tracker -- we can easily address this by moving that cleanup into the
-        # Exiter.
         self.assert_runner(workdir, pantsd_config, ['kill-pantsd'], expected_runs=1)
         try:
           yield workdir, pantsd_config, checker
@@ -98,7 +106,6 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
             workdir,
             pantsd_config,
             ['kill-pantsd'],
-            # TODO(#6574): this should be 1, see above.
             expected_runs=1,
           )
           checker.assert_stopped()
@@ -155,7 +162,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     self.assertEqual(
         runs_created,
         expected_runs,
-        'Expected {} RunTracker run to be created per pantsd run: was {}'.format(
+        'Expected {} RunTracker run(s) to be created per pantsd run: was {}'.format(
           expected_runs,
           runs_created,
         )

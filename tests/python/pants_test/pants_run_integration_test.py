@@ -17,6 +17,7 @@ from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
@@ -51,7 +52,7 @@ class PantsJoinHandle(datatype(['command', 'process', 'workdir'])):
       stdin_data = ensure_binary(stdin_data)
     (stdout_data, stderr_data) = communicate_fn(stdin_data)
 
-    if self.process.returncode != PantsRunIntegrationTest.PANTS_SUCCESS_CODE:
+    if self.process.returncode != PANTS_SUCCEEDED_EXIT_CODE:
       render_logs(self.workdir)
 
     return PantsResult(
@@ -160,7 +161,6 @@ def _read_log(filename):
 class PantsRunIntegrationTest(unittest.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
-  PANTS_SUCCESS_CODE = 0
   PANTS_SCRIPT_NAME = 'pants'
 
   @classmethod
@@ -453,10 +453,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return stdout.decode('utf-8')
 
   def assert_success(self, pants_run, msg=None):
-    self.assert_result(pants_run, self.PANTS_SUCCESS_CODE, expected=True, msg=msg)
+    self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=True, msg=msg)
 
   def assert_failure(self, pants_run, msg=None):
-    self.assert_result(pants_run, self.PANTS_SUCCESS_CODE, expected=False, msg=msg)
+    self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=False, msg=msg)
 
   def assert_result(self, pants_run, value, expected=True, msg=None):
     check, assertion = (eq, self.assertEqual) if expected else (ne, self.assertNotEqual)

@@ -4,12 +4,13 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import datetime
 import itertools
 import os
+import re
 import signal
 import threading
 import time
-import unittest
 from builtins import open, range, zip
 
 from pants.util.contextutil import environment_as, temporary_dir
@@ -75,13 +76,15 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_running()
 
       # Assert there were no warnings or errors thrown in the pantsd log.
+      full_log = '\n'.join(read_pantsd_log(workdir))
       for line in read_pantsd_log(workdir):
         # Ignore deprecation warning emissions.
         if 'DeprecationWarning' in line:
           continue
 
         # Check if the line begins with W or E to check if it is a warning or error line.
-        assertNotRegex(self, line, r'^[WE].*')
+        assertNotRegex(self, line, r'^[WE].*',
+                       'error message detected in log:\n{}'.format(full_log))
 
   def test_pantsd_broken_pipe(self):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):
@@ -403,10 +406,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         config,
       )
 
-      # Wait for the python run to be running
-      time.sleep(15)
-
       checker.assert_started()
+      checker.assert_pantsd_runner_started(waiter_handle.process.pid)
 
       creator_handle = self.run_pants_with_workdir_without_waiting(
         ['run', 'testprojects/src/python/coordinated_runs:creator', '--', file_to_make],
@@ -417,66 +418,38 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
-  @unittest.skip("Broken: https://github.com/pantsbuild/pants/issues/6778")
-  def test_pantsd_parent_runner_killed(self):
-    with self.pantsd_test_context() as (workdir, config, checker):
-      # Launch a run that will wait for a file to be created (but do not create that file).
-      file_to_make = os.path.join(workdir, 'some_magic_file')
-      waiter_handle = self.run_pants_with_workdir_without_waiting(
-        ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
-        workdir,
-        config,
-      )
-
-      # Wait for the python run to be running.
-      time.sleep(5)
-      checker.assert_started()
-
-      # Locate the single "parent" pantsd-runner process, and kill it.
-      pantsd_runner_processes = [p for p in checker.runner_process_context.current_processes()
-                                 if p.ppid() == 1]
-      self.assertEquals(1, len(pantsd_runner_processes))
-      parent_runner_process = pantsd_runner_processes[0]
-      # Send SIGTERM
-      parent_runner_process.terminate()
-      waiter_run = waiter_handle.join()
-
-      # Ensure that we saw the pantsd-runner process's failure in the client's stderr.
-      self.assert_failure(waiter_run)
-      assertRegex(self, waiter_run.stderr_data, """\
-Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
-""".format(signum=signal.SIGTERM))
-      # NB: testing stderr is an "end-to-end" test, as it requires pants knowing the correct remote
-      # pid and reading those files to print their content to stderr, so we don't necessarily need
-      # to test the log files themselves here.
-
-  def _assert_pantsd_keyboardinterrupt_signal(self, signum):
+  def _assert_pantsd_keyboardinterrupt_signal(self, signum, messages, regexps=[],
+                                              quit_timeout=None):
     # TODO: This tests that pantsd-runner processes actually die after the thin client receives the
     # specified signal.
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
       file_to_make = os.path.join(workdir, 'some_magic_file')
-      waiter_handle = self.run_pants_with_workdir_without_waiting(
-        ['run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make],
-        workdir,
-        config,
-      )
 
-      time.sleep(5)
+      if quit_timeout is not None:
+        timeout_args = ['--pantsd-pailgun-quit-timeout={}'.format(quit_timeout)]
+      else:
+        timeout_args = []
+      argv = timeout_args + [
+        'run', 'testprojects/src/python/coordinated_runs:waiter', '--', file_to_make
+      ]
+      waiter_handle = self.run_pants_with_workdir_without_waiting(argv, workdir, config)
+      client_pid = waiter_handle.process.pid
+
       checker.assert_started()
+      checker.assert_pantsd_runner_started(client_pid)
 
       # Get all the pantsd-runner processes while they're still around.
       pantsd_runner_processes = checker.runner_process_context.current_processes()
-      # This should kill the pantsd-runner processes through the RemotePantsRunner SIGINT handler.
-      os.kill(waiter_handle.process.pid, signum)
+      # This should kill the pantsd-runner processes through the RemotePantsRunner signal handler.
+      os.kill(client_pid, signum)
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
-      self.assertIn('\nInterrupted by user.\n', waiter_run.stderr_data)
 
-      # TODO: SIGTERM should be tested as well, but the expected behavior is a little different --
-      # we should test that the pantsd-runner process exits with failure (if possible -- see the
-      # caveat on psutil below), and then check the remote process's fatal error log to confirm the
-      # remote pantsd-runner receives a SIGTERM and dies.
+      for msg in messages:
+        self.assertIn(msg, waiter_run.stderr_data)
+      for regexp in regexps:
+        assertRegex(self, waiter_run.stderr_data, regexp)
 
       time.sleep(1)
       for proc in pantsd_runner_processes:
@@ -485,15 +458,26 @@ Signal {signum} was raised\\. Exiting with failure\\. \\(backtrace omitted\\)
         # The pantsd-runner processes should be dead, and they should have exited with 1.
         self.assertFalse(proc.is_running())
 
-  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
-  def test_pantsd_control_c(self):
-    self._assert_pantsd_keyboardinterrupt_signal(signal.SIGINT)
+  def test_pantsd_sigterm(self):
+    self._assert_pantsd_keyboardinterrupt_signal(
+      signal.SIGTERM,
+      ['Signal {signum} (SIGTERM) was raised. Exiting with failure.'.format(signum=signal.SIGTERM)])
 
-  @unittest.skip('TODO: this should be unskipped as part of the work for #6574!')
-  def test_pantsd_sigquit(self):
-    # We convert a local SIGQUIT in the thin client process -> SIGINT on the remote end in
-    # RemotePantsRunner.
-    self._assert_pantsd_keyboardinterrupt_signal(signal.SIGQUIT)
+  def test_keyboardinterrupt_signals_with_pantsd(self):
+    for interrupt_signal in [signal.SIGINT, signal.SIGQUIT]:
+      self._assert_pantsd_keyboardinterrupt_signal(
+        interrupt_signal,
+        ['\nInterrupted by user over pailgun client!\n'])
+
+  def test_signal_pailgun_stream_timeout(self):
+    today = datetime.date.today().isoformat()
+    self._assert_pantsd_keyboardinterrupt_signal(
+      signal.SIGINT,
+      messages=['\nInterrupted by user over pailgun client!\n'],
+      regexps=["""WARN\\] timed out when attempting to gracefully shut down the remote client executing "'pantsd-runner.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, overtime seconds: [^\n]+"""
+               .format(today=re.escape(today))],
+      quit_timeout=0.01,
+    )
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
