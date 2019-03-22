@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import sys
 from unittest import skipIf
 
 from future.utils import PY2
@@ -61,7 +62,7 @@ def python_interpreter_path(version):
 def skip_unless_any_pythons_present(*versions):
   """A decorator that only runs the decorated test method if any of the specified pythons are present.
 
-  :param string *versions: Python version strings, such as 2.7, 3.
+  :param string *versions: Python version strings, such as "2.7", "3".
   """
   if any(v for v in versions if has_python_version(v)):
     return skipIf(False, 'At least one of the expected python versions found.')
@@ -71,7 +72,7 @@ def skip_unless_any_pythons_present(*versions):
 def skip_unless_all_pythons_present(*versions):
   """A decorator that only runs the decorated test method if all of the specified pythons are present.
 
-  :param string *versions: Python version strings, such as 2.7, 3.
+  :param string *versions: Python version strings, such as "2.7", "3".
   """
   missing_versions = [v for v in versions if not has_python_version(v)]
   if len(missing_versions) == 1:
@@ -107,3 +108,37 @@ def skip_unless_python27_and_python3_present(func):
 def skip_unless_python27_and_python36_present(func):
   """A test skip decorator that only runs a test method if python2.7 and python3.6 are present."""
   return skip_unless_all_pythons_present(PY_27, PY_36)(func)
+
+
+def skip_if_interpreter_is_any_python_version(*versions):
+  """A decorator that skips if the current interpreter version is any of the of the specified versions.
+
+  :param string *versions: Python version strings, such as "2.7", "3".
+  """
+  interpreter_major, interpreter_minor = sys.version_info[0:2]
+  parsed_versions = [version.split(".") for version in versions]
+
+  def version_matches_current_interpreter(major, minor=None):
+    if int(major) == interpreter_major and minor is None:
+      return True
+    return int(major) == interpreter_major and int(minor) == interpreter_minor
+
+  if any(version_matches_current_interpreter(*parsed_version) for parsed_version in parsed_versions):
+    return skipIf(True, "Current interpreter is one of the specified Python versions.")
+  return skipIf(False, "Current interpreter")
+
+
+def skip_if_python27(func):
+  return skip_if_interpreter_is_any_python_version(PY_27)(func)
+
+
+def skip_if_python3(func):
+  return skip_if_interpreter_is_any_python_version(PY_3)(func)
+
+
+def skip_if_python36(func):
+  return skip_if_interpreter_is_any_python_version(PY_36)(func)
+
+
+def skip_if_python37(func):
+  return skip_if_interpreter_is_any_python_version(PY_37)(func)
