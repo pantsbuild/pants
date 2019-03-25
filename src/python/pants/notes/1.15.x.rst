@@ -3,6 +3,41 @@
 This document describes releases leading up to the ``1.15.x`` ``stable`` series.
 
 
+1.15.0rc1 (3/25/2019)
+---------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Release pants as both a Python 2.7 PEX and a Python 3.6 PEX (#7401)
+  `Issue #654 <https://github.com/pantsbuild/pex/issues/654>`_
+  `PR #7401 <https://github.com/pantsbuild/pants/pull/7401>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Refactor travis.yml to deduplicate Pyenv and AWS pex code (#7397)
+  `PR #7397 <https://github.com/pantsbuild/pants/pull/7397>`_
+
+Bugfixes
+~~~~~~~~
+
+* fix for pantsrc-files option (#7427)
+  `PR #7427 <https://github.com/pantsbuild/pants/pull/7427>`_
+
+* Allow usage of pants2 script from other directories (#7409)
+  `PR #7409 <https://github.com/pantsbuild/pants/pull/7409>`_
+
+* Specify the python version to use in the unstable pex deploy shard. (#7411)
+  `PR #7411 <https://github.com/pantsbuild/pants/pull/7411>`_
+
+* Simplify glob matching and directly match in-memory globs as Patterns. (#7402)
+  `PR #7402 <https://github.com/pantsbuild/pants/pull/7402>`_
+
+* add a non-numeric prefix before the unstable version to avoid getting parsed and truncated as a number (#7400)
+  `PR #7400 <https://github.com/pantsbuild/pants/pull/7400>`_
+
+
 1.15.0rc0 (3/18/2019)
 ---------------------
 
