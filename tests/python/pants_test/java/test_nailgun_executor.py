@@ -4,9 +4,13 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
+from contextlib import contextmanager
+
 import mock
 import psutil
 
+from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_executor import NailgunExecutor
 from pants_test.test_base import TestBase
 
@@ -18,6 +22,30 @@ def fake_process(**kwargs):
   proc = mock.create_autospec(psutil.Process, spec_set=True)
   [setattr(getattr(proc, k), 'return_value', v) for k, v in kwargs.items()]
   return proc
+
+
+@contextmanager
+def rw_pipes(write_input=None):
+  """Create a pair of pipes wrapped in python file objects.
+
+  :param str write_input: If `write_input` is not None, the writable pipe will have that string
+                          written to it, then closed.
+  """
+  read_pipe, write_pipe = os.pipe()
+  read_fileobj = os.fdopen(read_pipe, 'r')
+  write_fileobj = os.fdopen(write_pipe, 'w')
+
+  if write_input is not None:
+    write_fileobj.write(write_input)
+    write_fileobj.close()
+    write_fileobj = None
+
+  yield read_fileobj, write_fileobj
+
+  read_fileobj.close()
+
+  if write_fileobj is not None:
+    write_fileobj.close()
 
 
 class NailgunExecutorTest(TestBase):
@@ -50,3 +78,15 @@ class NailgunExecutorTest(TestBase):
       )
       self.assertFalse(self.executor.is_alive())
       mock_as_process.assert_called_with(self.executor)
+
+  def test_connect_timeout(self):
+    with rw_pipes() as (stdout_read, stdout_write),\
+         rw_pipes(write_input='xxx') as (stderr_read, _):
+      with mock.patch('pants.java.nailgun_executor.safe_open') as mock_open,\
+           mock.patch('pants.java.nailgun_executor.read_file') as mock_read_file:
+        mock_open.return_value = stdout_read
+        mock_read_file.return_value = stderr_read
+        # The stdout read pipe has no input and hasn't been closed, so the select.select() should
+        # time out regardless of the timemout argument, and raise.
+        with self.assertRaisesWithMessage(NailgunClient.NailgunError, 'wow'):
+          self.executor._await_socket(timeout=0.0001)
