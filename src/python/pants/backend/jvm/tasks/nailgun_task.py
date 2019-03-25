@@ -34,8 +34,10 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
              help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
                   'task will be quicker. If set to subprocess, then the task will be run without '
                   'nailgun. Hermetic execution is an experimental subprocess execution framework.')
+    register('--nailgun-subprocess-startup-timeout', advanced=True, default=10, type=float,
+             help='The time (secs) to wait for a nailgun subprocess to start.')
     register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
-             help='Timeout (secs) for nailgun startup.')
+             help='The time (secs) to wait for a nailgun subprocess to start writing to stdout.')
     register('--nailgun-connect-attempts', advanced=True, default=5, type=int,
              help='Max attempts for nailgun connects.')
     cls.register_jvm_tool(register,
@@ -83,6 +85,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                              self._executor_workdir,
                              classpath,
                              dist,
+                             startup_timeout=self.get_options().nailgun_subprocess_startup_timeout,
                              connect_timeout=self.get_options().nailgun_timeout_seconds,
                              connect_attempts=self.get_options().nailgun_connect_attempts)
     else:

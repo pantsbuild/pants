@@ -75,11 +75,11 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
   _PANTS_NG_BUILDROOT_ARG = '='.join((_PANTS_NG_ARG_PREFIX, get_buildroot()))
 
   _NAILGUN_SPAWN_LOCK = threading.Lock()
-  _SELECT_WAIT = 1
   _PROCESS_NAME = 'java'
 
   def __init__(self, identity, workdir, nailgun_classpath, distribution,
-               connect_timeout=10, connect_attempts=5, metadata_base_dir=None):
+               startup_timeout=10, connect_timeout=10, connect_attempts=5,
+               metadata_base_dir=None):
     Executor.__init__(self, distribution=distribution)
     FingerprintedProcessManager.__init__(self,
                                          name=identity,
@@ -94,6 +94,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     self._ng_stdout = os.path.join(workdir, 'stdout')
     self._ng_stderr = os.path.join(workdir, 'stderr')
     self._nailgun_classpath = maybe_list(nailgun_classpath)
+    self._startup_timeout = startup_timeout
     self._connect_timeout = connect_timeout
     self._connect_attempts = connect_attempts
 
@@ -140,14 +141,18 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
         return list(command)
 
       def run(this, stdout=None, stderr=None, stdin=None, cwd=None):
+        nailgun = None
         try:
           nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr, stdin)
           logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
           return nailgun.execute(main, cwd, *args)
-        except (nailgun.NailgunError, self.InitialNailgunConnectTimedOut) as e:
+        except (NailgunClient.NailgunError, self.InitialNailgunConnectTimedOut) as e:
           self.terminate()
           raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'
-                           .format(ng_desc=nailgun, main=main, args=' '.join(args), msg=e))
+                           .format(ng_desc=nailgun or '<no nailgun connection>',
+                                   main=main,
+                                   args=' '.join(args),
+                                   msg=e))
 
     return Runner()
 
@@ -197,7 +202,7 @@ Stderr:
       start_time = time.time()
       accumulated_stdout = ''
       while 1:
-        readable, _, _ = select.select([ng_stdout], [], [], self._SELECT_WAIT)
+        readable, _, _ = select.select([ng_stdout], [], [], self._connect_timeout)
         if readable:
           line = ng_stdout.readline()                          # TODO: address deadlock risk here.
           try:
@@ -207,7 +212,7 @@ Stderr:
           accumulated_stdout += line
 
         if (time.time() - start_time) > timeout:
-          stderr = read_file(self._ng_stderr)
+          stderr = read_file(self._ng_stderr, binary_mode=True)
           raise self.InitialNailgunConnectTimedOut(
             timeout=timeout,
             stdout=accumulated_stdout,
@@ -255,7 +260,7 @@ Stderr:
     self.daemon_spawn(post_fork_child_opts=post_fork_child_opts)
 
     # Wait for and write the port information in the parent so we can bail on exception/timeout.
-    self.await_pid(self._connect_timeout)
+    self.await_pid(self._startup_timeout)
     self.write_socket(self._await_socket(self._connect_timeout))
 
     logger.debug('Spawned nailgun server {i} with fingerprint={f}, pid={pid} port={port}'
