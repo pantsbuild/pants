@@ -6,6 +6,8 @@ This document describes releases leading up to the ``1.15.x`` ``stable`` series.
 1.15.0rc1 (3/25/2019)
 ---------------------
 
+Note: This release does not support using Python 3.7 due to a bug that was introduced while releasing a Python 3 PEX. We are prioritizing fixing this before 1.15.0 is cut. In the meantime, you may use Python 2.7 or Python 3.6.
+
 New Features
 ~~~~~~~~~~~~
 
