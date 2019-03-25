@@ -25,6 +25,11 @@ class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprint
   We read every file and add its contents to the hash.
   """
 
+  default_package_manager_lockfiles = {
+    'yarn': ['package.json', 'yarn.lock'],
+    'npm': ['package.json']
+  }
+
   def validate_lockfile_in_sources(self, full_path, target_sources, target_address):
     if full_path in target_sources:
       return full_path
@@ -38,12 +43,9 @@ class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprint
 
     lockfiles = target.payload.get_field_value("package_lockfiles")
     if lockfiles is None:
-      package_manager = target.payload.get_field_value("package_manger")
-      if package_manager == 'yarn':
-        lockfiles = ['package.json', 'yarn.lock']
-      else:
-        lockfiles = ['package.json']
-
+      package_manager = target.payload.get_field_value("package_manager", '')
+      # NB: Defaults to empty list for things like scalajs ad-hoc packages.
+      lockfiles = self.default_package_manager_lockfiles.get(package_manager, [])
     paths = [os.path.join(target.address.spec_path, name) for name in lockfiles]
     for path in paths:
       self.validate_lockfile_in_sources(path, target_sources, target.address)
