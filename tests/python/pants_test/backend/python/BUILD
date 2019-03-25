@@ -74,5 +74,6 @@ python_library(
   dependencies=[
     'src/python/pants/util:process_handler',
     '3rdparty/python:future',
+    '3rdparty/python:packaging',
   ]
 )

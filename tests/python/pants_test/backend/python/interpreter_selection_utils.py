@@ -6,9 +6,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
+from builtins import map, str
 from unittest import skipIf
 
 from future.utils import PY2
+from packaging.specifiers import SpecifierSet
 
 from pants.util.process_handler import subprocess
 
@@ -115,17 +117,24 @@ def skip_if_interpreter_is_any_python_version(*versions):
 
   :param string *versions: Python version strings, such as "2.7", "3".
   """
-  interpreter_major, interpreter_minor = sys.version_info[0:2]
-  parsed_versions = [version.split(".") for version in versions]
+  current_interpreter = ".".join(map(str, sys.version_info[0:2]))
+  # NB: if only the major Python version is specified, e.g. `2` or `3`, we must append `.*` to the string
+  # for packaging.specifiers.SpecifierSet to work properly.
+  version_strings = [
+    "=={}.*".format(version) if len(version) == 1 else "=={}".format(version)
+    for version in versions
+  ]
+  valid_versions = SpecifierSet(*version_strings)
+  return (
+    skipIf(True, "Current interpreter is one of the specified Python versions.")
+    if current_interpreter in valid_versions
+    else skipIf(False, "Current interpreter not one of the specified Python versions.")
+  )
 
-  def version_matches_current_interpreter(major, minor=None):
-    if int(major) == interpreter_major and minor is None:
-      return True
-    return int(major) == interpreter_major and int(minor) == interpreter_minor
 
-  if any(version_matches_current_interpreter(*parsed_version) for parsed_version in parsed_versions):
-    return skipIf(True, "Current interpreter is one of the specified Python versions.")
-  return skipIf(False, "Current interpreter")
+def skip_if_python2(func):
+  """A test skip decorator that skips if the current interpreter is Python 2."""
+  return skip_if_interpreter_is_any_python_version(PY_2)(func)
 
 
 def skip_if_python27(func):
