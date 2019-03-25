@@ -140,11 +140,11 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
         return list(command)
 
       def run(this, stdout=None, stderr=None, stdin=None, cwd=None):
-        nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr, stdin)
         try:
+          nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr, stdin)
           logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
           return nailgun.execute(main, cwd, *args)
-        except nailgun.NailgunError as e:
+        except (nailgun.NailgunError, self.InitialNailgunConnectTimedOut) as e:
           self.terminate()
           raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'
                            .format(ng_desc=nailgun, main=main, args=' '.join(args), msg=e))
@@ -180,6 +180,17 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
 
     return self._create_ngclient(self.socket, stdout, stderr, stdin)
 
+  class InitialNailgunConnectTimedOut(Exception):
+    _msg_fmt = """Failed to read nailgun output after {timeout} seconds!
+Stdout:
+{stdout}
+Stderr:
+{stderr}"""
+
+    def __init__(self, timeout, stdout, stderr):
+      msg = self._msg_fmt.format(timeout=timeout, stdout=stdout, stderr=stderr)
+      super(NailgunExecutor.InitialNailgunConnectTimedOut, self).__init__(msg)
+
   def _await_socket(self, timeout):
     """Blocks for the nailgun subprocess to bind and emit a listening port in the nailgun stdout."""
     with safe_open(self._ng_stdout, 'r') as ng_stdout:
@@ -197,13 +208,10 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
 
         if (time.time() - start_time) > timeout:
           stderr = read_file(self._ng_stderr)
-          raise NailgunClient.NailgunError(
-            'Failed to read nailgun output after {sec} seconds!\n'
-            'Stdout:\n{stdout}\nStderr:\n{stderr}'.format(
-              sec=timeout,
-              stdout=accumulated_stdout,
-              stderr=stderr,
-            )
+          raise self.InitialNailgunConnectTimedOut(
+            timeout=timeout,
+            stdout=accumulated_stdout,
+            stderr=stderr,
           )
 
   def _create_ngclient(self, port, stdout, stderr, stdin):

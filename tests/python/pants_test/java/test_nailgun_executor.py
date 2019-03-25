@@ -10,7 +10,6 @@ from contextlib import contextmanager
 import mock
 import psutil
 
-from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_executor import NailgunExecutor
 from pants_test.test_base import TestBase
 
@@ -80,13 +79,17 @@ class NailgunExecutorTest(TestBase):
       mock_as_process.assert_called_with(self.executor)
 
   def test_connect_timeout(self):
-    with rw_pipes() as (stdout_read, stdout_write),\
-         rw_pipes(write_input='xxx') as (stderr_read, _):
-      with mock.patch('pants.java.nailgun_executor.safe_open') as mock_open,\
-           mock.patch('pants.java.nailgun_executor.read_file') as mock_read_file:
-        mock_open.return_value = stdout_read
-        mock_read_file.return_value = stderr_read
-        # The stdout read pipe has no input and hasn't been closed, so the select.select() should
-        # time out regardless of the timemout argument, and raise.
-        with self.assertRaisesWithMessage(NailgunClient.NailgunError, 'wow'):
-          self.executor._await_socket(timeout=0.0001)
+    with rw_pipes() as (stdout_read, _),\
+         mock.patch('pants.java.nailgun_executor.safe_open') as mock_open,\
+         mock.patch('pants.java.nailgun_executor.read_file') as mock_read_file:
+      mock_open.return_value = stdout_read
+      mock_read_file.return_value = 'err'
+      # The stdout write pipe has no input and hasn't been closed, so the select.select() should
+      # time out regardless of the timemout argument, and raise.
+      with self.assertRaisesWithMessage(NailgunExecutor.InitialNailgunConnectTimedOut, """\
+Failed to read nailgun output after 0.0001 seconds!
+Stdout:
+
+Stderr:
+err"""):
+        self.executor._await_socket(timeout=0.0001)

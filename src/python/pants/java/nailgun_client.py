@@ -185,12 +185,12 @@ class NailgunClient(object):
 {description} (address: {address}, remote_pid={pid}, remote_pgrp={pgrp}): {wrapped_exc!r}\
 """
 
-    def __init__(self, address, pid, pgrp, wrapped_exc, traceback):
+    # TODO: preserve the traceback somehow!
+    def __init__(self, address, pid, pgrp, wrapped_exc):
       self.address = address
       self.pid = pid
       self.pgrp = pgrp
       self.wrapped_exc = wrapped_exc
-      self.traceback = traceback
 
       # TODO: these should be ensured to be non-None in NailgunClientSession!
       if self.pid is not None:
@@ -209,6 +209,14 @@ class NailgunClient(object):
         pgrp=pgrp_msg,
         wrapped_exc=self.wrapped_exc)
       super(NailgunClient.NailgunError, self).__init__(msg, self.wrapped_exc)
+
+  def _make_nailgun_error(self, wrapped_exc):
+    return self.NailgunError(
+      address=self._address_string,
+      pid=self._maybe_last_pid(),
+      pgrp=self._maybe_last_pgrp(),
+      wrapped_exc=wrapped_exc,
+    )
 
   class NailgunConnectionError(NailgunError):
     """Indicates an error upon initial connect to the nailgun server."""
@@ -356,22 +364,8 @@ class NailgunClient(object):
       remote_pgrp_callback=self._receive_remote_pgrp)
     try:
       return self._session.execute(cwd, main_class, *args, **environment)
-    except socket.error as e:
-      raise self.NailgunError(
-        address=self._address_string,
-        pid=self._maybe_last_pid(),
-        pgrp=self._maybe_last_pgrp(),
-        wrapped_exc=e,
-        traceback=sys.exc_info()[2]
-      )
-    except NailgunProtocol.ProtocolError as e:
-      raise self.NailgunError(
-        address=self._address_string,
-        pid=self._maybe_last_pid(),
-        pgrp=self._maybe_last_pgrp(),
-        wrapped_exc=e,
-        traceback=sys.exc_info()[2]
-      )
+    except (socket.error, NailgunProtocol.ProtocolError) as e:
+      raise self._make_nailgun_error(e)
     finally:
       sock.close()
       self._session = None
