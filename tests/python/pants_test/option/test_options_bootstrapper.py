@@ -205,6 +205,26 @@ class BootstrapOptionsTest(unittest.TestCase):
 
     self.do_test_create_bootstrapped_multiple_config(create_options_bootstrapper)
 
+
+  def test_options_pantsrc_files(self):
+    def create_options_bootstrapper(*config_paths):
+      return OptionsBootstrapper.create(args=['--pantsrc-files={}'.format(cp) for cp in config_paths])
+    with temporary_file(binary_mode=False) as fp:
+      fp.write(dedent("""
+      [resolver]
+      resolver: coursier
+      """))
+      fp.close()
+    bootstrapped_options = create_options_bootstrapper(fp.name)
+    opts_single_config = bootstrapped_options.get_full_options(known_scope_infos=[
+      ScopeInfo('', ScopeInfo.GLOBAL),
+      ScopeInfo('resolver', ScopeInfo.TASK),
+    ])
+    opts_single_config.register('', '--pantsrc-files', type=list)
+    opts_single_config.register('resolver', '--resolver')
+
+    self.assertEqual('coursier', opts_single_config.for_scope('resolver').coursier)
+
   def test_full_options_caching(self):
     with temporary_file_path() as config:
       args = self._config_path(config)

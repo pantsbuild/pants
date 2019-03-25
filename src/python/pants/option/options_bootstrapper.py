@@ -141,7 +141,7 @@ class OptionsBootstrapper(datatype([
     # from (typically pants.ini), then config override, then rcfiles.
     full_configpaths = pre_bootstrap_config.sources()
     if bootstrap_option_values.pantsrc:
-      rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
+      rcfiles = [os.path.expanduser(str(rcfile)) for rcfile in bootstrap_option_values.pantsrc_files]
       existing_rcfiles = list(filter(os.path.exists, rcfiles))
       full_configpaths.extend(existing_rcfiles)
 
