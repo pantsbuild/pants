@@ -40,8 +40,7 @@ class ClassPropertyDescriptor(object):
       raise TypeError("""\
 The classproperty '{func_name}' in type '{type_name}' was an abstractproperty, meaning that type \
 {type_name} must override it by setting it as a variable in the class body or defining a method \
-with an @classproperty decorator.
-"""
+with an @classproperty decorator."""
                       .format(func_name=field_name,
                               type_name=objtype.__name__))
     else:
