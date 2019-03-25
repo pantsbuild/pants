@@ -202,7 +202,18 @@ Stderr:
       start_time = time.time()
       accumulated_stdout = ''
       while 1:
-        readable, _, _ = select.select([ng_stdout], [], [], self._connect_timeout)
+        # TODO: share the decreasing timeout logic here with NailgunProtocol.iter_chunks() by adding
+        # a method to pants.util.contextutil!
+        remaining_time = time.time() - (start_time + timeout)
+        if remaining_time > 0:
+          stderr = read_file(self._ng_stderr, binary_mode=True)
+          raise self.InitialNailgunConnectTimedOut(
+            timeout=timeout,
+            stdout=accumulated_stdout,
+            stderr=stderr,
+          )
+
+        readable, _, _ = select.select([ng_stdout], [], [], (-1 * remaining_time))
         if readable:
           line = ng_stdout.readline()                          # TODO: address deadlock risk here.
           try:
@@ -210,14 +221,6 @@ Stderr:
           except AttributeError:
             pass
           accumulated_stdout += line
-
-        if (time.time() - start_time) > timeout:
-          stderr = read_file(self._ng_stderr, binary_mode=True)
-          raise self.InitialNailgunConnectTimedOut(
-            timeout=timeout,
-            stdout=accumulated_stdout,
-            stderr=stderr,
-          )
 
   def _create_ngclient(self, port, stdout, stderr, stdin):
     return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr, workdir=get_buildroot())
