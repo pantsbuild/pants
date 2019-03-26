@@ -13,7 +13,7 @@ from pants.base.exceptions import TaskError
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.option.custom_types import dir_option, file_option
-from pants.util.dirutil import safe_mkdir, safe_rmtree
+from pants.util.dirutil import is_readable_dir, safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method, memoized_property
 
 from pants.contrib.node.subsystems.command import command_gen
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 class NodeReleaseUrlGenerator(BinaryToolUrlGenerator):
 
-  _DIST_URL_FMT = 'https://nodejs.org/dist/{version}/node-{version}-{system_id}.tar.xz'
+  _DIST_URL_FMT = 'https://nodejs.org/dist/{version}/node-{version}-{system_id}.tar.gz'
 
   _SYSTEM_ID = {
     'mac': 'darwin-x64',
@@ -132,6 +132,10 @@ class NodeDistribution(NativeTool):
     # This line depends on repacked node distribution.
     # Should change it from 'node/bin' to 'dist/bin'
     node_bin_path = os.path.join(node_package_path, 'node', 'bin')
+    if not is_readable_dir(node_bin_path):
+      # The binary was pulled from nodejs and not our S3, in which
+      # case it's installed under a different directory.
+      return os.path.join(node_package_path, os.listdir(node_package_path)[0], 'bin')
     return node_bin_path
 
   @memoized_method
