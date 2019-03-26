@@ -12,8 +12,7 @@ import time
 from builtins import open, zip
 from contextlib import contextmanager
 
-from future.utils import PY3, raise_with_traceback
-from setproctitle import setproctitle as set_process_title
+from future.utils import raise_with_traceback
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, SignalHandler
@@ -261,9 +260,6 @@ class DaemonPantsRunner(ProcessManager):
     in that child process.
     """
 
-    ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
-    ExceptionSink.reset_signal_handler(DaemonSignalHandler())
-
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
 
@@ -304,7 +300,6 @@ class DaemonPantsRunner(ProcessManager):
       except GracefulTerminationException as e:
         ExceptionSink.log_exception(
           'Encountered graceful termination exception {}; exiting'.format(e))
-        self._exiter.exit(e.exit_code)
       except Exception:
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
         # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
