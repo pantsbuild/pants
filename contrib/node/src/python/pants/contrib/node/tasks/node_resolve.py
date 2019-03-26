@@ -25,31 +25,16 @@ class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprint
   We read every file and add its contents to the hash.
   """
 
-  default_package_manager_lockfiles = {
+  _package_manager_lockfiles = {
     'yarn': ['package.json', 'yarn.lock'],
-    'npm': ['package.json']
+    'npm': ['package.json', 'package-lock.json', 'npm-shrinkwrap.json']
   }
 
-  def validate_lockfile_in_sources(self, full_path, target_sources, target_address):
-    if full_path in target_sources:
-      return full_path
-    else:
-      raise ValueError("Trying to watch a file ({}) which is not in the sources of target {}".format(
-        full_path, target_address
-      ))
-
   def _get_files_to_watch(self, target):
-    target_sources = target.sources_relative_to_buildroot()
-
-    lockfiles = target.payload.get_field_value("package_lockfiles")
-    if lockfiles is None:
-      package_manager = target.payload.get_field_value("package_manager", '')
-      # NB: Defaults to empty list for things like scalajs ad-hoc packages.
-      lockfiles = self.default_package_manager_lockfiles.get(package_manager, [])
+    package_manager = target.payload.get_field_value("package_manager", '')
+    # NB: Defaults to empty list for things like scalajs ad-hoc packages.
+    lockfiles = self._package_manager_lockfiles.get(package_manager, [])
     paths = [os.path.join(target.address.spec_path, name) for name in lockfiles]
-    for path in paths:
-      self.validate_lockfile_in_sources(path, target_sources, target.address)
-
     return paths
 
   def compute_fingerprint(self, target):
@@ -57,9 +42,12 @@ class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprint
       hasher = sha1()
       for lockfile_path in self._get_files_to_watch(target):
         absolute_lockfile_path = os.path.join(get_buildroot(), lockfile_path)
-        with open(absolute_lockfile_path, 'r') as lockfile:
-          contents = lockfile.read().encode('utf-8')
-          hasher.update(contents)
+        # NB: It should not be up to the caching to decide what happens when a
+        # lockfile is not added in sources.
+        if os.path.exists(absolute_lockfile_path):
+          with open(absolute_lockfile_path, 'r') as lockfile:
+            contents = lockfile.read().encode('utf-8')
+            hasher.update(contents)
       return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
     return None
 

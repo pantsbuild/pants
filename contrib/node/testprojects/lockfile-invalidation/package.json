@@ -1,5 +1,5 @@
 {
-  "name": "pantsbuild-hello-node",
+  "name": "lockfiles",
   "version": "1.0.0",
   "description": "Project to test lockfile fingerprinting",
   "main": "index.js",

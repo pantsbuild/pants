@@ -21,19 +21,15 @@ class NodeModule(NodePackage):
   """A Node module."""
 
   def __init__(
-    self, package_manager=None, package_lockfiles=None, sources=None, build_script=None,
-    output_dir='dist', dev_dependency=False, style_ignore_path='.eslintignore', address=None,
-    payload=None, bin_executables=None, node_scope=None, **kwargs):
+    self, package_manager=None, sources=None, build_script=None, output_dir='dist',
+    dev_dependency=False, style_ignore_path='.eslintignore', address=None, payload=None,
+    bin_executables=None, node_scope=None, **kwargs):
     """
     :param sources: Javascript and other source code files that make up this module; paths are
                     relative to the BUILD file's directory.
     :type sources: `globs`, `rglobs` or a list of strings
 
     :param package_manager: choose among supported package managers (npm or yarn).
-    :param package_lockfiles: List of files to fingerprint to know when to reinstall this target.
-      If any of these change, the target will have to reinstall.
-      Defaults are ['package.json'] if `package_manager` is 'npm', and ['package.json', 'yarn.lock']
-      if `package_manager` is 'yarn'. All files specified here should be accounted for in `sources`.
     :param build_script: build script name as defined in package.json.  All files that are needed
       for the build script must be included in sources.  The script should output build results
       in the directory specified by output_dir.  If build_script is not supplied, the node
@@ -79,7 +75,6 @@ class NodeModule(NodePackage):
         sources=sources, sources_rel_path=address.spec_path, key_arg='sources'),
       'build_script': PrimitiveField(build_script),
       'package_manager': PrimitiveField(package_manager),
-      'package_lockfiles': PrimitiveField(package_lockfiles),
       'output_dir': PrimitiveField(output_dir),
       'dev_dependency': PrimitiveField(dev_dependency),
       'style_ignore_path': PrimitiveField(style_ignore_path),
