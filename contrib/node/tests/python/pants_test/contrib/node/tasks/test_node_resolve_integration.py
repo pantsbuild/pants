@@ -4,6 +4,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
+from textwrap import dedent
+
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -32,3 +35,62 @@ class NodeResolveIntegrationTest(PantsRunIntegrationTest):
                'contrib/node/examples/src/node/yarn-workspaces']
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
+
+  def _run_successfully(self, pants_command, workdir):
+    pants_run = self.run_pants_with_workdir(
+      command=pants_command,
+      workdir=workdir
+    )
+    self.assert_success(pants_run)
+    return pants_run
+
+  def assert_not_triggered_install(self, pants_command, workdir):
+    res = self._run_successfully(pants_command, workdir)
+    assert "yarn install" not in res.stdout_data
+
+  def run_and_assert_triggered_install(self, pants_command, workdir):
+    res = self._run_successfully(pants_command, workdir)
+    assert "yarn install" in res.stdout_data
+
+  def _modified_package_json_content(self, target_name):
+    return dedent(("""{{
+        "name": "{target_name}",
+        "version": "1.0.1",
+        "description": "Pantsbuild hello for Node.js",
+        "main": "index.js",
+        "repository": "https://github.com/pantsbuild/pants.git",
+        "author": "pantsbuild",
+        "scripts": {{
+          "start": "babel-node index.js"
+        }},
+        "devDependencies": {{
+          "babel-cli": "^6.22.2",
+          "babel-preset-latest": "^6.22.0"
+        }}
+      }}
+      """).format(target_name=target_name))
+
+  def test_no_reinstall_with_unchanged_lockfiles(self):
+    with self.temporary_workdir() as workdir:
+      root = 'contrib/node/testprojects/lockfile-invalidation'
+      target = root + ':lockfiles'
+      index_file = os.path.join(root, 'index.js')
+      command = ['run', target]
+      self.run_and_assert_triggered_install(command, workdir)
+
+      with self.with_overwritten_file_content(index_file, temporary_content='console.log("Hello World!!")'):
+        self.assert_not_triggered_install(command, workdir)
+
+  def test_changing_lockfiles_triggers_reinstall(self):
+    with self.temporary_workdir() as workdir:
+      root = 'contrib/node/testprojects/lockfile-invalidation'
+      target_name = 'lockfiles'
+      target = root + ':' + target_name
+      package_file = os.path.join(root, 'package.json')
+      new_package_contents = self._modified_package_json_content(target_name)
+
+      command = ['run', target]
+      self.run_and_assert_triggered_install(command, workdir)
+
+      with self.with_overwritten_file_content(package_file, temporary_content=new_package_contents):
+        self.run_and_assert_triggered_install(command, workdir)
