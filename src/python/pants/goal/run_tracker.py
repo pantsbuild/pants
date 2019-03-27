@@ -29,7 +29,6 @@ from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.reporting.report import Report
-from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import relative_symlink, safe_file_dump
@@ -78,7 +77,7 @@ class RunTracker(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(RunTracker, cls).subsystem_dependencies() + (StatsDBFactory, Cookies)
+    return super(RunTracker, cls).subsystem_dependencies() + (Cookies,)
 
   @classmethod
   def register_options(cls, register):
@@ -423,9 +422,6 @@ class RunTracker(Subsystem):
     stats_json_file_name = self.get_options().stats_local_json_file
     if stats_json_file_name:
       self.write_stats_to_json(stats_json_file_name, stats)
-
-    # Add to local stats db.
-    StatsDBFactory.global_instance().get_db().insert_stats(stats)
 
     # Upload to remote stats db.
     stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)

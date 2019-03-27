@@ -104,7 +104,6 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/option',
     'src/python/pants/reporting', # XXX(fixme)
-    'src/python/pants/stats',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
