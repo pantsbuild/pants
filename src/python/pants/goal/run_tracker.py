@@ -19,7 +19,6 @@ import requests
 from future.utils import PY3
 
 from pants.auth.cookies import Cookies
-from pants.base.build_environment import get_pants_cachedir
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
@@ -419,12 +418,6 @@ class RunTracker(Subsystem):
       'outcomes': self.outcomes,
       'recorded_options': self._get_options_to_record(),
     }
-
-    # Write stats json to local cache.
-    stats_file = os.path.join(get_pants_cachedir(), 'stats',
-                              '{}.json'.format(self.run_info.get_info('id')))
-
-    self.write_stats_to_json(stats_file, self._json_dump_options(stats))
 
     # Write stats to user-defined json file.
     stats_json_file_name = self.get_options().stats_local_json_file
