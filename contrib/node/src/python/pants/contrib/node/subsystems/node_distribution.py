@@ -11,8 +11,9 @@ import shutil
 
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_tool import NativeTool
+from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.option.custom_types import dir_option, file_option
-from pants.util.dirutil import safe_mkdir, safe_rmtree
+from pants.util.dirutil import is_readable_dir, safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method, memoized_property
 
 from pants.contrib.node.subsystems.command import command_gen
@@ -28,6 +29,20 @@ from pants.contrib.node.subsystems.yarnpkg_distribution import YarnpkgDistributi
 logger = logging.getLogger(__name__)
 
 
+class NodeReleaseUrlGenerator(BinaryToolUrlGenerator):
+
+  _DIST_URL_FMT = 'https://nodejs.org/dist/{version}/node-{version}-{system_id}.tar.gz'
+
+  _SYSTEM_ID = {
+    'mac': 'darwin-x64',
+    'linux': 'linux-x64',
+  }
+
+  def generate_urls(self, version, host_platform):
+    system_id = self._SYSTEM_ID[host_platform.os_name]
+    return [self._DIST_URL_FMT.format(version=version, system_id=system_id)]
+
+
 class NodeDistribution(NativeTool):
   """Represents a self-bootstrapping Node distribution."""
 
@@ -35,6 +50,9 @@ class NodeDistribution(NativeTool):
   name = 'node'
   default_version = 'v8.11.3'
   archive_type = 'tgz'
+
+  def get_external_url_generator(self):
+    return NodeReleaseUrlGenerator()
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -114,6 +132,10 @@ class NodeDistribution(NativeTool):
     # This line depends on repacked node distribution.
     # Should change it from 'node/bin' to 'dist/bin'
     node_bin_path = os.path.join(node_package_path, 'node', 'bin')
+    if not is_readable_dir(node_bin_path):
+      # The binary was pulled from nodejs and not our S3, in which
+      # case it's installed under a different directory.
+      return os.path.join(node_package_path, os.listdir(node_package_path)[0], 'bin')
     return node_bin_path
 
   @memoized_method
@@ -151,7 +173,7 @@ class NodeDistribution(NativeTool):
 
   def eslint_supportdir(self, task_workdir):
     """ Returns the path where the ESLint is bootstrapped.
-    
+
     :param string task_workdir: The task's working directory
     :returns: The path where ESLint is bootstrapped and whether or not it is configured
     :rtype: (string, bool)
