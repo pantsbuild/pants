@@ -9,6 +9,7 @@ import functools
 import inspect
 import itertools
 import logging
+import sys
 from abc import abstractproperty
 from builtins import bytes, str
 from types import GeneratorType
@@ -34,14 +35,13 @@ _type_field = SubclassesOf(type)
 class _RuleVisitor(ast.NodeVisitor):
   """Pull `Get` calls out of an @rule body and validate `yield` statements."""
 
-  def __init__(self, func, func_node, func_source, orig_indent, frame, parents_table):
+  def __init__(self, func, func_node, func_source, orig_indent, parents_table):
     super(_RuleVisitor, self).__init__()
     self._gets = []
     self._func = func
     self._func_node = func_node
     self._func_source = func_source
     self._orig_indent = orig_indent
-    self._frame = frame
     self._parents_table = parents_table
     self._yields_in_assignments = set()
 
@@ -51,7 +51,8 @@ class _RuleVisitor(ast.NodeVisitor):
 
   def _generate_ast_error_message(self, node, msg):
     # This is the location info of the start of the decorated @rule.
-    filename, line_number, _, context_lines, _ = inspect.getframeinfo(self._frame, context=4)
+    filename = inspect.getsourcefile(self._func)
+    source_lines, line_number = inspect.getsourcelines(self._func)
 
     # The asttokens library is able to keep track of line numbers and column offsets for us -- the
     # stdlib ast library only provides these relative to each parent node.
@@ -82,14 +83,14 @@ The invalid statement was:
 
 The rule defined by function `{func_name}` begins at:
 {filename}:{line_number}:{orig_indent}
-{context_lines}
+{source_lines}
 """.format(func_name=self._func.__name__, msg=msg,
            filename=filename, line_number=line_number, orig_indent=self._orig_indent,
            node_line_number=node_file_line,
            node_col=fully_indented_node_col,
            node_text=indented_node_text,
            # Strip any leading or trailing newlines from the start of the rule body.
-           context_lines=''.join(context_lines).strip('\n')))
+           source_lines=''.join(source_lines).strip('\n')))
 
   class YieldVisitError(Exception): pass
 
@@ -242,7 +243,7 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
     if not inspect.isfunction(func):
       raise ValueError('The @rule decorator must be applied innermost of all decorators.')
 
-    caller_frame = inspect.stack()[1][0]
+    owning_module = sys.modules[func.__module__]
     source = inspect.getsource(func)
     beginning_indent = _get_starting_indent(source)
     if beginning_indent:
@@ -250,8 +251,11 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
     module_ast = ast.parse(source)
 
     def resolve_type(name):
-      resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
-      if not isinstance(resolved, type):
+      resolved = getattr(owning_module, name, None) or owning_module.__builtins__.get(name, None)
+      if resolved is None:
+        raise ValueError('Could not resolve type `{}` in module {}'
+                         .format(name, owning_module.__name__))
+      elif not isinstance(resolved, type):
         raise ValueError('Expected a `type` constructor, but got: {}'.format(name))
       return resolved
 
@@ -270,7 +274,6 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       func_node=rule_func_node,
       func_source=source,
       orig_indent=beginning_indent,
-      frame=caller_frame,
       parents_table=parents_table,
     )
     rule_visitor.visit(rule_func_node)

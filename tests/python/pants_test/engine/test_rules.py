@@ -737,12 +737,14 @@ test_rules.py:{lineno}:{col}
 
 The rule defined by function `g` begins at:
 test_rules.py:{rule_lineno}:{rule_col}
-    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
       @rule(A, [])
       def g():
-""".format(lineno=(sys._getframe().f_lineno - 20),
+        # This is a yield statement without an assignment, and not at the end.
+        yield Get(B, D, D())
+        yield A()
+""".format(lineno=(sys._getframe().f_lineno - 22),
            col=8,
-           rule_lineno=(sys._getframe().f_lineno - 25),
+           rule_lineno=(sys._getframe().f_lineno - 27),
            rule_col=6))
 
   def create_full_graph(self, rules, validate=True):
