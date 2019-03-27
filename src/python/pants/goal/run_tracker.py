@@ -13,11 +13,10 @@ import sys
 import threading
 import time
 import uuid
-from builtins import open
 from contextlib import contextmanager
 
 import requests
-from future.utils import PY2, PY3
+from future.utils import PY3
 
 from pants.auth.cookies import Cookies
 from pants.base.build_environment import get_pants_cachedir
@@ -394,21 +393,14 @@ class RunTracker(Subsystem):
 
   @classmethod
   def write_stats_to_json(cls, file_name, stats):
-    """Write stats to a local json file.
-
-    :return: True if successfully written, False otherwise.
-    """
+    """Write stats to a local json file."""
     params = cls._json_dump_options(stats)
-    if PY2:
-      params = params.decode('utf-8')
+    mode = 'w' if PY3 else 'wb'
     try:
-      with open(file_name, 'w') as f:
-        f.write(params)
-    except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
+      safe_file_dump(file_name, params, mode=mode)
+    except Exception as e: # Broad catch - we don't want to fail in stats related failure.
       print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
             file=sys.stderr)
-      return False
-    return True
 
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
@@ -428,12 +420,16 @@ class RunTracker(Subsystem):
       'recorded_options': self._get_options_to_record(),
     }
 
-    # Dump individual stat file.
-    # TODO(benjy): Do we really need these, once the statsdb is mature?
+    # Write stats json to local cache.
     stats_file = os.path.join(get_pants_cachedir(), 'stats',
                               '{}.json'.format(self.run_info.get_info('id')))
-    mode = 'w' if PY3 else 'wb'
-    safe_file_dump(stats_file, self._json_dump_options(stats), mode=mode)
+
+    self.write_stats_to_json(stats_file, self._json_dump_options(stats))
+
+    # Write stats to user-defined json file.
+    stats_json_file_name = self.get_options().stats_local_json_file
+    if stats_json_file_name:
+      self.write_stats_to_json(stats_json_file_name, stats)
 
     # Add to local stats db.
     StatsDBFactory.global_instance().get_db().insert_stats(stats)
@@ -443,11 +439,6 @@ class RunTracker(Subsystem):
     timeout = self.get_options().stats_upload_timeout
     for stats_url, auth_provider in stats_upload_urls.items():
       self.post_stats(stats_url, stats, timeout=timeout, auth_provider=auth_provider)
-
-    # Write stats to local json file.
-    stats_json_file_name = self.get_options().stats_local_json_file
-    if stats_json_file_name:
-      self.write_stats_to_json(stats_json_file_name, stats)
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
