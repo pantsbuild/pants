@@ -9,11 +9,9 @@ import logging
 import os
 import sys
 
-from packaging.version import Version
-
-from pants.version import VERSION
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
+from pants.version import VERSION
 
 
 logger = logging.getLogger(__name__)
