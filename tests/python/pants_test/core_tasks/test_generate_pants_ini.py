@@ -12,7 +12,7 @@ from pants.version import VERSION
 from pants_test.task_test_base import ConsoleTaskTestBase
 
 
-class GeneratePantsIniIntegration(ConsoleTaskTestBase):
+class GeneratePantsIniTest(ConsoleTaskTestBase):
 
   @classmethod
   def task_type(cls):

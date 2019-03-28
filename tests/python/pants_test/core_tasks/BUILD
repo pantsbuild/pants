@@ -44,9 +44,7 @@ python_tests(
     'src/python/pants/core_tasks',
     'tests/python/pants_test:task_test_base',
     '3rdparty/python:configparser',
-    '3rdparty/python:future',
   ],
-  tags = {'integration'},
 )
 
 python_tests(
