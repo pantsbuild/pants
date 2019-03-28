@@ -708,7 +708,7 @@ Could not resolve type `XXX` in top level of module pants_test.engine.test_rules
 
     # This fails because the argument is defined in this file's module, but it is not a type.
     with self.assertRaisesWithMessage(ValueError, """\
-Expected a `type` constructor, but got: _this_is_not_a_type"""):
+Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)"""):
       @rule(A, [])
       def g():
         a = yield Get(A, _this_is_not_a_type, 3)

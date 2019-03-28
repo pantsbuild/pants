@@ -256,7 +256,8 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
         raise ValueError('Could not resolve type `{}` in top level of module {}'
                          .format(name, owning_module.__name__))
       elif not isinstance(resolved, type):
-        raise ValueError('Expected a `type` constructor, but got: {}'.format(name))
+        raise ValueError('Expected a `type` constructor for `{}`, but got: {} (type `{}`)'
+                         .format(name, resolved, type(resolved).__name__))
       return resolved
 
     gets = OrderedSet()
