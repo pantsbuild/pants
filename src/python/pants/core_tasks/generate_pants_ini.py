@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
+from textwrap import dedent
 
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
@@ -24,18 +25,21 @@ class GeneratePantsIni(Task):
 
     python_version = ".".join(str(v) for v in sys.version_info[:2])
 
-    self.context.log.info("Adding sensible defaults to the `{}` config file:".format(self.PANTS_INI))
-    self.context.log.info("* Pinning `pants_version` to `{}`.".format(pants_version))
-    self.context.log.info("* Pinning `pants_runtime_python_version` to `{}`.".format(python_version))
+    self.context.log.info(dedent("""\
+      Adding sensible defaults to the `{}` config file:
+      * Pinning `pants_version` to `{}`.
+      * Pinning `pants_runtime_python_version` to `{}`.
+      """.format(self.PANTS_INI, pants_version, python_version)
+    ))
 
     with open(self.PANTS_INI, "w") as f:
-      f.write("""\
+      f.write(dedent("""\
         [GLOBAL]
         pants_version: {}
         pants_runtime_python_version: {}
         """.format(pants_version, python_version)
-      )
+      ))
 
-    self.context.log.info("{} is now set up. You may modify its values directly in the file at any time, and "
+    self.context.log.info("You may modify these values directly in the file at any time, and "
                           "the ./pants script will detect the changes for you.".format(self.PANTS_INI))
     self.context.log.info("You are now ready to use Pants!")
