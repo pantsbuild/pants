@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import configparser
 import logging
-import os.path
+import os
 import sys
 
 from packaging.version import Version
@@ -38,8 +38,8 @@ class GeneratePantsIni(Task):
         self._write_section(fp, section, self._sections[section].items(), delimiter)
 
   def execute(self):
-    if os.path.isfile(self.PANTS_INI):
-      raise TaskError("{} already exists in this repository! This goal is only meant for first-time "
+    if os.stat(self.PANTS_INI).st_size != 0:
+      raise TaskError("{} already has content! This goal is only meant for first-time "
                       "users. Please update its values by directly modifying the file.".format(self.PANTS_INI))
 
     target_pants_version = VERSION

@@ -36,6 +36,19 @@ python_tests(
 )
 
 python_tests(
+  name = 'generate_pants_ini',
+  sources = ['test_generate_pants_ini.py'],
+  dependencies = [
+    'src/python/pants:version',
+    'src/python/pants/core_tasks',
+    'tests/python/pants_test:int-test',
+    '3rdparty/python:configparser',
+    '3rdparty/python:future',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'prep_command_integration',
   sources = ['test_prep_command_integration.py'],
   dependencies = [
