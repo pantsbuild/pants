@@ -21,7 +21,7 @@ from pants.util.objects import enum
 logger = logging.getLogger(__name__)
 
 
-class GenerateConfig(Task):
+class GeneratePantsIni(Task):
   """Generate pants.ini with sensible defaults."""
 
   PANTS_INI = "pants.ini"
@@ -44,7 +44,7 @@ class GenerateConfig(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(GenerateConfig, cls).register_options(register)
+    super(GeneratePantsIni, cls).register_options(register)
     register('--new-pants-version', type=str, default=None,
              help='Pin pants_version so that Pants runs with this specific version.')
     register('--new-runtime-python-version', type=cls.RuntimePythonVersion, default=None,
