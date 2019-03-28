@@ -533,7 +533,7 @@ class ProcessManager(ProcessMetadataManager):
     """Pre-fork callback for subclasses."""
 
   def post_fork_child(self):
-    """Pre-fork child callback for subclasses."""
+    """Post-fork child callback for subclasses."""
 
   def post_fork_parent(self):
     """Post-fork parent callback for subclasses."""

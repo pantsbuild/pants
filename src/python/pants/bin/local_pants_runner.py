@@ -51,7 +51,7 @@ class LocalExiter(Exiter):
           # Log the unrecognized exit code to the fatal exception log.
           ExceptionSink.log_exception(run_tracker_msg)
           # Ensure the unrecognized exit code message is also logged to the terminal.
-          additional_messages.push(run_tracker_msg)
+          additional_messages.append(run_tracker_msg)
           outcome = WorkUnit.FAILURE
 
         self._run_tracker.set_root_outcome(outcome)
@@ -62,7 +62,7 @@ class LocalExiter(Exiter):
       # so we just log that fact here and keep going.
       exception_string = str(e)
       ExceptionSink.log_exception(exception_string)
-      additional_messages.push(exception_string)
+      additional_messages.append(exception_string)
     finally:
       if self._repro:
         # TODO: Have Repro capture the 'after' state (as a diff) as well? (in reference to the below

@@ -26,7 +26,7 @@ class ReportingServerKill(QuietTaskMixin, Task):
     pid = server.pid
 
     try:
-      logger.info('Killing server with {pid} at http://localhost:{port}'
+      logger.info('Killing server with pid {pid} at http://localhost:{port}'
                   .format(pid=pid, port=server.socket))
       server.terminate()
     except ReportingServerManager.NonResponsiveProcess:

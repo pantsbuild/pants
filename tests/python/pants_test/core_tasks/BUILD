@@ -80,3 +80,14 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+python_tests(
+  name = 'reporting_server_integration',
+  sources = ['test_reporting_server_integration.py'],
+  dependencies = [
+    '3rdparty/python:psutil',
+    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/testutils:py2_compat',
+  ],
+  tags = {'integration'},
+)

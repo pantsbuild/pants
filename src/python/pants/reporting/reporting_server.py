@@ -21,6 +21,8 @@ import pystache
 from future.moves.urllib.parse import parse_qs, urlencode, urlsplit, urlunparse
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exception_sink import ExceptionSink
+from pants.base.exiter import Exiter
 from pants.base.mustache import MustacheRenderer
 from pants.base.run_info import RunInfo
 from pants.pantsd.process_manager import ProcessManager
@@ -414,6 +416,11 @@ class ReportingServerManager(ProcessManager):
 
   def post_fork_child(self):
     """Post-fork() child callback for ProcessManager.daemonize()."""
+    # LocalPantsRunner will reset this to perform some cleanup such as ending the run tracker that
+    # we don't want to do in this process. Reset this to the normal exiter, without cleaning up any
+    # resources.
+    ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
+
     # The server finds run-specific info dirs by looking at the subdirectories of info_dir,
     # which is conveniently and obviously the parent dir of the current run's info dir.
     info_dir = os.path.dirname(self.context.run_tracker.run_info_dir)
@@ -429,4 +436,10 @@ class ReportingServerManager(ProcessManager):
     self.write_socket(server.server_port())
 
     # Block forever.
-    server.start()
+    try:
+      server.start()
+    except Exception:
+      # TODO: Figure out why sys.excepthook is ignored here! When
+      # SignalHandler.SignalHandledNonLocalExit is raised the sys.excepthook override is ignored,
+      # even though it is set in this method by the ExceptionSink.reset_exiter() call!
+      ExceptionSink._log_unhandled_exception_and_exit()
