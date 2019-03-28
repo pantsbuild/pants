@@ -8,14 +8,12 @@ import configparser
 import logging
 import os.path
 import sys
-from builtins import str
 
 from packaging.version import Version
 
 from pants.version import VERSION
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
-from pants.util.objects import enum
 
 
 logger = logging.getLogger(__name__)
@@ -25,9 +23,6 @@ class GeneratePantsIni(Task):
   """Generate pants.ini with sensible defaults."""
 
   PANTS_INI = "pants.ini"
-
-  class RuntimePythonVersion(enum(['2.7', '3.6', '3.7'])):
-    pass
 
   class CustomConfigParser(configparser.ConfigParser):
     """We monkey-patch the write() function to allow us to write entries in the style `key: value`, 
@@ -42,29 +37,13 @@ class GeneratePantsIni(Task):
       for section in self._sections:
         self._write_section(fp, section, self._sections[section].items(), delimiter)
 
-  @classmethod
-  def register_options(cls, register):
-    super(GeneratePantsIni, cls).register_options(register)
-    register('--new-pants-version', type=str, default=None,
-             help='Pin pants_version so that Pants runs with this specific version.')
-    register('--new-runtime-python-version', type=cls.RuntimePythonVersion, default=None,
-             help='Pin pants_runtime_python_version so that Pants runs with this specific Python version.')
-
   def execute(self):
     if os.path.isfile(self.PANTS_INI):
       raise TaskError("{} already exists in this repository! This goal is only meant for first-time "
                       "users. Please update its values by directly modifying the file.".format(self.PANTS_INI))
 
-    target_pants_version = self.get_options().new_pants_version or VERSION
-    python_version_may_be_specified = Version(target_pants_version) >= Version("1.15.0.dev4")
-    if self.get_options().new_runtime_python_version:
-      if not python_version_may_be_specified:
-        raise TaskError("--new-runtime-python-version cannot be used with Pants versions earlier than "
-                        "1.15.0.dev4 (you're using {})".format(target_pants_version))
-      target_python_version = self.get_options().new_runtime_python_version.value
-    else:
-      interpreter_major_minor = ".".join(str(v) for v in sys.version_info[:2])
-      target_python_version = interpreter_major_minor if python_version_may_be_specified else None
+    target_pants_version = VERSION
+    target_python_version = ".".join(str(v) for v in sys.version_info[:2])
 
     config = self.CustomConfigParser()
     logger.info("Pinning `pants_version` to `{}`.".format(target_pants_version))
