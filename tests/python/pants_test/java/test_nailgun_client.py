@@ -158,7 +158,6 @@ class TestNailgunClient(unittest.TestCase):
       31337,
       -31336,
       Exception('oops'),
-      None
     )
 
     with self.assertRaises(NailgunClient.NailgunConnectionError):
