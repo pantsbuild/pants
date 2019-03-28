@@ -91,6 +91,15 @@ struct B {}
   def target_dict(self):
     return self.populate_target_dict(self._target_specs)
 
+  _exception_prelude = """\
+Clashing namespaces for python thrift library sources detected in build graph. This will silently
+overwrite previously generated python sources with generated sources from thrift files declaring the
+same python namespace. This is an upstream WONTFIX in thrift, see:
+      https://issues.apache.org/jira/browse/THRIFT-515
+
+Use --test_scope-skip to avoid this check if this breaks your existing build.
+Errors:"""
+
   def test_no_py_namespace(self):
     no_py_namespace_target = self.target_dict()['no-py-namespace']
     with self.assertRaisesWithMessage(PyThriftNamespaceClashCheck.NamespaceParseError, """\
@@ -100,17 +109,17 @@ found in thrift source src/py-thrift/bad.thrift from target src/py-thrift:no-py-
 
   def test_clashing_namespace_same_target(self):
     clashing_same_target = self.target_dict()['clashing-namespace']
-    with self.assertRaisesWithMessage(PyThriftNamespaceClashCheck.ClashingNamespaceError, """\
-clashing namespaces for python thrift library sources detected in build graph:
-org.pantsbuild.namespace: [(src/py-thrift:clashing-namespace, src/py-thrift/a.thrift), (src/py-thrift:clashing-namespace, src/py-thrift/b.thrift)]"""):
+    with self.assertRaisesWithMessage(PyThriftNamespaceClashCheck.ClashingNamespaceError, """{}
+org.pantsbuild.namespace: [(src/py-thrift:clashing-namespace, src/py-thrift/a.thrift), (src/py-thrift:clashing-namespace, src/py-thrift/b.thrift)]
+""".format(self._exception_prelude)):
       self.invoke_tasks(target_roots=[clashing_same_target])
 
   def test_clashing_namespace_multiple_targets(self):
     target_dict = self.target_dict()
     clashing_targets = [target_dict[k] for k in ['clashingA', 'clashingB']]
-    with self.assertRaisesWithMessage(PyThriftNamespaceClashCheck.ClashingNamespaceError, """\
-clashing namespaces for python thrift library sources detected in build graph:
-org.pantsbuild.namespace: [(src/py-thrift-clashing:clashingA, src/py-thrift-clashing/a.thrift), (src/py-thrift-clashing:clashingB, src/py-thrift-clashing/b.thrift)]"""):
+    with self.assertRaisesWithMessage(PyThriftNamespaceClashCheck.ClashingNamespaceError, """{}
+org.pantsbuild.namespace: [(src/py-thrift-clashing:clashingA, src/py-thrift-clashing/a.thrift), (src/py-thrift-clashing:clashingB, src/py-thrift-clashing/b.thrift)]
+""".format(self._exception_prelude)):
       self.invoke_tasks(target_roots=clashing_targets)
 
   def test_accepts_py_namespace_with_comments_above(self):

@@ -23,6 +23,8 @@ class PyThriftNamespaceClashCheck(Task, HasSkipOptionMixin):
   solution would be to check all *thrift* libraries in the build graph, but there is currently no
   "ThriftLibraryMixin" or other way to identify targets containing thrift code generically.
   """
+  # This scope is set for testing only.
+  options_scope = 'py-thrift-namespace-clash-check'
 
   @classmethod
   def register_options(cls, register):
@@ -98,8 +100,15 @@ class PyThriftNamespaceClashCheck(Task, HasSkipOptionMixin):
         )
         for namespace, all_paths in clashing_namespaces.items()
       )
-      raise self.ClashingNamespaceError(
-        'clashing namespaces for python thrift library sources detected in build graph:\n{}'
-        .format(pretty_printed_clashing))
+      raise self.ClashingNamespaceError("""\
+Clashing namespaces for python thrift library sources detected in build graph. This will silently
+overwrite previously generated python sources with generated sources from thrift files declaring the
+same python namespace. This is an upstream WONTFIX in thrift, see:
+      https://issues.apache.org/jira/browse/THRIFT-515
+
+Use --{}-skip to avoid this check if this breaks your existing build.
+Errors:
+{}
+""".format(self.get_options_scope_equivalent_flag_component(), pretty_printed_clashing))
     else:
       self.context.products.register_data('_py_thrift_namespaces_by_files', namespaces_by_files)
