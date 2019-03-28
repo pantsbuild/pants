@@ -210,14 +210,6 @@ class NailgunClient(object):
         wrapped_exc=self.wrapped_exc)
       super(NailgunClient.NailgunError, self).__init__(msg, self.wrapped_exc)
 
-  def _make_nailgun_error(self, wrapped_exc):
-    return self.NailgunError(
-      address=self._address_string,
-      pid=self._maybe_last_pid(),
-      pgrp=self._maybe_last_pgrp(),
-      wrapped_exc=wrapped_exc,
-    )
-
   class NailgunConnectionError(NailgunError):
     """Indicates an error upon initial connect to the nailgun server."""
     DESCRIPTION = 'Problem connecting to nailgun server'
@@ -308,7 +300,6 @@ class NailgunClient(object):
         pid=self._maybe_last_pid(),
         pgrp=self._maybe_last_pgrp(),
         wrapped_exc=e,
-        traceback=sys.exc_info()[2],
       )
     else:
       return sock
@@ -365,7 +356,12 @@ class NailgunClient(object):
     try:
       return self._session.execute(cwd, main_class, *args, **environment)
     except (socket.error, NailgunProtocol.ProtocolError) as e:
-      raise self._make_nailgun_error(e)
+      raise self.NailgunError(
+        address=self._address_string,
+        pid=self._maybe_last_pid(),
+        pgrp=self._maybe_last_pgrp(),
+        wrapped_exc=e,
+      )
     finally:
       sock.close()
       self._session = None
