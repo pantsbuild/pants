@@ -37,20 +37,22 @@ class GeneratePantsIni(Task):
 
   def execute(self):
     if os.stat(self.PANTS_INI).st_size != 0:
-      raise TaskError("{} already has content! This goal is only meant for first-time "
+      raise TaskError("{} is not empty! This goal is only meant for first-time "
                       "users. Please update its values by directly modifying the file.".format(self.PANTS_INI))
 
-    target_pants_version = VERSION
-    target_python_version = ".".join(str(v) for v in sys.version_info[:2])
+    pants_version = VERSION
+    python_version = ".".join(str(v) for v in sys.version_info[:2])
 
     config = self.CustomConfigParser()
-    logger.info("Pinning `pants_version` to `{}`.".format(target_pants_version))
-    config["GLOBAL"] = {"pants_version": target_pants_version}
-    if target_python_version is not None:
-      logger.info("Pinning `pants_runtime_python_version` to `{}`.".format(target_python_version))
-      config["GLOBAL"]["pants_runtime_python_version"] = target_python_version
+    logger.info("Adding sensible defaults to the `{}` config file:".format(self.PANTS_INI))
+
+    logger.info("* Pinning `pants_version` to `{}`.".format(pants_version))
+    config["GLOBAL"] = {"pants_version": pants_version}
+    if python_version is not None:
+      logger.info("* Pinning `pants_runtime_python_version` to `{}`.".format(python_version))
+      config["GLOBAL"]["pants_runtime_python_version"] = python_version
 
     with open(self.PANTS_INI, 'w') as f:
       config.write(f)
 
-    logger.info("{} set up with sensible defaults.".format(self.PANTS_INI))
+    logger.info("{} set up.".format(self.PANTS_INI))

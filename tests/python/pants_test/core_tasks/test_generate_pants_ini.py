@@ -38,4 +38,4 @@ class GeneratePantsIniIntegration(PantsRunIntegrationTest):
     self.assertTrue(os.path.isfile(GeneratePantsIni.PANTS_INI))
     pants_run = self.run_pants(["generate-pants-ini"])
     self.assert_failure(pants_run)
-    self.assertIn("already", pants_run.stdout_data)     
+    self.assertIn(GeneratePantsIni.PANTS_INI, pants_run.stdout_data)
