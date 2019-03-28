@@ -60,6 +60,9 @@ class SubA(A):
 _suba_root_rules = [RootRule(SubA)]
 
 
+_this_is_not_a_type = 3
+
+
 @console_rule('example', [Select(Console)])
 def a_console_rule_generator(console):
   a = yield Get(A, str('a str!'))
@@ -81,7 +84,7 @@ Rule entry A() had an unexpected type: <class 'pants_test.engine.test_rules.A'>.
       RuleIndex.create([A()])
 
 
-class RuleGraphTest(unittest.TestCase):
+class RuleGraphTest(TestBase):
   def test_ruleset_with_missing_product_type(self):
     @rule(A, [Select(B)])
     def a_from_b_noop(b):
@@ -694,7 +697,24 @@ class RuleGraphTest(unittest.TestCase):
                      }""").strip(),
                                     subgraph)
 
-  def test_validate_yield_statements(self):
+  def test_invalid_get_arguments(self):
+    with self.assertRaisesWithMessage(ValueError, """\
+Could not resolve type `XXX` in top level of module pants_test.engine.test_rules"""):
+      class XXX(object): pass
+      @rule(A, [])
+      def f():
+        a = yield Get(A, XXX, 3)
+        yield a
+
+    # This fails because the argument is defined in this file's module, but it is not a type.
+    with self.assertRaisesWithMessage(ValueError, """\
+Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)"""):
+      @rule(A, [])
+      def g():
+        a = yield Get(A, _this_is_not_a_type, 3)
+        yield a
+
+  def test_validate_yield_statements_in_rule_body(self):
     with self.assertRaisesRegexp(_RuleVisitor.YieldVisitError, re.escape('yield A()')):
       @rule(A, [])
       def f():
@@ -737,12 +757,14 @@ test_rules.py:{lineno}:{col}
 
 The rule defined by function `g` begins at:
 test_rules.py:{rule_lineno}:{rule_col}
-    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
       @rule(A, [])
       def g():
-""".format(lineno=(sys._getframe().f_lineno - 20),
+        # This is a yield statement without an assignment, and not at the end.
+        yield Get(B, D, D())
+        yield A()
+""".format(lineno=(sys._getframe().f_lineno - 22),
            col=8,
-           rule_lineno=(sys._getframe().f_lineno - 25),
+           rule_lineno=(sys._getframe().f_lineno - 27),
            rule_col=6))
 
   def create_full_graph(self, rules, validate=True):
