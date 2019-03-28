@@ -8,6 +8,7 @@ import os
 import sys
 from textwrap import dedent
 
+from pants.base.build_environment import get_default_pants_config_file
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 from pants.version import VERSION as pants_version
@@ -16,7 +17,7 @@ from pants.version import VERSION as pants_version
 class GeneratePantsIni(Task):
   """Generate pants.ini with sensible defaults."""
 
-  PANTS_INI = "pants.ini"
+  PANTS_INI = get_default_pants_config_file()
 
   def execute(self):
     if os.stat(self.PANTS_INI).st_size != 0:
@@ -26,7 +27,7 @@ class GeneratePantsIni(Task):
     python_version = ".".join(str(v) for v in sys.version_info[:2])
 
     self.context.log.info(dedent("""\
-      Adding sensible defaults to the `{}` config file:
+      Adding sensible defaults to {}:
       * Pinning `pants_version` to `{}`.
       * Pinning `pants_runtime_python_version` to `{}`.
       """.format(self.PANTS_INI, pants_version, python_version)
