@@ -20,11 +20,17 @@ class GeneratePantsIni(Task):
   PANTS_INI = get_default_pants_config_file()
 
   def execute(self):
-    if os.stat(self.PANTS_INI).st_size != 0:
-      raise TaskError("{} is not empty! This goal is only meant for first-time "
-                      "users. Please update config values by directly modifying the file.".format(self.PANTS_INI))
-
     python_version = ".".join(str(v) for v in sys.version_info[:2])
+    pants_ini_content = dedent("""\
+      [GLOBAL]
+      pants_version: {}
+      pants_runtime_python_version: {}
+      """.format(pants_version, python_version)
+    )
+
+    if os.stat(self.PANTS_INI).st_size != 0:
+      raise TaskError("{} is not empty. To update config values, please directly modify pants.ini. "
+                      "For example, you may want to add these entries:\n\n{}".format(self.PANTS_INI, pants_ini_content))
 
     self.context.log.info(dedent("""\
       Adding sensible defaults to {}:
@@ -34,12 +40,7 @@ class GeneratePantsIni(Task):
     ))
 
     with open(self.PANTS_INI, "w") as f:
-      f.write(dedent("""\
-        [GLOBAL]
-        pants_version: {}
-        pants_runtime_python_version: {}
-        """.format(pants_version, python_version)
-      ))
+      f.write(pants_ini_content)
 
     self.context.log.info("You may modify these values directly in the file at any time, and "
                           "the ./pants script will detect the changes for you the next time you run it.")
