@@ -38,7 +38,7 @@ class GeneratePantsIni(Task):
   def execute(self):
     if os.stat(self.PANTS_INI).st_size != 0:
       raise TaskError("{} is not empty! This goal is only meant for first-time "
-                      "users. Please update its values by directly modifying the file.".format(self.PANTS_INI))
+                      "users. Please update config values by directly modifying the file.".format(self.PANTS_INI))
 
     pants_version = VERSION
     python_version = ".".join(str(v) for v in sys.version_info[:2])
@@ -55,4 +55,6 @@ class GeneratePantsIni(Task):
     with open(self.PANTS_INI, 'w') as f:
       config.write(f)
 
-    logger.info("{} set up.".format(self.PANTS_INI))
+    logger.info("{} is now set up. You may modify its values directly in the file at any time, and "
+                "the ./pants script will detect the changes for you.".format(self.PANTS_INI))
+    logger.info("You are now ready to use Pants!")
