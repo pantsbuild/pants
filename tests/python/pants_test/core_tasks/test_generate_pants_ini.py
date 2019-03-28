@@ -18,19 +18,15 @@ class GeneratePantsIniIntegration(ConsoleTaskTestBase):
   def task_type(cls):
     return GeneratePantsIni
 
-  def setUp(self):
-    super(GeneratePantsIniIntegration, self).setUp()
-    self.temp_pants_ini_path = self.create_file("pants.ini")
-
   def test_pants_ini_generated_when_empty(self):
+    temp_pants_ini_path = self.create_file("pants.ini")
     self.execute_task()
     config = configparser.ConfigParser()
-    config.read(self.temp_pants_ini_path)
+    config.read(temp_pants_ini_path)
     self.assertEqual(config["GLOBAL"]["pants_version"], VERSION)
     self.assertIn(config["GLOBAL"]["pants_runtime_python_version"], {"2.7", "3.6", "3.7"})
 
   def test_fails_when_pants_ini_is_not_empty(self):
-    with open(self.temp_pants_ini_path, "w") as f:
-      f.write("[GLOBAL]")
-    with self.assertRaisesWithMessageContaining(TaskError, self.temp_pants_ini_path):
+    temp_pants_ini_path = self.create_file("pants.ini", contents="[GLOBAL]")
+    with self.assertRaisesWithMessageContaining(TaskError, temp_pants_ini_path):
       self.execute_task()
