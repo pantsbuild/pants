@@ -253,7 +253,7 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
     def resolve_type(name):
       resolved = getattr(owning_module, name, None) or owning_module.__builtins__.get(name, None)
       if resolved is None:
-        raise ValueError('Could not resolve type `{}` in module {}'
+        raise ValueError('Could not resolve type `{}` in top level of module {}'
                          .format(name, owning_module.__name__))
       elif not isinstance(resolved, type):
         raise ValueError('Expected a `type` constructor, but got: {}'.format(name))
