@@ -40,6 +40,7 @@ python_tests(
   sources = ['test_generate_pants_ini.py'],
   dependencies = [
     'src/python/pants:version',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/core_tasks',
     'tests/python/pants_test:task_test_base',
