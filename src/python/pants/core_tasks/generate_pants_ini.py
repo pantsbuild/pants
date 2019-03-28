@@ -17,9 +17,8 @@ from pants.version import VERSION as pants_version
 class GeneratePantsIni(Task):
   """Generate pants.ini with sensible defaults."""
 
-  PANTS_INI = get_default_pants_config_file()
-
   def execute(self):
+    pants_ini_path = get_default_pants_config_file()
     python_version = ".".join(str(v) for v in sys.version_info[:2])
     pants_ini_content = dedent("""\
       [GLOBAL]
@@ -28,18 +27,18 @@ class GeneratePantsIni(Task):
       """.format(pants_version, python_version)
     )
 
-    if os.stat(self.PANTS_INI).st_size != 0:
+    if os.stat(pants_ini_path).st_size != 0:
       raise TaskError("{} is not empty. To update config values, please directly modify pants.ini. "
-                      "For example, you may want to add these entries:\n\n{}".format(self.PANTS_INI, pants_ini_content))
+                      "For example, you may want to add these entries:\n\n{}".format(pants_ini_path, pants_ini_content))
 
     self.context.log.info(dedent("""\
       Adding sensible defaults to {}:
       * Pinning `pants_version` to `{}`.
       * Pinning `pants_runtime_python_version` to `{}`.
-      """.format(self.PANTS_INI, pants_version, python_version)
+      """.format(pants_ini_path, pants_version, python_version)
     ))
 
-    with open(self.PANTS_INI, "w") as f:
+    with open(pants_ini_path, "w") as f:
       f.write(pants_ini_content)
 
     self.context.log.info("You may modify these values directly in the file at any time, and "

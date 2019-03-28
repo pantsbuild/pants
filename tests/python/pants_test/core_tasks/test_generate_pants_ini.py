@@ -5,37 +5,33 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import configparser
-import os
-from builtins import open
-from contextlib import contextmanager
 
+from pants.base.exceptions import TaskError
 from pants.core_tasks.generate_pants_ini import GeneratePantsIni
 from pants.version import VERSION
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.task_test_base import TaskTestBase
 
 
-class GeneratePantsIniIntegration(PantsRunIntegrationTest):
+class GeneratePantsIniIntegration(TaskTestBase):
 
-  @contextmanager
-  def temporarily_remove_pants_ini_content(self):
-    os.rename(GeneratePantsIni.PANTS_INI, "{}.orig".format(GeneratePantsIni.PANTS_INI))
-    open(GeneratePantsIni.PANTS_INI, "w").close()
-    try:
-      yield
-    finally:
-      os.rename("{}.orig".format(GeneratePantsIni.PANTS_INI), GeneratePantsIni.PANTS_INI)
+  @classmethod
+  def task_type(cls):
+    return GeneratePantsIni
 
-  def test_pants_ini_generated_when_missing(self):
-    with self.temporarily_remove_pants_ini_content():
-      pants_run = self.run_pants(["generate-pants-ini"])
-      self.assert_success(pants_run)
-      config = configparser.ConfigParser()
-      config.read(GeneratePantsIni.PANTS_INI)
-      self.assertEqual(config["GLOBAL"]["pants_version"], VERSION)
-      self.assertIn(config["GLOBAL"]["pants_runtime_python_version"], {"2.7", "3.6", "3.7"})
+  def setUp(self):
+    super(GeneratePantsIniIntegration, self).setUp()
+    self.temp_pants_ini_path = self.create_file("pants.ini")
+    self.task = self.create_task(self.context())
 
-  def test_fails_when_pants_ini_present(self):
-    self.assertTrue(os.path.isfile(GeneratePantsIni.PANTS_INI))
-    pants_run = self.run_pants(["generate-pants-ini"])
-    self.assert_failure(pants_run)
-    self.assertIn(GeneratePantsIni.PANTS_INI, pants_run.stdout_data)
+  def test_pants_ini_generated_when_empty(self):
+    self.task.execute()
+    config = configparser.ConfigParser()
+    config.read(self.temp_pants_ini_path)
+    self.assertEqual(config["GLOBAL"]["pants_version"], VERSION)
+    self.assertIn(config["GLOBAL"]["pants_runtime_python_version"], {"2.7", "3.6", "3.7"})
+
+  def test_fails_when_pants_ini_is_not_empty(self):
+    with open(self.temp_pants_ini_path, "w") as f:
+      f.write("[GLOBAL]")
+    with self.assertRaisesWithMessageContaining(TaskError, self.temp_pants_ini_path):
+      self.task.execute()
