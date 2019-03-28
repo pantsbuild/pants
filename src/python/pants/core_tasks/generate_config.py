@@ -46,6 +46,10 @@ class GenerateConfig(Task):
              help='Pin pants_runtime_python_version so that Pants runs with this specific Python version.')
 
   def execute(self):
+    if os.path.isfile(self.PANTS_INI):
+      raise TaskError("{} already exists in this repository! This goal is only meant for first-time "
+                      "users. Please update its values by directly modifying the file.".format(self.PANTS_INI))
+
     target_pants_version = self.get_options().new_pants_version or VERSION
     python_version_may_be_specified = Version(target_pants_version) >= Version("1.15.0.dev4")
     if self.get_options().new_runtime_python_version:
@@ -58,9 +62,6 @@ class GenerateConfig(Task):
       target_python_version = interpreter_major_minor if python_version_may_be_specified else None
 
     config = self.CustomConfigParser()
-    if os.path.isfile(self.PANTS_INI):
-      config.read(self.PANTS_INI)
-
     config["GLOBAL"] = {"pants_version": target_pants_version}
     if target_python_version is not None:
       config["GLOBAL"]["pants_runtime_python_version"] = target_python_version
