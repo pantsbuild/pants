@@ -55,4 +55,4 @@ class GeneratePantsIni(Task):
     with open(self.PANTS_INI, 'w') as f:
       config.write(f)
 
-    logger.info("{} created.".format(self.PANTS_INI))
+    logger.info("{} set up with sensible defaults.".format(self.PANTS_INI))
