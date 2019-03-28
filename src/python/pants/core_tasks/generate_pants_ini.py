@@ -41,5 +41,5 @@ class GeneratePantsIni(Task):
       ))
 
     self.context.log.info("You may modify these values directly in the file at any time, and "
-                          "the ./pants script will detect the changes for you.".format(self.PANTS_INI))
+                          "the ./pants script will detect the changes for you the next time you run it.")
     self.context.log.info("You are now ready to use Pants!")
