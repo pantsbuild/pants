@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import configparser
+import logging
 import os.path
 import sys
 from builtins import str
@@ -15,6 +16,10 @@ from pants.version import VERSION
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 from pants.util.objects import enum
+
+
+logger = logging.getLogger(__name__)
+
 
 class GenerateConfig(Task):
   """Generate pants.ini with sensible defaults."""
@@ -62,9 +67,13 @@ class GenerateConfig(Task):
       target_python_version = interpreter_major_minor if python_version_may_be_specified else None
 
     config = self.CustomConfigParser()
+    logger.info("Pinning `pants_version` to `{}`.".format(target_pants_version))
     config["GLOBAL"] = {"pants_version": target_pants_version}
     if target_python_version is not None:
+      logger.info("Pinning `pants_runtime_python_version` to `{}`.".format(target_python_version))
       config["GLOBAL"]["pants_runtime_python_version"] = target_python_version
 
     with open(self.PANTS_INI, 'w') as f:
       config.write(f)
+
+    logger.info("{} created.".format(self.PANTS_INI))
