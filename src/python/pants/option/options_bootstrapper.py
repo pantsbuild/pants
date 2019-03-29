@@ -54,7 +54,9 @@ class OptionsBootstrapper(datatype([
     flag = '--pants-config-files='
     evars = ['PANTS_GLOBAL_PANTS_CONFIG_FILES', 'PANTS_PANTS_CONFIG_FILES', 'PANTS_CONFIG_FILES']
 
-    path_list_values = [ListValueComponent.create(get_default_pants_config_file())]
+    path_list_values = []
+    if os.path.isfile(get_default_pants_config_file()):
+      path_list_values.append(ListValueComponent.create(get_default_pants_config_file()))
     for var in evars:
       if var in env:
         path_list_values.append(ListValueComponent.create(env[var]))

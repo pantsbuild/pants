@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
+import os.path
 import sys
 from textwrap import dedent
 
@@ -27,8 +27,8 @@ class GeneratePantsIni(ConsoleTask):
       """.format(pants_version, python_version)
     )
 
-    if os.stat(pants_ini_path).st_size != 0:
-      raise TaskError("{} is not empty. To update config values, please directly modify pants.ini. "
+    if os.path.isfile(pants_ini_path):
+      raise TaskError("{} already exists. To update config values, please directly modify pants.ini. "
                       "For example, you may want to add these entries:\n\n{}".format(pants_ini_path, pants_ini_content))
 
     yield dedent("""\
