@@ -16,9 +16,6 @@ New features
 * Allow alternate nodejs binaries (#7405)
   `PR #7405 <https://github.com/pantsbuild/pants/pull/7405>`_
 
-* Cache resolution of Node targets via fingerprinting lockfiles. (#7414)
-  `PR #7414 <https://github.com/pantsbuild/pants/pull/7414>`_
-
 * Add JSON Reporter for more detailed workunit stats (#7392)
   `PR #7392 <https://github.com/pantsbuild/pants/pull/7392>`_
 
@@ -39,6 +36,9 @@ Refactoring, Improvements, and Tooling
 
 * Just ignore source arg (with a comment) (#7430)
   `PR #7430 <https://github.com/pantsbuild/pants/pull/7430>`_
+
+* Cache resolution of Node targets via fingerprinting lockfiles. (#7414)
+  `PR #7414 <https://github.com/pantsbuild/pants/pull/7414>`_
 
 * Handle signals gracefully (#6574)
   `PR #6574 <https://github.com/pantsbuild/pants/pull/6574>`_
