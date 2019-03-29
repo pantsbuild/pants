@@ -1,11 +1,11 @@
 Installing Pants
 ================
 
-There are a few ways to get a runnable version of pants set up for your workspace. Before
-beginning, make sure your machine fits the requirements. At a minimum, pants requires the following to run properly:
+There are a few ways to get a runnable version of Pants set up for your workspace. Before
+beginning, make sure your machine fits the requirements. At a minimum, Pants requires the following to run properly:
 
-* Linux or Mac OS X.
-* Python 2.7.x (the latest stable version of 2.7 is recommended).
+* Linux or macOS.
+* Python 2.7, 3.6, or 3.7.
 * A C compiler, system headers, Python headers (to compile native Python modules) and the libffi
   library and headers (to compile and link modules that use CFFI to access native code).
 * OpenJDK or Oracle JDK 7 or greater.
@@ -17,47 +17,46 @@ After you have pants installed, you'll need to
 Recommended Installation
 ------------------------
 
-To set up pants in your repo, we recommend installing our self-contained `pants` bash script
-in the root (ie, "buildroot") of your repo:
+To set up Pants in your repo, we recommend installing our self-contained `pants` bash script
+in the root (i.e. the "buildroot") of your repo:
 
     :::bash
-    curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants && touch pants.ini
+    curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants
 
-The first time you run the new `./pants` script it will install the latest version of pants (using
-virtualenv) and then run it.  It's recommended though, that you pin the version of pants.  To do
-this, first find out the version of pants you just installed:
+The first time you run the new `./pants` script, it will install the latest version of Pants (using
+virtualenv) and then run it.
+
+Start by running the below command to auto-generate a `pants.ini` config file with sensible defaults.
 
     :::bash
-    ./pants -V
-    1.0.0
+    ./pants generate-pants-ini
 
-Then add an entry like so to `pants.ini` with that version:
+This pins the `pants_version`. When you'd like to upgrade Pants, just edit the version in `pants.ini` and `./pants` will self-update on the next run.
+
+It also pins the `pants_runtime_python_version`, which is the Python version you use to run Pants. You may choose between `2.7`, `3.6`, and `3.7` (Note Pants 1.17.0 will be the last version to support Python 2.7).
+
+The script stores the various virtual environments you use centrally in
+`~/.cache/pants/setup`. When you switch back and forth between different Pants versions
+and different runtime Python versions, Pants will select the correct virtual environment
+from your local cache and use that.
+
+To use Pants plugins published to PyPi, add them to a `plugins` list, like so:
 
     :::ini
     [GLOBAL]
-    pants_version: 1.0.0
-
-When you'd like to upgrade pants, just edit the version in `pants.ini` and pants will self-update on
-the next run.  This script stores the various pants versions you use centrally in
-`~/.cache/pants/setup`.  When you switch back and forth between branches pants will select the
-correct version from your local cache and use that.
-
-If you use pants plugins published to pypi you can configure them by adding a `plugins` list as
-follows:
-
-    :::ini
-    [GLOBAL]
-    pants_version: 1.0.0
+    pants_version: 1.15.0
+    pants_runtime_python_version: 3.6
 
     plugins: [
         'pantsbuild.pants.contrib.go==%(pants_version)s',
         'pantsbuild.pants.contrib.scrooge==%(pants_version)s',
       ]
 
-Pants notices you changed your plugins and it installs them.
-NB: The formatting of the plugins list is important; all lines below the `plugins:` line must be
-indented by at least one white space to form logical continuation lines. This is standard for python
-ini files, see [[Options|pants('src/docs:options')]].
+Pants will notice you changed your plugins and will install them the next time you run `./pants`.
+
+Note the formatting of the plugins list is important; all lines below the `plugins:` line must be
+indented by at least one white space to form logical continuation lines. This is standard for Python
+ini files. See [[Options|pants('src/docs:options')]].
 
 The ./pants Runner Script
 -------------------------
@@ -98,6 +97,6 @@ where you are attempting to bootstrap pants. In particular, if you see an error 
     Failed to install requirements from /Users/someuser/workspace/pants/3rdparty/python/requirements.txt.
 
 This indicates that pants was attempting to `pip install` the `psutil` dependency into it's private
-virtualenv, and that install failed due to a compiler issue. On Mac OS X, we recommend running
+virtualenv, and that install failed due to a compiler issue. On macOS, we recommend running
 `xcode-select --install` to make sure you have the latest compiler infrastructure installed, and
 unset any compiler-related environment variables (i.e. run `unset CC`).
