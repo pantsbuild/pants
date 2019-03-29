@@ -33,7 +33,7 @@ Start by running the below command to auto-generate a `pants.ini` config file wi
 
 This pins the `pants_version`. When you'd like to upgrade Pants, just edit the version in `pants.ini` and `./pants` will self-update on the next run.
 
-It also pins the `pants_runtime_python_version`, which is the Python version you use to run Pants. You may choose between `2.7`, `3.6`, and `3.7` (Note Pants 1.17.0 will be the last version to support Python 2.7).
+It also pins the `pants_runtime_python_version`, which is the Python version you use to run Pants. You may choose between `2.7`, `3.6`, and `3.7`. Ensure you have this interpreter version discoverable on your PATH every where you plan to use Pants. Note Pants 1.17.0 will be the last version to support Python 2.7. 
 
 The script stores the various virtual environments you use centrally in
 `~/.cache/pants/setup`. When you switch back and forth between different Pants versions
