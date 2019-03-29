@@ -58,6 +58,7 @@ class SchedulerService(PantsService):
     self._logger = logging.getLogger(__name__)
     self._event_queue = queue.Queue(maxsize=self.QUEUE_SIZE)
     self._watchman_is_running = threading.Event()
+    self._snapshot_by_glob = {}
     self._invalidating_files = set()
 
     self._loop_condition = LoopCondition()
@@ -66,13 +67,14 @@ class SchedulerService(PantsService):
   def _combined_invalidating_fileset_from_globs(glob_strs, root):
     return set.union(*(Fileset.globs(glob_str, root=root)() for glob_str in glob_strs))
 
-  def _get_invalidation_globs_snapsots(self):
-    """Returns a Snapshot of the files watched under self._invalidation_globs"""
-    if self._invalidation_globs:
-      return self._scheduler.capture_snapshots(
-        (PathGlobsAndRoot(
-          PathGlobs(self._invalidation_globs),
-          self._build_root), ))
+  def _get_snapshot(self, glob):
+    """Returns a Snapshot of the input glob"""
+    return self._scheduler.capture_snapshots(
+      (PathGlobsAndRoot(PathGlobs(glob), self._build_root), ))[0]
+
+  def _get_files(self, snapshots):
+    """Returns a list of the files corresponding to the list of input snapshots"""
+    return [snapshot.files[0] for snapshot in snapshots]
 
   def setup(self, services):
     """Service setup."""
@@ -80,25 +82,13 @@ class SchedulerService(PantsService):
     # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
 
-    # N.B. We compute this combined set eagerly at launch with an assumption that files
+    # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
     # that exist at startup are the only ones that can affect the running daemon.
-
-    # Re: 5567, a solution would be to:
-    # - Request a snapshot for the output of _combined_invalidating_fileset_from_globs,
-    #   at startup time.
-    # - We store it in what currently is self._invalidating_files.
-    # - Every time we have an fs event, in _maybe_invalidate_scheduler_batch,
-    #   We recompute the snapshot, and compare its digest with the one we stored at startup.
     if self._invalidation_globs:
-      self._invalidating_files = self._combined_invalidating_fileset_from_globs(
-        self._invalidation_globs,
-        self._build_root
-      )
-      print('*'*10)
-      print(self._invalidating_files)
-      self._invalidating_files_snapshot = self._get_invalidation_globs_snapsots()
-      print(self._invalidating_files_snapshot)
-    self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
+      for glob in self._invalidation_globs:
+        self._snapshot_by_glob[glob] = self._get_snapshot([glob])
+      self._invalidating_files = self._get_files(self._snapshot_by_glob.values())
+      self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
 
     if self._pantsd_pidfile:
       self._fs_event_service.register_pidfile_handler(self._pantsd_pidfile, self._enqueue_fs_event)
@@ -109,11 +99,19 @@ class SchedulerService(PantsService):
                       .format(len(event['files']), event['subscription']))
     self._event_queue.put(event)
 
-  def _maybe_invalidate_scheduler_batch(self, files):
-    invalidating_files = self._invalidating_files
-    if any(f in invalidating_files for f in files):
-      self._logger.fatal('saw file events covered by invalidation globs, terminating the daemon.')
-      self.terminate()
+  def _maybe_invalidate_scheduler_batch(self, changed_globs):
+    def _is_glob_changed(glob):
+      # Recompute the digest for the glob
+      new_digest = self._get_snapshot([glob]).directory_digest
+      original_digest = self._snapshot_by_glob.get(glob, None)
+      return new_digest != original_digest
+
+    for glob in changed_globs:
+      if glob in self._invalidating_files and _is_glob_changed(glob):
+        self._logger.fatal(
+          'saw file events covered by invalidation glob [{}], terminating the daemon.'.format(glob))
+        self.terminate()
+        break
 
   def _maybe_invalidate_scheduler_pidfile(self):
     new_pid = self._check_pid_changed()
