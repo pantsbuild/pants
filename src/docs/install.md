@@ -23,17 +23,14 @@ in the root (i.e. the "buildroot") of your repo:
     :::bash
     curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants
 
-The first time you run the new `./pants` script, it will install the latest version of Pants (using
-virtualenv) and then run it.
-
-Start by running the below command to auto-generate a `pants.ini` config file with sensible defaults.
+Start by running the below command to auto-generate a `pants.ini` config file with sensible defaults. This will install the latest version of Pants, using virtualenv.
 
     :::bash
     ./pants generate-pants-ini
 
 This pins the `pants_version`. When you'd like to upgrade Pants, just edit the version in `pants.ini` and `./pants` will self-update on the next run.
 
-It also pins the `pants_runtime_python_version`, which is the Python version you use to run Pants. You may choose between `2.7`, `3.6`, and `3.7`. Ensure you have this interpreter version discoverable on your PATH every where you plan to use Pants. Note Pants 1.17.0 will be the last version to support Python 2.7. 
+It also pins the `pants_runtime_python_version`, which is the Python version you use to run Pants. You may choose between `2.7`, `3.6`, and `3.7`. Ensure you have this interpreter version discoverable on your PATH every where you plan to use Pants. Note that Pants 1.17.0 will be the last version to support Python 2.7.
 
 The script stores the various virtual environments you use centrally in
 `~/.cache/pants/setup`. When you switch back and forth between different Pants versions
@@ -54,7 +51,7 @@ To use Pants plugins published to PyPi, add them to a `plugins` list, like so:
 
 Pants will notice you changed your plugins and will install them the next time you run `./pants`.
 
-Note the formatting of the plugins list is important; all lines below the `plugins:` line must be
+Note that the formatting of the plugins list is important; all lines below the `plugins:` line must be
 indented by at least one white space to form logical continuation lines. This is standard for Python
 ini files. See [[Options|pants('src/docs:options')]].
 
