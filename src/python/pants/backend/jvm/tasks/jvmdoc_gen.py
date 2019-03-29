@@ -111,7 +111,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     if not targets:
       return
 
-    with self.invalidated(targets) as invalidation_check:
+    with self.invalidated(targets, invalidate_dependents=self.combined) as invalidation_check:
       def find_jvmdoc_targets():
         invalid_targets = set()
         for vt in invalidation_check.invalid_vts:
