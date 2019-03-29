@@ -85,7 +85,11 @@ class SchedulerService(PantsService):
     # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
     # that exist at startup are the only ones that can affect the running daemon.
     if self._invalidation_globs:
-      for glob in self._invalidation_globs:
+      invalidating_files = self._combined_invalidating_fileset_from_globs(
+        self._invalidation_globs,
+        self._build_root
+      )
+      for glob in invalidating_files:
         self._snapshot_by_glob[glob] = self._get_snapshot([glob])
       self._invalidating_files = self._get_files(self._snapshot_by_glob.values())
       self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
@@ -145,7 +149,7 @@ class SchedulerService(PantsService):
       self._loop_condition.notify_all()
 
   def _process_event_queue(self):
-    """File event notification queue processor."""
+    """File event notification queue processor. """
     try:
       event = self._event_queue.get(timeout=0.05)
     except queue.Empty:
