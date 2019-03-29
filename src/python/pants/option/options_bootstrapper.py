@@ -54,7 +54,9 @@ class OptionsBootstrapper(datatype([
     flag = '--pants-config-files='
     evars = ['PANTS_GLOBAL_PANTS_CONFIG_FILES', 'PANTS_PANTS_CONFIG_FILES', 'PANTS_CONFIG_FILES']
 
-    path_list_values = [ListValueComponent.create(get_default_pants_config_file())]
+    path_list_values = []
+    if os.path.isfile(get_default_pants_config_file()):
+      path_list_values.append(ListValueComponent.create(get_default_pants_config_file()))
     for var in evars:
       if var in env:
         path_list_values.append(ListValueComponent.create(env[var]))
@@ -104,10 +106,7 @@ class OptionsBootstrapper(datatype([
     short_flags = set()
 
     def filecontent_for(path):
-      return FileContent(
-        ensure_text(path),
-        read_file(path, binary_mode=True) if os.path.isfile(path) else b""
-      )
+      return FileContent(ensure_text(path), read_file(path, binary_mode=True))
 
     def capture_the_flags(*args, **kwargs):
       for arg in args:
