@@ -5,7 +5,7 @@ There are a few ways to get a runnable version of Pants set up for your workspac
 beginning, make sure your machine fits the requirements. At a minimum, Pants requires the following to run properly:
 
 * Linux or macOS.
-* Python 2.7, 3.6, or 3.7.
+* Python 2.7 or 3.6.
 * A C compiler, system headers, Python headers (to compile native Python modules) and the libffi
   library and headers (to compile and link modules that use CFFI to access native code).
 * OpenJDK or Oracle JDK 7 or greater.
@@ -30,7 +30,7 @@ Start by running the below command to auto-generate a `pants.ini` config file wi
 
 This pins the `pants_version`. When you'd like to upgrade Pants, just edit the version in `pants.ini` and `./pants` will self-update on the next run.
 
-It also pins the `pants_runtime_python_version`, which is the Python version you use to run Pants. You may choose between `2.7`, `3.6`, and `3.7`. Ensure you have this interpreter version discoverable on your PATH everywhere you plan to use Pants. Note that Pants 1.17.0 will be the last version to support Python 2.7.
+It also pins the `pants_runtime_python_version`, which is the Python version you use to run Pants. You may choose between `2.7` and `3.6`. Ensure you have this interpreter version discoverable on your PATH everywhere you plan to use Pants. Note that Pants 1.16.0 will be the last version to support Python 2.7.
 
 The script stores the various virtual environments you use centrally in
 `~/.cache/pants/setup`. When you switch back and forth between different Pants versions
