@@ -33,4 +33,4 @@ do
   esac
 done
 
-./pants -q --changed-parent=master fmt.isort -- ${isort_args[@]}
+./pants --changed-parent=master fmt.isort -- ${isort_args[@]}

@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import functools
 import logging
 import os
+import re
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -16,11 +17,11 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.fmt_task_mixin import FmtTaskMixin
-from pants.task.task import Task
+from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import pushd
 
 
-class IsortRun(FmtTaskMixin, Task):
+class IsortRun(FmtTaskMixin, ConsoleTask):
   """Autoformats Python source files with isort.
 
   Behavior:
@@ -38,7 +39,7 @@ class IsortRun(FmtTaskMixin, Task):
     super(IsortRun, cls).prepare(options, round_manager)
     round_manager.require_data(IsortPrep.tool_instance_cls)
 
-  def execute(self):
+  def console_output(self, _targets):
     targets = self.get_targets(self.is_non_synthetic_python_target)
     with self.invalidated(targets=targets) as invalidation_check:
       if not invalidation_check.invalid_vts:
@@ -54,16 +55,15 @@ class IsortRun(FmtTaskMixin, Task):
       isort = self.context.products.get_data(IsortPrep.tool_instance_cls)
       args = self.get_passthru_args() + sources
 
-      # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
-      #   https://github.com/timothycrosley/isort/issues/456
-      with pushd(get_buildroot()):
-        workunit_factory = functools.partial(self.context.new_workunit,
-                                             name='run-isort',
-                                             labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT])
-        cmdline, exit_code = isort.run(workunit_factory, args)
-        if exit_code != 0:
-          raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
-                          exit_code=exit_code)
+      stdout, stderr, exit_code, cmdline = isort.output(args)
+      if exit_code == 0:
+        yield "All Python imports correctly sorted for requested targets."
+      elif ("-c" in args or "--check-only" in args) and exit_code == 1:
+        failing_targets = '\n'.join(self._parse_failing_targets(stdout.strip()))
+        raise TaskError("The following files have incorrect import orders:\n\n{}".format(failing_targets))
+      else:
+        raise TaskError("{} ... exited non-zero ({}) with stderr {}.".format(cmdline, exit_code, stderr),
+                        exit_code=exit_code)
 
   def _calculate_isortable_python_sources(self, targets):
     """Generate a set of source files from the given targets."""
@@ -74,6 +74,14 @@ class IsortRun(FmtTaskMixin, Task):
         if os.path.splitext(source)[1] == self._PYTHON_SOURCE_EXTENSION
       )
     return list(sources)
+
+  @staticmethod
+  def _parse_failing_targets(stdout):
+    error_lines = (line for line in stdout.split("\n") if "ERROR" in line)
+    prefix = r"(?<={}/)".format(get_buildroot())
+    postfix = r'(?=\sImports)'
+    parsed_files = (re.search(f"{prefix}.*{postfix}", line)[0] for line in error_lines)
+    return sorted(parsed_files)
 
   @staticmethod
   def is_non_synthetic_python_target(target):
