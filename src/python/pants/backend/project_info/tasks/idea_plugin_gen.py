@@ -163,7 +163,7 @@ class IdeaPluginGen(ConsoleTask):
       return output.name
 
   def console_output(self, _targets):
-    if not self.context.target_roots:
+    if not self.context.options.target_specs:
       raise TaskError("No targets specified.")
 
     # Heuristics to guess whether user tries to load a python project,
