@@ -1,2 +1,1 @@
-tests/python/pants_test/backend/python/tasks:integration
 tests/python/pants_test/engine/legacy:console_rule_integration
