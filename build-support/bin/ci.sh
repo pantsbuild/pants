@@ -46,7 +46,6 @@ Usage: $0 (-h|-2fxbkmrjlpuneycitzsw)
               to run only even tests: '-i 0/2', odd: '-i 1/2'
  -t           run lint
  -z           test platform-specific behavior
- -w           Run only blacklisted tests
 EOF
   if (( $# > 0 )); then
     die "$@"
@@ -60,7 +59,7 @@ python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "h27fxbmrjlpeasu:ny:ci:tzw" opt; do
+while getopts "h27fxbmrjlpeasu:ny:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
     2) python_two="true" ;;
@@ -83,7 +82,6 @@ while getopts "h27fxbmrjlpeasu:ny:ci:tzw" opt; do
     i) python_intg_shard=${OPTARG} ;;
     t) run_lint="true" ;;
     z) test_platform_specific_behavior="true" ;;
-    w) run_blacklisted_tests_only="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -254,6 +252,7 @@ if [[ "${run_cargo_audit:-false}" == "true" ]]; then
     "${REPO_ROOT}/build-support/bin/native/cargo" ensure-installed --package=cargo-audit --version=0.5.2
     "${REPO_ROOT}/build-support/bin/native/cargo" audit -f "${REPO_ROOT}/src/rust/engine/Cargo.lock"
   ) || die "Cargo audit failure"
+  end_travis_section
 fi
 
 
@@ -262,6 +261,7 @@ if [[ "${run_rust_clippy:-false}" == "true" ]]; then
   (
     "${REPO_ROOT}/build-support/bin/check_clippy.sh"
   ) || die "Pants clippy failure"
+  end_travis_section
 fi
 
 # NB: this only tests python tests right now -- the command needs to be edited if test targets in
@@ -283,19 +283,9 @@ if [[ "${run_integration:-false}" == "true" ]]; then
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
-    known_py3_pex_failures_file="${REPO_ROOT}/build-support/known_py3_pex_failures.txt"
-    if [[ "${python_two:-false}" == "false" ]]; then
-      targets="$(comm -23 <(./pants.pex --tag='+integration' list tests/python:: | grep '.' | sort) <(sort "${known_py3_pex_failures_file}"))"
-    else
-      if [[ "${run_blacklisted_tests_only:-false}" == "true" ]]; then
-        targets="$(cat ${known_py3_pex_failures_file})"
-      else
-        targets="tests/python::"
-      fi
-    fi
     ./pants.pex --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
-      $targets -- ${PYTEST_PASSTHRU_ARGS}
+      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants Integration test failure"
   end_travis_section
 fi
