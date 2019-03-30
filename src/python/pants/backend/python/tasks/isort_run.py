@@ -63,7 +63,7 @@ class IsortRun(FmtTaskMixin, Task):
         cmdline, exit_code = isort.run(workunit_factory, args)
         if exit_code != 0:
           raise TaskError(
-            "Exited with return code {} while running isort with args `{}`.".format(exit_code, " ".join(args)),
+            "Exited with return code {} while running `{}`.".format(exit_code, cmdline),
             exit_code=exit_code
           )
 
