@@ -16,11 +16,11 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.fmt_task_mixin import FmtTaskMixin
-from pants.task.console_task import ConsoleTask
+from pants.task.task import Task
 from pants.util.contextutil import pushd
 
 
-class IsortRun(FmtTaskMixin, ConsoleTask):
+class IsortRun(FmtTaskMixin, Task):
   """Autoformats Python source files with isort.
 
   Behavior:
@@ -38,7 +38,7 @@ class IsortRun(FmtTaskMixin, ConsoleTask):
     super(IsortRun, cls).prepare(options, round_manager)
     round_manager.require_data(IsortPrep.tool_instance_cls)
 
-  def console_output(self, _targets):
+  def execute(self):
     targets = self.get_targets(self.is_non_synthetic_python_target)
     with self.invalidated(targets=targets) as invalidation_check:
       if not invalidation_check.invalid_vts:
@@ -57,11 +57,10 @@ class IsortRun(FmtTaskMixin, ConsoleTask):
       # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
       #   https://github.com/timothycrosley/isort/issues/456
       with pushd(get_buildroot()):
-        stdout, stderr, exit_code, _ = isort.output(args)
-        if stdout:
-          yield stdout
-        if stderr:
-          yield stderr
+        workunit_factory = functools.partial(self.context.new_workunit,
+                                             name='run-isort',
+                                             labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT])
+        cmdline, exit_code = isort.run(workunit_factory, args)
         if exit_code != 0:
           raise TaskError(
             "Exited with return code {} while running isort with args `{}`.".format(exit_code, " ".join(args)),
