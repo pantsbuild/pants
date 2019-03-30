@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import functools
 import logging
 import os
-import re
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -56,13 +55,12 @@ class IsortRun(FmtTaskMixin, ConsoleTask):
       args = self.get_passthru_args() + sources
 
       stdout, stderr, exit_code, cmdline = isort.output(args)
-      if exit_code == 0:
-        yield "All Python imports correctly sorted for requested targets."
-      elif ("-c" in args or "--check-only" in args) and exit_code == 1:
-        failing_targets = '\n'.join(self._parse_failing_targets(stdout.strip()))
-        raise TaskError("The following files have incorrect import orders:\n\n{}".format(failing_targets))
-      else:
-        raise TaskError("{} ... exited non-zero ({}) with stderr {}.".format(cmdline, exit_code, stderr),
+      if stdout:
+        yield stdout
+      if stderr:
+        yield stderr
+      if exit_code != 0:
+        raise TaskError("Exited non-zero ({}) while running `{}`.".format(exit_code, cmdline),
                         exit_code=exit_code)
 
   def _calculate_isortable_python_sources(self, targets):
@@ -74,14 +72,6 @@ class IsortRun(FmtTaskMixin, ConsoleTask):
         if os.path.splitext(source)[1] == self._PYTHON_SOURCE_EXTENSION
       )
     return list(sources)
-
-  @staticmethod
-  def _parse_failing_targets(stdout):
-    error_lines = (line for line in stdout.split("\n") if "ERROR" in line)
-    prefix = r"(?<={}/)".format(get_buildroot())
-    postfix = r'(?=\sImports)'
-    parsed_files = (re.search(f"{prefix}.*{postfix}", line)[0] for line in error_lines)
-    return sorted(parsed_files)
 
   @staticmethod
   def is_non_synthetic_python_target(target):
