@@ -54,14 +54,17 @@ class IsortRun(FmtTaskMixin, ConsoleTask):
       isort = self.context.products.get_data(IsortPrep.tool_instance_cls)
       args = self.get_passthru_args() + sources
 
-      stdout, stderr, exit_code, cmdline = isort.output(args)
-      if stdout:
-        yield stdout
-      if stderr:
-        yield stderr
-      if exit_code != 0:
-        raise TaskError("Exited non-zero ({}) while running `{}`.".format(exit_code, cmdline),
-                        exit_code=exit_code)
+      # NB: We execute isort out of process to avoid unwanted side-effects from importing it:
+      #   https://github.com/timothycrosley/isort/issues/456
+      with pushd(get_buildroot()):
+        stdout, stderr, exit_code, cmdline = isort.output(args)
+        if stdout:
+          yield stdout
+        if stderr:
+          yield stderr
+        if exit_code != 0:
+          raise TaskError("Exited non-zero ({}) while running `{}`.".format(exit_code, cmdline),
+                          exit_code=exit_code)
 
   def _calculate_isortable_python_sources(self, targets):
     """Generate a set of source files from the given targets."""
