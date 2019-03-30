@@ -132,9 +132,6 @@ class IdeaPluginGen(ConsoleTask):
       debug_port=self.get_options().debug_port,
     )
 
-    if not self.context.options.target_specs:
-      raise TaskError("No targets specified.")
-
     abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs]
     configured_workspace = TemplateData(
       targets=json.dumps(abs_target_specs),
@@ -154,8 +151,6 @@ class IdeaPluginGen(ConsoleTask):
     ipr = gen_file(self.project_template, project=configured_project)
     iws = gen_file(self.workspace_template, workspace=configured_workspace)
 
-    self._outstream.write(self.gen_project_workdir.encode('utf-8'))
-
     shutil.move(ipr, self.project_filename)
     shutil.move(iws, self.workspace_filename)
     return self.project_filename
@@ -167,7 +162,10 @@ class IdeaPluginGen(ConsoleTask):
       generator.write(output)
       return output.name
 
-  def execute(self):
+  def console_output(self, _targets):
+    if not self.context.target_roots:
+      raise TaskError("No targets specified.")
+
     # Heuristics to guess whether user tries to load a python project,
     # in which case intellij project sdk has to be set up manually.
     jvm_target_num = len([x for x in self.context.target_roots if isinstance(x, JvmTarget)])
@@ -177,6 +175,8 @@ class IdeaPluginGen(ConsoleTask):
                    'select the proper python interpreter as Project SDK in IntelliJ.')
 
     ide_file = self.generate_project()
+    yield self.gen_project_workdir
+
     if ide_file and self.get_options().open:
       open_with = self.get_options().open_with
       if open_with:
