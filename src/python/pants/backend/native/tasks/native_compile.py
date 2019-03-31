@@ -167,6 +167,7 @@ class NativeCompile(NativeTask, AbstractClass):
     sources_and_headers = self.get_sources_headers_for_target(target)
     compiler_option_sets = (self._compile_settings.native_build_step
                                 .get_compiler_option_sets_for_target(target))
+    self.context.log.debug('target: {}, compiler_option_sets: {}'.format(target, compiler_option_sets))
 
     compile_request = NativeCompileRequest(
       compiler=self._compiler(target),

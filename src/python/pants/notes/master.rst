@@ -4,6 +4,105 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.16.0.dev0 (3/29/2019)
+-----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add `./pants generate-pants-ini` for first time users to generate pants.ini with sensible defaults (#7448)
+  `PR #7448 <https://github.com/pantsbuild/pants/pull/7448>`_
+
+* Allow alternate nodejs binaries (#7405)
+  `PR #7405 <https://github.com/pantsbuild/pants/pull/7405>`_
+
+* Add JSON Reporter for more detailed workunit stats (#7392)
+  `PR #7392 <https://github.com/pantsbuild/pants/pull/7392>`_
+
+* Collect Zipkin spans for v2 engine (#7342)
+  `PR #7342 <https://github.com/pantsbuild/pants/pull/7342>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Revert unnecessary runtime check for valid Python interpreter (#7451)
+  `PR #7451 <https://github.com/pantsbuild/pants/pull/7451>`_
+
+* Make abstract classproperty error message nicer (#7429)
+  `PR #7429 <https://github.com/pantsbuild/pants/pull/7429>`_
+
+* remove inspect.stack() from @rule parsing to fix import time regression in py3 (#7447)
+  `PR #7447 <https://github.com/pantsbuild/pants/pull/7447>`_
+
+* Just ignore source arg (with a comment) (#7430)
+  `PR #7430 <https://github.com/pantsbuild/pants/pull/7430>`_
+
+* Cache resolution of Node targets via fingerprinting lockfiles. (#7414)
+  `PR #7414 <https://github.com/pantsbuild/pants/pull/7414>`_
+
+* Handle signals gracefully (#6574)
+  `PR #6574 <https://github.com/pantsbuild/pants/pull/6574>`_
+
+* Fix resolve test failing on Python 3.7 due to test using outdated cffi version (#7413)
+  `PR #7413 <https://github.com/pantsbuild/pants/pull/7413>`_
+
+* Loosen constraints for TensorFlow used in example code to work with Python 3.7 (#7410)
+  `PR #7410 <https://github.com/pantsbuild/pants/pull/7410>`_
+
+* Allow usage of pants2 script from other directories (#7409)
+  `PR #7409 <https://github.com/pantsbuild/pants/pull/7409>`_
+
+* Specify the python version to use in the unstable pex deploy shard. (#7411)
+  `PR #7411 <https://github.com/pantsbuild/pants/pull/7411>`_
+
+* Bump default MyPy version to 0.670 (#7407)
+  `PR #7407 <https://github.com/pantsbuild/pants/pull/7407>`_
+
+* Release pants as both a Python 2.7 PEX and a Python 3.6 PEX (#7401)
+  `PR #7401 <https://github.com/pantsbuild/pants/pull/7401>`_
+
+* add a non-numeric prefix before the unstable version to avoid getting parsed and truncated as a number (#7400)
+  `PR #7400 <https://github.com/pantsbuild/pants/pull/7400>`_
+
+* Refactor travis.yml to deduplicate Pyenv and AWS pex code (#7397)
+  `PR #7397 <https://github.com/pantsbuild/pants/pull/7397>`_
+
+Bugfixes
+~~~~~~~~
+
+* nailgun connect timeout error message fix (#7437)
+  `PR #7437 <https://github.com/pantsbuild/pants/pull/7437>`_
+
+* Add Python 3.7 tests to nightly cron CI run (#7261)
+  `PR #7261 <https://github.com/pantsbuild/pants/pull/7261>`_
+
+* Better message on tool interpreter selection failure. (#7438)
+  `PR #7438 <https://github.com/pantsbuild/pants/pull/7438>`_
+
+* fix for pantsrc-files option (#7427)
+  `PR #7427 <https://github.com/pantsbuild/pants/pull/7427>`_
+
+* Move with_overwritten_file_context to PantsRunIntegrationTest (#7408)
+  `PR #7408 <https://github.com/pantsbuild/pants/pull/7408>`_
+
+* Fix locale test failing on Python 3.7 due to forced UTF-8 mode (#7412)
+  `PR #7412 <https://github.com/pantsbuild/pants/pull/7412>`_
+
+* Simplify glob matching and directly match in-memory globs as Patterns. (#7402)
+  `PR #7402 <https://github.com/pantsbuild/pants/pull/7402>`_
+
+* Allow reporters to see the correct end_time for a workunit (#7389)
+  `PR #7389 <https://github.com/pantsbuild/pants/pull/7389>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Document pantsd startup and Pailgun behaviours (#7376)
+  `PR #7376 <https://github.com/pantsbuild/pants/pull/7376>`_
+
+* Explain in contributing doc that macOS users must brew install OpenSSL (#7396)
+  `PR #7396 <https://github.com/pantsbuild/pants/pull/7396>`_
+
 
 1.15.0rc0 (3/18/2019)
 ---------------------

@@ -211,7 +211,8 @@ py37_linux_test_config: &py37_linux_test_config
   <<: *base_linux_test_config
   stage: *test_cron
   env:
-    - &py37_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
+    # TODO(https://github.com/tensorflow/tensorflow/issues/27078): tensorflow==1.13.1 on python 3.7.2 for Linux uses the new C++ ABI, which may be an error.
+    - &py37_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
 
 base_osx_config: &base_osx_config
   os: osx

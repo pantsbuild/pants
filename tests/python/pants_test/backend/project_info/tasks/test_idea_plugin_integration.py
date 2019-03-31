@@ -64,7 +64,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
   def _get_project_dir(self, output_file):
     with open(output_file, 'r') as result:
-      return result.readlines()[0]
+      return result.readlines()[0].strip()
 
   def _run_and_check(self, target_specs, incremental_import=None):
     """
