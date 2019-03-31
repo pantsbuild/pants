@@ -8,9 +8,7 @@ import pkg_resources
 import pystache
 
 
-num_py3_integration_shards = 19
-num_py2_blacklist_integration_shards = 1
-num_cron_integration_shards = 20
+num_integration_shards = 20
 
 
 HEADER = """
@@ -37,12 +35,8 @@ def generate_travis_yml():
 
   context = {
     'header': HEADER,
-    'py3_integration_shards': range(0, num_py3_integration_shards),
-    'py3_integration_shards_length': num_py3_integration_shards,
-    'py2_blacklist_integration_shards': range(0, num_py2_blacklist_integration_shards),
-    'py2_blacklist_integration_shards_length': num_py2_blacklist_integration_shards,
-    'cron_integration_shards': range(0, num_cron_integration_shards),
-    'cron_integration_shards_length': num_cron_integration_shards,
+    'integration_shards': range(0, num_integration_shards),
+    'integration_shards_length': num_integration_shards,
   }
   renderer = pystache.Renderer(partials={
     'before_install_linux': before_install_linux,
