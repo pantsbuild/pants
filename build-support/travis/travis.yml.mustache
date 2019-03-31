@@ -412,18 +412,20 @@ py37_lint: &py37_lint
 # Rust lints
 # -------------------------------------------------------------------------
 
-linux_rust_clippy: &linux_rust_clippy
+base_rust_lints: &base_rust_lints
   <<: *linux_with_fuse
+  os: linux
+  dist: xenial
+  sudo: required
+  python: "3.6"
+
+linux_rust_clippy: &linux_rust_clippy
+  <<: *base_rust_lints
   <<: *native_engine_cache_config
   name: "Linux Rust Clippy (No PEX)"
   env:
     - CACHE_NAME=linuxclippy
-  os: linux
-  dist: xenial
-  sudo: required
   stage: *test
-  language: python
-  python: "3.6"
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -431,13 +433,10 @@ linux_rust_clippy: &linux_rust_clippy
     - ./build-support/bin/travis-ci.sh -s
 
 cargo_audit: &cargo_audit
-  <<: *linux_with_fuse
+  <<: *base_rust_lints
   name: "Cargo audit (No PEX)"
   env:
     - CACHE_NAME=linuxcargoaudit
-  os: linux
-  dist: xenial
-  sudo: required
   stage: *test_cron
   script:
     - ./build-support/bin/travis-ci.sh -a
