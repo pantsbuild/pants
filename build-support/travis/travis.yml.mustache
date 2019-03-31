@@ -577,7 +577,8 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   before_install:
     {{>before_install_osx}}
     - *pyenv_setup
-    - [[ ! -d  ${PYENV_ROOT}/versions/2.7.13 ]] && ${PYENV_BIN} install 2.7.13
+    - >
+      [[ ! -d  ${PYENV_ROOT}/versions/2.7.13 ]] && ${PYENV_BIN} install 2.7.13
     - ${PYENV_BIN} global 2.7.13
   script:
     - ./build-support/bin/ci.sh -2b
