@@ -7,7 +7,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import functools
 import re
 from abc import abstractproperty
-from builtins import str
+from builtins import bytes, str
+
+from future.utils import PY3
 
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
@@ -147,5 +149,6 @@ class Optionable(OptionableFactory, AbstractClass):
     # its __init__, as we do here. We usually only create a single instance of an Optionable
     # subclass anyway.
     cls = type(self)
-    if not isinstance(cls.options_scope, str):
+    # NB: Python 2 stores property names as bytes, whereas Python 3 stores them as unicode.
+    if not isinstance(cls.options_scope, str if PY3 else (str, bytes)):
       raise NotImplementedError('{} must set an options_scope class-level property.'.format(cls))
