@@ -58,6 +58,7 @@ native_engine_cache_config: &native_engine_cache_config
     # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
     timeout: 500
     directories:
+      - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/pants_dev_deps.py27.venv
       - build-support/pants_dev_deps.py36.venv
@@ -88,6 +89,7 @@ pants_run_cache_config: &pants_run_cache_config
     # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
     timeout: 500
     directories:
+      - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -105,16 +107,20 @@ pants_run_cache_config: &pants_run_cache_config
 # we directly clone the Pyenv repo.
 
 pyenv_setup: &pyenv_setup >
-  if [ ! -d "${PYENV_BIN}" ]; then
-  rm -rf "${PYENV_ROOT}";
-  git clone https://github.com/pyenv/pyenv "${PYENV_ROOT}";
+  if [[ ! -x "${PYENV_BIN}" ]]; then
+    rm -rf "${PYENV_ROOT}";
+    git clone https://github.com/pyenv/pyenv "${PYENV_ROOT}";
   fi
 
 pyenv_install_py36: &pyenv_install_py36 >
-  "${PYENV_BIN}" install "${PYENV_PY36_VERSION}"
+  if [[ ! -d ${PYENV_ROOT}/versions/"${PYENV_PY36_VERSION}" ]]; then
+    "${PYENV_BIN}" install "${PYENV_PY36_VERSION}"
+  fi
 
 pyenv_install_py37: &pyenv_install_py37 >
-  "${PYENV_BIN}" install "${PYENV_PY37_VERSION}"
+  if [[ ! -d ${PYENV_ROOT}/versions/"${PYENV_PY37_VERSION}" ]]; then
+    "${PYENV_BIN}" install "${PYENV_PY37_VERSION}"
+  fi
 
 pyenv_global_py36: &pyenv_global_py36 >
   "${PYENV_BIN}" global "${PYENV_PY36_VERSION}"
@@ -571,7 +577,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   before_install:
     {{>before_install_osx}}
     - *pyenv_setup
-    - ${PYENV_BIN} install 2.7.13
+    - [[ ! -d  ${PYENV_ROOT}/versions/2.7.13 ]] && ${PYENV_BIN} install 2.7.13
     - ${PYENV_BIN} global 2.7.13
   script:
     - ./build-support/bin/ci.sh -2b
