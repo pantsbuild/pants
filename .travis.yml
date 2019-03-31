@@ -65,6 +65,7 @@ native_engine_cache_config: &native_engine_cache_config
     # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
     timeout: 500
     directories:
+      - /usr/local/aws
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/pants_dev_deps.py27.venv
       - build-support/pants_dev_deps.py36.venv
@@ -95,6 +96,7 @@ pants_run_cache_config: &pants_run_cache_config
     # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
     timeout: 500
     directories:
+      - /usr/local/aws
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
