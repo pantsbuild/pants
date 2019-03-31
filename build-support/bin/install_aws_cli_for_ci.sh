@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -euox pipefail
 
 # Install the AWS CLI in CI jobs.
 
@@ -27,6 +27,8 @@ fi
 # Travis does not cache symlinks (https://docs.travis-ci.com/user/caching/), so we create
 # the symlink ourselves everytime to ensure `aws` is discoverable globally.
 sudo ln -s /usr/local/aws/bin/aws /usr/local/bin/aws
+ls /usr/local/bin
+echo $PATH
 
 # Multipart operations aren't supported for anonymous users, so we set the
 # threshold high to avoid them being used automatically by the aws cli.
