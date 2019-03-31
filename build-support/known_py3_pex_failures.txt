@@ -1,1 +1,0 @@
-tests/python/pants_test/engine/legacy:console_rule_integration

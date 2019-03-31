@@ -124,14 +124,14 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
                        'org/pantsbuild/__init__.py',
                        'org/pantsbuild/example/',
                        'org/pantsbuild/example/__init__.py',
-                       'org/pantsbuild/example/distance/',
-                       'org/pantsbuild/example/distance/__init__.py',
-                       'org/pantsbuild/example/distance/constants.py',
-                       'org/pantsbuild/example/distance/ttypes.py',
-                       'org/pantsbuild/example/precipitation/',
-                       'org/pantsbuild/example/precipitation/__init__.py',
-                       'org/pantsbuild/example/precipitation/constants.py',
-                       'org/pantsbuild/example/precipitation/ttypes.py'])
+                       'org/pantsbuild/example/monolithic_precipitation/',
+                       'org/pantsbuild/example/monolithic_precipitation/__init__.py',
+                       'org/pantsbuild/example/monolithic_precipitation/constants.py',
+                       'org/pantsbuild/example/monolithic_precipitation/ttypes.py',
+                       'org/pantsbuild/example/unexported_distance/',
+                       'org/pantsbuild/example/unexported_distance/__init__.py',
+                       'org/pantsbuild/example/unexported_distance/constants.py',
+                       'org/pantsbuild/example/unexported_distance/ttypes.py'])
 
   def test_setup_py_unregistered_pants_plugin(self):
     """setup-py should succeed on a pants plugin target that:

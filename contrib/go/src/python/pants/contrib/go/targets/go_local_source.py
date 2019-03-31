@@ -5,10 +5,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import re
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.build_graph.address import Address
+from pants.util.memo import memoized_property
 
 from pants.contrib.go.targets.go_target import GoTarget
 
@@ -60,3 +62,16 @@ class GoLocalSource(GoTarget):
   def import_path(self):
     """The import path as used in import statements in `.go` source files."""
     return self.local_import_path(self.target_base, self.address)
+
+  # From `go help test`, ignore files beginning with "_" or ".", but otherwise match the glob
+  # "*_test.go".
+  _test_file_regexp = re.compile(r'^[^_\.].*_test\.go')
+
+  @classmethod
+  def _is_test_file(cls, src_path):
+    base = os.path.basename(src_path)
+    return re.match(cls._test_file_regexp, base) is not None
+
+  @memoized_property
+  def has_tests(self):
+    return any(self._is_test_file(src) for src in self.payload.sources.source_paths)
