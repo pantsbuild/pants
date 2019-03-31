@@ -18,7 +18,7 @@ if [[ ! -d /usr/local/aws ]]; then
 
   curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
   unzip awscli-bundle.zip
-  sudo ./awscli-bundle/install -i /usr/local/aws
+  sudo ./awscli-bundle/install --install-dir /usr/local/aws
 
   popd
 
