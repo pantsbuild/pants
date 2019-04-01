@@ -117,8 +117,8 @@ pants_run_cache_config: &pants_run_cache_config
 
 pyenv_setup: &pyenv_setup >
   if [[ ! -x "${PYENV_BIN}" ]]; then
-    rm -rf "${PYENV_ROOT}";
-    git clone https://github.com/pyenv/pyenv "${PYENV_ROOT}";
+    rm -rf "${PYENV_ROOT}"
+    git clone https://github.com/pyenv/pyenv "${PYENV_ROOT}"
   fi
 
 pyenv_install_py36: &pyenv_install_py36 >
