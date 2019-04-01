@@ -70,13 +70,14 @@ pub struct InvalidationResult {
 type Nodes<N> = HashMap<EntryKey<N>, EntryId>;
 
 struct InnerGraph<N: Node> {
-  nodes: Nodes<N>,
+  pub nodes: Nodes<N>,
   pg: PGraph<N>,
   dirty_edges: HashMap<EntryId, Vec<EntryId>>,
   /// A Graph that is marked `draining:True` will not allow the creation of new `Nodes`. But
   /// while draining, any Nodes that exist in the Graph will continue to run until/unless they
   /// attempt to get/create new Nodes.
   draining: bool,
+  vis_count: usize,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -101,17 +102,21 @@ impl<N: Node> InnerGraph<N> {
   }
 
   fn ensure_entry(&mut self, node: EntryKey<N>) -> EntryId {
-    InnerGraph::ensure_entry_internal(&mut self.pg, &mut self.nodes, node)
+    Self::ensure_entry_internal(&mut self.pg, &mut self.nodes, node)
   }
 
   fn ensure_entry_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, node: EntryKey<N>) -> EntryId {
+    let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/log").unwrap();
+    use std::io::Write;
     if let Some(&id) = nodes.get(&node) {
+      writeln!(f, "{}: ensure_entry: re-using entry for {:?} : {} -> {:?}", std::process::id(), node, pg.node_weight(id).unwrap().format(), id).unwrap();
       return id;
     }
 
     // New entry.
     let id = pg.add_node(Entry::new(node.clone()));
-    nodes.insert(node, id);
+    nodes.insert(node.clone(), id);
+    //writeln!(f, "{}: ensure_entry: making new entry for {:?} : {} -> {:?}", std::process::id(), node, pg.node_weight(id).unwrap().format(), id).unwrap();
     id
   }
 
@@ -501,6 +506,7 @@ impl<N: Node> Graph<N> {
       nodes: HashMap::default(),
       pg: DiGraph::new(),
       dirty_edges: HashMap::default(),
+      vis_count: 0,
     };
     Graph {
       inner: Mutex::new(inner),
@@ -516,9 +522,10 @@ impl<N: Node> Graph<N> {
   /// In the context of the given src Node, declare a dependency on the given dst Node and
   /// begin its execution if it has not already started.
   ///
-  pub fn get<C>(&self, src_id: EntryId, context: &C, dst_node: N) -> BoxFuture<N::Item, N::Error>
+  pub fn get<C, Viz>(&self, viz: Viz, src_id: EntryId, context: &C, dst_node: N, roots: &[N]) -> BoxFuture<N::Item, N::Error>
   where
     C: NodeContext<Node = N>,
+    Viz: NodeVisualizer<N>,
   {
     let maybe_entry_and_id = {
       // Get or create the destination, and then insert the dep and return its state.
@@ -530,10 +537,19 @@ impl<N: Node> Graph<N> {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
           let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
+          let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/log").unwrap();
+          if inner.nodes.len() < 100 {
+            writeln!(f, "{}.{}: Getting {} -> {}", std::process::id(), inner.vis_count, inner.entry_for_id(src_id).unwrap().format(), inner.entry_for_id(potential_dst_id).unwrap().format()).unwrap();
+            inner.visualize(viz, roots, &std::path::PathBuf::from(format!("/Users/dwagnerhall/tmp/cycle/{}.{}.dot", std::process::id(), inner.vis_count))).unwrap();
+            inner.vis_count += 1;
+          }
+
           if inner.detect_cycle(src_id, potential_dst_id) {
+            writeln!(f, "{}: Detected cycle! {} -> {}", std::process::id(), inner.entry_for_id(src_id).unwrap().format(), inner.entry_for_id(potential_dst_id).unwrap().format()).unwrap();
             // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
             inner.ensure_entry(EntryKey::Cyclic(dst_node))
           } else {
+            writeln!(f, "{}: No cycle! {} -> {}", std::process::id(), inner.entry_for_id(src_id).unwrap().format(), inner.entry_for_id(potential_dst_id).unwrap().format()).unwrap();
             // Valid dependency.
             trace!(
               "Adding dependency from {:?} to {:?}",
@@ -675,7 +691,7 @@ impl<N: Node> Graph<N> {
     C: NodeContext<Node = N>,
   {
     let (entry, entry_id, dep_generations) = {
-      let mut inner = self.inner.lock();
+      let inner = self.inner.lock();
 
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).

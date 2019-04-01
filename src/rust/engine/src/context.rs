@@ -13,7 +13,7 @@ use futures::Future;
 
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
-use crate::nodes::{NodeKey, TryInto, WrappedNode};
+use crate::nodes::{NodeKey, TryInto, Visualizer, WrappedNode};
 use crate::rule_graph::RuleGraph;
 use crate::scheduler::Session;
 use crate::tasks::Tasks;
@@ -250,7 +250,7 @@ impl Context {
     self
       .core
       .graph
-      .get(self.entry_id, self, node.into())
+      .get(Visualizer::default(), self.entry_id, self, node.into(), &self.session.root_nodes())
       .map(|node_result| {
         node_result
           .try_into()

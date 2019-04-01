@@ -71,7 +71,7 @@ impl Session {
     roots.extend(new_roots.iter().cloned());
   }
 
-  fn root_nodes(&self) -> Vec<NodeKey> {
+  pub fn root_nodes(&self) -> Vec<NodeKey> {
     let roots = self.0.roots.lock();
     roots.iter().map(|r| r.clone().into()).collect()
   }

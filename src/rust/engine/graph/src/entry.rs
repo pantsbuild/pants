@@ -193,6 +193,12 @@ impl<N: Node> Entry<N> {
           // generations (which, if they are dirty, will cause recursive cleaning). If they
           // match, we can consider the previous result value to be clean for reuse.
           let was_clean = if let Some(previous_dep_generations) = previous_dep_generations {
+            /*{
+              let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/log").unwrap();
+              let inner = context.graph().inner.lock();
+              use std::io::Write;
+              writeln!(f, "{}: Checking whether {} is clean", std::process::id(), inner.entry_for_id(entry_id).unwrap().format()).unwrap();
+            }*/
             let context2 = context.clone();
             context
               .graph()
@@ -202,9 +208,16 @@ impl<N: Node> Entry<N> {
                 Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
                   // Dependencies have not changed: Node is clean.
                   let mut inner = context2.graph().inner.lock();
+                  {
+                    let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/log").unwrap();
+                    use std::io::Write;
+                    writeln!(f, "{}: Yes, {} is clean", std::process::id(), inner.entry_for_id(entry_id).unwrap().format()).unwrap();
+                  }
                   for dep in inner.dirty_edges.remove(&entry_id).expect("Dirty node being cleaned should have a dirty edges list") {
+                    if inner.detect_cycle(entry_id, dep) {
+                      return Ok(false);
+                    }
                     inner.pg.add_edge(entry_id, dep, ());
-                    // TODO: Cycle detect
                   }
 
                   Ok(true)
@@ -233,6 +246,12 @@ impl<N: Node> Entry<N> {
             } else {
               // The Node needs to (re-)run!
               let context2 = context.clone();
+              /*{
+                let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/log").unwrap();
+                let inner = context.graph().inner.lock();
+                use std::io::Write;
+                writeln!(f, "{}: Re-running {}", std::process::id(), inner.entry_for_id(entry_id).unwrap().format()).unwrap();
+              }*/
               node
                 .run(context)
                 .then(move |res| {
