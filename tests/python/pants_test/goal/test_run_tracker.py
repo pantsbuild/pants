@@ -67,7 +67,7 @@ class RunTrackerTest(TestBase):
 
     # Execute & verify
     with temporary_file_path() as file_name:
-      self.assertTrue(RunTracker.write_stats_to_json(file_name, stats))
+      RunTracker.write_stats_to_json(file_name, stats)
       with open(file_name, 'r') as f:
         result = json.load(f)
         self.assertEqual(stats, result)
