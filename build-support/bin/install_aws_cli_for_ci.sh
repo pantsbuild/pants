@@ -25,7 +25,7 @@ if [[ ! -x "${AWS_CLI_BIN}" ]]; then
 
   curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
   unzip awscli-bundle.zip
-  sudo ./awscli-bundle/install --install-dir "${AWS_CLI_ROOT}"
+  ./awscli-bundle/install --install-dir "${AWS_CLI_ROOT}"
 
   popd
 
