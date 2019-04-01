@@ -31,7 +31,6 @@ env:
     # NB: Linux shards use Pyenv to pre-install Python. We must not override
     # PYENV_ROOT on those shards, or their Python will no longer work.
     - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
-    - PYENV_BIN="${PYENV_ROOT}/bin/pyenv"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
@@ -106,36 +105,6 @@ pants_run_cache_config: &pants_run_cache_config
       # using its own isolated cache:
       #   https://github.com/pantsbuild/pants/issues/2485
       - ${HOME}/.npm
-
-# -------------------------------------------------------------------------
-# Pyenv
-# -------------------------------------------------------------------------
-
-# On several shards, the system installed Pyenv is too outdated so does not
-# have the Python versions we need, like Python 3.7. To get around this
-# we directly clone the Pyenv repo.
-
-pyenv_setup: &pyenv_setup >
-  if [[ ! -x "${PYENV_BIN}" ]]; then
-    rm -rf "${PYENV_ROOT}"
-    git clone https://github.com/pyenv/pyenv "${PYENV_ROOT}"
-  fi
-
-pyenv_install_py36: &pyenv_install_py36 >
-  if [[ ! -d ${PYENV_ROOT}/versions/"${PYENV_PY36_VERSION}" ]]; then
-    "${PYENV_BIN}" install "${PYENV_PY36_VERSION}"
-  fi
-
-pyenv_install_py37: &pyenv_install_py37 >
-  if [[ ! -d ${PYENV_ROOT}/versions/"${PYENV_PY37_VERSION}" ]]; then
-    "${PYENV_BIN}" install "${PYENV_PY37_VERSION}"
-  fi
-
-pyenv_global_py36: &pyenv_global_py36 >
-  "${PYENV_BIN}" global "${PYENV_PY36_VERSION}"
-
-pyenv_global_py37: &pyenv_global_py37 >
-  "${PYENV_BIN}" global "${PYENV_PY37_VERSION}"
 
 # -------------------------------------------------------------------------
 # AWS
@@ -248,9 +217,7 @@ py36_osx_config: &py36_osx_config
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - *pyenv_setup
-    - *pyenv_install_py36
-    - *pyenv_global_py36
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
 
 py37_osx_config: &py37_osx_config
   <<: *base_osx_config
@@ -267,9 +234,7 @@ py37_osx_config: &py37_osx_config
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - *pyenv_setup
-    - *pyenv_install_py37
-    - *pyenv_global_py37
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY37_VERSION}"
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
@@ -631,12 +596,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - *pyenv_setup
-    - >
-      if [[ ! -d ${PYENV_ROOT}/versions/2.7.13 ]]; then
-        ${PYENV_BIN} install 2.7.13
-      fi
-    - ${PYENV_BIN} global 2.7.13
+    - ./build-support/bin/install_python_for_ci.sh 2.7.13
   script:
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu
