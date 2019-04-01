@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euox pipefail
+set -euo pipefail
 
 # Install the AWS CLI in CI jobs.
 
@@ -9,8 +9,11 @@ set -euox pipefail
 # to use, which slows down CI jobs significantly. This is also the installation method recommended
 # by AWS, see https://docs.aws.amazon.com/cli/latest/userguide/install-bundle.html.
 
+INSTALL_DIR="/usr/local/aws"
+AWS_BIN="${INSTALL_DIR}/bin/aws"
+
 # We first check if AWS CLI is already installed thanks to Travis's cache.
-if [[ ! -d /usr/local/aws ]]; then
+if [[ ! -x "${AWS_BIN}" ]]; then
 
   TMPDIR=$(mktemp -d)
 
@@ -18,7 +21,7 @@ if [[ ! -d /usr/local/aws ]]; then
 
   curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
   unzip awscli-bundle.zip
-  sudo ./awscli-bundle/install --install-dir /usr/local/aws
+  sudo ./awscli-bundle/install --install-dir "${INSTALL_DIR}"
 
   popd
 
@@ -26,9 +29,7 @@ fi
 
 # Travis does not cache symlinks (https://docs.travis-ci.com/user/caching/), so we create
 # the symlink ourselves everytime to ensure `aws` is discoverable globally.
-sudo ln -s /usr/local/aws/bin/aws /usr/local/bin/aws
-ls /usr/local/bin
-echo $PATH
+sudo ln -s "${AWS_BIN}" /usr/local/bin/aws
 
 # Multipart operations aren't supported for anonymous users, so we set the
 # threshold high to avoid them being used automatically by the aws cli.
