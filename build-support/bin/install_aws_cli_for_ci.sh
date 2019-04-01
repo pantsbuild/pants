@@ -11,7 +11,7 @@ set -euo pipefail
 
 source build-support/common.sh
 
-if [[ -z "${AWS_CLI_ROOT}" ]]; then
+if [[ -z "${AWS_CLI_ROOT:+''}" ]]; then
   die "Caller of the script must set the env var AWS_CLI_ROOT."
 fi
 AWS_CLI_BIN="${AWS_CLI_ROOT}/bin/aws"
