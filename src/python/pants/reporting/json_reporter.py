@@ -63,6 +63,8 @@ class JsonReporter(Reporter):
       json.dumps({
         'workunits': self._results,
         'artifact_cache_stats': self.run_tracker.artifact_cache_stats.get_all(),
+        'pantsd_stats': self.run_tracker.pantsd_stats.get_all(),
+        'run_info': self.run_tracker.run_information(),
       }),
       mode=mode)
 
