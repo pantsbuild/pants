@@ -825,7 +825,13 @@ py37_jvm_tests: &py37_jvm_tests
 
 base_deploy: &base_deploy
   os: linux
+  dist: trusty
   language: python
+  python:
+    - "2.7"
+    - "3.6"
+  before_install:
+    - pyenv global 2.7.14 3.6.3
   env:
     - &base_deploy_env RUN_PANTS_FROM_PEX=1
 
@@ -853,7 +859,6 @@ base_deploy_stable_muliplatform_pex: &base_deploy_stable_muliplatform_pex
 py27_deploy_stable_multiplatform_pex: &py27_deploy_stable_multiplatform_pex
   <<: *base_deploy_stable_muliplatform_pex
   name: "Deploy stable multiplatform pants.pex (Py2.7 PEX)"
-  python: 2.7
   env:
     - *base_deploy_env
     - *base_deploy_stable_env
@@ -863,7 +868,6 @@ py27_deploy_stable_multiplatform_pex: &py27_deploy_stable_multiplatform_pex
 py36_deploy_stable_multiplatform_pex: &py36_deploy_stable_multiplatform_pex
   <<: *base_deploy_stable_muliplatform_pex
   name: "Deploy stable multiplatform pants.pex (Py3.6 PEX)"
-  python: 3.6
   env:
     - *base_deploy_env
     - *base_deploy_stable_env
@@ -871,7 +875,7 @@ py36_deploy_stable_multiplatform_pex: &py36_deploy_stable_multiplatform_pex
     - CACHE_NAME=linuxpexdeploystable.py36
 
 base_deploy_unstable_multiplatform_pex: &base_deploy_unstable_multiplatform_pex
-  <<: *base_deploy_unstable_multiplatform_pex
+  <<: *base_deploy
   stage: *build_unstable
   env:
     - &base_deploy_unstable_env PREPARE_DEPLOY=1
@@ -883,7 +887,6 @@ base_deploy_unstable_multiplatform_pex: &base_deploy_unstable_multiplatform_pex
 py27_deploy_unstable_multiplatform_pex: &py27_deploy_unstable_multiplatform_pex
   <<: *base_deploy_unstable_multiplatform_pex
   name: "Deploy unstable multiplatform pants.pex (Py2.7 PEX)"
-  python: 2.7
   env:
     - *base_deploy_env
     - *base_deploy_unstable_env
@@ -893,9 +896,6 @@ py27_deploy_unstable_multiplatform_pex: &py27_deploy_unstable_multiplatform_pex
 py36_deploy_unstable_multiplatform_pex: &py36_deploy_unstable_multiplatform_pex
   <<: *base_deploy_unstable_multiplatform_pex
   name: "Deploy unstable multiplatform pants.pex (Py3.6 PEX)"
-  python: 3.6
-  before_install:
-    - pyenv global 3.6.3
   env:
     - *base_deploy_env
     - *base_deploy_unstable_env
