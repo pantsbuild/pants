@@ -28,6 +28,8 @@ env:
     - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
     - PYENV_PY36_VERSION=3.6.8
     - PYENV_PY37_VERSION=3.7.2
+    # NB: Linux shards use Pyenv to pre-install Python. We must not override
+    # PYENV_ROOT on those shards, or their Python will no longer work.
     - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
     - PYENV_BIN="${PYENV_ROOT}/bin/pyenv"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
