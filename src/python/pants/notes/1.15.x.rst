@@ -3,6 +3,50 @@
 This document describes releases leading up to the ``1.15.x`` ``stable`` series.
 
 
+1.15.0rc2 (4/02/2019)
+---------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add `./pants generate-pants-ini` for first time users to generate pants.ini with sensible defaults (#7448)
+  `PR #7448 <https://github.com/pantsbuild/pants/pull/7448>`_
+  `PR #45 <https://github.com/pantsbuild/setup/pull/45>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* No longer pin `pants_runtime_python_version` with `./pants generate-pants-ini` (#7469)
+  `PR #7469 <https://github.com/pantsbuild/pants/pull/7469>`_
+
+* Fix flaky `./pants idea-plugin` when using Python 3 by properly using ConsoleTask interface (#7460)
+  `Issue #7150 <https://github.com/pantsbuild/pants/issues/7150>`_
+  `PR #7460 <https://github.com/pantsbuild/pants/pull/7460>`_
+
+* Revert unnecessary runtime check for valid Python interpreter (#7451)
+  `PR #7451 <https://github.com/pantsbuild/pants/pull/7451>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix issues with deploy shards not properly setting Python version (#7471)
+  `PR #7471 <https://github.com/pantsbuild/pants/pull/7471>`_
+
+* Switch to twitter.common 0.3.11 to fix DeprecationWarning when using Pants as a PEX (#7461)
+  `PR #7461 <https://github.com/pantsbuild/pants/pull/7461>`_
+
+* Fix `./pants server` not working with Python 3 (#7458)
+  `Issue #7443 <https://github.com/pantsbuild/pants/issues/7443>`_
+  `PR #7458 <https://github.com/pantsbuild/pants/pull/7458>`_
+
+* Fix crash if pants.ini is missing in the buildroot (#7452)
+  `PR #7452 <https://github.com/pantsbuild/pants/pull/7452>`_
+
+* remove inspect.stack() from @rule parsing to fix import time regression in py3 (#7447)
+  `PR #7447 <https://github.com/pantsbuild/pants/pull/7447>`_
+
+
 1.15.0rc1 (3/25/2019)
 ---------------------
 
