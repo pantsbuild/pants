@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os.path
-import sys
 from textwrap import dedent
 
 from pants.base.build_environment import get_default_pants_config_file
@@ -19,12 +18,10 @@ class GeneratePantsIni(ConsoleTask):
 
   def console_output(self, _targets):
     pants_ini_path = get_default_pants_config_file()
-    python_version = ".".join(str(v) for v in sys.version_info[:2])
     pants_ini_content = dedent("""\
       [GLOBAL]
       pants_version: {}
-      pants_runtime_python_version: {}
-      """.format(pants_version, python_version)
+      """.format(pants_version)
     )
 
     if os.path.isfile(pants_ini_path):
@@ -34,8 +31,7 @@ class GeneratePantsIni(ConsoleTask):
     yield dedent("""\
       Adding sensible defaults to {}:
       * Pinning `pants_version` to `{}`.
-      * Pinning `pants_runtime_python_version` to `{}`.
-      """.format(pants_ini_path, pants_version, python_version)
+      """.format(pants_ini_path, pants_version)
     )
 
     with open(pants_ini_path, "w") as f:

@@ -24,7 +24,6 @@ class GeneratePantsIniTest(ConsoleTaskTestBase):
     config = configparser.ConfigParser()
     config.read(get_default_pants_config_file())
     self.assertEqual(config["GLOBAL"]["pants_version"], VERSION)
-    self.assertIn(config["GLOBAL"]["pants_runtime_python_version"], {"2.7", "3.6", "3.7"})
 
   def test_fails_when_pants_ini_already_exists(self):
     temp_pants_ini_path = self.create_file("pants.ini")
