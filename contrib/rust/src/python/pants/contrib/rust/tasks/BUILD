@@ -6,6 +6,7 @@ target(
     ':cargo_task',
     ':cargo_test',
     ':cargo_toolchain',
+    ':cargo_fingerprint_strategy',
   ]
 )
 
@@ -35,6 +36,7 @@ python_library(
     'contrib/rust/src/python/pants/contrib/rust/utils:custom_build_invocation_conversion',
     'contrib/rust/src/python/pants/contrib/rust/utils:custom_build_output_parsing',
     ':cargo_workspace',
+    ':cargo_fingerprint_strategy',
   ]
 )
 
@@ -115,5 +117,13 @@ python_library(
   ]
 )
 
-
+python_library(
+  name='cargo_fingerprint_strategy',
+  sources=['cargo_fingerprint_strategy.py'],
+  dependencies=[
+    '3rdparty/python:future',
+    'src/python/pants/base:fingerprint_strategy',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_base',
+  ]
+)
 

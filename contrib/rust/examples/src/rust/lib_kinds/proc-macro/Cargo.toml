@@ -1,0 +1,8 @@
+[package]
+name = "proc-macro"
+version = "0.1.0"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+edition = "2018"
+
+[lib]
+proc-macro = true

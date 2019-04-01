@@ -3,8 +3,5 @@
 
 cargo_workspace(
   name='workspace',
-  include=['*.rs', 'Cargo.toml'],
-  dependencies=[
-    "contrib/rust/examples/src/rust/binary:binary"
-  ]
+  include=['*.rs', 'Cargo.toml']
 )

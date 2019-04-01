@@ -8,8 +8,10 @@ import collections
 import copy
 import unittest
 
-from pants.contrib.rust.utils.basic_invocation_conversion_rules import (args_rules, env_rules,
-                                                                        links_rules, outputs_rules)
+from pants.contrib.rust.utils.basic_invocation.args_rules import args_rules
+from pants.contrib.rust.utils.basic_invocation.env_rules import env_rules
+from pants.contrib.rust.utils.basic_invocation.links_rule import links_rule
+from pants.contrib.rust.utils.basic_invocation.outputs_rule import outputs_rule
 
 
 test_invocation = {
@@ -83,17 +85,17 @@ class UtilsTest(unittest.TestCase):
   def get_invocation(self):
     return copy.deepcopy(test_invocation)
 
-  def test_link_rules(self):
+  def test_link_rule(self):
     links = self.get_invocation()['links']
-    links_rules(links, result_dir)
+    links_rule(links, result_dir=result_dir)
     self.assertEqual(links, {
       '/pants/pants.d/libtar_api/libtar_api.rlib': '/pants/pants.d/libtar_api/deps/libtar_api-53a91134f88352d3.rlib'})
 
-  def test_outputs_rules(self):
+  def test_outputs_rule(self):
     outputs = self.get_invocation()['outputs']
     make_dirs = set()
     make_sym_links = set()
-    outputs_rules(outputs, result_dir, make_dirs, make_sym_links)
+    outputs_rule(outputs, result_dir=result_dir, make_dirs=make_dirs, make_sym_links=make_sym_links)
     self.assertEqual(outputs, ['/pants/pants.d/libtar_api/deps/libtar_api-53a91134f88352d3.rlib'])
     self.assertEqual(make_dirs, {'/pants/pants.d/libtar_api/deps'})
     self.assertEqual(make_sym_links,
@@ -104,7 +106,7 @@ class UtilsTest(unittest.TestCase):
     TargetMock = collections.namedtuple('TargetMock', 'dependencies')
     target = TargetMock([])
     crate_out_dirs = dict()
-    env_rules(env, target, result_dir, crate_out_dirs, libraries_dir)
+    env_rules(env, target=target, result_dir=result_dir, crate_out_dirs=crate_out_dirs, libraries_dir=libraries_dir)
     self.assertEqual(env['DYLD_LIBRARY_PATH'],
                      '/pants/pants.d/deps:/root/.rustup/toolchains/nightly-2018-12-31-x86_64-apple-darwin/lib:/root/.rustup/toolchains/nightly-2018-12-31-x86_64-apple-darwin/lib')
 
@@ -153,7 +155,7 @@ class UtilsTest(unittest.TestCase):
       "link-args=-undefined dynamic_lookup"
     ]
 
-    args_rules(args, target, result_dir, crate_out_dirs, libraries_dir, make_dirs)
+    args_rules(args, target=target, result_dir=result_dir, crate_out_dirs=crate_out_dirs, libraries_dir=libraries_dir, make_dirs=make_dirs)
     self.assertEqual(args, result)
     self.assertEqual(make_dirs,
                      {'/pants/pants.d/libtar_api/deps', '/pants/pants.d/libtar_api/incremental'})

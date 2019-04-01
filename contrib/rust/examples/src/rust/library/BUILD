@@ -4,8 +4,5 @@
 
 cargo_library(
   name='library',
-  sources=rglobs('*.rs', 'Cargo.toml', exclude=[rglobs('**/target/*.rs')]),
-  dependencies=[
-    'contrib/rust/examples/src/rust/workspace:workspace',
-  ]
+  sources=rglobs('*.rs', 'Cargo.toml', exclude=[rglobs('**/target/*.rs')])
 )

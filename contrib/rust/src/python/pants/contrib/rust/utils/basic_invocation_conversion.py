@@ -7,8 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import copy
 
 from pants.contrib.rust.tasks.cargo_task import CargoTask
-from pants.contrib.rust.utils.basic_invocation_conversion_rules import (args_rules, env_rules,
-                                                                        links_rules, outputs_rules)
+from pants.contrib.rust.utils.basic_invocation.args_rules import args_rules
+from pants.contrib.rust.utils.basic_invocation.env_rules import env_rules
+from pants.contrib.rust.utils.basic_invocation.links_rule import links_rule
+from pants.contrib.rust.utils.basic_invocation.outputs_rule import outputs_rule
 from pants.contrib.rust.utils.basic_invocation_conversion_utils import (reduce_invocation,
                                                                         sanitize_crate_name)
 from pants.contrib.rust.utils.collector import (collect_information, get_default_information,
@@ -18,8 +20,8 @@ from pants.contrib.rust.utils.collector import (collect_information, get_default
 def get_default_conversion_rules():
   return {
     'args': args_rules,
-    'outputs': outputs_rules,
-    'links': links_rules,
+    'outputs': outputs_rule,
+    'links': links_rule,
     'env': env_rules
   }
 
@@ -32,7 +34,7 @@ def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_
   transformation_rules = get_default_conversion_rules()
 
   for key in pants_invocation:
-    apply_rule = transformation_rules.get(key, None)
+    apply_rule = transformation_rules.get(key)
     if apply_rule:
       apply_rule(
         invocation_key=pants_invocation[key],

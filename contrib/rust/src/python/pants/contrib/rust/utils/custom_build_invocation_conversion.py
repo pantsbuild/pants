@@ -10,25 +10,25 @@ from pants.base.exceptions import TaskError
 
 from pants.contrib.rust.utils.basic_invocation_conversion_utils import reduce_invocation
 from pants.contrib.rust.utils.collector import collect_information, get_default_information
-from pants.contrib.rust.utils.custom_build_invocation_conversion_rules import (args_rules,
-                                                                               env_rules,
-                                                                               links_rules,
-                                                                               outputs_rules,
-                                                                               program_rules)
+from pants.contrib.rust.utils.custom_build_invocation.args_rules import args_rules
+from pants.contrib.rust.utils.custom_build_invocation.env_rules import env_rules
+from pants.contrib.rust.utils.custom_build_invocation.links_rule import links_rule
+from pants.contrib.rust.utils.custom_build_invocation.outputs_rule import outputs_rule
+from pants.contrib.rust.utils.custom_build_invocation.program_rule import program_rule
 
 
 def get_default_build_conversion_rules():
   return {
     'args': args_rules,
-    'outputs': outputs_rules,
-    'links': links_rules,
+    'outputs': outputs_rule,
+    'links': links_rule,
     'env': env_rules
   }
 
 
 def get_default_run_conversion_rules():
   return {
-    'program': program_rules,
+    'program': program_rule,
     'env': env_rules
   }
 
@@ -48,7 +48,7 @@ def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_
     raise TaskError('Unsupported compile mode! {0}'.format(compile_mode))
 
   for key in pants_invocation:
-    apply_rule = conversion_rules_set.get(key, None)
+    apply_rule = conversion_rules_set.get(key)
     if apply_rule:
       apply_rule(
         invocation_key=pants_invocation[key],

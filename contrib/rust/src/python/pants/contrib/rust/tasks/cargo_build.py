@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import collections
+import copy
 import hashlib
 import json
 import os
@@ -18,6 +19,7 @@ from pants.build_graph.address import Address
 from pants.invalidation.build_invalidator import CacheKeyGenerator
 from pants.util.dirutil import absolute_symlink, read_file, safe_file_dump, safe_mkdir
 
+from pants.contrib.rust.tasks.cargo_fingerprint_strategy import CargoFingerprintStrategy
 from pants.contrib.rust.tasks.cargo_workspace import Workspace
 from pants.contrib.rust.utils.basic_invocation_conversion import \
   convert_into_pants_invocation as convert_basic_into_pants_invocation
@@ -120,10 +122,11 @@ class Build(Workspace):
     }
 
     returncode, std_output, std_error = self.execute_command_and_get_output(cmd,
-                                                                         'cargo-build-plan',
-                                                                         [WorkUnitLabel.COMPILER],
-                                                                         env_vars=env,
-                                                                         current_working_dir=target.manifest)
+                                                                            'cargo-build-plan',
+                                                                            [
+                                                                              WorkUnitLabel.COMPILER],
+                                                                            env_vars=env,
+                                                                            current_working_dir=target.manifest)
 
     if returncode != 0:
       self.context.log.error('==== stderr ====\n{0}'.format(std_error))
@@ -139,24 +142,88 @@ class Build(Workspace):
 
   def get_target_definitions_out_of_cargo_build_plan(self, cargo_build_plan):
     cargo_invocations = cargo_build_plan['invocations']
-    target_definitions = []
+    return list(map(lambda invocation: self.create_target_definition(invocation), cargo_invocations))
+
+  def create_target_definition(self, cargo_invocation):
     TargetDefinition = collections.namedtuple('TargetDefinition',
-                                              'name, id, address, dependencies, kind, invocation, compile_mode')
-    for invocation in cargo_invocations:
-      rel_path = os.path.relpath(invocation['cwd'], get_buildroot())
-      # remove deps out of the fingerprint because the order of the targets is not fixed
-      dependencies = invocation.pop('deps')
-      # create a fingerprint over the item because the cargo build_plan dosen't provide a unique id
-      hasher = hashlib.md5(json.dumps(invocation, sort_keys=True).encode('utf-8'))
-      fingerprint = hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
-      name = invocation['package_name']
-      id = "{}_{}".format(name, fingerprint)
-      kind = invocation['target_kind'][0]
-      compile_mode = invocation['compile_mode']
-      target_definitions.append(
-        TargetDefinition(name, id, Address(rel_path, id), dependencies, kind, invocation,
-                         compile_mode))
-    return target_definitions
+                                              'name, id, address, '
+                                              'dependencies, kind, '
+                                              'invocation, compile_mode')
+    name = cargo_invocation['package_name']
+    fingerprint = self.calculate_target_definition_fingerprint(cargo_invocation)
+    id = "{}_{}".format(name, fingerprint)
+    rel_path = os.path.relpath(cargo_invocation['cwd'], get_buildroot())
+    dependencies = cargo_invocation.pop('deps')
+    assert (len(cargo_invocation['target_kind']) == 1)
+    kind = cargo_invocation['target_kind'][0]
+    compile_mode = cargo_invocation['compile_mode']
+    return TargetDefinition(name, id, Address(rel_path, id), dependencies, kind, cargo_invocation,
+                            compile_mode)
+
+  def calculate_target_definition_fingerprint(self, cargo_invocation):
+    invocation = copy.deepcopy(cargo_invocation)
+    invocation.pop('deps')
+    invocation.pop('outputs')
+    invocation.pop('links')
+
+    if invocation['env'].get('DYLD_LIBRARY_PATH'):
+      # nightly nightly-2018-12-31
+      invocation['env'].pop('DYLD_LIBRARY_PATH')
+    elif invocation['env'].get('DYLD_FALLBACK_LIBRARY_PATH'):
+      # nightly macOS
+      invocation['env'].pop('DYLD_FALLBACK_LIBRARY_PATH')
+    elif invocation['env'].get('LD_LIBRARY_PATH'):
+      # nightly linux
+      invocation['env'].pop('LD_LIBRARY_PATH')
+
+    def _c_flag_rules(key_value):
+      rules = {
+        'incremental': lambda _: "",
+      }
+
+      is_key_value = key_value.split('=')
+
+      if len(is_key_value) == 2:
+        key, value = is_key_value
+        apply_rule = rules.get(key)
+        return ("{}={}".format(key, apply_rule(value))) if apply_rule else key_value
+      else:
+        return key_value
+
+    def _l_flag_rules(key_value):
+      rules = {
+        'dependency': lambda _: "",
+      }
+
+      is_key_value = key_value.split('=')
+
+      if len(is_key_value) == 2:
+        key, value = is_key_value
+        apply_rule = rules.get(key)
+        return ("{}={}".format(key, apply_rule(value))) if apply_rule else key_value
+      else:
+        return key_value
+
+    rules = {
+      '--out-dir': lambda _: "",
+      '-C': _c_flag_rules,
+      '-L': _l_flag_rules,
+      '--extern': lambda _: ""
+    }
+    args = invocation['args']
+    for index, arg in enumerate(args):
+      apply_rule = rules.get(arg, None)
+      if apply_rule:
+        args[index + 1] = apply_rule(args[index + 1])
+
+    if invocation['compile_mode'] == 'run-custom-build':
+      invocation.pop('program')
+
+    if invocation['env'].get('OUT_DIR'):
+      invocation['env'].pop('OUT_DIR')
+
+    hasher = hashlib.md5(json.dumps(invocation, sort_keys=True).encode('utf-8'))
+    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def generate_targets(self, target_definitions, cargo_target):
     for target in target_definitions:
@@ -214,8 +281,19 @@ class Build(Workspace):
     self.inject_synthetic_of_original_target_into_build_graph(synthetic_of_original_target,
                                                               original_target)
 
+  def get_build_flags(self):
+    get_build_flags_func = copy.copy(self.get_options().cargo_opt)
+    get_build_flags_func.sort()
+    get_build_flags_func.append(self.context.products.get_data('cargo_toolchain'))
+    if self.include_compiling_tests():
+      get_build_flags_func.append('--tests')
+    return ' '.join(get_build_flags_func)
+
   def build_targets(self, targets):
+    build_flags = self.get_build_flags()
+    fingerprint_strategy = CargoFingerprintStrategy(build_flags)
     with self.invalidated(targets, invalidate_dependents=True,
+                          fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         pants_invocation = self.convert_cargo_invocation_into_pants_invocation(vt)
@@ -269,7 +347,8 @@ class Build(Workspace):
 
     if pants_invocation['program'] == 'rustc':
       self.execute_rustc(pants_invocation['package_name'],
-                         cmd, pants_invocation['compile_mode'],
+                         cmd, '{}-{}'.format(pants_invocation['compile_mode'],
+                                             pants_invocation['target_kind'][0]),
                          env, pants_invocation['cwd'])
     else:
       self.execute_custom_build(cmd,
@@ -382,10 +461,11 @@ class Build(Workspace):
 
   def execute_custom_build(self, cmd, workunit_name, env, cwd, target):
     returncode, std_output, std_error = self.execute_command_and_get_output(cmd,
-                                                                         workunit_name,
-                                                                         [WorkUnitLabel.COMPILER],
-                                                                         env_vars=env,
-                                                                         current_working_dir=cwd)
+                                                                            workunit_name,
+                                                                            [
+                                                                              WorkUnitLabel.COMPILER],
+                                                                            env_vars=env,
+                                                                            current_working_dir=cwd)
 
     if returncode != 0:
       self.context.log.error('==== stderr ====\n{0}'.format(std_error))
@@ -407,10 +487,10 @@ class Build(Workspace):
 
   def execute_rustc(self, package_name, cmd, workunit_name, env, cwd):
     returncode = self.execute_command(cmd,
-                                   workunit_name,
-                                   [WorkUnitLabel.COMPILER],
-                                   env_vars=env,
-                                   current_working_dir=cwd)
+                                      workunit_name,
+                                      [WorkUnitLabel.COMPILER],
+                                      env_vars=env,
+                                      current_working_dir=cwd)
 
     if returncode != 0:
       raise TaskError('Cannot build target: {}'.format(package_name))
@@ -435,7 +515,7 @@ class Build(Workspace):
       current = rust_tests.get(target.address.target_name, [])
       current.extend(list(
         map(lambda path: (path, cwd_test, env),
-            filter(lambda path: os.path.exists(path), links.keys()))))
+            filter(lambda path: os.path.exists(path) and os.path.isfile(path), links.keys()))))
       rust_tests.update({target.address.target_name: current})
 
   def mark_target_invalid(self, address):

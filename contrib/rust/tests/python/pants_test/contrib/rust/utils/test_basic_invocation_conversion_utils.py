@@ -14,7 +14,7 @@ from pants.contrib.rust.utils.basic_invocation_conversion_utils import (reduce_i
 test_invocation = {
   "package_name": "tar_api",
   "package_version": "0.0.1",
-  "target_kind": [],
+  "target_kind": ['lib'],
   "kind": "Host",
   "compile_mode": "build",
   "outputs": [],
@@ -35,6 +35,7 @@ class UtilsTest(unittest.TestCase):
     result = {
       "package_name": "tar_api",
       "package_version": "0.0.1",
+      "target_kind": ['lib'],
       "compile_mode": "build",
       "outputs": [],
       "links": {},

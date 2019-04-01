@@ -27,14 +27,14 @@ class Binary(CargoTask):
   def copy_libraries_into_dist(self):
     files = self.context.products.get_data('rust_libs')
     dist_path = self.get_options().pants_distdir
-    path_libs = os.path.join(dist_path, 'lib')
+    path_libs = os.path.join(dist_path, 'rust', 'lib')
     safe_mkdir(path_libs, clean=True)
     self.copy_files_into_dist(path_libs, files)
 
   def copy_binaries_into_dist(self):
     files = self.context.products.get_data('rust_bins')
     dist_path = self.get_options().pants_distdir
-    path_bins = os.path.join(dist_path, 'bin')
+    path_bins = os.path.join(dist_path, 'rust', 'bin')
     safe_mkdir(path_bins, clean=True)
     self.copy_files_into_dist(path_bins, files)
 

@@ -1,0 +1,8 @@
+[package]
+name = "lib_c"
+version = "0.1.0"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+sha2 = "0.8"

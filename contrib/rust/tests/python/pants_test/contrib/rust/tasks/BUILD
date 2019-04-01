@@ -50,5 +50,55 @@ python_tests(
     'tests/python/pants_test:task_test_base',
     'contrib/rust/src/python/pants/contrib/rust/tasks:cargo_fetch',
     'contrib/rust/src/python/pants/contrib/rust/targets/original:cargo_library',
+  ],
+    timeout=120,
+)
+
+python_tests(
+  name='test_cargo_workspace',
+  sources=['test_cargo_workspace.py'],
+  dependencies=[
+    '3rdparty/python:future',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test:task_test_base',
+    'contrib/rust/src/python/pants/contrib/rust/tasks:cargo_workspace',
   ]
+)
+
+python_tests(
+  name='test_cargo_build',
+  sources=['test_cargo_build.py'],
+  dependencies=[
+    '3rdparty/python:future',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test:task_test_base',
+    'contrib/rust/src/python/pants/contrib/rust/tasks:cargo_build',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_binary',
+    'contrib/rust/src/python/pants/contrib/rust/targets/synthetic:cargo_synthetic_custom_build',
+  ]
+)
+
+python_tests(
+  name='test_cargo_build_integration',
+  sources=['test_cargo_build_integration.py'],
+  dependencies=[
+    '3rdparty/python:future',
+    'tests/python/pants_test:int-test',
+  ],
+  timeout=360,
+)
+
+python_tests(
+  name='test_cargo_fetch_integration',
+  sources=['test_cargo_fetch_integration.py'],
+  dependencies=[
+    '3rdparty/python:future',
+    'tests/python/pants_test:int-test',
+  ],
+  timeout=100,
 )

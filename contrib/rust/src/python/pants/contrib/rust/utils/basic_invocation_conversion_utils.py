@@ -10,6 +10,5 @@ def sanitize_crate_name(create_name):
 
 
 def reduce_invocation(invocation):
-  invocation.pop('target_kind', None)
   invocation.pop('kind', None)
   return invocation
