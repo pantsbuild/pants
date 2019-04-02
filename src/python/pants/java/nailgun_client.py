@@ -7,23 +7,27 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import errno
 import logging
 import os
+import signal
 import socket
 import sys
+import time
 from builtins import object, str
 
+import psutil
 from future.utils import PY3
 
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.util.dirutil import safe_file_dump
 from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
-from pants.util.strutil import ensure_binary
+from pants.util.strutil import ensure_binary, safe_shlex_join
 
 
 logger = logging.getLogger(__name__)
 
 
-class NailgunClientSession(NailgunProtocol):
+class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
   """Handles a single nailgun client session."""
 
   def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False,
@@ -46,9 +50,37 @@ class NailgunClientSession(NailgunProtocol):
     self._stderr = err_file
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self.remote_pid = None
+    self.remote_process_cmdline = None
     self.remote_pgrp = None
     self._remote_pid_callback = remote_pid_callback
     self._remote_pgrp_callback = remote_pgrp_callback
+    # NB: These variables are set in a signal handler to implement graceful shutdown.
+    self._exit_timeout_start_time = None
+    self._exit_timeout = None
+    self._exit_reason = None
+
+  def _set_exit_timeout(self, timeout, reason):
+    """Set a timeout for the remainder of the session, along with an exception to raise.
+    which is implemented by NailgunProtocol.
+
+    This method may be called by a signal handler to set a timeout for the remainder of the
+    session. If the session completes before the timeout does, the exception in `reason` is
+    raised. Otherwise, `NailgunProtocol.ProcessStreamTimeout` is raised.
+
+    :param float timeout: The length of time to time out, in seconds.
+    :param Exception reason: The exception to raise if the session completes before the timeout
+                             occurs.
+    """
+    self._exit_timeout_start_time = time.time()
+    self._exit_timeout = timeout
+    self._exit_reason = reason
+
+  def maybe_timeout_options(self):
+    """Implements the NailgunProtocol.TimeoutProvider interface."""
+    if self._exit_timeout_start_time:
+      return NailgunProtocol.TimeoutOptions(self._exit_timeout_start_time, self._exit_timeout)
+    else:
+      return None
 
   def _maybe_start_input_writer(self):
     if self._input_writer and not self._input_writer.is_alive():
@@ -72,10 +104,19 @@ class NailgunClientSession(NailgunProtocol):
       # Otherwise, re-raise.
       raise
 
+  class ExitTimedOut(Exception):
+    """Raised when a timeout for the remote client exit was breached."""
+
   def _process_session(self):
-    """Process the outputs of the nailgun session."""
+    """Process the outputs of the nailgun session.
+
+    :raises: :class:`NailgunProtocol.ProcessStreamTimeout` if a timeout set from a signal handler
+                                                           with .set_exit_timeout() completes.
+    :raises: :class:`Exception` if the session completes before the timeout, the `reason` argument
+                                to .set_exit_timeout() will be raised."""
     try:
-      for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True):
+      for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True,
+                                                  timeout_object=self):
         # TODO(#6579): assert that we have at this point received all the chunk types in
         # ChunkType.REQUEST_TYPES, then require PID and PGRP (exactly once?), and then allow any of
         # ChunkType.EXECUTION_TYPES.
@@ -89,6 +130,7 @@ class NailgunClientSession(NailgunProtocol):
           return int(payload)
         elif chunk_type == ChunkType.PID:
           self.remote_pid = int(payload)
+          self.remote_process_cmdline = psutil.Process(self.remote_pid).cmdline()
           if self._remote_pid_callback:
             self._remote_pid_callback(self.remote_pid)
         elif chunk_type == ChunkType.PGRP:
@@ -99,10 +141,29 @@ class NailgunClientSession(NailgunProtocol):
           self._maybe_start_input_writer()
         else:
           raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
+    except NailgunProtocol.ProcessStreamTimeout as e:
+      assert(self.remote_pid is not None)
+      # NB: We overwrite the process title in the pantsd-runner process, which causes it to have an
+      # argv with lots of empty spaces for some reason. We filter those out and pretty-print the
+      # rest here.
+      filtered_remote_cmdline = safe_shlex_join(
+        arg for arg in self.remote_process_cmdline if arg != '')
+      logger.warning(
+        "timed out when attempting to gracefully shut down the remote client executing \"{}\". "
+        "sending SIGKILL to the remote client at pid: {}. message: {}"
+        .format(filtered_remote_cmdline, self.remote_pid, e))
     finally:
       # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
       # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamWriter is always stopped.
       self._maybe_stop_input_writer()
+      # If an asynchronous error was set at any point (such as in a signal handler), we want to make
+      # sure we clean up the remote process before exiting with error.
+      if self._exit_reason:
+        if self.remote_pgrp:
+          safe_kill(self.remote_pgrp, signal.SIGKILL)
+        if self.remote_pid:
+          safe_kill(self.remote_pid, signal.SIGKILL)
+        raise self._exit_reason
 
   def execute(self, working_dir, main_class, *arguments, **environment):
     # Send the nailgun request.
@@ -124,12 +185,12 @@ class NailgunClient(object):
 {description} (address: {address}, remote_pid={pid}, remote_pgrp={pgrp}): {wrapped_exc!r}\
 """
 
-    def __init__(self, address, pid, pgrp, wrapped_exc, traceback):
+    # TODO: preserve the traceback somehow!
+    def __init__(self, address, pid, pgrp, wrapped_exc):
       self.address = address
       self.pid = pid
       self.pgrp = pgrp
       self.wrapped_exc = wrapped_exc
-      self.traceback = traceback
 
       # TODO: these should be ensured to be non-None in NailgunClientSession!
       if self.pid is not None:
@@ -163,7 +224,7 @@ class NailgunClient(object):
   DEFAULT_NG_PORT = 2113
 
   def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
-               workdir=None, exit_on_broken_pipe=False, expects_pid=False):
+               workdir=None, exit_on_broken_pipe=False, metadata_base_dir=None):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to '127.0.0.1')
@@ -174,8 +235,12 @@ class NailgunClient(object):
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
     :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
-    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are encountered
-    :param bool expects_pid: Whether or not to expect a PID from the server (only true for pantsd)
+    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
+                                     encountered
+    :param string metadata_base_dir: If a PID and PGRP are received from the server (only for
+                                     pailgun connections), a file with the remote pid will be
+                                     written under this directory. For non-pailgun connections this
+                                     may be None.
     """
     self._host = host
     self._port = port
@@ -186,17 +251,31 @@ class NailgunClient(object):
     self._stderr = err or (sys.stderr.buffer if PY3 else sys.stderr)
     self._workdir = workdir or os.path.abspath(os.path.curdir)
     self._exit_on_broken_pipe = exit_on_broken_pipe
-    self._expects_pid = expects_pid
+    self._metadata_base_dir = metadata_base_dir
     # Mutable session state.
     self._session = None
     self._current_remote_pid = None
     self._current_remote_pgrp = None
 
+  def _get_remote_pid_file_path(self, pid):
+    return os.path.join(
+      self._metadata_base_dir,
+      'nailgun-client',
+      str(pid))
+
+  # TODO(#6579): this should be done within a contextmanager for RAII!
+  def _maybe_write_pid_file(self):
+    if self._current_remote_pid and self._current_remote_pgrp:
+      remote_pid_file_path = self._get_remote_pid_file_path(os.getpid())
+      safe_file_dump(remote_pid_file_path, str(self._current_remote_pid), mode='w')
+
   def _receive_remote_pid(self, pid):
     self._current_remote_pid = pid
+    self._maybe_write_pid_file()
 
   def _receive_remote_pgrp(self, pgrp):
     self._current_remote_pgrp = pgrp
+    self._maybe_write_pid_file()
 
   def _maybe_last_pid(self):
     return self._current_remote_pid
@@ -221,11 +300,17 @@ class NailgunClient(object):
         pid=self._maybe_last_pid(),
         pgrp=self._maybe_last_pgrp(),
         wrapped_exc=e,
-        traceback=sys.exc_info()[2],
       )
     else:
       return sock
 
+  def set_exit_timeout(self, timeout, reason):
+    """Expose the inner session object's exit timeout setter."""
+    self._session._set_exit_timeout(timeout, reason)
+
+  # TODO(#6579): make all invocations of this method instead require that the process is alive via
+  # the result of .remote_client_status() before sending a signal! safe_kill() should probably be
+  # removed as well.
   def maybe_send_signal(self, signum, include_pgrp=True):
     """Send the signal `signum` send if the PID and/or PGRP chunks have been received.
 
@@ -270,21 +355,12 @@ class NailgunClient(object):
       remote_pgrp_callback=self._receive_remote_pgrp)
     try:
       return self._session.execute(cwd, main_class, *args, **environment)
-    except socket.error as e:
+    except (socket.error, NailgunProtocol.ProtocolError) as e:
       raise self.NailgunError(
         address=self._address_string,
         pid=self._maybe_last_pid(),
         pgrp=self._maybe_last_pgrp(),
         wrapped_exc=e,
-        traceback=sys.exc_info()[2]
-      )
-    except NailgunProtocol.ProtocolError as e:
-      raise self.NailgunError(
-        address=self._address_string,
-        pid=self._maybe_last_pid(),
-        pgrp=self._maybe_last_pgrp(),
-        wrapped_exc=e,
-        traceback=sys.exc_info()[2]
       )
     finally:
       sock.close()

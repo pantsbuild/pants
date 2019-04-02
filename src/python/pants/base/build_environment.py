@@ -6,8 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
-import sys
-from builtins import str
 
 from pants.base.build_root import BuildRoot
 from pants.scm.scm import Scm
@@ -33,11 +31,7 @@ def get_buildroot():
 
   :API: public
   """
-  try:
-    return BuildRoot().path
-  except BuildRoot.NotFoundError as e:
-    print(str(e), file=sys.stderr)
-    sys.exit(1)
+  return BuildRoot().path
 
 
 def get_pants_cachedir():

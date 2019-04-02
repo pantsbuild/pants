@@ -21,6 +21,8 @@ from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 class PythonRunIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
+  py2_interpreter_constraint = 'CPython>=2.7,<3'
+  py3_interpreter_constraint = 'CPython>=3.6,<4'
 
   @classmethod
   def hermetic(cls):
@@ -49,9 +51,9 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     # Build a pex.
     # Avoid some known-to-choke-on interpreters.
     if version == PY_3:
-      constraint = '["CPython>=3.4,<3.7"]'
+      constraint = '["{}"]'.format(self.py3_interpreter_constraint)
     else:
-      constraint = '["CPython>=2.7,<3"]'
+      constraint = '["{}"]'.format(self.py2_interpreter_constraint)
     command = ['run',
                binary_target,
                '--python-setup-interpreter-constraints={}'.format(constraint),
@@ -70,8 +72,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run_27)
       pants_run_3 = self.run_pants(
         command=['run', '{}:echo_interpreter_version_3'.format(self.testproject),
-                 '--python-setup-interpreter-constraints=CPython>=2.7,<3',
-                 '--python-setup-interpreter-constraints=CPython>=3.4,<3.7'],
+                 '--python-setup-interpreter-constraints={}'.format(self.py2_interpreter_constraint),
+                 '--python-setup-interpreter-constraints={}'.format(self.py3_interpreter_constraint)],
         config=pants_ini_config
       )
       self.assert_success(pants_run_3)
@@ -79,11 +81,16 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   @skip_unless_python3_present
   def test_run_3_by_option(self):
     with temporary_dir() as interpreters_cache:
-      pants_ini_config = {'python-setup': {'interpreter_constraints': ["CPython>=2.7,<3.7"],
-        'interpreter_cache_dir': interpreters_cache}}
+      pants_ini_config = {'python-setup': {
+        'interpreter_constraints': [
+          '"{}"'.format(self.py2_interpreter_constraint),
+          '"{}"'.format(self.py3_interpreter_constraint)
+        ],
+        'interpreter_cache_dir': interpreters_cache
+        }}
       pants_run_3 = self.run_pants(
         command=['run', '{}:echo_interpreter_version_3'.format(self.testproject),
-        '--python-setup-interpreter-constraints=["CPython>=3"]'],
+        '--python-setup-interpreter-constraints=["{}"]'.format(self.py3_interpreter_constraint)],
         config=pants_ini_config
       )
       self.assert_success(pants_run_3)
@@ -91,11 +98,16 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   @skip_unless_python27_present
   def test_run_2_by_option(self):
     with temporary_dir() as interpreters_cache:
-      pants_ini_config = {'python-setup': {'interpreter_constraints': ["CPython>=2.7,<3.7"],
-        'interpreter_cache_dir': interpreters_cache}}
+      pants_ini_config = {'python-setup': {
+        'interpreter_constraints': [
+          '"{}"'.format(self.py2_interpreter_constraint),
+          '"{}"'.format(self.py3_interpreter_constraint)
+        ],
+        'interpreter_cache_dir': interpreters_cache
+        }}
       pants_run_2 = self.run_pants(
         command=['run', '{}:echo_interpreter_version_2.7'.format(self.testproject),
-        '--python-setup-interpreter-constraints=["CPython<3"]'],
+        '--python-setup-interpreter-constraints=["{}"]'.format(self.py2_interpreter_constraint)],
         config=pants_ini_config
       )
       self.assert_success(pants_run_2)
@@ -103,7 +115,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   def test_die(self):
     command = ['run',
                '{}:die'.format(self.testproject),
-               '--python-setup-interpreter-constraints=["CPython>=2.7,<3", ">=3.4,<3.7"]',
+               '--python-setup-interpreter-constraints=["{}", "{}"]'.format(self.py2_interpreter_constraint, self.py3_interpreter_constraint),
                '--quiet']
     pants_run = self.run_pants(command=command)
     assert pants_run.returncode == 57

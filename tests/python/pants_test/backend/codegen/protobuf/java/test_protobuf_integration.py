@@ -9,6 +9,7 @@ import re
 from builtins import range
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -63,7 +64,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                          '--deployjar',
                          'examples/src/java/org/pantsbuild/example/protobuf/unpacked_jars']
                         ) as pants_run:
-      self.assertEqual(pants_run.returncode, self.PANTS_SUCCESS_CODE,
+      self.assertEqual(pants_run.returncode, PANTS_SUCCEEDED_EXIT_CODE,
                         "goal bundle run expected success, got {0}\n"
                         "got stderr:\n{1}\n"
                         "got stdout:\n{2}\n".format(pants_run.returncode,

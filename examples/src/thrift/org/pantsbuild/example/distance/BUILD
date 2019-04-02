@@ -20,5 +20,5 @@ python_thrift_library(name='distance-python',
 )
 
 python_thrift_library(name='unexported-distance-python',
-  sources=['distance.thrift'],
+  sources=['unexported_distance.thrift'],
 )

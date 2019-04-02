@@ -129,7 +129,7 @@ class GoDistribution(NativeTool):
     :returns: A tuple of the exit code and the go command that was run.
     :rtype: (int, :class:`GoDistribution.GoCommand`)
     """
-    go_cmd = self.GoCommand._create(self.goroot, cmd, go_env=self.go_env(gopath=gopath), args=args)
+    go_cmd = self.create_go_cmd(cmd, gopath=gopath, args=args)
     if workunit_factory is None:
       return go_cmd.spawn(**kwargs).wait()
     else:

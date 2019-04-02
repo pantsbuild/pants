@@ -4,28 +4,32 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import functools
 import os
 import re
+import shutil
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
 from builtins import filter, next, object, str
+from contextlib import contextmanager
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for
+from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.process_handler import subprocess
 
 
 class TestResult(object):
-  @classmethod
-  @memoized_method
+  @memoized_classproperty
   def successful(cls):
     return cls.rc(0)
 
-  @classmethod
-  @memoized_method
+  @memoized_classproperty
   def exception(cls):
     return cls('EXCEPTION')
 
@@ -241,16 +245,16 @@ class TestRunnerTaskMixin(object):
     return tests_in_path
 
   def _get_test_targets_for_spawn(self):
-    """Invoked by _spawn_and_wait to know targets being executed. Defaults to _get_test_targets().
+    """Invoked by spawn_and_wait to know targets being executed. Defaults to _get_test_targets().
 
-    _spawn_and_wait passes all its arguments through to _spawn, but it needs to know what targets
-    are being executed by _spawn. A caller to _spawn_and_wait can override this method to return
-    the targets being executed by the current _spawn_and_wait. By default it returns
+    spawn_and_wait passes all its arguments through to _spawn, but it needs to know what targets
+    are being executed by _spawn. A caller to spawn_and_wait can override this method to return
+    the targets being executed by the current spawn_and_wait. By default it returns
     _get_test_targets(), which is all test targets.
     """
     return self._get_test_targets()
 
-  def _spawn_and_wait(self, *args, **kwargs):
+  def spawn_and_wait(self, *args, **kwargs):
     """Spawn the actual test runner process, and wait for it to complete."""
 
     test_targets = self._get_test_targets_for_spawn()
@@ -349,7 +353,7 @@ class TestRunnerTaskMixin(object):
 
     :return: list of targets
     """
-    return self.context.targets()
+    return self.get_targets()
 
   def _get_test_targets(self):
     """Returns the targets that are relevant test targets."""
@@ -433,6 +437,29 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
     """
     return self.get_options().chroot
 
+  @staticmethod
+  def _copy_files(dest_dir, target):
+    if isinstance(target, Files):
+      for source in target.sources_relative_to_buildroot():
+        src = os.path.join(get_buildroot(), source)
+        dest = os.path.join(dest_dir, source)
+        safe_mkdir_for(dest)
+        shutil.copy(src, dest)
+
+  @contextmanager
+  def chroot(self, targets, workdir):
+    if workdir is not None:
+      yield workdir
+    else:
+      root_dir = os.path.join(self.workdir, '_chroots')
+      safe_mkdir(root_dir)
+      with temporary_dir(root_dir=root_dir) as chroot:
+        self.context.build_graph.walk_transitive_dependency_graph(
+          addresses=[t.address for t in targets],
+          work=functools.partial(self._copy_files, chroot)
+        )
+        yield chroot
+
   def _execute(self, all_targets):
     test_targets = self._get_test_targets()
     if not test_targets:
@@ -471,7 +498,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
             result = rv
           else:
             log = self.context.log.info
-            result = self.result_class.successful()
+            result = self.result_class.successful
           log('{0:80}.....{1:>10}'.format(target.address.reference(), str(result)))
 
       msgs = [str(_rv) for _rv in results.values() if not _rv.success]
@@ -524,27 +551,28 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
                           # Re-run tests when the code they test (and depend on) changes.
                           invalidate_dependents=True) as invalidation_check:
 
+      # Processing proceeds through:
+      # 1.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
+      # 2.) output -> output_dir
+      # 3.) [iff all == invalid] output_dir -> cache: We do this manually for now.
+
+      # 1.) The full partition was valid, our results will have been staged for/by caching if not
+      # already local.
+      if not invalidation_check.invalid_vts:
+        return TestResult.successful
+
       invalid_test_tgts = [invalid_test_tgt
                            for vts in invalidation_check.invalid_vts
                            for invalid_test_tgt in vts.targets]
 
-      # Processing proceeds through:
-      # 1.) output -> output_dir
-      # 2.) [iff all == invalid] output_dir -> cache: We do this manually for now.
-      # 3.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
-
-      # 1.) Write all results that will be potentially cached to output_dir.
+      # 2.) Write all results that will be potentially cached to output_dir.
       result = self.run_tests(fail_fast, invalid_test_tgts, *args).checked()
 
       cache_vts = self._vts_for_partition(invalidation_check)
       if invalidation_check.all_vts == invalidation_check.invalid_vts:
-        # 2.) All tests in the partition were invalid, cache successful test results.
+        # 3.) All tests in the partition were invalid, cache successful test results.
         if result.success and self.artifact_cache_writes_enabled():
           self.update_artifact_cache([(cache_vts, self.collect_files(*args))])
-      elif not invalidation_check.invalid_vts:
-        # 3.) The full partition was valid, our results will have been staged for/by caching
-        # if not already local.
-        pass
       else:
         # The partition was partially invalid.
 

@@ -12,18 +12,66 @@ import signal
 import sys
 import traceback
 from builtins import object, str
+from contextlib import contextmanager
 
 import setproctitle
 from future.utils import PY3
 
-from pants.base.build_environment import get_buildroot
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.meta import classproperty
 from pants.util.osutil import IntegerForPid
 
 
 logger = logging.getLogger(__name__)
+
+
+class SignalHandler(object):
+  """A specification for how to handle a fixed set of nonfatal signals.
+
+  This is subclassed and registered with ExceptionSink.reset_signal_handler() whenever the signal
+  handling behavior is modified for different pants processes, for example in the remote client when
+  pantsd is enabled. The default behavior is to exit "gracefully" by leaving a detailed log of which
+  signal was received, then exiting with failure.
+
+  Note that the terminal will convert a ctrl-c from the user into a SIGINT.
+  """
+
+  @property
+  def signal_handler_mapping(self):
+    """A dict mapping (signal number) -> (a method handling the signal)."""
+    # Could use an enum here, but we never end up doing any matching on the specific signal value,
+    # instead just iterating over the registered signals to set handlers, so a dict is probably
+    # better.
+    return {
+      signal.SIGINT: self.handle_sigint,
+      signal.SIGQUIT: self.handle_sigquit,
+      signal.SIGTERM: self.handle_sigterm,
+    }
+
+  def handle_sigint(self, signum, _frame):
+    raise KeyboardInterrupt('User interrupted execution with control-c!')
+
+  # TODO(#7406): figure out how to let sys.exit work in a signal handler instead of having to raise
+  # this exception!
+  class SignalHandledNonLocalExit(Exception):
+    """Raised in handlers for non-fatal signals to overcome Python limitations.
+
+    When waiting on a subprocess and in a signal handler, sys.exit appears to be ignored, and causes
+    the signal handler to return. We want to (eventually) exit after these signals, not ignore them,
+    so we raise this exception instead and check it in our sys.excepthook override.
+    """
+
+    def __init__(self, signum, signame):
+      self.signum = signum
+      self.signame = signame
+      self.traceback_lines = traceback.format_stack()
+      super(SignalHandler.SignalHandledNonLocalExit, self).__init__()
+
+  def handle_sigquit(self, signum, _frame):
+    raise self.SignalHandledNonLocalExit(signum, 'SIGQUIT')
+
+  def handle_sigterm(self, signum, _frame):
+    raise self.SignalHandledNonLocalExit(signum, 'SIGTERM')
 
 
 class ExceptionSink(object):
@@ -39,36 +87,15 @@ class ExceptionSink(object):
   _interactive_output_stream = None
   # Whether to print a stacktrace in any fatal error message printed to the terminal.
   _should_print_backtrace_to_terminal = True
+  # An instance of `SignalHandler` which is invoked to handle a static set of specific
+  # nonfatal signals (these signal handlers are allowed to make pants exit, but unlike SIGSEGV they
+  # don't need to exit immediately).
+  _signal_handler = None
 
   # These persistent open file descriptors are kept so the signal handler can do almost no work
   # (and lets faulthandler figure out signal safety).
   _pid_specific_error_fileobj = None
   _shared_error_fileobj = None
-
-  # Integer code to exit with on an unhandled exception.
-  UNHANDLED_EXCEPTION_EXIT_CODE = 1
-
-  # faulthandler.enable() installs handlers for SIGSEGV, SIGFPE, SIGABRT, SIGBUS and SIGILL, but we
-  # also want to dump a traceback when receiving these other usually-fatal signals.
-  GRACEFULLY_HANDLED_SIGNALS = [
-    signal.SIGTERM,
-  ]
-
-  # These signals are converted into a KeyboardInterrupt exception.
-  KEYBOARD_INTERRUPT_SIGNALS = [
-    signal.SIGINT,
-    signal.SIGQUIT,
-  ]
-
-  @classproperty
-  def all_gracefully_handled_signals(cls):
-    """Return all the signals which are handled when calling reset_log_location().
-
-    These signals are handled by the method handle_signal_gracefully().
-
-    NB: A very basic SIGUSR2 handler is installed by reset_interactive_output_stream().
-    """
-    return cls.GRACEFULLY_HANDLED_SIGNALS + cls.KEYBOARD_INTERRUPT_SIGNALS
 
   def __new__(cls, *args, **kwargs):
     raise TypeError('Instances of {} are not allowed to be constructed!'
@@ -118,10 +145,6 @@ class ExceptionSink(object):
       faulthandler.disable()
     # Send a stacktrace to this file if interrupted by a fatal error.
     faulthandler.enable(file=pid_specific_error_stream, all_threads=True)
-    # Log a timestamped exception and exit gracefully on non-fatal signals.
-    for signum in cls.all_gracefully_handled_signals:
-      signal.signal(signum, cls.handle_signal_gracefully)
-      signal.siginterrupt(signum, False)
 
     # NB: mutate the class variables!
     cls._log_dir = new_log_location
@@ -151,22 +174,20 @@ class ExceptionSink(object):
     OS state:
     - Overwrites the SIGUSR2 handler.
 
-    This is where the the error message on exit will be printed to as well.
+    This method registers a SIGUSR2 handler, which permits a non-fatal `kill -31 <pants pid>` for
+    stacktrace retrieval. This is also where the the error message on fatal exit will be printed to.
     """
     try:
       # NB: mutate process-global state!
-      if faulthandler.unregister(signal.SIGUSR2):
-        logger.debug('re-registering a SIGUSR2 handler')
       # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
       faulthandler.register(signal.SIGUSR2, interactive_output_stream,
                             all_threads=True, chain=False)
-
       # NB: mutate the class variables!
-      # We don't *necessarily* need to keep a reference to this, but we do here for clarity.
       cls._interactive_output_stream = interactive_output_stream
     except ValueError:
-      # Warn about "ValueError: IO on closed file" when stderr is closed.
-      ExceptionSink.log_exception("Cannot reset output stream - sys.stderr is closed")
+      # Warn about "ValueError: IO on closed file" when the stream is closed.
+      cls.log_exception(
+        "Cannot reset interactive_output_stream -- stream (probably stderr) is closed")
 
   @classmethod
   def exceptions_log_path(cls, for_pid=None, in_dir=None):
@@ -250,6 +271,41 @@ class ExceptionSink(object):
     return (pid_specific_error_stream, shared_error_stream)
 
   @classmethod
+  def reset_signal_handler(cls, signal_handler):
+    """
+    Class state:
+    - Overwrites `cls._signal_handler`.
+    OS state:
+    - Overwrites signal handlers for SIGINT, SIGQUIT, and SIGTERM.
+
+    :returns: The :class:`SignalHandler` that was previously registered, or None if this is
+              the first time this method was called.
+    """
+    assert(isinstance(signal_handler, SignalHandler))
+    # NB: Modify process-global state!
+    for signum, handler in signal_handler.signal_handler_mapping.items():
+      signal.signal(signum, handler)
+      # Retry any system calls interrupted by any of the signals we just installed handlers for
+      # (instead of having them raise EINTR). siginterrupt(3) says this is the default behavior on
+      # Linux and OSX.
+      signal.siginterrupt(signum, False)
+
+    previous_signal_handler = cls._signal_handler
+    # NB: Mutate the class variables!
+    cls._signal_handler = signal_handler
+    return previous_signal_handler
+
+  @classmethod
+  @contextmanager
+  def trapped_signals(cls, new_signal_handler):
+    """A contextmanager which temporarily overrides signal handling."""
+    try:
+      previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
+      yield
+    finally:
+      cls.reset_signal_handler(previous_signal_handler)
+
+  @classmethod
   def _iso_timestamp_for_now(cls):
     return datetime.datetime.now().isoformat()
 
@@ -274,9 +330,9 @@ pid: {pid}
   _traceback_omitted_default_text = '(backtrace omitted)'
 
   @classmethod
-  def _format_traceback(cls, tb, should_print_backtrace):
+  def _format_traceback(cls, traceback_lines, should_print_backtrace):
     if should_print_backtrace:
-      traceback_string = '\n{}'.format(''.join(traceback.format_tb(tb)))
+      traceback_string = '\n{}'.format(''.join(traceback_lines))
     else:
       traceback_string = ' {}'.format(cls._traceback_omitted_default_text)
     return traceback_string
@@ -294,7 +350,8 @@ Exception message: {exception_message}{maybe_newline}
     maybe_newline = '\n' if add_newline else ''
     return cls._UNHANDLED_EXCEPTION_LOG_FORMAT.format(
       exception_type=exception_full_name,
-      backtrace=cls._format_traceback(tb, should_print_backtrace=should_print_backtrace),
+      backtrace=cls._format_traceback(traceback_lines=traceback.format_tb(tb),
+                                      should_print_backtrace=should_print_backtrace),
       exception_message=exception_message,
       maybe_newline=maybe_newline)
 
@@ -307,11 +364,9 @@ timestamp: {timestamp}
   def _exit_with_failure(cls, terminal_msg):
     formatted_terminal_msg = cls._EXIT_FAILURE_TERMINAL_MESSAGE_FORMAT.format(
       timestamp=cls._iso_timestamp_for_now(),
-      terminal_msg=terminal_msg or '')
+      terminal_msg=terminal_msg or '<no exit reason provided>')
     # Exit with failure, printing a message to the terminal (or whatever the interactive stream is).
-    cls._exiter.exit(result=cls.UNHANDLED_EXCEPTION_EXIT_CODE,
-                     msg=formatted_terminal_msg,
-                     out=cls._interactive_output_stream)
+    cls._exiter.exit_and_fail(msg=formatted_terminal_msg, out=cls._interactive_output_stream)
 
   @classmethod
   def _log_unhandled_exception_and_exit(cls, exc_class=None, exc=None, tb=None, add_newline=False):
@@ -319,6 +374,10 @@ timestamp: {timestamp}
     exc_class = exc_class or sys.exc_info()[0]
     exc = exc or sys.exc_info()[1]
     tb = tb or sys.exc_info()[2]
+
+    # This exception was raised by a signal handler with the intent to exit the program.
+    if exc_class == SignalHandler.SignalHandledNonLocalExit:
+      return cls._handle_signal_gracefully(exc.signum, exc.signame, exc.traceback_lines)
 
     extra_err_msg = None
     try:
@@ -340,46 +399,51 @@ timestamp: {timestamp}
     cls._exit_with_failure(stderr_printed_error)
 
   _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\
-Signal {signum} was raised. Exiting with failure.{formatted_traceback}
+Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_traceback}
 """
 
   @classmethod
-  def handle_signal_gracefully(cls, signum, frame):
-    """Signal handler for non-fatal signals which raises or logs an error and exits with failure.
-
-    NB: This method is registered for exactly the signals in
-    ExceptionSink.all_gracefully_handled_signals!
-
-    :raises: :class:`KeyboardInterrupt` if `signum` is in ExceptionSink.KEYBOARD_INTERRUPT_SIGNALS.
-    """
-    if signum in cls.KEYBOARD_INTERRUPT_SIGNALS:
-      raise KeyboardInterrupt('User interrupted execution with control-c!')
-    tb = sys.exc_info()[2]
-
-    # Format an entry to be written to the exception log.
-    formatted_traceback = cls._format_traceback(tb, should_print_backtrace=bool(tb))
+  def _handle_signal_gracefully(cls, signum, signame, traceback_lines):
+    """Signal handler for non-fatal signals which raises or logs an error and exits with failure."""
+    # Extract the stack, and format an entry to be written to the exception log.
+    formatted_traceback = cls._format_traceback(traceback_lines=traceback_lines,
+                                                should_print_backtrace=True)
     signal_error_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
+      signame=signame,
       formatted_traceback=formatted_traceback)
     # TODO: determine the appropriate signal-safe behavior here (to avoid writing to our file
     # descriptors re-entrantly, which raises an IOError).
     # This method catches any exceptions raised within it.
     cls.log_exception(signal_error_log_entry)
 
-    # Format a message to be printed to the terminal or other interactive stream, if applicable.
+    # Create a potentially-abbreviated traceback for the terminal or other interactive stream.
     formatted_traceback_for_terminal = cls._format_traceback(
-      tb, should_print_backtrace=cls._should_print_backtrace_to_terminal and bool(tb))
+      traceback_lines=traceback_lines,
+      should_print_backtrace=cls._should_print_backtrace_to_terminal)
     terminal_log_entry = cls._CATCHABLE_SIGNAL_ERROR_LOG_FORMAT.format(
       signum=signum,
+      signame=signame,
       formatted_traceback=formatted_traceback_for_terminal)
+    # Exit, printing the output to the terminal.
     cls._exit_with_failure(terminal_log_entry)
 
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
-# Sets fatal signal handlers with reasonable defaults to catch errors early in startup.
-ExceptionSink.reset_log_location(os.path.join(get_buildroot(), '.pants.d'))
-# Sets except hook.
+# TODO: add testing for fatal errors at import-time, which may occur if there are errors in plugins.
+# Set the initial log location, for fatal errors during import time.
+ExceptionSink.reset_log_location(os.path.join(os.getcwd(), '.pants.d'))
+# Sets except hook for exceptions at import time.
 ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
 ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
+# Sets a handler that logs nonfatal signals to the exception sink before exiting.
+ExceptionSink.reset_signal_handler(SignalHandler())
+# Set whether to print stacktraces on exceptions or signals during import time.
+# NB: This will be overridden by bootstrap options in PantsRunner, so we avoid printing out a full
+# stacktrace when a user presses control-c during import time unless the environment variable is set
+# to explicitly request it. The exception log will have any stacktraces regardless so this should
+# not hamper debugging.
+ExceptionSink.reset_should_print_backtrace_to_terminal(
+  should_print_backtrace=os.environ.get('PANTS_PRINT_EXCEPTION_STACKTRACE') == 'True')

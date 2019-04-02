@@ -13,14 +13,13 @@ import sys
 import threading
 import time
 import uuid
-from builtins import open
 from contextlib import contextmanager
 
 import requests
-from future.utils import PY2, PY3
+from future.utils import PY3
 
 from pants.auth.cookies import Cookies
-from pants.base.build_environment import get_pants_cachedir
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -169,6 +168,8 @@ class RunTracker(Subsystem):
     #   }
     # }
     self._target_to_data = {}
+
+    self._end_memoized_result = None
 
   def set_sorted_goal_infos(self, sorted_goal_infos):
     self._sorted_goal_infos = sorted_goal_infos
@@ -391,21 +392,14 @@ class RunTracker(Subsystem):
 
   @classmethod
   def write_stats_to_json(cls, file_name, stats):
-    """Write stats to a local json file.
-
-    :return: True if successfully written, False otherwise.
-    """
+    """Write stats to a local json file."""
     params = cls._json_dump_options(stats)
-    if PY2:
-      params = params.decode('utf-8')
+    mode = 'w' if PY3 else 'wb'
     try:
-      with open(file_name, 'w') as f:
-        f.write(params)
-    except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
+      safe_file_dump(file_name, params, mode=mode)
+    except Exception as e: # Broad catch - we don't want to fail in stats related failure.
       print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
             file=sys.stderr)
-      return False
-    return True
 
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
@@ -425,12 +419,10 @@ class RunTracker(Subsystem):
       'recorded_options': self._get_options_to_record(),
     }
 
-    # Dump individual stat file.
-    # TODO(benjy): Do we really need these, once the statsdb is mature?
-    stats_file = os.path.join(get_pants_cachedir(), 'stats',
-                              '{}.json'.format(self.run_info.get_info('id')))
-    mode = 'w' if PY3 else 'wb'
-    safe_file_dump(stats_file, self._json_dump_options(stats), mode=mode)
+    # Write stats to user-defined json file.
+    stats_json_file_name = self.get_options().stats_local_json_file
+    if stats_json_file_name:
+      self.write_stats_to_json(stats_json_file_name, stats)
 
     # Add to local stats db.
     StatsDBFactory.global_instance().get_db().insert_stats(stats)
@@ -441,20 +433,20 @@ class RunTracker(Subsystem):
     for stats_url, auth_provider in stats_upload_urls.items():
       self.post_stats(stats_url, stats, timeout=timeout, auth_provider=auth_provider)
 
-    # Write stats to local json file.
-    stats_json_file_name = self.get_options().stats_local_json_file
-    if stats_json_file_name:
-      self.write_stats_to_json(stats_json_file_name, stats)
-
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
+
+  def has_ended(self):
+    return self._end_memoized_result is not None
 
   def end(self):
     """This pants run is over, so stop tracking it.
 
     Note: If end() has been called once, subsequent calls are no-ops.
 
-    :return: 0 for success, 1 for failure.
+    :return: PANTS_SUCCEEDED_EXIT_CODE or PANTS_FAILED_EXIT_CODE
     """
+    if self._end_memoized_result is not None:
+      return self._end_memoized_result
     if self._background_worker_pool:
       if self._aborted:
         self.log(Report.INFO, "Aborting background workers.")
@@ -489,7 +481,10 @@ class RunTracker(Subsystem):
     self.report.close()
     self.store_stats()
 
-    return 1 if outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED] else 0
+    run_failed = outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED]
+    result = PANTS_FAILED_EXIT_CODE if run_failed else PANTS_SUCCEEDED_EXIT_CODE
+    self._end_memoized_result = result
+    return self._end_memoized_result
 
   def end_workunit(self, workunit):
     path, duration, self_time, is_tool = workunit.end()

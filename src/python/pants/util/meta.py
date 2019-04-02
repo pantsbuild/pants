@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from abc import ABCMeta
+from abc import ABCMeta, abstractproperty
 from builtins import object
 
 
@@ -33,7 +33,18 @@ class ClassPropertyDescriptor(object):
   def __get__(self, obj, objtype=None):
     if objtype is None:
       objtype = type(obj)
-    return self.fget.__get__(obj, objtype)()
+      # Get the callable field for this object, which may be a property.
+    callable_field = self.fget.__get__(obj, objtype)
+    if isinstance(self.fget.__func__, abstractproperty):
+      field_name = self.fget.__func__.fget.__name__
+      raise TypeError("""\
+The classproperty '{func_name}' in type '{type_name}' was an abstractproperty, meaning that type \
+{type_name} must override it by setting it as a variable in the class body or defining a method \
+with an @classproperty decorator."""
+                      .format(func_name=field_name,
+                              type_name=objtype.__name__))
+    else:
+      return callable_field()
 
 
 def classproperty(func):

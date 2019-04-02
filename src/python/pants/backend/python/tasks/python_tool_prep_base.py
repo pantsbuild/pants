@@ -15,6 +15,7 @@ from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.base.build_environment import get_pants_cachedir
+from pants.base.exceptions import TaskError
 from pants.base.hash_utils import stable_json_sha1
 from pants.base.workunit import WorkUnitLabel
 from pants.task.task import Task
@@ -130,7 +131,12 @@ class PythonToolPrepBase(Task):
     tool_subsystem = self.tool_subsystem_cls.scoped_instance(self)
 
     interpreter_cache = PythonInterpreterCache.global_instance()
-    interpreter = min(interpreter_cache.setup(filters=tool_subsystem.get_interpreter_constraints()))
+    interpreters = interpreter_cache.setup(filters=tool_subsystem.get_interpreter_constraints())
+    if not interpreters:
+      raise TaskError('Found no Python interpreter capable of running the {} tool with '
+                      'constraints {}'.format(tool_subsystem.options_scope,
+                                              tool_subsystem.get_interpreter_constraints()))
+    interpreter = min(interpreters)
 
     pex_path = self._generate_fingerprinted_pex_path(tool_subsystem, interpreter)
     if not os.path.exists(pex_path):

@@ -3,6 +3,90 @@
 This document describes releases leading up to the ``1.15.x`` ``stable`` series.
 
 
+1.15.0rc2 (4/02/2019)
+---------------------
+
+As of this release, Pants has reached implementation and performance parity when running under
+Python 3 and Python 2! Although Python 3.7 will not be supported in the 1.15.x series, Python 3.6 can
+now be considered a stable platform for running Pants.
+
+New Features
+~~~~~~~~~~~~
+
+* Add `./pants generate-pants-ini` for first time users to generate pants.ini with sensible defaults (#7448)
+  `PR #7448 <https://github.com/pantsbuild/pants/pull/7448>`_
+  `PR #45 <https://github.com/pantsbuild/setup/pull/45>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix flaky `./pants idea-plugin` when using Python 3 by properly using ConsoleTask interface (#7460)
+  `Issue #7150 <https://github.com/pantsbuild/pants/issues/7150>`_
+  `PR #7460 <https://github.com/pantsbuild/pants/pull/7460>`_
+
+* Fix issues with deploy shards not properly setting Python version (#7471)
+  `PR #7471 <https://github.com/pantsbuild/pants/pull/7471>`_
+
+* Switch to twitter.common 0.3.11 to fix DeprecationWarning when using Pants as a PEX (#7461)
+  `PR #7461 <https://github.com/pantsbuild/pants/pull/7461>`_
+
+* Fix `./pants server` not working with Python 3 (#7458)
+  `Issue #7443 <https://github.com/pantsbuild/pants/issues/7443>`_
+  `PR #7458 <https://github.com/pantsbuild/pants/pull/7458>`_
+
+* Fix crash if pants.ini is missing in the buildroot (#7452)
+  `PR #7452 <https://github.com/pantsbuild/pants/pull/7452>`_
+
+* remove inspect.stack() from @rule parsing to fix import time regression in py3 (#7447)
+  `PR #7447 <https://github.com/pantsbuild/pants/pull/7447>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* No longer pin `pants_runtime_python_version` with `./pants generate-pants-ini` (#7469)
+  `PR #7469 <https://github.com/pantsbuild/pants/pull/7469>`_
+
+* Revert unnecessary runtime check for valid Python interpreter (#7451)
+  `PR #7451 <https://github.com/pantsbuild/pants/pull/7451>`_
+
+
+1.15.0rc1 (3/25/2019)
+---------------------
+
+Note: This release does not support using Python 3.7 due to a bug that was introduced while releasing a Python 3 PEX. We are prioritizing fixing this before 1.15.0 is cut. In the meantime, you may use Python 2.7 or Python 3.6.
+
+New Features
+~~~~~~~~~~~~
+
+* Release pants as both a Python 2.7 PEX and a Python 3.6 PEX (#7401)
+  `Issue #654 <https://github.com/pantsbuild/pex/issues/654>`_
+  `PR #7401 <https://github.com/pantsbuild/pants/pull/7401>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Refactor travis.yml to deduplicate Pyenv and AWS pex code (#7397)
+  `PR #7397 <https://github.com/pantsbuild/pants/pull/7397>`_
+
+Bugfixes
+~~~~~~~~
+
+* fix for pantsrc-files option (#7427)
+  `PR #7427 <https://github.com/pantsbuild/pants/pull/7427>`_
+
+* Allow usage of pants2 script from other directories (#7409)
+  `PR #7409 <https://github.com/pantsbuild/pants/pull/7409>`_
+
+* Specify the python version to use in the unstable pex deploy shard. (#7411)
+  `PR #7411 <https://github.com/pantsbuild/pants/pull/7411>`_
+
+* Simplify glob matching and directly match in-memory globs as Patterns. (#7402)
+  `PR #7402 <https://github.com/pantsbuild/pants/pull/7402>`_
+
+* add a non-numeric prefix before the unstable version to avoid getting parsed and truncated as a number (#7400)
+  `PR #7400 <https://github.com/pantsbuild/pants/pull/7400>`_
+
+
 1.15.0rc0 (3/18/2019)
 ---------------------
 

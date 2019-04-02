@@ -54,7 +54,9 @@ class OptionsBootstrapper(datatype([
     flag = '--pants-config-files='
     evars = ['PANTS_GLOBAL_PANTS_CONFIG_FILES', 'PANTS_PANTS_CONFIG_FILES', 'PANTS_CONFIG_FILES']
 
-    path_list_values = [ListValueComponent.create(get_default_pants_config_file())]
+    path_list_values = []
+    if os.path.isfile(get_default_pants_config_file()):
+      path_list_values.append(ListValueComponent.create(get_default_pants_config_file()))
     for var in evars:
       if var in env:
         path_list_values.append(ListValueComponent.create(env[var]))
@@ -141,7 +143,7 @@ class OptionsBootstrapper(datatype([
     # from (typically pants.ini), then config override, then rcfiles.
     full_configpaths = pre_bootstrap_config.sources()
     if bootstrap_option_values.pantsrc:
-      rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
+      rcfiles = [os.path.expanduser(str(rcfile)) for rcfile in bootstrap_option_values.pantsrc_files]
       existing_rcfiles = list(filter(os.path.exists, rcfiles))
       full_configpaths.extend(existing_rcfiles)
 
