@@ -62,7 +62,6 @@ class _LoggerStream(object):
 
   def write(self, msg):
     msg = ensure_text(msg)
-    with open("/tmp/plog", "a") as l:
     for line in msg.rstrip().splitlines():
       # The log only accepts text, and will raise a decoding error if the default encoding is ascii
       # if provided a bytes input for unicode text.
@@ -373,7 +372,6 @@ class PantsDaemon(FingerprintedProcessManager):
     self._close_stdio()
     with self._pantsd_logging() as (log_stream, log_filename):
 
-      self._logger.info("BL {}, Log stream {}, filename {}".format(os.getpid(), log_stream, log_filename))
       # Register an exiter using os._exit to ensure we only close stdio streams once.
       ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
 
