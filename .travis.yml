@@ -550,6 +550,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
   <<: *base_linux_build_wheels
   <<: *native_engine_cache_config
   name: "Build wheels - Linux and cp27m (UCS2)"
+  stage: *bootstrap
   env:
     - *base_build_wheels_env
     - docker_image_name=travis_ci_py27_ucs2
