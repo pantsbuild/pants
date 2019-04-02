@@ -150,6 +150,7 @@ base_linux_config: &base_linux_config
   language: python
   before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv global 2.7.15 3.6.7 3.7.1
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
