@@ -828,7 +828,7 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
       rule: Rule::Intrinsic(ref intrinsic),
       ref params,
     }) => format!(
-      "({}, ({},) for {}",
+      "({}, [{}], <intrinsic>) for {}",
       intrinsic.product,
       intrinsic.input,
       params_str(params)
