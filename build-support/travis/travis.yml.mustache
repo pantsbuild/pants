@@ -650,6 +650,7 @@ base_osx_10_14_sanity_check: &base_osx_10_14_sanity_check
 py27_osx_10_14_sanity_check: &py27_osx_10_14_sanity_check
   <<: *py27_osx_test_config
   <<: *base_osx_10_14_sanity_check
+  stage: *test
   name: "OSX 10.14 sanity check (Py2.7 PEX)"
   env:
     - *py27_osx_test_config_env
@@ -666,6 +667,7 @@ py36_osx_10_14_sanity_check: &py36_osx_10_14_sanity_check
 py37_osx_10_14_sanity_check: &py37_osx_10_14_sanity_check
   <<: *py37_osx_test_config
   <<: *base_osx_10_14_sanity_check
+  stage: *test
   name: "OSX 10.14 sanity check (Py3.7 PEX)"
   env:
     - *py37_osx_test_config_env
