@@ -865,6 +865,15 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -lp
 
+    - <<: *py36_osx_test_config
+      name: "Unit tests - OSX (Py3.6 PEX)"
+      stage: *test_cron
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=osxunittests.osx.py36
+      script:
+        - ./build-support/bin/travis-ci.sh -lp
+
     - <<: *py37_linux_test_config
       name: "Unit tests (Py3.7 PEX)"
       env:
@@ -882,11 +891,31 @@ matrix:
     - <<: *py36_osx_build_wheels
 
 {{#integration_shards}}
+    - <<: *py27_linux_test_config
+      name: "Integration tests - shard {{.}} (Py2.7 PEX)"
+      env:
+        - *py27_linux_test_config_env
+        - CACHE_NAME=integration.linux.py27.shard{{.}}
+      script:
+        - ./build-support/bin/travis-ci.sh -c2 -i {{.}}/{{integration_shards_length}}
+
+{{/integration_shards}}
+{{#integration_shards}}
     - <<: *py36_linux_test_config
       name: "Integration tests - shard {{.}} (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard{{.}}
+        - CACHE_NAME=integration.linux.py36.shard{{.}}
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i {{.}}/{{integration_shards_length}}
+
+{{/integration_shards}}
+{{#integration_shards}}
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard {{.}} (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -c -i {{.}}/{{integration_shards_length}}
 
@@ -896,19 +925,9 @@ matrix:
       name: "Integration tests - shard {{.}} (Py3.7 PEX)"
       env:
         - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard{{.}}
+        - CACHE_NAME=integration.linux.py37.shard{{.}}
       script:
         - ./build-support/bin/travis-ci.sh -c7 -i {{.}}/{{integration_shards_length}}
-
-{{/integration_shards}}
-{{#integration_shards}}
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard {{.}} (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard{{.}}
-      script:
-        - ./build-support/bin/travis-ci.sh -c2 -i {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 
@@ -929,6 +948,14 @@ matrix:
       env:
         - *py36_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py36
+      script:
+        - ./build-support/bin/travis-ci.sh -n
+
+    - <<: *py36_osx_test_config
+      name: "Python contrib tests - OSX (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=osxcontribtests.py36
       script:
         - ./build-support/bin/travis-ci.sh -n
 

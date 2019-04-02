@@ -918,6 +918,15 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -lp
 
+    - <<: *py36_osx_test_config
+      name: "Unit tests - OSX (Py3.6 PEX)"
+      stage: *test_cron
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=osxunittests.osx.py36
+      script:
+        - ./build-support/bin/travis-ci.sh -lp
+
     - <<: *py37_linux_test_config
       name: "Unit tests (Py3.7 PEX)"
       env:
@@ -934,331 +943,11 @@ matrix:
     - <<: *py27_osx_build_wheels_ucs4
     - <<: *py36_osx_build_wheels
 
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 0 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard0
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 0/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 1 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard1
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 1/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 2 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard2
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 2/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 3 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard3
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 3/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 4 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard4
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 4/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 5 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard5
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 5/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 6 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard6
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 6/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 7 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard7
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 7/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 8 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard8
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 8/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 9 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard9
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 9/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 10 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard10
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 10/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 11 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard11
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 11/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 12 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard12
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 12/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 13 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard13
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 13/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 14 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard14
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 14/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 15 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard15
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 15/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 16 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard16
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 16/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 17 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard17
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 17/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 18 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard18
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 18/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests - shard 19 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - CACHE_NAME=integrationshard19
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 19/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 0 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard0
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 0/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 1 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard1
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 1/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 2 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard2
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 2/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 3 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard3
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 3/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 4 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard4
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 4/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 5 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard5
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 5/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 6 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard6
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 6/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 7 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard7
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 7/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 8 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard8
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 8/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 9 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard9
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 9/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 10 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard10
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 10/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 11 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard11
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 11/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 12 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard12
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 12/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 13 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard13
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 13/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 14 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard14
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 14/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 15 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard15
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 15/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 16 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard16
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 16/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 17 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard17
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 17/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 18 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard18
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 18/20
-
-    - <<: *py37_linux_test_config
-      name: "Integration tests - shard 19 (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=integrationshard19
-      script:
-        - ./build-support/bin/travis-ci.sh -c7 -i 19/20
-
     - <<: *py27_linux_test_config
       name: "Integration tests - shard 0 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard0
+        - CACHE_NAME=integration.linux.py27.shard0
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 0/20
 
@@ -1266,7 +955,7 @@ matrix:
       name: "Integration tests - shard 1 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard1
+        - CACHE_NAME=integration.linux.py27.shard1
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 1/20
 
@@ -1274,7 +963,7 @@ matrix:
       name: "Integration tests - shard 2 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard2
+        - CACHE_NAME=integration.linux.py27.shard2
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 2/20
 
@@ -1282,7 +971,7 @@ matrix:
       name: "Integration tests - shard 3 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard3
+        - CACHE_NAME=integration.linux.py27.shard3
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 3/20
 
@@ -1290,7 +979,7 @@ matrix:
       name: "Integration tests - shard 4 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard4
+        - CACHE_NAME=integration.linux.py27.shard4
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 4/20
 
@@ -1298,7 +987,7 @@ matrix:
       name: "Integration tests - shard 5 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard5
+        - CACHE_NAME=integration.linux.py27.shard5
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 5/20
 
@@ -1306,7 +995,7 @@ matrix:
       name: "Integration tests - shard 6 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard6
+        - CACHE_NAME=integration.linux.py27.shard6
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 6/20
 
@@ -1314,7 +1003,7 @@ matrix:
       name: "Integration tests - shard 7 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard7
+        - CACHE_NAME=integration.linux.py27.shard7
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 7/20
 
@@ -1322,7 +1011,7 @@ matrix:
       name: "Integration tests - shard 8 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard8
+        - CACHE_NAME=integration.linux.py27.shard8
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 8/20
 
@@ -1330,7 +1019,7 @@ matrix:
       name: "Integration tests - shard 9 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard9
+        - CACHE_NAME=integration.linux.py27.shard9
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 9/20
 
@@ -1338,7 +1027,7 @@ matrix:
       name: "Integration tests - shard 10 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard10
+        - CACHE_NAME=integration.linux.py27.shard10
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 10/20
 
@@ -1346,7 +1035,7 @@ matrix:
       name: "Integration tests - shard 11 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard11
+        - CACHE_NAME=integration.linux.py27.shard11
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 11/20
 
@@ -1354,7 +1043,7 @@ matrix:
       name: "Integration tests - shard 12 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard12
+        - CACHE_NAME=integration.linux.py27.shard12
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 12/20
 
@@ -1362,7 +1051,7 @@ matrix:
       name: "Integration tests - shard 13 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard13
+        - CACHE_NAME=integration.linux.py27.shard13
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 13/20
 
@@ -1370,7 +1059,7 @@ matrix:
       name: "Integration tests - shard 14 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard14
+        - CACHE_NAME=integration.linux.py27.shard14
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 14/20
 
@@ -1378,7 +1067,7 @@ matrix:
       name: "Integration tests - shard 15 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard15
+        - CACHE_NAME=integration.linux.py27.shard15
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 15/20
 
@@ -1386,7 +1075,7 @@ matrix:
       name: "Integration tests - shard 16 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard16
+        - CACHE_NAME=integration.linux.py27.shard16
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 16/20
 
@@ -1394,7 +1083,7 @@ matrix:
       name: "Integration tests - shard 17 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard17
+        - CACHE_NAME=integration.linux.py27.shard17
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 17/20
 
@@ -1402,7 +1091,7 @@ matrix:
       name: "Integration tests - shard 18 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard18
+        - CACHE_NAME=integration.linux.py27.shard18
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 18/20
 
@@ -1410,9 +1099,489 @@ matrix:
       name: "Integration tests - shard 19 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard19
+        - CACHE_NAME=integration.linux.py27.shard19
       script:
         - ./build-support/bin/travis-ci.sh -c2 -i 19/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 0 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard0
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 0/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 1 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard1
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 1/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 2 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard2
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 2/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 3 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard3
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 3/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 4 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard4
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 4/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 5 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard5
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 5/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 6 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard6
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 6/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 7 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard7
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 7/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 8 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard8
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 8/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 9 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard9
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 9/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 10 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard10
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 10/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 11 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard11
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 11/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 12 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard12
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 12/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 13 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard13
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 13/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 14 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard14
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 14/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 15 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard15
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 15/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 16 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard16
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 16/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 17 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard17
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 17/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 18 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard18
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 18/20
+
+    - <<: *py36_linux_test_config
+      name: "Integration tests - shard 19 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=integration.linux.py36.shard19
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 19/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 0 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard0
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 0/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 1 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard1
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 1/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 2 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard2
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 2/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 3 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard3
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 3/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 4 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard4
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 4/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 5 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard5
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 5/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 6 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard6
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 6/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 7 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard7
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 7/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 8 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard8
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 8/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 9 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard9
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 9/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 10 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard10
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 10/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 11 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard11
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 11/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 12 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard12
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 12/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 13 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard13
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 13/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 14 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard14
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 14/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 15 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard15
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 15/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 16 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard16
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 16/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 17 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard17
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 17/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 18 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard18
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 18/20
+
+    - <<: *py36_osx_test_config
+      name: "Integration tests - OSX - shard 19 (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=integration.osx.py36.shard19
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i 19/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 0 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard0
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 0/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 1 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard1
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 1/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 2 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard2
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 2/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 3 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard3
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 3/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 4 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard4
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 4/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 5 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard5
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 5/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 6 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard6
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 6/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 7 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard7
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 7/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 8 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard8
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 8/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 9 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard9
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 9/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 10 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard10
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 10/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 11 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard11
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 11/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 12 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard12
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 12/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 13 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard13
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 13/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 14 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard14
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 14/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 15 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard15
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 15/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 16 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard16
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 16/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 17 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard17
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 17/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 18 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard18
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 18/20
+
+    - <<: *py37_linux_test_config
+      name: "Integration tests - shard 19 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=integration.linux.py37.shard19
+      script:
+        - ./build-support/bin/travis-ci.sh -c7 -i 19/20
 
 
     - <<: *linux_rust_tests
@@ -1432,6 +1601,14 @@ matrix:
       env:
         - *py36_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py36
+      script:
+        - ./build-support/bin/travis-ci.sh -n
+
+    - <<: *py36_osx_test_config
+      name: "Python contrib tests - OSX (Py3.6 PEX)"
+      env:
+        - *py36_osx_test_config_env
+        - CACHE_NAME=osxcontribtests.py36
       script:
         - ./build-support/bin/travis-ci.sh -n
 
