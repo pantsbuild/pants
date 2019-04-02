@@ -20,7 +20,7 @@ from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import Params, Select
+from pants.engine.selectors import Params
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
@@ -202,11 +202,7 @@ class Scheduler(object):
     func = Function(self._to_key(rule.func))
     self._native.lib.tasks_task_begin(self._tasks, func, self._to_type(output_type), rule.cacheable)
     for selector in rule.input_selectors:
-      selector_type = type(selector)
-      if selector_type is Select:
-        self._native.lib.tasks_add_select(self._tasks, self._to_type(selector.product))
-      else:
-        raise ValueError('Unrecognized Selector type: {}'.format(selector))
+      self._native.lib.tasks_add_select(self._tasks, self._to_type(selector))
 
     def add_get_edge(product, subject):
       self._native.lib.tasks_add_get(self._tasks, self._to_type(product), self._to_type(subject))

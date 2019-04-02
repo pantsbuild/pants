@@ -9,12 +9,12 @@ from builtins import str
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.rules import console_rule
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants.option.scope import Scope, ScopedOptions
 from pants.rules.core.exceptions import GracefulTerminationException
 
 
-@console_rule('list-and-die-for-testing', [Select(Console), Select(BuildFileAddresses)])
+@console_rule('list-and-die-for-testing', [Console, BuildFileAddresses])
 def fast_list_and_die_for_testing(console, addresses):
   """A fast and deadly variant of `./pants list`."""
   options = yield Get(ScopedOptions, Scope(str('list')))

@@ -11,7 +11,6 @@ from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFil
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method, memoized_property
 
@@ -123,17 +122,17 @@ class LLVM(NativeTool):
 
 
 # TODO(#5663): use this over the XCode linker!
-@rule(Linker, [Select(Platform), Select(LLVM)])
+@rule(Linker, [Platform, LLVM])
 def get_lld(platform, llvm):
   return llvm.linker(platform)
 
 
-@rule(CCompiler, [Select(LLVM)])
+@rule(CCompiler, [LLVM])
 def get_clang(llvm):
   return llvm.c_compiler()
 
 
-@rule(CppCompiler, [Select(LLVM)])
+@rule(CppCompiler, [LLVM])
 def get_clang_plusplus(llvm):
   return llvm.cpp_compiler()
 

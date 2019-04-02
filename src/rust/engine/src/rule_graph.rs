@@ -192,7 +192,7 @@ impl Diagnostic {
     Diagnostic {
       params: available_params.clone(),
       reason: format!(
-        "ambiguous rules for {}{}{}",
+        "Ambiguous rules to compute {}{}{}",
         select_key_str(&key),
         params_clause,
         params_str(&available_params),
@@ -792,13 +792,13 @@ pub fn params_str(params: &ParamTypes) -> String {
 
 pub fn select_key_str(select_key: &SelectKey) -> String {
   match select_key {
-    &SelectKey::JustSelect(ref s) => select_str(s),
+    &SelectKey::JustSelect(ref s) => s.product.to_string(),
     &SelectKey::JustGet(ref g) => get_str(g),
   }
 }
 
-pub fn select_str(select: &Select) -> String {
-  format!("Select({})", select.product).to_string() // TODO variant key
+pub fn select_root_str(select: &Select) -> String {
+  format!("Select({})", select.product)
 }
 
 fn get_str(get: &Get) -> String {
@@ -828,7 +828,7 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
       rule: Rule::Intrinsic(ref intrinsic),
       ref params,
     }) => format!(
-      "({}, ({},) for {}",
+      "({}, [{}], <intrinsic>) for {}",
       intrinsic.product,
       intrinsic.input,
       params_str(params)
@@ -838,7 +838,7 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
       root
         .clause
         .iter()
-        .map(|s| select_str(s))
+        .map(|s| select_root_str(s))
         .collect::<Vec<_>>()
         .join(", "),
       params_str(&root.params)
@@ -851,7 +851,7 @@ fn task_display(task: &Task) -> String {
   let mut clause_portion = task
     .clause
     .iter()
-    .map(|c| select_str(c))
+    .map(|c| c.product.to_string())
     .collect::<Vec<_>>()
     .join(", ");
   clause_portion = format!("[{}]", clause_portion);
@@ -915,7 +915,7 @@ impl RuleGraph {
       1 => Ok(subset_matches[0].1.clone()),
       0 => Err(format!(
         "No installed @rules can satisfy {} for input Params({}).",
-        select_str(&select),
+        select_root_str(&select),
         params_str(&params),
       )),
       _ => {
@@ -925,7 +925,7 @@ impl RuleGraph {
           .collect::<Vec<_>>();
         Err(format!(
           "More than one set of @rules can satisfy {} for input Params({}):\n  {}",
-          select_str(&select),
+          select_root_str(&select),
           params_str(&params),
           match_strs.join("\n  "),
         ))

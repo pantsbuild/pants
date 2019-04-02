@@ -20,7 +20,7 @@ from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, Diffe
 from pants.engine.objects import Collection
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import rule
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.util.dirutil import safe_open
 from pants_test.engine.examples.parsers import JsonParser
@@ -139,7 +139,7 @@ class AddressFamilyTest(unittest.TestCase):
 UnhydratedStructs = Collection.of(UnhydratedStruct)
 
 
-@rule(UnhydratedStructs, [Select(BuildFileAddresses)])
+@rule(UnhydratedStructs, [BuildFileAddresses])
 def unhydrated_structs(build_file_addresses):
   uhs = yield [Get(UnhydratedStruct, Address, a) for a in build_file_addresses.addresses]
   yield UnhydratedStructs(uhs)

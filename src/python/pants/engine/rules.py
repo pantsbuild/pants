@@ -23,7 +23,7 @@ from pants.util.collections import assert_single_element
 from pants.util.collections_abc_backport import Iterable, OrderedDict
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.objects import SubclassesOf, TypedCollection, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -330,7 +330,7 @@ def union(cls):
   @union
   class UnionBase(object): pass
 
-  @rule(B, [Select(X)])
+  @rule(B, [X])
   def get_some_union_type(x):
     result = yield Get(ResultType, UnionBase, x.f())
     # ...
@@ -382,7 +382,7 @@ class Rule(AbstractClass):
 
 class TaskRule(datatype([
   ('output_type', _type_field),
-  ('input_selectors', tuple),
+  ('input_selectors', TypedCollection(SubclassesOf(type))),
   ('input_gets', tuple),
   'func',
   'goal',
