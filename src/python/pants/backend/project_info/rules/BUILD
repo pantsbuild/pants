@@ -1,0 +1,20 @@
+python_library(
+  dependencies=[
+    'src/python/pants/engine:console',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:objects',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/rules/core',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:objects',
+  ],
+)
+
+python_tests(
+  name='rules_tests',
+  dependencies=[
+    ':rules'
+  ]
+)

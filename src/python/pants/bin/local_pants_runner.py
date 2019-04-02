@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import traceback
 from builtins import object, str
 
 from pants.base.build_environment import get_buildroot
@@ -271,9 +272,9 @@ class LocalPantsRunner(object):
     except GracefulTerminationException as e:
       logger.debug('Encountered graceful termination exception {}; exiting'.format(e))
       return e.exit_code
-    except Exception as e:
-      logger.warn('Encountered unhandled exception {} during rule execution!'
-                  .format(e))
+    except Exception:
+      logger.warning('Encountered unhandled exception during rule execution!')
+      logger.warning(traceback.format_exc())
       return PANTS_FAILED_EXIT_CODE
     else:
       return PANTS_SUCCEEDED_EXIT_CODE

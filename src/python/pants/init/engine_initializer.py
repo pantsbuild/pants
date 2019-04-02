@@ -197,6 +197,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
     subjects = self._determine_subjects(target_roots)
     console = Console()
     # Console rule can only have one subject.
+    # TODO: What about console_rules with no subjects (i.e., no target specs)?
     assert len(subjects) == 1
     for goal in goals:
       try:
