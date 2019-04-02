@@ -119,7 +119,6 @@ class LocalPantsRunner(object):
       options=options,
       build_root=build_root,
       session=graph_session.scheduler_session,
-      symbol_table=graph_session.symbol_table,
       exclude_patterns=tuple(global_options.exclude_target_regexp),
       tags=tuple(global_options.tag)
     )

@@ -21,7 +21,7 @@ from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.parser import TargetAdaptorContainer
-from pants.engine.rules import RootRule, SingletonRule, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.util.collections_abc_backport import MutableMapping, MutableSequence
@@ -263,9 +263,13 @@ def create_graph_rules(address_mapper):
   :param address_mapper_key: The subject key for an AddressMapper instance.
   :param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
   """
+
+  @rule(AddressMapper, [])
+  def address_mapper_singleton():
+    return address_mapper
+
   return [
-    # A singleton to provide the AddressMapper.
-    SingletonRule(AddressMapper, address_mapper),
+    address_mapper_singleton,
     # Support for resolving Structs from Addresses.
     hydrate_struct,
     resolve_unhydrated_struct,

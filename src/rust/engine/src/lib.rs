@@ -409,13 +409,6 @@ pub extern "C" fn tasks_create() -> *const Tasks {
 }
 
 #[no_mangle]
-pub extern "C" fn tasks_singleton_add(tasks_ptr: *mut Tasks, handle: Handle, output_type: TypeId) {
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.singleton_add(handle.into(), output_type);
-  })
-}
-
-#[no_mangle]
 pub extern "C" fn tasks_task_begin(
   tasks_ptr: *mut Tasks,
   func: Function,

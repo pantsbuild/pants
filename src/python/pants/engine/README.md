@@ -177,20 +177,18 @@ dependencies.
 Currently, it is only possible to load rules into the pants scheduler in two ways: by importing and
 using them in `src/python/pants/bin/engine_initializer.py`, or by adding them to the list returned
 by a `rules()` method defined in `src/python/backend/<backend_name>/register.py`. Plugins cannot add
-new rules yet. Unit tests, however, can mix in `SchedulerTestBase` from
-`tests/python/pants_test/engine/scheduler_test_base.py` to generate and execute a scheduler from a
-given set of rules.
+new rules yet. Unit tests, however, can mix in `TestBase` from
+`tests/python/pants_test/test_base.py` to generate and execute a scheduler from a given set of
+rules.
 
-In general, there are three types of rules you can define:
+In general, there are two types of rules that you can define:
 
 1. an `@rule`, which has a single product type and selects its inputs as described above.
-2. a `SingletonRule`, which matches a product type with a value so the type can then be selected
-   as a parameter to an `@rule`.
-3. a `RootRule`, which declares a type that can be used as a *subject*, which means it can be
+2. a `RootRule`, which declares a type that can be used as a *subject*, which means it can be
    provided as an input to a `product_request()`.
 
-In more depth, a `RootRule` for some type is required when no other rule provides that type (i.e. it
-is not provided with a `SingletonRule` or as the product of any `@rule`). In the absence of a
+In more depth, a `RootRule` for some type is required when no other rule might provide that
+type (i.e. it is not provided as the product of any `@rule`) in some context. In the absence of a
 `RootRule`, any subject type involved in a request "at runtime" (i.e. via `product_request()`),
 would show up as an an unused or impossible path in the rule graph. Another potential name for
 `RootRule` might be `ParamRule`, or something similar, as it can be thought of as saying that the

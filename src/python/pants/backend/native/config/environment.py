@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from abc import abstractmethod, abstractproperty
 
-from pants.engine.rules import SingletonRule
+from pants.engine.rules import rule
 from pants.util.memo import memoized_classproperty
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype, enum
@@ -300,7 +300,12 @@ class CppToolchain(datatype([('cpp_compiler', CppCompiler), ('cpp_linker', Linke
 class HostLibcDev(datatype(['crti_object', 'fingerprint'])): pass
 
 
+@rule(Platform, [])
+def platform_singleton():
+  return Platform.current
+
+
 def create_native_environment_rules():
   return [
-    SingletonRule(Platform, Platform.current),
+    platform_singleton,
   ]
