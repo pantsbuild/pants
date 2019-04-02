@@ -19,7 +19,7 @@ from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable, TargetAdaptorContainer
-from pants.engine.rules import SingletonRule
+from pants.engine.rules import rule
 from pants.engine.struct import Struct, StructWithDeps
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsParser,
@@ -31,7 +31,7 @@ from pants_test.engine.util import Target, run_rule
 class ParseAddressFamilyTest(unittest.TestCase):
   def test_empty(self):
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
-    address_mapper = AddressMapper(JsonParser(TestTable()))
+    address_mapper = AddressMapper(JsonParser(TEST_TABLE))
     af = run_rule(parse_address_family, address_mapper, Dir('/dev/null'), {
         (Snapshot, PathGlobs): lambda _: Snapshot(Digest('abc', 10), ('/dev/null/BUILD',), ()),
         (FilesContent, Digest): lambda _: FilesContent([FileContent('/dev/null/BUILD', b'')]),
@@ -42,7 +42,7 @@ class ParseAddressFamilyTest(unittest.TestCase):
 class AddressesFromAddressFamiliesTest(unittest.TestCase):
 
   def _address_mapper(self):
-    return AddressMapper(JsonParser(TestTable()))
+    return AddressMapper(JsonParser(TEST_TABLE))
 
   def _snapshot(self):
     return Snapshot(Digest('xx', 2), ('root/BUILD',), ())
@@ -171,13 +171,13 @@ class PublishConfiguration(Struct):
     """"""
 
 
-class TestTable(SymbolTable):
-  def table(self):
-    return {'ApacheThriftConfig': ApacheThriftConfiguration,
-            'Struct': Struct,
-            'StructWithDeps': StructWithDeps,
-            'PublishConfig': PublishConfiguration,
-            'Target': Target}
+TEST_TABLE = SymbolTable({
+    'ApacheThriftConfig': ApacheThriftConfiguration,
+    'Struct': Struct,
+    'StructWithDeps': StructWithDeps,
+    'PublishConfig': PublishConfiguration,
+    'Target': Target,
+  })
 
 
 class GraphTestBase(unittest.TestCase, SchedulerTestBase):
@@ -185,13 +185,16 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     address_mapper = AddressMapper(build_patterns=build_patterns,
                                    parser=parser)
 
-    rules = create_fs_rules() + create_graph_rules(address_mapper) + [SingletonRule(SymbolTable, TestTable())]
+    @rule(SymbolTable, [])
+    def symbol_table_singleton():
+      return TEST_TABLE
+    rules = create_fs_rules() + create_graph_rules(address_mapper) + [symbol_table_singleton]
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
     scheduler = self.mk_scheduler(rules=rules, project_tree=project_tree)
     return scheduler
 
   def create_json(self):
-    return self.create(build_patterns=('*.BUILD.json',), parser=JsonParser(TestTable()))
+    return self.create(build_patterns=('*.BUILD.json',), parser=JsonParser(TEST_TABLE))
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
@@ -261,12 +264,12 @@ class InlinedGraphTest(GraphTestBase):
 
   def test_python(self):
     scheduler = self.create(build_patterns=('*.BUILD.python',),
-                            parser=PythonAssignmentsParser(TestTable()))
+                            parser=PythonAssignmentsParser(TEST_TABLE))
     self.do_test_codegen_simple(scheduler)
 
   def test_python_classic(self):
     scheduler = self.create(build_patterns=('*.BUILD',),
-                            parser=PythonCallbacksParser(TestTable()))
+                            parser=PythonCallbacksParser(TEST_TABLE))
     self.do_test_codegen_simple(scheduler)
 
   def test_resolve_cache(self):

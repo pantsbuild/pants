@@ -19,7 +19,15 @@ class FakeRunTracker(object):
     def get_all(self):
       return []
 
+  class FakePantsdStats(object):
+    def get_all(self):
+      return {}
+
   artifact_cache_stats = FakeCacheStats()
+  pantsd_stats = FakePantsdStats()
+
+  def run_information(self):
+    return {}
 
 
 class FakeWorkUnit(object):

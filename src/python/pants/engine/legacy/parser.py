@@ -91,7 +91,7 @@ class LegacyPythonCallbacksParser(Parser):
         else:
           return self._object_type(*args, **kwargs)
 
-    for alias, symbol in symbol_table.table().items():
+    for alias, symbol in symbol_table.table.items():
       registrar = Registrar(parse_context, alias, symbol)
       symbols[alias] = registrar
       symbols[symbol] = registrar

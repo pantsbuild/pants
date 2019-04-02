@@ -19,6 +19,7 @@ from pants.base.specs import AscendantAddresses, DescendantAddresses, SingleAddr
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.app_base import AppBase, Bundle
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
@@ -28,9 +29,9 @@ from pants.engine.legacy.structs import (BundleAdaptor, BundlesField, Hydrateabl
                                          SourcesField, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
-from pants.engine.parser import SymbolTable, TargetAdaptorContainer
+from pants.engine.parser import TargetAdaptorContainer
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
@@ -40,9 +41,8 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-def target_types_from_symbol_table(symbol_table):
-  """Given a LegacySymbolTable, return the concrete target types constructed for each alias."""
-  aliases = symbol_table.aliases()
+def target_types_from_build_file_aliases(aliases):
+  """Given BuildFileAliases, return the concrete target types constructed for each alias."""
   target_types = dict(aliases.target_types)
   for alias, factory in aliases.target_macro_factories.items():
     target_type, = factory.target_types
@@ -64,16 +64,15 @@ class LegacyBuildGraph(BuildGraph):
   """
 
   @classmethod
-  def create(cls, scheduler, symbol_table):
-    """Construct a graph given a Scheduler, Engine, and a SymbolTable class."""
-    return cls(scheduler, target_types_from_symbol_table(symbol_table))
+  def create(cls, scheduler, build_file_aliases):
+    """Construct a graph given a Scheduler and BuildFileAliases."""
+    return cls(scheduler, target_types_from_build_file_aliases(build_file_aliases))
 
   def __init__(self, scheduler, target_types):
-    """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
+    """Construct a graph given a Scheduler, and set of target type aliases.
 
     :param scheduler: A Scheduler that is configured to be able to resolve TransitiveHydratedTargets.
-    :param symbol_table: A SymbolTable instance used to instantiate Target objects. Must match
-      the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
+    :param target_types: A dict mapping aliases to target types.
     """
     self._scheduler = scheduler
     self._target_types = target_types
@@ -146,13 +145,7 @@ class LegacyBuildGraph(BuildGraph):
     return target
 
   def _instantiate_target(self, target_adaptor):
-    """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target.
-
-    TODO: This assumes that the SymbolTable used for parsing matches the SymbolTable passed
-    to this graph. Would be good to make that more explicit, but it might be better to nuke
-    the Target subclassing pattern instead, and lean further into the "configuration composition"
-    model explored in the `exp` package.
-    """
+    """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target."""
     target_cls = self._target_types[target_adaptor.type_alias]
     try:
       # Pop dependencies, which were already consumed during construction.
@@ -409,8 +402,8 @@ class OwnersRequest(datatype([
   """
 
 
-@rule(BuildFileAddresses, [Select(SymbolTable), Select(AddressMapper), Select(OwnersRequest)])
-def find_owners(symbol_table, address_mapper, owners_request):
+@rule(BuildFileAddresses, [BuildConfiguration, AddressMapper, OwnersRequest])
+def find_owners(build_configuration, address_mapper, owners_request):
   sources_set = OrderedSet(owners_request.sources)
   dirs_set = OrderedSet(dirname(source) for source in sources_set)
 
@@ -449,7 +442,8 @@ def find_owners(symbol_table, address_mapper, owners_request):
     all_structs = yield [Get(TargetAdaptorContainer, Address, a.to_address()) for a in all_addresses]
     all_structs = [s.value for s in all_structs]
 
-    graph = _DependentGraph.from_iterable(target_types_from_symbol_table(symbol_table),
+    bfa = build_configuration.registered_aliases()
+    graph = _DependentGraph.from_iterable(target_types_from_build_file_aliases(bfa),
                                           address_mapper,
                                           all_structs)
     if owners_request.include_dependees == 'direct':
@@ -459,7 +453,7 @@ def find_owners(symbol_table, address_mapper, owners_request):
       yield BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
 
 
-@rule(TransitiveHydratedTargets, [Select(BuildFileAddresses)])
+@rule(TransitiveHydratedTargets, [BuildFileAddresses])
 def transitive_hydrated_targets(build_file_addresses):
   """Given BuildFileAddresses, kicks off recursion on expansion of TransitiveHydratedTargets.
 
@@ -485,13 +479,13 @@ def transitive_hydrated_targets(build_file_addresses):
   yield TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
 
 
-@rule(TransitiveHydratedTarget, [Select(HydratedTarget)])
+@rule(TransitiveHydratedTarget, [HydratedTarget])
 def transitive_hydrated_target(root):
   dependencies = yield [Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies]
   yield TransitiveHydratedTarget(root, dependencies)
 
 
-@rule(HydratedTargets, [Select(BuildFileAddresses)])
+@rule(HydratedTargets, [BuildFileAddresses])
 def hydrated_targets(build_file_addresses):
   """Requests HydratedTarget instances for BuildFileAddresses."""
   targets = yield [Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses]
@@ -502,7 +496,7 @@ class HydratedField(datatype(['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 
 
-@rule(HydratedTarget, [Select(TargetAdaptorContainer)])
+@rule(HydratedTarget, [TargetAdaptorContainer])
 def hydrate_target(target_adaptor_container):
   target_adaptor = target_adaptor_container.value
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
@@ -531,7 +525,7 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
                               include_dirs=include_dirs)
 
 
-@rule(HydratedField, [Select(SourcesField), Select(GlobMatchErrorBehavior)])
+@rule(HydratedField, [SourcesField, GlobMatchErrorBehavior])
 def hydrate_sources(sources_field, glob_match_error_behavior):
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
@@ -547,7 +541,7 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
-@rule(HydratedField, [Select(BundlesField), Select(GlobMatchErrorBehavior)])
+@rule(HydratedField, [BundlesField, GlobMatchErrorBehavior])
 def hydrate_bundles(bundles_field, glob_match_error_behavior):
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   path_globs_with_match_errors = [

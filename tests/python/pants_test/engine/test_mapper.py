@@ -20,12 +20,12 @@ from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, Diffe
 from pants.engine.objects import Collection
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import rule
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.util.dirutil import safe_open
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.engine.util import Target, TargetTable
+from pants_test.engine.util import TARGET_TABLE, Target
 
 
 class Thing(object):
@@ -42,14 +42,8 @@ class Thing(object):
     return isinstance(other, Thing) and self._key() == other._key()
 
 
-class ThingTable(SymbolTable):
-  def table(cls):
-    return {'thing': Thing}
-
-
 class AddressMapTest(unittest.TestCase):
-  _symbol_table = ThingTable()
-  _parser = JsonParser(_symbol_table)
+  _parser = JsonParser(SymbolTable({'thing': Thing}))
 
   @contextmanager
   def parse_address_map(self, json):
@@ -139,7 +133,7 @@ class AddressFamilyTest(unittest.TestCase):
 UnhydratedStructs = Collection.of(UnhydratedStruct)
 
 
-@rule(UnhydratedStructs, [Select(BuildFileAddresses)])
+@rule(UnhydratedStructs, [BuildFileAddresses])
 def unhydrated_structs(build_file_addresses):
   uhs = yield [Get(UnhydratedStruct, Address, a) for a in build_file_addresses.addresses]
   yield UnhydratedStructs(uhs)
@@ -148,8 +142,7 @@ def unhydrated_structs(build_file_addresses):
 class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     # Set up a scheduler that supports address mapping.
-    symbol_table = TargetTable()
-    address_mapper = AddressMapper(parser=JsonParser(symbol_table),
+    address_mapper = AddressMapper(parser=JsonParser(TARGET_TABLE),
                                    build_patterns=('*.BUILD.json',))
 
     # We add the `unhydrated_structs` rule because it is otherwise not used in the core engine.

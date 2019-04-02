@@ -105,7 +105,6 @@ impl Select {
     params.retain(|k| match &entry {
       &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
       &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
-      &rule_graph::Entry::Singleton { .. } => false,
     });
     Select {
       params,
@@ -262,7 +261,6 @@ impl WrappedNode for Select {
           )))
         }
       }
-      &rule_graph::Entry::Singleton(ref key, _) => ok(externs::val_for(key)),
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Root(_)) => {
         panic!("Not a runtime-executable entry! {:?}", self.entry)
       }

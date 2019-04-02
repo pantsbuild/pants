@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -17,7 +16,7 @@ class _Options(datatype([('options', Options)])):
   """A wrapper around bootstrapped options values: not for direct consumption."""
 
 
-@rule(_Options, [Select(OptionsBootstrapper)])
+@rule(_Options, [OptionsBootstrapper])
 def parse_options(options_bootstrapper):
   # TODO: Because _OptionsBootstapper is currently provided as a Param, this @rule relies on options
   # remaining relatively stable in order to be efficient. See #6845 for a discussion of how to make
@@ -26,7 +25,7 @@ def parse_options(options_bootstrapper):
   return _Options(OptionsInitializer.create(options_bootstrapper, build_config, init_subsystems=False))
 
 
-@rule(ScopedOptions, [Select(Scope), Select(_Options)])
+@rule(ScopedOptions, [Scope, _Options])
 def scope_options(scope, options):
   return ScopedOptions(scope, options.options.for_scope(scope.scope))
 

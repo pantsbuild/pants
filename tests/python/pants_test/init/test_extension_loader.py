@@ -20,7 +20,6 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants.init.extension_loader import (PluginLoadOrderError, PluginNotFound, load_backend,
@@ -92,7 +91,7 @@ class WrapperType(datatype(['value'])):
   pass
 
 
-@rule(WrapperType, [Select(RootType)])
+@rule(WrapperType, [RootType])
 def example_rule(root_type):
   yield WrapperType(root_type.value)
 
@@ -101,7 +100,7 @@ class PluginProduct(object):
   pass
 
 
-@rule(PluginProduct, [Select(RootType)])
+@rule(PluginProduct, [RootType])
 def example_plugin_rule(root_type):
   yield PluginProduct()
 

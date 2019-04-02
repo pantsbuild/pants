@@ -60,11 +60,10 @@ class TargetRootsCalculator(object):
     return workspace.touched_files(changes_since)
 
   @classmethod
-  def create(cls, options, session, symbol_table, build_root=None, exclude_patterns=None, tags=None):
+  def create(cls, options, session, build_root=None, exclude_patterns=None, tags=None):
     """
     :param Options options: An `Options` instance to use.
     :param session: The Scheduler session
-    :param symbol_table: The symbol table
     :param string build_root: The build root.
     """
     # Determine the literal target roots.

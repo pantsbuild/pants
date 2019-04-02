@@ -14,7 +14,7 @@ from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcess
                                            FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import TransitiveHydratedTarget
 from pants.engine.rules import optionable_rule, rule
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult
 
 
@@ -27,7 +27,7 @@ class PyTestResult(TestResult):
 
 # TODO: Support deps
 # TODO: Support resources
-@rule(PyTestResult, [Select(TransitiveHydratedTarget), Select(PyTest)])
+@rule(PyTestResult, [TransitiveHydratedTarget, PyTest])
 def run_python_test(transitive_hydrated_target, pytest):
   target_root = transitive_hydrated_target.root
 

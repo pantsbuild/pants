@@ -9,10 +9,9 @@ from pex.orderedset import OrderedSet
 from pants.engine.console import Console
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import console_rule
-from pants.engine.selectors import Select
 
 
-@console_rule('filedeps', [Select(Console), Select(TransitiveHydratedTargets)])
+@console_rule('filedeps', [Console, TransitiveHydratedTargets])
 def file_deps(console, transitive_hydrated_targets):
   """List all source and BUILD files a target transitively depends on.
 

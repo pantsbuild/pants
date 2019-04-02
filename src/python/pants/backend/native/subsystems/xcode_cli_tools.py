@@ -8,7 +8,6 @@ import os
 
 from pants.backend.native.config.environment import Assembler, CCompiler, CppCompiler, Linker
 from pants.engine.rules import rule
-from pants.engine.selectors import Select
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method, memoized_property
@@ -167,22 +166,22 @@ class XCodeCLITools(Subsystem):
       extra_args=[MIN_OSX_VERSION_ARG])
 
 
-@rule(Assembler, [Select(XCodeCLITools)])
+@rule(Assembler, [XCodeCLITools])
 def get_assembler(xcode_cli_tools):
   return xcode_cli_tools.assembler()
 
 
-@rule(Linker, [Select(XCodeCLITools)])
+@rule(Linker, [XCodeCLITools])
 def get_ld(xcode_cli_tools):
   return xcode_cli_tools.linker()
 
 
-@rule(CCompiler, [Select(XCodeCLITools)])
+@rule(CCompiler, [XCodeCLITools])
 def get_clang(xcode_cli_tools):
   return xcode_cli_tools.c_compiler()
 
 
-@rule(CppCompiler, [Select(XCodeCLITools)])
+@rule(CppCompiler, [XCodeCLITools])
 def get_clang_plusplus(xcode_cli_tools):
   return xcode_cli_tools.cpp_compiler()
 

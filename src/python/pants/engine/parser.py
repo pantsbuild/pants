@@ -7,25 +7,17 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
-from pants.util.objects import Exactly, datatype
+from pants.util.objects import datatype
 
 
 class ParseError(Exception):
   """Indicates an error parsing BUILD configuration."""
 
 
-class SymbolTable(AbstractClass):
-  """A one-classmethod interface exposing a symbol table dict."""
-
-  @abstractmethod
-  def table(self):
-    """Returns a dict of name to implementation class."""
-
-  def constraint(self):
-    """Returns the typeconstraint for the symbol table"""
-    # NB Sort types so that multiple calls get the same tuples.
-    symbol_table_types = sorted(set(self.table().values()), key=repr)
-    return Exactly(*symbol_table_types, description='symbol table types')
+class SymbolTable(datatype([
+  ('table', dict),
+])):
+  """A symbol table dict mapping symbol name to implementation class."""
 
 
 class TargetAdaptorContainer(datatype(["value"])):
@@ -34,11 +26,6 @@ class TargetAdaptorContainer(datatype(["value"])):
   This exists so that the rule graph can statically provide a TargetAdaptor for a target, and rules can depend on this
   without needing to depend on having a concrete instance of SymbolTable to register their input selectors.
   """
-
-
-class EmptyTable(SymbolTable):
-  def table(self):
-    return {}
 
 
 class Parser(AbstractClass):

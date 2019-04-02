@@ -102,18 +102,3 @@ class Params(datatype([('params', tuple)])):
 
   def __new__(cls, *args):
     return super(Params, cls).__new__(cls, tuple(args))
-
-
-class Select(datatype([('product', _type_field), ('optional', bool)])):
-  """Selects the given Product for the Subject provided to the constructor.
-
-  If optional=True and no matching product can be produced, will return None.
-  """
-
-  def __new__(cls, product, optional=False):
-    return super(Select, cls).__new__(cls, product, optional)
-
-  def __repr__(self):
-    return '{}({}{})'.format(type(self).__name__,
-                             self.product.__name__,
-                             ', optional=True' if self.optional else '')
