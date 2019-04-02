@@ -24,7 +24,7 @@ RUN if [[ ! -d "${PYENV_ROOT}" ]]; then git clone https://github.com/pyenv/pyenv
 ENV PYTHON_CONFIGURE_OPTS --enable-unicode=ucs2
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '${PYENV_BIN} install ${PYTHON_27_VERSION_UCS2}'
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '${PYENV_BIN} global ${PYTHON_27_VERSION_UCS2}'
-ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}:${PATH}"
+ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/bin:${PATH}"
 ENV PY "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/bin/python"
 ENV PEX_PYTHON_PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/bin/python"
 
