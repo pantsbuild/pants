@@ -20,7 +20,7 @@ ARG PYTHON_27_VERSION_UCS2=2.7.15
 RUN yum install sqlite-devel -y
 ENV PYENV_ROOT "${PYENV_ROOT:-/pyenv-docker-build}"
 ENV PYENV_BIN ${PYENV_ROOT}/bin/pyenv
-RUN if [[ ! -x "${PYENV_BIN}" ]]; then git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}; fi
+RUN if [[ ! -d "${PYENV_ROOT}" ]]; then git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}; fi
 ENV PYTHON_CONFIGURE_OPTS --enable-unicode=ucs2
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '${PYENV_BIN} install ${PYTHON_27_VERSION_UCS2}'
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '${PYENV_BIN} global ${PYTHON_27_VERSION_UCS2}'
