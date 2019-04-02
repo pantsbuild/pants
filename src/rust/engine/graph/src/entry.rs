@@ -303,7 +303,6 @@ impl<N: Node> Entry<N> {
     {
       let mut state = self.state.lock();
 
-
       // First check whether the Node is already complete, or is currently running: in both of these
       // cases we don't swap the state of the Node.
       match &mut *state {

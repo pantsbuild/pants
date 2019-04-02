@@ -217,8 +217,7 @@ impl<N: Node> InnerGraph<N> {
     for id in &transitive_ids {
       if let Some(mut entry) = self.pg.node_weight_mut(*id).cloned() {
         entry.dirty(self);
-        let mut neighbors = self.pg.neighbors_directed(*id, Direction::Outgoing).detach();
-        while let Some((edge, dep)) = neighbors.next(&self.pg) {
+        while let Some((edge, dep)) = self.pg.neighbors_directed(*id, Direction::Outgoing).detach().next(&self.pg) {
           self.dirty_edges.entry(*id).or_insert_with(Vec::new).push(dep);
           self.pg.remove_edge(edge);
         }
