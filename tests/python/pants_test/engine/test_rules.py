@@ -14,8 +14,7 @@ from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import (RootRule, RuleIndex, SingletonRule, _GoalProduct, _RuleVisitor,
-                                console_rule, rule)
+from pants.engine.rules import RootRule, RuleIndex, _GoalProduct, _RuleVisitor, console_rule, rule
 from pants.engine.selectors import Get
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.util import (TARGET_TABLE, assert_equal_with_printing, create_scheduler,
@@ -192,10 +191,14 @@ class RuleGraphTest(TestBase):
     def d_from_c(c):
       pass
 
+    @rule(B, [])
+    def b_singleton():
+      return B()
+
     rules = [
       RootRule(A),
       d_from_c,
-      SingletonRule(B, B()),
+      b_singleton,
     ]
 
     with self.assertRaises(Exception) as cm:
@@ -462,10 +465,14 @@ class RuleGraphTest(TestBase):
     def a():
       pass
 
+    @rule(B, [])
+    def b_singleton():
+      return B()
+
     rules = [
       a_from_c,
       a,
-      SingletonRule(B, B()),
+      b_singleton,
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
@@ -574,14 +581,18 @@ class RuleGraphTest(TestBase):
                      }""").strip(),
       subgraph)
 
-  def test_get_with_matching_singleton(self):
-    @rule(A, [SubA])
+  def test_matching_singleton(self):
+    @rule(A, [SubA, B])
     def a_from_suba(suba):
-      _ = yield Get(B, C, C())  # noqa: F841
+      return A()
+
+    @rule(B, [])
+    def b_singleton():
+      return B()
 
     rules = [
       a_from_suba,
-      SingletonRule(B, B()),
+      b_singleton,
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -591,9 +602,10 @@ class RuleGraphTest(TestBase):
                        // root subject types: SubA
                        // root entries
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [SubA], [Get(B, C)], a_from_suba()) for SubA"}
+                         "Select(A) for SubA" -> {"(A, [SubA, B], a_from_suba()) for SubA"}
                        // internal entries
-                         "(A, [SubA], [Get(B, C)], a_from_suba()) for SubA" -> {"Param(SubA)" "Singleton(B(), B)"}
+                         "(A, [SubA, B], a_from_suba()) for SubA" -> {"(B, [], b_singleton()) for ()" "Param(SubA)"}
+                         "(B, [], b_singleton()) for ()" -> {}
                      }""").strip(),
       subgraph)
 

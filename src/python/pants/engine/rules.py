@@ -425,17 +425,6 @@ class TaskRule(datatype([
                     self.dependency_optionables))
 
 
-class SingletonRule(datatype([('output_type', _type_field), 'value']), Rule):
-  """A default rule for a product, which is thus a singleton for that product."""
-
-  @classmethod
-  def from_instance(cls, obj):
-    return cls(type(obj), obj)
-
-  def __hash__(self):
-    return hash((type(self), self.output_type))
-
-
 class RootRule(datatype([('output_type', _type_field)]), Rule):
   """Represents a root input to an execution of a rule graph.
 

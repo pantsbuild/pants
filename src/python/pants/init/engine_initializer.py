@@ -17,6 +17,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
@@ -34,7 +35,7 @@ from pants.engine.legacy.structs import (AppAdaptor, JvmBinaryAdaptor, PageAdapt
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
-from pants.engine.rules import RootRule, SingletonRule
+from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
@@ -335,14 +336,26 @@ class EngineInitializer(object):
                                    exclude_target_regexps=exclude_target_regexps,
                                    subproject_roots=subproject_roots)
 
+    @rule(GlobMatchErrorBehavior, [])
+    def glob_match_error_behavior_singleton():
+      return glob_match_error_behavior or GlobMatchErrorBehavior.ignore
+
+    @rule(BuildConfiguration, [])
+    def build_configuration_singleton():
+      return build_configuration
+
+    @rule(SymbolTable, [])
+    def symbol_table_singleton():
+      return symbol_table
+
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     rules = (
       [
         RootRule(Console),
-        SingletonRule.from_instance(glob_match_error_behavior or GlobMatchErrorBehavior.ignore),
-        SingletonRule.from_instance(build_configuration),
-        SingletonRule(SymbolTable, symbol_table),
+        glob_match_error_behavior_singleton,
+        build_configuration_singleton,
+        symbol_table_singleton,
       ] +
       create_legacy_graph_tasks() +
       create_fs_rules() +

@@ -19,7 +19,7 @@ from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable, TargetAdaptorContainer
-from pants.engine.rules import SingletonRule
+from pants.engine.rules import rule
 from pants.engine.struct import Struct, StructWithDeps
 from pants.util.objects import Exactly
 from pants_test.engine.examples.parsers import (JsonParser, PythonAssignmentsParser,
@@ -185,7 +185,10 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     address_mapper = AddressMapper(build_patterns=build_patterns,
                                    parser=parser)
 
-    rules = create_fs_rules() + create_graph_rules(address_mapper) + [SingletonRule(SymbolTable, TEST_TABLE)]
+    @rule(SymbolTable, [])
+    def symbol_table_singleton():
+      return TEST_TABLE
+    rules = create_fs_rules() + create_graph_rules(address_mapper) + [symbol_table_singleton]
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
     scheduler = self.mk_scheduler(rules=rules, project_tree=project_tree)
     return scheduler
