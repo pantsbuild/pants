@@ -39,6 +39,7 @@ would only trigger it's direct tests, and a change to a low-level node
 
 For most users, the following script would work well for a pull-request builder type CI job:
 
+<!-- TODO(#7346): Update this script to use --query! -->
 ```bash
 #!/bin/bash
 
@@ -46,14 +47,11 @@ set -x
 set -o
 set -e
 
-# Disable Zinc incremental compilation to ensure no historical cruft pollutes the current build.
-export PANTS_COMPILE_ZINC_INCREMENTAL=false
+changed=("$(./pants --changed-parent=origin/master list)")
+dependees=("$(./pants dependees --dependees-transitive --dependees-closed ${changed[@]})")
+minimized=("$(./pants minimize ${dependees[@]})")
+./pants filter --filter-type=-jvm_binary ${minimized[@]} | sort > minimized.txt
 
-changed=$(./pants --changed-parent=origin/master list)
-dependees=$(./pants dependees --dependees-transitive --dependees-closed $changed)
-minimized=$(./pants minimize $dependees)
-./pants filter --filter-type=-jvm_binary $minimized | sort > minimized.txt
-for target in $(cat minimized.txt); do
-  ./pants test $target
-done
+# Disable Zinc incremental compilation to ensure no historical cruft pollutes the build used for CI testing.
+./pants --target-spec-file=minimized.txt compile.zinc --no-incremental test
 ```
