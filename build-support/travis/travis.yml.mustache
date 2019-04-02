@@ -124,6 +124,10 @@ base_linux_config: &base_linux_config
   os: linux
   dist: xenial
   sudo: required
+  python:
+    - "2.7"
+    - "3.6"
+    - "3.7"
   addons:
     apt:
       packages:
@@ -144,15 +148,12 @@ base_linux_config: &base_linux_config
 
 py27_linux_config: &py27_linux_config
   <<: *base_linux_config
-  python: &python2_version "2.7"
 
 py36_linux_config: &py36_linux_config
   <<: *base_linux_config
-  python: "3.6"
 
 py37_linux_config: &py37_linux_config
   <<: *base_linux_config
-  python: "3.7"
 
 base_linux_test_config: &base_linux_test_config
   <<: *base_linux_config
@@ -187,31 +188,28 @@ py37_linux_test_config: &py37_linux_test_config
 base_osx_config: &base_osx_config
   os: osx
   language: generic
-  before_install:
-    {{>before_install_osx}}
-
-py27_osx_config: &py27_osx_config
-  <<: *base_osx_config
-
-py36_osx_config: &py36_osx_config
-  <<: *base_osx_config
   addons:
     brew:
-      packages: &py36_osx_config_brew_packages
+      packages:
       - openssl
-  env:
-    - &py36_osx_config_env >
-      {{>env_osx_with_pyenv}}
   before_install:
     {{>before_install_osx}}
     - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
 
+py27_osx_config: &py27_osx_config
+  <<: *base_osx_config
+  env:
+    - &py27_osx_config_env >
+      {{>env_osx_with_pyenv}}
+
+py36_osx_config: &py36_osx_config
+  <<: *base_osx_config
+  env:
+    - &py36_osx_config_env >
+      {{>env_osx_with_pyenv}}
+
 py37_osx_config: &py37_osx_config
   <<: *base_osx_config
-  addons:
-    brew:
-      packages: &py37_osx_config_brew_packages
-      - openssl
   env:
     - &py37_osx_config_env >
       {{>env_osx_with_pyenv}}
@@ -231,7 +229,9 @@ py27_osx_test_config: &py27_osx_test_config
   <<: *base_osx_test_config
   stage: *test_cron
   env:
-    - &py27_osx_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
+    - &py27_osx_test_config_env >
+      {{>env_osx_with_pyenv}}
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
 
 py36_osx_test_config: &py36_osx_test_config
   <<: *py36_osx_config
@@ -341,6 +341,7 @@ py27_osx_build_engine: &py27_osx_build_engine
   <<: *base_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py2.7 PEX)"
   env:
+    - *py27_osx_config_env
     - PREPARE_DEPLOY=1
     - CACHE_NAME=osxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
@@ -532,15 +533,10 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *base_osx_build_wheels
   <<: *native_engine_cache_config
   name: "Build wheels - OSX and cp27mu (UCS4)"
-  addons:
-    brew:
-      packages:
-      - openssl
   env:
+    - *py27_osx_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs4
-    - >
-      {{>env_osx_with_pyenv}}
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
     # We set $PY to ensure the UCS4 interpreter is used when bootstrapping the PEX.
     - PY=${PYENV_ROOT}/shims/python2.7
@@ -574,6 +570,8 @@ base_rust_tests: &base_rust_tests
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
+  script:
+    - ./build-support/bin/travis-ci.sh -e
 
 linux_rust_tests: &linux_rust_tests
   <<: *base_rust_tests
@@ -586,26 +584,24 @@ linux_rust_tests: &linux_rust_tests
   sudo: required
   language: python
   python: "3.6"
-  script:
-    - ./build-support/bin/travis-ci.sh -e
 
 osx_rust_tests: &osx_rust_tests
   <<: *base_rust_tests
   name: "Rust tests - OSX (No PEX)"
-  env:
-    - CACHE_NAME=macosrusttests
   os: osx
   # Fuse actually works on this image. It hangs on many others.
   osx_image: xcode8.3
   addons:
     homebrew:
       casks:
+      - openssl
       - osxfuse
-  script:
-  # N.B. We run this with Python 2 because this osx_image does not have
-  # Python 3.6 or 3.7 in its environment. We do not care which Python version
-  # we use and do not want to incur the cost of using pyenv to get 3.6 or 3.7.
-    - ./build-support/bin/travis-ci.sh -e2
+  before_install:
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
+  env:
+    - >
+      {{>env_osx_with_pyenv}}
+    - CACHE_NAME=macosrusttests
 
 # -------------------------------------------------------------------------
 # OSX sanity checks
