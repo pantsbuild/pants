@@ -10,7 +10,7 @@ set -euo pipefail
 
 source build-support/common.sh
 
-PYTHON_VERSIONS="$@"
+PYTHON_VERSIONS=("$@")
 
 if [[ -z "${PYENV_ROOT:+''}" ]]; then
   die "Caller of the script must set the env var PYENV_ROOT."
