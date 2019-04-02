@@ -452,7 +452,7 @@ py37_lint: &py37_lint
 linux_rust_clippy: &linux_rust_clippy
   <<: *linux_with_fuse
   <<: *native_engine_cache_config
-  name: "Linux Rust Clippy (No PEX)"
+  name: "Rust Clippy (No PEX)"
   env:
     - CACHE_NAME=linuxclippy
   os: linux
