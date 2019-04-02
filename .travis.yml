@@ -668,35 +668,6 @@ base_osx_sanity_check: &base_osx_sanity_check
   script:
     - MODE=debug ./build-support/bin/travis-ci.sh -m
 
-# TODO: Update this to use 10.14 once it is available
-base_osx_10_12_sanity_check: &base_osx_10_12_sanity_check
-  <<: *base_osx_sanity_check
-  osx_image: xcode9.2
-
-py27_osx_10_12_sanity_check: &py27_osx_10_12_sanity_check
-  <<: *py27_osx_test_config
-  <<: *base_osx_10_12_sanity_check
-  name: "OSX 10.12 sanity check (Py2.7 PEX)"
-  env:
-    - *py27_osx_test_config_env
-    - CACHE_NAME=macos10.12sanity.py27
-
-py36_osx_10_12_sanity_check: &py36_osx_10_12_sanity_check
-  <<: *py36_osx_test_config
-  <<: *base_osx_10_12_sanity_check
-  name: "OSX 10.12 sanity check (Py3.6 PEX)"
-  env:
-    - *py36_osx_test_config_env
-    - CACHE_NAME=macos10.12sanity.py36
-
-py37_osx_10_12_sanity_check: &py37_osx_10_12_sanity_check
-  <<: *py37_osx_test_config
-  <<: *base_osx_10_12_sanity_check
-  name: "OSX 10.12 sanity check (Py3.7 PEX)"
-  env:
-    - *py37_osx_test_config_env
-    - CACHE_NAME=macos10.12sanity.py37
-
 base_osx_10_13_sanity_check: &base_osx_10_13_sanity_check
   <<: *base_osx_sanity_check
   osx_image: xcode10.1
@@ -707,7 +678,7 @@ py27_osx_10_13_sanity_check: &py27_osx_10_13_sanity_check
   name: "OSX 10.13 sanity check (Py2.7 PEX)"
   env:
     - *py27_osx_test_config_env
-    - CACHE_NAME=macos10.13sanity.py27
+    - CACHE_NAME=macos_sanity.10_13.py27
 
 py36_osx_10_13_sanity_check: &py36_osx_10_13_sanity_check
   <<: *py36_osx_test_config
@@ -715,7 +686,7 @@ py36_osx_10_13_sanity_check: &py36_osx_10_13_sanity_check
   name: "OSX 10.13 sanity check (Py3.6 PEX)"
   env:
     - *py36_osx_test_config_env
-    - CACHE_NAME=macos10.13sanity.py36
+    - CACHE_NAME=macos_sanity.10_13.py36
 
 py37_osx_10_13_sanity_check: &py37_osx_10_13_sanity_check
   <<: *py37_osx_test_config
@@ -723,7 +694,35 @@ py37_osx_10_13_sanity_check: &py37_osx_10_13_sanity_check
   name: "OSX 10.13 sanity check (Py3.7 PEX)"
   env:
     - *py37_osx_test_config_env
-    - CACHE_NAME=macos10.13sanity.py37
+    - CACHE_NAME=macos_sanity.10_13.py37
+
+base_osx_10_14_sanity_check: &base_osx_10_14_sanity_check
+  <<: *base_osx_sanity_check
+  osx_image: xcode10.2
+
+py27_osx_10_14_sanity_check: &py27_osx_10_14_sanity_check
+  <<: *py27_osx_test_config
+  <<: *base_osx_10_14_sanity_check
+  name: "OSX 10.14 sanity check (Py2.7 PEX)"
+  env:
+    - *py27_osx_test_config_env
+    - CACHE_NAME=macos_sanity.10_14.py27
+
+py36_osx_10_14_sanity_check: &py36_osx_10_14_sanity_check
+  <<: *py36_osx_test_config
+  <<: *base_osx_10_14_sanity_check
+  name: "OSX 10.14 sanity check (Py3.6 PEX)"
+  env:
+    - *py36_osx_test_config_env
+    - CACHE_NAME=macos_sanity.10_14.py36
+
+py37_osx_10_14_sanity_check: &py37_osx_10_14_sanity_check
+  <<: *py37_osx_test_config
+  <<: *base_osx_10_14_sanity_check
+  name: "OSX 10.14 sanity check (Py3.7 PEX)"
+  env:
+    - *py37_osx_test_config_env
+    - CACHE_NAME=macos_sanity.10_14.py37
 
 # -------------------------------------------------------------------------
 # Platform specific tests
@@ -1443,13 +1442,13 @@ matrix:
       script:
         - ./build-support/bin/travis-ci.sh -7n
 
-    - <<: *py27_osx_10_12_sanity_check
-    - <<: *py36_osx_10_12_sanity_check
-    - <<: *py37_osx_10_12_sanity_check
-
     - <<: *py27_osx_10_13_sanity_check
     - <<: *py36_osx_10_13_sanity_check
     - <<: *py37_osx_10_13_sanity_check
+
+    - <<: *py27_osx_10_14_sanity_check
+    - <<: *py36_osx_10_14_sanity_check
+    - <<: *py37_osx_10_14_sanity_check
 
     - <<: *py27_osx_platform_tests
     - <<: *py36_osx_platform_tests
