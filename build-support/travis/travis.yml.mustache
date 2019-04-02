@@ -839,6 +839,8 @@ matrix:
     - <<: *py27_osx_build_engine
       stage: *bootstrap_cron
     - <<: *py36_osx_build_engine
+    - <<: *py36_osx_build_engine
+      stage: *bootstrap_cron
     - <<: *py37_osx_build_engine
 
     - <<: *py27_lint
