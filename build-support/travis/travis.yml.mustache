@@ -25,6 +25,7 @@ env:
     # PYENV_ROOT on those shards, or their Python will no longer work.
     - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
+    - AWS_CLI_ROOT="${HOME}/.aws_cli"
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
@@ -59,6 +60,7 @@ native_engine_cache_config: &native_engine_cache_config
     # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
     timeout: 500
     directories:
+      - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/pants_dev_deps.py27.venv
@@ -90,6 +92,7 @@ pants_run_cache_config: &pants_run_cache_config
     # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
     timeout: 500
     directories:
+      - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
