@@ -18,14 +18,9 @@ FROM pantsbuild/centos6:latest
 ARG PYTHON_27_VERSION=2.7.15
 # TODO(7064): remove this yum install line once we update the base Centos6 image to include this dependency.
 RUN yum install sqlite-devel -y
-# NB: we use a different PYENV_ROOT than we normally use in the other Dockerfiles to ensure
-# that we do not conflict with any Pyenv-installed interpreters already on the image. Specifically,
-# with https://github.com/pantsbuild/pants/pull/7064 we install Python 2.7 already onto the Centos6
-# image and must ensure that we do not accidently use that UCS4 interpreter.
-ENV PYENV_ROOT /pyenv-docker-build-ucs2
+ENV PYENV_ROOT "${PYENV_ROOT:-/pyenv-docker-build}"
 ENV PYENV_BIN ${PYENV_ROOT}/bin/pyenv
-RUN mkdir ${PYENV_ROOT}
-RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
+RUN if [[ ! -x "${PYENV_BIN}" ]]; then git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}; fi
 ENV PYTHON_CONFIGURE_OPTS --enable-unicode=ucs2
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '${PYENV_BIN} install ${PYTHON_27_VERSION}'
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '${PYENV_BIN} global ${PYTHON_27_VERSION}'
