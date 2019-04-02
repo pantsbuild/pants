@@ -6,8 +6,8 @@ This document describes releases leading up to the ``1.15.x`` ``stable`` series.
 1.15.0rc2 (4/02/2019)
 ---------------------
 
-As of this release, Pants running under Python 3 and Python 2 have reached implementation and
-performance parity! Although Python 3.7 will not be supported in the 1.15.x series, Python 3.6 can
+As of this release, Pants has reached implementation and performance parity when running under
+Python 3 and Python 2! Although Python 3.7 will not be supported in the 1.15.x series, Python 3.6 can
 now be considered a stable platform for running Pants.
 
 New Features
