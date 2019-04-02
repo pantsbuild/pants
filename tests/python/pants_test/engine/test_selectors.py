@@ -8,7 +8,7 @@ import ast
 import unittest
 from builtins import object, str
 
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 
 
 class AClass(object):
@@ -23,15 +23,6 @@ class BClass(object):
 
 class SubBClass(BClass):
   pass
-
-
-class SelectorsTest(unittest.TestCase):
-  def test_select_repr(self):
-    self.assert_repr("Select(AClass)", Select(AClass))
-    self.assert_repr("Select(AClass, optional=True)", Select(AClass, optional=True))
-
-  def assert_repr(self, expected, selector):
-    self.assertEqual(expected, repr(selector))
 
 
 class GetTest(unittest.TestCase):

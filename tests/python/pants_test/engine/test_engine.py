@@ -10,7 +10,7 @@ from textwrap import dedent
 
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants.util.objects import datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
@@ -36,7 +36,7 @@ def fn_raises(x):
   raise Exception('An exception for {}'.format(type(x).__name__))
 
 
-@rule(A, [Select(B)])
+@rule(A, [B])
 def nested_raise(x):
   fn_raises(x)
 
@@ -44,7 +44,7 @@ def nested_raise(x):
 class Fib(datatype([('val', int)])): pass
 
 
-@rule(Fib, [Select(int)])
+@rule(Fib, [int])
 def fib(n):
   if n < 2:
     yield Fib(n)
@@ -58,7 +58,7 @@ class MyInt(datatype([('val', int)])): pass
 class MyFloat(datatype([('val', float)])): pass
 
 
-@rule(MyFloat, [Select(MyInt)])
+@rule(MyFloat, [MyInt])
 def upcast(n):
   yield MyFloat(float(n.val))
 
@@ -150,15 +150,15 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
   def test_trace_multi(self):
     # Tests that when multiple distinct failures occur, they are each rendered.
 
-    @rule(D, [Select(B)])
+    @rule(D, [B])
     def d_from_b_nested_raise(b):
       fn_raises(b)
 
-    @rule(C, [Select(B)])
+    @rule(C, [B])
     def c_from_b_nested_raise(b):
       fn_raises(b)
 
-    @rule(A, [Select(C), Select(D)])
+    @rule(A, [C, D])
     def a_from_c_and_d(c, d):
       return A()
 

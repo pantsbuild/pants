@@ -16,7 +16,7 @@ from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import (RootRule, RuleIndex, SingletonRule, _GoalProduct, _RuleVisitor,
                                 console_rule, rule)
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.util import (TargetTable, assert_equal_with_printing, create_scheduler,
                                     run_rule)
@@ -63,7 +63,7 @@ _suba_root_rules = [RootRule(SubA)]
 _this_is_not_a_type = 3
 
 
-@console_rule('example', [Select(Console)])
+@console_rule('example', [Console])
 def a_console_rule_generator(console):
   a = yield Get(A, str('a str!'))
   console.print_stdout(str(a))
@@ -86,7 +86,7 @@ Rule entry A() had an unexpected type: <class 'pants_test.engine.test_rules.A'>.
 
 class RuleGraphTest(TestBase):
   def test_ruleset_with_missing_product_type(self):
-    @rule(A, [Select(B)])
+    @rule(A, [B])
     def a_from_b_noop(b):
       pass
 
@@ -103,15 +103,15 @@ class RuleGraphTest(TestBase):
                                     str(cm.exception))
 
   def test_ruleset_with_ambiguity(self):
-    @rule(A, [Select(C), Select(B)])
+    @rule(A, [C, B])
     def a_from_c_and_b(c, b):
       pass
 
-    @rule(A, [Select(B), Select(C)])
+    @rule(A, [B, C])
     def a_from_b_and_c(b, c):
       pass
 
-    @rule(D, [Select(A)])
+    @rule(D, [A])
     def d_from_a(a):
       pass
 
@@ -137,7 +137,7 @@ class RuleGraphTest(TestBase):
       str(cm.exception))
 
   def test_ruleset_with_rule_with_two_missing_selects(self):
-    @rule(A, [Select(B), Select(C)])
+    @rule(A, [B, C])
     def a_from_b_and_c(b, c):
       pass
 
@@ -154,7 +154,7 @@ class RuleGraphTest(TestBase):
       str(cm.exception))
 
   def test_ruleset_with_selector_only_provided_as_root_subject(self):
-    @rule(A, [Select(B)])
+    @rule(A, [B])
     def a_from_b(b):
       pass
 
@@ -162,11 +162,11 @@ class RuleGraphTest(TestBase):
     create_scheduler(rules)
 
   def test_ruleset_with_superclass_of_selected_type_produced_fails(self):
-    @rule(A, [Select(B)])
+    @rule(A, [B])
     def a_from_b(b):
       pass
 
-    @rule(B, [Select(SubA)])
+    @rule(B, [SubA])
     def b_from_suba(suba):
       pass
 
@@ -188,7 +188,7 @@ class RuleGraphTest(TestBase):
                                     str(cm.exception))
 
   def test_ruleset_with_failure_due_to_incompatible_subject_for_singleton(self):
-    @rule(D, [Select(C)])
+    @rule(D, [C])
     def d_from_c(c):
       pass
 
@@ -213,15 +213,15 @@ class RuleGraphTest(TestBase):
     # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
     # Only the unfulfillable one should be in the errors.
 
-    @rule(B, [Select(D)])
+    @rule(B, [D])
     def b_from_d(d):
       pass
 
-    @rule(D, [Select(A), Select(SubA)])
+    @rule(D, [A, SubA])
     def d_from_a_and_suba(a, suba):
       _ = yield Get(A, C, C())  # noqa: F841
 
-    @rule(A, [Select(C)])
+    @rule(A, [C])
     def a_from_c(c):
       pass
 
@@ -244,7 +244,7 @@ class RuleGraphTest(TestBase):
         str(cm.exception))
 
   def test_smallest_full_test(self):
-    @rule(A, [Select(SubA)])
+    @rule(A, [SubA])
     def a_from_suba(suba):
       pass
 
@@ -297,11 +297,11 @@ class RuleGraphTest(TestBase):
     self.assertTrue(12 < len(root_rule_lines)) # 2 lines per entry
 
   def test_smallest_full_test_multiple_root_subject_types(self):
-    @rule(A, [Select(SubA)])
+    @rule(A, [SubA])
     def a_from_suba(suba):
       pass
 
-    @rule(B, [Select(A)])
+    @rule(B, [A])
     def b_from_a(a):
       pass
 
@@ -333,7 +333,7 @@ class RuleGraphTest(TestBase):
                      fullgraph)
 
   def test_single_rule_depending_on_subject_selection(self):
-    @rule(A, [Select(SubA)])
+    @rule(A, [SubA])
     def a_from_suba(suba):
       pass
 
@@ -355,7 +355,7 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_multiple_selects(self):
-    @rule(A, [Select(SubA), Select(B)])
+    @rule(A, [SubA, B])
     def a_from_suba_and_b(suba, b):
       pass
 
@@ -390,15 +390,15 @@ class RuleGraphTest(TestBase):
     # This accounts for the fact that when someone uses Get (rather than Select), it's because
     # they intend for the Get's parameter to be consumed in the subgraph. Anything else would
     # be surprising.
-    @rule(A, [Select(SubA)])
+    @rule(A, [SubA])
     def a(sub_a):
       _ = yield Get(B, C())  # noqa: F841
 
-    @rule(B, [Select(SubA)])
+    @rule(B, [SubA])
     def b_from_suba(suba):
       pass
 
-    @rule(SubA, [Select(C)])
+    @rule(SubA, [C])
     def suba_from_c(c):
       pass
 
@@ -427,11 +427,11 @@ class RuleGraphTest(TestBase):
       )
 
   def test_one_level_of_recursion(self):
-    @rule(A, [Select(B)])
+    @rule(A, [B])
     def a_from_b(b):
       pass
 
-    @rule(B, [Select(SubA)])
+    @rule(B, [SubA])
     def b_from_suba(suba):
       pass
 
@@ -455,7 +455,7 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_noop_removal_in_subgraph(self):
-    @rule(A, [Select(C)])
+    @rule(A, [C])
     def a_from_c(c):
       pass
 
@@ -483,7 +483,7 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_noop_removal_full_single_subject_type(self):
-    @rule(A, [Select(C)])
+    @rule(A, [C])
     def a_from_c(c):
       pass
 
@@ -510,11 +510,11 @@ class RuleGraphTest(TestBase):
       fullgraph)
 
   def test_root_tuple_removed_when_no_matches(self):
-    @rule(A, [Select(C)])
+    @rule(A, [C])
     def a_from_c(c):
       pass
 
-    @rule(B, [Select(D), Select(A)])
+    @rule(B, [D, A])
     def b_from_d_and_a(d, a):
       pass
 
@@ -545,11 +545,11 @@ class RuleGraphTest(TestBase):
     # If a noop-able rule has rules that depend on it,
     # they should be removed from the graph.
 
-    @rule(B, [Select(C)])
+    @rule(B, [C])
     def b_from_c(c):
       pass
 
-    @rule(A, [Select(B)])
+    @rule(A, [B])
     def a_from_b(b):
       pass
 
@@ -576,7 +576,7 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_get_with_matching_singleton(self):
-    @rule(A, [Select(SubA)])
+    @rule(A, [SubA])
     def a_from_suba(suba):
       _ = yield Get(B, C, C())  # noqa: F841
 
@@ -599,15 +599,15 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_depends_on_multiple_one_noop(self):
-    @rule(B, [Select(A)])
+    @rule(B, [A])
     def b_from_a(a):
       pass
 
-    @rule(A, [Select(C)])
+    @rule(A, [C])
     def a_from_c(c):
       pass
 
-    @rule(A, [Select(SubA)])
+    @rule(A, [SubA])
     def a_from_suba(suba):
       pass
 
@@ -632,15 +632,15 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_multiple_depend_on_same_rule(self):
-    @rule(B, [Select(A)])
+    @rule(B, [A])
     def b_from_a(a):
       pass
 
-    @rule(C, [Select(A)])
+    @rule(C, [A])
     def c_from_a(a):
       pass
 
-    @rule(A, [Select(SubA)])
+    @rule(A, [SubA])
     def a_from_suba(suba):
       pass
 
@@ -674,7 +674,7 @@ class RuleGraphTest(TestBase):
     def a():
       _ = yield Get(B, D, D())  # noqa: F841
 
-    @rule(B, [Select(D)])
+    @rule(B, [D])
     def b_from_d(d):
       pass
 

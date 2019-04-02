@@ -330,7 +330,7 @@ def union(cls):
   @union
   class UnionBase(object): pass
 
-  @rule(B, [Select(X)])
+  @rule(B, [X])
   def get_some_union_type(x):
     result = yield Get(ResultType, UnionBase, x.f())
     # ...
@@ -404,6 +404,10 @@ class TaskRule(datatype([
               goal=None,
               dependency_optionables=None,
               cacheable=True):
+
+    for selector in input_selectors:
+      if not isinstance(selector, type):
+        raise ValueError('Parameter selectors must be types: got {}'.format(selector))
 
     return super(TaskRule, cls).__new__(
         cls,
