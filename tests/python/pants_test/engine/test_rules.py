@@ -18,7 +18,7 @@ from pants.engine.rules import (RootRule, RuleIndex, SingletonRule, _GoalProduct
                                 console_rule, rule)
 from pants.engine.selectors import Get
 from pants_test.engine.examples.parsers import JsonParser
-from pants_test.engine.util import (TargetTable, assert_equal_with_printing, create_scheduler,
+from pants_test.engine.util import (TARGET_TABLE, assert_equal_with_printing, create_scheduler,
                                     run_rule)
 from pants_test.test_base import TestBase
 
@@ -265,8 +265,7 @@ class RuleGraphTest(TestBase):
                      }""").strip(), fullgraph)
 
   def test_full_graph_for_planner_example(self):
-    symbol_table = TargetTable()
-    address_mapper = AddressMapper(JsonParser(symbol_table), '*.BUILD.json')
+    address_mapper = AddressMapper(JsonParser(TARGET_TABLE), '*.BUILD.json')
     rules = create_graph_rules(address_mapper) + create_fs_rules()
 
     fullgraph_str = self.create_full_graph(rules)

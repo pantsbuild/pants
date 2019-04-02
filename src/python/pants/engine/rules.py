@@ -432,6 +432,9 @@ class SingletonRule(datatype([('output_type', _type_field), 'value']), Rule):
   def from_instance(cls, obj):
     return cls(type(obj), obj)
 
+  def __hash__(self):
+    return hash((type(self), self.output_type))
+
 
 class RootRule(datatype([('output_type', _type_field)]), Rule):
   """Represents a root input to an execution of a rule graph.

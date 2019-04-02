@@ -203,7 +203,6 @@ class SchedulerService(PantsService):
     target_roots = TargetRootsCalculator.create(
       options=options,
       session=session.scheduler_session,
-      symbol_table=session.symbol_table,
       exclude_patterns=tuple(global_options.exclude_target_regexp) if global_options.exclude_target_regexp else tuple(),
       tags=tuple(global_options.tag) if global_options.tag else tuple()
     )

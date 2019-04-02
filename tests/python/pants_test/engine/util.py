@@ -112,10 +112,7 @@ class Target(Struct):
     pass
 
 
-class TargetTable(SymbolTable):
-  @classmethod
-  def table(cls):
-    return {'struct': Struct, 'target': Target}
+TARGET_TABLE = SymbolTable({'struct': Struct, 'target': Target})
 
 
 def assert_equal_with_printing(test_case, expected, actual):
