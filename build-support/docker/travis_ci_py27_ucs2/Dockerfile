@@ -20,14 +20,13 @@ ARG PYTHON_27_VERSION_UCS2=2.7.15
 RUN yum install sqlite-devel -y
 ENV PYENV_ROOT "${PYENV_ROOT:-/pyenv-docker-build}"
 ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
-ENV PYENV_PYTHON_27_BIN_FOLDER "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/bin"
 RUN if [[ ! -d "${PYENV_ROOT}" ]]; then git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}; fi
 ENV PYTHON_CONFIGURE_OPTS --enable-unicode=ucs2
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '${PYENV_BIN} install ${PYTHON_27_VERSION_UCS2}'
 RUN /usr/bin/scl enable devtoolset-7 -- bash -c '${PYENV_BIN} global ${PYTHON_27_VERSION_UCS2}'
-ENV PATH "${PYENV_PYTHON_27_BIN_FOLDER}:${PATH}"
-ENV PY "${PYENV_PYTHON_27_BIN_FOLDER}/python2.7"
-ENV PEX_PYTHON_PATH "${PYENV_PYTHON_27_BIN_FOLDER}/python2.7"
+ENV PATH "${PYENV_ROOT}/shims:${PATH}"
+ENV PY "${PYENV_ROOT}/shims/python2.7"
+ENV PEX_PYTHON_PATH "${PYENV_ROOT}/shims/python2.7"
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
