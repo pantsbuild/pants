@@ -97,7 +97,7 @@ class RuleGraphTest(TestBase):
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
-                       (A, [Select(B)], a_from_b_noop()):
+                       (A, [B], a_from_b_noop()):
                          No rule was available to compute B with parameter type SubA
                      """).strip(),
                                     str(cm.exception))
@@ -129,10 +129,10 @@ class RuleGraphTest(TestBase):
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
-                       (D, [Select(A)], d_from_a()):
-                         ambiguous rules for Select(A) with parameter types (B+C):
-                           (A, [Select(B), Select(C)], a_from_b_and_c()) for (B+C)
-                           (A, [Select(C), Select(B)], a_from_c_and_b()) for (B+C)
+                       (D, [A], d_from_a()):
+                         Ambiguous rules to compute A with parameter types (B+C):
+                           (A, [B, C], a_from_b_and_c()) for (B+C)
+                           (A, [C, B], a_from_c_and_b()) for (B+C)
                      """).strip(),
       str(cm.exception))
 
@@ -147,7 +147,7 @@ class RuleGraphTest(TestBase):
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
-                       (A, [Select(B), Select(C)], a_from_b_and_c()):
+                       (A, [B, C], a_from_b_and_c()):
                          No rule was available to compute B with parameter type SubA
                          No rule was available to compute C with parameter type SubA
                      """).strip(),
@@ -180,9 +180,9 @@ class RuleGraphTest(TestBase):
       create_scheduler(rules)
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 2
-                                        (A, [Select(B)], a_from_b()):
+                                        (A, [B], a_from_b()):
                                           No rule was available to compute B with parameter type C
-                                        (B, [Select(SubA)], b_from_suba()):
+                                        (B, [SubA], b_from_suba()):
                                           No rule was available to compute SubA with parameter type C
                                       """).strip(),
                                     str(cm.exception))
@@ -204,7 +204,7 @@ class RuleGraphTest(TestBase):
     # This error message could note near matches like the singleton.
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 1
-                                        (D, [Select(C)], d_from_c()):
+                                        (D, [C], d_from_c()):
                                           No rule was available to compute C with parameter type A
                                       """).strip(),
                                     str(cm.exception))
@@ -236,9 +236,9 @@ class RuleGraphTest(TestBase):
 
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 2
-                        (B, [Select(D)], b_from_d()):
+                        (B, [D], b_from_d()):
                           No rule was available to compute D with parameter type SubA
-                        (D, [Select(A), Select(SubA)], [Get(A, C)], d_from_a_and_suba()):
+                        (D, [A, SubA], [Get(A, C)], d_from_a_and_suba()):
                           No rule was available to compute A with parameter type SubA
                       """).strip(),
         str(cm.exception))
@@ -259,9 +259,9 @@ class RuleGraphTest(TestBase):
                        // root subject types: SubA
                        // root entries
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [Select(SubA)], a_from_suba()) for SubA"}
+                         "Select(A) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
                        // internal entries
-                         "(A, [Select(SubA)], a_from_suba()) for SubA" -> {"Param(SubA)"}
+                         "(A, [SubA], a_from_suba()) for SubA" -> {"Param(SubA)"}
                      }""").strip(), fullgraph)
 
   def test_full_graph_for_planner_example(self):
@@ -320,15 +320,15 @@ class RuleGraphTest(TestBase):
                          "Select(A) for A" [color=blue]
                          "Select(A) for A" -> {"Param(A)"}
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [Select(SubA)], a_from_suba()) for SubA"}
+                         "Select(A) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
                          "Select(B) for A" [color=blue]
-                         "Select(B) for A" -> {"(B, [Select(A)], b_from_a()) for A"}
+                         "Select(B) for A" -> {"(B, [A], b_from_a()) for A"}
                          "Select(B) for SubA" [color=blue]
-                         "Select(B) for SubA" -> {"(B, [Select(A)], b_from_a()) for SubA"}
+                         "Select(B) for SubA" -> {"(B, [A], b_from_a()) for SubA"}
                        // internal entries
-                         "(A, [Select(SubA)], a_from_suba()) for SubA" -> {"Param(SubA)"}
-                         "(B, [Select(A)], b_from_a()) for A" -> {"Param(A)"}
-                         "(B, [Select(A)], b_from_a()) for SubA" -> {"(A, [Select(SubA)], a_from_suba()) for SubA"}
+                         "(A, [SubA], a_from_suba()) for SubA" -> {"Param(SubA)"}
+                         "(B, [A], b_from_a()) for A" -> {"Param(A)"}
+                         "(B, [A], b_from_a()) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
                      }""").strip(),
                      fullgraph)
 
@@ -348,9 +348,9 @@ class RuleGraphTest(TestBase):
                        // root subject types: SubA
                        // root entries
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [Select(SubA)], a_from_suba()) for SubA"}
+                         "Select(A) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
                        // internal entries
-                         "(A, [Select(SubA)], a_from_suba()) for SubA" -> {"Param(SubA)"}
+                         "(A, [SubA], a_from_suba()) for SubA" -> {"Param(SubA)"}
                      }""").strip(),
       subgraph)
 
@@ -375,9 +375,9 @@ class RuleGraphTest(TestBase):
                        // root subject types: SubA
                        // root entries
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [Select(SubA), Select(B)], a_from_suba_and_b()) for SubA"}
+                         "Select(A) for SubA" -> {"(A, [SubA, B], a_from_suba_and_b()) for SubA"}
                        // internal entries
-                         "(A, [Select(SubA), Select(B)], a_from_suba_and_b()) for SubA" -> {"(B, [], b()) for ()" "Param(SubA)"}
+                         "(A, [SubA, B], a_from_suba_and_b()) for SubA" -> {"(B, [], b()) for ()" "Param(SubA)"}
                          "(B, [], b()) for ()" -> {}
                      }""").strip(),
       subgraph)
@@ -415,12 +415,12 @@ class RuleGraphTest(TestBase):
               // root subject types: SubA
               // root entries
                 "Select(A) for SubA" [color=blue]
-                "Select(A) for SubA" -> {"(A, [Select(SubA)], [Get(B, C)], a()) for SubA"}
+                "Select(A) for SubA" -> {"(A, [SubA], [Get(B, C)], a()) for SubA"}
               // internal entries
-                "(A, [Select(SubA)], [Get(B, C)], a()) for SubA" -> {"(B, [Select(SubA)], b_from_suba()) for C" "Param(SubA)"}
-                "(B, [Select(SubA)], b_from_suba()) for C" -> {"(SubA, [Select(C)], suba_from_c()) for C"}
-                "(B, [Select(SubA)], b_from_suba()) for SubA" -> {"Param(SubA)"}
-                "(SubA, [Select(C)], suba_from_c()) for C" -> {"Param(C)"}
+                "(A, [SubA], [Get(B, C)], a()) for SubA" -> {"(B, [SubA], b_from_suba()) for C" "Param(SubA)"}
+                "(B, [SubA], b_from_suba()) for C" -> {"(SubA, [C], suba_from_c()) for C"}
+                "(B, [SubA], b_from_suba()) for SubA" -> {"Param(SubA)"}
+                "(SubA, [C], suba_from_c()) for C" -> {"Param(C)"}
             }
         """).strip(),
         subgraph,
@@ -447,10 +447,10 @@ class RuleGraphTest(TestBase):
                        // root subject types: SubA
                        // root entries
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [Select(B)], a_from_b()) for SubA"}
+                         "Select(A) for SubA" -> {"(A, [B], a_from_b()) for SubA"}
                        // internal entries
-                         "(A, [Select(B)], a_from_b()) for SubA" -> {"(B, [Select(SubA)], b_from_suba()) for SubA"}
-                         "(B, [Select(SubA)], b_from_suba()) for SubA" -> {"Param(SubA)"}
+                         "(A, [B], a_from_b()) for SubA" -> {"(B, [SubA], b_from_suba()) for SubA"}
+                         "(B, [SubA], b_from_suba()) for SubA" -> {"Param(SubA)"}
                      }""").strip(),
       subgraph)
 
@@ -532,12 +532,12 @@ class RuleGraphTest(TestBase):
                        // root subject types: C, D
                        // root entries
                          "Select(A) for C" [color=blue]
-                         "Select(A) for C" -> {"(A, [Select(C)], a_from_c()) for C"}
+                         "Select(A) for C" -> {"(A, [C], a_from_c()) for C"}
                          "Select(B) for (C+D)" [color=blue]
-                         "Select(B) for (C+D)" -> {"(B, [Select(D), Select(A)], b_from_d_and_a()) for (C+D)"}
+                         "Select(B) for (C+D)" -> {"(B, [D, A], b_from_d_and_a()) for (C+D)"}
                        // internal entries
-                         "(A, [Select(C)], a_from_c()) for C" -> {"Param(C)"}
-                         "(B, [Select(D), Select(A)], b_from_d_and_a()) for (C+D)" -> {"(A, [Select(C)], a_from_c()) for C" "Param(D)"}
+                         "(A, [C], a_from_c()) for C" -> {"Param(C)"}
+                         "(B, [D, A], b_from_d_and_a()) for (C+D)" -> {"(A, [C], a_from_c()) for C" "Param(D)"}
                      }""").strip(),
       fullgraph)
 
@@ -592,9 +592,9 @@ class RuleGraphTest(TestBase):
                        // root subject types: SubA
                        // root entries
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [Select(SubA)], [Get(B, C)], a_from_suba()) for SubA"}
+                         "Select(A) for SubA" -> {"(A, [SubA], [Get(B, C)], a_from_suba()) for SubA"}
                        // internal entries
-                         "(A, [Select(SubA)], [Get(B, C)], a_from_suba()) for SubA" -> {"Param(SubA)" "Singleton(B(), B)"}
+                         "(A, [SubA], [Get(B, C)], a_from_suba()) for SubA" -> {"Param(SubA)" "Singleton(B(), B)"}
                      }""").strip(),
       subgraph)
 
@@ -624,10 +624,10 @@ class RuleGraphTest(TestBase):
                        // root subject types: SubA
                        // root entries
                          "Select(B) for SubA" [color=blue]
-                         "Select(B) for SubA" -> {"(B, [Select(A)], b_from_a()) for SubA"}
+                         "Select(B) for SubA" -> {"(B, [A], b_from_a()) for SubA"}
                        // internal entries
-                         "(A, [Select(SubA)], a_from_suba()) for SubA" -> {"Param(SubA)"}
-                         "(B, [Select(A)], b_from_a()) for SubA" -> {"(A, [Select(SubA)], a_from_suba()) for SubA"}
+                         "(A, [SubA], a_from_suba()) for SubA" -> {"Param(SubA)"}
+                         "(B, [A], b_from_a()) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
                      }""").strip(),
       subgraph)
 
@@ -657,15 +657,15 @@ class RuleGraphTest(TestBase):
                        // root subject types: SubA
                        // root entries
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, [Select(SubA)], a_from_suba()) for SubA"}
+                         "Select(A) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
                          "Select(B) for SubA" [color=blue]
-                         "Select(B) for SubA" -> {"(B, [Select(A)], b_from_a()) for SubA"}
+                         "Select(B) for SubA" -> {"(B, [A], b_from_a()) for SubA"}
                          "Select(C) for SubA" [color=blue]
-                         "Select(C) for SubA" -> {"(C, [Select(A)], c_from_a()) for SubA"}
+                         "Select(C) for SubA" -> {"(C, [A], c_from_a()) for SubA"}
                        // internal entries
-                         "(A, [Select(SubA)], a_from_suba()) for SubA" -> {"Param(SubA)"}
-                         "(B, [Select(A)], b_from_a()) for SubA" -> {"(A, [Select(SubA)], a_from_suba()) for SubA"}
-                         "(C, [Select(A)], c_from_a()) for SubA" -> {"(A, [Select(SubA)], a_from_suba()) for SubA"}
+                         "(A, [SubA], a_from_suba()) for SubA" -> {"Param(SubA)"}
+                         "(B, [A], b_from_a()) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
+                         "(C, [A], c_from_a()) for SubA" -> {"(A, [SubA], a_from_suba()) for SubA"}
                      }""").strip(),
       subgraph)
 
@@ -692,8 +692,8 @@ class RuleGraphTest(TestBase):
                          "Select(A) for ()" [color=blue]
                          "Select(A) for ()" -> {"(A, [], [Get(B, D)], a()) for ()"}
                        // internal entries
-                         "(A, [], [Get(B, D)], a()) for ()" -> {"(B, [Select(D)], b_from_d()) for D"}
-                         "(B, [Select(D)], b_from_d()) for D" -> {"Param(D)"}
+                         "(A, [], [Get(B, D)], a()) for ()" -> {"(B, [D], b_from_d()) for D"}
+                         "(B, [D], b_from_d()) for D" -> {"Param(D)"}
                      }""").strip(),
                                     subgraph)
 
