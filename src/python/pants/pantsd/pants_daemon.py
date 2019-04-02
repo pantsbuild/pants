@@ -63,7 +63,6 @@ class _LoggerStream(object):
   def write(self, msg):
     msg = ensure_text(msg)
     with open("/tmp/plog", "a") as l:
-      l.write("BL: Logging {} from stream {}\n".format(msg, self))
     for line in msg.rstrip().splitlines():
       # The log only accepts text, and will raise a decoding error if the default encoding is ascii
       # if provided a bytes input for unicode text.

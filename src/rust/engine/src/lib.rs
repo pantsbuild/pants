@@ -815,7 +815,6 @@ pub extern "C" fn materialize_directories(
 pub extern "C" fn init_logging(level: u64) {
   Logger::init(level);
   log::debug!("Rust logger initialized with level {}", level);
-  eprintln!("BL: Rust logger initialized with level {}", level);
 }
 
 #[no_mangle]

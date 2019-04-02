@@ -45,7 +45,6 @@ def _maybe_configure_extended_logging(logger):
 def init_rust_logger(level):
   native = Native()
   levelno = get_numeric_level(level)
-  print("BL: {}, I want to init logging with level {}".format(os.getpid(), level))
   native.init_rust_logging(levelno)
 
 
@@ -146,7 +145,6 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   for handler in logger.handlers:
     logger.removeHandler(handler)
 
-  print("BL: {}, Setup logging with log_dir {}, console_stream {}, level {}".format(os.getpid(), log_dir, console_stream, level))
 
   if console_stream:
     native_handler = create_native_stderr_log_handler(level, native, stream=console_stream)
@@ -158,10 +156,8 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
 
     native_handler = create_native_pantsd_file_log_handler(level, native, log_filename)
     file_handler = native_handler
-    print("BL: {}, Configured file handler".format(os.getpid()))
     logger.addHandler(native_handler)
 
-    #raise ValueError("BL: {} I don't feel like initializing logging with level {}".format(os.getpid(), level))
 
   logger.setLevel(level)
 

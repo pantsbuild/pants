@@ -673,7 +673,6 @@ class Native(Singleton):
     return self.context.raise_or_return(result)
 
   def init_rust_logging(self, level):
-    print("BL: Pythion process {} initialized logging with level {}".format(os.getpid(), level))
     return self.lib.init_logging(level)
 
   def maybe_encode_utf8(self, s):

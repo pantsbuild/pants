@@ -97,7 +97,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       pantsd_run(['-ldebug', 'help'])
       checker.assert_started()
 
-      print("BL: Checker-pid: {}".format(checker.pid))
       os.kill(checker.pid, signal.SIGUSR2)
 
       # Wait for log flush.

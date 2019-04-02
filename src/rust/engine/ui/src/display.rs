@@ -125,7 +125,6 @@ impl EngineDisplay {
   }
 
   fn start_raw_mode(&mut self) -> Result<()> {
-    eprintln!("BL: Start raw mode");
     match self.terminal {
       Console::Terminal(ref mut t) => t.activate_raw_mode(),
       _ => Ok(()),
