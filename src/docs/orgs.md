@@ -47,11 +47,18 @@ set -x
 set -o
 set -e
 
+# Disable Zinc incremental compilation to ensure no historical cruft pollutes the build used for CI testing.
+export PANTS_COMPILE_ZINC_INCREMENTAL=False
+
 changed=("$(./pants --changed-parent=origin/master list)")
 dependees=("$(./pants dependees --dependees-transitive --dependees-closed ${changed[@]})")
 minimized=("$(./pants minimize ${dependees[@]})")
 ./pants filter --filter-type=-jvm_binary ${minimized[@]} | sort > minimized.txt
 
-# Disable Zinc incremental compilation to ensure no historical cruft pollutes the build used for CI testing.
-./pants --target-spec-file=minimized.txt compile.zinc --no-incremental test
+# In other contexts we can use --target-spec-file to read the list of targets to operate on all at
+# once, but that would merge all the classpaths of all the test targets together, which may cause
+# errors. See https://www.pantsbuild.org/3rdparty_jvm.html#managing-transitive-dependencies.
+for target in $(cat minimized.txt); do
+  ./pants test $target
+done
 ```
