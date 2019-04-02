@@ -282,6 +282,7 @@ base_linux_build_engine: &base_linux_build_engine
   # Callers of this anchor are expected to provide values in their `env` for
   # `docker_image_name` and `docker_run_command` (i.e. the bash command(s) to run).
   script:
+    - python3.6 --version
     - >
       {{>docker_build_image}}
     - >
@@ -346,6 +347,7 @@ py27_osx_build_engine: &py27_osx_build_engine
     - CACHE_NAME=osxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
   script:
+    - python3.6 --version
     - ./build-support/bin/ci.sh -2b
     #  Also build fs_util.
     - ./build-support/bin/release.sh -f
@@ -388,7 +390,7 @@ py27_lint: &py27_lint
     - *py27_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py27
   script:
-    - ./build-support/bin/travis-ci.sh -fmrt2
+    - python3.6 --version && ./build-support/bin/travis-ci.sh -fmrt2
 
 py36_lint: &py36_lint
   <<: *py36_linux_test_config
@@ -467,6 +469,7 @@ base_linux_build_wheels: &base_linux_build_wheels
   # Callers of this anchor are expected to provide values in their `env` for
   # `docker_image_name` and `docker_run_command` (i.e. the bash command(s) to run).
   script:
+    - python3.6 --version
     - >
       {{>docker_build_image}}
     - >
@@ -524,6 +527,7 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs2
   script:
+    - python3.6 --version
     - ./build-support/bin/check_pants_pex_abi.py cp27m
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
@@ -543,6 +547,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     {{>before_install_osx}}
     - ./build-support/bin/install_python_for_ci.sh 2.7.13
   script:
+    - python3.6 --version
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
@@ -570,7 +575,7 @@ base_rust_tests: &base_rust_tests
     - ulimit -c unlimited
     - ulimit -n 8192
   script:
-    - ./build-support/bin/travis-ci.sh -e
+    - python3.6 --version && ./build-support/bin/travis-ci.sh -e
 
 linux_rust_tests: &linux_rust_tests
   <<: *base_rust_tests
@@ -608,7 +613,7 @@ osx_rust_tests: &osx_rust_tests
 
 base_osx_sanity_check: &base_osx_sanity_check
   script:
-    - MODE=debug ./build-support/bin/travis-ci.sh -m
+    - python3.6 --version && MODE=debug ./build-support/bin/travis-ci.sh -m
 
 # TODO: Update this to use 10.14 once it is available
 base_osx_10_12_sanity_check: &base_osx_10_12_sanity_check
@@ -678,7 +683,7 @@ py27_osx_platform_tests: &py27_osx_platform_tests
     - *py27_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py27
   script:
-    - ./build-support/bin/travis-ci.sh -z2
+    - python3.6 --version && ./build-support/bin/travis-ci.sh -z2
 
 py36_osx_platform_tests: &py36_osx_platform_tests
   <<: *py36_osx_test_config
@@ -713,7 +718,7 @@ py27_jvm_tests: &py27_jvm_tests
     - *py27_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py27
   script:
-    - ./build-support/bin/travis-ci.sh -j2
+    - python3.6 --version && ./build-support/bin/travis-ci.sh -j2
 
 py36_jvm_tests: &py36_jvm_tests
   <<: *py36_linux_test_config
@@ -850,7 +855,7 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=linuxunittests.py27
       script:
-        - ./build-support/bin/travis-ci.sh -2lp
+        - python3.6 --version && ./build-support/bin/travis-ci.sh -2lp
 
     - <<: *py36_linux_test_config
       name: "Unit tests (Py3.6 PEX)"
@@ -903,7 +908,7 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=cronshard{{.}}
       script:
-        - ./build-support/bin/travis-ci.sh -c2 -i {{.}}/{{integration_shards_length}}
+        - python3.6 --version && ./build-support/bin/travis-ci.sh -c2 -i {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 
@@ -917,7 +922,7 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py27
       script:
-        - ./build-support/bin/travis-ci.sh -2n
+        - python3.6 --version &&./build-support/bin/travis-ci.sh -2n
 
     - <<: *py36_linux_test_config
       name: "Python contrib tests (Py3.6 PEX)"
