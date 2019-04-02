@@ -21,8 +21,9 @@ env:
     - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
     - PYENV_PY36_VERSION=3.6.8
     - PYENV_PY37_VERSION=3.7.2
+    # NB: Linux shards use Pyenv to pre-install Python. We must not override
+    # PYENV_ROOT on those shards, or their Python will no longer work.
     - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
-    - PYENV_BIN="${PYENV_ROOT}/bin/pyenv"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
     - AWS_CLI_ROOT="${HOME}/.aws_cli"
 
@@ -60,6 +61,7 @@ native_engine_cache_config: &native_engine_cache_config
     timeout: 500
     directories:
       - ${AWS_CLI_ROOT}
+      - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
       - build-support/pants_dev_deps.py27.venv
       - build-support/pants_dev_deps.py36.venv
@@ -91,6 +93,7 @@ pants_run_cache_config: &pants_run_cache_config
     timeout: 500
     directories:
       - ${AWS_CLI_ROOT}
+      - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -98,32 +101,6 @@ pants_run_cache_config: &pants_run_cache_config
       # using its own isolated cache:
       #   https://github.com/pantsbuild/pants/issues/2485
       - ${HOME}/.npm
-
-# -------------------------------------------------------------------------
-# Pyenv
-# -------------------------------------------------------------------------
-
-# On several shards, the system installed Pyenv is too outdated so does not
-# have the Python versions we need, like Python 3.7. To get around this
-# we directly clone the Pyenv repo.
-
-pyenv_setup: &pyenv_setup >
-  if [ ! -d "${PYENV_BIN}" ]; then
-  rm -rf "${PYENV_ROOT}";
-  git clone https://github.com/pyenv/pyenv "${PYENV_ROOT}";
-  fi
-
-pyenv_install_py36: &pyenv_install_py36 >
-  "${PYENV_BIN}" install "${PYENV_PY36_VERSION}"
-
-pyenv_install_py37: &pyenv_install_py37 >
-  "${PYENV_BIN}" install "${PYENV_PY37_VERSION}"
-
-pyenv_global_py36: &pyenv_global_py36 >
-  "${PYENV_BIN}" global "${PYENV_PY36_VERSION}"
-
-pyenv_global_py37: &pyenv_global_py37 >
-  "${PYENV_BIN}" global "${PYENV_PY37_VERSION}"
 
 # -------------------------------------------------------------------------
 # AWS
@@ -227,9 +204,7 @@ py36_osx_config: &py36_osx_config
       {{>env_osx_with_pyenv}}
   before_install:
     {{>before_install_osx}}
-    - *pyenv_setup
-    - *pyenv_install_py36
-    - *pyenv_global_py36
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
 
 py37_osx_config: &py37_osx_config
   <<: *base_osx_config
@@ -242,9 +217,7 @@ py37_osx_config: &py37_osx_config
       {{>env_osx_with_pyenv}}
   before_install:
     {{>before_install_osx}}
-    - *pyenv_setup
-    - *pyenv_install_py37
-    - *pyenv_global_py37
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY37_VERSION}"
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
@@ -573,9 +546,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - PY=${PYENV_ROOT}/shims/python2.7
   before_install:
     {{>before_install_osx}}
-    - *pyenv_setup
-    - ${PYENV_BIN} install 2.7.13
-    - ${PYENV_BIN} global 2.7.13
+    - ./build-support/bin/install_python_for_ci.sh 2.7.13
   script:
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu
@@ -775,7 +746,13 @@ py37_jvm_tests: &py37_jvm_tests
 
 base_deploy: &base_deploy
   os: linux
+  dist: trusty
   language: python
+  python:
+    - "2.7"
+    - "3.6"
+  before_install:
+    - pyenv global 2.7.14 3.6.3
   env:
     - &base_deploy_env RUN_PANTS_FROM_PEX=1
 
@@ -803,7 +780,6 @@ base_deploy_stable_muliplatform_pex: &base_deploy_stable_muliplatform_pex
 py27_deploy_stable_multiplatform_pex: &py27_deploy_stable_multiplatform_pex
   <<: *base_deploy_stable_muliplatform_pex
   name: "Deploy stable multiplatform pants.pex (Py2.7 PEX)"
-  python: 2.7
   env:
     - *base_deploy_env
     - *base_deploy_stable_env
@@ -813,7 +789,6 @@ py27_deploy_stable_multiplatform_pex: &py27_deploy_stable_multiplatform_pex
 py36_deploy_stable_multiplatform_pex: &py36_deploy_stable_multiplatform_pex
   <<: *base_deploy_stable_muliplatform_pex
   name: "Deploy stable multiplatform pants.pex (Py3.6 PEX)"
-  python: 3.6
   env:
     - *base_deploy_env
     - *base_deploy_stable_env
@@ -821,7 +796,7 @@ py36_deploy_stable_multiplatform_pex: &py36_deploy_stable_multiplatform_pex
     - CACHE_NAME=linuxpexdeploystable.py36
 
 base_deploy_unstable_multiplatform_pex: &base_deploy_unstable_multiplatform_pex
-  <<: *base_deploy_unstable_multiplatform_pex
+  <<: *base_deploy
   stage: *build_unstable
   env:
     - &base_deploy_unstable_env PREPARE_DEPLOY=1
@@ -833,7 +808,6 @@ base_deploy_unstable_multiplatform_pex: &base_deploy_unstable_multiplatform_pex
 py27_deploy_unstable_multiplatform_pex: &py27_deploy_unstable_multiplatform_pex
   <<: *base_deploy_unstable_multiplatform_pex
   name: "Deploy unstable multiplatform pants.pex (Py2.7 PEX)"
-  python: 2.7
   env:
     - *base_deploy_env
     - *base_deploy_unstable_env
@@ -843,9 +817,6 @@ py27_deploy_unstable_multiplatform_pex: &py27_deploy_unstable_multiplatform_pex
 py36_deploy_unstable_multiplatform_pex: &py36_deploy_unstable_multiplatform_pex
   <<: *base_deploy_unstable_multiplatform_pex
   name: "Deploy unstable multiplatform pants.pex (Py3.6 PEX)"
-  python: 3.6
-  before_install:
-    - pyenv global 3.6.3
   env:
     - *base_deploy_env
     - *base_deploy_unstable_env
