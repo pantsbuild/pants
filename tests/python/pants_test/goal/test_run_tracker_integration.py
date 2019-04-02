@@ -13,11 +13,12 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class RunTrackerIntegrationTest(PantsRunIntegrationTest):
-  def test_stats_local_json_file(self):
+  def test_stats_local_json_file_v1(self):
     with temporary_file_path() as tmpfile:
       pants_run = self.run_pants([
         'test',
         '--run-tracker-stats-local-json-file={}'.format(tmpfile),
+        '--run-tracker-stats-version=1',
         '--run-tracker-stats-option-scopes-to-record=["GLOBAL", "GLOBAL^enable_pantsd", "compile.zinc^capture_classpath"]',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
       ])
@@ -38,6 +39,23 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         self.assertEqual(stats_json['recorded_options']['GLOBAL']['level'], 'info')
         self.assertIs(stats_json['recorded_options']['GLOBAL^enable_pantsd'], False)
         self.assertEqual(stats_json['recorded_options']['compile.zinc^capture_classpath'], True)
+
+  def test_stats_local_json_file_v2(self):
+    with temporary_file_path() as tmpfile:
+      pants_run = self.run_pants([
+        'test',
+        '--run-tracker-stats-local-json-file={}'.format(tmpfile),
+        '--run-tracker-stats-version=2',
+        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
+      ])
+      self.assert_success(pants_run)
+
+      with open(tmpfile, 'r') as fp:
+        stats_json = json.load(fp)
+        self.assertIn('artifact_cache_stats', stats_json)
+        self.assertIn('run_info', stats_json)
+        self.assertIn('pantsd_stats', stats_json)
+        self.assertIn('workunits', stats_json)
 
   def test_workunit_failure(self):
     pants_run = self.run_pants([

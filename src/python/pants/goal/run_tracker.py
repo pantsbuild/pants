@@ -88,6 +88,8 @@ class RunTracker(Subsystem):
                   'auth provider name is only used to provide a more helpful error message.')
     register('--stats-upload-timeout', advanced=True, type=int, default=2,
              help='Wait at most this many seconds for the stats upload to complete.')
+    register('--stats-version', advanced=True, type=int, default=1, choices=[1, 2],
+             help='Format of stats JSON for uploads and local json file.')
     register('--num-foreground-workers', advanced=True, type=int,
              default=multiprocessing.cpu_count(),
              help='Number of threads for foreground work.')
@@ -408,19 +410,24 @@ class RunTracker(Subsystem):
       run_information['target_data'] = ast.literal_eval(target_data)
     return run_information
 
+  def _stats(self):
+    if self.get_options().stats_version == 1:
+      return {
+        'run_info': self.run_information(),
+        'cumulative_timings': self.cumulative_timings.get_all(),
+        'self_timings': self.self_timings.get_all(),
+        'critical_path_timings': self.get_critical_path_timings().get_all(),
+        'artifact_cache_stats': self.artifact_cache_stats.get_all(),
+        'pantsd_stats': self.pantsd_stats.get_all(),
+        'outcomes': self.outcomes,
+        'recorded_options': self._get_options_to_record(),
+      }
+    else:
+      return json.loads(open(self.report.json_reporter.report_path).read())
+
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
-
-    stats = {
-      'run_info': self.run_information(),
-      'cumulative_timings': self.cumulative_timings.get_all(),
-      'self_timings': self.self_timings.get_all(),
-      'critical_path_timings': self.get_critical_path_timings().get_all(),
-      'artifact_cache_stats': self.artifact_cache_stats.get_all(),
-      'pantsd_stats': self.pantsd_stats.get_all(),
-      'outcomes': self.outcomes,
-      'recorded_options': self._get_options_to_record(),
-    }
+    stats = self._stats()
 
     # Write stats to user-defined json file.
     stats_json_file_name = self.get_options().stats_local_json_file

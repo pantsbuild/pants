@@ -72,6 +72,10 @@ class Report(object):
     # We synchronize on this, to support parallel execution.
     self._lock = threading.Lock()
 
+  @property
+  def json_reporter(self):
+    return self._reporters['json']
+
   def open(self):
     with self._lock:
       for reporter in self._reporters.values():
