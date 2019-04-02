@@ -89,3 +89,7 @@ impl From<PythonLogLevel> for log::Level {
     }
   }
 }
+
+mod pants_packages {
+  include!(concat!(env!("OUT_DIR"), "/packages.rs"));
+}

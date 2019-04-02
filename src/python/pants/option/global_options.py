@@ -110,6 +110,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')
+    register('--show-rust-3rdparty-logs', type=bool, default=False, advanced=True,
+             help='Whether to show/hide logging done by 3rdparty rust crates used by the pants '
+                  'engine.')
 
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
