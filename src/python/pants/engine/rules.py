@@ -23,7 +23,7 @@ from pants.util.collections import assert_single_element
 from pants.util.collections_abc_backport import Iterable, OrderedDict
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.objects import SubclassesOf, TypedCollection, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -382,7 +382,7 @@ class Rule(AbstractClass):
 
 class TaskRule(datatype([
   ('output_type', _type_field),
-  ('input_selectors', tuple),
+  ('input_selectors', TypedCollection(SubclassesOf(type))),
   ('input_gets', tuple),
   'func',
   'goal',
@@ -404,10 +404,6 @@ class TaskRule(datatype([
               goal=None,
               dependency_optionables=None,
               cacheable=True):
-
-    for selector in input_selectors:
-      if not isinstance(selector, type):
-        raise ValueError('Parameter selectors must be types: got {}'.format(selector))
 
     return super(TaskRule, cls).__new__(
         cls,
