@@ -6,6 +6,7 @@ use crate::node::{EntryId, Node, NodeContext, NodeError};
 
 use futures::future::{self, Future};
 use futures::sync::oneshot;
+use log::{self, trace};
 use parking_lot::Mutex;
 
 use boxfuture::{BoxFuture, Boxable};
@@ -283,6 +284,7 @@ impl<N: Node> Entry<N> {
         } => {
           let (send, recv) = oneshot::channel();
           waiters.push(send);
+          trace!("Adding waiter on {:?}", self.node);
           return recv
             .map_err(|_| N::Error::invalidated())
             .flatten()
@@ -329,6 +331,12 @@ impl<N: Node> Entry<N> {
             dirty || !self.node.content().cacheable(),
             "A clean Node should not reach this point: {:?}",
             result
+          );
+          trace!(
+            "Re-starting node {:?}. It was: dirty={}, cacheable={}",
+            self.node,
+            dirty,
+            self.node.content().cacheable()
           );
           // The Node has already completed but is now marked dirty. This indicates that we are the
           // first caller to request it since it was marked dirty. We attempt to clean it (which will
@@ -398,6 +406,7 @@ impl<N: Node> Entry<N> {
       _ => {
         // We care about exactly one case: a Running state with the same run_token. All other states
         // represent various (legal) race conditions.
+        trace!("Not completing node {:?} because it was invalidated (different run_token) before completing.", self.node);
         return;
       }
     }
@@ -415,6 +424,10 @@ impl<N: Node> Entry<N> {
           // Because it is always ephemeral, invalidation is the only type of Err that we do not
           // persist in the Graph. Instead, swap the Node to NotStarted to drop all waiters,
           // causing them to also experience invalidation (transitively).
+          trace!(
+            "Not completing node {:?} because it was invalidated before completing.",
+            self.node
+          );
           EntryState::NotStarted {
             run_token: run_token.next(),
             generation,
@@ -423,6 +436,10 @@ impl<N: Node> Entry<N> {
         } else if dirty {
           // The node was dirtied while it was running. The dep_generations and new result cannot
           // be trusted and were never published. We continue to use the previous result.
+          trace!(
+            "Not completing node {:?} because it was dirtied before completing.",
+            self.node
+          );
           Self::run(
             context,
             &self.node,
@@ -453,6 +470,11 @@ impl<N: Node> Entry<N> {
           // A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps
           // due to failure of another Future in a `join` or `join_all`, or due to a timeout at the
           // root of a request.
+          trace!(
+            "Completing node {:?} with {} waiters.",
+            self.node,
+            waiters.len()
+          );
           for waiter in waiters {
             let _ = waiter.send(next_result.clone().map(|res| (res, generation)));
           }
@@ -543,6 +565,8 @@ impl<N: Node> Entry<N> {
         } => (run_token, generation, Some(result)),
       };
 
+    trace!("Clearing node {:?}", self.node);
+
     // Swap in a state with a new RunToken value, which invalidates any outstanding work.
     *state = EntryState::NotStarted {
       run_token: run_token.next(),
@@ -558,7 +582,9 @@ impl<N: Node> Entry<N> {
   /// See comment on complete for information about _graph argument.
   ///
   pub(crate) fn dirty(&mut self, _graph: &mut super::InnerGraph<N>) {
-    match &mut *self.state.lock() {
+    let state = &mut *self.state.lock();
+    trace!("Dirtying node {:?}", self.node);
+    match state {
       &mut EntryState::Running { ref mut dirty, .. }
       | &mut EntryState::Completed { ref mut dirty, .. } => {
         // Mark dirty.
