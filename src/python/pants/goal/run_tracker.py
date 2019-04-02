@@ -400,15 +400,19 @@ class RunTracker(Subsystem):
       print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
             file=sys.stderr)
 
-  def store_stats(self):
-    """Store stats about this run in local and optionally remote stats dbs."""
+  def run_information(self):
+    """Basic information about this run."""
     run_information = self.run_info.get_as_dict()
     target_data = run_information.get('target_data', None)
     if target_data:
       run_information['target_data'] = ast.literal_eval(target_data)
+    return run_information
+
+  def store_stats(self):
+    """Store stats about this run in local and optionally remote stats dbs."""
 
     stats = {
-      'run_info': run_information,
+      'run_info': self.run_information(),
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
       'critical_path_timings': self.get_critical_path_timings().get_all(),
