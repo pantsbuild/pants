@@ -16,7 +16,7 @@ from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcess
                                            FallibleExecuteProcessResult, ProcessExecutionFailure)
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
 from pants.util.objects import TypeCheckError, datatype
 from pants_test.test_base import TestBase
@@ -69,7 +69,7 @@ class ShellCat(datatype([('binary_location', BinaryLocation)])):
 class CatExecutionRequest(datatype([('shell_cat', ShellCat), ('path_globs', PathGlobs)])): pass
 
 
-@rule(Concatted, [Select(CatExecutionRequest)])
+@rule(Concatted, [CatExecutionRequest])
 def cat_files_process_result_concatted(cat_exe_req):
   cat_bin = cat_exe_req.shell_cat
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
@@ -104,7 +104,7 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
 class JavacVersionOutput(datatype([('value', text_type)])): pass
 
 
-@rule(JavacVersionOutput, [Select(JavacVersionExecutionRequest)])
+@rule(JavacVersionOutput, [JavacVersionExecutionRequest])
 def get_javac_version_output(javac_version_command):
   javac_version_proc_req = ExecuteProcessRequest(
     argv=javac_version_command.gen_argv(),
@@ -154,7 +154,7 @@ class JavacCompileResult(datatype([
 # exhaustively correct java compilation.
 # This rule/test should be deleted when we have more real java rules (or anything else which serves
 # as a suitable rule-writing example).
-@rule(JavacCompileResult, [Select(JavacCompileRequest)])
+@rule(JavacCompileResult, [JavacCompileRequest])
 def javac_compile_process_result(javac_compile_req):
   java_files = javac_compile_req.javac_sources.java_files
   for java_file in java_files:

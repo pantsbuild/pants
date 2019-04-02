@@ -10,7 +10,6 @@ from pants.backend.native.config.environment import CCompiler, CppCompiler, Plat
 from pants.backend.native.subsystems.utils.archive_file_mapper import ArchiveFileMapper
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import rule
-from pants.engine.selectors import Select
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -96,12 +95,12 @@ class GCC(NativeTool):
       extra_args=[])
 
 
-@rule(CCompiler, [Select(GCC), Select(Platform)])
+@rule(CCompiler, [GCC, Platform])
 def get_gcc(gcc, platform):
   return gcc.c_compiler(platform)
 
 
-@rule(CppCompiler, [Select(GCC), Select(Platform)])
+@rule(CppCompiler, [GCC, Platform])
 def get_gplusplus(gcc, platform):
   return gcc.cpp_compiler(platform)
 

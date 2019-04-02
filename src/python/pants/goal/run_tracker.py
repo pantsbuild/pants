@@ -29,7 +29,6 @@ from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.reporting.report import Report
-from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import relative_symlink, safe_file_dump
@@ -78,7 +77,7 @@ class RunTracker(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(RunTracker, cls).subsystem_dependencies() + (StatsDBFactory, Cookies)
+    return super(RunTracker, cls).subsystem_dependencies() + (Cookies,)
 
   @classmethod
   def register_options(cls, register):
@@ -401,15 +400,19 @@ class RunTracker(Subsystem):
       print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
             file=sys.stderr)
 
-  def store_stats(self):
-    """Store stats about this run in local and optionally remote stats dbs."""
+  def run_information(self):
+    """Basic information about this run."""
     run_information = self.run_info.get_as_dict()
     target_data = run_information.get('target_data', None)
     if target_data:
       run_information['target_data'] = ast.literal_eval(target_data)
+    return run_information
+
+  def store_stats(self):
+    """Store stats about this run in local and optionally remote stats dbs."""
 
     stats = {
-      'run_info': run_information,
+      'run_info': self.run_information(),
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
       'critical_path_timings': self.get_critical_path_timings().get_all(),
@@ -423,9 +426,6 @@ class RunTracker(Subsystem):
     stats_json_file_name = self.get_options().stats_local_json_file
     if stats_json_file_name:
       self.write_stats_to_json(stats_json_file_name, stats)
-
-    # Add to local stats db.
-    StatsDBFactory.global_instance().get_db().insert_stats(stats)
 
     # Upload to remote stats db.
     stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)

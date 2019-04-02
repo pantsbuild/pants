@@ -27,3 +27,5 @@ class JsonReporterIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       parsed_report = json.loads(open(output).read())
       self.assertIsInstance(parsed_report['workunits'], dict)
+      self.assertIsInstance(parsed_report['pantsd_stats'], dict)
+      self.assertIsInstance(parsed_report['run_info'], dict)

@@ -46,15 +46,15 @@ As a very simple example, you might register the following `@rule` that can comp
 Product given a single `Int` input.
 
 ```python
-@rule(StringType, [Select(IntType)])
+@rule(StringType, [IntType])
 def int_to_str(an_int):
   return '{}'.format(an_int)
 ```
 
 The first argument to the `@rule` decorator is the Product (ie, return) type for the `@rule`. The
-second argument is a list of `Selector`s that declare the types of the input arguments to the
-`@rule`. In this case, because the Product type is `StringType` and there is one `Selector`
-(`Select(IntType)`), this `@rule` represents a conversion from `IntType` to `StrType`, with no
+second argument is a list of parameter selectors that declare the types of the input parameters for
+the `@rule`. In this case, because the Product type is `StringType` and there is one parameter
+selector (for `IntType`), this `@rule` represents a conversion from `IntType` to `StrType`, with no
 other inputs.
 
 When the engine statically checks whether it can use this `@rule` to create a string for a
@@ -73,7 +73,7 @@ definitions to provide a unique and descriptive type is strongly recommended:
 ```python
 class FormattedInt(datatype(['content'])): pass
 
-@rule(FormattedInt, [Select(IntType)])
+@rule(FormattedInt, [IntType])
 def int_to_str(an_int):
   return FormattedInt('{}'.format(an_int))
 
@@ -113,15 +113,15 @@ formalize the assumptions made about the value of an object into a specific type
 just wraps a single field. The `datatype()` function makes it simple and efficient to apply that
 strategy.
 
-### Selectors and Gets
+### Parameter selectors and Gets
 
-As demonstrated above, the `Selector` classes select `@rule` inputs in the context of a particular
+As demonstrated above, parameter selectors select `@rule` inputs in the context of a particular
 `Subject` (and its `Variants`: discussed below). But it is frequently necessary to "change" the
 subject and request products for subjects other than the one that the `@rule` is running for.
 
 In cases where this is necessary, `@rule`s may be written as coroutines (ie, using the python
 `yield` statement) that yield "`Get` requests" that request products for other subjects. Just like
-`@rule` parameter Selectors, `Get` requests instantiated in the body of an `@rule` are statically
+`@rule` parameter selectors, `Get` requests instantiated in the body of an `@rule` are statically
 checked to be satisfiable in the set of installed `@rule`s.
 
 #### Example
@@ -130,7 +130,7 @@ For example, you could declare an `@rule` that requests FileContent for each ent
 and then concatentates that content into a (typed) string:
 
 ```python
-@rule(ConcattedFiles, [Select(Files)])
+@rule(ConcattedFiles, [Files])
 def concat(files):
   file_content_list = yield [Get(FileContent, File(f)) for f in files]
   yield ConcattedFiles(''.join(fc.content for fc in file_content_list))
@@ -184,8 +184,8 @@ given set of rules.
 In general, there are three types of rules you can define:
 
 1. an `@rule`, which has a single product type and selects its inputs as described above.
-2. a `SingletonRule`, which matches a product type with a value so the type can then be `Select`ed
-   in an `@rule`.
+2. a `SingletonRule`, which matches a product type with a value so the type can then be selected
+   as a parameter to an `@rule`.
 3. a `RootRule`, which declares a type that can be used as a *subject*, which means it can be
    provided as an input to a `product_request()`.
 

@@ -9,7 +9,6 @@ import os
 from pants.backend.native.config.environment import Assembler, Linker
 from pants.binaries.binary_tool import NativeTool
 from pants.engine.rules import rule
-from pants.engine.selectors import Select
 
 
 class Binutils(NativeTool):
@@ -38,12 +37,12 @@ class Binutils(NativeTool):
     )
 
 
-@rule(Assembler, [Select(Binutils)])
+@rule(Assembler, [Binutils])
 def get_as(binutils):
   return binutils.assembler()
 
 
-@rule(Linker, [Select(Binutils)])
+@rule(Linker, [Binutils])
 def get_ld(binutils):
   return binutils.linker()
 

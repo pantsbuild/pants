@@ -9,7 +9,7 @@ from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import console_rule, optionable_rule
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -36,7 +36,7 @@ class ListOptions(Subsystem):
              help='Print only targets that are documented with a description.')
 
 
-@console_rule('list', [Select(Console), Select(ListOptions), Select(Specs)])
+@console_rule('list', [Console, ListOptions, Specs])
 def fast_list(console, options, specs):
   """A fast variant of `./pants list` with a reduced feature set."""
 

@@ -10,7 +10,6 @@ from future.utils import binary_type, text_type
 
 from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
 from pants.util.objects import Exactly, TypeCheckError, datatype
 
 
@@ -113,7 +112,7 @@ stderr:
     super(ProcessExecutionFailure, self).__init__(msg)
 
 
-@rule(ExecuteProcessResult, [Select(FallibleExecuteProcessResult), Select(ExecuteProcessRequest)])
+@rule(ExecuteProcessResult, [FallibleExecuteProcessResult, ExecuteProcessRequest])
 def fallible_to_exec_result_or_raise(fallible_result, request):
   """Converts a FallibleExecuteProcessResult to a ExecuteProcessResult or raises an error."""
 

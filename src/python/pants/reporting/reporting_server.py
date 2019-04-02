@@ -24,7 +24,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
 from pants.base.run_info import RunInfo
 from pants.pantsd.process_manager import ProcessManager
-from pants.stats.statsdb import StatsDBFactory
 
 
 logger = logging.getLogger(__name__)
@@ -45,8 +44,6 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     self._GET_handlers = [
       ('/runs/', self._handle_runs),  # Show list of known pants runs.
       ('/run/', self._handle_run),  # Show a report for a single pants run.
-      ('/stats/', self._handle_stats),  # Show a stats analytics page.
-      ('/statsdata/', self._handle_statsdata),  # Get JSON stats data.
       ('/browse/', self._handle_browse),  # Browse filesystem under build root.
       ('/content/', self._handle_content),  # Show content of file.
       ('/assets/', self._handle_assets),  # Statically serve assets (css, js etc.)
@@ -143,19 +140,6 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
 
     content = self._renderer.render_name('base.html', args).encode("utf-8")
     self._send_content(content, 'text/html')
-
-  def _handle_stats(self, relpath, params):
-    """Show stats for pants runs in the statsdb."""
-    args = self._default_template_args('stats.html')
-    content = self._renderer.render_name('base.html', args).encode("utf-8")
-    self._send_content(content, 'text/html')
-
-  def _handle_statsdata(self, relpath, params):
-    """Show stats for pants runs in the statsdb."""
-    statsdb = StatsDBFactory.global_instance().get_db()
-    statsdata = list(statsdb.get_aggregated_stats_for_cmd_line('cumulative_timings', '%'))
-    content = json.dumps(statsdata).encode("utf-8")
-    self._send_content(content, 'application/json')
 
   def _handle_browse(self, relpath, params):
     """Handle requests to browse the filesystem under the build root."""
