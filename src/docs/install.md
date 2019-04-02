@@ -28,14 +28,7 @@ Start by running the below command to auto-generate a `pants.ini` config file wi
     :::bash
     ./pants generate-pants-ini
 
-Running `./pants` for the first time will install the latest version of Pants, using virtualenv and first trying to use Python 3.6 and then falling back to Python 2.7. (Note that Pants 1.16.0 will be the last version to support Python 2.7.)
-
-This command also pins the `pants_version`. When you'd like to upgrade Pants, just edit the version in `pants.ini` and `./pants` will self-update on the next run.
-
-The script stores the various virtual environments you use centrally in
-`~/.cache/pants/setup`. When you switch back and forth between different Pants versions
-and different runtime Python versions, Pants will select the correct virtual environment
-from your local cache and use that.
+This command pins the `pants_version`. When you'd like to upgrade Pants, just edit the version in `pants.ini` and `./pants` will self-update on the next run.
 
 To use Pants plugins published to PyPi, add them to a `plugins` list, like so:
 
