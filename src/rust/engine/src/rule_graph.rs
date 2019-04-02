@@ -6,8 +6,7 @@ use std::io;
 
 use itertools::Itertools;
 
-use crate::core::{Key, Params, TypeId};
-use crate::externs;
+use crate::core::{Params, TypeId};
 use crate::selectors::{Get, Select};
 use crate::tasks::{Intrinsic, Task, Tasks};
 
@@ -116,7 +115,6 @@ impl EntryWithDeps {
 pub enum Entry {
   Param(TypeId),
   WithDeps(EntryWithDeps),
-  Singleton(Key, TypeId),
 }
 
 impl Entry {
@@ -124,7 +122,6 @@ impl Entry {
     match self {
       &Entry::WithDeps(ref e) => e.params().iter().cloned().collect(),
       &Entry::Param(ref type_id) => vec![*type_id],
-      &Entry::Singleton { .. } => vec![],
     }
   }
 }
@@ -455,9 +452,6 @@ impl<'t> GraphMaker<'t> {
           p @ Entry::Param(_) => {
             fulfillable_candidates.push(vec![p]);
           }
-          s @ Entry::Singleton { .. } => {
-            fulfillable_candidates.push(vec![s]);
-          }
         };
       }
 
@@ -682,16 +676,10 @@ impl<'t> GraphMaker<'t> {
       return vec![];
     }
 
-    // Prefer a Singleton, then a Param, then the non-ambiguous rule with the smallest set of
-    // input Params.
+    // Prefer a Param, then the non-ambiguous rule with the smallest set of input Params.
     // TODO: We should likely prefer Rules to Params.
     if satisfiable_entries.len() == 1 {
       satisfiable_entries
-    } else if let Some(singleton) = satisfiable_entries.iter().find(|e| match e {
-      &Entry::Singleton { .. } => true,
-      _ => false,
-    }) {
-      vec![*singleton]
     } else if let Some(param) = satisfiable_entries.iter().find(|e| match e {
       &Entry::Param(_) => true,
       _ => false,
@@ -812,9 +800,6 @@ pub fn entry_str(entry: &Entry) -> String {
   match entry {
     &Entry::WithDeps(ref e) => entry_with_deps_str(e),
     &Entry::Param(type_id) => format!("Param({})", type_id),
-    &Entry::Singleton(value, product) => {
-      format!("Singleton({}, {})", externs::key_to_str(&value), product)
-    }
   }
 }
 
@@ -1116,10 +1101,6 @@ impl RuleEdges {
 /// Select Entries that can provide the given product type with the given parameters.
 ///
 fn rhs(tasks: &Tasks, params: &ParamTypes, product_type: TypeId) -> Vec<Entry> {
-  if let Some(&(ref key, _)) = tasks.gen_singleton(product_type) {
-    return vec![Entry::Singleton(*key, product_type)];
-  }
-
   let mut entries = Vec::new();
   // If the params can provide the type directly, add that.
   if let Some(type_id) = params.get(&product_type) {
