@@ -171,6 +171,7 @@ base_linux_test_config: &base_linux_test_config
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv global 2.7.15 3.6.7 3.7.1
   before_script:
     - *aws_get_pants_pex
 
@@ -279,15 +280,23 @@ py37_osx_test_config: &py37_osx_test_config
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
 
 linux_with_fuse: &linux_with_fuse
+  os: linux
+  dist: xenial
+  sudo: required
   before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv global 2.7.15 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
+  python:
+    - "2.7"
+    - "3.6"
+    - "3.7"
 
 travis_docker_image: &travis_docker_image
   services:
@@ -457,10 +466,6 @@ py37_lint: &py37_lint
 
 base_rust_lints: &base_rust_lints
   <<: *linux_with_fuse
-  os: linux
-  dist: xenial
-  sudo: required
-  python: "3.6"
 
 linux_rust_clippy: &linux_rust_clippy
   <<: *base_rust_lints
@@ -637,11 +642,6 @@ linux_rust_tests: &linux_rust_tests
   name: "Rust tests - Linux (No PEX)"
   env:
     - CACHE_NAME=linuxrusttests
-  os: linux
-  dist: xenial
-  sudo: required
-  language: python
-  python: "3.6"
 
 osx_rust_tests: &osx_rust_tests
   <<: *base_rust_tests
