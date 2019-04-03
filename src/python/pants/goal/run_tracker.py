@@ -32,7 +32,7 @@ from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections_abc_backport import OrderedDict
-from pants.util.dirutil import relative_symlink, safe_file_dump, safe_mkdir
+from pants.util.dirutil import relative_symlink, safe_file_dump
 
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
@@ -253,9 +253,7 @@ class RunTracker(Subsystem):
 
     # Set up the JsonReporter for V2 stats.
     if self.get_options().stats_version == 2:
-      json_dir = os.path.join(self.get_options().pants_workdir, 'reports', self.run_info.get_info('id'), 'json')
-      safe_mkdir(json_dir)
-      json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO, json_dir=json_dir)
+      json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO)
       self.json_reporter = JsonReporter(self, json_reporter_settings)
       report.add_reporter('json', self.json_reporter)
 

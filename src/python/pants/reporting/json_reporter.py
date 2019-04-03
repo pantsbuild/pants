@@ -4,21 +4,17 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import json
-import os
 from builtins import list, str
 from collections import defaultdict, namedtuple
 
 from future.moves.itertools import zip_longest
-from future.utils import PY3
 from six import string_types
 
 from pants.reporting.reporter import Reporter
-from pants.util.dirutil import safe_file_dump, safe_mkdir
 
 
 class JsonReporter(Reporter):
-  """A reporter to capture workunit data into a JSON structure."""
+  """A reporter to capture workunit data into a JSON-serializable structure."""
 
   _log_level_str = [
     'FATAL',
@@ -29,44 +25,16 @@ class JsonReporter(Reporter):
   ]
 
   # JSON reporting settings.
-  #   json_dir: Where the report file goes.
-  Settings = namedtuple('Settings', Reporter.Settings._fields + ('json_dir',))
+  Settings = namedtuple('Settings', Reporter.Settings._fields)
 
   def __init__(self, run_tracker, settings):
     super(JsonReporter, self).__init__(run_tracker, settings)
-
-    # The main report output.
-    self._report_path = os.path.join(settings.json_dir, 'build.json')
 
     # We accumulate build state into this dict.
     self.results = {}
 
     # We use a stack to track the nested workunit traversal of each root.
     self._root_id_to_workunit_stack = defaultdict(list)
-
-  @property
-  def report_path(self):
-    return self._report_path
-
-  def open(self):
-    """Implementation of Reporter callback."""
-
-    safe_mkdir(os.path.dirname(self.report_path))
-
-  def close(self):
-    """Implementation of Reporter callback."""
-
-    mode = 'w' if PY3 else 'wb'
-
-    safe_file_dump(
-      self.report_path,
-      json.dumps({
-        'workunits': self.results,
-        'artifact_cache_stats': self.run_tracker.artifact_cache_stats.get_all(),
-        'pantsd_stats': self.run_tracker.pantsd_stats.get_all(),
-        'run_info': self.run_tracker.run_information(),
-      }),
-      mode=mode)
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""

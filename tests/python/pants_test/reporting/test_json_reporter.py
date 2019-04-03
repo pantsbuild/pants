@@ -4,12 +4,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import json
-
 from pants.base.workunit import WorkUnit
 from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
-from pants.util.contextutil import temporary_dir
 from pants_test.test_base import TestBase
 
 
@@ -67,11 +64,8 @@ def generate_callbacks(workunit_data, reporter, parent=None):
 class JsonReporterTest(TestBase):
 
   def _check_callbacks(self, root_workunit_dict, reporter):
-    reporter.open()
     generate_callbacks(root_workunit_dict, reporter)
-    reporter.close()
-    result = json.loads(open(reporter.report_path).read())
-    self.assertDictEqual(root_workunit_dict, result['workunits'][root_workunit_dict['id']])
+    self.assertDictEqual(root_workunit_dict, reporter.results[root_workunit_dict['id']])
 
   def test_nested_grandchild(self):
     expected = {
@@ -141,11 +135,10 @@ class JsonReporterTest(TestBase):
       'unaccounted_time': 0
     }
 
-    with temporary_dir() as temp_dir:
-      reporter = JsonReporter(FakeRunTracker(),
-        JsonReporter.Settings(log_level=Report.INFO, json_dir=temp_dir))
+    reporter = JsonReporter(FakeRunTracker(),
+      JsonReporter.Settings(log_level=Report.INFO))
 
-      self._check_callbacks(expected, reporter)
+    self._check_callbacks(expected, reporter)
 
   def test_nested_great_grandchilden(self):
     expected = {
@@ -231,8 +224,7 @@ class JsonReporterTest(TestBase):
       'unaccounted_time': 0
     }
 
-    with temporary_dir() as temp_dir:
-      reporter = JsonReporter(FakeRunTracker(),
-        JsonReporter.Settings(log_level=Report.INFO, json_dir=temp_dir))
+    reporter = JsonReporter(FakeRunTracker(),
+      JsonReporter.Settings(log_level=Report.INFO))
 
-      self._check_callbacks(expected, reporter)
+    self._check_callbacks(expected, reporter)
