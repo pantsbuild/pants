@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import sys
+import traceback
 from builtins import object
 
 from future.utils import PY3
@@ -70,6 +71,9 @@ class Exiter(object):
       except Exception as e:
         # If the file is already closed, or any other error occurs, just log it and continue to
         # exit.
+        if msg:
+          logger.warning("Encountered error when trying to log this message: {}".format(msg))
+          traceback.print_stack()
         logger.exception(e)
     self._exit(result)
 

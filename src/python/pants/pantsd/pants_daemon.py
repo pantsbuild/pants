@@ -377,7 +377,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
       # We don't have any stdio streams to log to anymore, but we can get tracebacks of the pantsd
       # process by tailing the pantsd log and sending it SIGUSR2.
-      ExceptionSink.reset_interactive_output_stream(log_stream, log_filename)
+      ExceptionSink.reset_interactive_output_stream(log_stream)
 
       # Reset the log location and the backtrace preference from the global bootstrap options.
       global_bootstrap_options = self._bootstrap_options.for_global_scope()
