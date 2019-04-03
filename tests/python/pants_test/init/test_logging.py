@@ -5,8 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-import uuid
-from builtins import open, str
+import os
+from builtins import open
 from contextlib import contextmanager
 
 from pants.init.logging import get_numeric_level, setup_logging
@@ -25,7 +25,7 @@ class LoggingTest(TestBase):
   @contextmanager
   def logger(self, level):
     native = self.scheduler._scheduler._native
-    logger = logging.getLogger(str(uuid.uuid4()))
+    logger = logging.getLogger('my_file_logger')
     with temporary_dir() as log_dir:
       log_file = setup_logging(level, log_dir=log_dir, scope=logger.name, native=native)
       yield logger, log_file.log_filename
@@ -40,12 +40,14 @@ class LoggingTest(TestBase):
 
   def test_file_logging(self):
     with self.logger('INFO') as (file_logger, log_file):
-      file_logger.warn('warn')
-      file_logger.info('info')
-      file_logger.debug('debug')
+      file_logger.warn('this is a warning')
+      file_logger.info('this is some info')
+      file_logger.debug('this is some debug info')
+
+      pid = os.getpid()
 
       with open(log_file, 'r') as fp:
         loglines = fp.read().splitlines()
         self.assertEqual(2, len(loglines))
-        self.assertTrue("[WARN] warn" in loglines[0])
-        self.assertTrue("[INFO] info" in loglines[1])
+        self.assertIn("[WARN] my_file_logger:{} - this is a warning".format(pid), loglines[0])
+        self.assertIn("[INFO] my_file_logger:{} - this is some info".format(pid), loglines[1])
