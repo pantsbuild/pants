@@ -77,7 +77,7 @@ class Report(object):
   # / Reporting classes - which the associated issue is meant to address.
   @property
   def json_reporter(self):
-    return self._reporters['json']
+    return self._reporters.get('json')
 
   def open(self):
     with self._lock:
