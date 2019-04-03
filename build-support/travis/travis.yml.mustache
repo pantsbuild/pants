@@ -549,7 +549,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - PY=${PYENV_ROOT}/shims/python2.7
   before_install:
     {{>before_install_osx}}
-    - ./build-support/bin/install_python_for_ci.sh 2.7.13
+    - ./build-support/bin/install_python_for_ci.sh 2.7.13 ${PYENV_PY36_VERSION}
   script:
     - python3.6 --version
     - ./build-support/bin/ci.sh -2b
