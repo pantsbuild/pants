@@ -350,9 +350,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
   def test_pantsd_memory_usage(self):
     """Validates that after N runs, memory usage has increased by no more than X percent."""
     number_of_runs = 10
-    max_memory_increase_fraction = 0.4
+    max_memory_increase_fraction = 0.35
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
-      cmd = ['list', 'testprojects::']
+      cmd = ['filter', 'testprojects::']
       self.assert_success(pantsd_run(cmd))
       initial_memory_usage = checker.current_memory_usage()
       for _ in range(number_of_runs):
@@ -367,7 +367,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           )
         )
 
-      increase_fraction = (final_memory_usage / initial_memory_usage) - 1.0
+      increase_fraction = (float(final_memory_usage) / initial_memory_usage) - 1.0
       self.assertTrue(
           increase_fraction <= max_memory_increase_fraction,
           "Memory usage increased more than expected: {} -> {}: {} actual increase (expected < {})".format(
