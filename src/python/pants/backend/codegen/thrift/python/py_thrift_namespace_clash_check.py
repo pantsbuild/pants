@@ -9,7 +9,6 @@ import re
 from builtins import zip
 
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.engine.fs import FilesContent
 from pants.task.task import Task
@@ -31,6 +30,7 @@ class PyThriftNamespaceClashCheck(Task):
   @classmethod
   def register_options(cls, register):
     super(PyThriftNamespaceClashCheck, cls).register_options(register)
+    # TODO: deprecate the --strict option in a future release!
     register('--strict', type=bool, default=False, fingerprint=True,
              help='Whether to fail the build if thrift sources have invalid python namespaces.')
 
@@ -140,16 +140,6 @@ Errors:
     return namespaces_by_files
 
   def execute(self):
-    deprecated_conditional(
-      lambda: not self.get_options().strict,
-      '1.18.0.dev0',
-      'Non-strict mode in the python thrift namespace clash check task',
-      """\
-The --{}-strict option will be removed, and python thrift sources will be required to declare a
-`namespace py` and avoid having those namespaces clash with any other python thrift source file.
-This is a strategy to mitigate the upstream bug https://issues.apache.org/jira/browse/THRIFT-515.
-""".format(self.get_options_scope_equivalent_flag_component()))
-
     py_thrift_targets = self.get_targets(lambda tgt: isinstance(tgt, PythonThriftLibrary))
     thrift_file_sources_by_target = self._get_python_thrift_library_sources(py_thrift_targets)
     py_namespaces_by_target = self._extract_all_python_namespaces(thrift_file_sources_by_target)
