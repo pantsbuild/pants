@@ -12,6 +12,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.memo import memoized
 
+
 MAX_ARG_STRLEN = 131072
 
 
