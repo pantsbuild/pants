@@ -72,6 +72,9 @@ class Report(object):
     # We synchronize on this, to support parallel execution.
     self._lock = threading.Lock()
 
+  # TODO(7487) This is needed so the run tracker can access the generated JSON
+  # report for v2 stats, though it more tightly couples RunTracker / Report
+  # / Reporting classes - which the associated issue is meant to address.
   @property
   def json_reporter(self):
     return self._reporters['json']

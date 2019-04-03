@@ -423,7 +423,9 @@ class RunTracker(Subsystem):
         'recorded_options': self._get_options_to_record(),
       }
     else:
-      return json.loads(open(self.report.json_reporter.report_path).read())
+      reporter = self.report.json_reporter
+      assert reporter, 'A JsonReporter is required for v2 stats'
+      return json.loads(open(reporter.report_path).read())
 
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
