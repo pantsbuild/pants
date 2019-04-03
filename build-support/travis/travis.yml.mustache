@@ -436,7 +436,7 @@ linux_rust_clippy: &linux_rust_clippy
     - ulimit -c unlimited
     - ulimit -n 8192
   script:
-    - ./build-support/bin/travis-ci.sh -s
+    - python3.6 --version && ./build-support/bin/travis-ci.sh -s
 
 cargo_audit: &cargo_audit
   <<: *base_rust_lints
@@ -445,7 +445,7 @@ cargo_audit: &cargo_audit
     - CACHE_NAME=linuxcargoaudit
   stage: *test_cron
   script:
-    - ./build-support/bin/travis-ci.sh -a
+    - python3.6 --version && ./build-support/bin/travis-ci.sh -a
 
 # -------------------------------------------------------------------------
 # Build wheels
