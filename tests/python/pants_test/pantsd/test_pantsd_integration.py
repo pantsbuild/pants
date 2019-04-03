@@ -347,6 +347,34 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Remove the pidfile so that the teardown script doesn't try to kill process 9.
       os.unlink(pidpath)
 
+  def test_pantsd_memory_usage(self):
+    """Validates that after N runs, memory usage has increased by no more than X percent."""
+    number_of_runs = 10
+    max_memory_increase_fraction = 0.4
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
+      cmd = ['list', 'testprojects::']
+      self.assert_success(pantsd_run(cmd))
+      initial_memory_usage = checker.current_memory_usage()
+      for _ in range(number_of_runs):
+        self.assert_success(pantsd_run(cmd))
+        checker.assert_running()
+
+      final_memory_usage = checker.current_memory_usage()
+      self.assertTrue(
+          initial_memory_usage <= final_memory_usage,
+          "Memory usage inverted unexpectedly: {} > {}".format(
+            initial_memory_usage, final_memory_usage
+          )
+        )
+
+      increase_fraction = (final_memory_usage / initial_memory_usage) - 1.0
+      self.assertTrue(
+          increase_fraction <= max_memory_increase_fraction,
+          "Memory usage increased more than expected: {} -> {}: {} actual increase (expected < {})".format(
+            initial_memory_usage, final_memory_usage, increase_fraction, max_memory_increase_fraction
+          )
+        )
+
   def test_pantsd_invalidation_stale_sources(self):
     test_path = 'tests/python/pants_test/daemon_correctness_test_0001'
     test_build_file = os.path.join(test_path, 'BUILD')
