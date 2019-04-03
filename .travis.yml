@@ -131,6 +131,10 @@ base_linux_config: &base_linux_config
   os: linux
   dist: xenial
   sudo: required
+  python:
+    - "2.7"
+    - "3.6"
+    - "3.7"
   addons:
     apt:
       packages:
@@ -146,20 +150,18 @@ base_linux_config: &base_linux_config
   language: python
   before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv global 2.7.15 3.6.7 3.7.1
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
 py27_linux_config: &py27_linux_config
   <<: *base_linux_config
-  python: &python2_version "2.7"
 
 py36_linux_config: &py36_linux_config
   <<: *base_linux_config
-  python: "3.6"
 
 py37_linux_config: &py37_linux_config
   <<: *base_linux_config
-  python: "3.7"
 
 base_linux_test_config: &base_linux_test_config
   <<: *base_linux_config
@@ -169,6 +171,7 @@ base_linux_test_config: &base_linux_test_config
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv global 2.7.15 3.6.7 3.7.1
   before_script:
     - *aws_get_pants_pex
 
@@ -197,37 +200,34 @@ py37_linux_test_config: &py37_linux_test_config
 base_osx_config: &base_osx_config
   os: osx
   language: generic
-  before_install:
-    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
-    - chmod 755 /usr/local/bin/jq
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-
-py27_osx_config: &py27_osx_config
-  <<: *base_osx_config
-
-py36_osx_config: &py36_osx_config
-  <<: *base_osx_config
   addons:
     brew:
-      packages: &py36_osx_config_brew_packages
+      packages:
       - openssl
-  env:
-    - &py36_osx_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
 
+py27_osx_config: &py27_osx_config
+  <<: *base_osx_config
+  env:
+    - &py27_osx_config_env >
+      PATH="/usr/local/opt/openssl/bin:$PATH"
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CPPFLAGS="-I/usr/local/opt/openssl/include"
+
+py36_osx_config: &py36_osx_config
+  <<: *base_osx_config
+  env:
+    - &py36_osx_config_env >
+      PATH="/usr/local/opt/openssl/bin:$PATH"
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CPPFLAGS="-I/usr/local/opt/openssl/include"
+
 py37_osx_config: &py37_osx_config
   <<: *base_osx_config
-  addons:
-    brew:
-      packages: &py37_osx_config_brew_packages
-      - openssl
   env:
     - &py37_osx_config_env >
       PATH="/usr/local/opt/openssl/bin:$PATH"
@@ -251,7 +251,11 @@ py27_osx_test_config: &py27_osx_test_config
   <<: *base_osx_test_config
   stage: *test_cron
   env:
-    - &py27_osx_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
+    - &py27_osx_test_config_env >
+      PATH="/usr/local/opt/openssl/bin:$PATH"
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CPPFLAGS="-I/usr/local/opt/openssl/include"
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
 
 py36_osx_test_config: &py36_osx_test_config
   <<: *py36_osx_config
@@ -276,15 +280,23 @@ py37_osx_test_config: &py37_osx_test_config
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
 
 linux_with_fuse: &linux_with_fuse
+  os: linux
+  dist: xenial
+  sudo: required
   before_install:
     - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
     - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
     - sudo sysctl fs.inotify.max_user_watches=524288
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    - pyenv global 2.7.15 3.6.7 3.7.1
     - sudo apt-get install -y pkg-config fuse libfuse-dev
     - sudo modprobe fuse
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
+  python:
+    - "2.7"
+    - "3.6"
+    - "3.7"
 
 travis_docker_image: &travis_docker_image
   services:
@@ -379,6 +391,7 @@ py27_osx_build_engine: &py27_osx_build_engine
   <<: *base_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py2.7 PEX)"
   env:
+    - *py27_osx_config_env
     - PREPARE_DEPLOY=1
     - CACHE_NAME=osxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
@@ -449,18 +462,16 @@ py37_lint: &py37_lint
 # Rust lints
 # -------------------------------------------------------------------------
 
-linux_rust_clippy: &linux_rust_clippy
+base_rust_lints: &base_rust_lints
   <<: *linux_with_fuse
+
+linux_rust_clippy: &linux_rust_clippy
+  <<: *base_rust_lints
   <<: *native_engine_cache_config
   name: "Linux Rust Clippy (No PEX)"
   env:
     - CACHE_NAME=linuxclippy
-  os: linux
-  dist: xenial
-  sudo: required
   stage: *test
-  language: python
-  python: "3.6"
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -468,13 +479,10 @@ linux_rust_clippy: &linux_rust_clippy
     - ./build-support/bin/travis-ci.sh -s
 
 cargo_audit: &cargo_audit
-  <<: *linux_with_fuse
+  <<: *base_rust_lints
   name: "Cargo audit (No PEX)"
   env:
     - CACHE_NAME=linuxcargoaudit
-  os: linux
-  dist: xenial
-  sudo: required
   stage: *test_cron
   script:
     - ./build-support/bin/travis-ci.sh -a
@@ -581,17 +589,10 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *base_osx_build_wheels
   <<: *native_engine_cache_config
   name: "Build wheels - OSX and cp27mu (UCS4)"
-  addons:
-    brew:
-      packages:
-      - openssl
   env:
+    - *py27_osx_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs4
-    - >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
     # We set $PY to ensure the UCS4 interpreter is used when bootstrapping the PEX.
     - PY=${PYENV_ROOT}/shims/python2.7
@@ -599,7 +600,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh 2.7.13
+    - ./build-support/bin/install_python_for_ci.sh 2.7.13 ${PYENV_PY36_VERSION}
   script:
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu
@@ -627,6 +628,8 @@ base_rust_tests: &base_rust_tests
   before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
+  script:
+    - ./build-support/bin/travis-ci.sh -e
 
 linux_rust_tests: &linux_rust_tests
   <<: *base_rust_tests
@@ -634,31 +637,26 @@ linux_rust_tests: &linux_rust_tests
   name: "Rust tests - Linux (No PEX)"
   env:
     - CACHE_NAME=linuxrusttests
-  os: linux
-  dist: xenial
-  sudo: required
-  language: python
-  python: "3.6"
-  script:
-    - ./build-support/bin/travis-ci.sh -e
 
 osx_rust_tests: &osx_rust_tests
   <<: *base_rust_tests
   name: "Rust tests - OSX (No PEX)"
-  env:
-    - CACHE_NAME=macosrusttests
   os: osx
   # Fuse actually works on this image. It hangs on many others.
   osx_image: xcode8.3
   addons:
     homebrew:
       casks:
+      - openssl
       - osxfuse
-  script:
-  # N.B. We run this with Python 2 because this osx_image does not have
-  # Python 3.6 or 3.7 in its environment. We do not care which Python version
-  # we use and do not want to incur the cost of using pyenv to get 3.6 or 3.7.
-    - ./build-support/bin/travis-ci.sh -e2
+  before_install:
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
+  env:
+    - >
+      PATH="/usr/local/opt/openssl/bin:$PATH"
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CPPFLAGS="-I/usr/local/opt/openssl/include"
+    - CACHE_NAME=macosrusttests
 
 # -------------------------------------------------------------------------
 # OSX sanity checks
