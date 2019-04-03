@@ -39,7 +39,7 @@ class JsonReporter(Reporter):
     self._report_path = os.path.join(settings.json_dir, 'build.json')
 
     # We accumulate build state into this dict.
-    self._results = {}
+    self.results = {}
 
     # We use a stack to track the nested workunit traversal of each root.
     self._root_id_to_workunit_stack = defaultdict(list)
@@ -61,7 +61,7 @@ class JsonReporter(Reporter):
     safe_file_dump(
       self.report_path,
       json.dumps({
-        'workunits': self._results,
+        'workunits': self.results,
         'artifact_cache_stats': self.run_tracker.artifact_cache_stats.get_all(),
         'pantsd_stats': self.run_tracker.pantsd_stats.get_all(),
         'run_info': self.run_tracker.run_information(),
@@ -88,7 +88,7 @@ class JsonReporter(Reporter):
 
     if not root_id in self._root_id_to_workunit_stack:
       self._root_id_to_workunit_stack[root_id].append(workunit_data)
-      self._results[root_id] = workunit_data
+      self.results[root_id] = workunit_data
     else:
       self._root_id_to_workunit_stack[root_id][-1]['children'].append(workunit_data)
       self._root_id_to_workunit_stack[root_id].append(workunit_data)
@@ -130,7 +130,7 @@ class JsonReporter(Reporter):
     if current_stack:
       current_stack[-1]['log_entries'].append(entry_info)
     else:
-      self._results[root_id]['log_entries'].append(entry_info)
+      self.results[root_id]['log_entries'].append(entry_info)
 
   def _render_messages(self, *msg_elements):
     def _message_details(element):

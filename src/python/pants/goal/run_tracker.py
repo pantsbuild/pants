@@ -28,10 +28,11 @@ from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
 from pants.option.options_fingerprinter import CoercingOptionEncoder
+from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections_abc_backport import OrderedDict
-from pants.util.dirutil import relative_symlink, safe_file_dump
+from pants.util.dirutil import relative_symlink, safe_file_dump, safe_mkdir
 
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
@@ -123,6 +124,7 @@ class RunTracker(Subsystem):
 
     # Initialized in `start()`.
     self.report = None
+    self.json_reporter = None
     self._main_root_workunit = None
     self._all_options = None
 
@@ -248,6 +250,15 @@ class RunTracker(Subsystem):
       raise AssertionError('RunTracker.initialize must be called before RunTracker.start.')
 
     self.report = report
+
+    # Set up the JsonReporter for V2 stats.
+    if self.get_options().stats_version == 2:
+      json_dir = os.path.join(self.get_options().pants_workdir, 'reports', self.run_info.get_info('id'), 'json')
+      safe_mkdir(json_dir)
+      json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO, json_dir=json_dir)
+      self.json_reporter = JsonReporter(self, json_reporter_settings)
+      report.add_reporter('json', self.json_reporter)
+
     self.report.open()
 
     # And create the workunit.
@@ -411,7 +422,14 @@ class RunTracker(Subsystem):
     return run_information
 
   def _stats(self):
-    if self.get_options().stats_version == 1:
+    if self.get_options().stats_version == 2:
+      return {
+        'run_info': self.run_information(),
+        'artifact_cache_stats': self.artifact_cache_stats.get_all(),
+        'pantsd_stats': self.pantsd_stats.get_all(),
+        'workunits': self.json_reporter.results,
+      }
+    else:
       return {
         'run_info': self.run_information(),
         'cumulative_timings': self.cumulative_timings.get_all(),
@@ -422,10 +440,6 @@ class RunTracker(Subsystem):
         'outcomes': self.outcomes,
         'recorded_options': self._get_options_to_record(),
       }
-    else:
-      reporter = self.report.json_reporter
-      assert reporter, 'A JsonReporter is required for v2 stats'
-      return json.loads(open(reporter.report_path).read())
 
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""

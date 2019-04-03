@@ -7,8 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import json
 
 from pants.base.workunit import WorkUnit
+from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
-from pants.reporting.reporting import JsonReporter
 from pants.util.contextutil import temporary_dir
 from pants_test.test_base import TestBase
 
