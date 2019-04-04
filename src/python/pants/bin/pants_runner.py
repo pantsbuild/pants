@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import sys
+import warnings
 from builtins import object
 
 from pants.base.exception_sink import ExceptionSink
@@ -52,6 +53,10 @@ class PantsRunner(object):
 
     ExceptionSink.reset_should_print_backtrace_to_terminal(global_bootstrap_options.print_exception_stacktrace)
     ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
+
+    for action, messages in global_bootstrap_options.warning_filters.items():
+      for msg in messages:
+        warnings.filterwarnings(action=action, message=msg)
 
     if global_bootstrap_options.enable_pantsd:
       try:

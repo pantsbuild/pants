@@ -148,10 +148,9 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None,
 
   # We need to have filename and line_number for warnings.formatwarning, which appears to be the only
   # way to get a warning message to display to stderr. We get that from frame_info -- it's too bad
-  # we have to reconstruct the `stacklevel` logic ourselves, but we do also gain the ability to have
-  # multiple lines of context, which is neat.
+  # we have to reconstruct the `stacklevel` logic ourselves.
   if frame_info is None:
-    frame_info = _get_frame_info(stacklevel, context=context)
+    frame_info = _get_frame_info(stacklevel, context=1)
   _, filename, line_number, _, code_context, _ = frame_info
   if code_context:
     context_lines = ''.join(code_context)
@@ -160,16 +159,17 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None,
 
   if removal_semver > PANTS_SEMVER:
     if ensure_stderr:
+      # No warning filters can stop us from printing this message directly to stderr.
       warning_msg = warnings.formatwarning(
         msg, DeprecationWarning, filename, line_number, line=context_lines)
       print(warning_msg, file=sys.stderr)
     else:
-      warnings.showwarning(
-        DeprecationWarning(msg) if PY2 else msg,
-        DeprecationWarning,
-        filename,
-        line_number,
-        line=context_lines)
+      # This output is filtered by warning filters.
+      warnings.warn_explicit(
+        message=DeprecationWarning(msg) if PY2 else msg,
+        category=DeprecationWarning,
+        filename=filename,
+        lineno=line_number)
     return msg
   else:
     raise CodeRemovedError(msg)
