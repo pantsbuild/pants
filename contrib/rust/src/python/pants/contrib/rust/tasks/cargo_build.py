@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import collections
 import copy
+import functools
 import hashlib
 import json
 import os
@@ -21,6 +22,9 @@ from pants.util.dirutil import absolute_symlink, read_file, safe_file_dump, safe
 
 from pants.contrib.rust.tasks.cargo_fingerprint_strategy import CargoFingerprintStrategy
 from pants.contrib.rust.tasks.cargo_workspace import Workspace
+from pants.contrib.rust.utils.basic_invocation.args_rules import (args_rules, c_flag_rules,
+                                                                  l_flag_rules)
+from pants.contrib.rust.utils.basic_invocation.env_rules import env_rules
 from pants.contrib.rust.utils.basic_invocation_conversion import \
   convert_into_pants_invocation as convert_basic_into_pants_invocation
 from pants.contrib.rust.utils.custom_build_invocation_conversion import \
@@ -47,7 +51,12 @@ class Build(Workspace):
       '--cargo-opt',
       type=list,
       default=[],
-      help='Append these options to the cargo command line.')
+      help='Additional cargo build options e.g. `--release`.')
+    register(
+      '--ignore-rerun',
+      type=bool,
+      default=False,
+      help='Ignore rebuilding build scripts which include a cargo `rerun-if-changed` statement.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -96,7 +105,8 @@ class Build(Workspace):
       target_definitions = self.get_target_definitions_out_of_cargo_build_plan(cargo_build_plan)
       self.generate_targets(target_definitions, target)
 
-    self.check_if_build_scripts_are_invalid()
+    if self.get_options().ignore_rerun is False:
+      self.check_if_build_scripts_are_invalid()
 
   def get_cargo_build_plan(self, target):
     abs_manifest_path = os.path.join(target.manifest, self.manifest_name())
@@ -129,8 +139,7 @@ class Build(Workspace):
                                                                             current_working_dir=target.manifest)
 
     if returncode != 0:
-      self.context.log.error('==== stderr ====\n{0}'.format(std_error))
-      self.context.log.error('==== stdour ====\n{0}'.format(std_output))
+      self.print_std_out_and_std_err(std_output, std_error)
       raise TaskError('Cannot create build plan for: {}'.format(abs_manifest_path))
 
     cargo_build_plan = json.loads(std_output)
@@ -142,7 +151,8 @@ class Build(Workspace):
 
   def get_target_definitions_out_of_cargo_build_plan(self, cargo_build_plan):
     cargo_invocations = cargo_build_plan['invocations']
-    return list(map(lambda invocation: self.create_target_definition(invocation), cargo_invocations))
+    return list(
+      map(lambda invocation: self.create_target_definition(invocation), cargo_invocations))
 
   def create_target_definition(self, cargo_invocation):
     TargetDefinition = collections.namedtuple('TargetDefinition',
@@ -162,65 +172,42 @@ class Build(Workspace):
 
   def calculate_target_definition_fingerprint(self, cargo_invocation):
     invocation = copy.deepcopy(cargo_invocation)
+
     invocation.pop('deps')
     invocation.pop('outputs')
     invocation.pop('links')
 
-    if invocation['env'].get('DYLD_LIBRARY_PATH'):
-      # nightly nightly-2018-12-31
-      invocation['env'].pop('DYLD_LIBRARY_PATH')
-    elif invocation['env'].get('DYLD_FALLBACK_LIBRARY_PATH'):
-      # nightly macOS
-      invocation['env'].pop('DYLD_FALLBACK_LIBRARY_PATH')
-    elif invocation['env'].get('LD_LIBRARY_PATH'):
-      # nightly linux
-      invocation['env'].pop('LD_LIBRARY_PATH')
+    c_flag_rule = {
+      'incremental': lambda _: "",
+    }
 
-    def _c_flag_rules(key_value):
-      rules = {
-        'incremental': lambda _: "",
-      }
+    l_flag_rule = {
+      'dependency': lambda _: "",
+    }
 
-      is_key_value = key_value.split('=')
-
-      if len(is_key_value) == 2:
-        key, value = is_key_value
-        apply_rule = rules.get(key)
-        return ("{}={}".format(key, apply_rule(value))) if apply_rule else key_value
-      else:
-        return key_value
-
-    def _l_flag_rules(key_value):
-      rules = {
-        'dependency': lambda _: "",
-      }
-
-      is_key_value = key_value.split('=')
-
-      if len(is_key_value) == 2:
-        key, value = is_key_value
-        apply_rule = rules.get(key)
-        return ("{}={}".format(key, apply_rule(value))) if apply_rule else key_value
-      else:
-        return key_value
-
-    rules = {
+    args_rules_set = {
       '--out-dir': lambda _: "",
-      '-C': _c_flag_rules,
-      '-L': _l_flag_rules,
+      '-C': functools.partial(c_flag_rules, rules=c_flag_rule),
+      '-L': functools.partial(l_flag_rules, rules=l_flag_rule),
       '--extern': lambda _: ""
     }
-    args = invocation['args']
-    for index, arg in enumerate(args):
-      apply_rule = rules.get(arg, None)
-      if apply_rule:
-        args[index + 1] = apply_rule(args[index + 1])
+
+    args_rules(invocation['args'], rules=args_rules_set)
+
+    env_rules_set = {
+      'OUT_DIR': lambda _: "",
+      # nightly-2018-12-31 macOS
+      'DYLD_LIBRARY_PATH': lambda _: "",
+      # nightly macOS
+      'DYLD_FALLBACK_LIBRARY_PATH': lambda _: "",
+      # nightly-2018-12-31 linux
+      'LD_LIBRARY_PATH': lambda _: ""
+    }
+
+    env_rules(invocation['env'], rules=env_rules_set)
 
     if invocation['compile_mode'] == 'run-custom-build':
       invocation.pop('program')
-
-    if invocation['env'].get('OUT_DIR'):
-      invocation['env'].pop('OUT_DIR')
 
     hasher = hashlib.md5(json.dumps(invocation, sort_keys=True).encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
@@ -468,8 +455,7 @@ class Build(Workspace):
                                                                             current_working_dir=cwd)
 
     if returncode != 0:
-      self.context.log.error('==== stderr ====\n{0}'.format(std_error))
-      self.context.log.error('==== stdour ====\n{0}'.format(std_output))
+      self.print_std_out_and_std_err(std_output, std_error)
       raise TaskError('Cannot execute build script for: {}'.format(cwd))
 
     build_script_std_out_dir = self._package_out_dirs[target.address.target_name][1]
@@ -568,3 +554,7 @@ class Build(Workspace):
     mode = 'w' if PY3 else 'wb'
     with open(build_index_path, mode) as build_index_json_file:
       json.dump(self._build_index, build_index_json_file, indent=2, separators=(',', ': '))
+
+  def print_std_out_and_std_err(self, std_output, std_error):
+    self.context.log.error('==== stdout ====\n{0}'.format(std_output))
+    self.context.log.error('==== stderr ====\n{0}'.format(std_error))

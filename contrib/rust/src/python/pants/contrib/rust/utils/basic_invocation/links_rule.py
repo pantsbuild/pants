@@ -21,5 +21,5 @@ def change_value(path, result_dir, **kargs):
 def links_rule(invocation_key, **kargs):
   cache = copy.deepcopy(invocation_key)
   for key, value in cache.items():
-    invocation_key.pop(key, None)
+    invocation_key.pop(key)
     invocation_key[change_key(key, **kargs)] = change_value(value, **kargs)

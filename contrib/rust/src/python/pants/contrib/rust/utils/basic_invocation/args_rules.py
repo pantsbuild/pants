@@ -10,10 +10,11 @@ from pants.contrib.rust.utils.basic_invocation.c_flag_rules import incremental
 from pants.contrib.rust.utils.basic_invocation.l_flag_rules import dependency as dependency_rule
 
 
-def c_flag_rules(key_value, **kwargs):
-  rules = {
-    'incremental': incremental,
-  }
+def c_flag_rules(key_value, rules=None, **kwargs):
+  if rules is None:
+    rules = {
+        'incremental': incremental,
+    }
 
   is_key_value = key_value.split('=')
 
@@ -25,10 +26,11 @@ def c_flag_rules(key_value, **kwargs):
     return key_value
 
 
-def l_flag_rules(key_value, **kwargs):
-  rules = {
-    'dependency': dependency_rule,
-  }
+def l_flag_rules(key_value, rules=None, **kwargs):
+  if rules is None:
+    rules = {
+        'dependency': dependency_rule,
+    }
 
   is_key_value = key_value.split('=')
 
@@ -65,10 +67,10 @@ def extern_flag_rule(key_value, target, crate_out_dirs, **kwargs):
 def args_rules(invocation_key, rules=None, **kwargs):
   if rules is None:
     rules = {
-      '--out-dir': out_dir_flag_rule,
-      '-C': c_flag_rules,
-      '-L': l_flag_rules,
-      '--extern': extern_flag_rule
+        '--out-dir': out_dir_flag_rule,
+        '-C': c_flag_rules,
+        '-L': l_flag_rules,
+        '--extern': extern_flag_rule
     }
 
   for index, arg in enumerate(invocation_key):
