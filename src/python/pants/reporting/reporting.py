@@ -14,7 +14,6 @@ from future.utils import PY3
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.invalidation_report import InvalidationReport
-from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.plaintext_reporter import LabelFormat, PlainTextReporter, ToolOutputFormat
 from pants.reporting.quiet_reporter import QuietReporter
 from pants.reporting.report import Report
@@ -77,8 +76,6 @@ class Reporting(Subsystem):
 
     html_dir = os.path.join(run_dir, 'html')
     safe_mkdir(html_dir)
-    json_dir = os.path.join(run_dir, 'json')
-    safe_mkdir(json_dir)
     relative_symlink(run_dir, os.path.join(self.get_options().reports_dir, 'latest'))
 
     report = Report()
@@ -102,11 +99,6 @@ class Reporting(Subsystem):
                                                    template_dir=self.get_options().template_dir)
     html_reporter = HtmlReporter(run_tracker, html_reporter_settings)
     report.add_reporter('html', html_reporter)
-
-    # Set up JSON reporting.
-    json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO, json_dir=json_dir)
-    json_reporter = JsonReporter(run_tracker, json_reporter_settings)
-    report.add_reporter('json', json_reporter)
 
     # Set up Zipkin reporting.
     zipkin_endpoint = self.get_options().zipkin_endpoint

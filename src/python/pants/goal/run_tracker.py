@@ -28,6 +28,7 @@ from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
 from pants.option.options_fingerprinter import CoercingOptionEncoder
+from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections_abc_backport import OrderedDict
@@ -88,6 +89,8 @@ class RunTracker(Subsystem):
                   'auth provider name is only used to provide a more helpful error message.')
     register('--stats-upload-timeout', advanced=True, type=int, default=2,
              help='Wait at most this many seconds for the stats upload to complete.')
+    register('--stats-version', advanced=True, type=int, default=1, choices=[1, 2],
+             help='Format of stats JSON for uploads and local json file.')
     register('--num-foreground-workers', advanced=True, type=int,
              default=multiprocessing.cpu_count(),
              help='Number of threads for foreground work.')
@@ -121,6 +124,7 @@ class RunTracker(Subsystem):
 
     # Initialized in `start()`.
     self.report = None
+    self.json_reporter = None
     self._main_root_workunit = None
     self._all_options = None
 
@@ -246,6 +250,13 @@ class RunTracker(Subsystem):
       raise AssertionError('RunTracker.initialize must be called before RunTracker.start.')
 
     self.report = report
+
+    # Set up the JsonReporter for V2 stats.
+    if self.get_options().stats_version == 2:
+      json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO)
+      self.json_reporter = JsonReporter(self, json_reporter_settings)
+      report.add_reporter('json', self.json_reporter)
+
     self.report.open()
 
     # And create the workunit.
@@ -408,19 +419,29 @@ class RunTracker(Subsystem):
       run_information['target_data'] = ast.literal_eval(target_data)
     return run_information
 
+  def _stats(self):
+    if self.get_options().stats_version == 2:
+      return {
+        'run_info': self.run_information(),
+        'artifact_cache_stats': self.artifact_cache_stats.get_all(),
+        'pantsd_stats': self.pantsd_stats.get_all(),
+        'workunits': self.json_reporter.results,
+      }
+    else:
+      return {
+        'run_info': self.run_information(),
+        'cumulative_timings': self.cumulative_timings.get_all(),
+        'self_timings': self.self_timings.get_all(),
+        'critical_path_timings': self.get_critical_path_timings().get_all(),
+        'artifact_cache_stats': self.artifact_cache_stats.get_all(),
+        'pantsd_stats': self.pantsd_stats.get_all(),
+        'outcomes': self.outcomes,
+        'recorded_options': self._get_options_to_record(),
+      }
+
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
-
-    stats = {
-      'run_info': self.run_information(),
-      'cumulative_timings': self.cumulative_timings.get_all(),
-      'self_timings': self.self_timings.get_all(),
-      'critical_path_timings': self.get_critical_path_timings().get_all(),
-      'artifact_cache_stats': self.artifact_cache_stats.get_all(),
-      'pantsd_stats': self.pantsd_stats.get_all(),
-      'outcomes': self.outcomes,
-      'recorded_options': self._get_options_to_record(),
-    }
+    stats = self._stats()
 
     # Write stats to user-defined json file.
     stats_json_file_name = self.get_options().stats_local_json_file
