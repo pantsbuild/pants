@@ -122,7 +122,7 @@ class ExceptionSink(object):
       `cls._shared_error_fileobj`.
     OS state:
     - May create a new directory.
-    - Overwrites signal handlers for many fatal and non-fatal signals.
+    - Overwrites signal handlers for many fatal and non-fatal signals (but not SIGUSR2).
 
     :raises: :class:`ExceptionSink.ExceptionSinkError` if the directory does not exist or is not
              writable.
@@ -167,7 +167,11 @@ class ExceptionSink(object):
     sys.excepthook = cls._log_unhandled_exception_and_exit
 
   @classmethod
-  def reset_interactive_output_stream(cls, interactive_output_stream):
+  def reset_interactive_output_stream(
+    cls,
+    interactive_output_stream,
+    override_faulthandler_destination=True
+  ):
     """
     Class state:
     - Overwrites `cls._interactive_output_stream`.
@@ -180,8 +184,9 @@ class ExceptionSink(object):
     try:
       # NB: mutate process-global state!
       # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
-      faulthandler.register(signal.SIGUSR2, interactive_output_stream,
-                            all_threads=True, chain=False)
+      if override_faulthandler_destination:
+        faulthandler.register(signal.SIGUSR2, interactive_output_stream,
+                              all_threads=True, chain=False)
       # NB: mutate the class variables!
       cls._interactive_output_stream = interactive_output_stream
     except ValueError:

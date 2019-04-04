@@ -821,7 +821,7 @@ pub extern "C" fn init_logging(level: u64) {
 pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u64) -> PyResult {
   let path_str = unsafe { CStr::from_ptr(log_file_ptr).to_string_lossy().into_owned() };
   let path = PathBuf::from(path_str);
-  LOGGER.set_pantsd_logger(path, level).into()
+  LOGGER.set_pantsd_logger(path, level).map(i64::from).map(externs::store_i64).into()
 }
 
 // Might be called before externs are set, therefore can't return a PyResult

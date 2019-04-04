@@ -375,9 +375,18 @@ class PantsDaemon(FingerprintedProcessManager):
       # Register an exiter using os._exit to ensure we only close stdio streams once.
       ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
 
-      # We don't have any stdio streams to log to anymore, but we can get tracebacks of the pantsd
-      # process by tailing the pantsd log and sending it SIGUSR2.
-      ExceptionSink.reset_interactive_output_stream(log_stream)
+      # We don't have any stdio streams to log to anymore, so we log to a file.
+      # We don't override the faulthandler destination because the stream we get will proxy things
+      # via the rust logging code, and faulthandler needs to be writing directly to a real file
+      # descriptor. When pantsd logging was originally initialised, we already set up faulthandler
+      # to log to the correct file descriptor, so don't override it.
+      #
+      # We can get tracebacks of the pantsd process by tailing the pantsd log and sending it
+      # SIGUSR2.
+      ExceptionSink.reset_interactive_output_stream(
+        log_stream,
+        override_faulthandler_destination=False,
+      )
 
       # Reset the log location and the backtrace preference from the global bootstrap options.
       global_bootstrap_options = self._bootstrap_options.for_global_scope()
@@ -385,8 +394,7 @@ class PantsDaemon(FingerprintedProcessManager):
         global_bootstrap_options.print_exception_stacktrace)
       # TODO Hello! I am your friendly neighborhoood log resetter. This resets the log location,
       #  which is not nice because we have already reset the interactive output stream.
-      ExceptionSink.reset_log_location("/tmp/pantslogs")
-      # ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
+      ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
 
       self._logger.info('pantsd starting, log level is {}, workdir {}, log_filename is {}'.format(
         self._log_level, global_bootstrap_options.pants_workdir, log_filename))

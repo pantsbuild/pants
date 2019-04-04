@@ -56,7 +56,13 @@ impl Logger {
     })
   }
 
-  pub fn set_pantsd_logger(&self, log_file_path: PathBuf, python_level: u64) -> Result<(), String> {
+  ///
+  /// Set up a file logger which logs at python_level to log_file_path.
+  /// Returns the file descriptor of the log file.
+  ///
+  #[cfg(unix)]
+  pub fn set_pantsd_logger(&self, log_file_path: PathBuf, python_level: u64) -> Result<std::os::unix::io::RawFd, String> {
+    use std::os::unix::io::AsRawFd;
     python_level.try_into_PythonLogLevel().and_then(|level| {
       {
         // Maybe close open file by dropping the existing logger
@@ -67,8 +73,10 @@ impl Logger {
         .append(true)
         .open(log_file_path)
         .map(|file| {
+          let fd = file.as_raw_fd();
           self.maybe_increase_global_verbosity(level.into());
           *self.pantsd_log.lock() = MaybeWriteLogger::new(file, level.into());
+          fd
         })
         .map_err(|err| format!("Error opening pantsd logfile: {}", err))
     })
