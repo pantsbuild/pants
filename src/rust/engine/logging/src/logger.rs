@@ -61,7 +61,11 @@ impl Logger {
   /// Returns the file descriptor of the log file.
   ///
   #[cfg(unix)]
-  pub fn set_pantsd_logger(&self, log_file_path: PathBuf, python_level: u64) -> Result<std::os::unix::io::RawFd, String> {
+  pub fn set_pantsd_logger(
+    &self,
+    log_file_path: PathBuf,
+    python_level: u64,
+  ) -> Result<std::os::unix::io::RawFd, String> {
     use std::os::unix::io::AsRawFd;
     python_level.try_into_PythonLogLevel().and_then(|level| {
       {
