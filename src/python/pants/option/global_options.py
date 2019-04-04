@@ -115,9 +115,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # after -l and -q in help output, which is conveniently contextual.
     register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
              help='Set whether log messages are displayed in color.')
-    register('--warning-filters', type=dict, default={},
-             help='Dict mapping action -> message, applying the `action` to warnings matching '
-                  '`message`. See the `warnings` module documentation for how these are used.')
+    # TODO(#7203): make a regexp option type!
+    register('--ignore-pants-warnings', type=list, member_type=str, default=[],
+             help='Regexps matching warning strings to ignore, e.g. '
+                  '["DeprecationWarning: this option has been removed"]. '
+                  'See the `warnings` module documentation for more background on these are used.')
 
     register('--pants-version', advanced=True, default=pants_version(),
              help='Use this pants version. Note Pants code only uses this to verify that you are '
@@ -232,6 +234,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help="Raise an exception if any targets declaring source files "
                   "fail to match any glob provided in the 'sources' argument.")
 
+    # TODO(#7203): make a regexp option type!
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
              metavar='<regexp>', help='Exclude target roots that match these regexes.')
     register('--subproject-roots', type=list, advanced=True, default=[],
