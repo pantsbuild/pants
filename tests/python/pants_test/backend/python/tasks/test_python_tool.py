@@ -22,6 +22,11 @@ class Tool(PythonToolBase):
   ]
   default_entry_point = 'pex.bin.pex:main'
 
+  @classmethod
+  def register_options(cls, register):
+    super(Tool, cls).register_options(register)
+    register('--needs-to-be-invoked-for-some-reason', type=bool, default=True)
+
 
 class ToolInstance(PythonToolInstance):
   pass
@@ -31,6 +36,9 @@ class ToolPrep(PythonToolPrepBase):
   options_scope = 'tool-prep-task'
   tool_subsystem_cls = Tool
   tool_instance_cls = ToolInstance
+
+  def will_be_invoked(self):
+    return Tool.scoped_instance(self).get_options().needs_to_be_invoked_for_some_reason
 
 
 class ToolTask(Task):
@@ -70,9 +78,10 @@ class PythonToolPrepTest(PythonTaskTestBase):
       tool_prep_task = tool_prep_type(context, os.path.join(
         self.pants_workdir, 'tp_py{}'.format(scope_string)))
       tool_prep_task.execute()
+      pex_tool = context.products.get_data(ToolPrep.tool_instance_cls)
+      self.assertIsNotNone(pex_tool)
       # Check that the tool can be created and executed successfully.
       self.create_task(context).execute()
-      pex_tool = context.products.get_data(ToolPrep.tool_instance_cls)
       # Check that our pex tool wrapper was constructed with the expected interpreter.
       self.assertTrue(pex_tool.interpreter.identity.matches(constraint_string))
       return pex_tool
@@ -86,3 +95,14 @@ class PythonToolPrepTest(PythonTaskTestBase):
     py2_pex_tool_path = py2_pex_tool.pex.path()
     self.assertTrue(os.path.isdir(py2_pex_tool_path))
     self.assertNotEqual(py3_pex_tool_path, py2_pex_tool_path)
+
+  def test_tool_noop(self):
+    tool_prep_type = self.synthesize_task_subtype(ToolPrep, 'tool_prep')
+    context = self.context(for_task_types=[tool_prep_type], for_subsystems=[Tool], options={
+      'test-tool': {
+        'needs_to_be_invoked_for_some_reason': False,
+      },
+    })
+    tool_prep_task = tool_prep_type(context, os.path.join(self.pants_workdir, 'tool_prep_dir'))
+    tool_prep_task.execute()
+    self.assertIsNone(context.products.get_data(ToolPrep.tool_instance_cls))
