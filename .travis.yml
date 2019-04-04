@@ -17,7 +17,9 @@ conditions: v1
 env:
   global:
     - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
-    - PYTEST_PASSTHRU_ARGS="-v --duration=3"
+    # With Pytest, we only want to output failures and skips.
+    # See https://docs.pytest.org/en/latest/usage.html#detailed-summary-report.
+    - PYTEST_PASSTHRU_ARGS="-q -rfa --duration=3"
     - LC_ALL="en_US.UTF-8"
     # This tells the ./pants runner script to avoid trying to clean the workspace when changing
     # python versions. CI starts off without the .python-interpreter-constraints file, so it would otherwise
