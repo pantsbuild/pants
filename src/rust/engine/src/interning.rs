@@ -44,15 +44,19 @@ impl Interns {
   }
 
   pub fn insert(&mut self, v: Value) -> Key {
-    let Ident { hash, type_id } = externs::identify(&v);
+    let ident = externs::identify(&v);
+    self.insert_with(v, ident)
+  }
+
+  pub fn insert_with(&mut self, v: Value, ident: Ident) -> Key {
     let mut inserted = false;
     let id_generator = self.id_generator;
     let key = *self
       .forward
-      .entry(InternKey(hash, v.clone()))
+      .entry(InternKey(ident.hash, v.clone()))
       .or_insert_with(|| {
         inserted = true;
-        Key::new(id_generator, type_id)
+        Key::new(id_generator, ident.type_id)
       });
     if inserted {
       self.reverse.insert(key, v);

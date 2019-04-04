@@ -295,9 +295,7 @@ class _FFISpecification(object):
     """
     c = self._ffi.from_handle(context_handle)
     obj = self._ffi.from_handle(val[0])
-    hash_ = hash(obj)
-    type_id = c.to_id(type(obj))
-    return (hash_, TypeId(type_id))
+    return c.identify(obj)
 
   @_extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
   def extern_equals(self, context_handle, val1, val2):
@@ -424,16 +422,19 @@ class _FFISpecification(object):
       if isinstance(res, Get):
         # Get.
         values = [res.subject]
+        identities = [c.identify(res.subject)]
         products = [res.product]
         tag = 2
       elif type(res) in (tuple, list):
         # GetMulti.
         values = [g.subject for g in res]
+        identities = [c.identify(g.subject) for g in res]
         products = [g.product for g in res]
         tag = 3
       else:
         # Break.
         values = [res]
+        identities = []
         products = []
         tag = 0
     except Exception as e:
@@ -441,12 +442,14 @@ class _FFISpecification(object):
       val = e
       val._formatted_exc = traceback.format_exc()
       values = [val]
+      identities = []
       products = []
       tag = 1
 
     return (
         tag,
         c.vals_buf([c.to_value(v) for v in values]),
+        c.identities_buf(identities),
         c.type_ids_buf([TypeId(c.to_id(t)) for t in products])
       )
 
@@ -521,6 +524,10 @@ class ExternContext(object):
     buf = self._ffi.new('Handle[]', vals)
     return (buf, len(vals), self.to_value(buf))
 
+  def identities_buf(self, idents):
+    buf = self._ffi.new('Ident[]', idents)
+    return (buf, len(idents), self.to_value(buf))
+
   def type_ids_buf(self, types):
     buf = self._ffi.new('TypeId[]', types)
     return (buf, len(types), self.to_value(buf))
@@ -544,6 +551,12 @@ class ExternContext(object):
 
   def drop_handles(self, handles):
     self._handles -= set(handles)
+
+  def identify(self, obj):
+    """Return an Ident-shaped tuple for the given object."""
+    hash_ = hash(obj)
+    type_id = self.to_id(type(obj))
+    return (hash_, TypeId(type_id))
 
   def to_id(self, typ):
     type_id = id(typ)

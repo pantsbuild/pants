@@ -223,29 +223,27 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
     PyGeneratorResponseType::Get => {
       let mut interns = INTERNS.write();
       let p = response.products.unwrap_one();
+      let i = response.identities.unwrap_one();
       let v = response.values.unwrap_one();
       let g = Get {
         product: p,
-        subject: interns.insert(v),
+        subject: interns.insert_with(v, i),
       };
       Ok(GeneratorResponse::Get(g))
     }
     PyGeneratorResponseType::GetMulti => {
       let mut interns = INTERNS.write();
-      let PyGeneratorResponse {
-        products: products_buf,
-        values: values_buf,
-        ..
-      } = response;
-      let products = products_buf.to_vec();
-      let values = values_buf.to_vec();
+      let products = response.products.to_vec();
+      let identities = response.identities.to_vec();
+      let values = response.values.to_vec();
       assert_eq!(products.len(), values.len());
       let continues: Vec<Get> = products
         .into_iter()
         .zip(values.into_iter())
-        .map(|(p, v)| Get {
+        .zip(identities.into_iter())
+        .map(|((p, v), i)| Get {
           product: p,
-          subject: interns.insert(v),
+          subject: interns.insert_with(v, i),
         })
         .collect();
       Ok(GeneratorResponse::GetMulti(continues))
@@ -478,6 +476,7 @@ pub enum PyGeneratorResponseType {
 pub struct PyGeneratorResponse {
   res_type: PyGeneratorResponseType,
   values: HandleBuffer,
+  identities: IdentBuffer,
   products: TypeIdBuffer,
 }
 
@@ -509,6 +508,7 @@ pub enum GeneratorResponse {
 /// the object's type.
 ///
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Ident {
   pub hash: i64,
   pub type_id: TypeId,
@@ -574,7 +574,28 @@ impl RawBuffer<Handle, Value> for HandleBuffer {
   }
 }
 
-// Points to an array of TypeIds.
+#[repr(C)]
+pub struct IdentBuffer {
+  idents_ptr: *mut Ident,
+  idents_len: u64,
+  // A Handle to hold the underlying array alive.
+  handle_: Handle,
+}
+
+impl RawBuffer<Ident, Ident> for IdentBuffer {
+  fn ptr(&self) -> *mut Ident {
+    self.idents_ptr
+  }
+
+  fn len(&self) -> u64 {
+    self.idents_len
+  }
+
+  fn lift(t: &Ident) -> Ident {
+    *t
+  }
+}
+
 #[repr(C)]
 pub struct TypeIdBuffer {
   ids_ptr: *mut TypeId,
