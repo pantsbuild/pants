@@ -27,6 +27,7 @@ pystache==0.5.3
 pytest-cov>=2.5,<2.6
 pytest>=3.4,<4.0
 pywatchman==1.4.1
+PyYAML==5.1
 py_zipkin==0.17.0
 requests[security]>=2.20.1
 responses==0.10.4
