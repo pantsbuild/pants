@@ -3,11 +3,8 @@
 
 """Utils for scripts to interface with the outside world."""
 
-import configparser
 import time
 from contextlib import contextmanager
-from enum import Enum
-from pathlib import Path
 from typing import Tuple
 
 # --------------------------------------------------------
