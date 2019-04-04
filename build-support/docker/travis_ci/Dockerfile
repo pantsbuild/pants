@@ -10,7 +10,7 @@ FROM ${BASE_IMAGE}
 # this requires publishing an updated image to Docker hub, so we copy the code here until then.
 
 ### BEGIN CENTOS6 DOCKERFILE CHANGES
-# Install a (more) modern gcc, and a JDK.
+# Install a (more) modern gcc, a JDK, and dependencies for installing Python through Pyenv.
 # Also install sqlite-devel because python 3 errors on startup if not -- see
 # https://stackoverflow.com/a/39907500/2518889.
 RUN yum -y update
@@ -27,7 +27,6 @@ RUN yum install -y \
         sqlite-devel \
         zlib{,-devel}
 
-# Install the desired versions of python 2.7 and 3.6.
 ARG PYTHON_27_VERSION=2.7.13
 ARG PYTHON_36_VERSION=3.6.8
 # NB: PYENV_ROOT must be set for `pyenv install` to be available. This failure mode is not mentioned
