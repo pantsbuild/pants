@@ -10,9 +10,6 @@ FROM ${BASE_IMAGE}
 # this requires publishing an updated image to Docker hub, so we copy the code here until then.
 
 ### BEGIN CENTOS6 DOCKERFILE CHANGES
-# Install a (more) modern gcc, a JDK, and dependencies for installing Python through Pyenv.
-# Also install sqlite-devel because python 3 errors on startup if not -- see
-# https://stackoverflow.com/a/39907500/2518889.
 RUN yum -y update
 # TODO: figure out why this needs to be installed first for /usr/bin/scl to work!
 RUN yum install -y centos-release-scl
@@ -33,14 +30,13 @@ ARG PYTHON_36_VERSION=3.6.8
 # in https://github.com/pyenv/pyenv#basic-github-checkout.
 ENV PYENV_ROOT "${PYENV_ROOT:-/pyenv-docker-build}"
 ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
-RUN if [[ ! -d "${PYENV_ROOT}" ]]; then git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}; fi
-
-# Install python 2.7 and 3.6, and set python 3.6 as the default interpreter.
-# Build the python shared library, as we use it to build the engine.
 ENV PYTHON_CONFIGURE_OPTS="--enable-shared"
-RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION}
-RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_36_VERSION}
-RUN ${PYENV_BIN} global ${PYTHON_27_VERSION} ${PYTHON_36_VERSION}
+RUN if [[ ! -d "${PYENV_ROOT}" ]]; then \
+  git clone https://github.com/pyenv/pyenv ${PYENV_ROOT} \
+  && /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION} \
+  && /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_36_VERSION} \
+  && ${PYENV_BIN} global ${PYTHON_27_VERSION} ${PYTHON_36_VERSION}; \
+  fi
 ENV PATH "${PYENV_ROOT}/shims:${PATH}"
 
 # Expose the installed gcc to the invoking shell.
