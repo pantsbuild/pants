@@ -108,10 +108,18 @@ class TypeCheckFailWrapper(object):
 
 @rule(A, [TypeCheckFailWrapper])
 def a_typecheck_fail_test(wrapper):
-  # This `yield Get(A, B, ...)` will use the `nested_raise` rule defined above, but it won't get to
-  # the point of raising since the type check will fail at the Get.
-  supposedly_a = yield Get(A, B, wrapper.inner)
-  yield supposedly_a
+  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+  # the type check will fail at the Get.
+  _ = yield Get(A, B, wrapper.inner) # noqa: F841
+  yield A()
+
+
+@rule(C, [TypeCheckFailWrapper])
+def c_unhashable(_):
+  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+  # the hashability check will fail.
+  _ = yield Get(A, B, list()) # noqa: F841
+  yield C()
 
 
 @contextmanager
@@ -201,6 +209,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
       RootRule(B),
       RootRule(TypeCheckFailWrapper),
       a_typecheck_fail_test,
+      c_unhashable,
       nested_raise,
     ]
 
@@ -212,6 +221,12 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
     with assert_execution_error(self, expected_msg):
       # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
       self.scheduler.product_request(A, [Params(TypeCheckFailWrapper(A()))])
+
+  def test_unhashable_failure(self):
+    """Test that unhashable Get(...) params result in a structured error."""
+    expected_msg = """TypeError: unhashable type: 'list'"""
+    with assert_execution_error(self, expected_msg):
+      self.scheduler.product_request(C, [Params(TypeCheckFailWrapper(A()))])
 
   def test_trace_includes_rule_exception_traceback(self):
     # Execute a request that will trigger the nested raise, and then directly inspect its trace.
