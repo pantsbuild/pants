@@ -514,6 +514,37 @@ pub struct Ident {
   pub type_id: TypeId,
 }
 
+pub trait RawBuffer<T, O> {
+  fn ptr(&self) -> *mut T;
+  fn len(&self) -> u64;
+
+  ///
+  /// A buffer-specific shallow clone operation (possibly just implemented via clone).
+  ///
+  fn lift(t: &T) -> O;
+
+  ///
+  /// Returns a Vec copy of the buffer contents.
+  ///
+  fn to_vec(&self) -> Vec<O> {
+    with_vec(self.ptr(), self.len() as usize, |vec| {
+      vec.iter().map(Self::lift).collect()
+    })
+  }
+
+  ///
+  /// Asserts that the buffer contains one item, and returns a copy of it.
+  ///
+  fn unwrap_one(&self) -> O {
+    assert!(
+      self.len() == 1,
+      "Expected exactly 1 item in Buffer, but had: {}",
+      self.len()
+    );
+    with_vec(self.ptr(), self.len() as usize, |vec| Self::lift(&vec[0]))
+  }
+}
+
 ///
 /// Points to an array containing a series of values allocated by Python.
 ///
@@ -529,30 +560,17 @@ pub struct HandleBuffer {
   handle_: Handle,
 }
 
-impl HandleBuffer {
-  pub fn to_vec(&self) -> Vec<Value> {
-    with_vec(self.handles_ptr, self.handles_len as usize, |handle_vec| {
-      handle_vec
-        .iter()
-        .map(|h| Value::new(unsafe { h.clone_shallow() }))
-        .collect()
-    })
+impl RawBuffer<Handle, Value> for HandleBuffer {
+  fn ptr(&self) -> *mut Handle {
+    self.handles_ptr
   }
 
-  ///
-  /// Asserts that the HandleBuffer contains one value, and returns it.
-  ///
-  /// NB: Consider making generic and merging with TypeIdBuffer if we get a third copy.
-  ///
-  pub fn unwrap_one(&self) -> Value {
-    assert!(
-      self.handles_len == 1,
-      "HandleBuffer contained more than one value: {}",
-      self.handles_len
-    );
-    with_vec(self.handles_ptr, self.handles_len as usize, |handle_vec| {
-      Value::new(unsafe { handle_vec.iter().next().unwrap().clone_shallow() })
-    })
+  fn len(&self) -> u64 {
+    self.handles_len
+  }
+
+  fn lift(t: &Handle) -> Value {
+    Value::new(unsafe { t.clone_shallow() })
   }
 }
 
@@ -565,25 +583,17 @@ pub struct TypeIdBuffer {
   handle_: Handle,
 }
 
-impl TypeIdBuffer {
-  pub fn to_vec(&self) -> Vec<TypeId> {
-    with_vec(self.ids_ptr, self.ids_len as usize, |vec| vec.clone())
+impl RawBuffer<TypeId, TypeId> for TypeIdBuffer {
+  fn ptr(&self) -> *mut TypeId {
+    self.ids_ptr
   }
 
-  ///
-  /// Asserts that the TypeIdBuffer contains one TypeId, and returns it.
-  ///
-  /// NB: Consider making generic and merging with HandleBuffer if we get a third copy.
-  ///
-  pub fn unwrap_one(&self) -> TypeId {
-    assert!(
-      self.ids_len == 1,
-      "TypeIdBuffer contained more than one value: {}",
-      self.ids_len
-    );
-    with_vec(self.ids_ptr, self.ids_len as usize, |ids_vec| {
-      *ids_vec.iter().next().unwrap()
-    })
+  fn len(&self) -> u64 {
+    self.ids_len
+  }
+
+  fn lift(t: &TypeId) -> TypeId {
+    *t
   }
 }
 

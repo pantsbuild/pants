@@ -58,7 +58,7 @@ use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern,
   HandleBuffer, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
-  StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
+  RawBuffer, StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
   StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
