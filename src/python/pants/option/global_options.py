@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import multiprocessing
 import os
 import sys
+from builtins import str
 from textwrap import dedent
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
@@ -118,7 +119,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # TODO(#7203): make a regexp option type!
     register('--ignore-pants-warnings', type=list, member_type=str, default=[],
              help='Regexps matching warning strings to ignore, e.g. '
-                  '["DeprecationWarning: this option has been removed"]. '
+                  '["DEPRECATED: scope some_scope will be removed"]. '
                   'See the `warnings` module documentation for more background on these are used.')
 
     register('--pants-version', advanced=True, default=pants_version(),
