@@ -4,10 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import unittest
 import warnings
 from builtins import object, str
 from contextlib import contextmanager
+
+import mock
+from packaging.version import Version
 
 from pants.base.deprecated import (BadDecoratorNestingError, BadSemanticVersionError,
                                    CodeRemovedError, InvalidSemanticVersionOrderingError,
@@ -15,11 +17,13 @@ from pants.base.deprecated import (BadDecoratorNestingError, BadSemanticVersionE
                                    deprecated, deprecated_conditional, deprecated_module,
                                    warn_or_error)
 from pants.util.collections import assert_single_element
-from pants.version import VERSION
-from pants_test.test_base import use_current_prerelease_semver
+from pants_test.test_base import TestBase
 
 
-class DeprecatedTest(unittest.TestCase):
+_FAKE_CUR_VERSION = '2.0.0.dev0'
+
+
+class DeprecatedTest(TestBase):
   FUTURE_VERSION = '9999.9.9.dev0'
 
   @contextmanager
@@ -153,12 +157,12 @@ class DeprecatedTest(unittest.TestCase):
       def test_func1a():
         pass
 
-  @use_current_prerelease_semver
+  @mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
   def test_removal_version_same(self):
     with self.assertRaises(CodeRemovedError):
-      warn_or_error(VERSION, 'dummy description')
+      warn_or_error(_FAKE_CUR_VERSION, 'dummy description')
 
-    @deprecated(VERSION)
+    @deprecated(_FAKE_CUR_VERSION)
     def test_func():
       pass
     with self.assertRaises(CodeRemovedError):
@@ -193,14 +197,21 @@ class DeprecatedTest(unittest.TestCase):
                     deprecated_entity_description='dummy',
                     deprecation_start_version='1.0.0.dev0')
 
-  @use_current_prerelease_semver
+  @mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
   def test_deprecation_start_period(self):
     with self.assertRaises(CodeRemovedError):
-      warn_or_error(removal_version=VERSION,
+      warn_or_error(removal_version=_FAKE_CUR_VERSION,
                     deprecated_entity_description='dummy',
                     deprecation_start_version='1.0.0.dev0')
+
+    with self.warnings_catcher() as w:
+      warn_or_error(removal_version='999.999.999.dev999',
+                    deprecated_entity_description='dummy',
+                    deprecation_start_version=_FAKE_CUR_VERSION)
+      self.assertWarning(w, DeprecationWarning,
+                         'DEPRECATED: dummy will be removed in version 999.999.999.dev999.')
 
     self.assertIsNone(
       warn_or_error(removal_version='999.999.999.dev999',
                     deprecated_entity_description='dummy',
-                    deprecation_start_version=VERSION))
+                    deprecation_start_version='500.0.0.dev0'))

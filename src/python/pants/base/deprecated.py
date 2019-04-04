@@ -134,9 +134,9 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None,
       deprecation_start_version, 'deprecation start version')
     if deprecation_start_semver >= removal_semver:
       raise InvalidSemanticVersionOrderingError(
-        'The deprecation start version {} must be greater than the end version {}.'
+        'The deprecation start version {} must be less than the end version {}.'
         .format(deprecation_start_version, removal_version))
-    elif PANTS_SEMVER <= deprecation_start_semver:
+    elif PANTS_SEMVER < deprecation_start_semver:
       return
 
   msg = 'DEPRECATED: {} {} removed in version {}.'.format(deprecated_entity_description,

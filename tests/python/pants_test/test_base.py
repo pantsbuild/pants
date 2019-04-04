@@ -8,6 +8,7 @@ import itertools
 import logging
 import os
 import unittest
+import warnings
 from builtins import object, open, str
 from collections import defaultdict
 from contextlib import contextmanager
@@ -40,7 +41,6 @@ from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_file_d
                                 safe_mkdtemp, safe_open, safe_rmtree)
 from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
-from pants.version import PANTS_SEMVER
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
@@ -699,6 +699,18 @@ class TestBase(unittest.TestCase, AbstractClass):
       root_logger.setLevel(old_level)
       root_logger.removeHandler(handler)
 
+  @contextmanager
+  def warnings_catcher(self):
+    with warnings.catch_warnings(record=True) as w:
+      warnings.simplefilter('always')
+      yield w
+
+  def assertWarning(self, w, category, warning_text):
+    single_warning = assert_single_element(w)
+    self.assertEqual(single_warning.category, category)
+    warning_message = single_warning.message
+    self.assertEqual(warning_text, text_type(warning_message))
+
   def retrieve_single_product_at_target_base(self, product_mapping, target):
     mapping_for_target = product_mapping.get(target)
     single_base_dir = assert_single_element(list(mapping_for_target.keys()))
@@ -754,9 +766,3 @@ class TestBase(unittest.TestCase, AbstractClass):
       target_dict[key] = generated_target
 
     return target_dict
-
-
-def use_current_prerelease_semver(f):
-  return unittest.skipIf(not PANTS_SEMVER.is_prerelease,
-                         'Uses the current version as a deprecation version, which is only valid '
-                         'for prereleases.')(f)

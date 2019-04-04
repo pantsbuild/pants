@@ -63,6 +63,7 @@ python_tests(
   name = 'deprecated',
   sources = ['test_deprecated.py'],
   dependencies = [
+    '3rdparty/python:mock',
     '3rdparty/python:future',
     'src/python/pants/base:deprecated',
     'src/python/pants/util:collections',
