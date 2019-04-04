@@ -56,8 +56,7 @@ echo "* Checking for bad shell patterns" && ./build-support/bin/check_shell.sh |
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
 if git rev-parse --verify "master" &>/dev/null; then
-  echo "* Checking imports" && ./build-support/bin/isort.sh || \
-    die "To fix import sort order, run \`\"$(pwd)/build-support/bin/isort.sh\" -f\`"
+  echo "* Checking imports" && ./build-support/bin/isort.py || exit 1
 
   # TODO(CMLivingston) Make lint use `-q` option again after addressing proper workunit labeling:
   # https://github.com/pantsbuild/pants/issues/6633
