@@ -73,9 +73,7 @@ class NativeHandler(StreamHandler):
     self.setLevel(level)
 
   def emit(self, record):
-    msg = ("{}:{} - {}".format(record.name, os.getpid(), self.format(record)))
-    # msg = ("{}".format(self.format(record)))
-    self.native.write_log(msg, record.levelno, record.name)
+    self.native.write_log(self.format(record), record.levelno, "{}:pid={}".format(record.name, os.getpid()))
 
 
 def create_native_pantsd_file_log_handler(level, native, native_filename):

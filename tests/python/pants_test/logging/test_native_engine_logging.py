@@ -29,9 +29,17 @@ class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
       daemon_run = pantsd_run(["list", "3rdparty::"])
       checker.assert_started()
 
-      wanted_in_client = "\\[DEBUG\\] pants.bin.remote_pants_runner: pants.bin.remote_pants_runner:\\d+ - connecting to pantsd on port"
-      self.assertRegexpMatches(daemon_run.stderr_data, wanted_in_client)
+      self.assert_run_contains_log(
+        "connecting to pantsd on port",
+        "DEBUG",
+        "pants.bin.remote_pants_runner",
+        daemon_run,
+      )
 
-      wanted_in_daemon = "\\[DEBUG\\] pants.pantsd.pants_daemon: pants.pantsd.pants_daemon:\\d+ - logging initialized"
       pantsd_log = '\n'.join(read_pantsd_log(workdir))
-      self.assertRegexpMatches(pantsd_log, wanted_in_daemon)
+      self.assert_contains_log(
+        "logging initialized",
+        "DEBUG",
+        "pants.pantsd.pants_daemon",
+        pantsd_log,
+      )
