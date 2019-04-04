@@ -118,7 +118,8 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None,
   :param string hint: A message describing how to migrate from the removed entity.
   :param string deprecation_start_version: The pantsbuild.pants version at which the entity will
                                            begin to display a deprecation warning. This must be less
-                                           than the `removal_version`.
+                                           than the `removal_version`. If not provided, the
+                                           deprecation warning is always displayed.
   :param int stacklevel: The stacklevel to pass to warnings.warn.
   :param FrameInfo frame_info: If provided, use this frame info instead of getting one from
                                `stacklevel`.

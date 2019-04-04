@@ -127,15 +127,15 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     register('--pants-runtime-python-version', advanced=True,
              removal_version='1.19.0.dev0',
+             deprecation_start_version='1.17.0.dev0',
              removal_hint="""\
-This option was only used to help with Pants' migration to support Python 3. Pants will now
+This option was only used to help with Pants' migration to run on Python 3. Pants will now
 correctly default to whichever Python versions are supported for the current `pants_version` you are
 using. Please make sure you are using the most up-to-date version of the `./pants` script with:
 
   curl -L -O https://pantsbuild.github.io/setup/pants
 
-and then remove this option.""",
-             deprecation_start_version='1.17.0.dev0',
+and then unset this option.""",
              help='Use this Python version to run Pants. The option expects the major and minor '
                   'version, e.g. 2.7 or 3.6. Note Pants code only uses this to verify that you are '
                   'using the requested interpreter, as Pants cannot dynamically change the '
