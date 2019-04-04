@@ -1,7 +1,7 @@
 ansicolors==1.0.2
 asttokens==1.1.13
 beautifulsoup4>=4.6.0,<4.7
-cffi==1.12
+cffi==1.11.5
 configparser==3.5.0 ; python_version<'3'
 contextlib2==0.5.5
 coverage>=4.5,<4.6
