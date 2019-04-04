@@ -17,28 +17,27 @@ RUN yum -y update
 # TODO: figure out why this needs to be installed first for /usr/bin/scl to work!
 RUN yum install -y centos-release-scl
 RUN yum install -y \
-        bzip2{,-devel} \
+        bzip2-devel \
         devtoolset-7-gcc{,-c++} \
         git \
         java-1.8.0-openjdk-devel \
-        libffi{,-devel} \
+        libffi-devel \
         openssl-devel \
-        readline{,-devel} \
+        readline-devel \
         sqlite-devel \
-        zlib{,-devel}
+        zlib-devel
 
 ARG PYTHON_27_VERSION=2.7.13
 ARG PYTHON_36_VERSION=3.6.8
 # NB: PYENV_ROOT must be set for `pyenv install` to be available. This failure mode is not mentioned
 # in https://github.com/pyenv/pyenv#basic-github-checkout.
-ENV PYENV_ROOT /pyenv-docker-build
-RUN mkdir ${PYENV_ROOT}
-RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
-ENV PYENV_BIN ${PYENV_ROOT}/bin/pyenv
+ENV PYENV_ROOT "${PYENV_ROOT:-/pyenv-docker-build}"
+ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
+RUN if [[ ! -d "${PYENV_ROOT}" ]]; then git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}; fi
 
 # Install python 2.7 and 3.6, and set python 3.6 as the default interpreter.
-# Build the python shared library, in addition to openssl, as we use it to build the engine.
-ENV PYTHON_CONFIGURE_OPTS="--enable-shared --with-openssl=${OPENSSL_DIR}"
+# Build the python shared library, as we use it to build the engine.
+ENV PYTHON_CONFIGURE_OPTS="--enable-shared"
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_36_VERSION}
 RUN ${PYENV_BIN} global ${PYTHON_27_VERSION} ${PYTHON_36_VERSION}
