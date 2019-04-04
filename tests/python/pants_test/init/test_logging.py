@@ -49,5 +49,5 @@ class LoggingTest(TestBase):
       with open(log_file, 'r') as fp:
         loglines = fp.read().splitlines()
         self.assertEqual(2, len(loglines))
-        self.assertIn("[WARN] my_file_logger:{} - this is a warning".format(pid), loglines[0])
-        self.assertIn("[INFO] my_file_logger:{} - this is some info".format(pid), loglines[1])
+        self.assertIn("[WARN] this is a warning", loglines[0])
+        self.assertIn("[INFO] this is some info", loglines[1])
