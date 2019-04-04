@@ -63,6 +63,8 @@ def validate_deprecation_semver(version_string, version_description):
   If so, returns that semver.  Raises an error otherwise.
 
   :param str version_string: A pantsbuild.pants version which affects some deprecated entity.
+  :param str version_description: A string used in exception messages to describe what the
+                                  `version_string` represents.
   :rtype: `packaging.version.Version`
   :raises DeprecationApplicationError: if the version_string parameter is invalid.
   """
