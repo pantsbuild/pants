@@ -5,7 +5,7 @@
 FROM centos:6
 
 # Install a (more) modern gcc, a JDK, and dependencies for installing Python through Pyenv.
-# Also install sqlite-devel because python 3 errors on startup if not -- see
+# Also install sqlite-devel because Python 3 errors on startup if not -- see
 # https://stackoverflow.com/a/39907500/2518889.
 RUN yum -y update
 # TODO: figure out why this needs to be installed first for /usr/bin/scl to work!
@@ -25,12 +25,12 @@ ARG PYTHON_27_VERSION=2.7.13
 ARG PYTHON_36_VERSION=3.6.8
 # NB: PYENV_ROOT must be set for `pyenv install` to be available. This failure mode is not mentioned
 # in https://github.com/pyenv/pyenv#basic-github-checkout.
-ENV PYENV_ROOT "${PYENV_ROOT:-/pyenv-docker-build}"
+ENV PYENV_ROOT /pyenv-docker-build
 ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
-RUN if [[ ! -d "${PYENV_ROOT}" ]]; then git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}; fi
+RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
 
-# Install python 2.7 and 3.6, and set python 3.6 as the default interpreter.
-# Build the python shared library, as we use it to build the engine.
+# Install Python 2.7 and 3.6.
+# Build the Python shared library, as we use it to build the engine.
 ENV PYTHON_CONFIGURE_OPTS="--enable-shared"
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_36_VERSION}
