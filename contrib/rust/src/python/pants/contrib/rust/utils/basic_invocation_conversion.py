@@ -18,12 +18,7 @@ from pants.contrib.rust.utils.collector import (collect_information, get_default
 
 
 def get_default_conversion_rules():
-  return {
-    'args': args_rules,
-    'outputs': outputs_rule,
-    'links': links_rule,
-    'env': env_rules
-  }
+  return {'args': args_rules, 'outputs': outputs_rule, 'links': links_rule, 'env': env_rules}
 
 
 def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_dir):
@@ -37,13 +32,13 @@ def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_
     apply_rule = transformation_rules.get(key)
     if apply_rule:
       apply_rule(
-        invocation_key=pants_invocation[key],
-        target=target,
-        result_dir=result_dir,
-        crate_out_dirs=crate_out_dirs,
-        libraries_dir=libraries_dir,
-        make_dirs=make_dirs,
-        make_sym_links=make_sym_links,
+          invocation_key=pants_invocation[key],
+          target=target,
+          result_dir=result_dir,
+          crate_out_dirs=crate_out_dirs,
+          libraries_dir=libraries_dir,
+          make_dirs=make_dirs,
+          make_sym_links=make_sym_links,
       )
 
   # package_name and crate_name can be different and create_name is used in the rustc flag '--extern <create_name>=<Path>'

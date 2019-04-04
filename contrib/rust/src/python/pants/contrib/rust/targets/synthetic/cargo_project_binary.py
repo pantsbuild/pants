@@ -16,8 +16,9 @@ class CargoProjectBinary(CargoSyntheticBinary):
     payload = payload or Payload()
 
     if sources:
-      payload.add_field('sources', self.create_sources_field(sources=sources,
-                                                             sources_rel_path=address.spec_path,
-                                                             key_arg='sources'))
+      payload.add_field(
+          'sources',
+          self.create_sources_field(
+              sources=sources, sources_rel_path=address.spec_path, key_arg='sources'))
 
     super(CargoProjectBinary, self).__init__(address=address, payload=payload, **kwargs)

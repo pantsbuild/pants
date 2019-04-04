@@ -13,6 +13,7 @@ from pants.contrib.rust.targets.synthetic.cargo_synthetic_base import CargoSynth
 
 
 class CargoFingerprintStrategy(FingerprintStrategy):
+
   def __init__(self, build_flags):
     self._build_flags = build_flags
 

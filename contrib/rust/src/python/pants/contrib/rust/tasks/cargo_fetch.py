@@ -14,6 +14,7 @@ from pants.contrib.rust.tasks.cargo_task import CargoTask
 
 
 class Fetch(CargoTask):
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(Fetch, cls).prepare(options, round_manager)
@@ -40,12 +41,12 @@ class Fetch(CargoTask):
     cmd = ['cargo', toolchain, 'fetch', '--manifest-path', abs_manifest_path]
 
     env = {
-      'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),
-      'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
+        'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),
+        'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
     }
 
-    returncode = self.execute_command(cmd, 'fetch', [WorkUnitLabel.TOOL], env_vars=env,
-                                   current_working_dir=target.manifest)
+    returncode = self.execute_command(
+        cmd, 'fetch', [WorkUnitLabel.TOOL], env_vars=env, current_working_dir=target.manifest)
 
     if returncode != 0:
       raise TaskError('Cannot fetch dependencies for: {}'.format(abs_manifest_path))

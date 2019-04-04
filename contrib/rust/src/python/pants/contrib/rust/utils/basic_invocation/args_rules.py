@@ -49,7 +49,7 @@ def out_dir_flag_rule(_, result_dir, make_dirs, **kwargs):
 
 
 def extern_flag_rule(key_value, target, crate_out_dirs, **kwargs):
-  key, value = key_value.split('=')
+  key, _ = key_value.split('=')
 
   extern = None
   for dependency in target.dependencies:

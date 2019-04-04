@@ -15,7 +15,9 @@ class CargoTaskBuildIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
   def test_cargo_compile_targets_nightly_2018_12_31(self):
-    args = ['compile', 'contrib/rust/examples/src/rust/::',
-            '--bootstrap-cargo-toolchain=nightly-2018-12-31']
+    args = [
+        'compile', 'contrib/rust/examples/src/rust/::',
+        '--bootstrap-cargo-toolchain=nightly-2018-12-31'
+    ]
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)

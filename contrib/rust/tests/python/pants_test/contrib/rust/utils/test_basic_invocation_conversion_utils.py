@@ -12,37 +12,38 @@ from pants.contrib.rust.utils.basic_invocation_conversion_utils import (reduce_i
 
 
 test_invocation = {
-  "package_name": "tar_api",
-  "package_version": "0.0.1",
-  "target_kind": ['lib'],
-  "kind": "Host",
-  "compile_mode": "build",
-  "outputs": [],
-  "links": {},
-  "program": "rustc",
-  "args": [],
-  "env": {},
-  "cwd": "/pants/src/rust/engine"
+    "package_name": "tar_api",
+    "package_version": "0.0.1",
+    "target_kind": ['lib'],
+    "kind": "Host",
+    "compile_mode": "build",
+    "outputs": [],
+    "links": {},
+    "program": "rustc",
+    "args": [],
+    "env": {},
+    "cwd": "/pants/src/rust/engine"
 }
 
 
 class UtilsTest(unittest.TestCase):
+
   def get_invocation(self):
     return copy.deepcopy(test_invocation)
 
   def test_reduce_invocation(self):
     invocation = self.get_invocation()
     result = {
-      "package_name": "tar_api",
-      "package_version": "0.0.1",
-      "target_kind": ['lib'],
-      "compile_mode": "build",
-      "outputs": [],
-      "links": {},
-      "program": "rustc",
-      "args": [],
-      "env": {},
-      "cwd": "/pants/src/rust/engine"
+        "package_name": "tar_api",
+        "package_version": "0.0.1",
+        "target_kind": ['lib'],
+        "compile_mode": "build",
+        "outputs": [],
+        "links": {},
+        "program": "rustc",
+        "args": [],
+        "env": {},
+        "cwd": "/pants/src/rust/engine"
     }
     reduce_invocation(invocation)
     self.assertEqual(invocation, result)

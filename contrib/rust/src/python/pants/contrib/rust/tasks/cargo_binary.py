@@ -14,6 +14,7 @@ from pants.contrib.rust.tasks.cargo_task import CargoTask
 
 
 class Binary(CargoTask):
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(Binary, cls).prepare(options, round_manager)
@@ -44,9 +45,8 @@ class Binary(CargoTask):
       path_project = os.path.join(libs_bins_path, name)
       safe_mkdir(path_project, clean=True)
       for path in paths:
-        self.context.log.info('Copy: {0}\n\tto: {1}'.format(os.path.relpath(path, build_root),
-                                                            os.path.relpath(path_project,
-                                                                            build_root)))
+        self.context.log.info('Copy: {0}\n\tto: {1}'.format(
+            os.path.relpath(path, build_root), os.path.relpath(path_project, build_root)))
         if os.path.isfile(path):
           shutil.copy(path, path_project)
         else:

@@ -10,13 +10,17 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class CargoTaskFetchIntegrationTest(PantsRunIntegrationTest):
 
   def test_cargo_fetch_targets_nightly(self):
-    args = ['resolve', 'contrib/rust/examples/src/rust/dependencies/workspace_a:workspace_a',
-            '--bootstrap-cargo-toolchain=nightly']
+    args = [
+        'resolve', 'contrib/rust/examples/src/rust/dependencies/workspace_a:workspace_a',
+        '--bootstrap-cargo-toolchain=nightly'
+    ]
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
 
   def test_cargo_fetch_targets_nightly_2018_12_31(self):
-    args = ['resolve', 'contrib/rust/examples/src/rust/dependencies/workspace_a:workspace_a',
-            '--bootstrap-cargo-toolchain=nightly-2018-12-31']
+    args = [
+        'resolve', 'contrib/rust/examples/src/rust/dependencies/workspace_a:workspace_a',
+        '--bootstrap-cargo-toolchain=nightly-2018-12-31'
+    ]
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)

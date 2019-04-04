@@ -20,10 +20,10 @@ def out_dir_flag_rule(_, information, result_dir, make_dirs, **kwargs):
 def args_rules(invocation_key, rules=None, **kwargs):
   if rules is None:
     rules = {
-      '--out-dir': out_dir_flag_rule,
-      '-C': c_flag_rules,
-      '-L': l_flag_rules,
-      '--extern': extern_flag_rule
+        '--out-dir': out_dir_flag_rule,
+        '-C': c_flag_rules,
+        '-L': l_flag_rules,
+        '--extern': extern_flag_rule
     }
 
   for index, arg in enumerate(invocation_key):

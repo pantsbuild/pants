@@ -17,6 +17,7 @@ from pants.contrib.rust.tasks.cargo_fetch import Fetch
 
 
 class CargoTaskFetch(TaskTestBase):
+
   @classmethod
   def task_type(cls):
     return Fetch
@@ -44,7 +45,9 @@ class CargoTaskFetch(TaskTestBase):
     src_path = os.path.join(project_path, 'src')
     safe_mkdir(src_path)
 
-    self.create_file(os.path.join(name, 'BUILD'), contents=dedent("""       
+    self.create_file(
+        os.path.join(name, 'BUILD'),
+        contents=dedent("""       
           # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
           # Licensed under the Apache License, Version 2.0 (see LICENSE).
   
@@ -54,7 +57,9 @@ class CargoTaskFetch(TaskTestBase):
           )
           """).format(name=name).strip())
 
-    self.create_file(os.path.join(name, 'Cargo.toml'), contents=dedent("""       
+    self.create_file(
+        os.path.join(name, 'Cargo.toml'),
+        contents=dedent("""       
           [package]
           name = "{name}"
           version = "0.1.0"
@@ -65,7 +70,9 @@ class CargoTaskFetch(TaskTestBase):
           sha2 = "0.8"
           """).format(name=name).strip())
 
-    self.create_file(os.path.join(name, 'src', 'lib.rs'), contents=dedent("""       
+    self.create_file(
+        os.path.join(name, 'src', 'lib.rs'),
+        contents=dedent("""       
           #[cfg(test)]
           mod tests {
               #[test]
@@ -95,8 +102,10 @@ class CargoTaskFetch(TaskTestBase):
 
     env = os.environ.copy()
     cargo_path = os.path.join(env['HOME'], '.cargo/bin')
-    context.products.safe_create_data('cargo_env',
-                                      lambda: {'CARGO_HOME': cargo_home, 'PATH': cargo_path})
+    context.products.safe_create_data('cargo_env', lambda: {
+        'CARGO_HOME': cargo_home,
+        'PATH': cargo_path
+    })
     context.products.safe_create_data('cargo_toolchain', lambda: 'nightly-2018-12-31')
 
     cargo_git = os.path.join(cargo_home, 'git')
@@ -122,8 +131,10 @@ class CargoTaskFetch(TaskTestBase):
 
     env = os.environ.copy()
     cargo_path = os.path.join(env['HOME'], '.cargo/bin')
-    context.products.safe_create_data('cargo_env',
-                                      lambda: {'CARGO_HOME': cargo_home, 'PATH': cargo_path})
+    context.products.safe_create_data('cargo_env', lambda: {
+        'CARGO_HOME': cargo_home,
+        'PATH': cargo_path
+    })
     context.products.safe_create_data('cargo_toolchain', lambda: 'XYZ')
 
     with self.assertRaises(TaskError):

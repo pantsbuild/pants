@@ -6,9 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 def args(args, collector):
+
   def _c_flag_filter(key_value, collector):
     needs = {
-      'extra-filename': True,
+        'extra-filename': True,
     }
 
     is_key_value = key_value.split('=')
@@ -21,8 +22,8 @@ def args(args, collector):
         collector.update({key: value})
 
   needs = {
-    '--crate-name': lambda name, collector: collector.update({'crate_name': name}),
-    '-C': _c_flag_filter,
+      '--crate-name': lambda name, collector: collector.update({'crate_name': name}),
+      '-C': _c_flag_filter,
   }
 
   for index, arg in enumerate(args):
@@ -33,21 +34,17 @@ def args(args, collector):
 
 def get_default_information():
   return {
-    'args': args,
-    'package_name': lambda name, collector: collector.update({'package_name': name})
+      'args': args,
+      'package_name': lambda name, collector: collector.update({'package_name': name})
   }
 
 
 def get_test_target_information():
-  return {
-    'env': env
-  }
+  return {'env': env}
 
 
 def env(invocation, collector):
-  needs = {
-    'CARGO_MANIFEST_DIR': lambda key, vaule, collector: collector.update({key: vaule})
-  }
+  needs = {'CARGO_MANIFEST_DIR': lambda key, vaule, collector: collector.update({key: vaule})}
 
   for key, value in invocation.items():
     filter = needs.get(key, None)

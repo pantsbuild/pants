@@ -15,6 +15,7 @@ from pants.contrib.rust.tasks.cargo_toolchain import Toolchain
 
 
 class CargoTaskToolchain(TaskTestBase):
+
   @classmethod
   def task_type(cls):
     return Toolchain
@@ -48,7 +49,9 @@ class CargoTaskToolchain(TaskTestBase):
 
   def test_get_toolchain(self):
     task = self.create_task(
-      self.context(options={'test_scope': {'toolchain': 'nightly-toolchain'}}))
+        self.context(options={'test_scope': {
+            'toolchain': 'nightly-toolchain'
+        }}))
     toolchain = task.get_toolchain()
     self.assertEqual('nightly-toolchain', toolchain)
 

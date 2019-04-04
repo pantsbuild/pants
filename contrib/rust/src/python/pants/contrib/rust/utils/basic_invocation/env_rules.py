@@ -22,7 +22,7 @@ def out_dir_rule(old_path, target, crate_out_dirs, result_dir, **kwargs):
 
 
 def dyld_lib_path_rule(old_path, libraries_dir, **kwargs):
-  user_path, system_paths = old_path.split(':', 1)
+  _, system_paths = old_path.split(':', 1)
   new_path = "{}:{}".format(libraries_dir, system_paths)
   return new_path
 
@@ -30,13 +30,13 @@ def dyld_lib_path_rule(old_path, libraries_dir, **kwargs):
 def env_rules(invocation_key, rules=None, **kargs):
   if rules is None:
     rules = {
-      'OUT_DIR': out_dir_rule,
-      # nightly-2018-12-31 macOS
-      'DYLD_LIBRARY_PATH': dyld_lib_path_rule,
-      # nightly macOS
-      'DYLD_FALLBACK_LIBRARY_PATH': dyld_lib_path_rule,
-      # nightly-2018-12-31 linux
-      'LD_LIBRARY_PATH': dyld_lib_path_rule
+        'OUT_DIR': out_dir_rule,
+        # nightly-2018-12-31 macOS
+        'DYLD_LIBRARY_PATH': dyld_lib_path_rule,
+        # nightly macOS
+        'DYLD_FALLBACK_LIBRARY_PATH': dyld_lib_path_rule,
+        # nightly-2018-12-31 linux
+        'LD_LIBRARY_PATH': dyld_lib_path_rule
     }
 
   for key, value in invocation_key.items():

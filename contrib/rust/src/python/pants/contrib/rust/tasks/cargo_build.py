@@ -48,15 +48,15 @@ class Build(Workspace):
   def register_options(cls, register):
     super(Build, cls).register_options(register)
     register(
-      '--cargo-opt',
-      type=list,
-      default=[],
-      help='Additional cargo build options e.g. `--release`.')
+        '--cargo-opt',
+        type=list,
+        default=[],
+        help='Additional cargo build options e.g. `--release`.')
     register(
-      '--ignore-rerun',
-      type=bool,
-      default=False,
-      help='Ignore rebuilding build scripts which include a cargo `rerun-if-changed` statement.')
+        '--ignore-rerun',
+        type=bool,
+        default=False,
+        help='Ignore rebuilding build scripts which include a cargo `rerun-if-changed` statement.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -112,14 +112,16 @@ class Build(Workspace):
     abs_manifest_path = os.path.join(target.manifest, self.manifest_name())
 
     self.context.log.info(
-      'Getting cargo build plan for manifest: {0}\nAdditional cargo options: {1}'.format(
-        abs_manifest_path, self.get_options().cargo_opt))
+        'Getting cargo build plan for manifest: {0}\nAdditional cargo options: {1}'.format(
+            abs_manifest_path,
+            self.get_options().cargo_opt))
 
     toolchain = "+{}".format(self.context.products.get_data('cargo_toolchain'))
 
-    cmd = ['cargo', toolchain, 'build',
-           '--manifest-path', abs_manifest_path,
-           '--build-plan', '-Z', 'unstable-options']
+    cmd = [
+        'cargo', toolchain, 'build', '--manifest-path', abs_manifest_path, '--build-plan', '-Z',
+        'unstable-options'
+    ]
 
     if self.include_compiling_tests():
       cmd.extend(['--tests'])
@@ -127,16 +129,15 @@ class Build(Workspace):
     cmd.extend(self.get_options().cargo_opt)
 
     env = {
-      'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),
-      'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
+        'CARGO_HOME': (self.context.products.get_data('cargo_env')['CARGO_HOME'], False),
+        'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
     }
 
-    returncode, std_output, std_error = self.execute_command_and_get_output(cmd,
-                                                                            'cargo-build-plan',
-                                                                            [
-                                                                              WorkUnitLabel.COMPILER],
-                                                                            env_vars=env,
-                                                                            current_working_dir=target.manifest)
+    returncode, std_output, std_error = self.execute_command_and_get_output(
+        cmd,
+        'cargo-build-plan', [WorkUnitLabel.COMPILER],
+        env_vars=env,
+        current_working_dir=target.manifest)
 
     if returncode != 0:
       self.print_std_out_and_std_err(std_output, std_error)
@@ -152,13 +153,13 @@ class Build(Workspace):
   def get_target_definitions_out_of_cargo_build_plan(self, cargo_build_plan):
     cargo_invocations = cargo_build_plan['invocations']
     return list(
-      map(lambda invocation: self.create_target_definition(invocation), cargo_invocations))
+        map(lambda invocation: self.create_target_definition(invocation), cargo_invocations))
 
   def create_target_definition(self, cargo_invocation):
-    TargetDefinition = collections.namedtuple('TargetDefinition',
-                                              'name, id, address, '
-                                              'dependencies, kind, '
-                                              'invocation, compile_mode')
+    TargetDefinition = collections.namedtuple(
+        'TargetDefinition', 'name, id, address, '
+        'dependencies, kind, '
+        'invocation, compile_mode')
     name = cargo_invocation['package_name']
     fingerprint = self.calculate_target_definition_fingerprint(cargo_invocation)
     id = "{}_{}".format(name, fingerprint)
@@ -178,30 +179,30 @@ class Build(Workspace):
     invocation.pop('links')
 
     c_flag_rule = {
-      'incremental': lambda _: "",
+        'incremental': lambda _: "",
     }
 
     l_flag_rule = {
-      'dependency': lambda _: "",
+        'dependency': lambda _: "",
     }
 
     args_rules_set = {
-      '--out-dir': lambda _: "",
-      '-C': functools.partial(c_flag_rules, rules=c_flag_rule),
-      '-L': functools.partial(l_flag_rules, rules=l_flag_rule),
-      '--extern': lambda _: ""
+        '--out-dir': lambda _: "",
+        '-C': functools.partial(c_flag_rules, rules=c_flag_rule),
+        '-L': functools.partial(l_flag_rules, rules=l_flag_rule),
+        '--extern': lambda _: ""
     }
 
     args_rules(invocation['args'], rules=args_rules_set)
 
     env_rules_set = {
-      'OUT_DIR': lambda _: "",
-      # nightly-2018-12-31 macOS
-      'DYLD_LIBRARY_PATH': lambda _: "",
-      # nightly macOS
-      'DYLD_FALLBACK_LIBRARY_PATH': lambda _: "",
-      # nightly-2018-12-31 linux
-      'LD_LIBRARY_PATH': lambda _: ""
+        'OUT_DIR': lambda _: "",
+        # nightly-2018-12-31 macOS
+        'DYLD_LIBRARY_PATH': lambda _: "",
+        # nightly macOS
+        'DYLD_FALLBACK_LIBRARY_PATH': lambda _: "",
+        # nightly-2018-12-31 linux
+        'LD_LIBRARY_PATH': lambda _: ""
     }
 
     env_rules(invocation['env'], rules=env_rules_set)
@@ -217,37 +218,35 @@ class Build(Workspace):
       target_exist = self.context.build_graph.get_target(target.address)
       if not target_exist:
         if self.is_workspace_member(target, cargo_target):
-          self.context.log.debug(
-            'Add project member target: {0}\ttarget kind: {1}'.format(target.id, target.kind))
+          self.context.log.debug('Add project member target: {0}\ttarget kind: {1}'.format(
+              target.id, target.kind))
           self.inject_member_target(target, cargo_target)
         elif self.is_lib_or_bin(target, cargo_target):
-          self.context.log.debug(
-            'Add project target: {0}\ttarget kind: {1}'.format(target.id, target.kind))
+          self.context.log.debug('Add project target: {0}\ttarget kind: {1}'.format(
+              target.id, target.kind))
           self.inject_lib_or_bin_target(target, cargo_target)
         else:
-          self.context.log.debug(
-            'Add synthetic target: {0}\ttarget kind: {1}'.format(target.id, target.kind))
-          self.context.build_graph.inject_synthetic_target(address=target.address,
-                                                           target_type=self._synthetic_target_kind[
-                                                             target.kind],
-                                                           cargo_invocation=target.invocation)
+          self.context.log.debug('Add synthetic target: {0}\ttarget kind: {1}'.format(
+              target.id, target.kind))
+          self.context.build_graph.inject_synthetic_target(
+              address=target.address,
+              target_type=self._synthetic_target_kind[target.kind],
+              cargo_invocation=target.invocation)
         for dependency in target.dependencies:
           dependency = target_definitions[dependency]
-          self.context.log.debug(
-            '\tInject dependency: {0}\tfor: {1}\ttarget kind: {2}'.format(dependency.id, target.id,
-                                                                          dependency.kind))
+          self.context.log.debug('\tInject dependency: {0}\tfor: {1}\ttarget kind: {2}'.format(
+              dependency.id, target.id, dependency.kind))
           self.context.build_graph.inject_dependency(target.address, dependency.address)
 
   def is_lib_or_bin(self, target_definition, original_target):
     if not self.is_cargo_original_library(original_target) and not self.is_cargo_original_binary(
-            original_target):
+        original_target):
       return False
     else:
       is_original_target = target_definition.name == original_target.name
 
-      if is_original_target and (
-              self.is_lib_or_bin_target(target_definition) or self.is_test_target(
-        target_definition)):
+      if is_original_target and (self.is_lib_or_bin_target(target_definition) or
+                                 self.is_test_target(target_definition)):
         return True
       else:
         return False
@@ -258,12 +257,13 @@ class Build(Workspace):
     else:
       synthetic_target_type = self._project_target_kind[target_definition.kind]
 
-    synthetic_of_original_target = self.context.add_new_target(address=target_definition.address,
-                                                               target_type=synthetic_target_type,
-                                                               cargo_invocation=target_definition.invocation,
-                                                               dependencies=original_target.dependencies,
-                                                               derived_from=original_target,
-                                                               sources=original_target.sources_relative_to_target_base())
+    synthetic_of_original_target = self.context.add_new_target(
+        address=target_definition.address,
+        target_type=synthetic_target_type,
+        cargo_invocation=target_definition.invocation,
+        dependencies=original_target.dependencies,
+        derived_from=original_target,
+        sources=original_target.sources_relative_to_target_base())
 
     self.inject_synthetic_of_original_target_into_build_graph(synthetic_of_original_target,
                                                               original_target)
@@ -279,52 +279,49 @@ class Build(Workspace):
   def build_targets(self, targets):
     build_flags = self.get_build_flags()
     fingerprint_strategy = CargoFingerprintStrategy(build_flags)
-    with self.invalidated(targets, invalidate_dependents=True,
-                          fingerprint_strategy=fingerprint_strategy,
-                          topological_order=True) as invalidation_check:
+    with self.invalidated(
+        targets,
+        invalidate_dependents=True,
+        fingerprint_strategy=fingerprint_strategy,
+        topological_order=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         pants_invocation = self.convert_cargo_invocation_into_pants_invocation(vt)
         if not vt.valid:
           self.build_target(vt.target, pants_invocation)
         else:
-          self.context.log.info('{0} v{1} is up to date.'.format(pants_invocation['package_name'],
-                                                                 pants_invocation[
-                                                                   'package_version']))
+          self.context.log.info('{0} v{1} is up to date.'.format(
+              pants_invocation['package_name'], pants_invocation['package_version']))
         self.add_rust_products(vt.target, pants_invocation)
 
   def convert_cargo_invocation_into_pants_invocation(self, vt):
     if self.is_cargo_synthetic_library(vt.target):
-      self.context.log.debug(
-        'Convert library invocation for: {0}'.format(vt.target.address.target_name))
-      pants_invocation = convert_basic_into_pants_invocation(vt.target, vt.results_dir,
-                                                             self._package_out_dirs,
-                                                             self._libraries_dir_path)
+      self.context.log.debug('Convert library invocation for: {0}'.format(
+          vt.target.address.target_name))
+      pants_invocation = convert_basic_into_pants_invocation(
+          vt.target, vt.results_dir, self._package_out_dirs, self._libraries_dir_path)
     elif self.is_cargo_synthetic_binary(vt.target):
-      self.context.log.debug(
-        'Convert binary invocation for: {0}'.format(vt.target.address.target_name))
-      pants_invocation = convert_basic_into_pants_invocation(vt.target, vt.results_dir,
-                                                             self._package_out_dirs,
-                                                             self._libraries_dir_path)
+      self.context.log.debug('Convert binary invocation for: {0}'.format(
+          vt.target.address.target_name))
+      pants_invocation = convert_basic_into_pants_invocation(
+          vt.target, vt.results_dir, self._package_out_dirs, self._libraries_dir_path)
     elif self.is_cargo_project_test(vt.target):
-      self.context.log.debug(
-        'Convert test invocation for: {0}'.format(vt.target.address.target_name))
-      pants_invocation = convert_basic_into_pants_invocation(vt.target, vt.results_dir,
-                                                             self._package_out_dirs,
-                                                             self._libraries_dir_path)
+      self.context.log.debug('Convert test invocation for: {0}'.format(
+          vt.target.address.target_name))
+      pants_invocation = convert_basic_into_pants_invocation(
+          vt.target, vt.results_dir, self._package_out_dirs, self._libraries_dir_path)
     elif self.is_cargo_synthetic_custom_build(vt.target):
-      self.context.log.debug(
-        'Convert custom build invocation for: {0}'.format(vt.target.address.target_name))
-      pants_invocation = convert_custom_build_into_pants_invocation(vt.target, vt.results_dir,
-                                                                    self._package_out_dirs,
-                                                                    self._libraries_dir_path)
+      self.context.log.debug('Convert custom build invocation for: {0}'.format(
+          vt.target.address.target_name))
+      pants_invocation = convert_custom_build_into_pants_invocation(
+          vt.target, vt.results_dir, self._package_out_dirs, self._libraries_dir_path)
     else:
-      raise TaskError(
-        'Unsupported target kind for target: {0}'.format(vt.target.address.target_name))
+      raise TaskError('Unsupported target kind for target: {0}'.format(
+          vt.target.address.target_name))
     return pants_invocation
 
   def build_target(self, target, pants_invocation):
-    self.context.log.info(
-      '{0} v{1}'.format(pants_invocation['package_name'], pants_invocation['package_version']))
+    self.context.log.info('{0} v{1}'.format(pants_invocation['package_name'],
+                                            pants_invocation['package_version']))
 
     self.create_directories(pants_invocation['pants_make_dirs'])
 
@@ -333,14 +330,13 @@ class Build(Workspace):
     env = self.create_env(pants_invocation['env'], target)
 
     if pants_invocation['program'] == 'rustc':
-      self.execute_rustc(pants_invocation['package_name'],
-                         cmd, '{}-{}'.format(pants_invocation['compile_mode'],
-                                             pants_invocation['target_kind'][0]),
-                         env, pants_invocation['cwd'])
+      self.execute_rustc(
+          pants_invocation['package_name'], cmd, '{}-{}'.format(pants_invocation['compile_mode'],
+                                                                pants_invocation['target_kind'][0]),
+          env, pants_invocation['cwd'])
     else:
-      self.execute_custom_build(cmd,
-                                pants_invocation['compile_mode'],
-                                env, pants_invocation['cwd'], target)
+      self.execute_custom_build(cmd, pants_invocation['compile_mode'], env, pants_invocation['cwd'],
+                                target)
 
     self.create_copies(pants_invocation['links'])
 
@@ -360,12 +356,12 @@ class Build(Workspace):
     return filter_cargo_statements(lines)
 
   def create_build_script_output_path(self, out_dir):
-    head, base = os.path.split(out_dir)
+    head, _ = os.path.split(out_dir)
     output_path = os.path.join(head, 'output')
     return output_path
 
   def create_build_script_stderr_path(self, out_dir):
-    head, base = os.path.split(out_dir)
+    head, _ = os.path.split(out_dir)
     stderr_path = os.path.join(head, 'stderr')
     return stderr_path
 
@@ -378,9 +374,8 @@ class Build(Workspace):
   def create_library_symlink(self, make_symlinks, libraries_dir):
     build_root = get_buildroot()
     for file in make_symlinks:
-      self.context.log.debug(
-        'Create sym link: {0}\n\tto: {1}'.format(os.path.relpath(file, build_root),
-                                                 os.path.relpath(libraries_dir, build_root)))
+      self.context.log.debug('Create sym link: {0}\n\tto: {1}'.format(
+          os.path.relpath(file, build_root), os.path.relpath(libraries_dir, build_root)))
       file_name = os.path.basename(file)
       destination = os.path.join(libraries_dir, file_name)
       absolute_symlink(file, destination)
@@ -388,9 +383,8 @@ class Build(Workspace):
   def create_copies(self, links):
     build_root = get_buildroot()
     for destination, source in links.items():
-      self.context.log.debug('Copy: {0}\n\tto: {1}'.format(os.path.relpath(source, build_root),
-                                                           os.path.relpath(destination,
-                                                                           build_root)))
+      self.context.log.debug('Copy: {0}\n\tto: {1}'.format(
+          os.path.relpath(source, build_root), os.path.relpath(destination, build_root)))
       if not os.path.exists(source):
         ## --release flag doesn't create dSYM folder
         self.context.log.warn('{0} doesn\'t exist.'.format(os.path.relpath(source, build_root)))
@@ -406,6 +400,7 @@ class Build(Workspace):
     return self.extend_args_with_cargo_statement(cmd, target)
 
   def extend_args_with_cargo_statement(self, cmd, target):
+
     def extend_cmd(cmd, build_script_output):
       for output_cmd in build_script_output:
         cmd.extend(output_cmd)
@@ -415,8 +410,8 @@ class Build(Workspace):
       build_script_output = self._build_script_output_cache.get(dependency.address.target_name,
                                                                 None)
       if build_script_output:
-        self.context.log.debug(
-          'Custom build outputs:\n{0}'.format(self.pretty(build_script_output)))
+        self.context.log.debug('Custom build outputs:\n{0}'.format(
+            self.pretty(build_script_output)))
         cmd = extend_cmd(cmd, build_script_output['rustc-link-lib'])
         cmd = extend_cmd(cmd, build_script_output['rustc-link-search'])
         cmd = extend_cmd(cmd, build_script_output['rustc-flags'])
@@ -425,8 +420,8 @@ class Build(Workspace):
 
   def create_env(self, invocation_env, target):
     env = {
-      'PATH': (self.context.products.get_data('cargo_env')['PATH'], True),
-      'RUSTUP_TOOLCHAIN': (self.context.products.get_data('cargo_toolchain'), False)
+        'PATH': (self.context.products.get_data('cargo_env')['PATH'], True),
+        'RUSTUP_TOOLCHAIN': (self.context.products.get_data('cargo_toolchain'), False)
     }
 
     env = self._add_env_vars(env, invocation_env)
@@ -438,8 +433,8 @@ class Build(Workspace):
       build_script_output = self._build_script_output_cache.get(dependency.address.target_name,
                                                                 None)
       if build_script_output:
-        self.context.log.debug(
-          'Custom build output:\n{0}'.format(self.pretty(build_script_output['rustc-env'])))
+        self.context.log.debug('Custom build output:\n{0}'.format(
+            self.pretty(build_script_output['rustc-env'])))
         for rustc_env in build_script_output['rustc-env']:
           # is PATH also possible?
           name, value = rustc_env
@@ -447,12 +442,8 @@ class Build(Workspace):
     return env
 
   def execute_custom_build(self, cmd, workunit_name, env, cwd, target):
-    returncode, std_output, std_error = self.execute_command_and_get_output(cmd,
-                                                                            workunit_name,
-                                                                            [
-                                                                              WorkUnitLabel.COMPILER],
-                                                                            env_vars=env,
-                                                                            current_working_dir=cwd)
+    returncode, std_output, std_error = self.execute_command_and_get_output(
+        cmd, workunit_name, [WorkUnitLabel.COMPILER], env_vars=env, current_working_dir=cwd)
 
     if returncode != 0:
       self.print_std_out_and_std_err(std_output, std_error)
@@ -465,18 +456,15 @@ class Build(Workspace):
     if len(std_error) > 0:
       stderr_path = self.create_build_script_stderr_path(build_script_std_out_dir)
       safe_file_dump(stderr_path, std_error, mode='w')
-      self.context.log.warn(
-        'STD_ERR of {0} saved in: {1}'.format(target.address.target_name, stderr_path))
+      self.context.log.warn('STD_ERR of {0} saved in: {1}'.format(target.address.target_name,
+                                                                  stderr_path))
 
     for warning in self._build_script_output_cache[target.address.target_name]['warning']:
       self.context.log.warn('Warning: {0}'.format(warning))
 
   def execute_rustc(self, package_name, cmd, workunit_name, env, cwd):
-    returncode = self.execute_command(cmd,
-                                      workunit_name,
-                                      [WorkUnitLabel.COMPILER],
-                                      env_vars=env,
-                                      current_working_dir=cwd)
+    returncode = self.execute_command(
+        cmd, workunit_name, [WorkUnitLabel.COMPILER], env_vars=env, current_working_dir=cwd)
 
     if returncode != 0:
       raise TaskError('Cannot build target: {}'.format(package_name))
@@ -499,9 +487,11 @@ class Build(Workspace):
       cwd_test = pants_invocation['cwd_test']
       rust_tests = self.context.products.get_data('rust_tests')
       current = rust_tests.get(target.address.target_name, [])
-      current.extend(list(
-        map(lambda path: (path, cwd_test, env),
-            filter(lambda path: os.path.exists(path) and os.path.isfile(path), links.keys()))))
+      current.extend(
+          list(
+              map(lambda path: (path, cwd_test, env),
+                  filter(lambda path: os.path.exists(path) and os.path.isfile(path),
+                         links.keys()))))
       rust_tests.update({target.address.target_name: current})
 
   def mark_target_invalid(self, address):
@@ -512,20 +502,20 @@ class Build(Workspace):
       self._build_invalidator.force_invalidate((CacheKeyGenerator().key_for_target(dependee)))
 
     self.context.build_graph.walk_transitive_dependee_graph(
-      [address],
-      work=lambda dependee: mark_dependee_invalid(dependee),
+        [address],
+        work=lambda dependee: mark_dependee_invalid(dependee),
     )
 
   def check_if_build_scripts_are_invalid(self):
     for target_addr_spec, build_script_output_path in self._build_index.items():
       target_address = Address.parse(target_addr_spec)
       if self.context.build_graph.get_target(target_address) and os.path.isfile(
-              build_script_output_path):
+          build_script_output_path):
         build_scripts_output = read_file(build_script_output_path, binary_mode=False)
         cargo_statements = self.parse_build_script_output(build_scripts_output)
         parsed_statements = parse_multiple_cargo_statements(cargo_statements)
         if len(parsed_statements['rerun-if-changed']) != 0 or len(
-                parsed_statements['rerun-if-env-changed']) != 0:
+            parsed_statements['rerun-if-env-changed']) != 0:
           self.context.log.info('Rebuild target: {0}'.format(target_address.target_name))
           self.mark_target_invalid(target_address)
 

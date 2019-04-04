@@ -20,13 +20,13 @@ def out_dir_rule(old_path, result_dir, make_dirs, **kargs):
 def env_rules(invocation_key, rules=None, **kargs):
   if rules is None:
     rules = {
-      'OUT_DIR': out_dir_rule,
-      # nightly-2018-12-31 macOS
-      'DYLD_LIBRARY_PATH': dyld_lib_path_rule,
-      # nightly macOS
-      'DYLD_FALLBACK_LIBRARY_PATH': dyld_lib_path_rule,
-      # nightly-2018-12-31 linux
-      'LD_LIBRARY_PATH': dyld_lib_path_rule
+        'OUT_DIR': out_dir_rule,
+        # nightly-2018-12-31 macOS
+        'DYLD_LIBRARY_PATH': dyld_lib_path_rule,
+        # nightly macOS
+        'DYLD_FALLBACK_LIBRARY_PATH': dyld_lib_path_rule,
+        # nightly-2018-12-31 linux
+        'LD_LIBRARY_PATH': dyld_lib_path_rule
     }
 
   for key, value in invocation_key.items():

@@ -10,14 +10,14 @@ from itertools import chain
 def get_default_converter():
   # https://github.com/rust-lang/cargo/blob/dc83ead224d8622f748f507574e1448a28d8dcc7/src/cargo/core/compiler/custom_build.rs#L482
   return {
-    'rustc-link-lib': lambda kind: ['-l', kind],
-    'rustc-link-search': lambda path: ['-L', path],
-    'rustc-flags': lambda flags: spilt_flags(flags),
-    'rustc-cfg': lambda cfg: ['--cfg', cfg],
-    'rustc-env': lambda var_value: spilt_into_key_value(var_value),
-    'warning': lambda warning: warning,
-    'rerun-if-changed': lambda file: file,
-    'rerun-if-env-changed': lambda env: env,
+      'rustc-link-lib': lambda kind: ['-l', kind],
+      'rustc-link-search': lambda path: ['-L', path],
+      'rustc-flags': lambda flags: spilt_flags(flags),
+      'rustc-cfg': lambda cfg: ['--cfg', cfg],
+      'rustc-env': lambda var_value: spilt_into_key_value(var_value),
+      'warning': lambda warning: warning,
+      'rerun-if-changed': lambda file: file,
+      'rerun-if-env-changed': lambda env: env,
   }
 
 
@@ -53,18 +53,18 @@ def parse_cargo_statement(cargo_statement):
 
 def parse_multiple_cargo_statements(cargo_statements):
   result = {
-    'rustc-link-lib': [],
-    'rustc-link-search': [],
-    'rustc-flags': [],
-    'rustc-cfg': [],
-    'rustc-env': [],
-    'warning': [],
-    'rerun-if-changed': [],
-    'rerun-if-env-changed': [],
+      'rustc-link-lib': [],
+      'rustc-link-search': [],
+      'rustc-flags': [],
+      'rustc-cfg': [],
+      'rustc-env': [],
+      'warning': [],
+      'rerun-if-changed': [],
+      'rerun-if-env-changed': [],
   }
 
   cargo_statements_without_prefix = list(
-    map(lambda cargo: cargo.split('cargo:', 1)[1], cargo_statements))
+      map(lambda cargo: cargo.split('cargo:', 1)[1], cargo_statements))
 
   for cargo_statement in cargo_statements_without_prefix:
     key_value = parse_cargo_statement(cargo_statement)
@@ -75,8 +75,8 @@ def parse_multiple_cargo_statements(cargo_statements):
       if in_result is not None:
         result[key].append(value)
       else:
-        result['warning'].append(
-          '(Pants) Unsupported cargo statement: {0} - {1}'.format(key, value))
+        result['warning'].append('(Pants) Unsupported cargo statement: {0} - {1}'.format(
+            key, value))
     else:
       result['warning'].append('(Pants) Unsupported cargo statement: {0}'.format(key_value))
   return result

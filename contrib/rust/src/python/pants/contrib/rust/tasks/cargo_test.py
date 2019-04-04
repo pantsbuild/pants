@@ -14,6 +14,7 @@ from pants.contrib.rust.tasks.cargo_task import CargoTask
 
 
 class Test(CargoTask):
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(Test, cls).prepare(options, round_manager)
@@ -27,20 +28,21 @@ class Test(CargoTask):
     result_dir = self.versioned_workdir
 
     for definition in test_definitions:
-      test_path, test_cwd, _ = definition
-      self.context.log.info(
-          'Copy: {0}\n\tto: {1}'.format(os.path.relpath(test_path, get_buildroot()),
-                                        os.path.relpath(result_dir, get_buildroot())))
+      test_path, _, _ = definition
+      self.context.log.info('Copy: {0}\n\tto: {1}'.format(
+          os.path.relpath(test_path, get_buildroot()), os.path.relpath(result_dir,
+                                                                       get_buildroot())))
       shutil.copy(test_path, result_dir)
 
   def run_test(self, test_path, test_cwd, test_env):
 
     test_env = self._add_env_vars({}, test_env)
 
-    self.execute_command(test_path, 'run-test',
-                                   [WorkUnitLabel.TEST],
-                                   env_vars=test_env,
-                                   current_working_dir=test_cwd)
+    self.execute_command(
+        test_path,
+        'run-test', [WorkUnitLabel.TEST],
+        env_vars=test_env,
+        current_working_dir=test_cwd)
 
   def run_tests(self, test_definitions):
     result_dir = self.versioned_workdir

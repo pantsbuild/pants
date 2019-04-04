@@ -19,19 +19,16 @@ from pants.contrib.rust.tasks.cargo_task import CargoTask
 
 
 class Toolchain(CargoTask):
+
   @classmethod
   def register_options(cls, register):
     super(Toolchain, cls).register_options(register)
+    register('--toolchain', type=str, default='nightly-2018-12-31', help='Toolchain')
     register(
-      '--toolchain',
-      type=str,
-      default='nightly-2018-12-31',
-      help='Toolchain')
-    register(
-      '--script_fingerprint',
-      type=str,
-      default='a741519217f27635fe49004764969cfac20fbce744d20b7114600012e6e80796',
-      help='The sha256 hash of the rustup install script (https://sh.rustup.rs).')
+        '--script_fingerprint',
+        type=str,
+        default='a741519217f27635fe49004764969cfac20fbce744d20b7114600012e6e80796',
+        help='The sha256 hash of the rustup install script (https://sh.rustup.rs).')
 
   @classmethod
   def product_types(cls):
@@ -46,12 +43,12 @@ class Toolchain(CargoTask):
     install_script = self.download_rustup_install_script()
     self.check_integrity_of_rustup_install_script(install_script.text)
     install_script_dir_path, install_script_file_path = self.save_rustup_install_script(
-      install_script.text)
+        install_script.text)
 
     cmd = [install_script_file_path, '-y']  # -y Disable confirmation prompt.
 
-    returncode = self.execute_command(cmd, 'setup-rustup', [WorkUnitLabel.BOOTSTRAP],
-                                   current_working_dir=install_script_dir_path)
+    returncode = self.execute_command(
+        cmd, 'setup-rustup', [WorkUnitLabel.BOOTSTRAP], current_working_dir=install_script_dir_path)
 
     if returncode != 0:
       raise TaskError('Cannot install rustup.')
@@ -64,8 +61,8 @@ class Toolchain(CargoTask):
     current_fingerprint = hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
     if current_fingerprint != self.get_options().script_fingerprint:
       raise TaskError(
-        'The fingerprint of the rustup script has changed!\nLast known: {0}\ncurrent: {1}'.format(
-          self.get_options().script_fingerprint, current_fingerprint))
+          'The fingerprint of the rustup script has changed!\nLast known: {0}\ncurrent: {1}'.format(
+              self.get_options().script_fingerprint, current_fingerprint))
 
   def save_rustup_install_script(self, install_script):
     save_dir_path = os.path.join(self.versioned_workdir, 'rustup_install_script')
@@ -81,19 +78,20 @@ class Toolchain(CargoTask):
 
     cmd = ['rustup', 'install', toolchain]
 
-    env = {
-      'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)
-    }
+    env = {'PATH': (self.context.products.get_data('cargo_env')['PATH'], True)}
 
-    returncode = self.execute_command(cmd, 'install-rustup-toolchain', [WorkUnitLabel.BOOTSTRAP],
-                                   env_vars=env)
+    returncode = self.execute_command(
+        cmd, 'install-rustup-toolchain', [WorkUnitLabel.BOOTSTRAP], env_vars=env)
 
     if returncode != 0:
       raise TaskError('Cannot install toolchain: {}'.format(toolchain))
 
   def check_if_rustup_exist(self):
-    # If the rustup executable can't be find via the path variable, try to find it in the default location.
-    return self.try_to_find_rustup_executable() or self.try_to_find_rustup_executable_in_default_location()
+    # If the rustup executable can't be find via the path variable,
+    # try to find it in the default location.
+
+    return self.try_to_find_rustup_executable(
+    ) or self.try_to_find_rustup_executable_in_default_location()
 
   def try_to_find_rustup_executable(self):
     return distutils.spawn.find_executable('rustup') is not None

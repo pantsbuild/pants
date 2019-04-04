@@ -18,13 +18,11 @@ from pants.contrib.rust.tasks.cargo_toolchain import Toolchain
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
+  return BuildFileAliases(targets={
       'cargo_binary': CargoBinary,
       'cargo_library': CargoLibrary,
       'cargo_workspace': CargoWorkspace
-    }
-  )
+  })
 
 
 def register_goals():

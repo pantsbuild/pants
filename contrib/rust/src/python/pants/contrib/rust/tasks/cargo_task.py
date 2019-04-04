@@ -96,52 +96,56 @@ class CargoTask(Task):
         current_env[name] = env_value.encode('utf-8')
     return current_env
 
-  def execute_command(self, command, workunit_name, workunit_labels, current_working_dir=None,
+  def execute_command(self,
+                      command,
+                      workunit_name,
+                      workunit_labels,
+                      current_working_dir=None,
                       env_vars=None):
 
     current_working_dir = current_working_dir or get_buildroot()
     env_vars = env_vars or {}
 
-    with self.context.new_workunit(name=workunit_name,
-                                   labels=workunit_labels,
-                                   cmd=str(command)) as workunit:
+    with self.context.new_workunit(
+        name=workunit_name, labels=workunit_labels, cmd=str(command)) as workunit:
       proc_env = self._set_env_vars(env_vars)
 
-      self.context.log.debug(
-        'Run\n\tCMD: {0}\n\tENV: {1}\n\tCWD: {2}'.format(self.pretty(command),
-                                                         self.pretty(proc_env),
-                                                         current_working_dir))
-      returncode = subprocess.call(command,
-                                   env=proc_env,
-                                   cwd=current_working_dir,
-                                   stdout=workunit.output('stdout'),
-                                   stderr=workunit.output('stderr'))
+      self.context.log.debug('Run\n\tCMD: {0}\n\tENV: {1}\n\tCWD: {2}'.format(
+          self.pretty(command), self.pretty(proc_env), current_working_dir))
+      returncode = subprocess.call(
+          command,
+          env=proc_env,
+          cwd=current_working_dir,
+          stdout=workunit.output('stdout'),
+          stderr=workunit.output('stderr'))
 
       workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
 
     return returncode
 
-  def execute_command_and_get_output(self, command, workunit_name, workunit_labels, env_vars=None,
+  def execute_command_and_get_output(self,
+                                     command,
+                                     workunit_name,
+                                     workunit_labels,
+                                     env_vars=None,
                                      current_working_dir=None):
 
     current_working_dir = current_working_dir or get_buildroot()
     env_vars = env_vars or {}
 
-    with self.context.new_workunit(name=workunit_name,
-                                   labels=workunit_labels,
-                                   cmd=str(command)) as workunit:
+    with self.context.new_workunit(
+        name=workunit_name, labels=workunit_labels, cmd=str(command)) as workunit:
       proc_env = self._set_env_vars(env_vars)
 
-      self.context.log.debug(
-        'Run\n\tCMD: {0}\n\tENV: {1}\n\tCWD: {2}'.format(self.pretty(command),
-                                                         self.pretty(proc_env),
-                                                         current_working_dir))
+      self.context.log.debug('Run\n\tCMD: {0}\n\tENV: {1}\n\tCWD: {2}'.format(
+          self.pretty(command), self.pretty(proc_env), current_working_dir))
 
-      proc = subprocess.Popen(command,
-                              env=proc_env,
-                              cwd=current_working_dir,
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE)
+      proc = subprocess.Popen(
+          command,
+          env=proc_env,
+          cwd=current_working_dir,
+          stdout=subprocess.PIPE,
+          stderr=subprocess.PIPE)
 
       std_out, std_err = proc.communicate()
 

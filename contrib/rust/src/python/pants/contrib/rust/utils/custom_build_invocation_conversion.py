@@ -18,19 +18,11 @@ from pants.contrib.rust.utils.custom_build_invocation.program_rule import progra
 
 
 def get_default_build_conversion_rules():
-  return {
-    'args': args_rules,
-    'outputs': outputs_rule,
-    'links': links_rule,
-    'env': env_rules
-  }
+  return {'args': args_rules, 'outputs': outputs_rule, 'links': links_rule, 'env': env_rules}
 
 
 def get_default_run_conversion_rules():
-  return {
-    'program': program_rule,
-    'env': env_rules
-  }
+  return {'program': program_rule, 'env': env_rules}
 
 
 def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_dir):
@@ -51,15 +43,14 @@ def convert_into_pants_invocation(target, result_dir, crate_out_dirs, libraries_
     apply_rule = conversion_rules_set.get(key)
     if apply_rule:
       apply_rule(
-        invocation_key=pants_invocation[key],
-        target=target,
-        result_dir=result_dir,
-        crate_out_dirs=crate_out_dirs,
-        libraries_dir=libraries_dir,
-        information=information,
-        invocation=pants_invocation,
-        make_dirs=make_dirs
-      )
+          invocation_key=pants_invocation[key],
+          target=target,
+          result_dir=result_dir,
+          crate_out_dirs=crate_out_dirs,
+          libraries_dir=libraries_dir,
+          information=information,
+          invocation=pants_invocation,
+          make_dirs=make_dirs)
 
   if compile_mode == "build":
     crate_out_dirs[target.address.target_name] = ('None', pants_invocation['links'])

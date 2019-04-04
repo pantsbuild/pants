@@ -12,6 +12,7 @@ from pants.contrib.rust.tasks.cargo_workspace import Workspace
 
 
 class CargoTaskWorkspace(TaskTestBase):
+
   class TestCargoWorkspace(Workspace):
 
     def execute(self):
@@ -37,13 +38,15 @@ class CargoTaskWorkspace(TaskTestBase):
 
   def test_is_lib_or_bin_target_true(self):
     TargetDefinition = collections.namedtuple('TargetDefinition', 'kind')
-    targets = [TargetDefinition('bin'),
-               TargetDefinition('lib'),
-               TargetDefinition('cdylib'),
-               TargetDefinition('rlib'),
-               TargetDefinition('dylib'),
-               TargetDefinition('staticlib'),
-               TargetDefinition('proc-macro')]
+    targets = [
+        TargetDefinition('bin'),
+        TargetDefinition('lib'),
+        TargetDefinition('cdylib'),
+        TargetDefinition('rlib'),
+        TargetDefinition('dylib'),
+        TargetDefinition('staticlib'),
+        TargetDefinition('proc-macro')
+    ]
 
     task = self.create_task(self.context())
 
@@ -58,9 +61,11 @@ class CargoTaskWorkspace(TaskTestBase):
 
   def test_is_test_target_true(self):
     TargetDefinition = collections.namedtuple('TargetDefinition', 'kind, compile_mode')
-    targets = [TargetDefinition('test', '_'),
-               TargetDefinition('test', 'test'),
-               TargetDefinition('_', 'test')]
+    targets = [
+        TargetDefinition('test', '_'),
+        TargetDefinition('test', 'test'),
+        TargetDefinition('_', 'test')
+    ]
 
     task = self.create_task(self.context())
     result = list(map(lambda target: task.is_test_target(target), targets))
@@ -68,18 +73,21 @@ class CargoTaskWorkspace(TaskTestBase):
 
   def test_is_test_target_false(self):
     TargetDefinition = collections.namedtuple('TargetDefinition', 'kind, compile_mode')
-    targets = [TargetDefinition('bin', 'build'),
-               TargetDefinition('lib', 'build'),
-               TargetDefinition('cdylib', 'build'),
-               TargetDefinition('rlib', 'build'),
-               TargetDefinition('rlib', 'build'),
-               TargetDefinition('dylib', 'build'),
-               TargetDefinition('staticlib', 'build'),
-               TargetDefinition('proc-macro', 'build')]
+    targets = [
+        TargetDefinition('bin', 'build'),
+        TargetDefinition('lib', 'build'),
+        TargetDefinition('cdylib', 'build'),
+        TargetDefinition('rlib', 'build'),
+        TargetDefinition('rlib', 'build'),
+        TargetDefinition('dylib', 'build'),
+        TargetDefinition('staticlib', 'build'),
+        TargetDefinition('proc-macro', 'build')
+    ]
 
     task = self.create_task(self.context())
     result = list(map(lambda target: task.is_test_target(target), targets))
     self.assertListEqual([False] * len(targets), result)
+
 
 # def is_workspace_member(self, target_definition, workspace_target):
 # def inject_member_target(self, target_definition, workspace_target):

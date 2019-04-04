@@ -42,6 +42,7 @@ test_shell_script = dedent("""
 
 
 class CargoTaskTest(TaskTestBase):
+
   class TestCargoTask(CargoTask):
 
     def execute(self):
@@ -53,195 +54,195 @@ class CargoTaskTest(TaskTestBase):
 
   def test_is_cargo_original(self):
     expected = {
-      CargoBase: True,
-      CargoBinary: True,
-      CargoLibrary: True,
-      # CargoWorkspace: True,
-      CargoProjectBinary: False,
-      CargoProjectLibrary: False,
-      CargoProjectTest: False,
-      CargoSyntheticBase: False,
-      CargoSyntheticBinary: False,
-      CargoSyntheticCustomBuild: False,
-      CargoSyntheticLibrary: False,
-      Target: False,
+        CargoBase: True,
+        CargoBinary: True,
+        CargoLibrary: True,
+        # CargoWorkspace: True,
+        CargoProjectBinary: False,
+        CargoProjectLibrary: False,
+        CargoProjectTest: False,
+        CargoSyntheticBase: False,
+        CargoSyntheticBinary: False,
+        CargoSyntheticCustomBuild: False,
+        CargoSyntheticLibrary: False,
+        Target: False,
     }
     self.assertEqual(expected, self._type_check(expected.keys(), CargoTask.is_cargo_original))
 
   def test_is_cargo_original_binary(self):
     expected = {
-      CargoBase: False,
-      CargoBinary: True,
-      CargoLibrary: False,
-      # CargoWorkspace: False,
-      CargoProjectBinary: False,
-      CargoProjectLibrary: False,
-      CargoProjectTest: False,
-      CargoSyntheticBase: False,
-      CargoSyntheticBinary: False,
-      CargoSyntheticCustomBuild: False,
-      CargoSyntheticLibrary: False,
-      Target: False,
+        CargoBase: False,
+        CargoBinary: True,
+        CargoLibrary: False,
+        # CargoWorkspace: False,
+        CargoProjectBinary: False,
+        CargoProjectLibrary: False,
+        CargoProjectTest: False,
+        CargoSyntheticBase: False,
+        CargoSyntheticBinary: False,
+        CargoSyntheticCustomBuild: False,
+        CargoSyntheticLibrary: False,
+        Target: False,
     }
-    self.assertEqual(expected,
-                     self._type_check(expected.keys(), CargoTask.is_cargo_original_binary))
+    self.assertEqual(expected, self._type_check(expected.keys(),
+                                                CargoTask.is_cargo_original_binary))
 
   def test_is_cargo_original_library(self):
     expected = {
-      CargoBase: False,
-      CargoBinary: False,
-      CargoLibrary: True,
-      # CargoWorkspace: False,
-      CargoProjectBinary: False,
-      CargoProjectLibrary: False,
-      CargoProjectTest: False,
-      CargoSyntheticBase: False,
-      CargoSyntheticBinary: False,
-      CargoSyntheticCustomBuild: False,
-      CargoSyntheticLibrary: False,
-      Target: False,
+        CargoBase: False,
+        CargoBinary: False,
+        CargoLibrary: True,
+        # CargoWorkspace: False,
+        CargoProjectBinary: False,
+        CargoProjectLibrary: False,
+        CargoProjectTest: False,
+        CargoSyntheticBase: False,
+        CargoSyntheticBinary: False,
+        CargoSyntheticCustomBuild: False,
+        CargoSyntheticLibrary: False,
+        Target: False,
     }
-    self.assertEqual(expected,
-                     self._type_check(expected.keys(), CargoTask.is_cargo_original_library))
+    self.assertEqual(expected, self._type_check(expected.keys(),
+                                                CargoTask.is_cargo_original_library))
 
   def test_is_cargo_original_workspace(self):
     expected = {
-      CargoBase: False,
-      CargoBinary: False,
-      CargoLibrary: False,
-      # CargoWorkspace: True,
-      CargoProjectBinary: False,
-      CargoProjectLibrary: False,
-      CargoProjectTest: False,
-      CargoSyntheticBase: False,
-      CargoSyntheticBinary: False,
-      CargoSyntheticCustomBuild: False,
-      CargoSyntheticLibrary: False,
-      Target: False,
+        CargoBase: False,
+        CargoBinary: False,
+        CargoLibrary: False,
+        # CargoWorkspace: True,
+        CargoProjectBinary: False,
+        CargoProjectLibrary: False,
+        CargoProjectTest: False,
+        CargoSyntheticBase: False,
+        CargoSyntheticBinary: False,
+        CargoSyntheticCustomBuild: False,
+        CargoSyntheticLibrary: False,
+        Target: False,
     }
     self.assertEqual(expected,
                      self._type_check(expected.keys(), CargoTask.is_cargo_original_workspace))
 
   def test_is_cargo_synthetic(self):
     expected = {
-      CargoBase: False,
-      CargoBinary: False,
-      CargoLibrary: False,
-      # CargoWorkspace: False,
-      CargoProjectBinary: True,
-      CargoProjectLibrary: True,
-      CargoProjectTest: True,
-      CargoSyntheticBase: True,
-      CargoSyntheticBinary: True,
-      CargoSyntheticCustomBuild: True,
-      CargoSyntheticLibrary: True,
-      Target: False,
+        CargoBase: False,
+        CargoBinary: False,
+        CargoLibrary: False,
+        # CargoWorkspace: False,
+        CargoProjectBinary: True,
+        CargoProjectLibrary: True,
+        CargoProjectTest: True,
+        CargoSyntheticBase: True,
+        CargoSyntheticBinary: True,
+        CargoSyntheticCustomBuild: True,
+        CargoSyntheticLibrary: True,
+        Target: False,
     }
     self.assertEqual(expected, self._type_check(expected.keys(), CargoTask.is_cargo_synthetic))
 
   def test_is_cargo_synthetic_library(self):
     expected = {
-      CargoBase: False,
-      CargoBinary: False,
-      CargoLibrary: False,
-      # CargoWorkspace: False,
-      CargoProjectBinary: False,
-      CargoProjectLibrary: True,
-      CargoProjectTest: False,
-      CargoSyntheticBase: False,
-      CargoSyntheticBinary: False,
-      CargoSyntheticCustomBuild: False,
-      CargoSyntheticLibrary: True,
-      Target: False,
+        CargoBase: False,
+        CargoBinary: False,
+        CargoLibrary: False,
+        # CargoWorkspace: False,
+        CargoProjectBinary: False,
+        CargoProjectLibrary: True,
+        CargoProjectTest: False,
+        CargoSyntheticBase: False,
+        CargoSyntheticBinary: False,
+        CargoSyntheticCustomBuild: False,
+        CargoSyntheticLibrary: True,
+        Target: False,
     }
     self.assertEqual(expected,
                      self._type_check(expected.keys(), CargoTask.is_cargo_synthetic_library))
 
   def test_is_cargo_synthetic_binary(self):
     expected = {
-      CargoBase: False,
-      CargoBinary: False,
-      CargoLibrary: False,
-      # CargoWorkspace: False,
-      CargoProjectBinary: True,
-      CargoProjectLibrary: False,
-      CargoProjectTest: False,
-      CargoSyntheticBase: False,
-      CargoSyntheticBinary: True,
-      CargoSyntheticCustomBuild: False,
-      CargoSyntheticLibrary: False,
-      Target: False,
+        CargoBase: False,
+        CargoBinary: False,
+        CargoLibrary: False,
+        # CargoWorkspace: False,
+        CargoProjectBinary: True,
+        CargoProjectLibrary: False,
+        CargoProjectTest: False,
+        CargoSyntheticBase: False,
+        CargoSyntheticBinary: True,
+        CargoSyntheticCustomBuild: False,
+        CargoSyntheticLibrary: False,
+        Target: False,
     }
-    self.assertEqual(expected,
-                     self._type_check(expected.keys(), CargoTask.is_cargo_synthetic_binary))
+    self.assertEqual(expected, self._type_check(expected.keys(),
+                                                CargoTask.is_cargo_synthetic_binary))
 
   def test_is_cargo_synthetic_custom_build(self):
     expected = {
-      CargoBase: False,
-      CargoBinary: False,
-      CargoLibrary: False,
-      # CargoWorkspace: False,
-      CargoProjectBinary: False,
-      CargoProjectLibrary: False,
-      CargoProjectTest: False,
-      CargoSyntheticBase: False,
-      CargoSyntheticBinary: False,
-      CargoSyntheticCustomBuild: True,
-      CargoSyntheticLibrary: False,
-      Target: False,
+        CargoBase: False,
+        CargoBinary: False,
+        CargoLibrary: False,
+        # CargoWorkspace: False,
+        CargoProjectBinary: False,
+        CargoProjectLibrary: False,
+        CargoProjectTest: False,
+        CargoSyntheticBase: False,
+        CargoSyntheticBinary: False,
+        CargoSyntheticCustomBuild: True,
+        CargoSyntheticLibrary: False,
+        Target: False,
     }
     self.assertEqual(expected,
                      self._type_check(expected.keys(), CargoTask.is_cargo_synthetic_custom_build))
 
   def test_is_cargo_project_binary(self):
     expected = {
-      CargoBase: False,
-      CargoBinary: False,
-      CargoLibrary: False,
-      # CargoWorkspace: False,
-      CargoProjectBinary: True,
-      CargoProjectLibrary: False,
-      CargoProjectTest: False,
-      CargoSyntheticBase: False,
-      CargoSyntheticBinary: False,
-      CargoSyntheticCustomBuild: False,
-      CargoSyntheticLibrary: False,
-      Target: False,
+        CargoBase: False,
+        CargoBinary: False,
+        CargoLibrary: False,
+        # CargoWorkspace: False,
+        CargoProjectBinary: True,
+        CargoProjectLibrary: False,
+        CargoProjectTest: False,
+        CargoSyntheticBase: False,
+        CargoSyntheticBinary: False,
+        CargoSyntheticCustomBuild: False,
+        CargoSyntheticLibrary: False,
+        Target: False,
     }
     self.assertEqual(expected, self._type_check(expected.keys(), CargoTask.is_cargo_project_binary))
 
   def test_is_cargo_project_library(self):
     expected = {
-      CargoBase: False,
-      CargoBinary: False,
-      CargoLibrary: False,
-      # CargoWorkspace: False,
-      CargoProjectBinary: False,
-      CargoProjectLibrary: True,
-      CargoProjectTest: False,
-      CargoSyntheticBase: False,
-      CargoSyntheticBinary: False,
-      CargoSyntheticCustomBuild: False,
-      CargoSyntheticLibrary: False,
-      Target: False,
+        CargoBase: False,
+        CargoBinary: False,
+        CargoLibrary: False,
+        # CargoWorkspace: False,
+        CargoProjectBinary: False,
+        CargoProjectLibrary: True,
+        CargoProjectTest: False,
+        CargoSyntheticBase: False,
+        CargoSyntheticBinary: False,
+        CargoSyntheticCustomBuild: False,
+        CargoSyntheticLibrary: False,
+        Target: False,
     }
-    self.assertEqual(expected,
-                     self._type_check(expected.keys(), CargoTask.is_cargo_project_library))
+    self.assertEqual(expected, self._type_check(expected.keys(),
+                                                CargoTask.is_cargo_project_library))
 
   def test_is_cargo_project_test(self):
     expected = {
-      CargoBase: False,
-      CargoBinary: False,
-      CargoLibrary: False,
-      # CargoWorkspace: False,
-      CargoProjectBinary: False,
-      CargoProjectLibrary: False,
-      CargoProjectTest: True,
-      CargoSyntheticBase: False,
-      CargoSyntheticBinary: False,
-      CargoSyntheticCustomBuild: False,
-      CargoSyntheticLibrary: False,
-      Target: False,
+        CargoBase: False,
+        CargoBinary: False,
+        CargoLibrary: False,
+        # CargoWorkspace: False,
+        CargoProjectBinary: False,
+        CargoProjectLibrary: False,
+        CargoProjectTest: True,
+        CargoSyntheticBase: False,
+        CargoSyntheticBinary: False,
+        CargoSyntheticCustomBuild: False,
+        CargoSyntheticLibrary: False,
+        Target: False,
     }
     self.assertEqual(expected, self._type_check(expected.keys(), CargoTask.is_cargo_project_test))
 
@@ -254,8 +255,10 @@ class CargoTaskTest(TaskTestBase):
     target_names = [':' + letter for letter in list(string.ascii_lowercase)]
     types_with_target_names = zip(types, target_names)
 
-    type_check_results = {type: type_check_function(self.make_target(target_name, type))
-                          for type, target_name in types_with_target_names}
+    type_check_results = {
+        type: type_check_function(self.make_target(target_name, type))
+        for type, target_name in types_with_target_names
+    }
 
     return type_check_results
 
@@ -266,14 +269,14 @@ class CargoTaskTest(TaskTestBase):
       execute_command_test_var = 'Test'
       with open(script, 'w') as fp:
         fp.write(
-          test_shell_script.format(execute_command_test_var=execute_command_test_var).strip())
+            test_shell_script.format(execute_command_test_var=execute_command_test_var).strip())
 
       chmod_plus_x(script)
-      returncode = task.execute_command([script], 'test', [WorkUnitLabel.TEST],
-                                        env_vars={
-                                          'EXECUTE_COMMAND_TEST': (
-                                            execute_command_test_var, False)},
-                                        current_working_dir=chroot)
+      returncode = task.execute_command(
+          [script],
+          'test', [WorkUnitLabel.TEST],
+          env_vars={'EXECUTE_COMMAND_TEST': (execute_command_test_var, False)},
+          current_working_dir=chroot)
 
       self.assertEqual(0, returncode)
 
@@ -284,10 +287,11 @@ class CargoTaskTest(TaskTestBase):
       execute_command_test_var = 'Test'
       with open(script, 'w') as fp:
         fp.write(
-          test_shell_script.format(execute_command_test_var=execute_command_test_var).strip())
+            test_shell_script.format(execute_command_test_var=execute_command_test_var).strip())
 
       chmod_plus_x(script)
-      returncode = task.execute_command([script], 'test', [WorkUnitLabel.TEST],
+      returncode = task.execute_command([script],
+                                        'test', [WorkUnitLabel.TEST],
                                         current_working_dir=chroot)
 
       self.assertEqual(1, returncode)
@@ -299,16 +303,14 @@ class CargoTaskTest(TaskTestBase):
       execute_command_test_var = 'Test'
       with open(script, 'w') as fp:
         fp.write(
-          test_shell_script.format(execute_command_test_var=execute_command_test_var).strip())
+            test_shell_script.format(execute_command_test_var=execute_command_test_var).strip())
 
       chmod_plus_x(script)
-      returncode, std_out, std_err = task.execute_command_and_get_output([script], 'test',
-                                                                         [WorkUnitLabel.TEST],
-                                                                         env_vars={
-                                                                           'EXECUTE_COMMAND_TEST': (
-                                                                             execute_command_test_var,
-                                                                             False)},
-                                                                         current_working_dir=chroot)
+      returncode, std_out, std_err = task.execute_command_and_get_output(
+          [script],
+          'test', [WorkUnitLabel.TEST],
+          env_vars={'EXECUTE_COMMAND_TEST': (execute_command_test_var, False)},
+          current_working_dir=chroot)
 
       self.assertEqual(0, returncode)
       self.assertEqual("success\n", std_out)
@@ -321,10 +323,11 @@ class CargoTaskTest(TaskTestBase):
       execute_command_test_var = 'Test'
       with open(script, 'w') as fp:
         fp.write(
-          test_shell_script.format(execute_command_test_var=execute_command_test_var).strip())
+            test_shell_script.format(execute_command_test_var=execute_command_test_var).strip())
 
       chmod_plus_x(script)
-      returncode, std_out, std_err = task.execute_command_and_get_output([script], 'test',
+      returncode, std_out, std_err = task.execute_command_and_get_output([script],
+                                                                         'test',
                                                                          [WorkUnitLabel.TEST],
                                                                          current_working_dir=chroot)
 

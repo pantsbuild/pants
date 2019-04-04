@@ -22,25 +22,25 @@ from pants.contrib.rust.tasks.cargo_task import CargoTask
 class Workspace(CargoTask):
   # https://docs.rs/cargo/0.20.0/cargo/core/manifest/enum.TargetKind.html
   _synthetic_target_kind = {
-    'bin': CargoSyntheticBinary,
-    'lib': CargoSyntheticLibrary,
-    'cdylib': CargoSyntheticLibrary,
-    'rlib': CargoSyntheticLibrary,
-    'proc-macro': CargoSyntheticLibrary,
-    'dylib': CargoSyntheticLibrary,
-    'staticlib': CargoSyntheticLibrary,
-    'custom-build': CargoSyntheticCustomBuild,
+      'bin': CargoSyntheticBinary,
+      'lib': CargoSyntheticLibrary,
+      'cdylib': CargoSyntheticLibrary,
+      'rlib': CargoSyntheticLibrary,
+      'proc-macro': CargoSyntheticLibrary,
+      'dylib': CargoSyntheticLibrary,
+      'staticlib': CargoSyntheticLibrary,
+      'custom-build': CargoSyntheticCustomBuild,
   }
 
   _project_target_kind = {
-    'bin': CargoProjectBinary,
-    'lib': CargoProjectLibrary,
-    'cdylib': CargoProjectLibrary,
-    'rlib': CargoProjectLibrary,
-    'proc-macro': CargoProjectLibrary,
-    'dylib': CargoProjectLibrary,
-    'staticlib': CargoProjectLibrary,
-    'test': CargoProjectTest,
+      'bin': CargoProjectBinary,
+      'lib': CargoProjectLibrary,
+      'cdylib': CargoProjectLibrary,
+      'rlib': CargoProjectLibrary,
+      'proc-macro': CargoProjectLibrary,
+      'dylib': CargoProjectLibrary,
+      'staticlib': CargoProjectLibrary,
+      'test': CargoProjectTest,
   }
 
   @classmethod
@@ -57,9 +57,8 @@ class Workspace(CargoTask):
     else:
       target_is_a_member = self.is_target_a_member(target_definition.name,
                                                    workspace_target.member_names)
-      if target_is_a_member and (
-              self.is_lib_or_bin_target(target_definition) or self.is_test_target(
-        target_definition)):
+      if target_is_a_member and (self.is_lib_or_bin_target(target_definition) or
+                                 self.is_test_target(target_definition)):
         return True
       else:
         return False
@@ -85,14 +84,16 @@ class Workspace(CargoTask):
       return False
 
   def inject_member_target(self, target_definition, workspace_target):
+
     def find_member(target_name, members):
       for member in members:
         name, _, _ = member
         if target_name == name:
           return member
 
-    member_definitions = tuple((name, path, workspace_target.include_sources) for (name, path) in
-                               zip(workspace_target.member_names, workspace_target.member_paths))
+    member_definitions = tuple(
+        (name, path, workspace_target.include_sources)
+        for (name, path) in zip(workspace_target.member_names, workspace_target.member_paths))
 
     member_definition = find_member(target_definition.name, member_definitions)
     target_sources = self.get_member_sources_files(member_definition)
@@ -102,12 +103,13 @@ class Workspace(CargoTask):
     else:
       synthetic_target_type = self._project_target_kind[target_definition.kind]
 
-    synthetic_of_original_target = self.context.add_new_target(address=target_definition.address,
-                                                               target_type=synthetic_target_type,
-                                                               derived_from=workspace_target,
-                                                               dependencies=workspace_target.dependencies,
-                                                               cargo_invocation=target_definition.invocation,
-                                                               sources=target_sources)
+    synthetic_of_original_target = self.context.add_new_target(
+        address=target_definition.address,
+        target_type=synthetic_target_type,
+        derived_from=workspace_target,
+        dependencies=workspace_target.dependencies,
+        cargo_invocation=target_definition.invocation,
+        sources=target_sources)
 
     self.inject_synthetic_of_original_target_into_build_graph(synthetic_of_original_target,
                                                               workspace_target)
@@ -117,14 +119,14 @@ class Workspace(CargoTask):
     build_graph = self.context.build_graph
     for dependent_address in build_graph.dependents_of(original_target.address):
       build_graph.inject_dependency(
-        dependent=dependent_address,
-        dependency=synthetic_target.address,
+          dependent=dependent_address,
+          dependency=synthetic_target.address,
       )
 
     for concrete_dependency_address in build_graph.dependencies_of(original_target.address):
       build_graph.inject_dependency(
-        dependent=synthetic_target.address,
-        dependency=concrete_dependency_address,
+          dependent=synthetic_target.address,
+          dependency=concrete_dependency_address,
       )
 
     if original_target in self.context.target_roots:
@@ -134,8 +136,8 @@ class Workspace(CargoTask):
     _, path, include_sources = member_definition
     rglobs = RGlobs.to_filespec(include_sources, root=path)
     path_globs = [PathGlobsAndRoot(
-      PathGlobs(tuple(rglobs['globs'])),
-      text_type(get_buildroot()),
+        PathGlobs(tuple(rglobs['globs'])),
+        text_type(get_buildroot()),
     )]
     snapshot = self.context._scheduler.capture_snapshots(tuple(path_globs))
     fileset = EagerFilesetWithSpec(path, rglobs, snapshot[0])
