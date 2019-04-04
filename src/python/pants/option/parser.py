@@ -332,16 +332,18 @@ class Parser(object):
     """Checks option for deprecation and issues a warning/error if necessary."""
     removal_version = kwargs.get('removal_version', None)
     if removal_version is not None:
-      warn_or_error(removal_version,
-                    "option '{}' in {}".format(dest, self._scope_str()),
-                    kwargs.get('removal_hint', ''),
-                    stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
+      warn_or_error(
+        removal_version=removal_version,
+        deprecated_entity_description="option '{}' in {}".format(dest, self._scope_str()),
+        deprecation_start_version=kwargs.get('deprecation_start_version', None),
+        hint=kwargs.get('removal_hint', None),
+        stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
 
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group',
-    'daemon'
+    'fingerprint', 'removal_version', 'removal_hint', 'deprecation_start_version', 'fromfile',
+    'mutually_exclusive_group', 'daemon'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.

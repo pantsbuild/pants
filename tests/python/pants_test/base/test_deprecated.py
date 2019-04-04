@@ -15,13 +15,8 @@ from pants.base.deprecated import (BadDecoratorNestingError, BadSemanticVersionE
                                    deprecated, deprecated_conditional, deprecated_module,
                                    warn_or_error)
 from pants.util.collections import assert_single_element
-from pants.version import PANTS_SEMVER, VERSION
-
-
-def _use_current_prerelease_semver(f):
-  return unittest.skipIf(not PANTS_SEMVER.is_prerelease,
-                         'Uses the current version as a deprecation version, which is only valid '
-                         'for prereleases.')(f)
+from pants.version import VERSION
+from pants_test.test_base import use_current_prerelease_semver
 
 
 class DeprecatedTest(unittest.TestCase):
@@ -158,7 +153,7 @@ class DeprecatedTest(unittest.TestCase):
       def test_func1a():
         pass
 
-  @_use_current_prerelease_semver
+  @use_current_prerelease_semver
   def test_removal_version_same(self):
     with self.assertRaises(CodeRemovedError):
       warn_or_error(VERSION, 'dummy description')
@@ -198,7 +193,7 @@ class DeprecatedTest(unittest.TestCase):
                     deprecated_entity_description='dummy',
                     deprecation_start_version='1.0.0.dev0')
 
-  @_use_current_prerelease_semver
+  @use_current_prerelease_semver
   def test_deprecation_start_period(self):
     with self.assertRaises(CodeRemovedError):
       warn_or_error(removal_version=VERSION,

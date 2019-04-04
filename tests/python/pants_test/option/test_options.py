@@ -35,7 +35,8 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.objects import enum
-from pants_test.test_base import TestBase
+from pants.version import VERSION
+from pants_test.test_base import TestBase, use_current_prerelease_semver
 
 
 def task(scope):
@@ -140,6 +141,12 @@ class OptionsTest(TestBase):
                       removal_hint='say no to crufty global options')
     register_global('--global-crufty-expired', removal_version='0.0.1.dev0',
                     removal_hint='use a less crufty global option')
+    register_global('--global-delayed-deprecated-option',
+                    removal_version='999.99.9.dev0',
+                    deprecation_start_version=VERSION)
+    register_global('--global-delayed-but-already-passed-deprecated-option',
+                    removal_version='999.99.9.dev0',
+                    deprecation_start_version='0.0.0.dev0')
 
     # Mutual Exclusive options
     register_global('--mutex-foo', mutually_exclusive_group='mutex')
@@ -915,6 +922,26 @@ class OptionsTest(TestBase):
       options = self._parse('./pants', config={'stale':{'crufty':'stale_and_crufty'}})
       self.assertEqual('stale_and_crufty', options.for_scope('stale').crufty)
       self.assertWarning(w, 'crufty')
+
+  @use_current_prerelease_semver
+  def test_delayed_deprecated_option(self):
+    with self.warnings_catcher() as w:
+      delayed_deprecation_option_value = (
+        self._parse(
+          './pants --global-delayed-deprecated-option=xxx')
+        .for_global_scope()
+        .global_delayed_deprecated_option)
+      self.assertEqual(delayed_deprecation_option_value, 'xxx')
+      self.assertEqual(0, len(w))
+
+    with self.warnings_catcher() as w:
+      delayed_passed_option_value = (
+        self._parse(
+          './pants --global-delayed-but-already-passed-deprecated-option=xxx')
+        .for_global_scope()
+        .global_delayed_but_already_passed_deprecated_option)
+      self.assertEqual(delayed_passed_option_value, 'xxx')
+      self.assertWarning(w, 'global_delayed_but_already_passed_deprecated_option')
 
   def test_mutually_exclusive_options_flags(self):
     """Ensure error is raised when mutual exclusive options are given together."""

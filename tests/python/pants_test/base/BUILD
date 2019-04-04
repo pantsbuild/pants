@@ -67,6 +67,7 @@ python_tests(
     'src/python/pants/base:deprecated',
     'src/python/pants/util:collections',
     'src/python/pants:version',
+    'tests/python/pants_test:test_base',
   ]
 )
 
