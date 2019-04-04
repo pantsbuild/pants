@@ -18,4 +18,4 @@ class ConanPrep(PythonToolPrepBase):
   tool_instance_cls = ConanInstance
 
   def will_be_invoked(self):
-    return len(self.get_targets(lambda t: isinstance(t, ExternalNativeLibrary))) > 0
+    return any(self.get_targets(lambda t: isinstance(t, ExternalNativeLibrary)))
