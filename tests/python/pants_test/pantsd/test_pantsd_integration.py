@@ -514,7 +514,10 @@ Interrupted by user over pailgun client!
       signal.SIGINT,
       regexps=["""\
 ^Interrupted by user\\.
-WARN\\] timed out when attempting to gracefully shut down the remote client executing "'pantsd-runner.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, overtime seconds: [^\n]+
+WARN\\] timed out when attempting to gracefully shut down the remote client executing \
+"'pantsd-runner.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating \
+over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, \
+overtime seconds: [^\n]+
 Interrupted by user:
 Interrupted by user over pailgun client!
 """
