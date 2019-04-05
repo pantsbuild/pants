@@ -106,7 +106,7 @@ export PANTS_DEV=1
 
 # We only want to output failures and skips.
 # See https://docs.pytest.org/en/latest/usage.html#detailed-summary-report.
-export PYTEST_PASSTHRU_ARGS="-q -rfa --duration=3"
+export PYTEST_PASSTHRU_ARGS="-q -rfa"
 
 # Determine the Python version to use for bootstrapping pants.pex. This would usually not be
 # necessary to set when developing locally, because the `./pants` and `./pants2` scripts set
