@@ -32,6 +32,7 @@ from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections_abc_backport import OrderedDict
+from pants.util.contextutil import recursion_limit
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
 
@@ -99,6 +100,11 @@ class RunTracker(Subsystem):
              help='Number of threads for background work.')
     register('--stats-local-json-file', advanced=True, default=None,
              help='Write stats to this local json file on run completion.')
+    register('--nested-output-max-depth', advanced=True, type=int,
+             default=sys.getrecursionlimit(),
+             help='The expected maximum depth of nested structures for workunit reporting. '
+                  'This can be set to avoid recursion depth exceeded errors when serializing '
+                  'workunit output.')
     register('--stats-option-scopes-to-record', advanced=True, type=list, default=[],
              help="Option scopes to record in stats on run completion. "
                   "Options may be selected by joining the scope and the option with a ^ character, "
@@ -446,7 +452,8 @@ class RunTracker(Subsystem):
     # Write stats to user-defined json file.
     stats_json_file_name = self.get_options().stats_local_json_file
     if stats_json_file_name:
-      self.write_stats_to_json(stats_json_file_name, stats)
+      with recursion_limit(limit=self.get_options().nested_output_max_depth):
+        self.write_stats_to_json(stats_json_file_name, stats)
 
     # Upload to remote stats db.
     stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)

@@ -403,3 +403,19 @@ def http_server(handler_class):
   finally:
     shutdown_queue.put(True)
     t.join()
+
+
+@contextmanager
+def recursion_limit(limit):
+  """Temporarily modify the allowed recursion limit.
+
+  This method is intended to be used when serializing deeply nested structures such as dicts which
+  otherwise would raise a recursion error. It will not fix recursion errors due to cyclic
+  structures.
+  """
+  prev_limit = sys.getrecursionlimit()
+  sys.setrecursionlimit(limit)
+  try:
+    yield
+  finally:
+    sys.setrecursionlimit(prev_limit)
