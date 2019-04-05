@@ -36,5 +36,4 @@ done
 # If changes were made or issues found, output those lines with any leading
 # whitespace trimmed.
 ./pants --changed-parent=master fmt.isort -- ${isort_args[@]} \
-  | grep -E 'Fixing|ERROR' \
-  | awk '{$1=$1};1'
+  | grep -Eo '(Fixing|ERROR).*$' \
