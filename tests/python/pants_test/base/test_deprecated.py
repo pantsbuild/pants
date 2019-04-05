@@ -4,20 +4,26 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import unittest
 import warnings
 from builtins import object, str
 from contextlib import contextmanager
 
-from pants.base.deprecated import (BadDecoratorNestingError, BadRemovalVersionError,
-                                   CodeRemovedError, MissingRemovalVersionError,
-                                   NonDevRemovalVersionError, deprecated, deprecated_conditional,
-                                   deprecated_module, warn_or_error)
+import mock
+from packaging.version import Version
+
+from pants.base.deprecated import (BadDecoratorNestingError, BadSemanticVersionError,
+                                   CodeRemovedError, InvalidSemanticVersionOrderingError,
+                                   MissingSemanticVersionError, NonDevSemanticVersionError,
+                                   deprecated, deprecated_conditional, deprecated_module,
+                                   warn_or_error)
 from pants.util.collections import assert_single_element
-from pants.version import PANTS_SEMVER, VERSION
+from pants_test.test_base import TestBase
 
 
-class DeprecatedTest(unittest.TestCase):
+_FAKE_CUR_VERSION = '2.0.0.dev0'
+
+
+class DeprecatedTest(TestBase):
   FUTURE_VERSION = '9999.9.9.dev0'
 
   @contextmanager
@@ -115,50 +121,48 @@ class DeprecatedTest(unittest.TestCase):
       self.assertIn(subject, str(extract_deprecation_warning()))
 
   def test_removal_version_required(self):
-    with self.assertRaises(MissingRemovalVersionError):
+    with self.assertRaises(MissingSemanticVersionError):
       @deprecated(None)
       def test_func():
         pass
 
   def test_removal_version_bad(self):
-    with self.assertRaises(BadRemovalVersionError):
+    with self.assertRaises(BadSemanticVersionError):
       warn_or_error('a.a.a', 'dummy description')
 
-    with self.assertRaises(BadRemovalVersionError):
+    with self.assertRaises(BadSemanticVersionError):
       @deprecated('a.a.a')
       def test_func0():
         pass
 
-    with self.assertRaises(BadRemovalVersionError):
+    with self.assertRaises(BadSemanticVersionError):
       warn_or_error(1.0, 'dummy description')
 
-    with self.assertRaises(BadRemovalVersionError):
+    with self.assertRaises(BadSemanticVersionError):
       @deprecated(1.0)
       def test_func1():
         pass
 
-    with self.assertRaises(BadRemovalVersionError):
+    with self.assertRaises(BadSemanticVersionError):
       warn_or_error('1.a.0', 'dummy description')
 
-    with self.assertRaises(BadRemovalVersionError):
+    with self.assertRaises(BadSemanticVersionError):
       @deprecated('1.a.0')
       def test_func1a():
         pass
 
   def test_removal_version_non_dev(self):
-    with self.assertRaises(NonDevRemovalVersionError):
+    with self.assertRaises(NonDevSemanticVersionError):
       @deprecated('1.0.0')
       def test_func1a():
         pass
 
-  @unittest.skipIf(not PANTS_SEMVER.is_prerelease,
-                   'Uses the current version as a deprecation version, which is only valid '
-                   'for prereleases.')
+  @mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
   def test_removal_version_same(self):
     with self.assertRaises(CodeRemovedError):
-      warn_or_error(VERSION, 'dummy description')
+      warn_or_error(_FAKE_CUR_VERSION, 'dummy description')
 
-    @deprecated(VERSION)
+    @deprecated(_FAKE_CUR_VERSION)
     def test_func():
       pass
     with self.assertRaises(CodeRemovedError):
@@ -181,3 +185,33 @@ class DeprecatedTest(unittest.TestCase):
         @property
         def test_prop(this):
           pass
+
+  def test_deprecation_start_version_validation(self):
+    with self.assertRaises(BadSemanticVersionError):
+      warn_or_error(removal_version='1.0.0.dev0',
+                    deprecated_entity_description='dummy',
+                    deprecation_start_version='1.a.0')
+
+    with self.assertRaises(InvalidSemanticVersionOrderingError):
+      warn_or_error(removal_version='0.0.0.dev0',
+                    deprecated_entity_description='dummy',
+                    deprecation_start_version='1.0.0.dev0')
+
+  @mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
+  def test_deprecation_start_period(self):
+    with self.assertRaises(CodeRemovedError):
+      warn_or_error(removal_version=_FAKE_CUR_VERSION,
+                    deprecated_entity_description='dummy',
+                    deprecation_start_version='1.0.0.dev0')
+
+    with self.warnings_catcher() as w:
+      warn_or_error(removal_version='999.999.999.dev999',
+                    deprecated_entity_description='dummy',
+                    deprecation_start_version=_FAKE_CUR_VERSION)
+      self.assertWarning(w, DeprecationWarning,
+                         'DEPRECATED: dummy will be removed in version 999.999.999.dev999.')
+
+    self.assertIsNone(
+      warn_or_error(removal_version='999.999.999.dev999',
+                    deprecated_entity_description='dummy',
+                    deprecation_start_version='500.0.0.dev0'))

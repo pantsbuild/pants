@@ -8,6 +8,7 @@ import itertools
 import logging
 import os
 import unittest
+import warnings
 from builtins import object, open, str
 from collections import defaultdict
 from contextlib import contextmanager
@@ -697,6 +698,18 @@ class TestBase(unittest.TestCase, AbstractClass):
     finally:
       root_logger.setLevel(old_level)
       root_logger.removeHandler(handler)
+
+  @contextmanager
+  def warnings_catcher(self):
+    with warnings.catch_warnings(record=True) as w:
+      warnings.simplefilter('always')
+      yield w
+
+  def assertWarning(self, w, category, warning_text):
+    single_warning = assert_single_element(w)
+    self.assertEqual(single_warning.category, category)
+    warning_message = single_warning.message
+    self.assertEqual(warning_text, text_type(warning_message))
 
   def retrieve_single_product_at_target_base(self, product_mapping, target):
     mapping_for_target = product_mapping.get(target)

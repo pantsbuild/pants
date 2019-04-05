@@ -13,7 +13,7 @@ from collections import defaultdict
 
 import six
 
-from pants.base.deprecated import validate_removal_semver, warn_or_error
+from pants.base.deprecated import validate_deprecation_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import (DictValueComponent, ListValueComponent, UnsetBool,
@@ -332,16 +332,18 @@ class Parser(object):
     """Checks option for deprecation and issues a warning/error if necessary."""
     removal_version = kwargs.get('removal_version', None)
     if removal_version is not None:
-      warn_or_error(removal_version,
-                    "option '{}' in {}".format(dest, self._scope_str()),
-                    kwargs.get('removal_hint', ''),
-                    stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
+      warn_or_error(
+        removal_version=removal_version,
+        deprecated_entity_description="option '{}' in {}".format(dest, self._scope_str()),
+        deprecation_start_version=kwargs.get('deprecation_start_version', None),
+        hint=kwargs.get('removal_hint', None),
+        stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
 
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group',
-    'daemon'
+    'fingerprint', 'removal_version', 'removal_hint', 'deprecation_start_version', 'fromfile',
+    'mutually_exclusive_group', 'daemon'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -388,7 +390,7 @@ class Parser(object):
 
     removal_version = kwargs.get('removal_version')
     if removal_version is not None:
-      validate_removal_semver(removal_version)
+      validate_deprecation_semver(removal_version, 'removal version')
 
   def _existing_scope(self, arg):
     if arg in self._known_args:

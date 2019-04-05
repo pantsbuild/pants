@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import multiprocessing
 import os
 import sys
+from textwrap import dedent
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
@@ -126,6 +127,17 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'version of the pants instance you are running using -v, -V, or --version.')
 
     register('--pants-runtime-python-version', advanced=True,
+             removal_version='1.19.0.dev0',
+             deprecation_start_version='1.17.0.dev0',
+             removal_hint=dedent("""
+                  This option was only used to help with Pants' migration to run on Python 3. \
+                  Pants will now correctly default to whichever Python versions are supported for \
+                  the current `pants_version` you are using. Please make sure you are using the \
+                  most up-to-date version of the `./pants` script with:
+
+                    curl -L -O https://pantsbuild.github.io/setup/pants
+
+                  and then unset this option."""),
              help='Use this Python version to run Pants. The option expects the major and minor '
                   'version, e.g. 2.7 or 3.6. Note Pants code only uses this to verify that you are '
                   'using the requested interpreter, as Pants cannot dynamically change the '
