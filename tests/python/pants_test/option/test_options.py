@@ -1243,7 +1243,7 @@ class OptionsTest(TestBase):
 
     val = {'a': {'b': 1}, 'c': [2, 3]}
     with temporary_file(suffix='.yaml', binary_mode=False) as fp:
-      yaml.dump(val, fp)
+      yaml.safe_dump(val, fp)
       fp.close()
       options = self._parse('./pants fromfile --{}=@{}'.format('dictvalue', fp.name))
       self.assertEqual(val, options.for_scope('fromfile')['dictvalue'])
