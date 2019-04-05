@@ -34,6 +34,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.collections_abc_backport import OrderedDict
 from pants.util.contextutil import recursion_limit
 from pants.util.dirutil import relative_symlink, safe_file_dump
+from pants.util.strutil import safe_shlex_join
 
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
@@ -117,7 +118,7 @@ class RunTracker(Subsystem):
     """
     super(RunTracker, self).__init__(*args, **kwargs)
     self._run_timestamp = time.time()
-    self._cmd_line = ' '.join(['pants'] + sys.argv[1:])
+    self._cmd_line = safe_shlex_join(['pants'] + sys.argv[1:])
     self._sorted_goal_infos = tuple()
 
     # Initialized in `initialize()`.
