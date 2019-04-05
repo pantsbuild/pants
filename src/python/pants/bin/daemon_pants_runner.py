@@ -337,6 +337,10 @@ class DaemonPantsRunner(ProcessManager):
           'Encountered graceful termination exception {}; exiting'.format(e))
         self._exiter.exit(e.exit_code)
       except Exception:
+        # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
+        # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
+        # happening here, so something is probably overriding the excepthook. By catching Exception
+        # and calling this method, we emulate the normal, expected sys.excepthook override.
         ExceptionSink._log_unhandled_exception_and_exit()
       else:
         self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)

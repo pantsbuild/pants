@@ -418,8 +418,20 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
-  def _assert_pantsd_keyboardinterrupt_signal(self, signum, messages, regexps=[],
+  def _assert_pantsd_keyboardinterrupt_signal(self, signum,
+                                              single_msg=None, messages=[], regexps=[],
                                               quit_timeout=None):
+    """Send a signal to the thin pailgun client and observe the error messaging.
+
+    :param int signum: The signal to send.
+    :param str single_msg: If provided, the string must exactly match the contents of stderr.
+    :param messages: Assert that all of these strings are contained in stderr.
+    :type messages: list of str
+    :param regexps: Assert that all of these regexps match somewhere in stderr.
+    :type regexps: list of str
+    :param float quit_timeout: The duration of time to wait for the pailgun client to flush all of
+                               its output and die after being killed.
+    """
     # TODO: This tests that pantsd-runner processes actually die after the thin client receives the
     # specified signal.
     with self.pantsd_test_context() as (workdir, config, checker):
@@ -446,6 +458,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
 
+      if single_msg is not None:
+        self.assertEqual(single_msg, waiter_run.stderr_data)
       for msg in messages:
         self.assertIn(msg, waiter_run.stderr_data)
       for regexp in regexps:
@@ -462,35 +476,48 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGTERM,
       messages=[
-        'Signal {signum} (SIGTERM) was raised. Exiting with failure.'.format(signum=signal.SIGTERM),
-        '\nInterrupted by user over pailgun client!\n',
+        "\nSignal {signum} (SIGTERM) was raised. Exiting with failure.\n"
+        .format(signum=signal.SIGTERM),
       ],
-      quit_timeout=0.01)
+      regexps=["""
+Interrupted by user:
+Interrupted by user over pailgun client!
+$"""],
+      quit_timeout=5.0)
 
   def test_pantsd_sigquit(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGQUIT,
       messages=[
-        'Signal {signum} (SIGQUIT) was raised. Exiting with failure.'.format(signum=signal.SIGQUIT),
-        '\nInterrupted by user over pailgun client!\n',
+        "\nSignal {signum} (SIGQUIT) was raised. Exiting with failure.\n"
+        .format(signum=signal.SIGQUIT),
       ],
-      quit_timeout=0.01)
+      regexps=["""
+Interrupted by user:
+Interrupted by user over pailgun client!
+$"""],
+      quit_timeout=5.0)
 
   def test_pantsd_sigint(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
-      messages=[
-        'User interrupted execution with control-c!',
-        '\nInterrupted by user over pailgun client!\n',
-      ],
-      quit_timeout=0.01)
+      single_msg="""\
+Interrupted by user.
+Interrupted by user:
+Interrupted by user over pailgun client!
+""",
+      quit_timeout=5.0)
 
   def test_signal_pailgun_stream_timeout(self):
     today = datetime.date.today().isoformat()
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
-      messages=['\nInterrupted by user over pailgun client!\n'],
-      regexps=["""WARN\\] timed out when attempting to gracefully shut down the remote client executing "'pantsd-runner.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, overtime seconds: [^\n]+"""
+      regexps=["""\
+^Interrupted by user\\.
+WARN\\] timed out when attempting to gracefully shut down the remote client executing "'pantsd-runner.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, overtime seconds: [^\n]+
+Interrupted by user:
+Interrupted by user over pailgun client!
+"""
                .format(today=re.escape(today))],
       quit_timeout=0.01,
     )
