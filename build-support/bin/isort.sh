@@ -33,7 +33,5 @@ do
   esac
 done
 
-# If changes were made or issues found, output those lines with any leading
-# whitespace trimmed.
-./pants --changed-parent=master fmt.isort -- ${isort_args[@]} \
-  | grep -Eo '(Fixing|ERROR).*$' \
+# If changes were made or issues found, output with leading whitespace trimmed.
+./pants --changed-parent=master fmt.isort -- ${isort_args[@]} | grep -Eo '(Fixing|ERROR).*$'

@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import re
 import shlex
-from builtins import str, bytes
+from builtins import bytes, str
 
 from future.utils import PY3
 
