@@ -81,7 +81,6 @@ def create_native_pantsd_file_log_handler(level, native, native_filename):
     fd = native.setup_pantsd_logger(native_filename, get_numeric_level(level))
     ExceptionSink.reset_interactive_output_stream(os.fdopen(fd, 'a'))
   except Exception as e:
-    print("Error setting up pantsd logger: {}".format(e), file=sys.stderr)
     raise e
 
   return NativeHandler(level, native, native_filename=native_filename)
