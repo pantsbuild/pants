@@ -131,7 +131,7 @@ def _greater_warnings_context(context_lines_string):
 # TODO: propagate `deprecation_start_version` to other methods in this file!
 def warn_or_error(removal_version, deprecated_entity_description, hint=None,
                   deprecation_start_version=None,
-                  frame_info=None, context=1, ensure_stderr=False):
+                  stacklevel=3, frame_info=None, context=1, ensure_stderr=False):
   """Check the removal_version against the current pants version.
 
   Issues a warning if the removal version is > current pants version, or an error otherwise.
