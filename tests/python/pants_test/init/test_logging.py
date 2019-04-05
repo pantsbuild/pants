@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-import os
 from builtins import open
 from contextlib import contextmanager
 
@@ -43,8 +42,6 @@ class LoggingTest(TestBase):
       file_logger.warn('this is a warning')
       file_logger.info('this is some info')
       file_logger.debug('this is some debug info')
-
-      pid = os.getpid()
 
       with open(log_file, 'r') as fp:
         loglines = fp.read().splitlines()
