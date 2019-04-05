@@ -471,7 +471,7 @@ class Parser(object):
                 return yaml.safe_load(s)
               else:
                 return s
-          except (IOError, json.JSONDecodeError, yaml.YAMLError) as e:
+          except (IOError, ValueError, yaml.YAMLError) as e:
             raise self.FromfileError('Failed to read {} in {} from file {}: {}'.format(
                 dest, self._scope_str(), fromfile, e))
       else:
