@@ -34,4 +34,7 @@ do
 done
 
 # If changes were made or issues found, output with leading whitespace trimmed.
-./pants --changed-parent=master fmt.isort -- ${isort_args[@]} | grep -Eo '(Fixing|ERROR).*$'
+output="$(./pants --changed-parent=master fmt.isort -- ${isort_args[@]})"
+echo "${output}" | grep -Eo '(ERROR).*$' && exit 1
+echo "${output}" | grep -Eo '(Fixing).*$'
+exit 0
