@@ -111,19 +111,25 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     if not targets:
       return
 
-    if self.combined:
-      self._generate_combined(targets, create_jvmdoc_command)
-    else:
-      with self.invalidated(targets) as invalidation_check:
-        def find_jvmdoc_targets():
-          invalid_targets = set()
-          for vt in invalidation_check.invalid_vts:
-            invalid_targets.update(vt.targets)
-          return invalid_targets
+    with self.invalidated(targets, invalidate_dependents=self.combined) as invalidation_check:
+      def find_invalid_targets():
+        invalid_targets = set()
+        for vt in invalidation_check.invalid_vts:
+          invalid_targets.update(vt.targets)
+        return invalid_targets
 
-        jvmdoc_targets = list(find_jvmdoc_targets())
+      invalid_targets = list(find_invalid_targets())
+      if invalid_targets:
+        if self.combined:
+          self._generate_combined(targets, create_jvmdoc_command)
+        else:
+          self._generate_individual(invalid_targets, create_jvmdoc_command)
 
-        self._generate_individual(jvmdoc_targets, create_jvmdoc_command)
+    if self.open and self.combined:
+      try:
+        desktop.ui_open(os.path.join(self.workdir, 'combined', 'index.html'))
+      except desktop.OpenError as e:
+        raise TaskError(e)
 
     if catalog:
       for target in targets:
@@ -143,11 +149,6 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
         self.context.log.debug("Running create_jvmdoc in {} with {}".format(gendir, " ".join(command)))
         result, gendir = create_jvmdoc(command, gendir)
         self._handle_create_jvmdoc_result(targets, result, command)
-    if self.open:
-      try:
-        desktop.ui_open(os.path.join(gendir, 'index.html'))
-      except desktop.OpenError as e:
-        raise TaskError(e)
 
   def _generate_individual(self, targets, create_jvmdoc_command):
     jobs = {}
