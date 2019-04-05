@@ -461,13 +461,29 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
   def test_pantsd_sigterm(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGTERM,
-      ['Signal {signum} (SIGTERM) was raised. Exiting with failure.'.format(signum=signal.SIGTERM)])
+      messages=[
+        'Signal {signum} (SIGTERM) was raised. Exiting with failure.'.format(signum=signal.SIGTERM),
+        '\nInterrupted by user over pailgun client!\n',
+      ],
+      quit_timeout=0.01)
 
-  def test_keyboardinterrupt_signals_with_pantsd(self):
-    for interrupt_signal in [signal.SIGINT, signal.SIGQUIT]:
-      self._assert_pantsd_keyboardinterrupt_signal(
-        interrupt_signal,
-        ['\nInterrupted by user over pailgun client!\n'])
+  def test_pantsd_sigquit(self):
+    self._assert_pantsd_keyboardinterrupt_signal(
+      signal.SIGQUIT,
+      messages=[
+        'Signal {signum} (SIGQUIT) was raised. Exiting with failure.'.format(signum=signal.SIGQUIT),
+        '\nInterrupted by user over pailgun client!\n',
+      ],
+      quit_timeout=0.01)
+
+  def test_pantsd_sigint(self):
+    self._assert_pantsd_keyboardinterrupt_signal(
+      signal.SIGINT,
+      messages=[
+        'User interrupted execution with control-c!',
+        '\nInterrupted by user over pailgun client!\n',
+      ],
+      quit_timeout=0.01)
 
   def test_signal_pailgun_stream_timeout(self):
     today = datetime.date.today().isoformat()
