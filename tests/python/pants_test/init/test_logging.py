@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -35,7 +35,7 @@ class LoggingTest(TestBase):
       file_logger.info(cat)
       with open(log_file, "r") as fp:
         contents = fp.read()
-        self.assertTrue(cat in contents)
+        self.assertIn(cat, contents)
 
   def test_file_logging(self):
     with self.logger('INFO') as (file_logger, log_file):

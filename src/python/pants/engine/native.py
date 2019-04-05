@@ -675,11 +675,8 @@ class Native(Singleton):
   def init_rust_logging(self, level):
     return self.lib.init_logging(level)
 
-  def maybe_encode_utf8(self, s):
-    return s.encode("utf-8") if PY3 else bytes(s, 'utf-8')
-
   def setup_pantsd_logger(self, log_file_path, level):
-    log_file_path = self.maybe_encode_utf8(log_file_path)
+    log_file_path = log_file_path.encode("utf-8")
     result = self.lib.setup_pantsd_logger(log_file_path, level)
     return self.context.raise_or_return(result)
 
@@ -687,8 +684,8 @@ class Native(Singleton):
     return self.lib.setup_stderr_logger(level)
 
   def write_log(self, msg, level, target):
-    msg = self.maybe_encode_utf8(msg)
-    target = self.maybe_encode_utf8(target)
+    msg = msg.encode("utf-8")
+    target = target.encode("utf-8")
     return self.lib.write_log(msg, level, target)
 
   def match_path_globs(self, path_globs, paths):

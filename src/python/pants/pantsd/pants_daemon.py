@@ -392,13 +392,7 @@ class PantsDaemon(FingerprintedProcessManager):
       global_bootstrap_options = self._bootstrap_options.for_global_scope()
       ExceptionSink.reset_should_print_backtrace_to_terminal(
         global_bootstrap_options.print_exception_stacktrace)
-      # TODO Hello! I am your friendly neighborhoood log resetter. This resets the log location,
-      #  which is not nice because we have already reset the interactive output stream.
       ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
-
-      self._logger.info('pantsd starting, log level is {}, workdir {}, log_filename is {}'.format(
-        self._log_level, global_bootstrap_options.pants_workdir, log_filename))
-      # self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
       self._native.set_panic_handler()
 

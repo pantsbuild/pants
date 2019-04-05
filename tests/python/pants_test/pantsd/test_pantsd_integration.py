@@ -102,7 +102,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Wait for log flush.
       time.sleep(2)
 
-      # raise Exception(read_pantsd_log(workdir))
       self.assertIn('Current thread 0x', '\n'.join(read_pantsd_log(workdir)))
 
   def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
