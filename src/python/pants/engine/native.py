@@ -16,7 +16,7 @@ from contextlib import closing
 
 import cffi
 import pkg_resources
-from future.utils import PY2, PY3, binary_type, text_type
+from future.utils import PY2, binary_type, text_type
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.engine.selectors import Get
