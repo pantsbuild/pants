@@ -209,35 +209,27 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
   .into()
 }
 
-///
-/// TODO: If we added support for inserting to the `Interns` using an `Ident`, `PyGeneratorResponse`
-/// could directly return `Idents` during `Get` calls. This would also require splitting its fields
-/// further to avoid needing to "identify" the result of a `PyGeneratorResponseType::Break`.
-///
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
   let response =
     with_externs(|e| (e.generator_send)(e.context, generator as &Handle, arg as &Handle));
-  match response.res_type {
-    PyGeneratorResponseType::Break => Ok(GeneratorResponse::Break(response.values.unwrap_one())),
-    PyGeneratorResponseType::Throw => Err(PyResult::failure_from(response.values.unwrap_one())),
-    PyGeneratorResponseType::Get => {
+  match response {
+    PyGeneratorResponse::Broke(h) => Ok(GeneratorResponse::Break(Value::new(h))),
+    PyGeneratorResponse::Throw(h) => Err(PyResult::failure_from(Value::new(h))),
+    PyGeneratorResponse::Get(product, handle, ident) => {
       let mut interns = INTERNS.write();
-      let p = response.products.unwrap_one();
-      let i = response.identities.unwrap_one();
-      let v = response.values.unwrap_one();
       let g = Get {
-        product: p,
-        subject: interns.insert_with(v, i),
+        product,
+        subject: interns.insert_with(Value::new(handle), ident),
       };
       Ok(GeneratorResponse::Get(g))
     }
-    PyGeneratorResponseType::GetMulti => {
+    PyGeneratorResponse::GetMulti(products, handles, identities) => {
       let mut interns = INTERNS.write();
-      let products = response.products.to_vec();
-      let identities = response.identities.to_vec();
-      let values = response.values.to_vec();
+      let products = products.to_vec();
+      let identities = identities.to_vec();
+      let values = handles.to_vec();
       assert_eq!(products.len(), values.len());
-      let continues: Vec<Get> = products
+      let gets: Vec<Get> = products
         .into_iter()
         .zip(values.into_iter())
         .zip(identities.into_iter())
@@ -246,7 +238,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
           subject: interns.insert_with(v, i),
         })
         .collect();
-      Ok(GeneratorResponse::GetMulti(continues))
+      Ok(GeneratorResponse::GetMulti(gets))
     }
   }
 }
@@ -460,24 +452,18 @@ impl From<Result<(), String>> for PyResult {
   }
 }
 
-// Only constructed from the python side.
-// TODO: map this into a C enum with cbindgen and consume from python instead of using magic numbers
-// in extern_generator_send() in native.py!
-#[allow(dead_code)]
-#[repr(u8)]
-pub enum PyGeneratorResponseType {
-  Break = 0,
-  Throw = 1,
-  Get = 2,
-  GetMulti = 3,
-}
-
+///
+/// The response from a call to extern_generator_send. Gets include Idents for their Handles
+/// in order to avoid roundtripping to intern them, and to eagerly trigger errors for unhashable
+/// types on the python side where possible.
+///
 #[repr(C)]
-pub struct PyGeneratorResponse {
-  res_type: PyGeneratorResponseType,
-  values: HandleBuffer,
-  identities: IdentBuffer,
-  products: TypeIdBuffer,
+pub enum PyGeneratorResponse {
+  Get(TypeId, Handle, Ident),
+  GetMulti(TypeIdBuffer, HandleBuffer, IdentBuffer),
+  // NB: Broke not Break because C keyword.
+  Broke(Handle),
+  Throw(Handle),
 }
 
 #[derive(Debug)]

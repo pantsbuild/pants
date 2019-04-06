@@ -226,8 +226,9 @@ def _extern_decl(return_type, arg_types):
 
 class _FFISpecification(object):
 
-  def __init__(self, ffi):
+  def __init__(self, ffi, lib):
     self._ffi = ffi
+    self._lib = lib
 
   @memoized_classproperty
   def _extern_fields(cls):
@@ -417,41 +418,37 @@ class _FFISpecification(object):
   def extern_generator_send(self, context_handle, func, arg):
     """Given a generator, send it the given value and return a response."""
     c = self._ffi.from_handle(context_handle)
+    response = self._ffi.new('PyGeneratorResponse*')
     try:
       res = c.from_value(func[0]).send(c.from_value(arg[0]))
       if isinstance(res, Get):
         # Get.
-        values = [res.subject]
-        identities = [c.identify(res.subject)]
-        products = [res.product]
-        tag = 2
+        response.tag = self._lib.Get
+        response.get = (
+            TypeId(c.to_id(res.product)),
+            c.to_value(res.subject),
+            c.identify(res.subject),
+          )
       elif type(res) in (tuple, list):
         # GetMulti.
-        values = [g.subject for g in res]
-        identities = [c.identify(g.subject) for g in res]
-        products = [g.product for g in res]
-        tag = 3
+        response.tag = self._lib.GetMulti
+        response.get_multi = (
+            c.type_ids_buf([TypeId(c.to_id(g.product)) for g in res]),
+            c.vals_buf([c.to_value(g.subject) for g in res]),
+            c.identities_buf([c.identify(g.subject) for g in res]),
+          )
       else:
         # Break.
-        values = [res]
-        identities = []
-        products = []
-        tag = 0
+        response.tag = self._lib.Broke
+        response.broke = (c.to_value(res),)
     except Exception as e:
       # Throw.
+      response.tag = self._lib.Throw
       val = e
       val._formatted_exc = traceback.format_exc()
-      values = [val]
-      identities = []
-      products = []
-      tag = 1
+      response.throw = (c.to_value(val),)
 
-    return (
-        tag,
-        c.vals_buf([c.to_value(v) for v in values]),
-        c.identities_buf(identities),
-        c.type_ids_buf([TypeId(c.to_id(t)) for t in products])
-      )
+    return response[0]
 
   @_extern_decl('PyResult', ['ExternContext*', 'Handle*', 'Handle**', 'uint64_t'])
   def extern_call(self, context_handle, func, args_ptr, args_len):
@@ -602,14 +599,14 @@ class Native(Singleton):
   @memoized_property
   def lib(self):
     """Load and return the native engine module."""
-    return self.ffi.dlopen(self.binary)
+    lib = self.ffi.dlopen(self.binary)
+    _FFISpecification(self.ffi, lib).register_cffi_externs()
+    return lib
 
   @memoized_property
   def ffi(self):
     """A CompiledCFFI handle as imported from the native engine python module."""
-    ffi = getattr(self._ffi_module, 'ffi')
-    _FFISpecification(ffi).register_cffi_externs()
-    return ffi
+    return getattr(self._ffi_module, 'ffi')
 
   @memoized_property
   def ffi_lib(self):
