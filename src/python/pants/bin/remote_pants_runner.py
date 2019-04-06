@@ -32,20 +32,23 @@ class PailgunClientSignalHandler(SignalHandler):
     self._timeout = timeout
     super(PailgunClientSignalHandler, self).__init__(*args, **kwargs)
 
-  def _forward_signal_with_timeout(self, signum):
+  def _forward_signal_with_timeout(self, signum, signame):
+    logger.info(
+      'Sending {} to pantsd-runner with pid {}, waiting up to {} seconds before sending SIGKILL...'
+      .format(signame, self._pailgun_client._maybe_last_pid(), self._timeout))
     self._pailgun_client.set_exit_timeout(
       timeout=self._timeout,
       reason=KeyboardInterrupt('Interrupted by user over pailgun client!'))
     self._pailgun_client.maybe_send_signal(signum)
 
   def handle_sigint(self, signum, _frame):
-    self._forward_signal_with_timeout(signum)
+    self._forward_signal_with_timeout(signum, 'SIGINT')
 
   def handle_sigquit(self, signum, _frame):
-    self._forward_signal_with_timeout(signum)
+    self._forward_signal_with_timeout(signum, 'SIGQUIT')
 
   def handle_sigterm(self, signum, _frame):
-    self._forward_signal_with_timeout(signum)
+    self._forward_signal_with_timeout(signum, 'SIGTERM')
 
 
 class RemotePantsRunner(object):
