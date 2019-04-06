@@ -138,7 +138,7 @@ class Target(AbstractTarget):
 
     @classmethod
     def register_options(cls, register):
-      register('--tag-targets-mappings', type=dict, default=None, fromfile=True, fingerprint=True,
+      register('--tag-targets-mappings', type=dict, default=None, fingerprint=True,
                help='Dict with tag assignments for targets. Ex: { "tag1": ["path/to/target:foo"] }')
 
     @classmethod

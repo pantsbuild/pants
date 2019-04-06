@@ -190,11 +190,11 @@ class OptionsTest(TestBase):
     options.register('scoped.and-dashed', '--spam')
 
     # For fromfile test
-    options.register('fromfile', '--string', fromfile=True)
-    options.register('fromfile', '--intvalue', type=int, fromfile=True)
-    options.register('fromfile', '--dictvalue', type=dict, fromfile=True)
-    options.register('fromfile', '--listvalue', type=list, fromfile=True)
-    options.register('fromfile', '--appendvalue', type=list, member_type=int, fromfile=True)
+    options.register('fromfile', '--string')
+    options.register('fromfile', '--intvalue', type=int)
+    options.register('fromfile', '--dictvalue', type=dict)
+    options.register('fromfile', '--listvalue', type=list)
+    options.register('fromfile', '--appendvalue', type=list, member_type=int)
 
     # For fingerprint tests
     options.register('fingerprinting', '--inverted')  # Implicitly: daemon=True
