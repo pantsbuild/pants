@@ -418,15 +418,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_success(creator_handle.join())
       self.assert_success(waiter_handle.join())
 
-  def _assert_pantsd_keyboardinterrupt_signal(self, signum,
-                                              single_msg=None, messages=[], regexps=[],
-                                              quit_timeout=None):
+  def _assert_pantsd_keyboardinterrupt_signal(self, signum, regexps=[], quit_timeout=None):
     """Send a signal to the thin pailgun client and observe the error messaging.
 
     :param int signum: The signal to send.
-    :param str single_msg: If provided, the string must exactly match the contents of stderr.
-    :param messages: Assert that all of these strings are contained in stderr.
-    :type messages: list of str
     :param regexps: Assert that all of these regexps match somewhere in stderr.
     :type regexps: list of str
     :param float quit_timeout: The duration of time to wait for the pailgun client to flush all of
@@ -458,10 +453,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
 
-      if single_msg is not None:
-        self.assertEqual(single_msg, waiter_run.stderr_data)
-      for msg in messages:
-        self.assertIn(msg, waiter_run.stderr_data)
       for regexp in regexps:
         assertRegex(self, waiter_run.stderr_data, regexp)
 
@@ -475,24 +466,23 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
   def test_pantsd_sigterm(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGTERM,
-      messages=[
-        "\nSignal {signum} (SIGTERM) was raised. Exiting with failure.\n"
-        .format(signum=signal.SIGTERM),
-      ],
-      regexps=["""
+      regexps=[
+        re.escape("\nSignal {signum} (SIGTERM) was raised. Exiting with failure.\n"
+                  .format(signum=signal.SIGTERM)),
+        """
 Interrupted by user:
 Interrupted by user over pailgun client!
-$"""],
+$"""
+      ],
       quit_timeout=5.0)
 
   def test_pantsd_sigquit(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGQUIT,
-      messages=[
-        "\nSignal {signum} (SIGQUIT) was raised. Exiting with failure.\n"
-        .format(signum=signal.SIGQUIT),
-      ],
-      regexps=["""
+      regexps=[
+        re.escape("\nSignal {signum} (SIGQUIT) was raised. Exiting with failure.\n"
+                  .format(signum=signal.SIGQUIT)),
+        """
 Interrupted by user:
 Interrupted by user over pailgun client!
 $"""],
@@ -501,11 +491,11 @@ $"""],
   def test_pantsd_sigint(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
-      single_msg="""\
-Interrupted by user.
+      regexps=["""\
+^Interrupted by user.
 Interrupted by user:
 Interrupted by user over pailgun client!
-""",
+$"""],
       quit_timeout=5.0)
 
   def test_signal_pailgun_stream_timeout(self):
