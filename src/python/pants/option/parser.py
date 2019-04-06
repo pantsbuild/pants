@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
+import json
 import os
 import re
 import traceback
@@ -12,6 +13,7 @@ from builtins import next, object, open, str
 from collections import defaultdict
 
 import six
+import yaml
 
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
@@ -453,6 +455,7 @@ class Parser(object):
             .format(type_arg.__name__, val_str, dest, self._scope_str(), e))
 
     # Helper function to expand a fromfile=True value string, if needed.
+    # May return a string or a dict/list decoded from a json/yaml file.
     def expand(val_str):
       if kwargs.get('fromfile', False) and val_str and val_str.startswith('@'):
         if val_str.startswith('@@'):   # Support a literal @ for fromfile values via @@.
@@ -461,8 +464,14 @@ class Parser(object):
           fromfile = val_str[1:]
           try:
             with open(fromfile, 'r') as fp:
-              return fp.read().strip()
-          except IOError as e:
+              s = fp.read().strip()
+              if fromfile.endswith('.json'):
+                return json.loads(s)
+              elif fromfile.endswith('.yml') or fromfile.endswith('.yaml'):
+                return yaml.safe_load(s)
+              else:
+                return s
+          except (IOError, ValueError, yaml.YAMLError) as e:
             raise self.FromfileError('Failed to read {} in {} from file {}: {}'.format(
                 dest, self._scope_str(), fromfile, e))
       else:
@@ -471,8 +480,8 @@ class Parser(object):
     # Get value from config files, and capture details about its derivation.
     config_details = None
     config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
-    config_default_val_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
-    config_val_str = expand(self._config.get(config_section, dest, default=None))
+    config_default_val_or_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
+    config_val_or_str = expand(self._config.get(config_section, dest, default=None))
     config_source_file = (self._config.get_source_for_option(config_section, dest) or
         self._config.get_source_for_option(Config.DEFAULT_SECTION, dest))
     if config_source_file is not None:
@@ -495,12 +504,12 @@ class Parser(object):
       sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub('_', self._scope.upper())
       env_vars = ['PANTS_{0}_{1}'.format(sanitized_env_var_scope, udest)]
 
-    env_val_str = None
+    env_val_or_str = None
     env_details = None
     if self._env:
       for env_var in env_vars:
         if env_var in self._env:
-          env_val_str = expand(self._env.get(env_var))
+          env_val_or_str = expand(self._env.get(env_var))
           env_details = 'from env var {}'.format(env_var)
           break
 
@@ -527,8 +536,8 @@ class Parser(object):
     # is idempotent, so this is OK.
 
     values_to_rank = [to_value_type(x) for x in
-                      [flag_val, env_val_str, config_val_str,
-                       config_default_val_str, kwargs.get('default'), None]]
+                      [flag_val, env_val_or_str, config_val_or_str,
+                       config_default_val_or_str, kwargs.get('default'), None]]
     # Note that ranked_vals will always have at least one element, and all elements will be
     # instances of RankedValue (so none will be None, although they may wrap a None value).
     ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))

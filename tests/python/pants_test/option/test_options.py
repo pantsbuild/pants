@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import io
+import json
 import os
 import shlex
 from builtins import open, str
@@ -12,6 +13,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 import mock
+import yaml
 from future.utils import text_type
 from packaging.version import Version
 
@@ -1223,6 +1225,28 @@ class OptionsTest(TestBase):
                          env={'PANTS_FROMFILE_{}'.format(dest.upper()): '@{}'.format(fromfile)})
 
     self.assert_fromfile(parse_func)
+
+  def test_fromfile_json(self):
+    def parse_func(dest, fromfile):
+      return self._parse('./pants fromfile --{}=@{}'.format(dest.replace('_', '-'), fromfile))
+
+    val = {'a': {'b': 1}, 'c': [2, 3]}
+    with temporary_file(suffix='.json', binary_mode=False) as fp:
+      json.dump(val, fp)
+      fp.close()
+      options = self._parse('./pants fromfile --{}=@{}'.format('dictvalue', fp.name))
+      self.assertEqual(val, options.for_scope('fromfile')['dictvalue'])
+
+  def test_fromfile_yaml(self):
+    def parse_func(dest, fromfile):
+      return self._parse('./pants fromfile --{}=@{}'.format(dest.replace('_', '-'), fromfile))
+
+    val = {'a': {'b': 1}, 'c': [2, 3]}
+    with temporary_file(suffix='.yaml', binary_mode=False) as fp:
+      yaml.safe_dump(val, fp)
+      fp.close()
+      options = self._parse('./pants fromfile --{}=@{}'.format('dictvalue', fp.name))
+      self.assertEqual(val, options.for_scope('fromfile')['dictvalue'])
 
   def test_fromfile_error(self):
     options = self._parse('./pants fromfile --string=@/does/not/exist')
