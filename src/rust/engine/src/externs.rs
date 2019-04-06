@@ -500,19 +500,19 @@ pub struct Ident {
   pub type_id: TypeId,
 }
 
-pub trait RawBuffer<T, O> {
-  fn ptr(&self) -> *mut T;
+pub trait RawBuffer<Raw, Output> {
+  fn ptr(&self) -> *mut Raw;
   fn len(&self) -> u64;
 
   ///
   /// A buffer-specific shallow clone operation (possibly just implemented via clone).
   ///
-  fn lift(t: &T) -> O;
+  fn lift(t: &Raw) -> Output;
 
   ///
   /// Returns a Vec copy of the buffer contents.
   ///
-  fn to_vec(&self) -> Vec<O> {
+  fn to_vec(&self) -> Vec<Output> {
     with_vec(self.ptr(), self.len() as usize, |vec| {
       vec.iter().map(Self::lift).collect()
     })
@@ -521,7 +521,7 @@ pub trait RawBuffer<T, O> {
   ///
   /// Asserts that the buffer contains one item, and returns a copy of it.
   ///
-  fn unwrap_one(&self) -> O {
+  fn unwrap_one(&self) -> Output {
     assert!(
       self.len() == 1,
       "Expected exactly 1 item in Buffer, but had: {}",
