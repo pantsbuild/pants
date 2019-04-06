@@ -119,7 +119,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # TODO(#7203): make a regexp option type!
     register('--ignore-pants-warnings', type=list, member_type=str, default=[],
              help='Regexps matching warning strings to ignore, e.g. '
-                  '["DEPRECATED: scope some_scope will be removed"]. '
+                  '["DEPRECATED: scope some_scope will be removed"]. The regexps will be matched '
+                  'from the start of the warning string, and will always be case-insensitive. '
                   'See the `warnings` module documentation for more background on these are used.')
 
     register('--pants-version', advanced=True, default=pants_version(),
