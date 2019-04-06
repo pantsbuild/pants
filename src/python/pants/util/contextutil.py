@@ -407,7 +407,7 @@ def http_server(handler_class):
 
 @contextmanager
 def recursion_limit(limit):
-  """Temporarily modify the allowed recursion limit.
+  """Temporarily modify the allowed recursion limit (typically this defaults to 1000).
 
   This method is intended to be used when serializing deeply nested structures such as dicts which
   otherwise would raise a recursion error. It will not fix recursion errors due to cyclic
