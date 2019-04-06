@@ -658,9 +658,15 @@ function build_pex() {
     platform_flags=("${platform_flags[@]}" "--platform=${platform}")
   done
 
+  interpreter_constraint="CPython==2.7.*"
+  if [[ "${python_three:-false}" == "true" ]]; then
+    interpreter_constraint="CPython==3.6.*"
+  fi
+
   execute_pex \
     -o "${dest}" \
     --script=pants \
+    --interpreter-constraint="${interpreter_constraint}" \
     "${platform_flags[@]}" \
     "${requirements[@]}"
 
