@@ -183,7 +183,7 @@ class HelpInfoExtracter(object):
                          scoped_cmd_line_args=scoped_cmd_line_args,
                          unscoped_cmd_line_args=unscoped_cmd_line_args,
                          typ=typ,
-                         fromfile=kwargs.get('fromfile', False),
+                         fromfile=kwargs.get('fromfile', True),
                          default=default,
                          help=help_msg,
                          deprecated_message=deprecated_message,

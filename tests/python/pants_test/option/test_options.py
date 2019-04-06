@@ -1041,8 +1041,8 @@ class OptionsTest(TestBase):
 
     options = self._parse('./pants',
                           env={
-                            'PANTS_A': 100,
-                            'PANTS_COMPILE_A': 99})
+                            'PANTS_A': '100',
+                            'PANTS_COMPILE_A': '99'})
     self.assertEqual(100, options.for_global_scope().a)
     self.assertEqual(99, options.for_scope('compile').a)
     self.assertEqual(99, options.for_scope('compile.java').a)
@@ -1058,7 +1058,7 @@ class OptionsTest(TestBase):
 
     # Command line has precedence over environment.
     options = self._parse('./pants compile --a=99',
-                          env={'PANTS_A': 100}, )
+                          env={'PANTS_A': '100'}, )
     self.assertEqual(100, options.for_global_scope().a)
     self.assertEqual(99, options.for_scope('compile').a)
     self.assertEqual(99, options.for_scope('compile.java').a)
@@ -1068,14 +1068,14 @@ class OptionsTest(TestBase):
                           config={
                             'DEFAULT': {'a': 100},
                           },
-                          env={'PANTS_COMPILE_A': 99}, )
+                          env={'PANTS_COMPILE_A': '99'}, )
     self.assertEqual(100, options.for_global_scope().a)
     self.assertEqual(99, options.for_scope('compile').a)
     self.assertEqual(99, options.for_scope('compile.java').a)
 
     # Command line global overrides the middle scope setting in then env.
     options = self._parse('./pants --a=100',
-                          env={'PANTS_COMPILE_A': 99}, )
+                          env={'PANTS_COMPILE_A': '99'}, )
     self.assertEqual(100, options.for_global_scope().a)
     self.assertEqual(100, options.for_scope('compile').a)
     self.assertEqual(100, options.for_scope('compile.java').a)
@@ -1094,7 +1094,7 @@ class OptionsTest(TestBase):
                           config={
                             'compile': {'a': 99},
                           },
-                          env={'PANTS_A': 100}, )
+                          env={'PANTS_A': '100'}, )
     self.assertEqual(100, options.for_global_scope().a)
     self.assertEqual(100, options.for_scope('compile').a)
     self.assertEqual(100, options.for_scope('compile.java').a)
