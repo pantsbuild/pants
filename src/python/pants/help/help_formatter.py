@@ -72,11 +72,9 @@ class HelpFormatter(object):
     """
     lines = []
     choices = 'one of: [{}] '.format(ohi.choices) if ohi.choices else ''
-    arg_line = ('{args} {fromfile}{dflt}'
+    arg_line = ('{args} {dflt}'
                 .format(args=self._maybe_cyan(', '.join(ohi.display_args)),
-                        dflt=self._maybe_green('({}default: {})'.format(choices, ohi.default)),
-                        fromfile=self._maybe_green('(@fromfile value supported) ' if ohi.fromfile
-                                                   else '')))
+                        dflt=self._maybe_green('({}default: {})'.format(choices, ohi.default))))
     lines.append(arg_line)
 
     indent = '    '
