@@ -288,7 +288,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='The host to bind the pants nailgun server to.')
     register('--pantsd-pailgun-port', advanced=True, type=int, default=0,
              help='The port to bind the pants nailgun server to. Defaults to a random port.')
-    register('--pantsd-pailgun-quit-timeout', advanced=True, type=float, default=1.0,
+    # TODO(#7514): Make this default to 1.0 seconds if stdin is a tty!
+    register('--pantsd-pailgun-quit-timeout', advanced=True, type=float, default=5.0,
              help='The length of time (in seconds) to wait for further output after sending a '
                   'signal to the remote pantsd-runner process before killing it.')
     register('--pantsd-log-dir', advanced=True, default=None,
