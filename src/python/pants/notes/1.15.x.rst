@@ -3,6 +3,24 @@
 This document describes releases leading up to the ``1.15.x`` ``stable`` series.
 
 
+1.15.0rc3 (4/08/2019)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Pass interpreter constraints to the Pex we release (#7511)
+  `PR #7511 <https://github.com/pantsbuild/pants/pull/7511>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Install Python 2.7 and 3.6 on Centos6 base image through Pyenv (#7064)
+  `PR #7064 <https://github.com/pantsbuild/pants/pull/7064>`_
+
+* Prepare Linux UCS2 shard for upgrade to Centos6 base image in #7064 (#7418)
+  `PR #7418 <https://github.com/pantsbuild/pants/pull/7418>`_
+
 1.15.0rc2 (4/02/2019)
 ---------------------
 
