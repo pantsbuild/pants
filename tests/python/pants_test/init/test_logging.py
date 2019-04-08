@@ -36,7 +36,7 @@ class LoggingTest(TestBase):
       file_logger.info(cat)
       file_logger.info("DWH2")
       import time
-      time.sleep(5)
+      # time.sleep(5)
       with open(log_file, "r") as fp:
         contents = fp.read()
         self.assertIn(cat, contents)
