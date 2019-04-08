@@ -32,7 +32,11 @@ class LoggingTest(TestBase):
   def test_utf8_logging(self):
     with self.logger('INFO') as (file_logger, log_file):
       cat = "🐈"
+      file_logger.info("DWH1")
       file_logger.info(cat)
+      file_logger.info("DWH2")
+      import time
+      time.sleep(5)
       with open(log_file, "r") as fp:
         contents = fp.read()
         self.assertIn(cat, contents)
