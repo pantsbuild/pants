@@ -12,7 +12,7 @@ from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.objects import Collection
-from pants.engine.rules import rule, optionable_rule, console_rule
+from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.subsystem.subsystem import Subsystem
@@ -24,7 +24,7 @@ class DetailLevel(enum(['none', 'summary', 'nonmatching', 'all'])):
 
   none: Emit nothing.
   summary: Emit a summary only.
-  nonmatched: Emit details for source files that failed to match at least one required pattern.
+  nonmatching: Emit details for source files that failed to match at least one required pattern.
   all: Emit details for all source files.
   """
   pass
@@ -232,7 +232,7 @@ def validate(console, regex_match_results, source_file_validation):
 def match_regexes(hydrated_targets, source_file_regexes):
   multi_matcher = source_file_regexes.get_multi_matcher()
   res = []
-  for tgt in hydrated_targets.dependencies:
+  for tgt in hydrated_targets:
     if hasattr(tgt.adaptor, 'sources'):
       files_content = yield Get(FilesContent,
                                 Digest, tgt.adaptor.sources.snapshot.directory_digest)
