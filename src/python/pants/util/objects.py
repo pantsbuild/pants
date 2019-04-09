@@ -7,12 +7,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import re
 from abc import abstractmethod
 from builtins import zip
-from collections import namedtuple
 
-import six
+from future.utils import binary_type, text_type
 from twitter.common.collections import OrderedSet
 
-from pants.util.collections_abc_backport import Iterable, OrderedDict
+from pants.util.collections_abc_backport import Iterable, OrderedDict, namedtuple
 from pants.util.memo import memoized_classproperty
 from pants.util.meta import AbstractClass, classproperty
 
@@ -26,6 +25,8 @@ class TypeCheckError(TypeError):
     super(TypeCheckError, self).__init__(formatted_msg, *args, **kwargs)
 
 
+# TODO: remove the `.type_check_error_type` property in `DatatypeMixin` and just have mixers
+# override a class object!
 class TypedDatatypeInstanceConstructionError(TypeCheckError):
   """Raised when a datatype()'s fields fail a type check upon construction."""
 
@@ -121,7 +122,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
             "field '{}' was invalid: {}".format(field_name, e))
       if type_failure_msgs:
         raise cls.make_type_error(
-          'errors type checking constructor arguments:\n{}'
+          'error(s) type checking constructor arguments:\n{}'
           .format('\n'.join(type_failure_msgs)))
 
       return this_object
@@ -367,7 +368,7 @@ def enum(all_values):
   # Python requires creating an explicit closure to save the value on each loop iteration.
   accessor_generator = lambda case: lambda cls: cls(case)
   for case in all_values_realized:
-    if isinstance(case, six.string_types):
+    if _string_type_constraint.satisfied_by(case):
       accessor = classproperty(accessor_generator(case))
       attr_name = re.sub(r'-', '_', case)
       setattr(ChoiceDatatype, attr_name, accessor)
@@ -375,7 +376,7 @@ def enum(all_values):
   return ChoiceDatatype
 
 
-# TODO: make these members of the `TypeConstraint` class!
+# TODO: make this error into an attribute on the `TypeConstraint` class object!
 class TypeConstraintError(TypeError):
   """Indicates a :class:`TypeConstraint` violation."""
 
@@ -519,13 +520,16 @@ class SubclassesOf(TypeOnlyConstraint):
     return issubclass(obj_type, self._types)
 
 
+_string_type_constraint = SubclassesOf(binary_type, text_type)
+
+
 class TypedCollection(TypeConstraint):
   """A `TypeConstraint` which accepts a TypeOnlyConstraint and validates a collection."""
 
   _iterable_constraint = SubclassesOf(Iterable)
   # strings in Python are considered iterables of substrings, but we only want to allow explicit
   # collection types.
-  _exclude_iterable_constraint = SubclassesOf(*six.string_types)
+  _exclude_iterable_constraint = _string_type_constraint
 
   def __init__(self, constraint):
     """Create a `TypeConstraint` which validates each member of a collection with `constraint`.
