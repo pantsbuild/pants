@@ -162,5 +162,4 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
         'test_pants_plugin/tasks/',
         'test_pants_plugin/tasks/__init__.py',
         'test_pants_plugin/tasks/deprecation_warning_task.py',
-        'test_pants_plugin/tasks/lifecycle_stub_task.py',
-      ])
+        'test_pants_plugin/tasks/lifecycle_stub_task.py'])
