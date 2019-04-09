@@ -18,8 +18,6 @@ lazy_static! {
 
 pub struct Logger {
   pantsd_log: Mutex<MaybeWriteLogger<File>>,
-  // TODO We may want to replace this with logging to an arbitrary file descriptor,
-  // but we never need it right now.
   stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
 }
 

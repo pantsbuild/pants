@@ -215,7 +215,7 @@ if [[ "${run_python:-false}" == "true" ]]; then
   (
     ./pants.pex --tag='-integration' test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
-      tests/python:: -- ${PYTEST_PASSTHRU_ARGS} -s -k test_utf8_logging
+      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Core python test failure"
   end_travis_section
 fi

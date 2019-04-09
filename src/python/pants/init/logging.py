@@ -50,6 +50,10 @@ def init_rust_logger(level):
 
 
 def setup_logging_to_stderr(python_logger, level):
+  """
+  We setup logging as loose as possible from the Python side,
+  and let Rust do the filtering.
+  """
   native = Native()
   levelno = get_numeric_level(level)
   handler = create_native_stderr_log_handler(levelno, native, stream=sys.stderr)
