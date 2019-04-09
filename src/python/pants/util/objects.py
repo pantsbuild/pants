@@ -7,12 +7,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import re
 from abc import abstractmethod
 from builtins import zip
-from collections import namedtuple
 
-import six
+from future.utils import binary_type, text_type
 from twitter.common.collections import OrderedSet
 
-from pants.util.collections_abc_backport import Iterable, OrderedDict
+from pants.util.collections_abc_backport import Iterable, OrderedDict, namedtuple
 from pants.util.memo import memoized_classproperty
 from pants.util.meta import AbstractClass, classproperty
 
@@ -26,6 +25,8 @@ class TypeCheckError(TypeError):
     super(TypeCheckError, self).__init__(formatted_msg, *args, **kwargs)
 
 
+# TODO: remove the `.type_check_error_type` property in `DatatypeMixin` and just have mixers
+# override a class object!
 class TypedDatatypeInstanceConstructionError(TypeCheckError):
   """Raised when a datatype()'s fields fail a type check upon construction."""
 
@@ -121,7 +122,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
             "field '{}' was invalid: {}".format(field_name, e))
       if type_failure_msgs:
         raise cls.make_type_error(
-          'errors type checking constructor arguments:\n{}'
+          'error(s) type checking constructor arguments:\n{}'
           .format('\n'.join(type_failure_msgs)))
 
       return this_object
@@ -367,7 +368,7 @@ def enum(all_values):
   # Python requires creating an explicit closure to save the value on each loop iteration.
   accessor_generator = lambda case: lambda cls: cls(case)
   for case in all_values_realized:
-    if isinstance(case, six.string_types):
+    if _string_type_constraint.satisfied_by(case):
       accessor = classproperty(accessor_generator(case))
       attr_name = re.sub(r'-', '_', case)
       setattr(ChoiceDatatype, attr_name, accessor)
@@ -375,7 +376,7 @@ def enum(all_values):
   return ChoiceDatatype
 
 
-# TODO: make these members of the `TypeConstraint` class!
+# TODO: make this error into an attribute on the `TypeConstraint` class object!
 class TypeConstraintError(TypeError):
   """Indicates a :class:`TypeConstraint` violation."""
 
@@ -519,10 +520,16 @@ class SubclassesOf(TypeOnlyConstraint):
     return issubclass(obj_type, self._types)
 
 
+_string_type_constraint = SubclassesOf(binary_type, text_type)
+
+
 class TypedCollection(TypeConstraint):
   """A `TypeConstraint` which accepts a TypeOnlyConstraint and validates a collection."""
 
   _iterable_constraint = SubclassesOf(Iterable)
+  # strings in Python are considered iterables of substrings, but we only want to allow explicit
+  # collection types.
+  _exclude_iterable_constraint = _string_type_constraint
 
   def __init__(self, constraint):
     """Create a `TypeConstraint` which validates each member of a collection with `constraint`.
@@ -542,12 +549,15 @@ class TypedCollection(TypeConstraint):
 
     super(TypedCollection, self).__init__(description=description)
 
+  def _is_iterable(self, obj):
+    return (self._iterable_constraint.satisfied_by(obj)
+            and not self._exclude_iterable_constraint.satisfied_by(obj))
+
   # TODO: consider making this a private method of TypeConstraint, as it now duplicates the logic in
   # self.validate_satisfied_by()!
   def satisfied_by(self, obj):
-    if self._iterable_constraint.satisfied_by(obj):
-      return all(self._constraint.satisfied_by(el) for el in obj)
-    return False
+    return (self._is_iterable(obj)
+            and all(self._constraint.satisfied_by(el) for el in obj))
 
   def make_collection_type_constraint_error(self, base_obj, el):
     base_error = self.make_type_constraint_error(el, self._constraint)
@@ -555,15 +565,15 @@ class TypedCollection(TypeConstraint):
                                .format(self, base_obj, base_error))
 
   def validate_satisfied_by(self, obj):
-    if self._iterable_constraint.satisfied_by(obj):
-      for el in obj:
-        if not self._constraint.satisfied_by(el):
-          raise self.make_collection_type_constraint_error(obj, el)
-      return obj
-
-    base_iterable_error = self.make_type_constraint_error(obj, self._iterable_constraint)
-    raise TypeConstraintError(
-      "in wrapped constraint {}: {}".format(self, base_iterable_error))
+    if not self._is_iterable(obj):
+      base_iterable_error = self.make_type_constraint_error(obj, self._iterable_constraint)
+      raise TypeConstraintError(
+        "in wrapped constraint {}: {}\nNote that objects matching {} are not considered iterable."
+        .format(self, base_iterable_error, self._exclude_iterable_constraint))
+    for el in obj:
+      if not self._constraint.satisfied_by(el):
+        raise self.make_collection_type_constraint_error(obj, el)
+    return obj
 
   def __hash__(self):
     return hash((type(self), self._constraint))

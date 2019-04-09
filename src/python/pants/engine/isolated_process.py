@@ -10,7 +10,7 @@ from future.utils import binary_type, text_type
 
 from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
-from pants.util.objects import Exactly, TypeCheckError, datatype
+from pants.util.objects import Exactly, TypedCollection, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -19,18 +19,20 @@ _default_timeout_seconds = 15 * 60
 
 
 class ExecuteProcessRequest(datatype([
-  ('argv', tuple),
+  ('argv', TypedCollection(Exactly(text_type))),
   ('input_files', Digest),
   ('description', text_type),
-  ('env', tuple),
-  ('output_files', tuple),
-  ('output_directories', tuple),
+  ('env', TypedCollection(Exactly(text_type))),
+  ('output_files', TypedCollection(Exactly(text_type))),
+  ('output_directories', TypedCollection(Exactly(text_type))),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
   ('jdk_home', Exactly(text_type, type(None))),
 ])):
   """Request for execution with args and snapshots to extract."""
 
+  # TODO: add a method to hack together a `process_executor` invocation command line which
+  # reproduces this process execution request to make debugging remote executions effortless!
   def __new__(
     cls,
     argv,
@@ -46,13 +48,8 @@ class ExecuteProcessRequest(datatype([
       env = ()
     else:
       if not isinstance(env, dict):
-        raise TypeCheckError(
-          cls.__name__,
-          "arg 'env' was invalid: value {} (with type {}) must be a dict".format(
-            env,
-            type(env)
-          )
-        )
+        raise cls.make_type_error(
+          "arg 'env' was invalid: value {} (with type {}) must be a dict".format(env, type(env)))
       env = tuple(item for pair in env.items() for item in pair)
 
     return super(ExecuteProcessRequest, cls).__new__(
