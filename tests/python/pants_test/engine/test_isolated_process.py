@@ -205,9 +205,12 @@ class ExecuteProcessRequestTest(unittest.TestCase):
       self.assertTrue(False, "should be able to construct without error")
 
     with self.assertRaises(TypeCheckError):
-      self._default_args_execute_process_request(argv=['1'])
+      self._default_args_execute_process_request(argv=1)
     with self.assertRaises(TypeCheckError):
-      self._default_args_execute_process_request(argv=('1',), env=['foo', 'bar'])
+      self._default_args_execute_process_request(argv='1')
+    with self.assertRaises(TypeCheckError):
+      self._default_args_execute_process_request(argv=('1',), env='foo=bar')
+
 
     with self.assertRaisesRegexp(TypeCheckError, "env"):
       ExecuteProcessRequest(
