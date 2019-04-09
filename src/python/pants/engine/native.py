@@ -688,6 +688,9 @@ class Native(Singleton):
     target = target.encode("utf-8")
     return self.lib.write_log(msg, level, target)
 
+  def flush_log(self):
+    return self.lib.flush_log()
+
   def match_path_globs(self, path_globs, paths):
     path_globs = self.context.to_value(path_globs)
     paths_buf = self.context.utf8_buf_buf(tuple(paths))

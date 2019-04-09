@@ -78,7 +78,7 @@ use crate::tasks::Tasks;
 use crate::types::Types;
 use futures::Future;
 use hashing::Digest;
-use log::error;
+use log::{error, Log};
 use logging::logger::LOGGER;
 use logging::Logger;
 
@@ -844,6 +844,11 @@ pub extern "C" fn write_log(msg: *const raw::c_char, level: u64, target: *const 
   LOGGER
     .log_from_python(message_str.borrow(), level, target_str.borrow())
     .expect("Error logging message");
+}
+
+#[no_mangle]
+pub extern "C" fn flush_log() {
+  LOGGER.flush();
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

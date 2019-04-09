@@ -75,6 +75,9 @@ class NativeHandler(StreamHandler):
   def emit(self, record):
     self.native.write_log(self.format(record), record.levelno, "{}:pid={}".format(record.name, os.getpid()))
 
+  def flush(self):
+    self.native.flush_log()
+
 
 def create_native_pantsd_file_log_handler(level, native, native_filename):
   try:

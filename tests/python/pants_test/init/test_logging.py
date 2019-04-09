@@ -26,60 +26,26 @@ class LoggingTest(TestBase):
     native = self.scheduler._scheduler._native
     logger = logging.getLogger('my_file_logger')
     with temporary_dir() as log_dir:
-      log_file = setup_logging(level, log_dir=log_dir, scope=logger.name, native=native)
-      yield logger, log_file.log_filename
+      logging_setup_result = setup_logging(level, log_dir=log_dir, scope=logger.name, native=native)
+      yield logger, logging_setup_result
 
   def test_utf8_logging(self):
-    with self.logger('INFO') as (file_logger, log_file):
-      cat = "🐈"
-      #file_logger.info("DWH1")
-      file_logger.info(cat)
-      #file_logger.info("DWH2")
-      #import time
-      # time.sleep(5)
-      with open(log_file, "r") as fp:
-        contents = fp.read()
-        self.assertIn(cat, contents)
-
-  def test_utf8_logging2(self):
-    with self.logger('INFO') as (file_logger, log_file):
+    with self.logger('INFO') as (file_logger, logging_setup_result):
       cat = "🐈"
       file_logger.info(cat)
-      with open(log_file, "r") as fp:
-        contents = fp.read()
-        self.assertIn(cat, contents)
-
-  def test_utf8_logging3(self):
-    with self.logger('INFO') as (file_logger, log_file):
-      cat = "🐈"
-      file_logger.info(cat)
-      with open(log_file, "r") as fp:
-        contents = fp.read()
-        self.assertIn(cat, contents)
-
-  def test_utf8_logging4(self):
-    with self.logger('INFO') as (file_logger, log_file):
-      cat = "🐈"
-      file_logger.info(cat)
-      with open(log_file, "r") as fp:
-        contents = fp.read()
-        self.assertIn(cat, contents)
-
-  def test_utf8_logging5(self):
-    with self.logger('INFO') as (file_logger, log_file):
-      cat = "🐈"
-      file_logger.info(cat)
-      with open(log_file, "r") as fp:
+      logging_setup_result.log_handler.flush()
+      with open(logging_setup_result.log_filename, "r") as fp:
         contents = fp.read()
         self.assertIn(cat, contents)
 
   def test_file_logging(self):
-    with self.logger('INFO') as (file_logger, log_file):
+    with self.logger('INFO') as (file_logger, logging_setup_result):
       file_logger.warn('this is a warning')
       file_logger.info('this is some info')
       file_logger.debug('this is some debug info')
+      logging_setup_result.log_handler.flush()
 
-      with open(log_file, 'r') as fp:
+      with open(logging_setup_result.log_filename, 'r') as fp:
         loglines = fp.read().splitlines()
         self.assertEqual(2, len(loglines))
         self.assertIn("[WARN] this is a warning", loglines[0])
