@@ -173,7 +173,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       - The number of mislabeled tests is currently small (~20 tests).
       - Those tests will still run, just with pantsd disabled.
     """
-    return True
+    return os.getenv("TRAVIS_AND_PANTS_INTEGRATION_TESTS_SHOULD_HAVE_PANTSD") is True
 
   @classmethod
   def hermetic(cls):
