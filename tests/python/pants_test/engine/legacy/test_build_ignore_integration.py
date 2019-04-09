@@ -8,11 +8,20 @@ import os
 import tempfile
 from builtins import open
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
   """Tests the functionality of the build_ignore_patterns option in pants.ini ."""
+
+  @classmethod
+  def should_configure_pantsd(cls):
+    """
+    Some of the tests here expect to read the standard error after an intentional failure.
+    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
+    So stderr appears empty. (see #7320)
+    """
+    return False
 
   def test_build_ignore_patterns_pants_ini(self):
     def output_to_list(output_filename):
@@ -60,16 +69,6 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:there-was-a-duck',
                      results)
 
-  @daemon_blacklist("""
-  This expects to read the standard error after an intentional failure.
-  However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
-  So stderr appears empty.
-  
-  CLI To repro locally (with this annotation removed):
-  PANTS_ENABLE_PANTSD=true ./pants test \
-   tests/python/pants_test/engine/legacy:build_ignore_integration -- \
-   -s -k test_build_ignore_dependency
-  """)
   def test_build_ignore_dependency(self):
     run_result = self.run_pants(['-q',
                                  'list',

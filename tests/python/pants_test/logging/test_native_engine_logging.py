@@ -4,12 +4,21 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 
 
 class NativeEngineLoggingTest(PantsRunIntegrationTest):
-  @daemon_blacklist('TODO: Pantsd swallows logs into its log file, so stderr will be empty. (#7320).')
+
+  @classmethod
+  def should_configure_pantsd(cls):
+    """
+    Some of the tests here expect to read the standard error after an intentional failure.
+    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
+    So stderr appears empty. (see #7320)
+    """
+    return False
+
   def test_native_logging(self):
 
     pants_run = self.run_pants([

@@ -11,10 +11,19 @@ from future.utils import PY2
 
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class GraphIntegrationTest(PantsRunIntegrationTest):
+
+  @classmethod
+  def should_configure_pantsd(cls):
+    """
+    Some of the tests here expect to read the standard error after an intentional failure.
+    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
+    So stderr appears empty. (see #7320)
+    """
+    return False
 
   _SOURCES_TARGET_BASE = 'testprojects/src/python/sources'
 
@@ -96,15 +105,6 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     for excerpt in expected_excerpts:
       self.assertIn(excerpt, pants_run.stderr_data)
 
-  @daemon_blacklist("""
-  This expects to read the standard error after an intentional failure.
-  However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
-  So stderr appears empty.
-
-  CLI To repro locally (with this annotation removed):
-  PANTS_ENABLE_PANTSD=true ./pants test tests/python/pants_test/engine/legacy:graph_integration -- \
-   -s -k test_missing_sources_warnings
-  """)
   def test_missing_sources_warnings(self):
     for target_name in self._SOURCES_ERR_MSGS.keys():
       self._list_target_check_warnings_sources(target_name)
@@ -119,15 +119,6 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertNotIn("WARN]", pants_run.stderr_data)
 
-  @daemon_blacklist("""
-  This expects to read the standard error after an intentional failure.
-  However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
-  So stderr appears empty.
-
-  CLI To repro locally (with this annotation removed):
-  PANTS_ENABLE_PANTSD=true ./pants test tests/python/pants_test/engine/legacy:graph_integration -- \
-   -s -k test_missing_bundles_warnings
-  """)
   def test_missing_bundles_warnings(self):
     target_full = '{}:missing-bundle-fileset'.format(self._BUNDLE_TARGET_BASE)
     pants_run = self.run_pants(['list', target_full], config={

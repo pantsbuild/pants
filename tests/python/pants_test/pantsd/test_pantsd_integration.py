@@ -15,8 +15,7 @@ from builtins import open, range, zip
 
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
-from pants_test.pants_run_integration_test import (daemon_blacklist,
-                                                   no_pantsd_shutdown_between_runs, read_pantsd_log)
+from pants_test.pants_run_integration_test import read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
 from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
@@ -45,14 +44,12 @@ def launch_file_toucher(f):
 
 class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
-  @no_pantsd_shutdown_between_runs("Keep pantsd alive between runs inside the same test.")
   def test_pantsd_compile(self):
     with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, _, _):
       # This tests a deeper pantsd-based run by actually invoking a full compile.
       pantsd_run(['compile', 'examples/src/scala/org/pantsbuild/example/hello/welcome'])
       checker.assert_started()
 
-  @no_pantsd_shutdown_between_runs("Keep pantsd alive between runs inside the same test.")
   def test_pantsd_run(self):
     extra_config = {
       'GLOBAL': {
@@ -227,7 +224,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     for run_pairs in zip(non_daemon_runs, daemon_runs):
       self.assertEqual(*(run.stdout_data for run in run_pairs))
 
-  @no_pantsd_shutdown_between_runs("Keep pantsd alive between runs inside the same test.")
   def test_pantsd_filesystem_invalidation(self):
     """Runs with pantsd enabled, in a loop, while another thread invalidates files."""
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
@@ -502,10 +498,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         # The pantsd-runner processes should be dead, and they should have exited with 1.
         self.assertFalse(proc.is_running())
 
-  @skip_if_tests_are_hermetic(
-    PantsDaemonIntegrationTestBase,
-    "TODO: For some reason, this only works when" +
-    "PANTS_ENABLE_PANTSD is not set in the calling run, even though it's hermetic.")
   def test_pantsd_sigterm(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGTERM,

@@ -83,6 +83,11 @@ class PantsDaemonMonitor(ProcessManager):
 
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
 
+  @classmethod
+  def should_configure_pantsd(cls):
+    """We set our own ad-hoc pantsd configuration in most of these tests"""
+    return False
+
   @contextmanager
   def pantsd_test_context(self, log_level='info', extra_config=None):
     with no_lingering_process_by_command('pantsd-runner') as runner_process_context:

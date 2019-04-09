@@ -12,11 +12,18 @@ from builtins import open
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, daemon_blacklist
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.py2_compat import assertRegex
 
 
 class BuildLocalPythonDistributionsIntegrationTest(PantsRunIntegrationTest):
+
+  @classmethod
+  def should_configure_pantsd(cls):
+    """TODO: See the point about watchman in #7320.
+    """
+    return False
+
   hello_install_requires_dir = 'testprojects/src/python/python_distribution/hello_with_install_requires'
   hello_setup_requires = 'examples/src/python/example/python_distribution/hello/setup_requires'
   py_dist_test = 'testprojects/tests/python/example_test/python_distribution'
@@ -59,7 +66,6 @@ United States
       # Check that text was properly printed to stdout.
       self._assert_nation_and_greeting(pants_run.stdout_data)
 
-  @daemon_blacklist('TODO: See #7320.')
   def test_pydist_invalidation(self):
     """Test that the current version of a python_dist() is resolved after modifying its sources."""
     hello_run = '{}:main_with_no_conflict'.format(self.hello_install_requires_dir)

@@ -13,7 +13,6 @@ from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open, safe_rmtree
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
-from pants_test.pants_run_integration_test import daemon_blacklist
 
 
 class Compile(namedtuple('Compile', ['srcfiles', 'config', 'artifact_count'])):
@@ -21,6 +20,12 @@ class Compile(namedtuple('Compile', ['srcfiles', 'config', 'artifact_count'])):
 
 
 class CacheCompileIntegrationTest(BaseCompileIT):
+
+  @classmethod
+  def should_configure_pantsd(cls):
+    """TODO: See the point about watchman in #7320.
+    """
+    return False
 
   def run_compile(self, target_spec, config, workdir):
     args = ['compile', target_spec]
@@ -165,8 +170,6 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.assertEqual(sorted(classfiles(w) for w in target_workdirs if w != 'current'),
                         sorted([['A.class', 'Main.class'], ['A.class', 'NotMain.class']]))
 
-  @daemon_blacklist('Watchman is crashing because we switch buildroots '
-                    'and/or create wordirs within tempdirs')
   def test_analysis_portability(self):
     # Tests that analysis can be relocated between workdirs and still result in incremental
     # compile.

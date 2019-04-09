@@ -102,43 +102,6 @@ def ensure_resolver(f):
   return wrapper
 
 
-def daemon_blacklist(_unused_msg_for_documentation_purposes=None):
-  """A decorator to ensure that pantsd is not used (via env vars) for an integration test.
-
-  NB: pantsd is not yet enabled by default (via #4438), but it will be used temporarily
-  in pants' integration test environment via environment variables. This decorator will mark
-  tests that fail in that environment.
-  """
-  def decorator(f):
-    def wrapper(self, *args, **kwargs):
-      env = {
-          'PANTS_ENABLE_PANTSD': 'false',
-          'PANTS_SHUTDOWN_PANTSD_AFTER_RUN': 'false',
-      }
-      with environment_as(**env):
-        f(self, *args, **kwargs)
-    return wrapper
-  return decorator
-
-
-def no_pantsd_shutdown_between_runs(_unused_msg_for_documentation_purposes=None):
-  """
-  A decorator to ensure we don't leak an external value for PANTS_SHUTDOWN_PANTSD_AFTER_RUN.
-
-  Some tests assume a particular instance of pantsd is alive run-after-run inside the same test.
-  If we leak this env var, pantsd will terminate after every run,
-  making most pantsd integration tests fail.
-  """
-  def decorator(f):
-    def wrapper(self, *args, **kwargs):
-      env = {
-          'PANTS_SHUTDOWN_PANTSD_AFTER_RUN': 'false'
-      }
-      with environment_as(**env):
-        f(self, *args, **kwargs)
-    return wrapper
-  return decorator
-
 def ensure_daemon(f):
   """A decorator for running an integration test with and without the daemon enabled."""
   def wrapper(self, *args, **kwargs):
@@ -199,6 +162,18 @@ class PantsRunIntegrationTest(unittest.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
   PANTS_SCRIPT_NAME = 'pants'
+
+  @classmethod
+  def should_configure_pantsd(cls):
+    """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled.
+
+    That is, --enable-pantsd will not be added to their configuration.
+    This approach is coarsely grained, meaning we disable pantsd in some tests that actually run
+    when pantsd is enabled. However:
+      - The number of mislabeled tests is currently small (~20 tests).
+      - Those tests will still run, just with pantsd disabled.
+    """
+    return True
 
   @classmethod
   def hermetic(cls):
@@ -310,7 +285,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
       '--pants-workdir={}'.format(workdir),
       '--kill-nailguns',
       '--print-exception-stacktrace={}'.format(print_exception_stacktrace),
-      '--enable-pantsd'
     ]
 
 
@@ -322,6 +296,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
                    # Turn cache on just for tool bootstrapping, for performance.
                    '--cache-bootstrap-read', '--cache-bootstrap-write'
                    ])
+
+    if self.should_configure_pantsd():
+      args.append("--enable-pantsd=True")
+      args.append("--no-shutdown-pantsd-after-run")
+    else:
+      # NB. By unsetting this explicitly we avoid PANTS_ENABLE_PANTSD leaking into the test.
+      os.unsetenv("PANTS_ENABLE_PANTSD")
 
     if config:
       config_data = config.copy()
@@ -581,8 +562,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
                      'pants-plugins',
                      'pants.ini',
                      'pants.travis-ci.ini',
+                     '.python-interpreter-constraints',
                      'rust-toolchain',
-                     'src')
+                     'src',
+                     )
     dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
 
     with self.temporary_workdir() as tmp_dir:
