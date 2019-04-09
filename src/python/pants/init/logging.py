@@ -86,7 +86,7 @@ class NativeHandler(StreamHandler):
 def create_native_pantsd_file_log_handler(level, native, native_filename):
   try:
     fd = native.setup_pantsd_logger(native_filename, get_numeric_level(level))
-    ExceptionSink.reset_interactive_output_stream(os.fdopen(fd, 'a'))
+    ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), 'a'))
   except Exception as e:
     raise e
 
