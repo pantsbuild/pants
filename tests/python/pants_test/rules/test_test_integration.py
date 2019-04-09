@@ -60,7 +60,6 @@ class TestIntegrationTest(PantsRunIntegrationTest):
 
     return pants_run
 
-  @daemon_blacklist("Pantsd swallows logs into its log file, so stderr will be empty. (#7320)")
   def test_passing_python_test(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:passing_target',
@@ -81,7 +80,6 @@ testprojects/tests/python/pants/dummies:passing_target                          
 """,
     )
 
-  @daemon_blacklist("Pantsd swallows logs into its log file, so stderr will be empty. (#7320)")
   def test_failing_python_test(self):
     pants_run = self.run_failing_pants_test([
       'testprojects/tests/python/pants/dummies:failing_target',
@@ -110,7 +108,6 @@ testprojects/tests/python/pants/dummies:failing_target                          
 """,
     )
 
-  @daemon_blacklist("Pantsd swallows logs into its log file, so stderr will be empty. (#7320)")
   def test_source_dep(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:target_with_source_dep',
@@ -129,7 +126,6 @@ testprojects/tests/python/pants/dummies/test_with_source_dep.py .        [100%]
 testprojects/tests/python/pants/dummies:target_with_source_dep                  .....   SUCCESS
 """)
 
-  @daemon_blacklist("Pantsd swallows logs into its log file, so stderr will be empty. (#7320)")
   def test_thirdparty_dep(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:target_with_thirdparty_dep',
@@ -148,7 +144,6 @@ testprojects/tests/python/pants/dummies/test_with_thirdparty_dep.py .    [100%]
 testprojects/tests/python/pants/dummies:target_with_thirdparty_dep              .....   SUCCESS
 """)
 
-  @daemon_blacklist("Pantsd swallows logs into its log file, so stderr will be empty. (#7320)")
   def test_mixed_python_tests(self):
     pants_run = self.run_failing_pants_test([
       'testprojects/tests/python/pants/dummies:failing_target',
