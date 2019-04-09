@@ -37,7 +37,7 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
     assertRegex(
       self,
       warning_run.stderr_data,
-      '^WARN\\].*DeprecationWarning: DEPRECATED: This is a test warning!')
+      '\\[WARN\\].*DeprecationWarning: DEPRECATED: This is a test warning!')
 
     non_warning_run = self.run_pants(cmdline, config={
       GLOBAL_SCOPE_CONFIG_SECTION: {
