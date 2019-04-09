@@ -165,15 +165,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   @classmethod
   def should_configure_pantsd(cls):
-    """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled.
+    """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled,
+    or they want to configure pantsd themselves.
 
-    That is, --enable-pantsd will not be added to their configuration.
+    In those cases, --enable-pantsd will not be added to their configuration.
     This approach is coarsely grained, meaning we disable pantsd in some tests that actually run
     when pantsd is enabled. However:
       - The number of mislabeled tests is currently small (~20 tests).
       - Those tests will still run, just with pantsd disabled.
     """
-    return os.getenv("TRAVIS_AND_PANTS_INTEGRATION_TESTS_SHOULD_HAVE_PANTSD") is True
+    should_pantsd = os.getenv("TRAVIS_AND_PANTS_INTEGRATION_TESTS_SHOULD_HAVE_PANTSD")
+    return should_pantsd in ["True", "true", "1"]
 
   @classmethod
   def hermetic(cls):
