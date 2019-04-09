@@ -165,7 +165,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.assertEqual(sorted(classfiles(w) for w in target_workdirs if w != 'current'),
                         sorted([['A.class', 'Main.class'], ['A.class', 'NotMain.class']]))
 
-  @daemon_blacklist('TODO: See #7320.')
+  @daemon_blacklist('Watchman is crashing because we switch buildroots '
+                    'and/or create wordirs within tempdirs')
   def test_analysis_portability(self):
     # Tests that analysis can be relocated between workdirs and still result in incremental
     # compile.
