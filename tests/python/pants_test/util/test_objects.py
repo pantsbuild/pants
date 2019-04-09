@@ -199,13 +199,12 @@ class TypedCollectionTest(TypeConstraintTestBase):
     collection_exactly_a_or_b = TypedCollection(Exactly(self.A, self.B))
     self.assertEqual([self.A()], collection_exactly_a_or_b.validate_satisfied_by([self.A()]))
     self.assertEqual([self.B()], collection_exactly_a_or_b.validate_satisfied_by([self.B()]))
-    with self.assertRaisesWithMessage(
-        TypeConstraintError,
-        "in wrapped constraint TypedCollection(Exactly(A or B)): value A() (with type 'A') must satisfy this type constraint: SubclassesOf(Iterable). Note that objects matching SubclassesOf(str) are not considered iterable."):
+    with self.assertRaisesWithMessage(TypeConstraintError, """\
+in wrapped constraint TypedCollection(Exactly(A or B)): value A() (with type 'A') must satisfy this type constraint: SubclassesOf(Iterable).
+Note that objects matching SubclassesOf(str) are not considered iterable."""):
       collection_exactly_a_or_b.validate_satisfied_by(self.A())
-    with self.assertRaisesWithMessage(
-        TypeConstraintError,
-        "in wrapped constraint TypedCollection(Exactly(A or B)) matching iterable object [C()]: value C() (with type 'C') must satisfy this type constraint: Exactly(A or B). Note that objects matching SubclassesOf(str) are not considered iterable."):
+    with self.assertRaisesWithMessage(TypeConstraintError, """\
+in wrapped constraint TypedCollection(Exactly(A or B)) matching iterable object [C()]: value C() (with type 'C') must satisfy this type constraint: Exactly(A or B)."""):
       collection_exactly_a_or_b.validate_satisfied_by([self.C()])
 
   def test_iterable_detection(self):
@@ -216,8 +215,11 @@ class TypedCollectionTest(TypeConstraintTestBase):
 
     with self.assertRaisesWithMessage(TypeCheckError, """\
 type check error in class StringCollectionField: errors type checking constructor arguments:
-field 'hello_strings' was invalid: in wrapped constraint TypedCollection(Exactly(str)): value 'xxx' (with type 'str') must satisfy this type constraint: SubclassesOf(Iterable).
-Note that objects matching SubclassesOf(str) are not considered iterable."""):
+field 'hello_strings' was invalid: in wrapped constraint TypedCollection(Exactly({string_type})): \
+value 'xxx' (with type '{string_type}') must satisfy this type constraint: SubclassesOf(Iterable).
+Note that objects matching SubclassesOf({text_type}) are not considered iterable."""
+                                      .format(string_type=str.__name__,
+                                              text_type=text_type.__name__)):
       StringCollectionField(hello_strings='xxx')
 
 
@@ -673,7 +675,8 @@ field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type
 
     expected_msg = """\
 type check error in class WithCollectionTypeConstraint: errors type checking constructor arguments:
-field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)): value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(Iterable)."""
+field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)): value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(Iterable).
+Note that objects matching SubclassesOf(str) are not considered iterable."""
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       WithCollectionTypeConstraint(3)
 
