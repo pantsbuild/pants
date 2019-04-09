@@ -523,6 +523,9 @@ class TypedCollection(TypeConstraint):
   """A `TypeConstraint` which accepts a TypeOnlyConstraint and validates a collection."""
 
   _iterable_constraint = SubclassesOf(Iterable)
+  # strings in Python are considered iterables of substrings, but we only want to allow explicit
+  # collection types.
+  _exclude_iterable_constraint = SubclassesOf(*six.string_types)
 
   def __init__(self, constraint):
     """Create a `TypeConstraint` which validates each member of a collection with `constraint`.
@@ -542,12 +545,15 @@ class TypedCollection(TypeConstraint):
 
     super(TypedCollection, self).__init__(description=description)
 
+  def _is_iterable(self, obj):
+    return (self._iterable_constraint.satisfied_by(obj)
+            and not self._exclude_iterable_constraint.satisfied_by(obj))
+
   # TODO: consider making this a private method of TypeConstraint, as it now duplicates the logic in
   # self.validate_satisfied_by()!
   def satisfied_by(self, obj):
-    if self._iterable_constraint.satisfied_by(obj):
-      return all(self._constraint.satisfied_by(el) for el in obj)
-    return False
+    return (self._is_iterable(obj)
+            and all(self._constraint.satisfied_by(el) for el in obj))
 
   def make_collection_type_constraint_error(self, base_obj, el):
     base_error = self.make_type_constraint_error(el, self._constraint)
@@ -555,15 +561,15 @@ class TypedCollection(TypeConstraint):
                                .format(self, base_obj, base_error))
 
   def validate_satisfied_by(self, obj):
-    if self._iterable_constraint.satisfied_by(obj):
-      for el in obj:
-        if not self._constraint.satisfied_by(el):
-          raise self.make_collection_type_constraint_error(obj, el)
-      return obj
-
-    base_iterable_error = self.make_type_constraint_error(obj, self._iterable_constraint)
-    raise TypeConstraintError(
-      "in wrapped constraint {}: {}".format(self, base_iterable_error))
+    if not self._is_iterable(obj):
+      base_iterable_error = self.make_type_constraint_error(obj, self._iterable_constraint)
+      raise TypeConstraintError(
+        "in wrapped constraint {}: {}\nNote that objects matching {} are not considered iterable."
+        .format(self, base_iterable_error, self._exclude_iterable_constraint))
+    for el in obj:
+      if not self._constraint.satisfied_by(el):
+        raise self.make_collection_type_constraint_error(obj, el)
+    return obj
 
   def __hash__(self):
     return hash((type(self), self._constraint))
