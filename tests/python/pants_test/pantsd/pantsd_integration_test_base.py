@@ -85,7 +85,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
   @contextmanager
   def pantsd_test_context(self, log_level='info', extra_config=None):
     with no_lingering_process_by_command('pantsd-runner') as runner_process_context:
-      with self.temporary_workdir(cleanup=False) as workdir_base:
+      with self.temporary_workdir() as workdir_base:
         pid_dir = os.path.join(workdir_base, '.pids')
         workdir = os.path.join(workdir_base, '.workdir.pants.d')
         print('\npantsd log is {}/pantsd/pantsd.log'.format(workdir))
