@@ -10,12 +10,13 @@ from future.utils import text_type
 
 from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent
-from pants.engine.legacy.graph import HydratedTargets
+from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.objects import Collection
 from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.exceptions import GracefulTerminationException
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_method
 from pants.util.objects import datatype, enum
 
 
@@ -69,6 +70,7 @@ class SourceFileValidation(Subsystem):
     register('--detail-level', type=DetailLevel, default=DetailLevel.nonmatching,
              help='How much detail to emit to the console.')
 
+  @memoized_method
   def get_multi_matcher(self):
     return MultiMatcher(self.get_options().config)
 
@@ -228,22 +230,26 @@ def validate(console, regex_match_results, source_file_validation):
     raise GracefulTerminationException('Files failed validation.')
 
 
-@rule(RegexMatchResults, [HydratedTargets, SourceFileValidation])
-def match_regexes(hydrated_targets, source_file_regexes):
-  multi_matcher = source_file_regexes.get_multi_matcher()
-  res = []
-  for tgt in hydrated_targets:
-    if hasattr(tgt.adaptor, 'sources'):
-      files_content = yield Get(FilesContent,
-                                Digest, tgt.adaptor.sources.snapshot.directory_digest)
-      for file_content in files_content:
-        res.append(multi_matcher.check_source_file(file_content.path, file_content.content))
-  yield RegexMatchResults(res)
+@rule(RegexMatchResults, [HydratedTargets])
+def match_regexes(hydrated_targets):
+  rmrs = yield [Get(RegexMatchResult, HydratedTarget, ht) for ht in hydrated_targets]
+  yield RegexMatchResults(rmrs)
+
+
+@rule(RegexMatchResult, [HydratedTarget, SourceFileValidation])
+def match_regexes_for_one_target(hydrated_target, source_file_validation):
+  multi_matcher = source_file_validation.get_multi_matcher()
+  if hasattr(hydrated_target.adaptor, 'sources'):
+    files_content = yield Get(FilesContent,
+                              Digest, hydrated_target.adaptor.sources.snapshot.directory_digest)
+    for file_content in files_content:
+      yield multi_matcher.check_source_file(file_content.path, file_content.content)
 
 
 def rules():
   return [
     validate,
     match_regexes,
+    match_regexes_for_one_target,
     optionable_rule(SourceFileValidation),
   ]
