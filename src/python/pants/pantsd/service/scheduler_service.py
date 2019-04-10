@@ -14,7 +14,7 @@ from builtins import open
 from future.utils import PY3
 from twitter.common.dirutil import Fileset
 
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.pantsd.service.pants_service import PantsService
 
@@ -55,6 +55,7 @@ class SchedulerService(PantsService):
     self._pantsd_pidfile = pantsd_pidfile
 
     self._scheduler = legacy_graph_scheduler.scheduler
+    self._scheduler_session = self._scheduler.new_session(False)
     self._logger = logging.getLogger(__name__)
     self._event_queue = queue.Queue(maxsize=self.QUEUE_SIZE)
     self._watchman_is_running = threading.Event()
@@ -68,13 +69,13 @@ class SchedulerService(PantsService):
     return set.union(*(Fileset.globs(glob_str, root=root)() for glob_str in glob_strs))
 
   def _get_snapshot(self, glob):
+    print(dir(self._scheduler))
     """Returns a Snapshot of the input glob"""
-    return self._scheduler.capture_snapshots(
-      (PathGlobsAndRoot(PathGlobs(glob), self._build_root), ))[0]
+    return self._scheduler_session.product_request(Snapshot, subjects=[PathGlobs(glob)])[0]
 
   def _get_files(self, snapshots):
     """Returns a list of the files corresponding to the list of input snapshots"""
-    return [snapshot.files[0] for snapshot in snapshots]
+    return [snapshot.files for snapshot in snapshots][0]
 
   def setup(self, services):
     """Service setup."""
@@ -89,8 +90,7 @@ class SchedulerService(PantsService):
         self._invalidation_globs,
         self._build_root
       )
-      for glob in invalidating_files:
-        self._snapshot_by_glob[glob] = self._get_snapshot([glob])
+      self._snapshot_by_glob['invalidating_files'] = self._get_snapshot(invalidating_files)
       self._invalidating_files = self._get_files(self._snapshot_by_glob.values())
       self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
 
@@ -113,7 +113,7 @@ class SchedulerService(PantsService):
     for glob in changed_globs:
       if glob in self._invalidating_files and _is_glob_changed(glob):
         self._logger.fatal(
-          'saw file events covered by invalidation glob [{}], terminating the daemon.'.format(glob))
+          'saw file events covered by invalidation globs [{}], terminating the daemon.'.format(glob))
         self.terminate()
         break
 
@@ -142,11 +142,11 @@ class SchedulerService(PantsService):
   def _handle_batch_event(self, files):
     self._logger.debug('handling change event for: %s', files)
 
-    self._maybe_invalidate_scheduler_batch(files)
-
     invalidated = self._scheduler.invalidate_files(files)
     if invalidated:
       self._loop_condition.notify_all()
+
+    self._maybe_invalidate_scheduler_batch(files)
 
   def _process_event_queue(self):
     """File event notification queue processor. """
