@@ -10,15 +10,15 @@ from builtins import object
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress, Specs
+from pants.base.specs import SingleAddress, Specs
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import UnhydratedStruct, create_graph_rules
+from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
 from pants.engine.objects import Collection
-from pants.engine.parser import SymbolTable
+from pants.engine.parser import SymbolTable, TargetAdaptorContainer
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
@@ -130,13 +130,13 @@ class AddressFamilyTest(unittest.TestCase):
                                        {'one': Thing(name='one', age=37)})])
 
 
-UnhydratedStructs = Collection.of(UnhydratedStruct)
+TargetAdaptorContainers = Collection.of(TargetAdaptorContainer)
 
 
-@rule(UnhydratedStructs, [BuildFileAddresses])
+@rule(TargetAdaptorContainers, [BuildFileAddresses])
 def unhydrated_structs(build_file_addresses):
-  uhs = yield [Get(UnhydratedStruct, Address, a) for a in build_file_addresses.addresses]
-  yield UnhydratedStructs(uhs)
+  tacs = yield [Get(TargetAdaptorContainer, Address, a) for a in build_file_addresses.addresses]
+  yield TargetAdaptorContainers(tacs)
 
 
 class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
@@ -155,17 +155,14 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     self.scheduler = self.mk_scheduler(rules=rules, project_tree=project_tree)
 
     self.a_b = Address.parse('a/b')
-    self.a_b_target = Target(name='b',
-                             dependencies=['//d:e'],
-                             configurations=['//a', Struct(embedded='yes')],
+    self.a_b_target = Target(address=self.a_b,
+                             dependencies=['//a/d/e'],
+                             configurations=['//a/d/e', Struct(embedded='yes')],
                              type_alias='target')
 
   def resolve(self, spec):
-    uhs, = self.scheduler.product_request(UnhydratedStructs, [Specs(tuple([spec]))])
-    return uhs.dependencies
-
-  def resolve_multi(self, spec):
-    return {uhs.address: uhs.struct for uhs in self.resolve(spec)}
+    tacs, = self.scheduler.product_request(TargetAdaptorContainers, [Specs(tuple([spec]))])
+    return [tac.value for tac in tacs]
 
   def test_no_address_no_family(self):
     spec = SingleAddress('a/c', 'c')
@@ -187,31 +184,9 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     # Success.
     resolved = self.resolve(spec)
     self.assertEqual(1, len(resolved))
-    self.assertEqual([Struct(name='c', type_alias='struct')], [r.struct for r in resolved])
+    self.assertEqual([Struct(address=Address.parse('a/c'), type_alias='struct')], resolved)
 
   def test_resolve(self):
     resolved = self.resolve(SingleAddress('a/b', 'b'))
     self.assertEqual(1, len(resolved))
     self.assertEqual(self.a_b, resolved[0].address)
-
-  @staticmethod
-  def addr(spec):
-    return Address.parse(spec)
-
-  def test_walk_siblings(self):
-    self.assertEqual({self.addr('a/b:b'): self.a_b_target},
-                     self.resolve_multi(SiblingAddresses('a/b')))
-
-  def test_walk_descendants(self):
-    self.assertEqual({self.addr('//:root'): Struct(name='root', type_alias='struct'),
-                      self.addr('a/b:b'): self.a_b_target,
-                      self.addr('a/d:d'): Target(name='d', type_alias='target'),
-                      self.addr('a/d/e:e'): Target(name='e', type_alias='target'),
-                      self.addr('a/d/e:e-prime'): Struct(name='e-prime', type_alias='struct')},
-                     self.resolve_multi(DescendantAddresses('')))
-
-  def test_walk_descendants_rel_path(self):
-    self.assertEqual({self.addr('a/d:d'): Target(name='d', type_alias='target'),
-                      self.addr('a/d/e:e'): Target(name='e', type_alias='target'),
-                      self.addr('a/d/e:e-prime'): Struct(name='e-prime', type_alias='struct')},
-                     self.resolve_multi(DescendantAddresses('a/d')))

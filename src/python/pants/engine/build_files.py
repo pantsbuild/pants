@@ -25,7 +25,7 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.util.collections_abc_backport import MutableMapping, MutableSequence
-from pants.util.objects import TypeConstraintError, datatype
+from pants.util.objects import TypeConstraintError
 
 
 logger = logging.getLogger(__name__)
@@ -62,19 +62,6 @@ def parse_address_family(address_mapper, directory):
   yield AddressFamily.create(directory.path, address_maps)
 
 
-class UnhydratedStruct(datatype(['address', 'struct', 'dependencies'])):
-  """A product type that holds a Struct which has not yet been hydrated.
-
-  A Struct counts as "hydrated" when all of its members (which are not themselves dependencies
-  lists) have been resolved from the graph. This means that hydrating a struct is eager in terms
-  of inline addressable fields, but lazy in terms of the complete graph walk represented by
-  the `dependencies` field of StructWithDeps.
-  """
-
-  def __hash__(self):
-    return hash(self.struct)
-
-
 def _raise_did_you_mean(address_family, name, source=None):
   names = [a.target_name for a in address_family.addressables]
   possibilities = '\n  '.join(':{}'.format(target_name) for target_name in sorted(names))
@@ -89,9 +76,9 @@ def _raise_did_you_mean(address_family, name, source=None):
     raise resolve_error
 
 
-@rule(UnhydratedStruct, [AddressMapper, Address])
-def resolve_unhydrated_struct(address_mapper, address):
-  """Given an AddressMapper and an Address, resolve an UnhydratedStruct.
+@rule(TargetAdaptorContainer, [AddressMapper, Address])
+def hydrate_struct(address_mapper, address):
+  """Given an AddressMapper and an Address, resolve a Struct from a BUILD file.
 
   Recursively collects any embedded addressables within the Struct, but will not walk into a
   dependencies field, since those should be requested explicitly by rules.
@@ -103,18 +90,19 @@ def resolve_unhydrated_struct(address_mapper, address):
   addresses = address_family.addressables
   if not struct or address not in addresses:
     _raise_did_you_mean(address_family, address.target_name)
+  address = next(build_address for build_address in addresses if build_address == address)
 
-  dependencies = []
+  inline_dependencies = []
   def maybe_append(outer_key, value):
     if isinstance(value, six.string_types):
       if outer_key != 'dependencies':
-        dependencies.append(Address.parse(value,
+        inline_dependencies.append(Address.parse(value,
                                           relative_to=address.spec_path,
                                           subproject_roots=address_mapper.subproject_roots))
     elif isinstance(value, Struct):
-      collect_dependencies(value)
+      collect_inline_dependencies(value)
 
-  def collect_dependencies(item):
+  def collect_inline_dependencies(item):
     for key, value in sorted(item._asdict().items(), key=_key_func):
       if not AddressableDescriptor.is_addressable(item, key):
         continue
@@ -127,25 +115,12 @@ def resolve_unhydrated_struct(address_mapper, address):
       else:
         maybe_append(key, value)
 
-  collect_dependencies(struct)
+  # Recursively collect inline dependencies from the fields of the struct into `inline_dependencies`.
+  collect_inline_dependencies(struct)
 
-  yield UnhydratedStruct(
-    next(build_address for build_address in addresses if build_address == address),
-    struct,
-    dependencies)
-
-
-@rule(TargetAdaptorContainer, [AddressMapper, UnhydratedStruct])
-def hydrate_struct(address_mapper, unhydrated_struct):
-  """Hydrates a Struct from an UnhydratedStruct and its satisfied embedded addressable deps.
-
-  Note that this relies on the guarantee that DependenciesNode provides dependencies in the
-  order they were requested.
-  """
-  dependencies = yield [Get(TargetAdaptorContainer, Address, a) for a in unhydrated_struct.dependencies]
+  # And then hydrate the inline dependencies.
+  dependencies = yield [Get(TargetAdaptorContainer, Address, a) for a in inline_dependencies]
   dependencies = [d.value for d in dependencies]
-  address = unhydrated_struct.address
-  struct = unhydrated_struct.struct
 
   def maybe_consume(outer_key, value):
     if isinstance(value, six.string_types):
@@ -270,10 +245,8 @@ def create_graph_rules(address_mapper):
 
   return [
     address_mapper_singleton,
-    # Support for resolving Structs from Addresses.
-    hydrate_struct,
-    resolve_unhydrated_struct,
     # BUILD file parsing.
+    hydrate_struct,
     parse_address_family,
     # Spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
