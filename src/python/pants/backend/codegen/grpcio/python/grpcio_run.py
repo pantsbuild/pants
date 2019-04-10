@@ -30,7 +30,7 @@ class GrpcioRun(SimpleCodegenTask):
     round_manager.require_data(GrpcioPrep.tool_instance_cls)
 
   def synthetic_target_type(self, target):
-    return PythonLibrary.alias()
+    return PythonLibrary
 
   @memoized_property
   def _grpcio_binary(self):

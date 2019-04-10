@@ -24,7 +24,7 @@ class ApacheThriftPyGen(ApacheThriftGenBase):
   sources_globs = ('**/*',)
 
   def synthetic_target_type(self, target):
-    return PythonLibrary.alias()
+    return PythonLibrary
 
   def execute_codegen(self, target, target_workdir):
     super(ApacheThriftPyGen, self).execute_codegen(target, target_workdir)
