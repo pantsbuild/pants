@@ -495,7 +495,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGTERM,
       regexps=[
-        '^INFO] Sending SIGTERM to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
+        '^\\[INFO\\] Sending SIGTERM to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
         re.escape("\nSignal {signum} (SIGTERM) was raised. Exiting with failure.\n"
                   .format(signum=signal.SIGTERM)),
         """
@@ -508,7 +508,7 @@ $"""
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGQUIT,
       regexps=[
-        '^INFO] Sending SIGQUIT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
+        '^\\[INFO\\]] Sending SIGQUIT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
         re.escape("\nSignal {signum} (SIGQUIT) was raised. Exiting with failure.\n"
                   .format(signum=signal.SIGQUIT)),
         """
@@ -520,7 +520,7 @@ $"""])
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
       regexps=["""\
-^INFO] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.
+^\\[INFO\\] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.
 Interrupted by user.
 Interrupted by user:
 Interrupted by user over pailgun client!
@@ -533,7 +533,7 @@ $"""])
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
       regexps=["""\
-^INFO] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 0\\.01 seconds before sending SIGKILL\\.\\.\\.
+^\\[INFO\\] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 0\\.01 seconds before sending SIGKILL\\.\\.\\.
 Interrupted by user\\.
 WARN\\] timed out when attempting to gracefully shut down the remote client executing \
 "'pantsd-runner.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating \
