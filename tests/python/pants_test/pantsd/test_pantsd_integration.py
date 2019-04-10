@@ -508,7 +508,7 @@ $"""
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGQUIT,
       regexps=[
-        '\\[INFO\\]] Sending SIGQUIT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
+        '\\[INFO\\] Sending SIGQUIT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
         re.escape("\nSignal {signum} (SIGQUIT) was raised. Exiting with failure.\n"
                   .format(signum=signal.SIGQUIT)),
         """
