@@ -104,6 +104,7 @@ class Matcher(object):
 
 class PathMatcher(Matcher):
   """A matcher for matching file paths."""
+  
   def __init__(self, pattern, inverted=False, content_encoding='utf8'):
     super(PathMatcher, self).__init__(pattern, inverted)
     # The expected encoding of the content of files whose paths match this pattern.
