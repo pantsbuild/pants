@@ -11,6 +11,7 @@ from builtins import object
 
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.remote_pants_runner import RemotePantsRunner
+from pants.init.logging import init_rust_logger, setup_logging_to_stderr
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
@@ -31,6 +32,11 @@ class PantsRunner(object):
     self._env = env or os.environ
     self._start_time = start_time
 
+  def _enable_rust_logging(self, global_bootstrap_options):
+    levelname = global_bootstrap_options.level.upper()
+    init_rust_logger(levelname)
+    setup_logging_to_stderr(logging.getLogger(None), levelname)
+
   def run(self):
     # Register our exiter at the beginning of the run() method so that any code in this process from
     # this point onwards will use that exiter in the case of a fatal error.
@@ -39,6 +45,10 @@ class PantsRunner(object):
     options_bootstrapper = OptionsBootstrapper.create(env=self._env, args=self._args)
     bootstrap_options = options_bootstrapper.bootstrap_options
     global_bootstrap_options = bootstrap_options.for_global_scope()
+
+    # We enable Rust logging here,
+    # and everything before it will be routed through regular Python logging.
+    self._enable_rust_logging(global_bootstrap_options)
 
     ExceptionSink.reset_should_print_backtrace_to_terminal(global_bootstrap_options.print_exception_stacktrace)
     ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)

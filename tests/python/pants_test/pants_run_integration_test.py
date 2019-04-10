@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import glob
 import os
+import re
 import shutil
 import unittest
 from builtins import open
@@ -476,6 +477,24 @@ class PantsRunIntegrationTest(unittest.TestCase):
     error_msg = '\n'.join(details)
 
     assertion(value, pants_run.returncode, error_msg)
+
+  def assert_run_contains_log(self, msg, level, module, pants_run):
+    """Asserts that the passed run's stderr contained the log message."""
+    self.assert_contains_log(msg, level, module, pants_run.stderr_data, pants_run.pid)
+
+  def assert_contains_log(self, msg, level, module, log, pid=None):
+    """
+    Asserts that the passed log contains the message logged by the module at the level.
+
+    If pid is specified, performs an exact match including the pid of the pants process.
+    Otherwise performs a regex match asserting that some pid is present.
+    """
+    prefix = "[{}] {}:pid=".format(level, module)
+    suffix = ": {}".format(msg)
+    if pid is None:
+      self.assertRegexpMatches(log, re.escape(prefix) + "\\d+" + re.escape(suffix))
+    else:
+      self.assertIn("{}{}{}".format(prefix, pid, suffix), log)
 
   def normalize(self, s):
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""

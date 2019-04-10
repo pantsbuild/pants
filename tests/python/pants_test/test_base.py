@@ -410,7 +410,12 @@ class TestBase(unittest.TestCase, AbstractClass):
   def scheduler(self):
     if self._scheduler is None:
       self._init_engine()
+      self.post_scheduler_init()
     return self._scheduler
+
+  def post_scheduler_init(self):
+    """Run after initializing the Scheduler, it will have the same lifetime"""
+    pass
 
   @property
   def address_mapper(self):

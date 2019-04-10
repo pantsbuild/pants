@@ -94,7 +94,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
   def test_pantsd_stacktrace_dump(self):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
-      pantsd_run(['help'])
+      pantsd_run(['-ldebug', 'help'])
       checker.assert_started()
 
       os.kill(checker.pid, signal.SIGUSR2)
@@ -495,7 +495,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGTERM,
       regexps=[
-        '^INFO] Sending SIGTERM to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
+        '\\[INFO\\] Sending SIGTERM to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
         re.escape("\nSignal {signum} (SIGTERM) was raised. Exiting with failure.\n"
                   .format(signum=signal.SIGTERM)),
         """
@@ -508,7 +508,7 @@ $"""
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGQUIT,
       regexps=[
-        '^INFO] Sending SIGQUIT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
+        '\\[INFO\\] Sending SIGQUIT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
         re.escape("\nSignal {signum} (SIGQUIT) was raised. Exiting with failure.\n"
                   .format(signum=signal.SIGQUIT)),
         """
@@ -520,7 +520,7 @@ $"""])
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
       regexps=["""\
-^INFO] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.
+\\[INFO\\] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.
 Interrupted by user.
 Interrupted by user:
 Interrupted by user over pailgun client!
@@ -533,9 +533,9 @@ $"""])
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
       regexps=["""\
-^INFO] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 0\\.01 seconds before sending SIGKILL\\.\\.\\.
+\\[INFO\\] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 0\\.01 seconds before sending SIGKILL\\.\\.\\.
 Interrupted by user\\.
-WARN\\] timed out when attempting to gracefully shut down the remote client executing \
+[^ ]* \\[WARN\\] timed out when attempting to gracefully shut down the remote client executing \
 "'pantsd-runner.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating \
 over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, \
 overtime seconds: [^\n]+

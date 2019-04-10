@@ -95,19 +95,6 @@ class RemotePantsRunner(object):
     with ExceptionSink.trapped_signals(signal_handler):
       yield
 
-  def _setup_logging(self):
-    """Sets up basic stdio logging for the thin client."""
-    log_level = logging.getLevelName(self._bootstrap_options.for_global_scope().level.upper())
-
-    formatter = logging.Formatter('%(levelname)s] %(message)s')
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setLevel(log_level)
-    handler.setFormatter(formatter)
-
-    root = logging.getLogger()
-    root.setLevel(log_level)
-    root.addHandler(handler)
-
   @staticmethod
   def _backoff(attempt):
     """Minimal backoff strategy for daemon restarts."""
@@ -200,6 +187,5 @@ class RemotePantsRunner(object):
     return PantsDaemon.Factory.maybe_launch(options_bootstrapper=self._options_bootstrapper)
 
   def run(self, args=None):
-    self._setup_logging()
     pantsd_handle = self._maybe_launch_pantsd()
     self._run_pants_with_retry(pantsd_handle)

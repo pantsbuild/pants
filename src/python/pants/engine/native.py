@@ -271,12 +271,6 @@ class _FFISpecification(object):
 
     return PyResult(is_throw, c.to_value(val))
 
-  @_extern_decl('void', ['ExternContext*', 'uint8_t', 'uint8_t*', 'uint64_t'])
-  def extern_log(self, context_handle, level, msg_ptr, msg_len):
-    """Given a log level and utf8 message string, log it."""
-    msg = bytes(self._ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
-    logger.log(level, msg)
-
   @_extern_decl('TypeId', ['ExternContext*', 'Handle*'])
   def extern_get_type_for(self, context_handle, val):
     """Return a representation of the object's type."""
@@ -628,7 +622,6 @@ class Native(Singleton):
     def init_externs():
       context = ExternContext(self.ffi, self.lib)
       self.lib.externs_set(context._handle,
-                           self.ffi_lib.extern_log,
                            logger.getEffectiveLevel(),
                            self.ffi_lib.extern_call,
                            self.ffi_lib.extern_generator_send,
@@ -678,6 +671,25 @@ class Native(Singleton):
   def decompress_tarball(self, tarfile_path, dest_dir):
     result = self.lib.decompress_tarball(tarfile_path, dest_dir)
     return self.context.raise_or_return(result)
+
+  def init_rust_logging(self, level):
+    return self.lib.init_logging(level)
+
+  def setup_pantsd_logger(self, log_file_path, level):
+    log_file_path = log_file_path.encode("utf-8")
+    result = self.lib.setup_pantsd_logger(log_file_path, level)
+    return self.context.raise_or_return(result)
+
+  def setup_stderr_logger(self, level):
+    return self.lib.setup_stderr_logger(level)
+
+  def write_log(self, msg, level, target):
+    msg = msg.encode("utf-8")
+    target = target.encode("utf-8")
+    return self.lib.write_log(msg, level, target)
+
+  def flush_log(self):
+    return self.lib.flush_log()
 
   def match_path_globs(self, path_globs, paths):
     path_globs = self.context.to_value(path_globs)
