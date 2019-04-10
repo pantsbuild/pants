@@ -29,7 +29,7 @@ from pants.engine.legacy.structs import (BundleAdaptor, BundlesField, Hydrateabl
                                          SourcesField, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
-from pants.engine.parser import TargetAdaptorContainer
+from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -439,7 +439,7 @@ def find_owners(build_configuration, address_mapper, owners_request):
   else:
     # Otherwise: find dependees.
     all_addresses = yield Get(BuildFileAddresses, Specs((DescendantAddresses(''),)))
-    all_structs = yield [Get(TargetAdaptorContainer, Address, a.to_address()) for a in all_addresses]
+    all_structs = yield [Get(HydratedStruct, Address, a.to_address()) for a in all_addresses]
     all_structs = [s.value for s in all_structs]
 
     bfa = build_configuration.registered_aliases()
@@ -496,9 +496,9 @@ class HydratedField(datatype(['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 
 
-@rule(HydratedTarget, [TargetAdaptorContainer])
-def hydrate_target(target_adaptor_container):
-  target_adaptor = target_adaptor_container.value
+@rule(HydratedTarget, [HydratedStruct])
+def hydrate_target(hydrated_struct):
+  target_adaptor = hydrated_struct.value
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
   hydrated_fields = yield [Get(HydratedField, HydrateableField, fa)

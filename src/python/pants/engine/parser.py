@@ -20,10 +20,10 @@ class SymbolTable(datatype([
   """A symbol table dict mapping symbol name to implementation class."""
 
 
-class TargetAdaptorContainer(datatype(["value"])):
-  """A wrapper around a concrete TargetAdaptor subclass.
+class HydratedStruct(datatype(['value'])):
+  """A wrapper around a Struct subclass post hydration.
 
-  This exists so that the rule graph can statically provide a TargetAdaptor for a target, and rules can depend on this
+  This exists so that the rule graph can statically provide a struct for a target, and rules can depend on this
   without needing to depend on having a concrete instance of SymbolTable to register their input selectors.
   """
 

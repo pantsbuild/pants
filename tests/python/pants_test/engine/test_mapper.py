@@ -18,7 +18,7 @@ from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
 from pants.engine.objects import Collection
-from pants.engine.parser import SymbolTable, TargetAdaptorContainer
+from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
@@ -130,13 +130,13 @@ class AddressFamilyTest(unittest.TestCase):
                                        {'one': Thing(name='one', age=37)})])
 
 
-TargetAdaptorContainers = Collection.of(TargetAdaptorContainer)
+HydratedStructs = Collection.of(HydratedStruct)
 
 
-@rule(TargetAdaptorContainers, [BuildFileAddresses])
+@rule(HydratedStructs, [BuildFileAddresses])
 def unhydrated_structs(build_file_addresses):
-  tacs = yield [Get(TargetAdaptorContainer, Address, a) for a in build_file_addresses.addresses]
-  yield TargetAdaptorContainers(tacs)
+  tacs = yield [Get(HydratedStruct, Address, a) for a in build_file_addresses.addresses]
+  yield HydratedStructs(tacs)
 
 
 class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
@@ -161,7 +161,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              type_alias='target')
 
   def resolve(self, spec):
-    tacs, = self.scheduler.product_request(TargetAdaptorContainers, [Specs(tuple([spec]))])
+    tacs, = self.scheduler.product_request(HydratedStructs, [Specs(tuple([spec]))])
     return [tac.value for tac in tacs]
 
   def test_no_address_no_family(self):

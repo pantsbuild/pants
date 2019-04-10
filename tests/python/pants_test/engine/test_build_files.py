@@ -18,7 +18,7 @@ from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapsh
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
-from pants.engine.parser import SymbolTable, TargetAdaptorContainer
+from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
 from pants.engine.struct import Struct, StructWithDeps
 from pants.util.objects import Exactly
@@ -198,7 +198,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
-    request = scheduler.execution_request([TargetAdaptorContainer], [address])
+    request = scheduler.execution_request([HydratedStruct], [address])
     returns, throws = scheduler.execute(request)
     if returns:
       state = returns[0][1]

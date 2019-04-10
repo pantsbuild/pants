@@ -20,7 +20,7 @@ from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.parser import TargetAdaptorContainer
+from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
@@ -76,7 +76,7 @@ def _raise_did_you_mean(address_family, name, source=None):
     raise resolve_error
 
 
-@rule(TargetAdaptorContainer, [AddressMapper, Address])
+@rule(HydratedStruct, [AddressMapper, Address])
 def hydrate_struct(address_mapper, address):
   """Given an AddressMapper and an Address, resolve a Struct from a BUILD file.
 
@@ -119,7 +119,7 @@ def hydrate_struct(address_mapper, address):
   collect_inline_dependencies(struct)
 
   # And then hydrate the inline dependencies.
-  dependencies = yield [Get(TargetAdaptorContainer, Address, a) for a in inline_dependencies]
+  dependencies = yield [Get(HydratedStruct, Address, a) for a in inline_dependencies]
   dependencies = [d.value for d in dependencies]
 
   def maybe_consume(outer_key, value):
@@ -159,7 +159,7 @@ def hydrate_struct(address_mapper, address):
         hydrated_args[key] = maybe_consume(key, value)
     return _hydrate(type(item), address.spec_path, **hydrated_args)
 
-  yield TargetAdaptorContainer(consume_dependencies(struct, args={'address': address}))
+  yield HydratedStruct(consume_dependencies(struct, args={'address': address}))
 
 
 def _hydrate(item_type, spec_path, **kwargs):
