@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import itertools
 import re
 
 from future.utils import text_type
@@ -200,8 +201,11 @@ class MultiMatcher(object):
 
 # TODO: Switch this to `lint` once we figure out a good way for v1 tasks and v2 rules
 # to share goal names.
-@console_rule('validate', [Console, RegexMatchResults, SourceFileValidation])
-def validate(console, regex_match_results, source_file_validation):
+@console_rule('validate', [Console, HydratedTargets, SourceFileValidation])
+def validate(console, hydrated_targets, source_file_validation):
+  per_tgt_rmrs = yield [Get(RegexMatchResults, HydratedTarget, ht) for ht in hydrated_targets]
+  regex_match_results = list(itertools.chain(*per_tgt_rmrs))
+
   detail_level = source_file_validation.get_options().detail_level
   regex_match_results = sorted(regex_match_results, key=lambda x: x.path)
   num_matched_all = 0
@@ -231,26 +235,21 @@ def validate(console, regex_match_results, source_file_validation):
     raise GracefulTerminationException('Files failed validation.')
 
 
-@rule(RegexMatchResults, [HydratedTargets])
-def match_regexes(hydrated_targets):
-  rmrs = yield [Get(RegexMatchResult, HydratedTarget, ht) for ht in hydrated_targets]
-  yield RegexMatchResults(rmrs)
-
-
-@rule(RegexMatchResult, [HydratedTarget, SourceFileValidation])
+@rule(RegexMatchResults, [HydratedTarget, SourceFileValidation])
 def match_regexes_for_one_target(hydrated_target, source_file_validation):
   multi_matcher = source_file_validation.get_multi_matcher()
+  rmrs = []
   if hasattr(hydrated_target.adaptor, 'sources'):
     files_content = yield Get(FilesContent,
                               Digest, hydrated_target.adaptor.sources.snapshot.directory_digest)
     for file_content in files_content:
-      yield multi_matcher.check_source_file(file_content.path, file_content.content)
+      rmrs.append(multi_matcher.check_source_file(file_content.path, file_content.content))
+  yield RegexMatchResults(rmrs)
 
 
 def rules():
   return [
     validate,
-    match_regexes,
     match_regexes_for_one_target,
     optionable_rule(SourceFileValidation),
   ]
