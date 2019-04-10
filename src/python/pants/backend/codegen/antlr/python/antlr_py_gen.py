@@ -54,7 +54,7 @@ class AntlrPyGen(SimpleCodegenTask, NailgunTask):
     return isinstance(target, PythonAntlrLibrary)
 
   def synthetic_target_type(self, target):
-    return PythonLibrary
+    return PythonLibrary.alias()
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     return self._deps()
