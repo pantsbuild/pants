@@ -173,6 +173,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
     when pantsd is enabled. However:
       - The number of mislabeled tests is currently small (~20 tests).
       - Those tests will still run, just with pantsd disabled.
+
+    N.B. Currently, this doesn't interact with test hermeticity.
+    This means that, if the test coordinator has set PANTS_ENABLE_PANTSD, and a test is not marked
+    as hermetic, it will run under pantsd regardless of the value of this function.
     """
     should_pantsd = os.getenv("TRAVIS_AND_PANTS_INTEGRATION_TESTS_SHOULD_HAVE_PANTSD")
     return should_pantsd in ["True", "true", "1"]
@@ -302,9 +306,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     if self.should_configure_pantsd():
       args.append("--enable-pantsd=True")
       args.append("--no-shutdown-pantsd-after-run")
-    else:
-      # NB. By unsetting this explicitly we avoid PANTS_ENABLE_PANTSD leaking into the test.
-      os.unsetenv("PANTS_ENABLE_PANTSD")
 
     if config:
       config_data = config.copy()
