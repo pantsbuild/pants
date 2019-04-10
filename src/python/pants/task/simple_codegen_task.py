@@ -359,6 +359,7 @@ class SimpleCodegenTask(Task):
     synthetic_target = self.context.add_new_target(
       address=self._get_synthetic_address(target, synthetic_target_dir),
       target_type=synthetic_target_type,
+      type_alias=synthetic_target_type.alias(),
       dependencies=synthetic_extra_dependencies,
       sources=sources,
       derived_from=target,
