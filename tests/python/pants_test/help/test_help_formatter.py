@@ -14,7 +14,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
   def format_help_for_foo(self, **kwargs):
     ohi = OptionHelpInfo(registering_class=type(None), display_args=['--foo'],
                          scoped_cmd_line_args=['--foo'], unscoped_cmd_line_args=['--foo'],
-                         typ=bool, fromfile=False, default=None, help='help for foo',
+                         typ=bool, default=None, help='help for foo',
                          deprecated_message=None, removal_version=None, removal_hint=None,
                          choices=None)
     ohi = ohi._replace(**kwargs)
@@ -27,10 +27,6 @@ class OptionHelpFormatterTest(unittest.TestCase):
   def test_format_help(self):
     line = self.format_help_for_foo(default='MYDEFAULT')
     self.assertEqual('--foo (default: MYDEFAULT)', line)
-
-  def test_format_help_fromfile(self):
-    line = self.format_help_for_foo(fromfile=True)
-    self.assertEqual('--foo (@fromfile value supported) (default: None)', line)
 
   def test_suppress_advanced(self):
     args = ['--foo']

@@ -15,7 +15,7 @@ from pants.option.option_util import is_list_option
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
     ['registering_class', 'display_args', 'scoped_cmd_line_args', 'unscoped_cmd_line_args',
-     'typ', 'fromfile', 'default', 'help', 'deprecated_message', 'removal_version',
+     'typ', 'default', 'help', 'deprecated_message', 'removal_version',
      'removal_hint', 'choices'])):
   """A container for help information for a single option.
 
@@ -27,7 +27,6 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
   unscoped_cmd_line_args: The unscoped raw flag names allowed on the cmd line in this option's
                           scope context (e.g., [--baz, --no-baz, --qux])
   typ: The type of the option.
-  fromfile: `True` if the option supports @fromfile value loading.
   default: The value of this option if no flags are specified (derived from config and env vars).
   help: The help message registered for this option.
   deprecated_message: If deprecated: A message explaining that this option is deprecated at
@@ -183,7 +182,6 @@ class HelpInfoExtracter(object):
                          scoped_cmd_line_args=scoped_cmd_line_args,
                          unscoped_cmd_line_args=unscoped_cmd_line_args,
                          typ=typ,
-                         fromfile=kwargs.get('fromfile', False),
                          default=default,
                          help=help_msg,
                          deprecated_message=deprecated_message,

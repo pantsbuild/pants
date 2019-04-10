@@ -456,12 +456,13 @@ class Parser(object):
 
     # Helper function to expand a fromfile=True value string, if needed.
     # May return a string or a dict/list decoded from a json/yaml file.
-    def expand(val_str):
-      if kwargs.get('fromfile', False) and val_str and val_str.startswith('@'):
-        if val_str.startswith('@@'):   # Support a literal @ for fromfile values via @@.
-          return val_str[1:]
+    def expand(val_or_str):
+      if (kwargs.get('fromfile', True) and val_or_str and
+          isinstance(val_or_str, str) and val_or_str.startswith('@')):
+        if val_or_str.startswith('@@'):   # Support a literal @ for fromfile values via @@.
+          return val_or_str[1:]
         else:
-          fromfile = val_str[1:]
+          fromfile = val_or_str[1:]
           try:
             with open(fromfile, 'r') as fp:
               s = fp.read().strip()
@@ -475,7 +476,7 @@ class Parser(object):
             raise self.FromfileError('Failed to read {} in {} from file {}: {}'.format(
                 dest, self._scope_str(), fromfile, e))
       else:
-        return val_str
+        return val_or_str
 
     # Get value from config files, and capture details about its derivation.
     config_details = None

@@ -213,13 +213,13 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              advanced=True,
              help='Verify that all config file values correspond to known options.')
 
-    register('--build-ignore', advanced=True, type=list, fromfile=True,
+    register('--build-ignore', advanced=True, type=list,
              default=['.*/', default_rel_distdir, 'bower_components/',
                       'node_modules/', '*.egg-info/'],
              help='Paths to ignore when identifying BUILD files. '
                   'This does not affect any other filesystem operations. '
                   'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
-    register('--pants-ignore', advanced=True, type=list, fromfile=True,
+    register('--pants-ignore', advanced=True, type=list,
              default=['.*/', default_rel_distdir],
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
@@ -231,10 +231,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
              metavar='<regexp>', help='Exclude target roots that match these regexes.')
-    register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
+    register('--subproject-roots', type=list, advanced=True, default=[],
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
-    register('--owner-of', type=list, default=[], daemon=False, fromfile=True, metavar='<path>',
+    register('--owner-of', type=list, default=[], daemon=False, metavar='<path>',
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed-* '
                   'options and specifying the targets directly. These three types of target '
@@ -294,7 +294,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'signal to the remote pantsd-runner process before killing it.')
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
-    register('--pantsd-invalidation-globs', advanced=True, type=list, fromfile=True, default=[],
+    register('--pantsd-invalidation-globs', advanced=True, type=list, default=[],
              help='Filesystem events matching any of these globs will trigger a daemon restart.')
 
     # Watchman options.
