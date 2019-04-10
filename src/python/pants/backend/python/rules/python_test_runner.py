@@ -58,7 +58,7 @@ def run_python_test(transitive_hydrated_target, pytest):
         all_requirements.append(str(py_req.requirement))
 
   # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
-  python_binary = sys.executable
+  python_binary = str(sys.executable)
 
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
   # pex27, where it should be hermetically provided in some way.
