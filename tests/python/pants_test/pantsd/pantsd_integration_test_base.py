@@ -109,6 +109,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
 
         if extra_config:
           recursively_update(pantsd_config, extra_config)
+        print('>>> config: \n{}\n'.format(pantsd_config))
 
         checker = PantsDaemonMonitor(runner_process_context, pid_dir)
         self.assert_runner(workdir, pantsd_config, ['kill-pantsd'], expected_runs=1)
