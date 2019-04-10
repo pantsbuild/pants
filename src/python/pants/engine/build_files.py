@@ -90,6 +90,8 @@ def hydrate_struct(address_mapper, address):
   addresses = address_family.addressables
   if not struct or address not in addresses:
     _raise_did_you_mean(address_family, address.target_name)
+  # TODO: This is effectively: "get the BuildFileAddress for this Address".
+  #  see https://github.com/pantsbuild/pants/issues/6657
   address = next(build_address for build_address in addresses if build_address == address)
 
   inline_dependencies = []
@@ -119,8 +121,8 @@ def hydrate_struct(address_mapper, address):
   collect_inline_dependencies(struct)
 
   # And then hydrate the inline dependencies.
-  dependencies = yield [Get(HydratedStruct, Address, a) for a in inline_dependencies]
-  dependencies = [d.value for d in dependencies]
+  hydrated_inline_dependencies = yield [Get(HydratedStruct, Address, a) for a in inline_dependencies]
+  dependencies = [d.value for d in hydrated_inline_dependencies]
 
   def maybe_consume(outer_key, value):
     if isinstance(value, six.string_types):
