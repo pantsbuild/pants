@@ -58,6 +58,7 @@ def setup_logging_to_stderr(python_logger, level):
   levelno = get_numeric_level(level)
   handler = create_native_stderr_log_handler(levelno, native, stream=sys.stderr)
   python_logger.addHandler(handler)
+  # Let the rust side filter levels; try to have the python side send everything to the rust logger.
   python_logger.setLevel("TRACE")
 
 
@@ -84,12 +85,8 @@ class NativeHandler(StreamHandler):
 
 
 def create_native_pantsd_file_log_handler(level, native, native_filename):
-  try:
-    fd = native.setup_pantsd_logger(native_filename, get_numeric_level(level))
-    ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), 'a'))
-  except Exception as e:
-    raise e
-
+  fd = native.setup_pantsd_logger(native_filename, get_numeric_level(level))
+  ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), 'a'))
   return NativeHandler(level, native, native_filename=native_filename)
 
 

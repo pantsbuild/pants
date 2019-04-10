@@ -73,6 +73,9 @@ class Exiter(object):
         # exit.
         if msg:
           logger.warning("Encountered error when trying to log this message: {}".format(msg))
+          # In pantsd, this won't go anywhere, because there's really nowhere for us to log if we
+          # can't log :(
+          # Not in pantsd, this will end up in sys.stderr.
           traceback.print_stack()
         logger.exception(e)
     self._exit(result)
