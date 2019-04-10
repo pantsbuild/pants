@@ -67,7 +67,7 @@ use crate::core::{Function, Key, Params, TypeId, Value};
 use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern,
-  HandleBuffer, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
+  HandleBuffer, IdentifyExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
   RawBuffer, StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
   StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
