@@ -110,8 +110,8 @@ class MultiMatcherTest(unittest.TestCase):
                       self._rm.check_source_file('foo/bar/baz.py', py_file_content))
 
   def test_multiple_encodings_error(self):
-    with self.assertRaisesRegex(ValueError, r'Path matched patterns with multiple content '
-                                            r'encodings \(ascii, utf8\): hello\/world.foo'):
+    with self.assertRaisesRegexp(ValueError, r'Path matched patterns with multiple content '
+                                             r'encodings \(ascii, utf8\): hello\/world.foo'):
       self._rm.get_applicable_content_pattern_names('hello/world.foo')
 
   def test_pattern_name_checks(self):
@@ -121,8 +121,8 @@ class MultiMatcherTest(unittest.TestCase):
         'unknown_path_pattern2': (),
       }
     }
-    with self.assertRaisesRegex(ValueError, 'required_matches uses unknown path pattern names: '
-                                            'unknown_path_pattern1, unknown_path_pattern2'):
+    with self.assertRaisesRegexp(ValueError, 'required_matches uses unknown path pattern names: '
+                                             'unknown_path_pattern1, unknown_path_pattern2'):
       MultiMatcher(bad_config1)
 
     bad_config2 = {
@@ -131,6 +131,6 @@ class MultiMatcherTest(unittest.TestCase):
         'dummy': ('unknown_content_pattern1',)
       }
     }
-    with self.assertRaisesRegex(ValueError, 'required_matches uses unknown content '
-                                            'pattern names: unknown_content_pattern1'):
+    with self.assertRaisesRegexp(ValueError, 'required_matches uses unknown content '
+                                             'pattern names: unknown_content_pattern1'):
       MultiMatcher(bad_config2)
