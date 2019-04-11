@@ -14,7 +14,7 @@ from builtins import open
 from future.utils import PY3
 from twitter.common.dirutil import Fileset
 
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.pantsd.service.pants_service import PantsService
 
@@ -59,23 +59,18 @@ class SchedulerService(PantsService):
     self._logger = logging.getLogger(__name__)
     self._event_queue = queue.Queue(maxsize=self.QUEUE_SIZE)
     self._watchman_is_running = threading.Event()
-    self._snapshot_by_glob = {}
+    self._invalidating_snapshot = None
     self._invalidating_files = set()
 
     self._loop_condition = LoopCondition()
 
-  @staticmethod
-  def _combined_invalidating_fileset_from_globs(glob_strs, root):
-    return set.union(*(Fileset.globs(glob_str, root=root)() for glob_str in glob_strs))
-
-  def _get_snapshot(self, glob):
-    print(dir(self._scheduler))
-    """Returns a Snapshot of the input glob"""
-    return self._scheduler_session.product_request(Snapshot, subjects=[PathGlobs(glob)])[0]
+  def _get_snapshot(self, globs):
+    """Returns a Snapshot of the input globs"""
+    return self._scheduler_session.product_request(Snapshot, subjects=[PathGlobs(globs)])[0]
 
   def _get_files(self, snapshots):
-    """Returns a list of the files corresponding to the list of input snapshots"""
-    return [snapshot.files for snapshot in snapshots][0]
+    """Returns a set of the files corresponding to the list of input snapshots"""
+    return snapshots.files
 
   def setup(self, services):
     """Service setup."""
@@ -86,12 +81,8 @@ class SchedulerService(PantsService):
     # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
     # that exist at startup are the only ones that can affect the running daemon.
     if self._invalidation_globs:
-      invalidating_files = self._combined_invalidating_fileset_from_globs(
-        self._invalidation_globs,
-        self._build_root
-      )
-      self._snapshot_by_glob['invalidating_files'] = self._get_snapshot(invalidating_files)
-      self._invalidating_files = self._get_files(self._snapshot_by_glob.values())
+      self._invalidating_snapshot = self._get_snapshot(self._invalidation_globs)
+      self._invalidating_files = self._get_files(self._invalidating_snapshot)
       self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
 
     if self._pantsd_pidfile:
@@ -104,18 +95,12 @@ class SchedulerService(PantsService):
     self._event_queue.put(event)
 
   def _maybe_invalidate_scheduler_batch(self, changed_globs):
-    def _is_glob_changed(glob):
-      # Recompute the digest for the glob
-      new_digest = self._get_snapshot([glob]).directory_digest
-      original_digest = self._snapshot_by_glob.get(glob, None)
-      return new_digest != original_digest
-
-    for glob in changed_globs:
-      if glob in self._invalidating_files and _is_glob_changed(glob):
-        self._logger.fatal(
-          'saw file events covered by invalidation globs [{}], terminating the daemon.'.format(glob))
-        self.terminate()
-        break
+    new_snapshot = self._get_snapshot(changed_globs)
+    if new_snapshot.directory_digest != self._invalidating_snapshot.directory_digest:
+      self._logger.fatal(
+        'saw file events covered by invalidation globs [{}], terminating the daemon.'
+          .format(self._invalidating_files))
+      self.terminate()
 
   def _maybe_invalidate_scheduler_pidfile(self):
     new_pid = self._check_pid_changed()
