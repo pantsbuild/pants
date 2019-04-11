@@ -18,7 +18,7 @@ class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
   objects."""
 
   @classmethod
-  def should_configure_pantsd(cls):
+  def use_pantsd_env_var(cls):
     """The test fails to run under pantsd because of a failure to initialize a subsystem"""
     return False
 

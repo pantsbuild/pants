@@ -164,7 +164,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
   PANTS_SCRIPT_NAME = 'pants'
 
   @classmethod
-  def should_configure_pantsd(cls):
+  def use_pantsd_env_var(cls):
     """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled,
     or they want to configure pantsd themselves.
 
@@ -178,7 +178,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     This means that, if the test coordinator has set PANTS_ENABLE_PANTSD, and a test is not marked
     as hermetic, it will run under pantsd regardless of the value of this function.
     """
-    should_pantsd = os.getenv("TRAVIS_AND_PANTS_INTEGRATION_TESTS_SHOULD_HAVE_PANTSD")
+    should_pantsd = os.getenv("USE_PANTSD_FOR_INTEGRATION_TESTS")
     return should_pantsd in ["True", "true", "1"]
 
   @classmethod
@@ -293,7 +293,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
       '--print-exception-stacktrace={}'.format(print_exception_stacktrace),
     ]
 
-
     if self.hermetic():
       args.extend(['--pants-config-files=[]',
                    # Turn off cache globally.  A hermetic integration test shouldn't rely on cache,
@@ -303,7 +302,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
                    '--cache-bootstrap-read', '--cache-bootstrap-write'
                    ])
 
-    if self.should_configure_pantsd():
+    if self.use_pantsd_env_var():
       args.append("--enable-pantsd=True")
       args.append("--no-shutdown-pantsd-after-run")
 
@@ -565,10 +564,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
                      'pants-plugins',
                      'pants.ini',
                      'pants.travis-ci.ini',
-                     '.python-interpreter-constraints',
                      'rust-toolchain',
-                     'src',
-                     )
+                     'src')
     dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
 
     with self.temporary_workdir() as tmp_dir:

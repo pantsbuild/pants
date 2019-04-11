@@ -15,7 +15,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
   """Tests the functionality of the build_ignore_patterns option in pants.ini ."""
 
   @classmethod
-  def should_configure_pantsd(cls):
+  def use_pantsd_env_var(cls):
     """
     Some of the tests here expect to read the standard error after an intentional failure.
     However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
@@ -82,7 +82,6 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
                                 })
 
     self.assert_failure(run_result)
-
     # Error message complains dependency dir has no BUILD files.
     self.assertIn('testprojects/src/thrift/org/pantsbuild/constants_only', run_result.stderr_data)
 

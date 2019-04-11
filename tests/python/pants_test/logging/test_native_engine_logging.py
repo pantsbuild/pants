@@ -11,7 +11,7 @@ from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 class NativeEngineLoggingTest(PantsRunIntegrationTest):
 
   @classmethod
-  def should_configure_pantsd(cls):
+  def use_pantsd_env_var(cls):
     """
     Some of the tests here expect to read the standard error after an intentional failure.
     However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log

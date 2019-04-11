@@ -84,7 +84,7 @@ class PantsDaemonMonitor(ProcessManager):
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
 
   @classmethod
-  def should_configure_pantsd(cls):
+  def use_pantsd_env_var(cls):
     """We set our own ad-hoc pantsd configuration in most of these tests"""
     return False
 

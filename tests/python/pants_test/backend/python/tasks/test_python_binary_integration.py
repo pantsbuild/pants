@@ -24,9 +24,8 @@ _OSX_WHEEL_SUBSTRING = "macosx"
 class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
-  def should_configure_pantsd(cls):
-    """TODO: See the point about watchman in #7320.
-    """
+  def use_pantsd_env_var(cls):
+    """TODO(#7320): See the point about watchman."""
     return False
 
   @staticmethod

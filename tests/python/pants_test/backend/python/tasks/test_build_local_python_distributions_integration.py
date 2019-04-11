@@ -19,9 +19,8 @@ from pants_test.testutils.py2_compat import assertRegex
 class BuildLocalPythonDistributionsIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
-  def should_configure_pantsd(cls):
-    """TODO: See the point about watchman in #7320.
-    """
+  def use_pantsd_env_var(cls):
+    """TODO(#7320): See the point about watchman."""
     return False
 
   hello_install_requires_dir = 'testprojects/src/python/python_distribution/hello_with_install_requires'
