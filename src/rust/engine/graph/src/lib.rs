@@ -1308,7 +1308,7 @@ mod tests {
     }
 
     fn get(&self, dst: TNode) -> BoxFuture<Vec<T>, TError> {
-      self.graph.get(self.entry_id.unwrap(), self, dst)
+      self.graph.get(EmptyVisualizer{}, self.entry_id.unwrap(), self, dst, &[])
     }
 
     fn ran(&self, node: TNode) {
