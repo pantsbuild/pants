@@ -35,7 +35,10 @@ class DaemonSignalHandler(SignalHandler):
 
 
 class DaemonExiter(Exiter):
-  """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
+  """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol.
+
+  TODO: This no longer really follows the Exiter API, per-se (or at least, it doesn't call super).
+  """
 
   def __init__(self, socket):
     # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
@@ -63,18 +66,15 @@ class DaemonExiter(Exiter):
         except Exception:
           pass
 
-    try:
-      # Write a final message to stderr if present.
-      if msg:
-        NailgunProtocol.send_stderr(self._socket, msg)
+    # Write a final message to stderr if present.
+    if msg:
+      NailgunProtocol.send_stderr(self._socket, msg)
 
-      # Send an Exit chunk with the result.
-      NailgunProtocol.send_exit_with_code(self._socket, result)
+    # Send an Exit chunk with the result.
+    NailgunProtocol.send_exit_with_code(self._socket, result)
 
-      # Shutdown the connected socket.
-      teardown_socket(self._socket)
-    finally:
-      super(DaemonExiter, self).exit(result=result, *args, **kwargs)
+    # Shutdown the connected socket.
+    teardown_socket(self._socket)
 
 
 class DaemonPantsRunner(ProcessManager):
@@ -260,33 +260,6 @@ class DaemonPantsRunner(ProcessManager):
     when the pantsd-runner forks from pantsd, there is a working pool for any work that happens
     in that child process.
     """
-    fork_context = self._graph_helper.scheduler_session.with_fork_context if self._graph_helper else None
-    self.daemonize(write_pid=False, fork_context=fork_context)
-
-  def pre_fork(self):
-    # Mark all services pausing (to allow them to concurrently pause), and then wait for them
-    # to have paused.
-    # NB: PailgunServer ensures that the entire run occurs under the lifecycle_lock.
-    for service in self._services.services:
-      service.mark_pausing()
-    for service in self._services.services:
-      service.await_paused()
-
-  def post_fork_parent(self):
-    # NB: PailgunServer ensures that the entire run occurs under the lifecycle_lock.
-    for service in self._services.services:
-      service.resume()
-
-  def post_fork_child(self):
-    """Post-fork child process callback executed via ProcessManager.daemonize()."""
-    # Set the Exiter exception hook post-fork so as not to affect the pantsd processes exception
-    # hook with socket-specific behavior. Note that this intentionally points the faulthandler
-    # trace stream to sys.stderr, which at this point is still a _LoggerStream object writing to
-    # the `pantsd.log`. This ensures that in the event of e.g. a hung but detached pantsd-runner
-    # process that the stacktrace output lands deterministically in a known place vs to a stray
-    # terminal window.
-    # TODO: test the above!
-    ExceptionSink.reset_exiter(self._exiter)
 
     ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
     ExceptionSink.reset_signal_handler(DaemonSignalHandler())
@@ -294,17 +267,10 @@ class DaemonPantsRunner(ProcessManager):
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
 
-    # Set context in the process title.
-    set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
-
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
     NailgunProtocol.send_pid(self._socket, os.getpid())
     NailgunProtocol.send_pgrp(self._socket, os.getpgrp() * -1)
-
-    # Stop the services that were paused pre-fork.
-    for service in self._services.services:
-      service.terminate()
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
     with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
@@ -326,7 +292,10 @@ class DaemonPantsRunner(ProcessManager):
           self._env,
           self._target_roots,
           self._graph_helper,
-          self._options_bootstrapper
+          self._options_bootstrapper,
+          # TODO: If both the daemon and the child process `setup_logging`, we end up with
+          # infinite recursion on the second child run.
+          setup_logging=False,
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
         runner.run()

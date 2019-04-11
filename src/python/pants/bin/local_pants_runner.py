@@ -126,7 +126,7 @@ class LocalPantsRunner(object):
 
   @classmethod
   def create(cls, exiter, args, env, target_roots=None, daemon_graph_session=None,
-             options_bootstrapper=None):
+             options_bootstrapper=None, setup_logging=None):
     """Creates a new LocalPantsRunner instance by parsing options.
 
     :param Exiter exiter: The Exiter instance to use for this run.
