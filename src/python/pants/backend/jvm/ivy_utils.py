@@ -537,7 +537,7 @@ class IvyModuleRef(object):
   def __eq__(self, other):
     return isinstance(other, IvyModuleRef) and self._id == other._id
 
-  # TODO(python3port): Return NotImplemented if other does not have attributes
+  # TODO(#6071): Return NotImplemented if other does not have attributes
   def __lt__(self, other):
     # We can't just re-use __repr__ or __str_ because we want to order rev last
     return ((self.org, self.name, self.classifier or '', self.ext, self.rev) <

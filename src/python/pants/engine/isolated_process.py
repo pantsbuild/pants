@@ -6,11 +6,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 
-from future.utils import binary_type, text_type
+from future.utils import binary_type
 
 from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
-from pants.util.objects import Exactly, TypedCollection, datatype
+from pants.util.objects import Exactly, datatype, string_list, string_optional, string_type
 
 
 logger = logging.getLogger(__name__)
@@ -19,15 +19,15 @@ _default_timeout_seconds = 15 * 60
 
 
 class ExecuteProcessRequest(datatype([
-  ('argv', TypedCollection(Exactly(text_type))),
+  ('argv', string_list),
   ('input_files', Digest),
-  ('description', text_type),
-  ('env', TypedCollection(Exactly(text_type))),
-  ('output_files', TypedCollection(Exactly(text_type))),
-  ('output_directories', TypedCollection(Exactly(text_type))),
+  ('description', string_type),
+  ('env', string_list),
+  ('output_files', string_list),
+  ('output_directories', string_list),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
-  ('jdk_home', Exactly(text_type, type(None))),
+  ('jdk_home', string_optional),
 ])):
   """Request for execution with args and snapshots to extract."""
 

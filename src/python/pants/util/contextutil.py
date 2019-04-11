@@ -306,7 +306,7 @@ def open_tar(path_or_file, *args, **kwargs):
     If path_or_file is a file, caller must close it separately.
   """
   (path, fileobj) = ((path_or_file, None) if isinstance(path_or_file, string_types)
-                     else (None, path_or_file))  # TODO(python3port): stop using six.string_types
+                     else (None, path_or_file))  # TODO(#6071): stop using six.string_types
                                                  # This should only accept python3 `str`, not byte strings.
   with closing(TarFile.open(path, *args, fileobj=fileobj, **kwargs)) as tar:
     yield tar

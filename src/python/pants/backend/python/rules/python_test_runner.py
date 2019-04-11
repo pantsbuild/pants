@@ -8,6 +8,8 @@ import os.path
 import sys
 from builtins import str
 
+from future.utils import text_type
+
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
@@ -58,18 +60,26 @@ def run_python_test(transitive_hydrated_target, pytest):
         all_requirements.append(str(py_req.requirement))
 
   # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
-  python_binary = sys.executable
+  # TODO(#7061): This str() can be removed after we drop py2!
+  python_binary = str(sys.executable)
 
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
   # pex27, where it should be hermetically provided in some way.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   requirements_pex_argv = [
     './{}'.format(pex_snapshot.files[0]),
-    '--python', python_binary,
+    # TODO(#7061): This text_type() can be removed after we drop py2!
+    '--python', text_type(python_binary),
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
     # Sort all user requirement strings to increase the chance of cache hits across invocations.
-  ] + list(pytest.get_requirement_strings()) + sorted(all_requirements)
+  ] + [
+    # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
+    text_type(req)
+    for req in sorted(
+        list(pytest.get_requirement_strings())
+        + list(all_requirements))
+  ]
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
     input_files=pex_snapshot.directory_digest,
