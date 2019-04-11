@@ -543,8 +543,8 @@ Interrupted by user:
 Interrupted by user over pailgun client!
 """
                .format(today=re.escape(today))],
-      quit_timeout=0.01,
-    )
+      # NB: Make the timeout very small to ensure the warning message will reliably occur in CI!
+      quit_timeout=0.000001)
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
