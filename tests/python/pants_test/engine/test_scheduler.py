@@ -238,12 +238,11 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
 
   def test_unhashable_failure(self):
     """Test that unhashable Get(...) params result in a structured error."""
-    with assert_execution_error(self, dedent("""\
-      TypeError: For object with type 'list', error was: unhashable type: 'list'""")):
+    with assert_execution_error(self, "TypeError: unhashable type: 'list'"):
       self.scheduler.product_request(C, [Params(TypeCheckFailWrapper(A()))])
 
     with assert_execution_error(self, dedent("""\
-      TypeError: For object with type 'CollectionType', error was: unhashable type: 'list'""")):
+      TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': error was: unhashable type: 'list'""")):
       self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
 
   def test_trace_includes_rule_exception_traceback(self):

@@ -147,7 +147,22 @@ def datatype(field_decls, superclass_name=None, **kwargs):
     # explicitly implemented, otherwise Python will raise "unhashable type". See
     # https://docs.python.org/3/reference/datamodel.html#object.__hash__.
     def __hash__(self):
-      return super(DataType, self).__hash__()
+      try:
+        return super(DataType, self).__hash__()
+      except TypeError:
+        # If any fields are unhashable, we want to be able to specify which ones in the error
+        # message, but we don't want to slow down the normal __hash__ code path, so we take the time
+        # to break it down by field if we know the __hash__ fails for some reason.
+        for field_name, value in self._asdict().items():
+          try:
+            hash(value)
+          except TypeError as e:
+            raise TypeError("For datatype object {} (type '{}'): in field '{}': {}"
+                            .format(self, type(self).__name__, field_name, e))
+          else:
+            # If the error doesn't seem to be with hashing any of the fields, just re-raise the
+            # original error.
+            raise
 
     # NB: As datatype is not iterable, we need to override both __iter__ and all of the
     # namedtuple methods that expect self to be iterable.
@@ -526,10 +541,25 @@ _string_type_constraint = SubclassesOf(binary_type, text_type)
 class TypedCollection(TypeConstraint):
   """A `TypeConstraint` which accepts a TypeOnlyConstraint and validates a collection."""
 
-  _iterable_constraint = SubclassesOf(Iterable)
-  # strings in Python are considered iterables of substrings, but we only want to allow explicit
-  # collection types.
-  _exclude_iterable_constraint = _string_type_constraint
+  @memoized_classproperty
+  def iterable_constraint(cls):
+    """Define what kind of collection inputs are accepted by this type constraint.
+
+    :rtype: TypeConstraint
+    """
+    return SubclassesOf(Iterable)
+
+  # TODO: extend TypeConstraint to specify includes and excludes in a single constraint!
+  @classproperty
+  def exclude_iterable_constraint(cls):
+    """Define what collection inputs are *not* accepted by this type constraint.
+
+    Strings in Python are considered iterables of substrings, but we only want to allow explicit
+    collection types.
+
+    :rtype: TypeConstraint
+    """
+    return _string_type_constraint
 
   def __init__(self, constraint):
     """Create a `TypeConstraint` which validates each member of a collection with `constraint`.
@@ -550,8 +580,8 @@ class TypedCollection(TypeConstraint):
     super(TypedCollection, self).__init__(description=description)
 
   def _is_iterable(self, obj):
-    return (self._iterable_constraint.satisfied_by(obj)
-            and not self._exclude_iterable_constraint.satisfied_by(obj))
+    return (self.iterable_constraint.satisfied_by(obj)
+            and not self.exclude_iterable_constraint.satisfied_by(obj))
 
   # TODO: consider making this a private method of TypeConstraint, as it now duplicates the logic in
   # self.validate_satisfied_by()!
@@ -566,10 +596,10 @@ class TypedCollection(TypeConstraint):
 
   def validate_satisfied_by(self, obj):
     if not self._is_iterable(obj):
-      base_iterable_error = self.make_type_constraint_error(obj, self._iterable_constraint)
+      base_iterable_error = self.make_type_constraint_error(obj, self.iterable_constraint)
       raise TypeConstraintError(
         "in wrapped constraint {}: {}\nNote that objects matching {} are not considered iterable."
-        .format(self, base_iterable_error, self._exclude_iterable_constraint))
+        .format(self, base_iterable_error, self.exclude_iterable_constraint))
     for el in obj:
       if not self._constraint.satisfied_by(el):
         raise self.make_collection_type_constraint_error(obj, el)
@@ -592,7 +622,7 @@ hashable_collection_constraint = Exactly(tuple)
 
 
 class HashableTypedCollection(TypedCollection):
-  _iterable_constraint = hashable_collection_constraint
+  iterable_constraint = hashable_collection_constraint
 
 
 string_type = Exactly(text_type)
