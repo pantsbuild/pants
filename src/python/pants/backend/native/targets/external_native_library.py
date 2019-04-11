@@ -8,7 +8,6 @@ import re
 
 from future.utils import text_type
 
-from pants.base.deprecated import warn_or_error
 from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField
@@ -100,16 +99,8 @@ class ExternalNativeLibrary(Target):
     """
     payload = payload or Payload()
 
-    try:
-      assert_list(packages, key_arg='packages', expected_type=ConanRequirement,
-                  raise_type=self._DeprecatedStringPackage)
-    except self._DeprecatedStringPackage as e:
-      warn_or_error('1.16.0.dev1',
-                    'Raw strings as conan package descriptors',
-                    hint='Use conan_requirement(...) instead! Error was: {}'.format(str(e)),
-                    stacklevel=2, context=0)
-      packages = [ConanRequirement(s) if not isinstance(s, ConanRequirement) else s
-                  for s in packages]
+    assert_list(packages, key_arg='packages', expected_type=ConanRequirement,
+                raise_type=self._DeprecatedStringPackage)
 
     payload.add_fields({
       'packages': ConanRequirementSetField(packages),
