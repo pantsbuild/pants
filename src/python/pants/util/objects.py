@@ -585,3 +585,9 @@ class TypedCollection(TypeConstraint):
     return ('{type_constraint_type}({constraint!r})'
             .format(type_constraint_type=type(self).__name__,
                     constraint=self._constraint))
+
+
+# TODO(#6742): Useful type constraints for datatype fields before we start using mypy type hints!
+string_type = Exactly(text_type)
+string_list = TypedCollection(string_type)
+string_optional = Exactly(text_type, type(None))

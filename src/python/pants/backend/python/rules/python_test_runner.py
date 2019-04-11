@@ -8,6 +8,8 @@ import os.path
 import sys
 from builtins import str
 
+from future.utils import text_type
+
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
@@ -65,11 +67,15 @@ def run_python_test(transitive_hydrated_target, pytest):
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   requirements_pex_argv = [
     './{}'.format(pex_snapshot.files[0]),
-    '--python', python_binary,
+    '--python', text_type(python_binary),
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
     # Sort all user requirement strings to increase the chance of cache hits across invocations.
-  ] + list(pytest.get_requirement_strings()) + sorted(all_requirements)
+  ] + list(
+    text_type(req) for req in sorted(
+      list(pytest.get_requirement_strings())
+      + list(all_requirements))
+  )
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
     input_files=pex_snapshot.directory_digest,

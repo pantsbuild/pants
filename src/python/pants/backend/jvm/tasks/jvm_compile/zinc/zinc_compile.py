@@ -449,6 +449,9 @@ class BaseZincCompile(JvmCompile):
       '-cp', zinc_relpath,
       Zinc.ZINC_COMPILE_MAIN
     ] + zinc_args
+    # TODO(python3port): Our ExecuteProcessRequest expects a specific string type for arguments,
+    # which py2 doesn't default to. This can be removed when we drop python 2.
+    argv = [text_type(arg) for arg in argv]
 
     req = ExecuteProcessRequest(
       argv=tuple(argv),
