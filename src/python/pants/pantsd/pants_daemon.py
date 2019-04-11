@@ -243,7 +243,7 @@ class PantsDaemon(FingerprintedProcessManager):
     self._log_level = log_level
     self._services = services
     self._bootstrap_options = bootstrap_options
-    self._log_show_rust_3rdparty = bootstrap_options.log_show_rust_3rdparty if bootstrap_options else True
+    self._log_show_rust_3rdparty = bootstrap_options.for_global_scope().log_show_rust_3rdparty if bootstrap_options else True
 
     self._log_dir = os.path.join(work_dir, self.name)
     self._logger = logging.getLogger(__name__)
