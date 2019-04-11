@@ -1872,7 +1872,7 @@ mod remote {
               digest, err
             ))
             .to_boxed(),
-            Ok(((sender, receiver), client)) => {
+            Ok(((sender, receiver), _client)) => {
               let chunk_size_bytes = store.chunk_size_bytes;
               let resource_name = resource_name.clone();
               let bytes = bytes.clone();
@@ -1898,11 +1898,26 @@ mod remote {
                 }
               });
 
-              future::ok(client)
-                .join(sender.send_all(stream).map_err(move |e| {
-                  format!("Error attempting to upload digest {:?}: {:?}", digest, e)
-                }))
-                .and_then(move |_| {
+              sender
+                .send_all(stream)
+                .map(|_| ())
+                .or_else(move |e| {
+                  match e {
+                    // NB(#7422): This can sometimes occur when pants sends many process execution
+                    // requests which depend on the same large file at the same time. It appears that
+                    // the check_alive() method in grpc-rs which returns RpcFinished(None) is used as
+                    // a way to exit early out of methods which return a Result, if the future's
+                    // contents are already available. This may be a race condition that deserves
+                    // respect, but right now it's not clear it's an error. See #6344 for a case where
+                    // we override this type of behavior by forking gprcio.
+                    grpcio::Error::RpcFinished(None) => Ok(()),
+                    e => Err(format!(
+                      "Error attempting to upload digest {:?}: {:?}",
+                      digest, e
+                    )),
+                  }
+                })
+                .and_then(move |()| {
                   receiver.map_err(move |e| {
                     format!(
                       "Error from server when uploading digest {:?}: {:?}",
