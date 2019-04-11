@@ -18,7 +18,7 @@ fn main() {
     File::create(PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("packages.rs")).unwrap();
   writeln!(
     out_file,
-    "pub const PANTS_PACKAGE_NAMES: &'static[&'static str] = &["
+    "pub const PANTS_PACKAGE_NAMES: &[&str] = &["
   )
   .unwrap();
   for package in packages {
