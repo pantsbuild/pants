@@ -10,7 +10,8 @@ from future.utils import binary_type
 
 from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
-from pants.util.objects import Exactly, datatype, string_list, string_optional, string_type
+from pants.util.objects import (Exactly, datatype, hashable_string_list, string_list,
+                                string_optional, string_type)
 
 
 logger = logging.getLogger(__name__)
@@ -19,12 +20,12 @@ _default_timeout_seconds = 15 * 60
 
 
 class ExecuteProcessRequest(datatype([
-  ('argv', string_list),
+  ('argv', hashable_string_list),
   ('input_files', Digest),
   ('description', string_type),
-  ('env', string_list),
-  ('output_files', string_list),
-  ('output_directories', string_list),
+  ('env', hashable_string_list),
+  ('output_files', hashable_string_list),
+  ('output_directories', hashable_string_list),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
   ('jdk_home', string_optional),

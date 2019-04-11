@@ -588,6 +588,16 @@ class TypedCollection(TypeConstraint):
 
 
 # TODO(#6742): Useful type constraints for datatype fields before we start using mypy type hints!
+hashable_collection_constraint = Exactly(tuple)
+
+
+class HashableTypedCollection(TypedCollection):
+  _iterable_constraint = hashable_collection_constraint
+
+
 string_type = Exactly(text_type)
 string_list = TypedCollection(string_type)
 string_optional = Exactly(text_type, type(None))
+
+
+hashable_string_list = HashableTypedCollection(string_type)

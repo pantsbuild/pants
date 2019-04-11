@@ -13,10 +13,10 @@ from textwrap import dedent
 from future.utils import PY2, PY3, text_type
 
 from pants.util.collections_abc_backport import OrderedDict
-from pants.util.objects import (EnumVariantSelectionError, Exactly, SubclassesOf, SuperclassesOf,
-                                TypeCheckError, TypeConstraintError, TypedCollection,
-                                TypedDatatypeInstanceConstructionError, _string_type_constraint,
-                                datatype, enum)
+from pants.util.objects import (EnumVariantSelectionError, Exactly, HashableTypedCollection,
+                                SubclassesOf, SuperclassesOf, TypeCheckError, TypeConstraintError,
+                                TypedCollection, TypedDatatypeInstanceConstructionError,
+                                _string_type_constraint, datatype, enum)
 from pants_test.test_base import TestBase
 
 
@@ -225,6 +225,20 @@ class TypedCollectionTest(TypeConstraintTestBase):
                                               input_string_type=type('xxx').__name__,
                                               exclude_constraint=_string_type_constraint)):
       StringCollectionField(hello_strings='xxx')
+
+  def test_hashable_collection(self):
+    class NormalCollection(datatype(['value'])):
+      pass
+
+    with self.assertRaisesWithMessage(TypeError, "unhashable type: 'list'"):
+      hash(NormalCollection([]))
+
+    class HashableIntVector(datatype([('value', HashableTypedCollection(Exactly(int)))])):
+      pass
+
+    vec = HashableIntVector((1, 2, 3,))
+    self.assertEqual(vec.value, (1, 2, 3,))
+    self.assertIsInstance(hash(vec), int)
 
 
 class ExportedDatatype(datatype(['val'])):
