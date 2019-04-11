@@ -78,7 +78,12 @@ class PailgunHandler(PailgunHandlerBase):
 
     # NB: This represents the end of pantsd's involvement in the request, but the request will
     # continue to run post-fork.
-    self.logger.info('pailgun request completed: `{}`'.format(' '.join(arguments)))
+    try:
+      self.logger.info('pailgun request completed: `{}`'.format(' '.join(arguments)))
+    except Exception as e:
+      with open('logs', 'a') as f:
+        f.write('\n logging error\n')
+        f.write(e)
 
   def handle_error(self, exc=None):
     """Error handler for failed calls to handle()."""

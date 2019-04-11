@@ -156,8 +156,11 @@ class RemotePantsRunner(object):
       # Execute the command on the pailgun.
       result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
 
+    with open('logs', 'a') as f:
+      f.write('inside _connect_and_execute\n')
+      f.write(str(result))
     # Exit.
-    self._exiter.exit(result)
+    #self._exiter.exit(result)
 
   def _extract_remote_exception(self, pantsd_pid, nailgun_error):
     """Given a NailgunError, returns a Terminated exception with additional info (where possible).

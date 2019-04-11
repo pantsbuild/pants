@@ -13,6 +13,7 @@ from builtins import open, zip
 from contextlib import contextmanager
 
 from future.utils import raise_with_traceback
+from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, SignalHandler
@@ -259,7 +260,6 @@ class DaemonPantsRunner(ProcessManager):
     when the pantsd-runner forks from pantsd, there is a working pool for any work that happens
     in that child process.
     """
-
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
 
@@ -289,12 +289,9 @@ class DaemonPantsRunner(ProcessManager):
           self._target_roots,
           self._graph_helper,
           self._options_bootstrapper,
-          # TODO: If both the daemon and the child process `setup_logging`, we end up with
-          # infinite recursion on the second child run.
-          setup_logging=False,
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
-        runner.run()
+        runner.run(exit_on_completion=False)
       except KeyboardInterrupt:
         self._exiter.exit_and_fail('Interrupted by user.\n')
       except GracefulTerminationException as e:

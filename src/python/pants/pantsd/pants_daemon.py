@@ -66,8 +66,7 @@ class _LoggerStream(object):
       # The log only accepts text, and will raise a decoding error if the default encoding is ascii
       # if provided a bytes input for unicode text.
       line = ensure_text(line)
-      # TODO(ity): Enable logging here
-      # self._logger.log(self._log_level, line.rstrip())
+      self._logger.log(self._log_level, line.rstrip())
 
   def flush(self):
     return
@@ -352,7 +351,19 @@ class PantsDaemon(FingerprintedProcessManager):
     # Once all services are started, write our pid.
     self.write_pid()
     self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint))
-
+    with open('logs', 'a') as f:
+      pid = os.getpid()
+      f.write('writing pid inside pants_daemon')
+      f.write(str(pid))
+      # while not self.is_killed:
+      #   for service, service_thread in service_thread_map.items():
+      #     f.write(str(service))
+      #     f.write('\n')
+      #     f.write(str(service._state._state))
+      #     f.write('\n')
+      #     f.write(str(service_thread))
+      #     f.write('\n')
+      f.write('*'*10)
     # Monitor services.
     while not self.is_killed:
       for service, service_thread in service_thread_map.items():
@@ -399,7 +410,7 @@ class PantsDaemon(FingerprintedProcessManager):
       self._native.set_panic_handler()
 
       # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
-      set_process_title('pantsd [{}]'.format(self._build_root))
+      set_process_title('pantsd-daemon [{}]'.format(self._build_root))
 
       # Write service socket information to .pids.
       self._write_named_sockets(self._services.port_map)
@@ -445,6 +456,10 @@ class PantsDaemon(FingerprintedProcessManager):
     self.daemon_spawn()
     # Wait up to 60 seconds for pantsd to write its pidfile.
     pantsd_pid = self.await_pid(60)
+    with open('logs', 'a') as f:
+      f.write('\n2 inside launch')
+      f.write('\n2 writing pid')
+      f.write(str(pantsd_pid))
     listening_port = self.read_named_socket('pailgun', int)
     self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
                        .format(self.pid, listening_port))
