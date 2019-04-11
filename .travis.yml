@@ -10,6 +10,8 @@
 # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1
 conditions: v1
 
+if: commit_message !~ SKIP_FULL_CI
+
 # -------------------------------------------------------------------------
 # Global setup
 # -------------------------------------------------------------------------
