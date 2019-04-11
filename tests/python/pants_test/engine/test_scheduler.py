@@ -122,6 +122,18 @@ def c_unhashable(_):
   yield C()
 
 
+class CollectionType(datatype(['items'])):
+  pass
+
+
+@rule(C, [CollectionType])
+def c_unhashable_datatype(_):
+  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+  # the hashability check will fail.
+  _ = yield Get(A, B, list()) # noqa: F841
+  yield C()
+
+
 @contextmanager
 def assert_execution_error(test_case, expected_msg):
   with test_case.assertRaises(ExecutionError) as cm:
@@ -208,8 +220,10 @@ class SchedulerWithNestedRaiseTest(TestBase):
     return super(SchedulerWithNestedRaiseTest, cls).rules() + [
       RootRule(B),
       RootRule(TypeCheckFailWrapper),
+      RootRule(CollectionType),
       a_typecheck_fail_test,
       c_unhashable,
+      c_unhashable_datatype,
       nested_raise,
     ]
 
@@ -224,15 +238,19 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
 
   def test_unhashable_failure(self):
     """Test that unhashable Get(...) params result in a structured error."""
-    expected_msg = """TypeError: unhashable type: 'list'"""
-    with assert_execution_error(self, expected_msg):
+    with assert_execution_error(self, dedent("""\
+      TypeError: For object with type 'list', error was: unhashable type: 'list'""")):
       self.scheduler.product_request(C, [Params(TypeCheckFailWrapper(A()))])
+
+    with assert_execution_error(self, dedent("""\
+      TypeError: For object with type 'CollectionType', error was: unhashable type: 'list'""")):
+      self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
 
   def test_trace_includes_rule_exception_traceback(self):
     # Execute a request that will trigger the nested raise, and then directly inspect its trace.
     request = self.scheduler.execution_request([A], [B()])
     self.scheduler.execute(request)
-    
+
     trace = remove_locations_from_traceback('\n'.join(self.scheduler.trace(request)))
     assert_equal_with_printing(self, dedent('''
                      Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A)

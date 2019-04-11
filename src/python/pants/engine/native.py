@@ -545,8 +545,13 @@ class ExternContext(object):
 
   def identify(self, obj):
     """Return an Ident-shaped tuple for the given object."""
-    hash_ = hash(obj)
-    type_id = self.to_id(type(obj))
+    try:
+      hash_ = hash(obj)
+      type_id = self.to_id(type(obj))
+    except TypeError as e:
+      # datatypes and other tuple types can have a TypeError when trying to hash one of their
+      # fields, and the error message doesn't otherwise have the datatype's name in it.
+      raise TypeError("For object with type '{}', error was: {}".format(type(obj).__name__, e))
     return (hash_, TypeId(type_id))
 
   def to_id(self, typ):
