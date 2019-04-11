@@ -81,7 +81,6 @@ testprojects/tests/python/pants/dummies:passing_target                          
     )
 
   def test_failing_python_test(self):
-    self.maxDiff = None
     pants_run = self.run_failing_pants_test([
       'testprojects/tests/python/pants/dummies:failing_target',
     ])

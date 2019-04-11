@@ -60,6 +60,7 @@ def run_python_test(transitive_hydrated_target, pytest):
         all_requirements.append(str(py_req.requirement))
 
   # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
+  # TODO(#7061): This str() can be removed after we drop py2!
   python_binary = str(sys.executable)
 
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
@@ -67,15 +68,18 @@ def run_python_test(transitive_hydrated_target, pytest):
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   requirements_pex_argv = [
     './{}'.format(pex_snapshot.files[0]),
+    # TODO(#7061): This text_type() can be removed after we drop py2!
     '--python', text_type(python_binary),
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
     # Sort all user requirement strings to increase the chance of cache hits across invocations.
-  ] + list(
-    text_type(req) for req in sorted(
-      list(pytest.get_requirement_strings())
-      + list(all_requirements))
-  )
+  ] + [
+    # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
+    text_type(req)
+    for req in sorted(
+        list(pytest.get_requirement_strings())
+        + list(all_requirements))
+  ]
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
     input_files=pex_snapshot.directory_digest,
