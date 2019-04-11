@@ -43,10 +43,10 @@ def _maybe_configure_extended_logging(logger):
     _configure_requests_debug_logging()
 
 
-def init_rust_logger(level, show_rust_3rdparty_logs):
+def init_rust_logger(level, log_show_rust_3rdparty):
   native = Native()
   levelno = get_numeric_level(level)
-  native.init_rust_logging(levelno, show_rust_3rdparty_logs)
+  native.init_rust_logging(levelno, log_show_rust_3rdparty)
 
 
 def setup_logging_to_stderr(python_logger, level):

@@ -35,7 +35,7 @@ class PantsRunner(object):
 
   def _enable_rust_logging(self, global_bootstrap_options):
     levelname = global_bootstrap_options.level.upper()
-    init_rust_logger(levelname, global_bootstrap_options.show_rust_3rdparty_logs)
+    init_rust_logger(levelname, global_bootstrap_options.log_show_rust_3rdparty)
     setup_logging_to_stderr(logging.getLogger(None), levelname)
 
   def run(self):
