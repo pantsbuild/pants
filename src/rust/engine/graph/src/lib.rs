@@ -106,17 +106,13 @@ impl<N: Node> InnerGraph<N> {
   }
 
   fn ensure_entry_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, node: EntryKey<N>) -> EntryId {
-    let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/log").unwrap();
-    use std::io::Write;
     if let Some(&id) = nodes.get(&node) {
-      writeln!(f, "{}: ensure_entry: re-using entry for {:?} : {} -> {:?}", std::process::id(), node, pg.node_weight(id).unwrap().format(), id).unwrap();
       return id;
     }
 
     // New entry.
     let id = pg.add_node(Entry::new(node.clone()));
     nodes.insert(node.clone(), id);
-    //writeln!(f, "{}: ensure_entry: making new entry for {:?} : {} -> {:?}", std::process::id(), node, pg.node_weight(id).unwrap().format(), id).unwrap();
     id
   }
 
@@ -536,19 +532,15 @@ impl<N: Node> Graph<N> {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
           let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-          let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/log").unwrap();
           if inner.nodes.len() < 100 {
-            writeln!(f, "{}.{}: Getting {} -> {}", std::process::id(), inner.vis_count, inner.entry_for_id(src_id).unwrap().format(), inner.entry_for_id(potential_dst_id).unwrap().format()).unwrap();
             inner.visualize(viz, roots, &std::path::PathBuf::from(format!("/Users/dwagnerhall/tmp/cycle/{}.{}.dot", std::process::id(), inner.vis_count))).unwrap();
             inner.vis_count += 1;
           }
 
           if inner.detect_cycle(src_id, potential_dst_id) {
-            writeln!(f, "{}: Detected cycle! {} -> {}", std::process::id(), inner.entry_for_id(src_id).unwrap().format(), inner.entry_for_id(potential_dst_id).unwrap().format()).unwrap();
             // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
             inner.ensure_entry(EntryKey::Cyclic(dst_node))
           } else {
-            writeln!(f, "{}: No cycle! {} -> {}", std::process::id(), inner.entry_for_id(src_id).unwrap().format(), inner.entry_for_id(potential_dst_id).unwrap().format()).unwrap();
             // Valid dependency.
             trace!(
               "Adding dependency from {:?} to {:?}",
