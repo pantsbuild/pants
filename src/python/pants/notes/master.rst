@@ -49,6 +49,9 @@ New features
 Bugfixes
 ~~~~~~~~
 
+* Increase strictness of type checking for ExecuteProcessRequest args (#7529)
+  `PR #7529 <https://github.com/pantsbuild/pants/pull/7529>`_
+
 * Improve Get errors for unhashable or mismatched types (#7502)
   `PR #7502 <https://github.com/pantsbuild/pants/pull/7502>`_
 
