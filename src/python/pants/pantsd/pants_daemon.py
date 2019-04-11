@@ -243,7 +243,7 @@ class PantsDaemon(FingerprintedProcessManager):
     self._log_level = log_level
     self._services = services
     self._bootstrap_options = bootstrap_options
-    self._show_rust_3rdparty_logs = bootstrap_options.show_rust_3rdparty_logs if bootstrap_options else True
+    self._log_show_rust_3rdparty = bootstrap_options.log_show_rust_3rdparty if bootstrap_options else True
 
     self._log_dir = os.path.join(work_dir, self.name)
     self._logger = logging.getLogger(__name__)
@@ -307,7 +307,7 @@ class PantsDaemon(FingerprintedProcessManager):
     # for further forks.
     with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
       # Reinitialize logging for the daemon context.
-      init_rust_logger(self._log_level, self._show_rust_3rdparty_logs)
+      init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
       result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME, native=self._native)
 
       # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
