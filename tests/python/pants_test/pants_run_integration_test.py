@@ -282,7 +282,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     if config:
       config_data = config.copy()
-      # TODO(python3port): RawConfigParser is legacy. Investigate updating to modern API.
+      # TODO(#6071): RawConfigParser is legacy. Investigate updating to modern API.
       ini = configparser.RawConfigParser(defaults=config_data.pop('DEFAULT', None))
       for section, section_config in config_data.items():
         ini.add_section(section)

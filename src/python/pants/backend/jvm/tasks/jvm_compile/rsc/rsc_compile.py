@@ -543,7 +543,7 @@ class RscCompile(ZincCompile):
     tool_classpath_abs = self.tool_classpath(tool_name)
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
-    # TODO(python3port): Our ExecuteProcessRequest expects a specific string type for arguments,
+    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
     # which py2 doesn't default to. This can be removed when we drop python 2.
     str_jvm_options = [text_type(opt) for opt in self.get_options().jvm_options]
     cmd = [
