@@ -153,7 +153,7 @@ export RUN_PANTS_FROM_PEX=1
 
 if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
-  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
+  FULL_CHECK=1 ./build-support/githooks/pre-commit || exit 1
   end_travis_section
 fi
 
