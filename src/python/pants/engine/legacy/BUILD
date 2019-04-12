@@ -69,6 +69,7 @@ python_library(
   dependencies=[
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':address_mapper',
     ':structs',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:parse_context',
