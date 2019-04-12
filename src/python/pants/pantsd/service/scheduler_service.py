@@ -64,9 +64,10 @@ class SchedulerService(PantsService):
 
     self._loop_condition = LoopCondition()
 
-  def _get_snapshot(self, globs):
-    """Returns a Snapshot of the input globs"""
-    return self._scheduler_session.product_request(Snapshot, subjects=[PathGlobs(globs)])[0]
+  def _get_snapshot(self):
+    """Returns a Snapshot of the input globs(the self._invalidation_globs)"""
+    return self._scheduler_session.product_request(
+      Snapshot, subjects=[PathGlobs(self._invalidation_globs)])[0]
 
   def _get_files(self, snapshots):
     """Returns a set of the files corresponding to the list of input snapshots"""
@@ -81,7 +82,7 @@ class SchedulerService(PantsService):
     # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
     # that exist at startup are the only ones that can affect the running daemon.
     if self._invalidation_globs:
-      self._invalidating_snapshot = self._get_snapshot(self._invalidation_globs)
+      self._invalidating_snapshot = self._get_snapshot()
       self._invalidating_files = self._get_files(self._invalidating_snapshot)
       self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
 
@@ -94,8 +95,8 @@ class SchedulerService(PantsService):
                       .format(len(event['files']), event['subscription']))
     self._event_queue.put(event)
 
-  def _maybe_invalidate_scheduler_batch(self, changed_globs):
-    new_snapshot = self._get_snapshot(changed_globs)
+  def _maybe_invalidate_scheduler_batch(self):
+    new_snapshot = self._get_snapshot()
     if new_snapshot.directory_digest != self._invalidating_snapshot.directory_digest:
       self._logger.fatal(
         'saw file events covered by invalidation globs [{}], terminating the daemon.'
@@ -131,7 +132,7 @@ class SchedulerService(PantsService):
     if invalidated:
       self._loop_condition.notify_all()
 
-    self._maybe_invalidate_scheduler_batch(files)
+    self._maybe_invalidate_scheduler_batch()
 
   def _process_event_queue(self):
     """File event notification queue processor. """

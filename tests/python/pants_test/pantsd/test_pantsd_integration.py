@@ -14,7 +14,7 @@ import time
 from builtins import open, range, zip
 
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
+from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch, safe_delete
 from pants_test.pants_run_integration_test import read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
@@ -283,6 +283,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
   def test_pantsd_invalidation_file_tracking(self):
     test_file = 'testprojects/src/python/print_env/main.py'
+    test_file2 = 'testprojects/src/python/print_env/file2.py'
+    # Create test_file2
+    safe_file_dump(test_file2, "import this\n", mode='w')
     config = {'GLOBAL': {'pantsd_invalidation_globs': '["testprojects/src/python/print_env/*"]'}}
     with self.pantsd_successful_run_context(extra_config=config) as (
       pantsd_run, checker, workdir, _
@@ -304,12 +307,21 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       )
 
       checker.assert_running()
+
       touch(test_file)
       # Permit ample time for the async file event propagate in CI.
+      time.sleep(10)
+      checker.assert_running()
+
+      # Update test_file2
+      safe_file_dump(test_file2, "import that\n", mode='w')
       time.sleep(10)
       checker.assert_stopped()
 
       self.assertIn('saw file events covered by invalidation globs', full_pantsd_log())
+
+      # Remove test_file2
+      safe_delete(test_file2)
 
   def test_pantsd_pid_deleted(self):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
