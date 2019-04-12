@@ -124,17 +124,17 @@ mod tests {
       BackoffConfig::new(Duration::from_millis(1), 1.0, Duration::from_millis(1)).unwrap(),
       TimerHandle::default(),
     )
-    .unwrap();
-    assert_eq!(
-      Err(format!(
-        "Failed after 5 retries for identity; last failure: bad"
-      )),
-      Retry(s)
-        .all_errors_immediately(
-          |v: Result<u8, _>| v,
-          RetryParameters::new(5, "identity".to_string())
-        )
-        .wait()
-    );
+      .unwrap();
+    let result = Retry(s)
+      .all_errors_immediately(
+        |v: Result<u8, _>| v,
+        RetryParameters::new(5, "identity".to_string())
+      )
+      .wait();
+    assert!(match result {
+      // Logs may have timestamps or other preceding information, but end with the error message.
+      Err(s) => s.ends_with("Failed after 5 retries for identity; last failure: bad"),
+      Ok(_) => false,
+    });
   }
 }
