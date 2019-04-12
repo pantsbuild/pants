@@ -533,18 +533,18 @@ $"""])
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
       regexps=["""\
-\\[INFO\\] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 0\\.01 seconds before sending SIGKILL\\.\\.\\.
+\\[INFO\\] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 1e-06 seconds before sending SIGKILL\\.\\.\\.
 Interrupted by user\\.
 [^ ]* \\[WARN\\] timed out when attempting to gracefully shut down the remote client executing \
 "'pantsd-runner.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating \
-over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, \
+over bytes from nailgun timed out with timeout interval 1e-06 starting at {today}T[^\n]+, \
 overtime seconds: [^\n]+
 Interrupted by user:
 Interrupted by user over pailgun client!
 """
                .format(today=re.escape(today))],
-      quit_timeout=0.01,
-    )
+      # NB: Make the timeout very small to ensure the warning message will reliably occur in CI!
+      quit_timeout=1e-6)
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
