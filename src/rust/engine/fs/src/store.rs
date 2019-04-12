@@ -1872,7 +1872,7 @@ mod remote {
               digest, err
             ))
             .to_boxed(),
-            Ok(((sender, receiver), client)) => {
+            Ok(((sender, receiver), _client)) => {
               let chunk_size_bytes = store.chunk_size_bytes;
               let resource_name = resource_name.clone();
               let bytes = bytes.clone();
@@ -1898,11 +1898,30 @@ mod remote {
                 }
               });
 
-              future::ok(client)
-                .join(sender.send_all(stream).map_err(move |e| {
-                  format!("Error attempting to upload digest {:?}: {:?}", digest, e)
-                }))
-                .and_then(move |_| {
+              sender
+                .send_all(stream)
+                .map(|_| ())
+                .or_else(move |e| {
+                  match e {
+                    // Some implementations of the remote execution API early-return if the blob has
+                    // been concurrently uploaded by another client. In this case, they return a
+                    // WriteResponse with a committed_size equal to the digest's entire size before
+                    // closing the stream.
+                    // Because the server then closes the stream, the client gets an RpcFinished
+                    // error in this case. We ignore this, and will later on verify that the
+                    // committed_size we received from the server is equal to the expected one. If
+                    // these are not equal, the upload will be considered a failure at that point.
+                    // Whether this type of response will become part of the official API is up for
+                    // discussion: see
+                    // https://groups.google.com/d/topic/remote-execution-apis/NXUe3ItCw68/discussion.
+                    grpcio::Error::RpcFinished(None) => Ok(()),
+                    e => Err(format!(
+                      "Error attempting to upload digest {:?}: {:?}",
+                      digest, e
+                    )),
+                  }
+                })
+                .and_then(move |()| {
                   receiver.map_err(move |e| {
                     format!(
                       "Error from server when uploading digest {:?}: {:?}",
