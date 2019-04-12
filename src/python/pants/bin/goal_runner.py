@@ -51,12 +51,10 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-  def _maybe_handle_help(self, help_request):
+  def handle_help(self):
     """Handle requests for `help` information."""
-    if help_request:
-      help_printer = HelpPrinter(self._options)
-      result = help_printer.print_help()
-      self._exiter(result)
+    help_printer = HelpPrinter(self._options)
+    return help_printer.print_help()
 
   def _determine_goals(self, address_mapper, requested_goals):
     """Check and populate the requested goals for a given run."""
@@ -121,8 +119,8 @@ class GoalRunnerFactory(object):
 
       return goals, context
 
+
   def create(self):
-    self._maybe_handle_help(self._options.help_request)
     goals, context = self._setup_context()
     return GoalRunner(context=context,
                       goals=goals,

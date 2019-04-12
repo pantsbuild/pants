@@ -16,7 +16,6 @@ from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.logging import setup_logging_from_options
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
@@ -83,14 +82,8 @@ class LocalPantsRunner(object):
   """Handles a single pants invocation running in the process-local context."""
 
   @staticmethod
-  def parse_options(args, env, setup_logging=False, options_bootstrapper=None):
+  def parse_options(args, env, options_bootstrapper=None):
     options_bootstrapper = options_bootstrapper or OptionsBootstrapper.create(args=args, env=env)
-    bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-
-    if setup_logging:
-      # Bootstrap logging and then fully initialize options.
-      setup_logging_from_options(bootstrap_options)
-    logger.debug("Inside parse_options")
     build_config = BuildConfigInitializer.get(options_bootstrapper)
     options = OptionsInitializer.create(options_bootstrapper, build_config)
     return options, build_config, options_bootstrapper
@@ -143,7 +136,6 @@ class LocalPantsRunner(object):
     options, build_config, options_bootstrapper = cls.parse_options(
       args,
       env,
-      setup_logging=True,
       options_bootstrapper=options_bootstrapper,
     )
     global_options = options.for_global_scope()
@@ -186,7 +178,6 @@ class LocalPantsRunner(object):
       daemon_graph_session is not None,
       profile_path
     )
-
 
   def __init__(self, build_root, exiter, options, options_bootstrapper, build_config, target_roots,
                graph_session, is_daemon, profile_path):
@@ -234,9 +225,9 @@ class LocalPantsRunner(object):
     self._exiter = LocalExiter(self._run_tracker, self._repro, exiter=self._exiter)
     ExceptionSink.reset_exiter(self._exiter)
 
-  def run(self, exit_on_completion=True):
+  def run(self):
     with maybe_profiled(self._profile_path):
-      self._run(exit_on_completion)
+      self._run()
 
   def _maybe_run_v1(self):
     if not self._global_options.v1:
@@ -253,6 +244,9 @@ class LocalPantsRunner(object):
       self._target_roots,
       self._exiter
     )
+    if self._options.help_request:
+      return goal_runner_factory.handle_help()
+
     return goal_runner_factory.create().run()
 
   def _maybe_run_v2(self):
@@ -291,11 +285,10 @@ class LocalPantsRunner(object):
         max_code = code
     return max_code
 
-  def _run(self, exit_on_completion):
+  def _run(self):
     try:
       engine_result = self._maybe_run_v2()
       goal_runner_result = self._maybe_run_v1()
-      print('inside _run')
     finally:
       try:
         run_tracker_result = self._run_tracker.end()
@@ -309,5 +302,4 @@ class LocalPantsRunner(object):
       goal_runner_result,
       run_tracker_result
     )
-    if exit_on_completion:
-      self._exiter.exit(final_exit_code)
+    self._exiter.exit(final_exit_code)

@@ -15,7 +15,7 @@ from future.utils import text_type
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink
+from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
@@ -80,6 +80,17 @@ class _LoggerStream(object):
   @property
   def buffer(self):
     return self
+
+
+class PantsDaemonSignalHandler(SignalHandler):
+
+  def __init__(self, services):
+    super(PantsDaemonSignalHandler, self).__init__()
+    self._services = services
+
+  def handle_sigint(self, signum, _frame):
+    for service in self._services:
+      service.record_exception(KeyboardInterrupt('remote client sent control-c!'))
 
 
 class PantsDaemon(FingerprintedProcessManager):
@@ -351,19 +362,7 @@ class PantsDaemon(FingerprintedProcessManager):
     # Once all services are started, write our pid.
     self.write_pid()
     self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint))
-    with open('logs', 'a') as f:
-      pid = os.getpid()
-      f.write('writing pid inside pants_daemon')
-      f.write(str(pid))
-      # while not self.is_killed:
-      #   for service, service_thread in service_thread_map.items():
-      #     f.write(str(service))
-      #     f.write('\n')
-      #     f.write(str(service._state._state))
-      #     f.write('\n')
-      #     f.write(str(service_thread))
-      #     f.write('\n')
-      f.write('*'*10)
+
     # Monitor services.
     while not self.is_killed:
       for service, service_thread in service_thread_map.items():
@@ -372,6 +371,7 @@ class PantsDaemon(FingerprintedProcessManager):
           raise PantsDaemon.RuntimeFailure('service failure for {}, shutting down!'.format(service))
         else:
           # Avoid excessive CPU utilization.
+          logging.info("BL: Joining service {}, {}  ".format(service, service_thread))
           service_thread.join(self.JOIN_TIMEOUT_SECONDS)
 
   def _write_named_sockets(self, socket_map):
@@ -410,7 +410,7 @@ class PantsDaemon(FingerprintedProcessManager):
       self._native.set_panic_handler()
 
       # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
-      set_process_title('pantsd-daemon [{}]'.format(self._build_root))
+      set_process_title('pantsd [{}]'.format(self._build_root))
 
       # Write service socket information to .pids.
       self._write_named_sockets(self._services.port_map)
@@ -456,10 +456,6 @@ class PantsDaemon(FingerprintedProcessManager):
     self.daemon_spawn()
     # Wait up to 60 seconds for pantsd to write its pidfile.
     pantsd_pid = self.await_pid(60)
-    with open('logs', 'a') as f:
-      f.write('\n2 inside launch')
-      f.write('\n2 writing pid')
-      f.write(str(pantsd_pid))
     listening_port = self.read_named_socket('pailgun', int)
     self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
                        .format(self.pid, listening_port))

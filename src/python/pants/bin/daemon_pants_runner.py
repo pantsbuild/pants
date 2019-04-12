@@ -13,12 +13,12 @@ from builtins import open, zip
 from contextlib import contextmanager
 
 from future.utils import raise_with_traceback
-from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
+from pants.init.logging import setup_logging_from_options, encapsulated_global_logger
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
@@ -32,6 +32,18 @@ class DaemonSignalHandler(SignalHandler):
 
   def handle_sigint(self, signum, _frame):
     raise KeyboardInterrupt('remote client sent control-c!')
+
+  def handle_sigterm(self, signum, _frame):
+    try:
+      self.daemon.shutdown()
+    except Exception as e:
+      pass
+
+
+class NoopExiter(Exiter):
+  def exit(self, result, *args, **kwargs):
+    # super(NoopExiter, self).exit(result=result, out=sys.stderr, *args, **kwargs)
+    pass
 
 
 class DaemonExiter(Exiter):
@@ -65,6 +77,7 @@ class DaemonExiter(Exiter):
           )
         except Exception:
           pass
+
 
     # Write a final message to stderr if present.
     if msg:
@@ -269,21 +282,20 @@ class DaemonPantsRunner(ProcessManager):
     NailgunProtocol.send_pgrp(self._socket, os.getpgrp() * -1)
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
-    with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
-         hermetic_environment_as(**self._env):
+    with self.nailgunned_stdio(self._socket, self._env), \
+      hermetic_environment_as(**self._env), \
+      encapsulated_global_logger():
       try:
-        # Setup the Exiter's finalizer.
-        self._exiter.set_finalizer(finalizer)
-
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
         # Re-raise any deferred exceptions, if present.
         self._raise_deferred_exc()
-
+        bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
+        setup_logging_from_options(bootstrap_options)
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner.create(
-          self._exiter,
+          NoopExiter(),
           self._args,
           self._env,
           self._target_roots,
@@ -291,13 +303,19 @@ class DaemonPantsRunner(ProcessManager):
           self._options_bootstrapper,
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
-        runner.run(exit_on_completion=False)
+        runner.run()
       except KeyboardInterrupt:
         self._exiter.exit_and_fail('Interrupted by user.\n')
       except GracefulTerminationException as e:
         ExceptionSink.log_exception(
           'Encountered graceful termination exception {}; exiting'.format(e))
+        self._exiter.exit(e.exit_code)
       except Exception:
+
+        # LocalPantsRunner.set_start_time resets the global exiter,
+        # which used to be okay, because it was process-local,
+        # but now we need to un-reset it here.
+        ExceptionSink.reset_exiter(self._exiter)
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
         # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
         # happening here, so something is probably overriding the excepthook. By catching Exception

@@ -376,6 +376,7 @@ timestamp: {timestamp}
   @classmethod
   def _log_unhandled_exception_and_exit(cls, exc_class=None, exc=None, tb=None, add_newline=False):
     """A sys.excepthook implementation which logs the error and exits with failure."""
+
     exc_class = exc_class or sys.exc_info()[0]
     exc = exc or sys.exc_info()[1]
     tb = tb or sys.exc_info()[2]

@@ -468,27 +468,16 @@ class ProcessManager(ProcessMetadataManager):
       pid = os.fork()
       if pid == 0:
         os.setsid()
-        with open('logs', 'a') as f:
-          f.write('\n1 inside daemonize \n')
-          f.write(str(pid))
-          f.write('\n')
         second_pid = os.fork()
         if second_pid == 0:
           return False, True
         else:
-          with open('logs', 'a') as f:
-            f.write('\n2 inside daemonize \n')
-            f.write(str(second_pid))
-            f.write('\n')
           if write_pid: self.write_pid(second_pid)
           return False, False
       else:
         # This prevents un-reaped, throw-away parent processes from lingering in the process table.
         os.waitpid(pid, 0)
         return True, False
-
-      with open('logs', 'a') as f:
-        f.write('*'*100)
 
     fork_func = functools.partial(fork_context, double_fork) if fork_context else double_fork
 
@@ -525,35 +514,22 @@ class ProcessManager(ProcessMetadataManager):
     self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
-    with open('logs', 'a') as f:
-      f.write('\n4 inside daemon_spawn')
-    with open('logs', 'a') as f:
-      f.write('\n5 inside daemon_spawn\n')
-      f.write(str(pid))
-      f.write('\n')
     if pid == 0:
-      """ PARENT 1 """
+      # fork's child execution
       try:
         os.setsid()
         os.chdir(self._buildroot)
-        self.post_fork_parent(**post_fork_parent_opts or {})
+        self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
         logger.critical(traceback.format_exc())
       finally:
         os._exit(0)
     else:
-      """ CHILD 1 """
+      # fork's parent execution
       try:
-        with open('logs', 'a') as f:
-          f.write('\n9 inside daemon_spawn \n')
-          f.write('\n')
-        self.post_fork_child(**post_fork_child_opts or {})
+        self.post_fork_parent(**post_fork_parent_opts or {})
       except Exception:
         logger.critical(traceback.format_exc())
-
-
-    with open('logs', 'a') as f:
-      f.write('='*100)
 
   def pre_fork(self):
     """Pre-fork callback for subclasses."""

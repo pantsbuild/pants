@@ -107,8 +107,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assertIn('Current thread 0x', '\n'.join(read_pantsd_log(workdir)))
 
   def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
-    # Check for no stray pantsd-runner prcesses.
-    with no_lingering_process_by_command('pantsd-runner'):
+    # Check for no stray pantsd prcesses.
+    with no_lingering_process_by_command('pantsd'):
       with self.pantsd_test_context() as (workdir, pantsd_config, checker):
         # Run target that throws an exception in pants.
         self.assert_failure(
@@ -193,7 +193,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     attempts = int(os.environ.get('PANTS_TEST_PANTSD_STRESS_ATTEMPTS', 20))
     cmd = os.environ.get('PANTS_TEST_PANTSD_STRESS_CMD', 'help').split()
 
-    with no_lingering_process_by_command('pantsd-runner'):
+    with no_lingering_process_by_command('pantsd'):
       with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, _, _):
         pantsd_run(cmd)
         checker.assert_started()
@@ -221,6 +221,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_started()
 
     for cmd, run in zip(cmds, daemon_runs):
+      print("BL: (cmd, run) = ({}, {}, {})".format(cmd, run.stdout_data, run.stderr_data))
       self.assertNotEqual(run.stdout_data, '', 'Empty stdout for {}'.format(cmd))
 
     for run_pairs in zip(non_daemon_runs, daemon_runs):
@@ -487,7 +488,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     :param float quit_timeout: The duration of time to wait for the pailgun client to flush all of
                                its output and die after being killed.
     """
-    # TODO: This tests that pantsd-runner processes actually die after the thin client receives the
+    # TODO: This tests that pantsd processes actually die after the thin client receives the
     # specified signal.
     with self.pantsd_test_context() as (workdir, config, checker):
       # Launch a run that will wait for a file to be created (but do not create that file).
@@ -506,12 +507,15 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       checker.assert_started()
       checker.assert_pantsd_runner_started(client_pid)
 
-      # Get all the pantsd-runner processes while they're still around.
+      # Get all the pantsd processes while they're still around.
       pantsd_runner_processes = checker.runner_process_context.current_processes()
-      # This should kill the pantsd-runner processes through the RemotePantsRunner signal handler.
+      # This should kill the pantsd processes through the RemotePantsRunner signal handler.
       os.kill(client_pid, signum)
       waiter_run = waiter_handle.join()
       self.assert_failure(waiter_run)
+
+
+      print("BL: Run finished, stderr data is {}".format(waiter_run.stderr_data))
 
       for regexp in regexps:
         assertRegex(self, waiter_run.stderr_data, regexp)
@@ -520,7 +524,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       for proc in pantsd_runner_processes:
         # TODO: we could be checking the return codes of the subprocesses, but psutil is currently
         # limited on non-Windows hosts -- see https://psutil.readthedocs.io/en/latest/#processes.
-        # The pantsd-runner processes should be dead, and they should have exited with 1.
+        # The pantsd processes should be dead, and they should have exited with 1.
         self.assertFalse(proc.is_running())
 
   @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7554')
@@ -528,7 +532,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGTERM,
       regexps=[
-        '\\[INFO\\] Sending SIGTERM to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
+        '\\[INFO\\] Sending SIGTERM to pantsd with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
         re.escape("\nSignal {signum} (SIGTERM) was raised. Exiting with failure.\n"
                   .format(signum=signal.SIGTERM)),
         """
@@ -542,7 +546,7 @@ $"""
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGQUIT,
       regexps=[
-        '\\[INFO\\] Sending SIGQUIT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
+        '\\[INFO\\] Sending SIGQUIT to pantsd with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.',
         re.escape("\nSignal {signum} (SIGQUIT) was raised. Exiting with failure.\n"
                   .format(signum=signal.SIGQUIT)),
         """
@@ -555,7 +559,7 @@ $"""])
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
       regexps=["""\
-\\[INFO\\] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.
+\\[INFO\\] Sending SIGINT to pantsd with pid [0-9]+, waiting up to 5\\.0 seconds before sending SIGKILL\\.\\.\\.
 Interrupted by user.
 Interrupted by user:
 Interrupted by user over pailgun client!
@@ -569,11 +573,11 @@ $"""])
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
       regexps=["""\
-\\[INFO\\] Sending SIGINT to pantsd-runner with pid [0-9]+, waiting up to 1e-06 seconds before sending SIGKILL\\.\\.\\.
+\\[INFO\\] Sending SIGINT to pantsd with pid [0-9]+, waiting up to 0\\.01 seconds before sending SIGKILL\\.\\.\\.
 Interrupted by user\\.
 [^ ]* \\[WARN\\] timed out when attempting to gracefully shut down the remote client executing \
-"'pantsd-runner.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating \
-over bytes from nailgun timed out with timeout interval 1e-06 starting at {today}T[^\n]+, \
+"'pantsd.*'"\\. sending SIGKILL to the remote client at pid: [0-9]+\\. message: iterating \
+over bytes from nailgun timed out with timeout interval 0\\.01 starting at {today}T[^\n]+, \
 overtime seconds: [^\n]+
 Interrupted by user:
 Interrupted by user over pailgun client!

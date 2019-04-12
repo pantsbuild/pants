@@ -260,10 +260,6 @@ Stderr:
     logger.debug('Spawning nailgun server {i} with fingerprint={f}, jvm_options={j}, classpath={cp}'
                  .format(i=self._identity, f=fingerprint, j=jvm_options, cp=classpath))
 
-    with open('logs', 'a') as f:
-      f.write('calling from nailgun_executor')
-      f.write('*'*100)
-
     self.daemon_spawn(post_fork_child_opts=post_fork_child_opts)
 
     # Wait for and write the port information in the parent so we can bail on exception/timeout.

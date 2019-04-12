@@ -34,7 +34,7 @@ class PailgunClientSignalHandler(SignalHandler):
 
   def _forward_signal_with_timeout(self, signum, signame):
     logger.info(
-      'Sending {} to pantsd-runner with pid {}, waiting up to {} seconds before sending SIGKILL...'
+      'Sending {} to pantsd with pid {}, waiting up to {} seconds before sending SIGKILL...'
       .format(signame, self._pailgun_client._maybe_last_pid(), self._timeout))
     self._pailgun_client.set_exit_timeout(
       timeout=self._timeout,
@@ -156,11 +156,8 @@ class RemotePantsRunner(object):
       # Execute the command on the pailgun.
       result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
 
-    with open('logs', 'a') as f:
-      f.write('inside _connect_and_execute\n')
-      f.write(str(result))
     # Exit.
-    #self._exiter.exit(result)
+    self._exiter.exit(result)
 
   def _extract_remote_exception(self, pantsd_pid, nailgun_error):
     """Given a NailgunError, returns a Terminated exception with additional info (where possible).

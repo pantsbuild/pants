@@ -33,6 +33,7 @@ class PantsServices(datatype([
     return super(PantsServices, cls).__new__(cls, services, port_map, lifecycle_lock)
 
 
+
 class PantsService(AbstractClass):
   """Pants daemon service base class.
 
@@ -93,6 +94,16 @@ class PantsService(AbstractClass):
     See the class and _ServiceState pydocs.
     """
     self._state.mark_terminating()
+
+  def record_exception(self, exception):
+    """Record an exception to be raised later.
+    Subclasses may override this to record it however they please."""
+
+  def raise_deferred_exceptions(self):
+    """Raise the recorded exceptions, if any."""
+    if self._deferred_exception:
+      raise self._deferred_exception
+
 
 
 class _ServiceState(object):

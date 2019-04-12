@@ -10,6 +10,7 @@ import traceback
 
 from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
+from pants.base.exception_sink import SignalHandler
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
 from pants.util.socket import RecvBufferedSocket, safe_select
@@ -78,12 +79,7 @@ class PailgunHandler(PailgunHandlerBase):
 
     # NB: This represents the end of pantsd's involvement in the request, but the request will
     # continue to run post-fork.
-    try:
-      self.logger.info('pailgun request completed: `{}`'.format(' '.join(arguments)))
-    except Exception as e:
-      with open('logs', 'a') as f:
-        f.write('\n logging error\n')
-        f.write(e)
+    self.logger.info('pailgun request completed: `{}`'.format(' '.join(arguments)))
 
   def handle_error(self, exc=None):
     """Error handler for failed calls to handle()."""
@@ -93,7 +89,8 @@ class PailgunHandler(PailgunHandlerBase):
     NailgunProtocol.send_exit_with_code(self.request, failure_code)
 
 
-class PailgunServer(ThreadingMixIn, TCPServer):
+class PailgunServer(TCPServer):
+# class PailgunServer(ThreadingMixIn, TCPServer):
   """A pants nailgun server.
 
   This class spawns a thread per request via `ThreadingMixIn`: the thread body runs
@@ -142,32 +139,34 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     """Override of TCPServer.server_bind() that tracks bind-time assigned random ports."""
     TCPServer.server_bind(self)
     _, self.server_port = self.socket.getsockname()[:2]
+  #
+  # def handle_request(self):
+  #   """Override of TCPServer.handle_request() that provides locking.
+  #
+  #   Calling this method has the effect of "maybe" (if the socket does not time out first)
+  #   accepting a request and (because we mixin in ThreadingMixIn) spawning it on a thread. It should
+  #   always return within `min(self.timeout, socket.gettimeout())`.
+  #
+  #   N.B. Most of this is copied verbatim from SocketServer.py in the stdlib.
+  #   """
+  #   timeout = self.socket.gettimeout()
+  #   if timeout is None:
+  #     timeout = self.timeout
+  #   elif self.timeout is not None:
+  #     timeout = min(timeout, self.timeout)
+  #   fd_sets = safe_select([self], [], [], timeout)
+  #   if not fd_sets[0]:
+  #     self.handle_timeout()
+  #     return
+  #
+  #   # After select tells us we can safely accept, guard the accept and request
+  #   # handling with the lifecycle lock to avoid abrupt teardown mid-request.
+  #   with self.lifecycle_lock():
+  #     # self._handle_request_noblock()
+  #     self.handle_request()
 
-  def handle_request(self):
-    """Override of TCPServer.handle_request() that provides locking.
-
-    Calling this method has the effect of "maybe" (if the socket does not time out first)
-    accepting a request and (because we mixin in ThreadingMixIn) spawning it on a thread. It should
-    always return within `min(self.timeout, socket.gettimeout())`.
-
-    N.B. Most of this is copied verbatim from SocketServer.py in the stdlib.
-    """
-    timeout = self.socket.gettimeout()
-    if timeout is None:
-      timeout = self.timeout
-    elif self.timeout is not None:
-      timeout = min(timeout, self.timeout)
-    fd_sets = safe_select([self], [], [], timeout)
-    if not fd_sets[0]:
-      self.handle_timeout()
-      return
-
-    # After select tells us we can safely accept, guard the accept and request
-    # handling with the lifecycle lock to avoid abrupt teardown mid-request.
-    with self.lifecycle_lock():
-      self._handle_request_noblock()
-
-  def process_request_thread(self, request, client_address):
+  def process_request(self, request, client_address):
+  # def process_request_thread(self, request, client_address):
     """Override of ThreadingMixIn.process_request_thread() that delegates to the request handler."""
     # Instantiate the request handler.
     handler = self.RequestHandlerClass(request, client_address, self)
