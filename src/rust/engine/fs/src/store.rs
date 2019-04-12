@@ -314,10 +314,12 @@ impl Store {
           expanding_futures.push(self.expand_directory(digest));
         }
         Ok(None) => {
-          return future::err(format!("Failed to upload digest {:?}: Not found", digest)).to_boxed();
+          return future::err(format!("Failed to upload digest {:?}: Not found", digest))
+            .to_boxed();
         }
         Err(err) => {
-          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err)).to_boxed();
+          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err))
+            .to_boxed();
         }
       };
     }
