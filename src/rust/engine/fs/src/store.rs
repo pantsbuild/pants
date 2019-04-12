@@ -1903,13 +1903,17 @@ mod remote {
                 .map(|_| ())
                 .or_else(move |e| {
                   match e {
-                    // NB(#7422): This can sometimes occur when pants sends many process execution
-                    // requests which depend on the same large file at the same time. It appears that
-                    // the check_alive() method in grpc-rs which returns RpcFinished(None) is used as
-                    // a way to exit early out of methods which return a Result, if the future's
-                    // contents are already available. This may be a race condition that deserves
-                    // respect, but right now it's not clear it's an error. See #6344 for a case where
-                    // we override this type of behavior by forking gprcio.
+                    // Some implementations of the remote execution API early-return if the blob has
+                    // been concurrently uploaded by another client. In this case, they return a
+                    // WriteResponse with a committed_size equal to the digest's entire size before
+                    // closing the stream.
+                    // Because the server then closes the stream, the client gets an RpcFinished
+                    // error in this case. We ignore this, and will later on verify that the
+                    // committed_size we received from the server is equal to the expected one. If
+                    // these are not equal, the upload will be considered a failure at that point.
+                    // Whether this type of response will become part of the official API is up for
+                    // discussion: see
+                    // https://groups.google.com/d/topic/remote-execution-apis/NXUe3ItCw68/discussion.
                     grpcio::Error::RpcFinished(None) => Ok(()),
                     e => Err(format!(
                       "Error attempting to upload digest {:?}: {:?}",
