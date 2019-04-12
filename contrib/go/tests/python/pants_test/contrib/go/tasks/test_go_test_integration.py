@@ -30,6 +30,24 @@ class GoTestIntegrationTest(PantsRunIntegrationTest):
     assertRegex(self, pants_run.stdout_data, r'contrib/go/examples/src/go/libA\s+\.+\s+SUCCESS')
     assertRegex(self, pants_run.stdout_data, r'contrib/go/examples/src/go/libB\s+\.+\s+SUCCESS')
 
+    # Assert that we do *not* contain verbose output.
+    self.assertNotIn('=== RUN   TestAdd', pants_run.stdout_data)
+    self.assertNotIn('PASS', pants_run.stdout_data)
+
+  def test_go_test_with_options(self):
+    args = [
+      'test.go', '--shlexed-build-and-test-flags=["-v"]',
+      'contrib/go/examples/src/go/libA',
+    ]
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)
+    assertRegex(self, pants_run.stdout_data, r'ok\s+libA')
+    assertRegex(self, pants_run.stdout_data, r'ok\s+libB')
+
+    # Ensure that more verbose output is presented.
+    self.assertIn('=== RUN   TestAdd', pants_run.stdout_data)
+    self.assertIn('PASS', pants_run.stdout_data)
+
   def test_no_fast(self):
     args = ['test.go',
             '--no-fast',
