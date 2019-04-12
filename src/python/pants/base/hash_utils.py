@@ -11,7 +11,6 @@ from builtins import bytes, object, open, str
 from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated
 from pants.util.collections_abc_backport import Iterable, Mapping, OrderedDict, Set
 from pants.util.objects import DatatypeMixin
 from pants.util.strutil import ensure_binary
@@ -103,24 +102,6 @@ class CoercingEncoder(json.JSONEncoder):
 
   def encode(self, o):
     return super(CoercingEncoder, self).encode(self.default(o))
-
-
-@deprecated(
-  '1.16.0.dev1',
-  'Please use pants.base.hash_utils.stable_json_sha1 instead.')
-def stable_json_hash(obj, digest=None, encoder=None):
-  """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.
-
-  :param obj: An object that can be rendered to json using the given `encoder`.
-  :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
-  :param encoder: An optional custom json encoder.
-  :type encoder: :class:`json.JSONEncoder`
-  :returns: A stable hash of the given `obj`.
-  :rtype: str
-
-  :API: public
-  """
-  return json_hash(obj, digest=digest, encoder=encoder)
 
 
 def json_hash(obj, digest=None, encoder=None):

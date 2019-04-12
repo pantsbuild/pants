@@ -12,13 +12,11 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.collections_abc_backport import OrderedDict
@@ -84,15 +82,6 @@ class ProtobufGen(SimpleCodegenTask):
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     deps = OrderedSet()
-    if target.all_imported_jar_deps:
-      # We need to add in the proto imports jars.
-      jars_address = Address(os.path.relpath(target_workdir, get_buildroot()),
-                             target.id + '-rjars')
-      jars_target = self.context.add_new_target(jars_address,
-                                                JarLibrary,
-                                                jars=target.all_imported_jar_deps,
-                                                derived_from=target)
-      deps.update([jars_target])
     deps.update(self.javadeps)
     return deps
 

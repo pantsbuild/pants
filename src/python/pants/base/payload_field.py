@@ -11,13 +11,9 @@ from hashlib import sha1
 from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
-from pants.base.hash_utils import stable_json_hash, stable_json_sha1
+from pants.base.hash_utils import stable_json_sha1
 from pants.util.meta import AbstractClass
 from pants.util.strutil import ensure_binary
-
-
-# NB: A deprecated alias/re-export.
-stable_json_hash = stable_json_hash
 
 
 def combine_hashes(hashes):

@@ -23,9 +23,6 @@ from pants.util.memo import memoized_property
 
 class ConanFetch(SimpleCodegenTask):
 
-  deprecated_scope = 'native-third-party-fetch'
-  deprecated_scope_removal_version = '1.16.0.dev0'
-
   gentarget_type = ExternalNativeLibrary
 
   sources_globs = ('include/**/*', 'lib/*',)
