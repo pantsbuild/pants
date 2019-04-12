@@ -609,7 +609,7 @@ Interrupted by user over pailgun client!
           directory = directory[2:]
 
         def list_and_verify():
-          result = pantsd_run(['list', '{}:'.format(directory)])
+          result = pantsd_run(['-ltrace', 'list', '{}:'.format(directory)])
           checker.assert_started()
           self.assert_success(result)
           expected_targets = {'{}:{}'.format(directory, target) for target in ('A', 'B')}

@@ -517,7 +517,7 @@ impl<N: Node> Graph<N> {
   /// In the context of the given src Node, declare a dependency on the given dst Node and
   /// begin its execution if it has not already started.
   ///
-  pub fn get<C, Viz>(&self, viz: Viz, src_id: EntryId, context: &C, dst_node: N, roots: &[N]) -> BoxFuture<N::Item, N::Error>
+  pub fn get<C, Viz>(&self, viz: Viz, root: &Path, src_id: EntryId, context: &C, dst_node: N, roots: &[N]) -> BoxFuture<N::Item, N::Error>
   where
     C: NodeContext<Node = N>,
     Viz: NodeVisualizer<N>,
@@ -539,14 +539,32 @@ impl<N: Node> Graph<N> {
 
           if inner.detect_cycle(src_id, potential_dst_id) {
             // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
+            trace!("Ensuring cyclic entry from {:?} to {}", inner.entry_for_id(src_id).unwrap(), dst_node);
+            let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/dwh").unwrap();
+            use std::io::Write;
+            writeln!(f, "{} Ensuring cyclic entry from {:?} to {}", std::process::id(), inner.entry_for_id(src_id).unwrap(), dst_node).unwrap();
+
             inner.ensure_entry(EntryKey::Cyclic(dst_node))
           } else {
             // Valid dependency.
+            if root.file_name().unwrap().to_str().unwrap() != "pants" {
+              panic!("DWH: Adding dependency from {:?} to {:?}",
+                     inner.entry_for_id(src_id).unwrap().node(),
+                     inner.entry_for_id(potential_dst_id).unwrap().node())
+            }
             trace!(
               "Adding dependency from {:?} to {:?}",
               inner.entry_for_id(src_id).unwrap().node(),
               inner.entry_for_id(potential_dst_id).unwrap().node()
             );
+            let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/dwh").unwrap();
+            use std::io::Write;
+            writeln!(f, "{} Adding dependency from {:?} to {:?}",
+                   std::process::id(),
+                   inner.entry_for_id(src_id).unwrap().node(),
+                   inner.entry_for_id(potential_dst_id).unwrap().node()
+            ).unwrap();
+
             potential_dst_id
           }
         };
@@ -579,7 +597,13 @@ impl<N: Node> Graph<N> {
         None
       } else {
         let id = inner.ensure_entry(EntryKey::Valid(node));
-        inner.entry_for_id(id).cloned().map(|entry| (entry, id))
+        inner.entry_for_id(id).cloned().map(|entry| {
+          trace!("About to call get from create for {:?}", entry);
+          let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/dwh").unwrap();
+          use std::io::Write;
+          writeln!(f, "{}: About to call get from create for {:?}", std::process::id(), entry).unwrap();
+          (entry, id)
+        })
       }
     };
     if let Some((mut entry, entry_id)) = maybe_entry_and_id {
@@ -611,6 +635,13 @@ impl<N: Node> Graph<N> {
           .collect::<Vec<_>>()
     };
 
+    let src_entry = inner.entry_for_id(entry_id).unwrap().clone();
+    for dep_id in &dep_ids {
+      trace!("In dep_generations, adding dep from {:?} to {:?}", src_entry, inner.entry_for_id(*dep_id));
+      let mut f = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/dwh").unwrap();
+      use std::io::Write;
+      writeln!(f, "{}: In dep_generations, adding dep from {:?} to {:?}", std::process::id(), src_entry, inner.entry_for_id(*dep_id)).unwrap();
+    }
 
     future::join_all(
       dep_ids

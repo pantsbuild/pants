@@ -85,7 +85,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
   @contextmanager
   def pantsd_test_context(self, log_level='info', extra_config=None):
     with no_lingering_process_by_command('pantsd-runner') as runner_process_context:
-      with self.temporary_workdir() as workdir_base:
+      with self.temporary_workdir(cleanup=False) as workdir_base:
         pid_dir = os.path.join(workdir_base, '.pids')
         workdir = os.path.join(workdir_base, '.workdir.pants.d')
         print('\npantsd log is {}/pantsd/pantsd.log'.format(workdir))
@@ -151,8 +151,8 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
   def assert_runner(self, workdir, config, cmd, extra_config={}, extra_env={}, expected_runs=1, success=True):
     combined_config = config.copy()
     recursively_update(combined_config, extra_config)
-    print(bold(cyan('\nrunning: ./pants {} (config={}) (extra_env={})'
-                    .format(' '.join(cmd), combined_config, extra_env))))
+    print(bold(cyan('\n{}: running: ./pants {} (config={}) (extra_env={})'
+                    .format(time.ctime(), ' '.join(cmd), combined_config, extra_env))))
     run_count = self._run_count(workdir)
     start_time = time.time()
     run = self.run_pants_with_workdir(

@@ -250,7 +250,7 @@ impl Context {
     self
       .core
       .graph
-      .get(Visualizer::default(), self.entry_id, self, node.into(), &self.session.root_nodes())
+      .get(Visualizer::default(), &self.core.build_root, self.entry_id, self, node.into(), &self.session.root_nodes())
       .map(|node_result| {
         node_result
           .try_into()
