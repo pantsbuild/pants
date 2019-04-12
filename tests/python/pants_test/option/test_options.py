@@ -1363,7 +1363,7 @@ class OptionsTest(TestBase):
     # Check that we got a warning, but not for the inherited option.
     single_warning_dummy1 = assert_single_element(w)
     self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
-    self.assertNotIn('inherited', single_warning_dummy1.message)
+    self.assertNotIn('inherited', str(single_warning_dummy1.message))
 
     # Check values.
     # Deprecated scope takes precedence at equal rank.
@@ -1378,7 +1378,7 @@ class OptionsTest(TestBase):
     # Check that we got a warning.
     single_warning_dummy2 = assert_single_element(w)
     self.assertEqual(single_warning_dummy2.category, DeprecationWarning)
-    self.assertNotIn('inherited', single_warning_dummy2.message)
+    self.assertNotIn('inherited', str(single_warning_dummy2.message))
 
     # Check values.
     self.assertEqual('uu', vals2.qux)

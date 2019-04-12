@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import inspect
 import sys
 import warnings
+from contextlib import contextmanager
 from functools import wraps
 
 import six
@@ -105,6 +106,28 @@ def _get_frame_info(stacklevel, context=1):
   return frame_list[frame_stack_index]
 
 
+@contextmanager
+def _greater_warnings_context(context_lines_string):
+  """Provide the `line` argument to warnings.showwarning().
+
+  warnings.warn_explicit() doesn't use the `line` argument to showwarning(), but we want to
+  make use of the warning filtering provided by warn_explicit(). This contextmanager overwrites the
+  showwarning() method to pipe in the desired amount of context lines when using warn_explicit().
+  """
+  prev_showwarning = warnings.showwarning
+  def wrapped(message, category, filename, lineno, file=None, line=None):
+    return prev_showwarning(
+      message=message,
+      category=category,
+      filename=filename,
+      lineno=lineno,
+      file=file,
+      line=(line or context_lines_string))
+  warnings.showwarning = wrapped
+  yield
+  warnings.showwarning = prev_showwarning
+
+
 # TODO: propagate `deprecation_start_version` to other methods in this file!
 def warn_or_error(removal_version, deprecated_entity_description, hint=None,
                   deprecation_start_version=None,
@@ -125,6 +148,8 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None,
   :param int stacklevel: The stacklevel to pass to warnings.warn.
   :param FrameInfo frame_info: If provided, use this frame info instead of getting one from
                                `stacklevel`.
+  :param int context: The number of lines of source code surrounding the selected frame to display
+                      in a warning message.
   :param bool ensure_stderr: Whether use warnings.warn, or use warnings.showwarning to print
                              directly to stderr.
   :raises DeprecationApplicationError: if the removal_version parameter is invalid.
@@ -160,16 +185,18 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None,
 
   if removal_semver > PANTS_SEMVER:
     if ensure_stderr:
+      # No warning filters can stop us from printing this message directly to stderr.
       warning_msg = warnings.formatwarning(
         msg, DeprecationWarning, filename, line_number, line=context_lines)
       print(warning_msg, file=sys.stderr)
     else:
-      warnings.showwarning(
-        DeprecationWarning(msg) if PY2 else msg,
-        DeprecationWarning,
-        filename,
-        line_number,
-        line=context_lines)
+      # This output is filtered by warning filters.
+      with _greater_warnings_context(context_lines):
+        warnings.warn_explicit(
+          message=DeprecationWarning(msg) if PY2 else msg,
+          category=DeprecationWarning,
+          filename=filename,
+          lineno=line_number)
     return msg
   else:
     raise CodeRemovedError(msg)
