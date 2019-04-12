@@ -3,6 +3,16 @@
 This document describes releases leading up to the ``1.15.x`` ``stable`` series.
 
 
+1.15.0 (4/15/2019)
+------------------
+
+The first stable release of the `1.15.x` series, with no changes since `rc3`!
+
+This is the first Pants version to support being run under either Python 3.6 or 2.7. If you've been
+using the `./pants` script we provide prior to this release, update the script by
+running `curl -L -O https://pantsbuild.github.io/setup/pants`. Pants 1.17.0 will no longer support
+running Pants with Python 2.7 and will require Python 3.6+.
+
 1.15.0rc3 (4/08/2019)
 ---------------------
 
