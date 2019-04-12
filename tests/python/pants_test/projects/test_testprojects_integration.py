@@ -130,8 +130,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
   @ensure_resolver
   def run_shard(self, shard):
     targets = self.targets_for_shard(shard)
-    pants_run = self.pants_test(targets + ['--jvm-platform-default-platform=java7',
-                                           '--gen-protoc-import-from-root'])
+    pants_run = self.pants_test(targets + ['--jvm-platform-default-platform=java7'])
     self.assert_success(pants_run)
 
   def test_self(self):
