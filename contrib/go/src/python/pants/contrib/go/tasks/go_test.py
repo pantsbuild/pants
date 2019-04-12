@@ -96,8 +96,9 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     # Maintain the non-shlexed behavior for now to avoid breakage.
     single_string_flags = self.get_options().build_and_test_flags.split()
     return single_string_flags + [
-      safe_shlex_split(flags_section)
+      single_flag
       for flags_section in self.get_options().shlexed_build_and_test_flags
+      for single_flag in safe_shlex_split(flags_section)
     ]
 
   def _spawn(self, workunit, go_cmd, cwd):
