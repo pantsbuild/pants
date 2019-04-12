@@ -4,7 +4,7 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
-1.16.0.dev1 (4/11/2019)
+1.16.0.dev1 (4/12/2019)
 -----------------------
 
 API Changes
@@ -30,6 +30,9 @@ API Changes
 
 New features
 ~~~~~~~~~~~~
+
+* A @console_rule for validating source files against regexes. (#7515)
+  `PR #7515 <https://github.com/pantsbuild/pants/pull/7515>`_
 
 * Support JSON and YAML option fromfiles. (#7500)
   `PR #7500 <https://github.com/pantsbuild/pants/pull/7500>`_
@@ -78,6 +81,18 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* fix TestPantsDaemonIntegration.test_signal_pailgun_stream_timeout flakiness (#7533)
+  `PR #7533 <https://github.com/pantsbuild/pants/pull/7533>`_
+
+* Restore cron CI run from #7534 to adjust the time it starts (#7538)
+  `PR #7538 <https://github.com/pantsbuild/pants/pull/7538>`_
+
+* Temporarily turn off cron CI run to adjust the time it starts (#7534)
+  `PR #7534 <https://github.com/pantsbuild/pants/pull/7534>`_
+
+* Label messages of docs-only commits with SKIP_FULL_CI (#7526)
+  `PR #7526 <https://github.com/pantsbuild/pants/pull/7526>`_
 
 * Fuse hydrated and unhydrated Struct parsing (#7523)
   `PR #7523 <https://github.com/pantsbuild/pants/pull/7523>`_
