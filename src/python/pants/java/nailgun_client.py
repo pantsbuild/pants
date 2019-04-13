@@ -21,7 +21,7 @@ from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.dirutil import safe_file_dump
 from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
-from pants.util.strutil import ensure_binary, safe_shlex_join
+from pants.util.strutil import safe_shlex_join
 
 
 logger = logging.getLogger(__name__)
@@ -95,7 +95,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
     """Write a payload to a given fd (if provided) and flush the fd."""
     try:
       if payload:
-        fd.write(ensure_binary(payload))
+        fd.write(payload.decode('utf-8'))
       fd.flush()
     except (IOError, OSError) as e:
       # If a `Broken Pipe` is encountered during a stdio fd write, we're headless - bail.

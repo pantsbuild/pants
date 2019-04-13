@@ -5,7 +5,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
+from pants.base.build_environment import get_buildroot
 from pants.task.task import TaskBase
+from pants.util.dirutil import fast_relpath_collection
+from pants.util.memo import memoized_method
 
 
 class JvmToolTaskMixin(JvmToolMixin, TaskBase):
@@ -55,3 +58,11 @@ class JvmToolTaskMixin(JvmToolMixin, TaskBase):
 
   def _scope(self, scope=None):
     return scope or self.options_scope
+
+  @memoized_method
+  def tool_classpath_snapshot(self, key, scope=None):
+    """???"""
+    cp_abs_paths = self.tool_classpath(key, scope=scope)
+    cp_rel_paths = fast_relpath_collection(cp_abs_paths, get_buildroot())
+    return self.digest_classpath_paths_synchronously(
+      tuple(cp_rel_paths), get_buildroot(), self.context._scheduler)

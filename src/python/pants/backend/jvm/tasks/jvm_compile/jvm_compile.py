@@ -44,7 +44,7 @@ from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
 
 
-class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
+class JvmCompile(NailgunTaskBase, CompilerOptionSetsMixin):
   """A common framework for JVM compilation.
 
   To subclass for a specific JVM language, implement the static values and methods
@@ -60,6 +60,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
+    cls.register_compiler_option_sets_options(register)
 
     register('--args', advanced=True, type=list,
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,

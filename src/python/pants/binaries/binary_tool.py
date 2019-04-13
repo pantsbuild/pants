@@ -14,7 +14,8 @@ from pants.binaries.binary_util import BinaryRequest, BinaryUtil
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.fs.archive import XZCompressedTarArchiver, create_archiver
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.collections import assert_single_element
+from pants.util.memo import memoized_classmethod, memoized_method, memoized_property
 
 
 logger = logging.getLogger(__name__)
@@ -179,6 +180,34 @@ class BinaryToolBase(Subsystem):
     binary_request = self._make_binary_request(version)
     return self._binary_util.select(binary_request)
 
+  def _as_rooted_glob(self, context):
+    extracted = self.select(context=context)
+    # TODO: ???/some are dirs and some are files
+    if os.path.isdir(extracted):
+      rooted_glob = PathGlobsAndRoot(
+        path_globs=PathGlobs(include=['**/*']),
+        root=text_type(extracted),
+        # TODO: consider `digest_hint`!
+      )
+    else:
+      assert os.path.isfile(extracted)
+      rooted_glob = PathGlobsAndRoot(
+        path_globs=PathGlobs(include=[os.path.basename(extracted)]),
+        root=text_type(os.path.dirname(extracted)),
+      )
+    return rooted_glob
+
+  @memoized_classmethod
+  def _hackily_snapshot_multiple(self, binary_tool_instances, context):
+    """???
+
+    ???/This needs to exist to efficiently get multiple snapshots from multiple tools at once (???)
+    """
+    # ???/convert all the binary tools into globs with their own roots
+    globs_with_roots = [tool._as_rooted_glob(context) for tool in binary_tool_instances]
+    # Request all the snapshots at once, then return a single merged digest.
+    return context._scheduler.capture_merged_snapshot(tuple(globs_with_roots))
+
 
 class NativeTool(BinaryToolBase):
   """A base class for native-code tools.
@@ -196,14 +225,9 @@ class Script(BinaryToolBase):
   platform_dependent = False
 
   def hackily_snapshot(self, context):
-    bootstrapdir = self.get_options().pants_bootstrapdir
-    script_relpath = os.path.relpath(self.select(context), bootstrapdir)
-    snapshot = context._scheduler.capture_snapshots((
-      PathGlobsAndRoot(
-        PathGlobs((script_relpath,)),
-        text_type(bootstrapdir),
-      ),
-    ))[0]
+    snapshot = self._hackily_snapshot_multiple([self], context=context)
+    assert (not snapshot.dirs)
+    script_relpath = assert_single_element(snapshot.files)
     return (script_relpath, snapshot)
 
 

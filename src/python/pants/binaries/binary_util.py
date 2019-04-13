@@ -390,6 +390,8 @@ class BinaryUtil(object):
   def _get_urls(self, url_generator, binary_request):
     return url_generator.generate_urls(binary_request.version, self._host_platform())
 
+  # TODO(#7517): make a `host_platform` arg which defaults to self._host_platform() in order to
+  # resolve tools for a separate target platform for cross-compilation via remote execution!
   def select(self, binary_request):
     """Fetches a file, unpacking it if necessary."""
 

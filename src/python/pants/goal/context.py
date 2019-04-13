@@ -24,6 +24,7 @@ from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.source.source_root import SourceRootConfig
+from pants.util.strutil import safe_shlex_join
 
 
 class Context(object):
@@ -384,7 +385,7 @@ class Context(object):
     with self.new_workunit(
       name=name,
       labels=labels,
-      cmd=' '.join(execute_process_request.argv),
+      cmd=safe_shlex_join(execute_process_request.argv),
     ) as workunit:
       result = self._scheduler.product_request(FallibleExecuteProcessResult, [execute_process_request])[0]
       workunit.output("stdout").write(result.stdout)

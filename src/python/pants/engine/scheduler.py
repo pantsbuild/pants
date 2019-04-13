@@ -11,6 +11,8 @@ import time
 from builtins import object, open, str, zip
 from types import GeneratorType
 
+from twitter.common.collections import OrderedSet
+
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
@@ -316,6 +318,24 @@ class Scheduler(object):
     )
     return self._raise_or_return(result)
 
+  def capture_merged_snapshot(self, path_globs_and_roots):
+    """???"""
+    # TODO: ...can we just use lists here?
+    digests = OrderedSet()
+    files = OrderedSet()
+    dirs = OrderedSet()
+    for snapshot in self.capture_snapshots(path_globs_and_roots):
+      digests.add(snapshot.directory_digest)
+      files.update(snapshot.files)
+      dirs.update(snapshot.dirs)
+
+    merged_digest = self.merge_directories(tuple(digests))
+    return Snapshot(
+      directory_digest=merged_digest,
+      files=tuple(files),
+      dirs=tuple(dirs),
+    )
+
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.
 
@@ -529,6 +549,9 @@ class SchedulerSession(object):
 
   def merge_directories(self, directory_digests):
     return self._scheduler.merge_directories(directory_digests)
+
+  def capture_merged_snapshot(self, path_globs_and_roots):
+    return self._scheduler.capture_merged_snapshot(path_globs_and_roots)
 
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.

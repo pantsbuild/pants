@@ -17,8 +17,7 @@ class CompilerOptionSetsMixin(object):
   """A mixin for language-scoped that support compiler option sets."""
 
   @classmethod
-  def register_options(cls, register):
-    super(CompilerOptionSetsMixin, cls).register_options(register)
+  def register_compiler_option_sets_options(cls, register):
     register('--compiler-option-sets-enabled-args', advanced=True, type=dict, fingerprint=True,
              default=cls.get_compiler_option_sets_enabled_default_value,
              help='Extra compiler args to use for each enabled option set.')

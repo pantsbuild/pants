@@ -24,13 +24,13 @@ from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize, PathGlobs,
-                             PathGlobsAndRoot)
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryToMaterialize, PathGlobs,
+                             PathGlobsAndRoot, digest_file_paths)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
-from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
+from pants.util.dirutil import fast_relpath, fast_relpath_collection, safe_mkdir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import enum
 
@@ -43,11 +43,6 @@ from pants.util.objects import enum
 #
 #
 logger = logging.getLogger(__name__)
-
-
-def fast_relpath_collection(collection):
-  buildroot = get_buildroot()
-  return [fast_relpath_optional(c, buildroot) or c for c in collection]
 
 
 def stdout_contents(wu):
@@ -223,28 +218,9 @@ class RscCompile(ZincCompile):
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
-    def pathglob_for(filename):
-      return PathGlobsAndRoot(
-        PathGlobs(
-          (fast_relpath_optional(filename, get_buildroot()),)),
-        text_type(get_buildroot()))
 
     def to_classpath_entries(paths, scheduler):
-      # list of path ->
-      # list of (path, optional<digest>) ->
-      path_and_digests = [(p, Digest.load(os.path.dirname(p))) for p in paths]
-      # partition: list of path, list of tuples
-      paths_without_digests = [p for (p, d) in path_and_digests if not d]
-      if paths_without_digests:
-        self.context.log.debug('Expected to find digests for {}, capturing them.'
-          .format(paths_without_digests))
-      paths_with_digests = [(p, d) for (p, d) in path_and_digests if d]
-      # list of path -> list path, captured snapshot -> list of path with digest
-      snapshots = scheduler.capture_snapshots(tuple(pathglob_for(p) for p in paths_without_digests))
-      captured_paths_and_digests = [(p, s.directory_digest)
-        for (p, s) in zip(paths_without_digests, snapshots)]
-      # merge and classpath ify
-      return [ClasspathEntry(p, d) for (p, d) in paths_with_digests + captured_paths_and_digests]
+      return [ClasspathEntry(p, d) for (p, d) in digest_file_paths(paths, scheduler)]
 
     def confify(entries):
       return [(conf, e) for e in entries for conf in self._confs]
@@ -350,7 +326,8 @@ class RscCompile(ZincCompile):
           self.context.products.get_data('rsc_classpath').get_for_targets(dependencies_for_target),
           collection_type=OrderedSet)
 
-        rsc_classpath_rel = fast_relpath_collection(list(rsc_deps_classpath_unprocessed))
+        rsc_classpath_rel = fast_relpath_collection(list(rsc_deps_classpath_unprocessed),
+                                                    get_buildroot())
 
         ctx.ensure_output_dirs_exist()
 
@@ -541,7 +518,7 @@ class RscCompile(ZincCompile):
 
   def _runtool_hermetic(self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
     tool_classpath_abs = self.tool_classpath(tool_name)
-    tool_classpath = fast_relpath_collection(tool_classpath_abs)
+    tool_classpath = fast_relpath_collection(tool_classpath_abs, get_buildroot())
 
     # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
     # which py2 doesn't default to. This can be removed when we drop python 2.

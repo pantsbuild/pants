@@ -4,16 +4,21 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 import os
 
 from future.utils import binary_type, text_type
 
+from pants.base.build_environment import get_buildroot
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
-from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
+from pants.util.dirutil import fast_relpath_optional, maybe_read_file, safe_delete, safe_file_dump
 from pants.util.objects import Exactly, datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 class FileContent(datatype([('path', text_type), ('content', binary_type)])):
@@ -181,6 +186,54 @@ EMPTY_SNAPSHOT = Snapshot(
   files=(),
   dirs=()
 )
+
+
+def _pathglob_for(filename, root=None):
+  root = root or get_buildroot()
+  return PathGlobsAndRoot(
+    PathGlobs(tuple([fast_relpath_optional(filename, root)])),
+    text_type(root))
+
+
+def digest_file_paths(paths, scheduler, root=None):
+  """Generate digests for a set of file paths.
+
+  :rtype: list of (path, digest)
+  """
+  if not paths:
+    return tuple()
+  # list of path ->
+  # list of (path, optional<digest>) ->
+  path_and_digests = [(p, Digest.load(os.path.dirname(p))) for p in paths]
+  # partition: list of path, list of tuples
+  paths_without_digests = [p for (p, d) in path_and_digests if not d]
+  if paths_without_digests:
+    logger.debug('Expected to find digests for {}, capturing them.'
+                           .format(paths_without_digests))
+  paths_with_digests = [(p, d) for (p, d) in path_and_digests if d]
+  # list of path -> list path, captured snapshot -> list of path with digest
+  snapshots = scheduler.capture_snapshots(
+    tuple(_pathglob_for(p, root=root) for p in paths_without_digests))
+  captured_paths_and_digests = [
+    (p, s.directory_digest)
+    for (p, s) in zip(paths_without_digests, snapshots)
+  ]
+  return paths_with_digests + captured_paths_and_digests
+
+
+def rooted_toplevel_globs_for_paths(absolute_paths):
+  """???"""
+  return [
+    PathGlobsAndRoot(
+      PathGlobs(include=[
+        os.path.basename(file_or_dir_path)
+        if os.path.isfile(file_or_dir_path)
+        else '{}/**'.format(os.path.basename(file_or_dir_path))
+      ]),
+      root=text_type(os.path.dirname(file_or_dir_path)),
+    )
+    for file_or_dir_path in absolute_paths
+  ]
 
 
 def create_fs_rules():
