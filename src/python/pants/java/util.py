@@ -13,7 +13,7 @@ from pants.java.jar.manifest import Manifest
 from pants.java.nailgun_executor import NailgunExecutor
 from pants.util.contextutil import open_zip, temporary_file
 from pants.util.dirutil import safe_concurrent_rename, safe_mkdir, safe_mkdtemp
-from pants.util.process_handler import ProcessHandler, SubprocessProcessHandler
+from pants.util.process_handler import SubprocessProcessHandler
 
 
 logger = logging.getLogger(__name__)
@@ -201,10 +201,11 @@ def execute_runner_async(runner, workunit_factory=None, workunit_name=None, work
                            stderr=workunit.output('stderr'),
                            cwd=cwd)
 
-    class WorkUnitProcessHandler(ProcessHandler):
-      def wait(_, timeout=None):
+    class WorkUnitProcessHandler(SubprocessProcessHandler):
+
+      def wait(self, timeout=None):
         try:
-          ret = process.wait(timeout=timeout)
+          ret = super(WorkUnitProcessHandler, self).wait(timeout=timeout)
           workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
           workunit_generator.__exit__(None, None, None)
           return ret
@@ -212,16 +213,7 @@ def execute_runner_async(runner, workunit_factory=None, workunit_name=None, work
           if not workunit_generator.__exit__(*sys.exc_info()):
             raise
 
-      def kill(_):
-        return process.kill()
-
-      def terminate(_):
-        return process.terminate()
-
-      def poll(_):
-        return process.poll()
-
-    return WorkUnitProcessHandler()
+    return WorkUnitProcessHandler(process)
 
 
 def relativize_classpath(classpath, root_dir, followlinks=True):

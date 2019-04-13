@@ -4,9 +4,14 @@
 from collections import namedtuple
 from textwrap import dedent
 
+from future.utils import text_type
+
 from pants.base.exceptions import TaskError
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
+from pants.util.memo import memoized_staticmethod
+from pants.util.objects import datatype
 
 
 class JvmToolMixin:
@@ -19,7 +24,7 @@ class JvmToolMixin:
   class InvalidToolClasspath(TaskError):
     """Indicates an invalid jvm tool classpath."""
 
-  class JvmTool(namedtuple('JvmTool', ['scope', 'key', 'classpath', 'main', 'custom_rules'])):
+  class JvmTool(datatype(['scope', 'key', 'classpath', 'main', 'custom_rules'])):
     """Represents a jvm tool classpath request."""
 
     def dep_spec(self, options):
@@ -226,3 +231,21 @@ class JvmToolMixin:
       raise TaskError('No bootstrap callback registered for {key} in {scope}'
                       .format(key=key, scope=scope))
     return callback()
+
+  @memoized_staticmethod
+  def digest_classpath_paths_synchronously(classpath_relative_paths, root, scheduler):
+    """???
+
+    :param classpath_relative_paths: ???
+    :type classpath_relative_paths: list of string
+    :param root: ???
+    :type root: string
+    :param scheduler: ???
+    :rtype: Snapshot
+    """
+    return scheduler.capture_merged_snapshot(tuple([
+      PathGlobsAndRoot(
+        PathGlobs(include=classpath_relative_paths),
+        root=text_type(root),
+      ),
+    ]))

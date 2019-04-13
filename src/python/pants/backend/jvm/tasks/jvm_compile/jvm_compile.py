@@ -47,7 +47,7 @@ _JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
 
-class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
+class JvmCompile(NailgunTaskBase, CompilerOptionSetsMixin):
   """A common framework for JVM compilation.
 
   To subclass for a specific JVM language, implement the static values and methods
@@ -68,6 +68,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
+    cls.register_compiler_option_sets_options(register)
 
     register('--args', advanced=True, type=list,
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,

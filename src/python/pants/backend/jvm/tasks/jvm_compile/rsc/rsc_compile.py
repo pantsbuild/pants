@@ -19,13 +19,13 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryToMaterialize, PathGlobs,
-                             PathGlobsAndRoot)
+                             PathGlobsAndRoot, digest_file_paths)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import Timer
-from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
+from pants.util.dirutil import fast_relpath, fast_relpath_collection, safe_mkdir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype, enum
 from pants.util.strutil import safe_shlex_join
@@ -39,11 +39,6 @@ from pants.util.strutil import safe_shlex_join
 #
 #
 logger = logging.getLogger(__name__)
-
-
-def fast_relpath_collection(collection):
-  buildroot = get_buildroot()
-  return [fast_relpath_optional(c, buildroot) or c for c in collection]
 
 
 def stdout_contents(wu):
@@ -209,6 +204,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super().register_extra_products_from_contexts(targets, compile_contexts)
+
+    def to_classpath_entries(paths, scheduler):
+      return [ClasspathEntry(p, d) for (p, d) in digest_file_paths(paths, scheduler)]
 
     def confify(entries):
       return [(conf, e) for e in entries for conf in self._confs]
