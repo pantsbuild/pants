@@ -398,7 +398,7 @@ py27_lint: &py27_lint
     - *py27_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py27
   script:
-    - ./build-support/bin/travis-ci.sh -fmrt2
+    - ./build-support/bin/ci.sh -fmrt2
 
 py36_lint: &py36_lint
   <<: *py36_linux_test_config
@@ -407,7 +407,7 @@ py36_lint: &py36_lint
     - *py36_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py36
   script:
-    - ./build-support/bin/travis-ci.sh -fmrt
+    - ./build-support/bin/ci.sh -fmrt
 
 py37_lint: &py37_lint
   <<: *py37_linux_test_config
@@ -416,7 +416,7 @@ py37_lint: &py37_lint
     - *py37_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py37
   script:
-    - ./build-support/bin/travis-ci.sh -fmrt7
+    - ./build-support/bin/ci.sh -fmrt7
 
 # -------------------------------------------------------------------------
 # Rust lints
@@ -436,7 +436,7 @@ linux_rust_clippy: &linux_rust_clippy
     - ulimit -c unlimited
     - ulimit -n 8192
   script:
-    - ./build-support/bin/travis-ci.sh -s
+    - ./build-support/bin/ci.sh -s
 
 cargo_audit: &cargo_audit
   <<: *base_rust_lints
@@ -445,7 +445,7 @@ cargo_audit: &cargo_audit
     - CACHE_NAME=linuxcargoaudit
   stage: *test_cron
   script:
-    - ./build-support/bin/travis-ci.sh -a
+    - ./build-support/bin/ci.sh -a
 
 # -------------------------------------------------------------------------
 # Build wheels
@@ -580,7 +580,7 @@ base_rust_tests: &base_rust_tests
     - ulimit -c unlimited
     - ulimit -n 8192
   script:
-    - ./build-support/bin/travis-ci.sh -e
+    - ./build-support/bin/ci.sh -e
 
 linux_rust_tests: &linux_rust_tests
   <<: *base_rust_tests
@@ -613,7 +613,7 @@ osx_rust_tests: &osx_rust_tests
 
 base_osx_sanity_check: &base_osx_sanity_check
   script:
-    - MODE=debug ./build-support/bin/travis-ci.sh -m
+    - MODE=debug ./build-support/bin/ci.sh -m
 
 # TODO: Update this to use 10.14 once it is available
 base_osx_10_12_sanity_check: &base_osx_10_12_sanity_check
@@ -683,7 +683,7 @@ py27_osx_platform_tests: &py27_osx_platform_tests
     - *py27_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py27
   script:
-    - ./build-support/bin/travis-ci.sh -z2
+    - ./build-support/bin/ci.sh -z2
 
 py36_osx_platform_tests: &py36_osx_platform_tests
   <<: *py36_osx_test_config
@@ -692,7 +692,7 @@ py36_osx_platform_tests: &py36_osx_platform_tests
     - *py36_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py36
   script:
-    - ./build-support/bin/travis-ci.sh -z
+    - ./build-support/bin/ci.sh -z
 
 py37_osx_platform_tests: &py37_osx_platform_tests
   <<: *py37_osx_test_config
@@ -701,7 +701,7 @@ py37_osx_platform_tests: &py37_osx_platform_tests
     - *py37_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py37
   script:
-    - ./build-support/bin/travis-ci.sh -z7
+    - ./build-support/bin/ci.sh -z7
 
 # -------------------------------------------------------------------------
 # JVM tests
@@ -718,7 +718,7 @@ py27_jvm_tests: &py27_jvm_tests
     - *py27_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py27
   script:
-    - ./build-support/bin/travis-ci.sh -j2
+    - ./build-support/bin/ci.sh -j2
 
 py36_jvm_tests: &py36_jvm_tests
   <<: *py36_linux_test_config
@@ -728,7 +728,7 @@ py36_jvm_tests: &py36_jvm_tests
     - *py36_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py36
   script:
-    - ./build-support/bin/travis-ci.sh -j
+    - ./build-support/bin/ci.sh -j
 
 py37_jvm_tests: &py37_jvm_tests
   <<: *py37_linux_test_config
@@ -738,7 +738,7 @@ py37_jvm_tests: &py37_jvm_tests
     - *py37_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py37
   script:
-    - ./build-support/bin/travis-ci.sh -j7
+    - ./build-support/bin/ci.sh -j7
 
 # -------------------------------------------------------------------------
 # Deploy
@@ -855,7 +855,7 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=linuxunittests.py27
       script:
-        - ./build-support/bin/travis-ci.sh -2lp
+        - ./build-support/bin/ci.sh -2lp
 
     - <<: *py36_linux_test_config
       name: "Unit tests (Py3.6 PEX)"
@@ -863,7 +863,7 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=linuxunittests.py36
       script:
-        - ./build-support/bin/travis-ci.sh -lp
+        - ./build-support/bin/ci.sh -lp
 
     - <<: *py37_linux_test_config
       name: "Unit tests (Py3.7 PEX)"
@@ -871,7 +871,7 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=linuxunittests.py37
       script:
-        - ./build-support/bin/travis-ci.sh -7lp
+        - ./build-support/bin/ci.sh -7lp
 
     - <<: *py27_linux_build_wheels_ucs2
     - <<: *py27_linux_build_wheels_ucs4
@@ -888,7 +888,7 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}
       script:
-        - ./build-support/bin/travis-ci.sh -c -i {{.}}/{{integration_shards_length}}
+        - ./build-support/bin/ci.sh -c -i {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 {{#integration_shards}}
@@ -898,7 +898,7 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}
       script:
-        - ./build-support/bin/travis-ci.sh -c7 -i {{.}}/{{integration_shards_length}}
+        - ./build-support/bin/ci.sh -c7 -i {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 {{#integration_shards}}
@@ -908,7 +908,7 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=cronshard{{.}}
       script:
-        - ./build-support/bin/travis-ci.sh -c2 -i {{.}}/{{integration_shards_length}}
+        - ./build-support/bin/ci.sh -c2 -i {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 
@@ -922,7 +922,7 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py27
       script:
-        - ./build-support/bin/travis-ci.sh -2n
+        - ./build-support/bin/ci.sh -2n
 
     - <<: *py36_linux_test_config
       name: "Python contrib tests (Py3.6 PEX)"
@@ -930,7 +930,7 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py36
       script:
-        - ./build-support/bin/travis-ci.sh -n
+        - ./build-support/bin/ci.sh -n
 
     - <<: *py37_linux_test_config
       name: "Python contrib tests (Py3.7 PEX)"
@@ -938,7 +938,7 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=linuxcontribtests.py37
       script:
-        - ./build-support/bin/travis-ci.sh -7n
+        - ./build-support/bin/ci.sh -7n
 
     - <<: *py27_osx_10_12_sanity_check
     - <<: *py36_osx_10_12_sanity_check
