@@ -27,8 +27,11 @@ RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} global ${PYTHON_27_VERSION_UCS2}
 ENV PATH "${PYENV_ROOT}/shims:${PATH}"
 
+# We ensure selection of the the UCS4 interpreter by the pants script and pants.pex with these
+# env vars.
 ENV PY "${PYENV_ROOT}/shims/python2.7"
 ENV PEX_PYTHON_PATH "${PYENV_ROOT}/shims/python2.7"
+ENV PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYTHON_27_VERSION_UCS2}']"
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
