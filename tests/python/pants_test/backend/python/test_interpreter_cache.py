@@ -72,13 +72,15 @@ class TestInterpreterCache(TestBase):
 
   def test_cache_setup_with_no_filters_uses_repo_default(self):
     with self._setup_cache(constraints=[]) as (cache, _):
-      self.assertIn(self._interpreter, cache.setup())
+      self.assertIn(self._interpreter.identity, [interp.identity for interp in cache.setup()])
 
   def test_cache_setup_with_filter_overrides_repo_default(self):
-    bad_interpreter_requirement = self._make_bad_requirement(self._interpreter.identity.requirement)
+    repo_default_requirement = str(self._interpreter.identity.requirement)
+    bad_interpreter_requirement = self._make_bad_requirement(repo_default_requirement)
     with self._setup_cache(constraints=[bad_interpreter_requirement]) as (cache, _):
-      self.assertIn(self._interpreter,
-                    cache.setup(filters=(str(self._interpreter.identity.requirement),)))
+      self.assertIn(self._interpreter.identity,
+                    [interp.identity
+                     for interp in cache.setup(filters=(repo_default_requirement,))])
 
   def test_setup_using_eggs(self):
     def link_egg(repo_root, requirement):
