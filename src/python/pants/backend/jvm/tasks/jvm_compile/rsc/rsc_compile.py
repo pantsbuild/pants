@@ -551,7 +551,6 @@ class RscCompile(ZincCompile):
       output_directories=(output_dir,),
       timeout_seconds=15*60,
       description='run {} for {}'.format(tool_name, tgt),
-      # TODO: These should always be unicodes
       # Since this is always hermetic, we need to use `underlying.home` because
       # ExecuteProcessRequest requires an existing, local jdk location.
       jdk_home=text_type(distribution.underlying_home),

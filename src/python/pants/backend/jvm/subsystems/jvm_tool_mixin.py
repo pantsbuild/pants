@@ -11,7 +11,7 @@ from future.utils import text_type
 
 from pants.base.exceptions import TaskError
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
-from pants.java.distribution.distribution import DistributionLocator
+from pants.java.distribution.distribution import DistributionLocator, HermeticDistribution
 from pants.option.custom_types import target_option
 from pants.util.memo import memoized_staticmethod
 from pants.util.objects import datatype
@@ -180,6 +180,10 @@ class JvmToolMixin(object):
       # Use default until told otherwise.
       self.set_distribution()
     return self._dist
+
+  @property
+  def hermetic_dist(self):
+    return HermeticDistribution.create(self.dist)
 
   @classmethod
   def tool_jar_from_products(cls, products, key, scope):

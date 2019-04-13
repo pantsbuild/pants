@@ -9,7 +9,6 @@ import os
 from builtins import object, open, str
 from multiprocessing import cpu_count
 
-from future.utils import text_type
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -34,7 +33,7 @@ from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
-from pants.java.distribution.distribution import DistributionLocator
+from pants.java.distribution.distribution import DistributionLocator, HermeticDistribution
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer
@@ -837,41 +836,6 @@ class JvmCompile(NailgunTaskBase, CompilerOptionSetsMixin):
       local_distribution = JvmPlatform.preferred_jvm_distribution(settings_args, strict=False)
     return local_distribution
 
-  class _HermeticDistribution(object):
-    def __init__(self, home_path, distribution):
-      self._underlying = distribution
-      self._home = home_path
-
-    def find_libs(self, names):
-      underlying_libs = self._underlying.find_libs(names)
-      return [self._rehome(l) for l in underlying_libs]
-
-    def find_libs_path_globs(self, names):
-      libs_abs = self._underlying.find_libs(names)
-      libs_unrooted = [self._unroot_lib_path(l) for l in libs_abs]
-      path_globs = PathGlobsAndRoot(
-        PathGlobs(tuple(libs_unrooted)),
-        text_type(self._underlying.home))
-      return (libs_unrooted, path_globs)
-
-    @property
-    def java(self):
-      return os.path.join(self._home, 'bin', 'java')
-
-    @property
-    def home(self):
-      return self._home
-
-    @property
-    def underlying_home(self):
-      return self._underlying.home
-
-    def _unroot_lib_path(self, path):
-      return path[len(self._underlying.home)+1:]
-
-    def _rehome(self, l):
-      return os.path.join(self._home, self._unroot_lib_path(l))
-
   def _get_jvm_distribution(self):
     # TODO We may want to use different jvm distributions depending on what
     # java version the target expects to be compiled against.
@@ -881,7 +845,7 @@ class JvmCompile(NailgunTaskBase, CompilerOptionSetsMixin):
     return self.execution_strategy_enum.resolve_for_enum_variant({
       self.SUBPROCESS: lambda: local_distribution,
       self.NAILGUN: lambda: local_distribution,
-      self.HERMETIC: lambda: self._HermeticDistribution('.jdk', local_distribution),
+      self.HERMETIC: lambda: HermeticDistribution.create(local_distribution),
     })()
 
   def _default_work_for_vts(self, vts, ctx, input_classpath_product_key, counter, all_compile_contexts, output_classpath_product):

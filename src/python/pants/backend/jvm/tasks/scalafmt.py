@@ -4,10 +4,16 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 from abc import abstractproperty
 
+from future.utils import text_type
+
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
+from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
 from pants.task.fmt_task_mixin import FmtTaskMixin
@@ -25,7 +31,9 @@ class ScalaFmt(RewriteBase):
   def register_options(cls, register):
     super(ScalaFmt, cls).register_options(register)
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
-              help='Path to scalafmt config file, if not specified default scalafmt config used')
+             help='Path to scalafmt config file, if not specified default scalafmt config used')
+    register('--use-hermetic-execution', advanced=True, type=bool, default=False,
+             help='Execute scalafmt using the v2 engine process execution framework.')
 
     cls.register_jvm_tool(register,
                           'scalafmt',
@@ -46,6 +54,75 @@ class ScalaFmt(RewriteBase):
   @classmethod
   def implementation_version(cls):
     return super(ScalaFmt, cls).implementation_version() + [('ScalaFmt', 5)]
+
+  def _execute_hermetic(self, targets):
+    classpath_snapshot = self.tool_classpath_snapshot('scalafmt')
+
+    source_snapshots = [
+      tgt.sources_snapshot(scheduler=self.context._scheduler)
+      for tgt in targets
+    ]
+
+    config_file = self.get_options().configuration
+    if config_file is not None:
+      config_rel_path = os.path.relpath(config_file, get_buildroot())
+      merged_snapshot = self.context._scheduler.capture_merged_snapshot(tuple([
+        PathGlobsAndRoot(
+          PathGlobs([config_rel_path]),
+          root=text_type(get_buildroot()),
+        )
+      ]))
+      config_args = ['--config', config_rel_path]
+    else:
+      merged_snapshot = None
+      config_args = []
+
+    merged_inputs = self.context._scheduler.merge_directories(tuple(
+      [classpath_snapshot.directory_digest]
+      + [snap.directory_digest for snap in source_snapshots]
+      + ([merged_snapshot.directory_digest] if merged_snapshot else [])))
+    rel_src_files = [
+      src_file
+      for snap in source_snapshots
+      for src_file in snap.files
+    ]
+
+    hermetic_jvm_dist = self.hermetic_dist
+
+    full_argv = ([
+      hermetic_jvm_dist.java,
+      '-classpath', os.pathsep.join(classpath_snapshot.files + classpath_snapshot.dirs),
+      'org.scalafmt.cli.Cli',
+    ] + config_args
+      + self.additional_args
+      + rel_src_files)
+    request = ExecuteProcessRequest(
+      argv=tuple(full_argv),
+      input_files=merged_inputs,
+      description='execute scalafmt via native-image',
+      output_files=tuple(rel_src_files),
+      # TODO: this argument could potentially be added automatically.
+      jdk_home=hermetic_jvm_dist.underlying_home
+    )
+    result = self.context.execute_process_synchronously_without_raising(
+      request,
+      'execute-scalafmt-hermetically',
+    )
+    if self.sideeffecting:
+      output_dir = self.get_options().output_dir or get_buildroot()
+      self.context._scheduler.materialize_directories(tuple([
+        DirectoryToMaterialize(
+          path=text_type(output_dir),
+          directory_digest=result.output_directory_digest,
+        ),
+        ]))
+    return self.process_result(result.exit_code)
+
+  def _execute_for(self, targets):
+    if self.get_options().use_hermetic_execution:
+      return self._execute_hermetic(targets)
+    else:
+      return super(ScalaFmt, self)._execute_for(targets)
 
   def invoke_tool(self, absolute_root, target_sources):
     # If no config file is specified use default scalafmt config.
