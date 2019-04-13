@@ -9,6 +9,7 @@ import sys
 from builtins import map, object
 from contextlib import contextmanager
 
+from future.utils import PY3
 from twitter.common.collections import maybe_list
 
 from pants.base.workunit import WorkUnit
@@ -41,7 +42,7 @@ class TestContext(Context):
    """
 
     def output(self, name):
-      return sys.stderr
+      return sys.stderr.buffer if PY3 else sys.stderr
 
     def set_outcome(self, outcome):
       return sys.stderr.write('\nWorkUnit outcome: {}\n'.format(WorkUnit.outcome_string(outcome)))
