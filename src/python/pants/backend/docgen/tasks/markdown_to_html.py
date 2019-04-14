@@ -4,10 +4,9 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import codecs
 import os
 import re
-from builtins import str
+from builtins import open, str
 
 from pkg_resources import resource_string
 from pygments.formatters.html import HtmlFormatter
@@ -173,9 +172,9 @@ class MarkdownToHtml(Task):
     wikilinks = util().WikilinksExtension(build_url)
 
     safe_mkdir(os.path.dirname(output_path))
-    with codecs.open(output_path, 'w', 'utf-8') as output:
+    with open(output_path, 'w') as output:
       source_path = os.path.join(get_buildroot(), source)
-      with codecs.open(source_path, 'r', 'utf-8') as source_stream:
+      with open(source_path, 'r') as source_stream:
         md_html = util().markdown.markdown(
           source_stream.read(),
           extensions=['codehilite(guess_lang=False)',
@@ -186,21 +185,24 @@ class MarkdownToHtml(Task):
                       util().IncludeExcerptExtension(source_path)],
         )
         if fragmented:
-          style_css = (HtmlFormatter(style=self.code_style)).get_style_defs('.codehilite')
-          template = resource_string(__name__,
-                                     os.path.join(self._templates_dir, 'fragment.mustache'))
+          style_css = HtmlFormatter(style=self.code_style).get_style_defs('.codehilite')
+          template = resource_string(
+            __name__, os.path.join(self._templates_dir, 'fragment.mustache')
+          ).decode('utf-8')
           generator = Generator(template, style_css=style_css, md_html=md_html)
           generator.write(output)
         else:
           style_link = os.path.relpath(css, os.path.dirname(output_path))
-          template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
+          template = resource_string(
+            __name__, os.path.join(self._templates_dir, 'page.mustache')
+          ).decode('utf-8')
           generator = Generator(template, style_link=style_link, md_html=md_html)
           generator.write(output)
         return output.name
 
   def process_rst(self, workunit, page, output_path, source, fragmented):
     source_path = os.path.join(get_buildroot(), source)
-    with codecs.open(source_path, 'r', 'utf-8') as source_stream:
+    with open(source_path, 'r') as source_stream:
       rst_html, returncode = util().rst_to_html(source_stream.read(),
                                                 stderr=StringWriter(workunit.output('stderr')))
       if returncode != 0:
@@ -212,9 +214,9 @@ class MarkdownToHtml(Task):
 
       template_path = os.path.join(self._templates_dir,
                                    'fragment.mustache' if fragmented else 'page.mustache')
-      template = resource_string(__name__, template_path)
+      template = resource_string(__name__, template_path).decode('utf-8')
       generator = Generator(template, md_html=rst_html)
       safe_mkdir(os.path.dirname(output_path))
-      with codecs.open(output_path, 'w', 'utf-8') as output:
+      with open(output_path, 'w') as output:
         generator.write(output)
         return output.name
