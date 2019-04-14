@@ -67,8 +67,10 @@ if git rev-parse --verify "master" &>/dev/null; then
 
   if git diff master --name-only | grep '\.rs$' > /dev/null; then
     echo "* Checking formatting of rust files" && ./build-support/bin/check_rust_formatting.sh || exit 1
-    # Clippy happens on a different shard because of separate caching concerns.
-    if [[ "${RUNNING_VIA_TRAVIS_CI_SCRIPT}" != "1" ]]; then
+    # Clippy happens on a different Travis CI shard because of separate caching concerns.
+    # The TRAVIS env var is documented here:
+    #   https://docs.travis-ci.com/user/environment-variables/#default-environment-variables
+    if [[ "${TRAVIS}" != "true" ]]; then
       echo "* Running cargo clippy" && ./build-support/bin/check_clippy.sh || exit 1
     fi
     echo "* Checking rust target headers" && build-support/bin/check_rust_target_headers.sh || exit 1
