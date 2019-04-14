@@ -596,13 +596,17 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs4
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
-    # We set $PY to ensure the UCS4 interpreter is used when bootstrapping the PEX.
+    # We ensure selection of the the UCS4 interpreter by the pants script and pants.pex with these
+    # env vars.
+    - PYTHON_27_VERSION_UCS4=2.7.13
     - PY=${PYENV_ROOT}/shims/python2.7
+    - PEX_PYTHON_PATH=${PYENV_ROOT}/shims/python2.7
+    - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYTHON_27_VERSION_UCS4}']"
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh 2.7.13 ${PYENV_PY36_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYTHON_27_VERSION_UCS4} ${PYENV_PY36_VERSION}
   script:
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu

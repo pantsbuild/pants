@@ -122,17 +122,11 @@ else
 fi
 export PY="${PY:-python${py_major_minor}}"
 
-# Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
-# to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
-# Python 2.7.10 vs. 2.7.13. When running with Python 3, we must also set this constraint to ensure
-# all spawned subprocesses use Python 3 rather than the default of Python 2. This is in part
-# necessary to avoid the _Py_Dealloc error (#6985).
-py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor}.*']}"
 banner "Setting interpreter constraints to ${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}"
 
 if [[ "${run_bootstrap:-false}" == "true" ]]; then
-  start_travis_section "Bootstrap" "Bootstrapping pants as a Python ${py_major_minor_patch} PEX"
+  start_travis_section "Bootstrap" "Bootstrapping pants as a Python ${py_major_minor} PEX"
   (
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."

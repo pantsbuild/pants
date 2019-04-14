@@ -22,12 +22,17 @@ done
 # Reset opt parsing's position to start
 OPTIND=0
 
-# Set the Python interpreter to be used for the virtualenv. Note we allow the user to
-# predefine this value so that they may point to a specific interpreter, e.g. 2.7.13 vs. 2.7.15.
-default_interpreter="python2.7";
+# Setup Python interpreter constraints and pick a suitable interpreter to be used for the
+# virtualenv.
 if [[ "${python_three:-false}" == "true" ]]; then
   default_interpreter="python3.6"
+  interpreter_constraint="CPython==3.6.*"
+else
+  default_interpreter="python2.7"
+  interpreter_constraint="CPython==2.7.*"
 fi
+# Note we allow the user to predefine this value so that they may point to a specific interpreter,
+# e.g. 2.7.13 vs. 2.7.15.
 export PY="${PY:-${default_interpreter}}"
 if ! which "${PY}" >/dev/null; then
   die "Python interpreter ${PY} not discoverable on your PATH."
@@ -37,12 +42,7 @@ if [[ "${py_major_minor}" != "2.7" ]] && [[ "${py_major_minor}" != "3.6" ]]; the
   die "Invalid interpreter. The release script requires Python 2.7 or 3.6 (you are using ${py_major_minor})."
 fi
 
-# Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
-# to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
-# Python 2.7.13 vs. 2.7.15. We must also set this when running with Python 3 to ensure
-# that spawned subprocesses use Python 3.
-py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
 
 function run_local_pants() {
   ${ROOT}/pants "$@"
@@ -657,11 +657,6 @@ function build_pex() {
   for platform in "${platforms[@]}"; do
     platform_flags=("${platform_flags[@]}" "--platform=${platform}")
   done
-
-  interpreter_constraint="CPython==2.7.*"
-  if [[ "${python_three:-false}" == "true" ]]; then
-    interpreter_constraint="CPython==3.6.*"
-  fi
 
   execute_pex \
     -o "${dest}" \
