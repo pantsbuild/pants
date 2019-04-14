@@ -65,13 +65,9 @@ class SchedulerService(PantsService):
     self._loop_condition = LoopCondition()
 
   def _get_snapshot(self):
-    """Returns a Snapshot of the input globs(the self._invalidation_globs)"""
+    """Returns a Snapshot of the input globs"""
     return self._scheduler_session.product_request(
       Snapshot, subjects=[PathGlobs(self._invalidation_globs)])[0]
-
-  def _get_files(self, snapshots):
-    """Returns a set of the files corresponding to the list of input snapshots"""
-    return snapshots.files
 
   def setup(self, services):
     """Service setup."""
@@ -83,7 +79,7 @@ class SchedulerService(PantsService):
     # that exist at startup are the only ones that can affect the running daemon.
     if self._invalidation_globs:
       self._invalidating_snapshot = self._get_snapshot()
-      self._invalidating_files = self._get_files(self._invalidating_snapshot)
+      self._invalidating_files = self._invalidating_snapshot.files
       self._logger.info('watching invalidating files: {}'.format(self._invalidating_files))
 
     if self._pantsd_pidfile:
