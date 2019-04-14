@@ -130,7 +130,7 @@ def precompute_pantsrefs(soups):
         continue
       pantsmark = tag['pantsmark']
       if pantsmark in accumulator:
-        raise TaskError('pantsmarks are unique but "{0}" appears in {1} and {2}'
+        raise TaskError('pantsmarks are unique but "{}" appears in {} and {}'
                         .format(pantsmark, page, accumulator[pantsmark]))
 
       # To link to a place "mid-page", we need an HTML anchor.
@@ -141,11 +141,11 @@ def precompute_pantsrefs(soups):
         anchor = pantsmark
         while anchor in existing_anchors:
           count += 1
-          anchor = '{0}_{1}'.format(pantsmark, count)
+          anchor = '{}_{}'.format(pantsmark, count)
         tag['id'] = anchor
         existing_anchors = find_existing_anchors(soup)
 
-      link = '{0}.html#{1}'.format(page, anchor)
+      link = '{}.html#{}'.format(page, anchor)
       accumulator[pantsmark] = link
   return accumulator
 
@@ -226,7 +226,7 @@ def ensure_page_headings_linkable(soup):
       snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
       while True:
         count += 1
-        candidate_id = 'heading_{0}_{1}'.format(snippet, count).lower()
+        candidate_id = 'heading_{}_{}'.format(snippet, count).lower()
         if not candidate_id in existing_anchors:
           existing_anchors.add(candidate_id)
           tag['id'] = candidate_id
@@ -241,7 +241,7 @@ def link_pantsrefs(soups, precomputed):
         continue
       pantsref = a['pantsref']
       if not pantsref in precomputed.pantsref:
-        raise TaskError('Page {0} has pantsref "{1}" and I cannot find pantsmark for'
+        raise TaskError('Page {} has pantsref "{}" and I cannot find pantsmark for'
                         ' it'.format(page, pantsref))
       a['href'] = rel_href(page, precomputed.pantsref[pantsref])
 
@@ -313,7 +313,7 @@ def hdepth(tag):
   E.g., h1 at top level is 1, h1 in a section is 2, h2 at top level is 2.
   """
   if not _heading_re.search(tag.name):
-    raise TaskError('Can\'t compute heading depth of non-heading {0}'.format(tag))
+    raise TaskError("Can't compute heading depth of non-heading {}".format(tag))
   depth = int(tag.name[1], 10)  # get the 2 from 'h2'
   cursor = tag
   while cursor:
