@@ -241,8 +241,33 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
     with assert_execution_error(self, "TypeError: unhashable type: 'list'"):
       self.scheduler.product_request(C, [Params(TypeCheckFailWrapper(A()))])
 
+    # Test that the error contains the full traceback from within the CFFI context as well
+    # (mentioning which specific extern method ended up raising the exception).
     with assert_execution_error(self, dedent("""\
-      TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': error was: unhashable type: 'list'""")):
+      1 Exception raised in CFFI extern methods:
+      Traceback (most recent call last):
+        File LOCATION-INFO, in __hash__
+          return super(DataType, self).__hash__()
+      TypeError: unhashable type: 'list'
+
+      During handling of the above exception, another exception occurred:
+
+      Traceback (most recent call last):
+        File LOCATION-INFO, in __hash__
+          hash(value)
+      TypeError: unhashable type: 'list'
+
+      During handling of the above exception, another exception occurred:
+
+      Traceback (most recent call last):
+        File LOCATION-INFO, in extern_identify
+          return c.identify(obj)
+        File LOCATION-INFO, in identify
+          hash_ = hash(obj)
+        File LOCATION-INFO, in __hash__
+          .format(self, type(self).__name__, field_name, e))
+      TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': unhashable type: 'list'
+      """)):
       self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
 
   def test_trace_includes_rule_exception_traceback(self):

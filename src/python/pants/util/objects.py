@@ -161,10 +161,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
           except TypeError as e:
             raise TypeError("For datatype object {} (type '{}'): in field '{}': {}"
                             .format(self, type(self).__name__, field_name, e))
-          else:
-            # If the error doesn't seem to be with hashing any of the fields, just re-raise the
-            # original error.
-            raise
+        # If the error doesn't seem to be with hashing any of the fields, just re-raise the
+        # original error.
+        raise
 
     # NB: As datatype is not iterable, we need to override both __iter__ and all of the
     # namedtuple methods that expect self to be iterable.

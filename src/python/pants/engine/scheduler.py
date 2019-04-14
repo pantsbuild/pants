@@ -8,6 +8,7 @@ import logging
 import multiprocessing
 import os
 import time
+import traceback
 from builtins import object, open, str, zip
 from types import GeneratorType
 
@@ -504,8 +505,31 @@ class SchedulerSession(object):
     :param list subjects: A list of subjects or Params instances for the request.
     :returns: A list of the requested products, with length match len(subjects).
     """
-    request = self.execution_request([product], subjects)
-    returns, throws = self.execute(request)
+    request = None
+    try:
+      request = self.execution_request([product], subjects)
+    except Exception:
+      internal_errors = self._scheduler._native.cffi_extern_method_runtime_exceptions()
+      if not internal_errors:
+        raise
+
+      error_tracebacks = [
+        ''.join(
+          traceback.format_exception(etype=error_info.exc_type,
+                                     value=error_info.exc_value,
+                                     tb=error_info.traceback))
+        for error_info in internal_errors
+      ]
+      # Zero out the errors raised in CFFI callbacks in case this one is caught and pants doesn't
+      # exit.
+      self._scheduler._native.reset_cffi_extern_method_runtime_exceptions()
+      raise ExecutionError(
+        '{} raised in CFFI extern methods:\n{}'
+        .format(pluralize(len(internal_errors), 'Exception'),
+                '\n++++++++++\n'.join(formatted_tb
+                                      for formatted_tb in error_tracebacks)))
+    else:
+      returns, throws = self.execute(request)
 
     # Throw handling.
     if throws:
