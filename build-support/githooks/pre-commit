@@ -29,6 +29,7 @@ set -e
 
 # You can use ("$()") with double quotes in zsh, I assume this splits by IFS...
 ADDED_FILES=($(./build-support/bin/get_added_files.sh))
+MERGE_BASE="$(git_merge_base)"
 
 echo "* Checking packages"
 # TODO: Determine the most *hygienic* way to split an array on the command line in portable bash,
@@ -50,7 +51,6 @@ echo "* Checking for bad shell patterns" && ./build-support/bin/check_shell.sh |
 
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
-MERGE_BASE="$(git_merge_base)"
 if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking imports" && ./build-support/bin/isort.sh || \
     die "To fix import sort order, run \`\"$(pwd)/build-support/bin/isort.sh\" -f\`"
