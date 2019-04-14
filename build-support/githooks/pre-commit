@@ -50,7 +50,8 @@ echo "* Checking for bad shell patterns" && ./build-support/bin/check_shell.sh |
 
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
-if git rev-parse --verify "master" &>/dev/null; then
+MERGE_BASE="$(git_merge_base)"
+if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking imports" && ./build-support/bin/isort.sh || \
     die "To fix import sort order, run \`\"$(pwd)/build-support/bin/isort.sh\" -f\`"
 
@@ -58,9 +59,9 @@ if git rev-parse --verify "master" &>/dev/null; then
   # https://github.com/pantsbuild/pants/issues/6633
   # TODO: add a test case for this while including a pexrc file, as python checkstyle currently fails
   # quite often with a pexrc available.
-  echo "* Checking lint" && ./pants --exclude-target-regexp='testprojects/.*' --changed-parent=master lint || exit 1
+  echo "* Checking lint" && ./pants --exclude-target-regexp='testprojects/.*' --changed-parent="${MERGE_BASE}" lint || exit 1
 
-  if git diff master --name-only | grep '\.rs$' > /dev/null; then
+  if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
     echo "* Checking formatting of rust files" && ./build-support/bin/check_rust_formatting.sh || exit 1
     # Clippy happens on a different Travis CI shard because of separate caching concerns.
     # The TRAVIS env var is documented here:
@@ -71,7 +72,7 @@ if git rev-parse --verify "master" &>/dev/null; then
     echo "* Checking rust target headers" && build-support/bin/check_rust_target_headers.sh || exit 1
   fi
 
-  if git diff master --name-only | grep build-support/travis > /dev/null; then
+  if git diff "${MERGE_BASE}" --name-only | grep build-support/travis > /dev/null; then
     echo "* Checking .travis.yml generation" && \
     actual_travis_yml=$(<.travis.yml) && \
     expected_travis_yml=$(./pants --quiet run build-support/travis:generate_travis_yml) && \

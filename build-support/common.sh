@@ -61,3 +61,8 @@ function end_travis_section() {
 function fingerprint_data() {
   git hash-object -t blob --stdin
 }
+
+function git_merge_base() {
+  # This prints the tracking branch if set and otherwise falls back to local "master".
+  git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo master
+}
