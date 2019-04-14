@@ -64,5 +64,5 @@ function fingerprint_data() {
 
 function git_merge_base() {
   # This prints the tracking branch if set and otherwise falls back to local "master".
-  git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo master
+  git rev-parse --symbolic-full-name --abbrev-ref HEAD@{upstream} 2>/dev/null || echo master
 }
