@@ -14,6 +14,7 @@ from twitter.common.collections import OrderedSet
 from pants.util.collections_abc_backport import Iterable, OrderedDict, namedtuple
 from pants.util.memo import memoized_classproperty
 from pants.util.meta import AbstractClass, classproperty
+from pants.util.strutil import pluralize
 
 
 class TypeCheckError(TypeError):
@@ -122,8 +123,9 @@ def datatype(field_decls, superclass_name=None, **kwargs):
             "field '{}' was invalid: {}".format(field_name, e))
       if type_failure_msgs:
         raise cls.make_type_error(
-          'error(s) type checking constructor arguments:\n{}'
-          .format('\n'.join(type_failure_msgs)))
+          '{} type checking constructor arguments:\n{}'
+          .format(pluralize(len(type_failure_msgs), 'error'),
+                  '\n'.join(type_failure_msgs)))
 
       return this_object
 
