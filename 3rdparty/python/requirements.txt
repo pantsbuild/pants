@@ -5,7 +5,7 @@ cffi==1.11.5
 configparser==3.5.0 ; python_version<'3'
 contextlib2==0.5.5
 coverage>=4.5,<4.6
-docutils>=0.12,<0.13
+docutils==0.14
 fasteners==0.14.1
 faulthandler==2.6 ; python_version<'3'
 future==0.17.1
