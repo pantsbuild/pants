@@ -14,7 +14,7 @@ from abc import abstractmethod
 from builtins import bytes, map, object, str, zip
 from collections import defaultdict
 
-from pex.installer import InstallerBase, Packager
+from pex.installer import Packager, WheelInstaller
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
@@ -108,31 +108,15 @@ def distutils_repr(obj):
   return output.getvalue()
 
 
-class SetupPyRunner(InstallerBase):
-  _EXTRAS = ('setuptools', 'wheel')
+class SetupPyRunner(WheelInstaller):
+  # We extend WheelInstaller to make sure `setuptools` and `wheel` are available to setup.py.
 
   def __init__(self, source_dir, setup_command, **kw):
-    self.__setup_command = setup_command
+    self._setup_command = setup_command
     super(SetupPyRunner, self).__init__(source_dir, **kw)
 
-  def mixins(self):
-    mixins = super(SetupPyRunner, self).mixins().copy()
-    extras = set(self._EXTRAS)
-    for (key, version) in self._interpreter.extras:
-      if key in extras:
-        mixins[key] = '{}=={}'.format(key, version)
-        extras.remove(key)
-        if not extras:
-          break
-    else:
-      # We know Pants sets up python interpreters with setuptools and wheel via the `PythonSetup`
-      # subsystem; so this should never happen
-      raise AssertionError("Expected interpreter {} to have the extras {}"
-                           .format(self._interpreter, self._EXTRAS))
-    return mixins
-
-  def _setup_command(self):
-    return self.__setup_command
+  def setup_command(self):
+    return self._setup_command
 
 
 class TargetAncestorIterator(object):

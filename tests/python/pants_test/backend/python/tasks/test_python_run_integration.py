@@ -5,9 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import unittest
 
-from pex.pex_bootstrapper import get_pex_info
+from pex.pex_info import PexInfo
 
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.interpreter_selection_utils import (PY_3, PY_27,
@@ -132,9 +131,6 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertEqual(var_val, pants_run.stdout_data.strip())
 
-  @unittest.skip(
-    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
-      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   @skip_unless_python27_and_python3_present
   def test_pants_run_interpreter_selection_with_pexrc(self):
     py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
@@ -156,9 +152,6 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
         self.assert_success(pants_run_3)
         self.assertIn(py3_path, pants_run_3.stdout_data)
 
-  @unittest.skip(
-    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
-      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   @skip_unless_python27_and_python3_present
   def test_pants_binary_interpreter_selection_with_pexrc(self):
     py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
@@ -181,8 +174,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     # Ensure proper interpreter constraints were passed to built pexes.
     py2_pex = os.path.join(os.getcwd(), 'dist', 'main_py2.pex')
     py3_pex = os.path.join(os.getcwd(), 'dist', 'main_py3.pex')
-    py2_info = get_pex_info(py2_pex)
-    py3_info = get_pex_info(py3_pex)
+    py2_info = PexInfo.from_pex(py2_pex)
+    py3_info = PexInfo.from_pex(py3_pex)
     self.assertIn('CPython>2.7.6,<3', py2_info.interpreter_constraints)
     self.assertIn('CPython>3', py3_info.interpreter_constraints)
 
@@ -190,9 +183,6 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     os.remove(py2_pex)
     os.remove(py3_pex)
 
-  @unittest.skip(
-    "Upgrade PEX: https://github.com/pantsbuild/pants/pull/7186. \
-      NB: Ensure https://github.com/pantsbuild/pex/pull/678 is merged into the PEX release.")
   @skip_unless_python3_present
   def test_target_constraints_with_no_sources(self):
     with temporary_dir() as interpreters_cache:
@@ -221,7 +211,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
 
     # Ensure proper interpreter constraints were passed to built pexes.
     py2_pex = os.path.join(os.getcwd(), 'dist', 'test_bin.pex')
-    py2_info = get_pex_info(py2_pex)
+    py2_info = PexInfo.from_pex(py2_pex)
     self.assertIn('CPython>3', py2_info.interpreter_constraints)
     # Cleanup.
     os.remove(py2_pex)

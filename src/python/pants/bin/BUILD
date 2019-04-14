@@ -60,6 +60,9 @@ python_binary(
   dependencies=[
     ':bin',
   ],
+  # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
+  # dependency on setuptools (for namespace package support).
+  emit_warnings=False,
 )
 
 # This binary is for internal use only.  It adds deps on both internal_backends not meant for
@@ -73,4 +76,7 @@ python_binary(
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
     'pants-plugins/src/python/internal_backend:plugins',
   ],
+  # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
+  # dependency on setuptools (for namespace package support).
+  emit_warnings=False,
 )

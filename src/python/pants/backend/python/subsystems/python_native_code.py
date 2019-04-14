@@ -125,18 +125,16 @@ class BuildSetupRequiresPex(ExecutablePexTool):
   options_scope = 'build-setup-requires-pex'
 
   @classmethod
-  def subsystem_dependencies(cls):
-    return super(BuildSetupRequiresPex, cls).subsystem_dependencies() + (PythonSetup,)
-
-  @memoized_property
-  def python_setup(self):
-    return PythonSetup.global_instance()
+  def register_options(cls, register):
+    super(BuildSetupRequiresPex, cls).register_options(register)
+    register('--setuptools-version', advanced=True, fingerprint=True, default='40.6.3',
+             help='The setuptools version to use when executing `setup.py` scripts.')
+    register('--wheel-version', advanced=True, fingerprint=True, default='0.32.3',
+             help='The wheel version to use when executing `setup.py` scripts.')
 
   @property
   def base_requirements(self):
-    # TODO: would we ever want to configure these requirement versions separately from the global
-    # PythonSetup values?
     return [
-      PythonRequirement('setuptools=={}'.format(self.python_setup.setuptools_version)),
-      PythonRequirement('wheel=={}'.format(self.python_setup.wheel_version)),
+      PythonRequirement('setuptools=={}'.format(self.get_options().setuptools_version)),
+      PythonRequirement('wheel=={}'.format(self.get_options().wheel_version)),
     ]

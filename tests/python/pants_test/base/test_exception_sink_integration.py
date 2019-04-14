@@ -55,7 +55,7 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
         # The backtrace should be omitted when --print-exception-stacktrace=False.
         print_exception_stacktrace=False)
       self.assert_failure(pants_run)
-      assertRegex(self, pants_run.stderr_data, """\\A\
+      assertRegex(self, pants_run.stderr_data, """\
 timestamp: ([^\n]+)
 Exception caught: \\(pants\\.build_graph\\.address_lookup_error\\.AddressLookupError\\) \\(backtrace omitted\\)
 Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
