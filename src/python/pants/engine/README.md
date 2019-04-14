@@ -218,6 +218,28 @@ $ ls viz
 run.0.dot
 ```
 
+# Remote Execution Testing
+
+Pants can execute processes invoked via the v2 engine remotely against an implementor of the [Bazel Remote Execution API](???). If `--remote-execution-sever` and `--remote-store-server` are provided on the Pants command line, Pants will remotely execute every v2 process execution. There is currently only one backend, *Scoot*.
+
+## [Scoot](https://github.com/twitter/scoot)
+- Clone the Scoot repo and follow the setup instructions (TODO: https://github.com/twitter/scoot/pull/420).
+- In the Scoot repo, run `go run ./binaries/setup-cloud-scoot/main.go --strategy local.local`.
+    - The output will contain lines such as "Serving GRPC CAS API on:" and "Serving GRPC Execution API on:" which specify host (localhost) and port.
+        - Use the "CAS API" host:port outputs as elements of `--remote-store-server` (a list option).
+        - Use the "Execution API" host:port single output as the value of `--remote-execution-server`.
+
+## Native Engine
+
+The native engine is integrated into the pants codebase via `native.py` in
+this directory along with `build-support/bin/native/bootstrap.sh` which ensures a
+pants native engine library is built and available for linking. The glue is the
+sha1 hash of the native engine source code used as its version by the `Native`
+class. This hash is maintained by `build-support/bin/native/bootstrap.sh` and
+output to the `native_engine_version` file in this directory. Any modification
+to this resource file's location will need adjustments in
+`build-support/bin/native/bootstrap.sh` to ensure the linking continues to work.
+
 ## History
 
 The need for an engine that could schedule all work as a result of linking required products to

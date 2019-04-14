@@ -264,3 +264,14 @@ resources(
   name='native_engine_shared_library',
   sources=['native_engine.so']
 )
+
+python_tests(
+  name='test-remote-execution-integration',
+  dependencies=[
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+)

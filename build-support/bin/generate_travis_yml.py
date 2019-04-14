@@ -582,6 +582,24 @@ def integration_tests_v2(python_version: PythonVersion) -> Dict:
   safe_append(shard, "env", f"CACHE_NAME=integration.v2.py{python_version.number}")
   return shard
 
+def scoot_integration_test(python_version: PythonVersion) -> Dict:
+  shard = {
+    **linux_shard(python_version=python_version),
+    "name": f"Integration test - Remote Execution (local Scoot cluster)",
+    "before_script": ["curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh"],
+    "go": ["tip"],
+    "addons": {
+      "apt": {
+        "packages": ["git"],
+      },
+    },
+    "script": [
+      "./pants --pytest-args='-vs' test src/python/pants/engine:test-remote-execution-integration",
+    ],
+  }
+  safe_append(shard, "env", "CACHE_NAME=scootintegrationtests")
+  return shard
+
 # -------------------------------------------------------------------------
 # Rust tests
 # -------------------------------------------------------------------------
@@ -796,6 +814,7 @@ def main() -> None:
       *integration_tests_v1(PythonVersion.py36),
       *integration_tests_v1(PythonVersion.py36, use_pantsd=True),
       *integration_tests_v1(PythonVersion.py37),
+      scoot_integration_test(PythonVersion.py36),
       rust_tests_linux(),
       rust_tests_osx(),
       *[osx_platform_tests(v) for v in PythonVersion],
