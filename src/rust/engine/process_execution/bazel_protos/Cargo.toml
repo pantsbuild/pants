@@ -19,6 +19,7 @@ tower-grpc = { git = "https://github.com/pantsbuild/tower-grpc.git", rev = "ef19
 
 [build-dependencies]
 build_utils = { path = "../../build_utils" }
+dir-diff = "0.3.1"
 grpcio-compiler = "0.3"
 protoc-grpcio = "0.2"
 tempfile = "3"
