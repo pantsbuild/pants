@@ -10,8 +10,7 @@ from future.utils import binary_type
 
 from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
-from pants.util.objects import (Exactly, datatype, hashable_string_list, string_optional,
-                                string_type)
+from pants.util.objects import Exactly, datatype, hashable_string_list, string_optional, string_type
 
 
 logger = logging.getLogger(__name__)
