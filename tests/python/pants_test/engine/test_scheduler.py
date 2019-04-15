@@ -9,6 +9,8 @@ from builtins import object, str
 from contextlib import contextmanager
 from textwrap import dedent
 
+from future.utils import PY3
+
 from pants.engine.rules import RootRule, UnionRule, rule, union
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get, Params
@@ -243,7 +245,8 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
 
     # Test that the error contains the full traceback from within the CFFI context as well
     # (mentioning which specific extern method ended up raising the exception).
-    with assert_execution_error(self, dedent("""\
+    expected_msg = dedent(
+      """\
       1 Exception raised in CFFI extern methods:
       Traceback (most recent call last):
         File LOCATION-INFO, in __hash__
@@ -267,7 +270,18 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
         File LOCATION-INFO, in __hash__
           .format(self, type(self).__name__, field_name, e))
       TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': unhashable type: 'list'
-      """)):
+      """ if PY3 else """\
+      1 Exception raised in CFFI extern methods:
+      Traceback (most recent call last):
+        File LOCATION-INFO, in extern_identify
+          return c.identify(obj)
+        File LOCATION-INFO, in identify
+          hash_ = hash(obj)
+        File LOCATION-INFO, in __hash__
+          .format(self, type(self).__name__, field_name, e))
+      TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': unhashable type: 'list'
+      """)
+    with assert_execution_error(self, expected_msg):
       self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
 
   def test_trace_includes_rule_exception_traceback(self):
