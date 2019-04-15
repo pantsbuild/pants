@@ -11,6 +11,7 @@ import re
 import signal
 import threading
 import time
+import unittest
 from builtins import open, range, zip
 
 from pants.util.contextutil import environment_as, temporary_dir
@@ -491,6 +492,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         # The pantsd-runner processes should be dead, and they should have exited with 1.
         self.assertFalse(proc.is_running())
 
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7554')
   def test_pantsd_sigterm(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGTERM,
@@ -516,6 +518,7 @@ Interrupted by user:
 Interrupted by user over pailgun client!
 $"""])
 
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7547')
   def test_pantsd_sigint(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGINT,
@@ -526,6 +529,7 @@ Interrupted by user:
 Interrupted by user over pailgun client!
 $"""])
 
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7457')
   def test_signal_pailgun_stream_timeout(self):
     # NB: The actual timestamp has the date and time at sub-second granularity. The date is just
     # used here since that is known in advance in order to assert that the timestamp is well-formed.
