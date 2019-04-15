@@ -245,44 +245,33 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
 
     # Test that the error contains the full traceback from within the CFFI context as well
     # (mentioning which specific extern method ended up raising the exception).
-    expected_msg = dedent(
-      """\
-      1 Exception raised in CFFI extern methods:
-      Traceback (most recent call last):
-        File LOCATION-INFO, in __hash__
-          return super(DataType, self).__hash__()
-      TypeError: unhashable type: 'list'
-
-      During handling of the above exception, another exception occurred:
-
-      Traceback (most recent call last):
-        File LOCATION-INFO, in __hash__
-          hash(value)
-      TypeError: unhashable type: 'list'
-
-      During handling of the above exception, another exception occurred:
-
-      Traceback (most recent call last):
-        File LOCATION-INFO, in extern_identify
-          return c.identify(obj)
-        File LOCATION-INFO, in identify
-          hash_ = hash(obj)
-        File LOCATION-INFO, in __hash__
-          .format(self, type(self).__name__, field_name, e))
-      TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': unhashable type: 'list'
-      """ if PY3 else """\
-      1 Exception raised in CFFI extern methods:
-      Traceback (most recent call last):
-        File LOCATION-INFO, in extern_identify
-          return c.identify(obj)
-        File LOCATION-INFO, in identify
-          hash_ = hash(obj)
-        File LOCATION-INFO, in __hash__
-          .format(self, type(self).__name__, field_name, e))
-      TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': unhashable type: 'list'
-      """)
-    with assert_execution_error(self, expected_msg):
+    with self.assertRaises(ExecutionError) as cm:
       self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
+
+    exc_str = remove_locations_from_traceback(str(cm.exception))
+    # TODO: convert these manual self.assertTrue() conditionals to a self.assertStartsWith() method
+    # in TestBase!
+    self.assertTrue(exc_str.startswith(dedent("""\
+      1 Exception raised in CFFI extern methods:
+      Traceback (most recent call last):
+      """)), "exc_str was: {}".format(exc_str))
+    self.assertIn(dedent("""\
+      Traceback (most recent call last):
+        File LOCATION-INFO, in extern_identify
+          return c.identify(obj)
+        File LOCATION-INFO, in identify
+          hash_ = hash(obj)
+        File LOCATION-INFO, in __hash__
+          .format(self, type(self).__name__, field_name, e))
+      TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': unhashable type: 'list'
+      """), exc_str, "exc_str was: {}".format(exc_str))
+    self.assertIn(dedent("""\
+      The engine execution request raised this error, which is probably due to the errors in the
+      CFFI extern methods listed above, as CFFI externs return None upon error:
+      """), exc_str)
+    self.assertTrue(exc_str.endswith(
+      "Exception: No installed @rules can satisfy Select(C) for input Params(Any).\n\n\n"),
+                    "exc_str was: {}".format(exc_str))
 
   def test_trace_includes_rule_exception_traceback(self):
     # Execute a request that will trigger the nested raise, and then directly inspect its trace.
