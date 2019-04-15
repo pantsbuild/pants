@@ -19,7 +19,7 @@ class LoggingTest(TestBase):
     self.native = self.scheduler._scheduler._native
     # Initialize it with the least verbose level.
     # Individual loggers will increase verbosity as needed.
-    self.native.init_rust_logging(get_numeric_level("ERROR"))
+    self.native.init_rust_logging(get_numeric_level("ERROR"), False)
 
   @contextmanager
   def logger(self, level):
