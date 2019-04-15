@@ -21,6 +21,7 @@ from pants.task.console_task import ConsoleTask
 from pants.util import desktop
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
+from pants.util.objects import enum
 from pants.util.process_handler import subprocess
 
 
@@ -56,6 +57,8 @@ class IdeaPluginGen(ConsoleTask):
 
   PROJECT_NAME_LIMIT = 200
 
+  class CallbackExportStyle(enum(['raw_specs', 'target_list'])): pass
+
   @classmethod
   def register_options(cls, register):
     super(IdeaPluginGen, cls).register_options(register)
@@ -77,6 +80,14 @@ class IdeaPluginGen(ConsoleTask):
                   'jdk name for the --java-language-level is used')
     register('--java-language-level', type=int, default=8,
              help='Sets the java language and jdk used to compile the project\'s java sources.')
+    register('--callback-export-style', type=cls.CallbackExportStyle,
+             default=cls.CallbackExportStyle.raw_specs,
+             help='What IntelliJ would use to call `./pants export` with.'
+                  'For example, ./pants --tag=\'-py3\' idea-plugin examples/::.'
+                  'If `raw_specs` is selected, IntelliJ will call `./pants export examples/::`, '
+                  'missing the targets that would be filtered out by the tags.'
+                  'If `target_list` is specified, IntelliJ will call `./pants export examples:a '
+                  'example:b example:c ...` i.e. all target roots explicitly after the filtering.')
 
   def __init__(self, *args, **kwargs):
     super(IdeaPluginGen, self).__init__(*args, **kwargs)
@@ -131,8 +142,11 @@ class IdeaPluginGen(ConsoleTask):
       ),
       debug_port=self.get_options().debug_port,
     )
+    if self.get_options().callback_export_style == self.CallbackExportStyle.raw_specs:
+      abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs]
+    else:
+      abs_target_specs = [os.path.join(get_buildroot(), t.address.spec) for t in self.context.target_roots]
 
-    abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs]
     configured_workspace = TemplateData(
       targets=json.dumps(abs_target_specs),
       project_path=os.path.join(get_buildroot(), abs_target_specs[0].split(':')[0]),
