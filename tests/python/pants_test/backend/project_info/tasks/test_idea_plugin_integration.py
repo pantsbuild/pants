@@ -136,3 +136,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
     self.assertEqual(IdeaPluginGen.PROJECT_NAME_LIMIT, len(IdeaPluginGen.get_project_name(a_lot_of_targets)))
     self._run_and_check(a_lot_of_targets)
+
+  def test_idea_plugin_export_callback_target_list(self):
+    target_a = 'examples/src/scala/org/pantsbuild/example/hello::'
+    self._run_and_check([target_a])
