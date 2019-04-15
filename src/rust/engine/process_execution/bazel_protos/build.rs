@@ -235,7 +235,7 @@ fn replace_if_changed<F: FnOnce(&Path)>(path: &Path, f: F) {
     std::fs::remove_dir_all(path).unwrap();
   }
   std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-  std::fs::rename(tempdir.path(), path).unwrap()
+  copy_dir::copy_dir(tempdir.path(), path).unwrap();
 }
 
 fn format(path: &Path) {
@@ -262,3 +262,4 @@ fn format(path: &Path) {
     }
   }
 }
+// 1026
