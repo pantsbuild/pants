@@ -51,6 +51,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       pantsd_run(['compile', 'examples/src/scala/org/pantsbuild/example/hello/welcome'])
       checker.assert_started()
 
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7573')
   def test_pantsd_run(self):
     extra_config = {
       'GLOBAL': {
@@ -513,6 +514,7 @@ Interrupted by user over pailgun client!
 $"""
       ])
 
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7572')
   def test_pantsd_sigquit(self):
     self._assert_pantsd_keyboardinterrupt_signal(
       signal.SIGQUIT,
