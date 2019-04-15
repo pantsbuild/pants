@@ -87,7 +87,7 @@ impl Snapshot {
       })
       .map(move |path_stats_per_directory| {
         let mut path_stats =
-          Iterator::flatten(path_stats_per_directory.into_iter().map(|v| v.into_iter()))
+          Iterator::flatten(path_stats_per_directory.into_iter().map(Vec::into_iter))
             .collect::<Vec<_>>();
         path_stats.sort_by(|l, r| l.path().cmp(&r.path()));
         Snapshot { digest, path_stats }
@@ -281,7 +281,7 @@ impl Snapshot {
         let unique_count = out_dir
           .get_files()
           .iter()
-          .map(|v| v.get_name())
+          .map(bazel_protos::remote_execution::FileNode::get_name)
           .dedup()
           .count();
         if unique_count != out_dir.get_files().len() {

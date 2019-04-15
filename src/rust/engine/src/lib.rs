@@ -241,6 +241,7 @@ pub extern "C" fn scheduler_create(
     string: type_string,
     bytes: type_bytes,
   };
+  #[allow(clippy::redundant_closure)] // I couldn't find an easy way to remove this closure.
   let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
   tasks.intrinsics_set(&types);
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.

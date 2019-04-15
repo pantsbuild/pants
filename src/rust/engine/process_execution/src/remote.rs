@@ -242,7 +242,7 @@ impl super::CommandRunner for CommandRunner {
                         // maybe the delay here should be the min of remaining time and the backoff period
                         Delay::new_handle(
                           Instant::now() + Duration::from_millis(backoff_period),
-                          futures_timer_thread.with(|thread| thread.handle()),
+                          futures_timer_thread.with(futures_timer::HelperThread::handle),
                         )
                         .map_err(move |e| {
                           format!(
@@ -762,7 +762,7 @@ fn make_execute_request(
     .iter()
     .map(|p| {
       p.to_str()
-        .map(|s| s.to_owned())
+        .map(str::to_owned)
         .ok_or_else(|| format!("Non-UTF8 output file path: {:?}", p))
     })
     .collect::<Result<Vec<String>, String>>()?;
@@ -774,7 +774,7 @@ fn make_execute_request(
     .iter()
     .map(|p| {
       p.to_str()
-        .map(|s| s.to_owned())
+        .map(str::to_owned)
         .ok_or_else(|| format!("Non-UTF8 output directory path: {:?}", p))
     })
     .collect::<Result<Vec<String>, String>>()?;

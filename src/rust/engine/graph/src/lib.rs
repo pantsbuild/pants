@@ -656,7 +656,7 @@ impl<N: Node> Graph<N> {
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
         .filter_map(|dep_id| inner.entry_for_id(dep_id))
-        .map(|entry| entry.generation())
+        .map(Entry::generation)
         .collect();
       (
         inner.entry_for_id(entry_id).cloned(),

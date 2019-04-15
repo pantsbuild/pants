@@ -57,7 +57,7 @@ impl CommandRunner {
         dir_glob.push("/**");
         vec![dir, dir_glob]
       })
-      .chain(output_file_paths.into_iter().map(|p| p.into_os_string()))
+      .chain(output_file_paths.into_iter().map(PathBuf::into_os_string))
       .map(|s| {
         s.into_string()
           .map_err(|e| format!("Error stringifying output paths: {:?}", e))
