@@ -145,7 +145,8 @@ class IdeaPluginGen(ConsoleTask):
     if self.get_options().callback_export_style == self.CallbackExportStyle.raw_specs:
       abs_target_specs = [os.path.join(get_buildroot(), spec) for spec in self.context.options.target_specs]
     else:
-      abs_target_specs = [os.path.join(get_buildroot(), t.address.spec) for t in self.context.target_roots]
+      # sort them to ensure behavior consistency
+      abs_target_specs = sorted([os.path.join(get_buildroot(), t.address.spec) for t in self.context.target_roots])
 
     configured_workspace = TemplateData(
       targets=json.dumps(abs_target_specs),

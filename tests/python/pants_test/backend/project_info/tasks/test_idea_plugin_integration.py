@@ -17,11 +17,11 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
-  def _do_check(self, project_dir_path, expected_project_path, expected_targets,
+  def _do_check(self, project_dir_path, expected_project_path, raw_target_specs, expected_targets,
                 incremental_import=None):
     """Check to see that the project contains the expected source folders."""
 
-    iws_file = os.path.join(project_dir_path, '{}.iws'.format(IdeaPluginGen.get_project_name(expected_targets)))
+    iws_file = os.path.join(project_dir_path, '{}.iws'.format(IdeaPluginGen.get_project_name(raw_target_specs)))
     self.assertTrue(os.path.exists(iws_file))
     dom = minidom.parse(iws_file)
     self.assertEqual(1, len(dom.getElementsByTagName("project")))
@@ -43,8 +43,8 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
     self.assertEqual('targets', actual_properties[0].getAttribute('name'))
     actual_targets = json.loads(actual_properties[0].getAttribute('value'))
-    abs_expected_target_specs = [os.path.join(get_buildroot(), relative_spec) for relative_spec in expected_targets]
-    self.assertEqual(abs_expected_target_specs, actual_targets)
+    abs_expected_target_specs = set(os.path.join(get_buildroot(), relative_spec) for relative_spec in expected_targets)
+    self.assertEqual(abs_expected_target_specs, set(actual_targets))
 
     self.assertEqual('project_path', actual_properties[1].getAttribute('name'))
     actual_project_path = actual_properties[1].getAttribute('value')
@@ -94,7 +94,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
         project_dir = self._get_project_dir(output_file.name)
         self.assertTrue(os.path.exists(project_dir), "{} does not exist".format(project_dir))
-        self._do_check(project_dir, project_path, target_specs, incremental_import=incremental_import)
+        self._do_check(project_dir, project_path, target_specs, target_specs, incremental_import=incremental_import)
 
   def test_idea_plugin_single_target(self):
     target = 'examples/src/scala/org/pantsbuild/example/hello:hello'
@@ -139,4 +139,25 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
 
   def test_idea_plugin_export_callback_target_list(self):
     target_a = 'examples/src/scala/org/pantsbuild/example/hello::'
-    self._run_and_check([target_a])
+    project_path = 'examples/src/scala/org/pantsbuild/example/hello/exe'
+
+    expected_spec_set = {'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
+                         'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome',
+                         'examples/src/scala/org/pantsbuild/example/hello:hello'}
+
+    with self.temporary_workdir() as workdir:
+      with temporary_file(root_dir=workdir, cleanup=True) as output_file:
+        args = [
+          'idea-plugin',
+          '--output-file={}'.format(output_file.name),
+          '--callback-export-style=target_list',
+          '--no-open',
+        ]
+        pants_run = self.run_pants_with_workdir(args + [target_a], workdir)
+        self.assert_success(pants_run)
+
+        project_dir = self._get_project_dir(output_file.name)
+        self.assertTrue(os.path.exists(project_dir), "{} does not exist".format(project_dir))
+        # import pdb
+        # pdb.set_trace()
+        self._do_check(project_dir, project_path, [target_a], expected_spec_set)
