@@ -181,7 +181,7 @@ impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
     if !self.show_rust_3rdparty_logs {
       if let Some(ref module_path) = record.module_path() {
         for pants_package in super::pants_packages::PANTS_PACKAGE_NAMES {
-          if module_path.starts_with(pants_package) {
+          if &module_path.split("::").next().unwrap() == pants_package {
             should_log = true;
             break;
           }
