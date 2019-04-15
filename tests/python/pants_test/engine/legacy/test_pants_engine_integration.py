@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
+from pants_test.testutils.py2_compat import assertRegex
 
 
 class PantsEngineIntegrationTest(PantsRunIntegrationTest):
@@ -15,7 +15,6 @@ class PantsEngineIntegrationTest(PantsRunIntegrationTest):
     assertRegex(self, pants_run.stderr_data, 'build_graph is: .*LegacyBuildGraph')
     assertRegex(self, pants_run.stderr_data,
                              'computed \d+ nodes in')
-    assertNotRegex(self, pants_run.stderr_data, 'pantsd is running at pid \d+')
 
   def test_engine_binary(self):
     self.assert_success(

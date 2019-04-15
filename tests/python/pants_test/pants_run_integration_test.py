@@ -165,6 +165,24 @@ class PantsRunIntegrationTest(unittest.TestCase):
   PANTS_SCRIPT_NAME = 'pants'
 
   @classmethod
+  def use_pantsd_env_var(cls):
+    """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled,
+    or they want to configure pantsd themselves.
+
+    In those cases, --enable-pantsd will not be added to their configuration.
+    This approach is coarsely grained, meaning we disable pantsd in some tests that actually run
+    when pantsd is enabled. However:
+      - The number of mislabeled tests is currently small (~20 tests).
+      - Those tests will still run, just with pantsd disabled.
+
+    N.B. Currently, this doesn't interact with test hermeticity.
+    This means that, if the test coordinator has set PANTS_ENABLE_PANTSD, and a test is not marked
+    as hermetic, it will run under pantsd regardless of the value of this function.
+    """
+    should_pantsd = os.getenv("USE_PANTSD_FOR_INTEGRATION_TESTS")
+    return should_pantsd in ["True", "true", "1"]
+
+  @classmethod
   def hermetic(cls):
     """Subclasses may override to acknowledge that they are hermetic.
 
@@ -280,6 +298,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
                    # Turn cache on just for tool bootstrapping, for performance.
                    '--cache-bootstrap-read', '--cache-bootstrap-write'
                    ])
+
+    if self.use_pantsd_env_var():
+      args.append("--enable-pantsd=True")
+      args.append("--no-shutdown-pantsd-after-run")
 
     if config:
       config_data = config.copy()

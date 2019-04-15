@@ -82,6 +82,12 @@ class PantsDaemonMonitor(ProcessManager):
 
 
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
+
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """We set our own ad-hoc pantsd configuration in most of these tests"""
+    return False
+
   @contextmanager
   def pantsd_test_context(self, log_level='info', extra_config=None):
     with no_lingering_process_by_command('pantsd-runner') as runner_process_context:
@@ -92,6 +98,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         pantsd_config = {
           'GLOBAL': {
             'enable_pantsd': True,
+            'shutdown_pantsd_after_run': False,
             # The absolute paths in CI can exceed the UNIX socket path limitation
             # (>104-108 characters), so we override that here with a shorter path.
             'watchman_socket_path': '/tmp/watchman.{}.sock'.format(os.getpid()),
@@ -99,9 +106,11 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
             'pants_subprocessdir': pid_dir,
           }
         }
+
         if extra_config:
           recursively_update(pantsd_config, extra_config)
         print('>>> config: \n{}\n'.format(pantsd_config))
+
         checker = PantsDaemonMonitor(runner_process_context, pid_dir)
         self.assert_runner(workdir, pantsd_config, ['kill-pantsd'], expected_runs=1)
         try:

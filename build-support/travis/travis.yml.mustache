@@ -121,6 +121,9 @@ aws_get_pants_pex: &aws_get_pants_pex >
 # Generic shard setups
 # -------------------------------------------------------------------------
 
+run_tests_under_pantsd: &run_tests_under_pantsd >
+  USE_PANTSD_FOR_INTEGRATION_TESTS="true"
+
 base_linux_config: &base_linux_config
   os: linux
   dist: xenial
@@ -170,14 +173,16 @@ py27_linux_test_config: &py27_linux_test_config
   <<: *base_linux_test_config
   stage: *test_cron
   env:
-    - &py27_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
+    - &py27_linux_test_config_env >
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
 py36_linux_test_config: &py36_linux_test_config
   <<: *py36_linux_config
   <<: *base_linux_test_config
   stage: *test
   env:
-    - &py36_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
+    - &py36_linux_test_config_env >
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
 py37_linux_test_config: &py37_linux_test_config
   <<: *py37_linux_config
@@ -892,6 +897,18 @@ matrix:
 
 {{/integration_shards}}
 {{#integration_shards}}
+    - <<: *py36_linux_test_config
+      name: "Integration tests with Pantsd - shard {{.}} (Py3.6 PEX)"
+      stage: *test_cron
+      env:
+        - *py36_linux_test_config_env
+        - *run_tests_under_pantsd
+        - CACHE_NAME=integrationshard{{.}}_pantsd
+      script:
+        - ./build-support/bin/travis-ci.sh -c -i {{.}}/{{integration_shards_length}}
+
+{{/integration_shards}}
+{{#integration_shards}}
     - <<: *py37_linux_test_config
       name: "Integration tests - shard {{.}} (Py3.7 PEX)"
       env:
@@ -931,6 +948,16 @@ matrix:
         - CACHE_NAME=linuxcontribtests.py36
       script:
         - ./build-support/bin/ci.sh -n
+
+    - <<: *py36_linux_test_config
+      name: "Python contrib tests with Pantsd (Py3.6 PEX)"
+      stage: *test_cron
+      env:
+        - *py36_linux_test_config_env
+        - *run_tests_under_pantsd
+        - CACHE_NAME=linuxcontribtests.py36
+      script:
+        - ./build-support/bin/travis-ci.sh -n
 
     - <<: *py37_linux_test_config
       name: "Python contrib tests (Py3.7 PEX)"

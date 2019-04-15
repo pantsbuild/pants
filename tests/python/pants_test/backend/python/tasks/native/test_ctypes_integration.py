@@ -35,6 +35,15 @@ def _toolchain_variants(func):
 
 class CTypesIntegrationTest(PantsRunIntegrationTest):
 
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """
+    Some of the tests here expect to read the standard error after an intentional failure.
+    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
+    So stderr appears empty. (see #7320)
+    """
+    return False
+
   _binary_target_dir = 'testprojects/src/python/python_distribution/ctypes'
   _binary_target = '{}:bin'.format(_binary_target_dir)
   _binary_interop_target_dir = 'testprojects/src/python/python_distribution/ctypes_interop'
