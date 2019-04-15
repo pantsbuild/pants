@@ -938,186 +938,6 @@ matrix:
     - <<: *py36_osx_build_wheels
 
     - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 0 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard0_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 0/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 1 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard1_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 1/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 2 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard2_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 2/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 3 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard3_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 3/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 4 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard4_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 4/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 5 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard5_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 5/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 6 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard6_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 6/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 7 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard7_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 7/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 8 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard8_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 8/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 9 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard9_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 9/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 10 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard10_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 10/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 11 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard11_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 11/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 12 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard12_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 12/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 13 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard13_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 13/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 14 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard14_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 14/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 15 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard15_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 15/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 16 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard16_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 16/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 17 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard17_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 17/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 18 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard18_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 18/20
-
-    - <<: *py36_linux_test_config
-      name: "Integration tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) - shard 19 (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=integrationshard19_pantsd_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -c -i 19/20
-
-    - <<: *py36_linux_test_config
       name: "Integration tests - shard 0 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
@@ -1279,8 +1099,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 0 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1290,8 +1109,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 1 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1301,8 +1119,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 2 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1312,8 +1129,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 3 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1323,8 +1139,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 4 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1334,8 +1149,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 5 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1345,8 +1159,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 6 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1356,8 +1169,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 7 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1367,8 +1179,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 8 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1378,8 +1189,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 9 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1389,8 +1199,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 10 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1400,8 +1209,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 11 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1411,8 +1219,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 12 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1422,8 +1229,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 13 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1433,8 +1239,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 14 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1444,8 +1249,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 15 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1455,8 +1259,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 16 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1466,8 +1269,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 17 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1477,8 +1279,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 18 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1488,8 +1289,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 19 (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1839,18 +1639,8 @@ matrix:
         - ./build-support/bin/travis-ci.sh -n
 
     - <<: *py36_linux_test_config
-      name: "Python contrib tests with Pantsd (THIS SHARD WILL GO AWAY BEFORE THE PR IS MERGED, THIS IS A MIRROR OF WHAT WILL BE IN CRON) (Py3.6 PEX)"
-      env:
-        - *py36_linux_test_config_env
-        - *run_tests_under_pantsd
-        - CACHE_NAME=linuxcontribtests.py36_to_del
-      script:
-        - ./build-support/bin/travis-ci.sh -n
-
-    - <<: *py36_linux_test_config
       name: "Python contrib tests with Pantsd (Py3.6 PEX)"
-      stage:
-        - *test_cron
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
