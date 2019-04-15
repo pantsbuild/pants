@@ -175,7 +175,7 @@ class HelpInfoExtracter(object):
       deprecated_message = 'DEPRECATED. {} removed in version: {}'.format(deprecated_tense,
                                                                           removal_version)
     removal_hint = kwargs.get('removal_hint')
-    choices = ', '.join(str(kwargs.get('choices'))) if kwargs.get('choices') else None
+    choices = ', '.join(str(choice) for choice in kwargs.get('choices')) if kwargs.get('choices') else None
 
     ret = OptionHelpInfo(registering_class=kwargs.get('registering_class', type(None)),
                          display_args=display_args,
