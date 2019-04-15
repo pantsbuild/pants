@@ -95,6 +95,7 @@
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
     "styleguide": "dist/markdown/html/src/docs/styleguide.html",
     "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
+    "target_aggregate": "dist/markdown/html/src/docs/common_tasks/target_aggregate.html",
     "test": "dist/markdown/html/src/docs/common_tasks/test.html",
     "test_suite": "dist/markdown/html/src/docs/common_tasks/test_suite.html",
     "thrift_deps": "dist/markdown/html/examples/src/thrift/org/pantsbuild/example/README.html",
