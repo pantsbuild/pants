@@ -538,7 +538,13 @@ impl Store {
           .write(true)
           .mode(if is_executable { 0o755 } else { 0o644 })
           .open(&destination)
-          .and_then(|mut f| f.write_all(&bytes))
+          .and_then(|mut f| {
+            f.write_all(&bytes)?;
+            // See `materialize_directory`, but we fundamentally materialize files for other
+            // processes to read; as such, we must ensure data is flushed to disk and visible
+            // to them as opposed to just our process.
+            f.sync_all()
+          })
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
       })
       .and_then(move |write_result| match write_result {
