@@ -25,6 +25,27 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+
+///
+/// Macro to allow debug logging to a file which bypasses the standard logging systems.
+/// This is useful for one-off debugging, and is code that several developers have found they're
+/// writing a lot as one-offs when working in the rust code (particularly when working on logging),
+/// so this is a useful macro to exist for one-off use.
+///
+/// This should not be used for actual production logging; use the log crate's macros
+/// (info!, debug!, trace!) for that.
+///
+#[macro_export]
+macro_rules! debug_log {
+    ($path:expr, $($arg:tt)+) => {
+      {
+        use ::std::io::Write;
+        let mut f = ::std::fs::OpenOptions::new().create(true).append(true).open($path).unwrap();
+        writeln!(f, $($arg)+).unwrap()
+      }
+    };
+}
+
 pub mod logger;
 
 pub type Logger = logger::Logger;
