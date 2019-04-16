@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os.path
 import sys
 from builtins import str
 
@@ -59,6 +58,7 @@ def run_python_test(transitive_hydrated_target, pytest):
   # pex27, where it should be hermetically provided in some way.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   requirements_pex_argv = [
+    python_binary,
     './{}'.format(pex_snapshot.files[0]),
     # TODO(#7061): This text_type() can be removed after we drop py2!
     '--python', text_type(python_binary),
@@ -76,8 +76,6 @@ def run_python_test(transitive_hydrated_target, pytest):
     argv=tuple(requirements_pex_argv),
     input_files=pex_snapshot.directory_digest,
     description='Resolve requirements for {}'.format(target_root.address.reference()),
-    # TODO: This should not be necessary
-    env={'PATH': os.path.dirname(python_binary)},
     output_files=(output_pytest_requirements_pex_filename,),
   )
   requirements_pex_response = yield Get(
@@ -102,11 +100,9 @@ def run_python_test(transitive_hydrated_target, pytest):
   )
 
   request = ExecuteProcessRequest(
-    argv=('./pytest-with-requirements.pex',),
+    argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
     input_files=merged_input_files,
     description='Run pytest for {}'.format(target_root.address.reference()),
-    # TODO: This should not be necessary
-    env={'PATH': os.path.dirname(python_binary)}
   )
 
   result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
