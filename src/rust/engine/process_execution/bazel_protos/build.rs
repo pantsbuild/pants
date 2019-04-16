@@ -246,6 +246,11 @@ fn format(path: &Path) {
   rustfmt_config.pop(); // bazel_protos
   rustfmt_config.pop(); // process_execution
   rustfmt_config.push("rustfmt.toml");
+
+  if !rustfmt_config.exists() {
+    panic!("Couldn't find file {}", rustfmt_config.display());
+  }
+
   for file in walkdir::WalkDir::new(path) {
     let file = file.unwrap();
     if file.file_type().is_file() {
