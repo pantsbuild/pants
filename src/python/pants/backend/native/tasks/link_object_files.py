@@ -62,7 +62,11 @@ class LinkObjectFiles(NativeTask, AbstractClass):
   @abstractmethod
   @classproperty
   def linker_args(cls):
-    """???"""
+    """Arguments for the linker command line to generate e.g. shared libraries vs binaries.
+
+    :returns: a dict mapping (normalized os name) -> (list of string arguments).
+    :rtype: dict
+    """
 
   def linker(self, native_library_target):
     # NB: we are using the C++ toolchain here for linking every type of input, including compiled C
@@ -79,48 +83,51 @@ class LinkObjectFiles(NativeTask, AbstractClass):
 
   @abstractmethod
   def process_result(self, vt, result):
-    """???"""
+    """Do something with the result of linking, typically adding it to a v1 product.
+
+    The `result` argument here is produced by either `.collect_output()` (if the target wasn't
+    cached) or `.retrieve_output_from_cache()` (if it was cached)."""
 
   def execute(self):
     targets_providing_artifacts = self.native_artifact_targets()
     compiled_objects_product = self.context.products.get(ObjectFiles)
-    # shared_libs_product = self.context.products.get(SharedLibrary)
-
-    # all_shared_libs_by_name = {}
 
     with self.invalidated(targets_providing_artifacts,
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         if vt.valid:
-          shared_library = self.retrieve_output_from_cache(vt)
+          linked_output = self.retrieve_output_from_cache(vt)
         else:
           # TODO: We need to partition links based on proper dependency edges and not
           # perform a link to every packaged_native_library() for all targets in the closure.
           # https://github.com/pantsbuild/pants/issues/6178
           link_request = self._make_link_request(vt, compiled_objects_product)
           self.context.log.debug("link_request: {}".format(link_request))
-          shared_library = self._execute_link_request(link_request)
+          linked_output = self._execute_link_request(link_request)
 
-        # same_name_shared_lib = all_shared_libs_by_name.get(shared_library.name, None)
-        # if same_name_shared_lib:
-        #   # TODO: test this branch!
-        #   raise self.LinkObjectFilesError(
-        #     "The name '{name}' was used for two shared libraries: {prev} and {cur}."
-        #     .format(name=shared_library.name,
-        #             prev=same_name_shared_lib,
-        #             cur=shared_library))
-        # else:
-        #   all_shared_libs_by_name[shared_library.name] = shared_library
-
-        self.process_result(vt, shared_library)
+        self.process_result(vt, linked_output)
 
   @abstractmethod
   def retrieve_output_from_cache(self, vt):
-    """???"""
+    """Given a versioned target, retrieve the linked output from its cache directory.
+
+    The return type of this method is task-specific, and this is consumed in `.process_result()`.
+    """
 
   @abstractmethod
   def collect_output(self, native_artifact, output_file):
-    """???"""
+    """Given a declaration for a native_artifact() and an output file, generate a result.
+
+    The return type of this method is task-specific, and this is consumed in `.process_result()`.
+    """
+
+  @abstractmethod
+  def get_output_filename(self, native_artifact):
+    """Given a declaration for a native_artifact(), return the correct output filename.
+
+    E.g. for shared libraries, this would be a filename ending in .dylib or .so.
+    :rtype: string
+    """
 
   def _make_link_request(self, vt, compiled_objects_product):
     self.context.log.debug("link target: {}".format(vt.target))
@@ -131,7 +138,8 @@ class LinkObjectFiles(NativeTask, AbstractClass):
     for dep_tgt in deps:
       if compiled_objects_product.get(dep_tgt):
         self.context.log.debug("dep_tgt: {}".format(dep_tgt))
-        object_files = self._retrieve_single_product_at_target_base(compiled_objects_product, dep_tgt)
+        object_files = self._retrieve_single_product_at_target_base(
+          compiled_objects_product, dep_tgt)
         self.context.log.debug("object_files: {}".format(object_files))
         object_file_paths = object_files.file_paths()
         self.context.log.debug("object_file_paths: {}".format(object_file_paths))
@@ -166,15 +174,14 @@ class LinkObjectFiles(NativeTask, AbstractClass):
     linker = link_request.linker
     native_artifact = link_request.native_artifact
     output_dir = link_request.output_dir
-    resulting_shared_lib_path = os.path.join(output_dir,
-                                             native_artifact.as_shared_lib(self.platform))
+    output_file_path = os.path.join(output_dir, self.get_output_filename(native_artifact))
 
-    self.context.log.debug("resulting_shared_lib_path: {}".format(resulting_shared_lib_path))
+    self.context.log.debug("output_file_path: {}".format(output_file_path))
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = ([linker.exe_filename] +
            self.platform.resolve_for_enum_variant(self.linker_args) +
            linker.extra_args +
-           ['-o', os.path.abspath(resulting_shared_lib_path)] +
+           ['-o', os.path.abspath(output_file_path)] +
            ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +
            ['-l{}'.format(lib_name) for lib_name in link_request.external_lib_names] +
            [os.path.abspath(obj) for obj in object_files])
@@ -210,10 +217,12 @@ class LinkObjectFiles(NativeTask, AbstractClass):
           "for request {req}. Exit code was: {rc}."
           .format(cmd=cmd, env=env, req=link_request, rc=rc))
 
-    return self.collect_output(native_artifact, resulting_shared_lib_path)
+    return self.collect_output(native_artifact, output_file_path)
 
 
 class LinkSharedLibraries(LinkObjectFiles):
+  # TODO: validate that all shared libraries that a target depends on have a unique name! Otherwise
+  # we can't link them with `-l` in the same command line!
 
   @classmethod
   def product_types(cls):
@@ -225,6 +234,9 @@ class LinkSharedLibraries(LinkObjectFiles):
       'darwin': ['-Wl,-dylib'],
       'linux': ['-shared'],
     }
+
+  def get_output_filename(self, native_artifact):
+    return native_artifact.as_shared_lib(self.platform)
 
   def retrieve_output_from_cache(self, vt):
     native_artifact = vt.target.ctypes_native_library
@@ -252,6 +264,9 @@ class LinkBinaries(LinkObjectFiles):
       'linux': [],
     }
 
+  def get_output_filename(self, native_artifact):
+    return native_artifact.lib_name
+
   def native_artifact_targets(self):
     return set(super(LinkBinaries, self).native_artifact_targets()) & set(self.context.target_roots)
 
@@ -269,6 +284,6 @@ class LinkBinaries(LinkObjectFiles):
     binary_output_path = result.binary_output_file
     native_artifact = vt.target.ctypes_native_library
     distdir = self.get_options().pants_distdir
-    dist_output_bin = os.path.join(distdir, native_artifact.lib_name)
+    dist_output_bin = os.path.join(distdir, self.get_output_filename(native_artifact))
     safe_mkdir_for(dist_output_bin)
     shutil.copy(binary_output_path, dist_output_bin)

@@ -52,7 +52,7 @@ def register_goals():
   task(name='c-for-ctypes', action=CCompile).install('native-compile')
   task(name='cpp-for-ctypes', action=CppCompile).install('native-compile')
   task(name='shared-libraries', action=LinkSharedLibraries).install('link')
-  task(name='binaries', action=LinkBinaries).install('binary')
+  task(name='native-binaries', action=LinkBinaries).install('binary')
 
 
 def rules():
