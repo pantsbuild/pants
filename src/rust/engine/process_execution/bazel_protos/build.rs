@@ -262,4 +262,3 @@ fn format(path: &Path) {
     }
   }
 }
-// 1026
