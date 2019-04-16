@@ -12,7 +12,6 @@ import threading
 from builtins import open
 
 from future.utils import PY3
-from twitter.common.dirutil import Fileset
 
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.init.target_roots_calculator import TargetRootsCalculator
@@ -93,7 +92,8 @@ class SchedulerService(PantsService):
 
   def _maybe_invalidate_scheduler_batch(self):
     new_snapshot = self._get_snapshot()
-    if new_snapshot.directory_digest != self._invalidating_snapshot.directory_digest:
+    if new_snapshot is not None and self._invalidating_snapshot is not None and \
+      new_snapshot.directory_digest != self._invalidating_snapshot.directory_digest:
       self._logger.fatal(
         'saw file events covered by invalidation globs [{}], terminating the daemon.'
           .format(self._invalidating_files))
