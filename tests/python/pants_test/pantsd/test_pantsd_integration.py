@@ -14,7 +14,7 @@ import time
 import unittest
 from builtins import open, range, zip
 
-from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
@@ -290,9 +290,28 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       )
       checker.assert_running()
 
-  def test_pantsd_invalidation_file_tracking(self):
+  def test_pantsd_touching_a_file_does_not_restart_daemon(self):
     test_file = 'testprojects/src/python/print_env/main.py'
     config = {'GLOBAL': {'pantsd_invalidation_globs': '["testprojects/src/python/print_env/*"]'}}
+    with self.pantsd_successful_run_context(extra_config=config) as (
+      pantsd_run, checker, workdir, _
+    ):
+      pantsd_run(['help'])
+      checker.assert_started()
+
+      # Let any fs events quiesce.
+      time.sleep(5)
+
+      checker.assert_running()
+
+      touch(test_file)
+      # Permit ample time for the async file event propagate in CI.
+      time.sleep(10)
+      checker.assert_running()
+
+  def test_pantsd_invalidation_file_tracking(self):
+    test_dir = 'testprojects/src/python/print_env'
+    config = {'GLOBAL': {'pantsd_invalidation_globs': '["%s/*"]' %(test_dir)}}
     with self.pantsd_successful_run_context(extra_config=config) as (
       pantsd_run, checker, workdir, _
     ):
@@ -309,14 +328,18 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       assertRegex(
         self,
         full_pantsd_log(),
-        r'watching invalidating files:.*{}'.format(test_file)
+        r'watching invalidating files:.*{}'.format(test_dir)
       )
 
       checker.assert_running()
-      touch(test_file)
-      # Permit ample time for the async file event propagate in CI.
-      time.sleep(10)
-      checker.assert_stopped()
+
+      # Create a new file in test_dir
+      with temporary_file(suffix='.py', binary_mode=False, root_dir=test_dir) as temp_f:
+        temp_f.write("import that\n")
+        temp_f.close()
+
+        time.sleep(10)
+        checker.assert_stopped()
 
       self.assertIn('saw file events covered by invalidation globs', full_pantsd_log())
 
