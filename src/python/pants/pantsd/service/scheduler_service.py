@@ -92,7 +92,7 @@ class SchedulerService(PantsService):
 
   def _maybe_invalidate_scheduler_batch(self):
     new_snapshot = self._get_snapshot()
-    if new_snapshot is not None and self._invalidating_snapshot is not None and \
+    if self._invalidating_snapshot and \
       new_snapshot.directory_digest != self._invalidating_snapshot.directory_digest:
       self._logger.fatal(
         'saw file events covered by invalidation globs [{}], terminating the daemon.'
