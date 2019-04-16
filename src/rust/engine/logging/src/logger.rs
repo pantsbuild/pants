@@ -11,6 +11,7 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{stderr, Stderr, Write};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 lazy_static! {
   pub static ref LOGGER: Logger = Logger::new();
@@ -19,6 +20,7 @@ lazy_static! {
 pub struct Logger {
   pantsd_log: Mutex<MaybeWriteLogger<File>>,
   stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
+  show_rust_3rdparty_logs: AtomicBool,
 }
 
 impl Logger {
@@ -26,15 +28,19 @@ impl Logger {
     Logger {
       pantsd_log: Mutex::new(MaybeWriteLogger::empty()),
       stderr_log: Mutex::new(MaybeWriteLogger::empty()),
+      show_rust_3rdparty_logs: AtomicBool::new(true),
     }
   }
 
-  pub fn init(max_level: u64) {
+  pub fn init(max_level: u64, show_rust_3rdparty_logs: bool) {
     let max_python_level = (max_level).try_into_PythonLogLevel();
     match max_python_level {
       Ok(python_level) => {
         let level: log::LevelFilter = python_level.into();
         set_max_level(level);
+        LOGGER
+          .show_rust_3rdparty_logs
+          .store(show_rust_3rdparty_logs, Ordering::SeqCst);
         set_logger(&*LOGGER).expect("Error setting up global logger.");
       }
       Err(err) => panic!("Unrecognised log level from python: {}: {}", max_level, err),
@@ -50,7 +56,11 @@ impl Logger {
   pub fn set_stderr_logger(&self, python_level: u64) -> Result<(), String> {
     python_level.try_into_PythonLogLevel().map(|level| {
       self.maybe_increase_global_verbosity(level.into());
-      *self.stderr_log.lock() = MaybeWriteLogger::new(stderr(), level.into())
+      *self.stderr_log.lock() = MaybeWriteLogger::new(
+        stderr(),
+        level.into(),
+        self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
+      )
     })
   }
 
@@ -77,7 +87,11 @@ impl Logger {
         .map(|file| {
           let fd = file.as_raw_fd();
           self.maybe_increase_global_verbosity(level.into());
-          *self.pantsd_log.lock() = MaybeWriteLogger::new(file, level.into());
+          *self.pantsd_log.lock() = MaybeWriteLogger::new(
+            file,
+            level.into(),
+            self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
+          );
           fd
         })
         .map_err(|err| format!("Error opening pantsd logfile: {}", err))
@@ -117,6 +131,7 @@ impl Log for Logger {
 
 struct MaybeWriteLogger<W: Write + Send + 'static> {
   level: LevelFilter,
+  show_rust_3rdparty_logs: bool,
   inner: Option<Box<WriteLogger<W>>>,
 }
 
@@ -124,16 +139,22 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
   pub fn empty() -> MaybeWriteLogger<W> {
     MaybeWriteLogger {
       level: LevelFilter::Off,
+      show_rust_3rdparty_logs: true,
       inner: None,
     }
   }
 
-  pub fn new(writable: W, level: LevelFilter) -> MaybeWriteLogger<W> {
+  pub fn new(
+    writable: W,
+    level: LevelFilter,
+    show_rust_3rdparty_logs: bool,
+  ) -> MaybeWriteLogger<W> {
     // We initialize the inner WriteLogger with no filters so that we don't
     // have to create a new one every time we change the level of the outer
     // MaybeWriteLogger.
     MaybeWriteLogger {
       level,
+      show_rust_3rdparty_logs,
       inner: Some(WriteLogger::new(
         LevelFilter::max(),
         Config::default(),
@@ -154,6 +175,22 @@ impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
 
   fn log(&self, record: &Record) {
     if !self.enabled(record.metadata()) {
+      return;
+    }
+    let mut should_log = self.show_rust_3rdparty_logs;
+    if !self.show_rust_3rdparty_logs {
+      if let Some(ref module_path) = record.module_path() {
+        for pants_package in super::pants_packages::PANTS_PACKAGE_NAMES {
+          if &module_path.split("::").next().unwrap() == pants_package {
+            should_log = true;
+            break;
+          }
+        }
+      } else {
+        should_log = true;
+      }
+    }
+    if !should_log {
       return;
     }
     if let Some(ref logger) = self.inner {

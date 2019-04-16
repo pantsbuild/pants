@@ -812,9 +812,8 @@ pub extern "C" fn materialize_directories(
 
 // This is called before externs are set up, so we cannot return a PyResult
 #[no_mangle]
-pub extern "C" fn init_logging(level: u64) {
-  Logger::init(level);
-  log::debug!("Rust logger initialized with level {}", level);
+pub extern "C" fn init_logging(level: u64, show_rust_3rdparty_logs: bool) {
+  Logger::init(level, show_rust_3rdparty_logs);
 }
 
 #[no_mangle]

@@ -48,6 +48,7 @@ use fnv::FnvHasher;
 
 use futures::future::{self, Future};
 use indexmap::IndexSet;
+use log::trace;
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -518,6 +519,11 @@ impl<N: Node> Graph<N> {
             inner.ensure_entry(EntryKey::Cyclic(dst_node))
           } else {
             // Valid dependency.
+            trace!(
+              "Adding dependency from {:?} to {:?}",
+              inner.entry_for_id(src_id).unwrap().node(),
+              inner.entry_for_id(potential_dst_id).unwrap().node()
+            );
             potential_dst_id
           }
         };
