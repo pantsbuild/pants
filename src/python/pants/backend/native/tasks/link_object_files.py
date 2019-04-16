@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.dirutil import safe_mkdir_for
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass, classproperty
 from pants.util.objects import datatype
 from pants.util.process_handler import subprocess
@@ -86,7 +86,8 @@ class LinkObjectFiles(NativeTask, AbstractClass):
     """Do something with the result of linking, typically adding it to a v1 product.
 
     The `result` argument here is produced by either `.collect_output()` (if the target wasn't
-    cached) or `.retrieve_output_from_cache()` (if it was cached)."""
+    cached) or `.retrieve_output_from_cache()` (if it was cached).
+    """
 
   def execute(self):
     targets_providing_artifacts = self.native_artifact_targets()
@@ -235,13 +236,13 @@ class LinkSharedLibraries(LinkObjectFiles):
       'linux': ['-shared'],
     }
 
+  @memoized_method
   def get_output_filename(self, native_artifact):
     return native_artifact.as_shared_lib(self.platform)
 
   def retrieve_output_from_cache(self, vt):
     native_artifact = vt.target.ctypes_native_library
-    path_to_cached_lib = os.path.join(
-      vt.results_dir, native_artifact.as_shared_lib(self.platform))
+    path_to_cached_lib = os.path.join(vt.results_dir, self.get_output_filename(native_artifact))
     if not os.path.isfile(path_to_cached_lib):
       raise self.LinkObjectFilesError("The shared library at {} does not exist!"
                                           .format(path_to_cached_lib))
@@ -264,15 +265,16 @@ class LinkBinaries(LinkObjectFiles):
       'linux': [],
     }
 
+  @memoized_method
   def get_output_filename(self, native_artifact):
-    return native_artifact.lib_name
+    return native_artifact.exe_name
 
   def native_artifact_targets(self):
     return set(super(LinkBinaries, self).native_artifact_targets()) & set(self.context.target_roots)
 
   def retrieve_output_from_cache(self, vt):
     native_artifact = vt.target.ctypes_native_library
-    bin_path = os.path.join(vt.results_dir, native_artifact.lib_name)
+    bin_path = os.path.join(vt.results_dir, self.get_output_filename(native_artifact))
     if not os.path.isfile(bin_path):
       raise self.LinkObjectFilesError('binary at {} does not exist!'.format(bin_path))
     return NativeBinary(binary_output_file=bin_path)
