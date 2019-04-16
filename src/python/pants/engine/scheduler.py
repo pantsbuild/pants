@@ -511,7 +511,7 @@ class SchedulerSession(object):
     raised_exception = None
     try:
       request = self.execution_request([product], subjects)
-    except:
+    except:                     # noqa: T803
       # If there are any exceptions during CFFI extern method calls, we want to return an error with
       # them and whatever failure results from it. This typically results from unhashable types.
       if self._scheduler._native.cffi_extern_method_runtime_exceptions():
