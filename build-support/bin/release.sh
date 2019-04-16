@@ -82,17 +82,13 @@ function run_pex() {
   # TODO: Cache this in case we run pex multiple times
   (
     PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
-    PEX_PEX=pex27
-    if [[ "${python_three:-false}" == "true" ]]; then
-      PEX_PEX=pex36
-    fi
 
     pexdir="$(mktemp -d -t build_pex.XXXXX)"
     trap "rm -rf ${pexdir}" EXIT
 
-    pex="${pexdir}/${PEX_PEX}"
+    pex="${pexdir}/pex"
 
-    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" > "${pex}"
+    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
     chmod +x "${pex}"
     "${pex}" "$@"
   )
@@ -658,8 +654,12 @@ function build_pex() {
     platform_flags=("${platform_flags[@]}" "--platform=${platform}")
   done
 
+  # Pants depends on twitter.common libraries that trigger pex warnings for not properly declaring
+  # their dependency on setuptools (for namespace package support). To prevent these known warnings
+  # from polluting stderr we pass `--no-emit-warnings`.
   execute_pex \
     -o "${dest}" \
+    --no-emit-warnings \
     --script=pants \
     --interpreter-constraint="${interpreter_constraint}" \
     "${platform_flags[@]}" \

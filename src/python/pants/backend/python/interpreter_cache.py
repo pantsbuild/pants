@@ -7,14 +7,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import shutil
-from builtins import map, str
+from builtins import str
 from collections import defaultdict
 
 from pex.interpreter import PythonInterpreter
-from pex.package import EggPackage, Package, SourcePackage
-from pex.resolver import resolve
 
-from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
@@ -27,15 +24,6 @@ from pants.util.memo import memoized_property
 logger = logging.getLogger(__name__)
 
 
-# TODO(wickman) Create a safer version of this and add to twitter.common.dirutil
-def _safe_link(src, dst):
-  try:
-    os.unlink(dst)
-  except OSError:
-    pass
-  os.symlink(src, dst)
-
-
 # TODO: Move under subsystems/ .
 class PythonInterpreterCache(Subsystem):
   """Finds python interpreters on the local system."""
@@ -43,8 +31,7 @@ class PythonInterpreterCache(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super(PythonInterpreterCache, cls).subsystem_dependencies() +
-            (PythonSetup, PythonRepos))
+    return super(PythonInterpreterCache, cls).subsystem_dependencies() + (PythonSetup,)
 
   class UnsatisfiableInterpreterConstraintsError(TaskError):
     """Indicates a python interpreter matching given constraints could not be located."""
@@ -62,10 +49,6 @@ class PythonInterpreterCache(Subsystem):
   @memoized_property
   def _python_setup(self):
     return PythonSetup.global_instance()
-
-  @memoized_property
-  def _python_repos(self):
-    return PythonRepos.global_instance()
 
   @memoized_property
   def _cache_dir(self):
@@ -124,9 +107,9 @@ class PythonInterpreterCache(Subsystem):
         return None
     except OSError:
       return None
-    interpreter = PythonInterpreter.from_binary(executable, include_site_extras=False)
+    interpreter = PythonInterpreter.from_binary(executable)
     if self._matches(interpreter, filters=filters):
-      return self._resolve(interpreter)
+      return interpreter
     return None
 
   def _setup_interpreter(self, interpreter, identity_str):
@@ -134,7 +117,7 @@ class PythonInterpreterCache(Subsystem):
     with safe_concurrent_creation(cache_target_path) as safe_path:
       os.mkdir(safe_path)  # Parent will already have been created by safe_concurrent_creation.
       os.symlink(interpreter.binary, os.path.join(safe_path, 'python'))
-      return self._resolve(interpreter, safe_path)
+      return interpreter
 
   def _setup_cached(self, filters=()):
     """Find all currently-cached interpreters."""
@@ -192,67 +175,6 @@ class PythonInterpreterCache(Subsystem):
     logger.debug(
       'Initialized Python interpreter cache with {}'.format(', '.join([x.binary for x in matches])))
     return matches
-
-  def _resolve(self, interpreter, interpreter_dir=None):
-    """Resolve and cache an interpreter with a setuptools and wheel capability."""
-    interpreter = self._resolve_interpreter(interpreter, interpreter_dir,
-                                            self._python_setup.setuptools_requirement())
-    if interpreter:
-      return self._resolve_interpreter(interpreter, interpreter_dir,
-                                       self._python_setup.wheel_requirement())
-
-  def _resolve_interpreter(self, interpreter, interpreter_dir, requirement):
-    """Given a :class:`PythonInterpreter` and a requirement, return an interpreter with the
-    capability of resolving that requirement or ``None`` if it's not possible to install a
-    suitable requirement.
-
-    If interpreter_dir is unspecified, operates on the default location.
-    """
-    if interpreter.satisfies([requirement]):
-      return interpreter
-
-    if not interpreter_dir:
-      interpreter_dir = os.path.join(self._cache_dir, str(interpreter.identity))
-
-    target_link = os.path.join(interpreter_dir, requirement.key)
-    bdist = self._resolve_and_link(interpreter, requirement, target_link)
-    if bdist:
-      return interpreter.with_extra(bdist.name, bdist.raw_version, bdist.path)
-    else:
-      logger.debug('Failed to resolve requirement {} for {}'.format(requirement, interpreter))
-
-  def _resolve_and_link(self, interpreter, requirement, target_link):
-    # Short-circuit if there is a local copy.
-    if os.path.exists(target_link) and os.path.exists(os.path.realpath(target_link)):
-      bdist = Package.from_href(os.path.realpath(target_link))
-      if bdist.satisfies(requirement):
-        return bdist
-
-    # Since we're resolving to bootstrap a bare interpreter, we won't have wheel available.
-    # Explicitly set the precedence to avoid resolution of wheels or distillation of sdists into
-    # wheels.
-    precedence = (EggPackage, SourcePackage)
-    resolved_dists = resolve(requirements=[requirement],
-                             fetchers=self._python_repos.get_fetchers(),
-                             interpreter=interpreter,
-                             # The local interpreter cache is, by definition, composed of
-                             #  interpreters for the 'current' platform.
-                             platform='current',
-                             context=self._python_repos.get_network_context(),
-                             precedence=precedence)
-    if not resolved_dists:
-      return None
-
-    assert len(resolved_dists) == 1, ('Expected exactly 1 distribution to be resolved for {}, '
-                                     'found:\n\t{}'.format(requirement,
-                                                           '\n\t'.join(map(str, resolved_dists))))
-
-    dist_location = resolved_dists[0].distribution.location
-    target_location = os.path.join(os.path.dirname(target_link), os.path.basename(dist_location))
-    shutil.move(dist_location, target_location)
-    _safe_link(target_location, target_link)
-    logger.debug('    installed {}'.format(target_location))
-    return Package.from_href(target_location)
 
   def _purge_interpreter(self, interpreter_dir):
     try:

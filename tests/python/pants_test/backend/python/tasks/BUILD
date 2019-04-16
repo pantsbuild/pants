@@ -17,7 +17,9 @@ python_library(
     ':interpreter_cache_test_mixin',
     '3rdparty/python:future',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
+    'src/python/pants/subsystem',
     'tests/python/pants_test:task_test_base'
   ]
 )

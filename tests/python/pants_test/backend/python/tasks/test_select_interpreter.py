@@ -17,6 +17,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import TaskError
+from pants.option.ranked_value import RankedValue
 from pants.util.dirutil import chmod_plus_x, safe_mkdtemp
 from pants_test.task_test_base import TaskTestBase
 
@@ -29,9 +30,6 @@ class SelectInterpreterTest(TaskTestBase):
   def setUp(self):
     super(SelectInterpreterTest, self).setUp()
 
-    self.set_options(interpreter=['IronPython>=2.55'])
-    self.set_options_for_scope(PythonSetup.options_scope)
-
     # We're tied tightly to pex implementation details here faking out a python binary that outputs
     # only one value no matter what arguments, environment or input stream it has attached. That
     # value is the interpreter identity which is - minimally, one line containing:
@@ -39,7 +37,7 @@ class SelectInterpreterTest(TaskTestBase):
 
     def fake_interpreter(id_str):
       interpreter_dir = safe_mkdtemp()
-      binary = os.path.join(interpreter_dir, 'binary')
+      binary = os.path.join(interpreter_dir, 'python')
       with open(binary, 'w') as fp:
         fp.write(dedent("""
         #!{}
@@ -56,6 +54,12 @@ class SelectInterpreterTest(TaskTestBase):
       fake_interpreter('ip ip2 2 2 88 888'),
       fake_interpreter('ip ip2 2 2 99 999')
     ]
+
+    self.set_options_for_scope(
+      PythonSetup.options_scope,
+      interpreter_constraints=RankedValue(RankedValue.CONFIG, ['IronPython>=2.55']),
+      interpreter_search_paths=[interpreter.binary for interpreter in self.fake_interpreters]
+    )
 
     self.reqtgt = self.make_target(
       spec='req',
@@ -75,25 +79,21 @@ class SelectInterpreterTest(TaskTestBase):
                             dependencies=dependencies, compatibility=compatibility)
 
   def _select_interpreter(self, target_roots, should_invalidate=None):
+    PythonInterpreter.CACHE.clear()
+
     context = self.context(target_roots=target_roots)
+
     task = self.create_task(context)
     if should_invalidate is not None:
-      task._create_interpreter_path_file = mock.MagicMock(wraps=task._create_interpreter_path_file)
+      task._select_interpreter = mock.MagicMock(wraps=task._select_interpreter)
 
-    # Mock out the interpreter cache setup, so we don't actually look for real interpreters
-    # on the filesystem.
-    with mock.patch.object(PythonInterpreterCache, 'setup', autospec=True) as mock_resolve:
-      def se(me, *args, **kwargs):
-        me._interpreters = self.fake_interpreters
-        return self.fake_interpreters
-      mock_resolve.side_effect = se
-      task.execute()
+    task.execute()
 
     if should_invalidate is not None:
       if should_invalidate:
-        task._create_interpreter_path_file.assert_called_once()
+        task._select_interpreter.assert_called_once()
       else:
-        task._create_interpreter_path_file.assert_not_called()
+        task._select_interpreter.assert_not_called()
 
     return context.products.get_data(PythonInterpreter)
 
@@ -113,8 +113,10 @@ class SelectInterpreterTest(TaskTestBase):
     self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt20]))
     self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt30]))
     self.assertEqual('IronPython-2.77.777', self._select_interpreter_and_get_version([self.tgt40]))
-    self.assertEqual('IronPython-2.99.999', self._select_interpreter_and_get_version([self.tgt2, self.tgt3]))
-    self.assertEqual('IronPython-2.88.888', self._select_interpreter_and_get_version([self.tgt2, self.tgt4]))
+    self.assertEqual('IronPython-2.99.999',
+                     self._select_interpreter_and_get_version([self.tgt2, self.tgt3]))
+    self.assertEqual('IronPython-2.88.888',
+                     self._select_interpreter_and_get_version([self.tgt2, self.tgt4]))
 
     with self.assertRaises(TaskError) as cm:
       self._select_interpreter_and_get_version([self.tgt3, self.tgt4])
@@ -153,3 +155,9 @@ class SelectInterpreterTest(TaskTestBase):
 
     with self.assertRaises(PythonInterpreterCache.UnsatisfiableInterpreterConstraintsError):
       self._select_interpreter_and_get_version([tgt])
+
+  def test_stale_binary_detected(self):
+    interpreter1 = self._select_interpreter([self.tgt2])
+    os.remove(interpreter1.binary)
+    interpreter2 = self._select_interpreter([self.tgt2])
+    self.assertNotEqual(interpreter1.binary, interpreter2.binary)

@@ -2,7 +2,7 @@ ansicolors==1.0.2
 asttokens==1.1.13
 beautifulsoup4>=4.6.0,<4.7
 cffi==1.11.5
-configparser==3.5.0 ; python_version<'3'
+configparser==3.7.1 ; python_version<'3'
 contextlib2==0.5.5
 coverage>=4.5,<4.6
 docutils==0.14
@@ -17,7 +17,7 @@ more-itertools<6.0.0 ; python_version<'3'
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.9
-pex==1.5.3
+pex==1.6.6
 psutil==5.4.8
 pycodestyle==2.4.0
 pyflakes==2.0.0
@@ -33,7 +33,7 @@ requests[security]>=2.20.1
 responses==0.10.4
 scandir==1.2
 setproctitle==1.1.10
-setuptools==40.4.3
+setuptools==40.6.3
 six>=1.9.0,<2
 subprocess32==3.2.7 ; python_version<'3'
 wheel==0.31.1
