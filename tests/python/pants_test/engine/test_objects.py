@@ -31,3 +31,7 @@ field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(
 field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int or {string_type})) matching iterable object [()]: value () (with type 'tuple') must satisfy this type constraint: Exactly(int or {string_type})."""
                                                            .format(string_type='str' if PY3 else 'unicode'))):
       IntOrStringColl([()])
+
+  def test_collection_bool(self):
+    self.assertTrue(bool(Collection.of(int)([0])))
+    self.assertFalse(bool(Collection.of(int)([])))

@@ -187,3 +187,10 @@ class Collection(object):
 
   def __iter__(self):
     return iter(self.dependencies)
+
+  def __bool__(self):
+    return bool(self.dependencies)
+
+  def __nonzero__(self):
+    # For python 2 compatibility.
+    return self.__bool__()
