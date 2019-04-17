@@ -48,7 +48,7 @@ use fnv::FnvHasher;
 
 use futures::future::{self, Future};
 use indexmap::IndexSet;
-use log::trace;
+use log::{trace, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -76,6 +76,12 @@ struct InnerGraph<N: Node> {
   /// while draining, any Nodes that exist in the Graph will continue to run until/unless they
   /// attempt to get/create new Nodes.
   draining: bool,
+}
+
+enum CycleType<N: Node> {
+  None,
+  ContainingDirtyNodes(HashSet<N>),
+  Permanent,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -119,7 +125,7 @@ impl<N: Node> InnerGraph<N> {
   ///
   /// Returns true if a cycle would be created by adding an edge from src->dst.
   ///
-  fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
+  fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> CycleType<N> {
     // Search either forward from the dst, or backward from the src.
     let (root, needle, direction) = {
       let out_from_dst = self.pg.neighbors(dst_id).count();
@@ -137,7 +143,28 @@ impl<N: Node> InnerGraph<N> {
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
     roots.push_back(root);
-    self.walk(roots, direction).any(|eid| eid == needle)
+    let mut walk = self.walk(roots, direction);
+    let contains_cycle = walk.any(|eid| eid == needle);
+    if !contains_cycle {
+      return CycleType::None;
+    }
+    let dirty_nodes: HashSet<_> = walk
+      .walked
+      .iter()
+      .filter_map(|node_id| {
+        let entry = self.entry_for_id(*node_id).unwrap();
+        if entry.may_have_dirty_edges() {
+          Some(entry.node().clone())
+        } else {
+          None
+        }
+      })
+      .collect();
+    if dirty_nodes.is_empty() {
+      CycleType::Permanent
+    } else {
+      CycleType::ContainingDirtyNodes(dirty_nodes)
+    }
   }
 
   ///
@@ -155,7 +182,7 @@ impl<N: Node> InnerGraph<N> {
   fn clear(&mut self) {
     for eid in self.nodes.values() {
       if let Some(entry) = self.pg.node_weight_mut(*eid) {
-        entry.clear();
+        entry.clear(true);
       }
     }
   }
@@ -193,7 +220,7 @@ impl<N: Node> InnerGraph<N> {
     // Clear roots and remove their outbound edges.
     for id in &root_ids {
       if let Some(entry) = self.pg.node_weight_mut(*id) {
-        entry.clear();
+        entry.clear(false);
       }
     }
     self.pg.retain_edges(|pg, edge| {
@@ -514,17 +541,21 @@ impl<N: Node> Graph<N> {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
           let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-          if inner.detect_cycle(src_id, potential_dst_id) {
-            // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-            inner.ensure_entry(EntryKey::Cyclic(dst_node))
-          } else {
-            // Valid dependency.
-            trace!(
-              "Adding dependency from {:?} to {:?}",
-              inner.entry_for_id(src_id).unwrap().node(),
-              inner.entry_for_id(potential_dst_id).unwrap().node()
-            );
-            potential_dst_id
+          match Self::detect_cycle(src_id, potential_dst_id, &mut inner) {
+            Ok(true) => {
+              // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
+              inner.ensure_entry(EntryKey::Cyclic(dst_node))
+            }
+            Ok(false) => {
+              // Valid dependency.
+              trace!(
+                "Adding dependency from {:?} to {:?}",
+                inner.entry_for_id(src_id).unwrap().node(),
+                inner.entry_for_id(potential_dst_id).unwrap().node()
+              );
+              potential_dst_id
+            }
+            Err(err) => return futures::future::err(err).to_boxed(),
           }
         };
         inner.pg.add_edge(src_id, dst_id, ());
@@ -540,6 +571,28 @@ impl<N: Node> Graph<N> {
       entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
+    }
+  }
+
+  fn detect_cycle(
+    src_id: EntryId,
+    potential_dst_id: EntryId,
+    inner: &mut InnerGraph<N>,
+  ) -> Result<bool, N::Error> {
+    let mut counter = 0;
+    loop {
+      match inner.detect_cycle(src_id, potential_dst_id) {
+        CycleType::Permanent => return Ok(true),
+        CycleType::None => return Ok(false),
+        CycleType::ContainingDirtyNodes(dirty_nodes) => {
+          counter += 1;
+          if counter > 5 {
+            warn!("Couldn't remove cycle containing dirty nodes after {} attempts; nodes in cycle: {:?}", counter, dirty_nodes);
+            return Err(N::Error::cyclic());
+          }
+          inner.invalidate_from_roots(|node| dirty_nodes.contains(node));
+        }
+      }
     }
   }
 

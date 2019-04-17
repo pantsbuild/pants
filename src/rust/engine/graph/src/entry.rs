@@ -62,10 +62,25 @@ pub(crate) enum EntryState<N: Node> {
   // The previous_result value is _not_ a valid value for this Entry: rather, it is preserved in
   // order to compute the generation value for this Node by comparing it to the new result the next
   // time the Node runs.
+  //
+  // A note on dirty as was_dirty:
+  // dirty and was_dirty have different meanings for each variant.
+  // Completed::dirty means "The current value may not longer be relevant - you should check whether
+  //   its dependencies have new values, and if so, you should re-compute this value."
+  // Running::dirty means "When this completes, its computed value should be marked dirty
+  //   (and then see Completed::dirty's comment)
+  // NotStarted::was_dirty and Running::was_dirty mean "The _previous_ value (not the current value)
+  //   may no longer be relevant - you should check whether its dependencies have new values, and if
+  //   so, you should re-compute this value, BUT ALSO, the graph containing this node may show edges
+  //   which are no longer valid (and may cause a spurious cycle to be detected if these spurious
+  //   edges happen to form a cycle). Accordingly, if a cycle is detected involving a node which is
+  //   marked was_dirty, you should consider clearing it, removing any edges from it, and re-running
+  //   it.
   NotStarted {
     run_token: RunToken,
     generation: Generation,
     previous_result: Option<Result<N::Item, N::Error>>,
+    was_dirty: bool,
   },
   // A node that is running. A running node that has been marked dirty re-runs rather than
   // completing.
@@ -78,6 +93,7 @@ pub(crate) enum EntryState<N: Node> {
     waiters: Vec<oneshot::Sender<Result<(N::Item, Generation), N::Error>>>,
     previous_result: Option<Result<N::Item, N::Error>>,
     dirty: bool,
+    was_dirty: bool,
   },
   // A node that has completed, and then possibly been marked dirty. Because marking a node
   // dirty does not eagerly re-execute any logic, it will stay this way until a caller moves it
@@ -97,6 +113,7 @@ impl<N: Node> EntryState<N> {
       run_token: RunToken::initial(),
       generation: Generation::initial(),
       previous_result: None,
+      was_dirty: false,
     }
   }
 }
@@ -176,6 +193,7 @@ impl<N: Node> Entry<N> {
     generation: Generation,
     previous_dep_generations: Option<Vec<Generation>>,
     previous_result: Option<Result<N::Item, N::Error>>,
+    was_dirty: bool,
   ) -> EntryState<N>
   where
     C: NodeContext<Node = N>,
@@ -245,6 +263,7 @@ impl<N: Node> Entry<N> {
           generation,
           previous_result: previous_result,
           dirty: false,
+          was_dirty,
         }
       }
       &EntryKey::Cyclic(_) => EntryState::Completed {
@@ -311,6 +330,7 @@ impl<N: Node> Entry<N> {
           run_token,
           generation,
           previous_result,
+          was_dirty,
         } => Self::run(
           context,
           &self.node,
@@ -319,6 +339,7 @@ impl<N: Node> Entry<N> {
           generation,
           None,
           previous_result,
+          was_dirty,
         ),
         EntryState::Completed {
           run_token,
@@ -360,6 +381,7 @@ impl<N: Node> Entry<N> {
             } else {
               None
             },
+            dirty, // TODO: Should this also cover uncacheable?
           )
         }
         EntryState::Running { .. } => {
@@ -432,6 +454,7 @@ impl<N: Node> Entry<N> {
             run_token: run_token.next(),
             generation,
             previous_result,
+            was_dirty: true,
           }
         } else if dirty {
           // The node was dirtied while it was running. The dep_generations and new result cannot
@@ -448,6 +471,7 @@ impl<N: Node> Entry<N> {
             generation,
             None,
             previous_result,
+            true,
           )
         } else {
           // If the new result does not match the previous result, the generation increments.
@@ -541,7 +565,7 @@ impl<N: Node> Entry<N> {
   ///
   /// Clears the state of this Node, forcing it to be recomputed.
   ///
-  pub(crate) fn clear(&mut self) {
+  pub(crate) fn clear(&mut self, graph_still_contains_edges: bool) {
     let mut state = self.state.lock();
 
     let (run_token, generation, previous_result) =
@@ -550,6 +574,7 @@ impl<N: Node> Entry<N> {
           run_token,
           generation,
           previous_result,
+          ..
         }
         | EntryState::Running {
           run_token,
@@ -572,6 +597,7 @@ impl<N: Node> Entry<N> {
       run_token: run_token.next(),
       generation,
       previous_result,
+      was_dirty: graph_still_contains_edges,
     };
   }
 
@@ -591,6 +617,14 @@ impl<N: Node> Entry<N> {
         *dirty = true;
       }
       &mut EntryState::NotStarted { .. } => {}
+    }
+  }
+
+  pub fn may_have_dirty_edges(&self) -> bool {
+    match *self.state.lock() {
+      EntryState::NotStarted { was_dirty, .. } => was_dirty,
+      EntryState::Running { was_dirty, .. } => was_dirty,
+      EntryState::Completed { dirty, .. } => dirty,
     }
   }
 
