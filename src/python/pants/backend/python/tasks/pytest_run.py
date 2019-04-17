@@ -563,7 +563,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
             pytest_relpath = testcase.getAttribute('file')
             relsrc = os.path.join(buildroot_relpath, pytest_relpath)
             failed_target = relsrc_to_target.get(relsrc)
-            if failed_target is not None:
+            if failed_target:
               failed_targets.add(failed_target)
             else:
               # If test failure/error was not reported in junitxml, pick the first test target
