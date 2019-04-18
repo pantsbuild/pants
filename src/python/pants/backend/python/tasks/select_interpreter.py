@@ -13,7 +13,6 @@ from pex.executor import Executor
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
@@ -27,17 +26,14 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, Finge
   def compute_fingerprint(self, python_target):
     # Consider the compatibility requirements from both the targets and global constraints, as only
     # those can affect the selected interpreter.
-    interpreter_constraints = PythonSetup.global_instance().interpreter_constraints
     hash_elements_for_target = []
     if python_target.compatibility:
       hash_elements_for_target.extend(sorted(python_target.compatibility))
-    if not interpreter_constraints and not hash_elements_for_target:
+    if not hash_elements_for_target:
       return None
     hasher = hashlib.sha1()
     for element in hash_elements_for_target:
       hasher.update(element.encode('utf-8'))
-    for constraint in interpreter_constraints:
-      hasher.update(constraint.encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
 
@@ -69,8 +65,10 @@ class SelectInterpreter(Task):
     if not python_tgts_and_reqs:
       return
     python_tgts = [tgt for tgt in python_tgts_and_reqs if isinstance(tgt, PythonTarget)]
-    fs = PythonInterpreterFingerprintStrategy()
-    with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
+    # fs = PythonInterpreterFingerprintStrategy()
+    # TODO: how to merge the custom fingerprint strategy with default fingerprint() from
+    # https://github.com/pantsbuild/pants/blob/7819724acb0f0e6fd83a3cd9ec6b5b72a9799721/src/python/pants/task/task.py#L310
+    with self.invalidated(python_tgts) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of selecting
       # an interpreter, to prevent downstream tasks from having to check for this special case.
       if invalidation_check.all_vts:
