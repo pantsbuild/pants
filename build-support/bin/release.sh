@@ -764,3 +764,5 @@ else
       banner "Successfully released packages to PyPi"
   ) || die "Failed to release packages to PyPi."
 fi
+
+# Trigger CI?
