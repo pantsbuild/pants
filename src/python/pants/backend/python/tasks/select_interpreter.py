@@ -19,6 +19,7 @@ from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, Fing
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir_for
+from pants.util.memo import memoized_property
 
 
 class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
@@ -55,6 +56,10 @@ class SelectInterpreter(Task):
   def product_types(cls):
     return [PythonInterpreter]
 
+  @memoized_property
+  def _interpreter_cache(self):
+    return PythonInterpreterCache.global_instance()
+
   def execute(self):
     # NB: Downstream product consumers may need the selected interpreter for use with
     # any type of importable Python target, including `PythonRequirementLibrary` targets
@@ -66,8 +71,7 @@ class SelectInterpreter(Task):
     if not python_tgts_and_reqs:
       return
     python_tgts = [tgt for tgt in python_tgts_and_reqs if isinstance(tgt, PythonTarget)]
-    interpreter_cache = PythonInterpreterCache.global_instance()
-    fs = PythonInterpreterFingerprintStrategy(python_setup=interpreter_cache._python_setup)
+    fs = PythonInterpreterFingerprintStrategy(python_setup=self._interpreter_cache.python_setup)
     with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
       # If there are no constraints, meaning no global constraints nor compatibility requirements on
       # the targets, we still go through the motions of selecting an interpreter, to prevent
@@ -83,8 +87,7 @@ class SelectInterpreter(Task):
     self.context.products.register_data(PythonInterpreter, interpreter)
 
   def _select_interpreter(self, interpreter_path_file, targets):
-    interpreter_cache = PythonInterpreterCache.global_instance()
-    interpreter = interpreter_cache.select_interpreter_for_targets(targets)
+    interpreter = self._interpreter_cache.select_interpreter_for_targets(targets)
     safe_mkdir_for(interpreter_path_file)
     with open(interpreter_path_file, 'w') as outfile:
       outfile.write('{}\n'.format(interpreter.binary))
