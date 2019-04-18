@@ -581,7 +581,18 @@ impl<N: Node> Graph<N> {
           return Ok(true);
         }
         counter += 1;
-        if counter > 5 {
+        // Obsolete edges from a dirty node may cause fake cycles to be detected if there was a
+        // dirty dep from A to B, and we're trying to add a dep from B to A.
+        // If we detect a cycle that contains dirty nodes (and so potentially obsolete edges),
+        // we repeatedly cycle-detect, clearing (and re-running) and dirty nodes (and their edges)
+        // that we encounter.
+        //
+        // We do this repeatedly, because there may be multiple paths which would cause cycles,
+        // which contain dirty nodes. If we've cleared 10 separate paths which contain dirty nodes,
+        // and are still detecting cycle-causing paths containing dirty nodes, give up. 10 is a very
+        // arbitrary number, which we can increase if we find real graphs in the wild which hit this
+        // limit.
+        if counter > 10 {
           warn!(
             "Couldn't remove cycle containing dirty nodes after {} attempts; nodes in cycle: {:?}",
             counter, cycle_path
