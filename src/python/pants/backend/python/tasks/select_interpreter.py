@@ -45,7 +45,7 @@ class SelectInterpreter(Task):
   def implementation_version(cls):
     # TODO(John Sirois): Fixup this task to use VTS results_dirs. Right now version bumps aren't
     # effective in dealing with workdir data format changes.
-    return super(SelectInterpreter, cls).implementation_version() + [('SelectInterpreter', 3)]
+    return super(SelectInterpreter, cls).implementation_version() + [('SelectInterpreter', 4)]
 
   @classmethod
   def subsystem_dependencies(cls):
