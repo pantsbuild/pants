@@ -13,6 +13,7 @@ from pex.executor import Executor
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
@@ -24,16 +25,19 @@ from pants.util.dirutil import safe_mkdir_for
 class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, python_target):
-    # Only consider the compatibility requirements in the fingerprint, as only
+    # Consider the compatibility requirements from both the targets and global constraints, as only
     # those can affect the selected interpreter.
+    interpreter_constraints = PythonSetup.global_instance().interpreter_constraints
     hash_elements_for_target = []
     if python_target.compatibility:
       hash_elements_for_target.extend(sorted(python_target.compatibility))
-    if not hash_elements_for_target:
+    if not interpreter_constraints and not hash_elements_for_target:
       return None
     hasher = hashlib.sha1()
     for element in hash_elements_for_target:
       hasher.update(element.encode('utf-8'))
+    for constraint in interpreter_constraints:
+      hasher.update(constraint.encode('utf-8'))
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
 
