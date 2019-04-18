@@ -144,7 +144,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Run at most this many tests in a single test process.')
     register('--test', type=list, fingerprint=True,
              help='Force running of just these tests.  Tests can be specified using any of: '
-                  '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
+                  '[fully qualified classname], [fully qualified classname]#[methodname]')
     register('--per-test-timer', type=bool, help='Show progress and timer for each test.')
     register('--default-concurrency', advanced=True, fingerprint=True,
              choices=JUnitTests.VALID_CONCURRENCY_OPTS, default=JUnitTests.CONCURRENCY_SERIAL,
