@@ -48,7 +48,7 @@ use fnv::FnvHasher;
 
 use futures::future::{self, Future};
 use indexmap::IndexSet;
-use log::{trace, warn};
+use log::{info, trace, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -59,7 +59,7 @@ use boxfuture::{BoxFuture, Boxable};
 
 type FNV = BuildHasherDefault<FnvHasher>;
 
-type PGraph<N> = DiGraph<Entry<N>, (), u32>;
+type PGraph<N> = DiGraph<Entry<N>, f32, u32>;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct InvalidationResult {
@@ -76,23 +76,6 @@ struct InnerGraph<N: Node> {
   /// while draining, any Nodes that exist in the Graph will continue to run until/unless they
   /// attempt to get/create new Nodes.
   draining: bool,
-}
-
-/// Possible states when detecting cycles in a Graph.
-enum CycleType<N: Node> {
-  /// Indicates that no cycle was detected.
-  None,
-  /// Indicates that a cycle was detected, but that some nodes in that cycle were dirty, and may
-  /// have edges which are obsolete. Clearing those nodes, and removing their edges, and re-running
-  /// them may remove this cycle.
-  ///
-  /// This notably happens if two nodes in the graph swap positions, so that we go from A
-  /// depending on B, to B depending on B (possibly transitively). In this case, an obsolete edge
-  ///from A to B would be considered as a cycle when trying to add an edge from B to A, but by
-  /// clearing A and re-running, the cycle would be removed.
-  ContainingDirtyNodes(HashSet<N>),
-  /// Indicates that a cycle was detected, and there is nothing to be done to resolve it.
-  Permanent,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -134,48 +117,36 @@ impl<N: Node> InnerGraph<N> {
   ///
   /// Detect whether adding an edge from src to dst would create a cycle.
   ///
-  /// Returns true if a cycle would be created by adding an edge from src->dst.
+  /// Returns a path which would cause the cycle if an edge were added from src to dst, or None if
+  /// no cycle would be created.
   ///
-  fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> CycleType<N> {
-    // Search either forward from the dst, or backward from the src.
-    let (root, needle, direction) = {
-      let out_from_dst = self.pg.neighbors(dst_id).count();
-      let in_to_src = self
-        .pg
-        .neighbors_directed(src_id, Direction::Incoming)
-        .count();
-      if out_from_dst < in_to_src {
-        (dst_id, src_id, Direction::Outgoing)
-      } else {
-        (src_id, dst_id, Direction::Incoming)
-      }
-    };
+  fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> Option<Vec<Entry<N>>> {
+    Self::shortest_path(&self.pg, dst_id, src_id).map(|path| {
+      path
+        .into_iter()
+        .map(|index| self.entry_for_id(index).unwrap().clone())
+        .collect()
+    })
+  }
 
-    // Search for an existing path from dst to src.
-    let mut roots = VecDeque::new();
-    roots.push_back(root);
-    let mut walk = self.walk(roots, direction);
-    let contains_cycle = walk.any(|eid| eid == needle);
-    if !contains_cycle {
-      return CycleType::None;
+  ///
+  /// Compute and return one shortest path from `src` to `dst`.
+  ///
+  fn shortest_path(graph: &PGraph<N>, src: EntryId, dst: EntryId) -> Option<Vec<EntryId>> {
+    let (_path_weights, paths) = petgraph::algo::bellman_ford(graph, src)
+      .expect("There should not be any negative edge weights");
+
+    let mut next = dst;
+    let mut path = Vec::new();
+    path.push(next);
+    while let Some(current) = paths[next.index()] {
+      path.push(current);
+      if current == src {
+        return Some(path);
+      }
+      next = current;
     }
-    let dirty_nodes: HashSet<_> = walk
-      .walked
-      .iter()
-      .filter_map(|node_id| {
-        let entry = self.entry_for_id(*node_id).unwrap();
-        if entry.may_have_dirty_edges() {
-          Some(entry.node().clone())
-        } else {
-          None
-        }
-      })
-      .collect();
-    if dirty_nodes.is_empty() {
-      CycleType::Permanent
-    } else {
-      CycleType::ContainingDirtyNodes(dirty_nodes)
-    }
+    None
   }
 
   ///
@@ -569,7 +540,9 @@ impl<N: Node> Graph<N> {
             Err(err) => return futures::future::err(err).to_boxed(),
           }
         };
-        inner.pg.add_edge(src_id, dst_id, ());
+        // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
+        // edge as having equal weight.
+        inner.pg.add_edge(src_id, dst_id, 1.0);
         inner
           .entry_for_id(dst_id)
           .cloned()
@@ -592,17 +565,32 @@ impl<N: Node> Graph<N> {
   ) -> Result<bool, N::Error> {
     let mut counter = 0;
     loop {
-      match inner.detect_cycle(src_id, potential_dst_id) {
-        CycleType::Permanent => return Ok(true),
-        CycleType::None => return Ok(false),
-        CycleType::ContainingDirtyNodes(dirty_nodes) => {
-          counter += 1;
-          if counter > 5 {
-            warn!("Couldn't remove cycle containing dirty nodes after {} attempts; nodes in cycle: {:?}", counter, dirty_nodes);
-            return Err(N::Error::cyclic());
-          }
-          inner.invalidate_from_roots(|node| dirty_nodes.contains(node));
+      if let Some(cycle_path) = inner.detect_cycle(src_id, potential_dst_id) {
+        let dirty_nodes: HashSet<_> = cycle_path
+          .iter()
+          .filter(|n| n.may_have_dirty_edges())
+          .map(|n| n.node().clone())
+          .collect();
+        if dirty_nodes.is_empty() {
+          info!(
+            "Detected cycle considering adding edge from {:?} to {:?}; existing path: {:?}",
+            inner.entry_for_id(src_id).unwrap(),
+            inner.entry_for_id(potential_dst_id).unwrap(),
+            cycle_path
+          );
+          return Ok(true);
         }
+        counter += 1;
+        if counter > 5 {
+          warn!(
+            "Couldn't remove cycle containing dirty nodes after {} attempts; nodes in cycle: {:?}",
+            counter, cycle_path
+          );
+          return Err(N::Error::cyclic());
+        }
+        inner.invalidate_from_roots(|node| dirty_nodes.contains(node));
+      } else {
+        return Ok(false);
       }
     }
   }
