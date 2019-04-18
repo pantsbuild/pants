@@ -46,6 +46,14 @@ class ListOwnersIntegrationTest(PantsRunIntegrationTest):
                                   success=False)
     self.assertIn(expected_error, pants_run_3.stderr_data)
 
-  # def test_owner_list_repeated_directory_separator(self):
-  #   pants_run = self.do_command('--owner-of=testprojects/tests/python/pants/dummies/test_pass.py',
-  #                               'list')
+  def test_owner_list_repeated_directory_separator(self):
+    pants_run = self.do_command('--owner-of=testprojects/tests/python/pants/dummies//test_pass.py',
+                                'list',
+                                success=True)
+    self.assertEqual(
+      set([
+        'testprojects/tests/python/pants/dummies:passing_target',
+        'testprojects/tests/python/pants:secondary_source_file_owner'
+      ]),
+      set(pants_run.stdout_data.splitlines()),
+    )
