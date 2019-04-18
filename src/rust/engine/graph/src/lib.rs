@@ -78,9 +78,20 @@ struct InnerGraph<N: Node> {
   draining: bool,
 }
 
+/// Possible states when detecting cycles in a Graph.
 enum CycleType<N: Node> {
+  /// Indicates that no cycle was detected.
   None,
+  /// Indicates that a cycle was detected, but that some nodes in that cycle were dirty, and may
+  /// have edges which are obsolete. Clearing those nodes, and removing their edges, and re-running
+  /// them may remove this cycle.
+  ///
+  /// This notably happens if two nodes in the graph swap positions, so that we go from A
+  /// depending on B, to B depending on B (possibly transitively). In this case, an obsolete edge
+  ///from A to B would be considered as a cycle when trying to add an edge from B to A, but by
+  /// clearing A and re-running, the cycle would be removed.
   ContainingDirtyNodes(HashSet<N>),
+  /// Indicates that a cycle was detected, and there is nothing to be done to resolve it.
   Permanent,
 }
 
