@@ -7,31 +7,24 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pex.orderedset import OrderedSet
 
 from pants.engine.console import Console
-from pants.engine.goal import Goal
+from pants.engine.goal import Goal, LineOriented, line_oriented
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import console_rule
 
 
-class Filedeps(Goal):
+class Filedeps(LineOriented, Goal):
   """List all source and BUILD files a target transitively depends on.
 
   Files may be listed with absolute or relative paths and any BUILD files implied in the transitive
   closure of targets are also included.
   """
 
-  name = 'filedeps'
-
-  @classmethod
-  def register_options(cls, register):
-    super(Filedeps, cls).register_options(register)
-    register('--globs', type=bool,
-             help='Instead of outputting filenames, output globs (ignoring excludes)')
-    register('--absolute', type=bool, default=True,
-             help='If True output with absolute path, else output with path relative to the build root')
+  # TODO: Until this implements more of the options of `filedeps`, it can't claim the name!
+  name = 'fast-filedeps'
 
 
-@console_rule(Filedeps, [Console, TransitiveHydratedTargets])
-def file_deps(console, transitive_hydrated_targets):
+@console_rule(Filedeps, [Console, Filedeps.Options, TransitiveHydratedTargets])
+def file_deps(console, filedeps_options, transitive_hydrated_targets):
 
   uniq_set = OrderedSet()
 
@@ -39,10 +32,13 @@ def file_deps(console, transitive_hydrated_targets):
     if hydrated_target.address.rel_path:
       uniq_set.add(hydrated_target.address.rel_path)
     if hasattr(hydrated_target.adaptor, "sources"):
-      uniq_set.update(f.path for f in hydrated_target.adaptor.sources.snapshot.files)
+      uniq_set.update(hydrated_target.adaptor.sources.snapshot.files)
 
-  for f_path in uniq_set:
-    console.print_stdout(f_path)
+  with line_oriented(filedeps_options, console) as (print_stdout, print_stderr):
+    for f_path in uniq_set:
+      print_stdout(f_path)
+
+  return Filedeps(exit_code=0)
 
 
 def rules():

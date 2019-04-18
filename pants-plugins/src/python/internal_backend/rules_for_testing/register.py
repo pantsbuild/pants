@@ -8,7 +8,6 @@ from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal
 from pants.engine.rules import console_rule
-from pants.rules.core.exceptions import GracefulTerminationException
 
 
 class ListAndDieForTesting(Goal):
@@ -21,7 +20,7 @@ class ListAndDieForTesting(Goal):
 def fast_list_and_die_for_testing(console, addresses):
   for address in addresses.dependencies:
     console.print_stdout(address.spec)
-  raise GracefulTerminationException(exit_code=42)
+  yield ListAndDieForTesting(exit_code=42)
 
 
 def rules():

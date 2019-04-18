@@ -8,7 +8,6 @@ from io import StringIO
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal
-from pants.engine.rules import _GoalProduct
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.init.target_roots_calculator import TargetRootsCalculator
@@ -39,7 +38,7 @@ class ConsoleRuleTestBase(TestBase):
     if not issubclass(self.goal_cls, Goal):
       raise AssertionError('goal_cls() must return a Goal subclass, got {}'.format(self.goal_cls))
 
-  def execute_rule(self, args=tuple(), env=tuple()):
+  def execute_rule(self, args=tuple(), env=tuple(), exit_code=0):
     """Executes the @console_rule for this test class.
 
     :API: public
@@ -51,19 +50,27 @@ class ConsoleRuleTestBase(TestBase):
     env = dict(env)
     options_bootstrapper = OptionsBootstrapper.create(args=args, env=env)
     BuildConfigInitializer.get(options_bootstrapper)
-    full_options = options_bootstrapper.get_full_options(list(self.goal_cls.known_scope_infos()))
+    full_options = options_bootstrapper.get_full_options(list(self.goal_cls.Options.known_scope_infos()))
     stdout, stderr = StringIO(), StringIO()
     console = Console(stdout=stdout, stderr=stderr)
 
     # Run for the target specs parsed from the args.
     specs = TargetRootsCalculator.parse_specs(full_options.target_specs, self.build_root)
     params = Params(specs, console, options_bootstrapper)
-    goal_product = _GoalProduct.for_name(self.goal_cls.options_scope)
-    self.scheduler.run_console_rule(goal_product, params)
+    actual_exit_code = self.scheduler.run_console_rule(self.goal_cls, params)
 
     # Flush and capture console output.
     console.flush()
-    return stdout.getvalue()
+    stdout = stdout.getvalue()
+    stderr = stderr.getvalue()
+
+    self.assertEqual(
+        exit_code,
+        actual_exit_code,
+        "Exited with {} (expected {}):\nstdout:\n{}\nstderr:\n{}".format(actual_exit_code, exit_code, stdout, stderr)
+      )
+
+    return stdout
 
   def assert_entries(self, sep, *output, **kwargs):
     """Verifies the expected output text is flushed by the console task under test.

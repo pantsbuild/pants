@@ -9,15 +9,23 @@ import os
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
-from pants.rules.core import filedeps as filedeps_rules
 from pants.task.console_task import ConsoleTask
 
 
 class FileDeps(ConsoleTask):
+  """List all source and BUILD files a target transitively depends on.
+
+  Files may be listed with absolute or relative paths and any BUILD files implied in the transitive
+  closure of targets are also included.
+  """
 
   @classmethod
-  def subsystem_dependencies(cls):
-    return super(FileDeps, cls).subsystem_dependencies() + (filedeps_rules.Filedeps,)
+  def register_options(cls, register):
+    super(FileDeps, cls).register_options(register)
+    register('--globs', type=bool,
+             help='Instead of outputting filenames, output globs (ignoring excludes)')
+    register('--absolute', type=bool, default=True,
+             help='If True output with absolute path, else output with path relative to the build root')
 
   def _file_path(self, path):
     return os.path.join(get_buildroot(), path) if self.get_options().absolute else path

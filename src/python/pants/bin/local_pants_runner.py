@@ -23,7 +23,6 @@ from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
-from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import maybe_profiled
 
 
@@ -273,14 +272,11 @@ class LocalPantsRunner(object):
       return PANTS_SUCCEEDED_EXIT_CODE
 
     try:
-      self._graph_session.run_console_rules(
+      return self._graph_session.run_console_rules(
         self._options_bootstrapper,
         goals,
         self._target_roots,
       )
-    except GracefulTerminationException as e:
-      logger.debug('Encountered graceful termination exception {}; exiting'.format(e))
-      return e.exit_code
     except Exception:
       logger.warning('Encountered unhandled exception during rule execution!')
       logger.warning(traceback.format_exc())

@@ -23,7 +23,7 @@ def register_goals():
 
   task(name='depmap', action=Depmap).install()
   task(name='dependencies', action=Dependencies).install()
-  task(name='legacy', action=FileDeps).install('filedeps')
+  task(name='filedeps', action=FileDeps).install('filedeps')
 
 
 def rules():

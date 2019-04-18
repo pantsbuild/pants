@@ -9,6 +9,7 @@ import re
 
 from future.utils import text_type
 
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent
 from pants.engine.goal import Goal
@@ -16,7 +17,6 @@ from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.objects import Collection
 from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.exceptions import GracefulTerminationException
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.objects import datatype, enum
@@ -210,12 +210,12 @@ class MultiMatcher(object):
 
 # TODO: Switch this to `lint` once we figure out a good way for v1 tasks and v2 rules
 # to share goal names.
-@console_rule(Validate, [Console, HydratedTargets, Validate])
-def validate(console, hydrated_targets, validate_goal):
+@console_rule(Validate, [Console, HydratedTargets, Validate.Options])
+def validate(console, hydrated_targets, validate_options):
   per_tgt_rmrs = yield [Get(RegexMatchResults, HydratedTarget, ht) for ht in hydrated_targets]
   regex_match_results = list(itertools.chain(*per_tgt_rmrs))
 
-  detail_level = validate_goal.options.detail_level
+  detail_level = validate_options.values.detail_level
   regex_match_results = sorted(regex_match_results, key=lambda x: x.path)
   num_matched_all = 0
   num_nonmatched_some = 0
@@ -241,7 +241,11 @@ def validate(console, hydrated_targets, validate_goal):
       num_nonmatched_some))
 
   if num_nonmatched_some:
-    raise GracefulTerminationException('Files failed validation.')
+    console.print_stderr('Files failed validation.')
+    exit_code = PANTS_FAILED_EXIT_CODE
+  else:
+    exit_code = PANTS_SUCCEEDED_EXIT_CODE
+  yield Validate(exit_code)
 
 
 @rule(RegexMatchResults, [HydratedTarget, SourceFileValidation])

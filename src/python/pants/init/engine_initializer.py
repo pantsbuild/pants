@@ -16,12 +16,14 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
+from pants.engine.goal import Goal
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
@@ -174,6 +176,8 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
 
     :param list goals: The list of requested goal names as passed on the commandline.
     :param TargetRoots target_roots: The targets root of the request.
+
+    :returns: An exit code.
     """
     subject = target_roots.specs
     console = Console()
@@ -182,9 +186,13 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
       params = Params(subject, options_bootstrapper, console)
       logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
       try:
-        self.scheduler_session.run_console_rule(goal_product, params)
+        exit_code = self.scheduler_session.run_console_rule(goal_product, params)
       finally:
         console.flush()
+
+      if exit_code != PANTS_SUCCEEDED_EXIT_CODE:
+        return exit_code
+    return PANTS_SUCCEEDED_EXIT_CODE
 
   def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.
@@ -215,9 +223,10 @@ class EngineInitializer(object):
   def _make_goal_map_from_rules(rules):
     goal_map = {}
     for r in rules:
-      if getattr(r, 'goal_cls', None) is None:
+      output_type = getattr(r, 'output_type', None)
+      if not output_type or not issubclass(output_type, Goal):
         continue
-      goal = r.goal_cls.options_scope
+      goal = r.output_type.name
       if goal in goal_map:
         raise EngineInitializer.GoalMappingError(
           'could not map goal `{}` to rule `{}`: already claimed by product `{}`'

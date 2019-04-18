@@ -5,17 +5,13 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
-import functools
 import inspect
 import itertools
 import logging
 import sys
 from abc import abstractproperty
-from builtins import bytes, str
-from types import GeneratorType
 
 import asttokens
-from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
 from pants.engine.goal import Goal
@@ -175,42 +171,6 @@ Use `_ = yield Get(...)` if you wish to yield control to the engine and discard 
 """))
 
 
-class _GoalProduct(object):
-  """GoalProduct is a factory for anonymous singleton types representing the execution of goals.
-
-  The created types are returned by `@console_rule` instances, which may not have any outputs
-  of their own.
-  """
-  PRODUCT_MAP = {}
-
-  @staticmethod
-  def _synthesize_goal_product(name):
-    product_type_name = '{}GoalExecution'.format(name.capitalize())
-    if PY2:
-      product_type_name = product_type_name.encode('utf-8')
-    return type(product_type_name, (datatype([]),), {})
-
-  @classmethod
-  def for_name(cls, name):
-    assert isinstance(name, (bytes, str))
-    if name is bytes:
-      name = name.decode('utf-8')
-    if name not in cls.PRODUCT_MAP:
-      cls.PRODUCT_MAP[name] = cls._synthesize_goal_product(name)
-    return cls.PRODUCT_MAP[name]
-
-
-def _terminated(generator, terminator):
-  """A generator that "appends" the given terminator value to the given generator."""
-  gen_input = None
-  try:
-    while True:
-      res = generator.send(gen_input)
-      gen_input = yield res
-  except StopIteration:
-    yield terminator
-
-
 @memoized
 def optionable_rule(optionable_factory):
   """Returns a TaskRule that constructs an instance of the Optionable for the given OptionableFactory.
@@ -231,14 +191,21 @@ def _get_starting_indent(source):
   return 0
 
 
-def _make_rule(output_type, input_selectors, goal_cls=None, cacheable=True):
+def _make_rule(output_type, input_selectors, cacheable=True):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
+
+  As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
+  are registered as dependency Optionables.
 
   :param type output_type: The return/output type for the Rule. This must be a concrete Python type.
   :param list input_selectors: A list of Selector instances that matches the number of arguments
     to the @decorated function.
-  :param Goal goal_cls: If this is a `@console_rule`, a Goal class to provide options, help, and a scope.
   """
+
+  is_goal_cls = isinstance(output_type, type) and issubclass(output_type, Goal)
+  if is_goal_cls == cacheable:
+    raise TypeError('An `@rule` that produces a `Goal` must be declared with @console_rule in order '
+                    'to signal that it is not cacheable.')
 
   def wrapper(func):
     if not inspect.isfunction(func):
@@ -283,34 +250,22 @@ def _make_rule(output_type, input_selectors, goal_cls=None, cacheable=True):
       Get.create_statically_for_rule_graph(resolve_type(p), resolve_type(s))
       for p, s in rule_visitor.gets)
 
-    # For @console_rule, redefine the function to avoid needing a literal return of the output type.
-    if goal_cls:
-      def goal_and_return(*args, **kwargs):
-        res = func(*args, **kwargs)
-        if isinstance(res, GeneratorType):
-          # Return a generator with an output_type instance appended.
-          return _terminated(res, output_type())
-        elif res is not None:
-          raise Exception('A @console_rule should not have a return value.')
-        return output_type()
-      functools.update_wrapper(goal_and_return, func)
-      wrapped_func = goal_and_return
-      dependency_rules = (optionable_rule(goal_cls),)
+    # Register dependencies for @console_rule/Goal.
+    if is_goal_cls:
+      dependency_rules = (optionable_rule(output_type.Options),)
     else:
-      wrapped_func = func
       dependency_rules = None
 
-    wrapped_func.rule = TaskRule(
+    func.rule = TaskRule(
         output_type,
         tuple(input_selectors),
-        wrapped_func,
+        func,
         input_gets=tuple(gets),
-        goal_cls=goal_cls,
         dependency_rules=dependency_rules,
         cacheable=cacheable,
       )
 
-    return wrapped_func
+    return func
   return wrapper
 
 
@@ -319,11 +274,7 @@ def rule(output_type, input_selectors):
 
 
 def console_rule(goal_cls, input_selectors):
-  if not isinstance(goal_cls, type) or not issubclass(goal_cls, Goal):
-    raise TypeError('The first argument for a @console_rule must be an associated `Goal` to '
-                    'declare its help, options, and scope. Got: `{}`.'.format(goal_cls))
-  output_type = _GoalProduct.for_name(goal_cls.options_scope)
-  return _make_rule(output_type, input_selectors, goal_cls, False)
+  return _make_rule(goal_cls, input_selectors, False)
 
 
 def union(cls):
@@ -400,7 +351,6 @@ class TaskRule(datatype([
   ('input_selectors', TypedCollection(SubclassesOf(type))),
   ('input_gets', tuple),
   'func',
-  'goal_cls',
   ('dependency_rules', tuple),
   ('dependency_optionables', tuple),
   ('cacheable', bool),
@@ -419,13 +369,7 @@ class TaskRule(datatype([
               input_gets,
               dependency_optionables=None,
               dependency_rules=None,
-              goal_cls=None,
               cacheable=True):
-
-    # Validate associated Goal (if any).
-    if goal_cls and not issubclass(goal_cls, Goal):
-      raise TypeError("Expected a Goal instance for `{}`, got: {}".format(
-        func.__name__, type(goal_cls)))
 
     # Create.
     return super(TaskRule, cls).__new__(
@@ -434,7 +378,6 @@ class TaskRule(datatype([
         input_selectors,
         input_gets,
         func,
-        goal_cls,
         dependency_rules or tuple(),
         dependency_optionables or tuple(),
         cacheable,

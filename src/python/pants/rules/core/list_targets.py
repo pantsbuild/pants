@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.base.specs import Specs
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
-from pants.engine.goal import Goal, LineOriented
+from pants.engine.goal import Goal, LineOriented, line_oriented
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import console_rule
 from pants.engine.selectors import Get
@@ -33,11 +33,11 @@ class List(LineOriented, Goal):
              help='Print only targets that are documented with a description.')
 
 
-@console_rule(List, [Console, List, Specs])
-def list_targets(console, list_goal, specs):
-  provides = list_goal.options.provides
-  provides_columns = list_goal.options.provides_columns
-  documented = list_goal.options.documented
+@console_rule(List, [Console, List.Options, Specs])
+def list_targets(console, list_options, specs):
+  provides = list_options.values.provides
+  provides_columns = list_options.values.provides_columns
+  documented = list_options.values.documented
   if provides or documented:
     # To get provides clauses or documentation, we need hydrated targets.
     collection = yield Get(HydratedTargets, Specs, specs)
@@ -73,7 +73,7 @@ def list_targets(console, list_goal, specs):
     collection = yield Get(BuildFileAddresses, Specs, specs)
     print_fn = lambda address: address.spec
 
-  with list_goal.line_oriented(console) as (print_stdout, print_stderr):
+  with line_oriented(list_options, console) as (print_stdout, print_stderr):
     if not collection.dependencies:
       print_stderr('WARNING: No targets were matched in goal `{}`.'.format('list'))
 
@@ -81,6 +81,8 @@ def list_targets(console, list_goal, specs):
       result = print_fn(item)
       if result:
         print_stdout(result)
+
+  yield List(exit_code=0)
 
 
 def rules():
