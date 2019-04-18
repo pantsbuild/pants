@@ -54,10 +54,26 @@ def list_option(s):
   return ListValueComponent.create(s)
 
 
-# Match any repeated instances of the directory separator, unless they occur at the start. This
-# will normalize file and target paths as required by the engine, without stripping a leading // in
-# target addresses.
-_repeated_separator_pattern = re.compile('(?!^){}+'.format(re.escape(os.sep)))
+def target_option(s):
+  """Same type as 'str', but indicates a single target spec.
+
+  :API: public
+
+  TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
+  """
+  return s
+
+
+# TODO: Replace target_list_option with type=list, member_type=target_option.
+# Then we'll get all the goodies from list_option (e.g., appending) free.
+def target_list_option(s):
+  """Same type as 'list_option', but indicates list contents are target specs.
+
+  :API: public
+
+  TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
+  """
+  return _convert(s, (list, tuple))
 
 
 def _normalize_directory_separators(s):
@@ -70,29 +86,7 @@ def _normalize_directory_separators(s):
 
   TODO: give the engine more control over matching paths so we don't have to sanitize the input!
   """
-  return re.sub(_repeated_separator_pattern, os.sep, s)
-
-
-def target_option(s):
-  """Same type as 'str', but indicates a single target spec.
-
-  :API: public
-
-  TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
-  """
-  return _normalize_directory_separators(s)
-
-
-# TODO: Replace target_list_option with type=list, member_type=target_option.
-# Then we'll get all the goodies from list_option (e.g., appending) free.
-def target_list_option(s):
-  """Same type as 'list_option', but indicates list contents are target specs.
-
-  :API: public
-
-  TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
-  """
-  return [_normalize_directory_separators(spec) for spec in _convert(s, (list, tuple))]
+  return os.path.normpath(s)
 
 
 def dir_option(s):
