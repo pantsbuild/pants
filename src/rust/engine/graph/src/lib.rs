@@ -692,6 +692,24 @@ impl<N: Node> Graph<N> {
   /// reliably the case because Entry happens to require a &mut InnerGraph reference; it would be
   /// great not to violate that in the future.
   ///
+  /// TODO: We don't track which generation actually added which edges, so over time nodes will end
+  /// up with spurious dependencies. This is mostly sound, but may lead to over-invalidation and
+  /// doing more work than is necessary.
+  /// As an example, if generation 0 or X depends on A and B, and generation 1 of X depends on C,
+  /// nothing will prune the dependencies from X onto A and B, so generation 1 of X will have
+  /// dependencies on A, B, and C in the graph, even though running it only depends on C.
+  /// At some point we should address this, but we must be careful with how we do so; anything which
+  /// ties together the generation of a node with specifics of edges would require careful
+  /// consideration of locking (probably it would require merging the EntryState locks and Graph
+  /// locks, or working out something clever).
+  ///
+  /// It would also require careful consideration of nodes in the Running EntryState - these may
+  /// have previous RunToken edges and next RunToken edges which collapse into the same Generation
+  /// edges; when working out whether a dirty node is really clean, care must be taken to avoid
+  /// spurious cycles. Currently we handle this as a special case by, if we detect a cycle that
+  /// contains dirty nodes, clearing those nodes (removing any edges from them). This is a little
+  /// hacky, but will tide us over until we fully solve this problem.
+  ///
   fn complete<C>(
     &self,
     context: &C,
