@@ -640,6 +640,8 @@ Interrupted by user over pailgun client!
       for process in pantsd_runner_processes:
         self.assertFalse(process.is_running())
 
+  # This is a regression test for a bug where we would incorrectly detect a cycle if two targets swapped their
+  # dependency relationship (#7404).
   def test_dependencies_swap(self):
     template = dedent("""
         python_library(
