@@ -24,8 +24,12 @@ from pants.util.dirutil import safe_mkdir_for
 class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, python_target):
-    # Consider the compatibility requirements from both the targets and global constraints, as only
+    # Only consider the compatibility requirements in the fingerprint, as only
     # those can affect the selected interpreter.
+    #
+    # NB: this FP strategy is only concerned with targets, but we also care about
+    # --python-setup-interpreter-constraints. This is tracked via the subsystem and
+    # self.fingerprint.
     hash_elements_for_target = []
     if python_target.compatibility:
       hash_elements_for_target.extend(sorted(python_target.compatibility))
@@ -44,7 +48,7 @@ class SelectInterpreter(Task):
   def implementation_version(cls):
     # TODO(John Sirois): Fixup this task to use VTS results_dirs. Right now version bumps aren't
     # effective in dealing with workdir data format changes.
-    return super(SelectInterpreter, cls).implementation_version() + [('SelectInterpreter', 3)]
+    return super(SelectInterpreter, cls).implementation_version() + [('SelectInterpreter', 4)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -65,17 +69,15 @@ class SelectInterpreter(Task):
     if not python_tgts_and_reqs:
       return
     python_tgts = [tgt for tgt in python_tgts_and_reqs if isinstance(tgt, PythonTarget)]
-    # fs = PythonInterpreterFingerprintStrategy()
-    # TODO: how to merge the custom fingerprint strategy with default fingerprint() from
-    # https://github.com/pantsbuild/pants/blob/7819724acb0f0e6fd83a3cd9ec6b5b72a9799721/src/python/pants/task/task.py#L310
-    with self.invalidated(python_tgts) as invalidation_check:
+    fs = PythonInterpreterFingerprintStrategy()
+    with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of selecting
       # an interpreter, to prevent downstream tasks from having to check for this special case.
-      if invalidation_check.all_vts:
-        target_set_id = VersionedTargetSet.from_versioned_targets(
-            invalidation_check.all_vts).cache_key.hash
-      else:
-        target_set_id = 'no_targets'
+      target_set_id = (
+        'no_targets'
+        if not invalidation_check.all_vts else
+        VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts).cache_key.hash
+      )
       interpreter_path_file = self._interpreter_path_file(target_set_id)
       interpreter = self._get_interpreter(interpreter_path_file, python_tgts)
 
@@ -96,7 +98,7 @@ class SelectInterpreter(Task):
     # The historical names to avoid:
     # - interpreter.path
     # - interpreter.info
-    return os.path.join(self.workdir, target_set_id, 'interpreter.binary')
+    return os.path.join(self.workdir, self.fingerprint, target_set_id, 'interpreter.binary')
 
   def _get_interpreter(self, interpreter_path_file, targets):
     if os.path.exists(interpreter_path_file):
