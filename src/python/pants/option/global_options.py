@@ -13,7 +13,7 @@ from textwrap import dedent
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.custom_types import dir_option
+from pants.option.custom_types import dir_option, file_option
 from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
@@ -245,7 +245,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--subproject-roots', type=list, advanced=True, default=[],
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
-    register('--owner-of', type=list, default=[], daemon=False, metavar='<path>',
+    register('--owner-of', type=list, member_type=file_option, default=[], daemon=False, metavar='<path>',
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed-* '
                   'options and specifying the targets directly. These three types of target '

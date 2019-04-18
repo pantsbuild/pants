@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 import re
 from builtins import bytes, object, str
 
@@ -53,6 +54,25 @@ def list_option(s):
   return ListValueComponent.create(s)
 
 
+# Match any repeated instances of the directory separator, unless they occur at the start. This
+# will normalize file and target paths as required by the engine, without stripping a leading // in
+# target addresses.
+_repeated_separator_pattern = re.compile('(?!^){}+'.format(re.escape(os.sep)))
+
+
+def _normalize_directory_separators(s):
+  """Coalesce runs of consecutive instances of `os.sep` in `s`, e.g. '//' -> '/' on POSIX.
+
+  The engine will use paths or target addresses either to form globs or to string-match against, and
+  including the directory separator '/' multiple times in a row e.g. '//' produces an equivalent
+  glob as with a single '/', but produces a different actual string, which will cause the engine to
+  fail to glob file paths or target specs correctly.
+
+  TODO: give the engine more control over matching paths so we don't have to sanitize the input!
+  """
+  return re.sub(_repeated_separator_pattern, os.sep, s)
+
+
 def target_option(s):
   """Same type as 'str', but indicates a single target spec.
 
@@ -60,7 +80,7 @@ def target_option(s):
 
   TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
   """
-  return s
+  return _normalize_directory_separators(s)
 
 
 # TODO: Replace target_list_option with type=list, member_type=target_option.
@@ -72,7 +92,7 @@ def target_list_option(s):
 
   TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
   """
-  return _convert(s, (list, tuple))
+  return [_normalize_directory_separators(spec) for spec in _convert(s, (list, tuple))]
 
 
 def dir_option(s):
@@ -80,7 +100,7 @@ def dir_option(s):
 
   :API: public
   """
-  return s
+  return _normalize_directory_separators(s)
 
 
 def file_option(s):
@@ -88,7 +108,7 @@ def file_option(s):
 
   :API: public
   """
-  return s
+  return _normalize_directory_separators(s)
 
 
 def dict_with_files_option(s):

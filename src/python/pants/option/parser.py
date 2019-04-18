@@ -576,6 +576,7 @@ class Parser(object):
           type_arg = kwargs.get('type')
           if hasattr(type_arg, 'all_variants'):
             choices = list(type_arg.all_variants)
+        # TODO: convert this into an enum() pattern match!
         if choices is not None and val not in choices:
           raise ParseError('`{}` is not an allowed value for option {} in {}. '
                            'Must be one of: {}'.format(val, dest, self._scope_str(), choices))
@@ -592,12 +593,14 @@ class Parser(object):
       merged_rank = ranked_vals[-1].rank
       merged_val = ListValueComponent.merge(
           [rv.value for rv in ranked_vals if rv.value is not None]).val
+      # TODO: run `check()` for all elements of a list option too!!!
       merged_val = [self._convert_member_type(kwargs.get('member_type', str), x)
                     for x in merged_val]
       for val in merged_val:
         check(val)
       ret = RankedValue(merged_rank, merged_val)
     elif is_dict_option(kwargs):
+      # TODO: convert `member_type` for dict values too!
       merged_rank = ranked_vals[-1].rank
       merged_val = DictValueComponent.merge(
           [rv.value for rv in ranked_vals if rv.value is not None]).val
