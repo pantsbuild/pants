@@ -139,27 +139,15 @@ class SelectInterpreterTest(TaskTestBase):
   def test_invalidation_for_global_constraints(self):
     # Because the system is setup with interpreter constraints, the task should
     # invalidate on the first run.
-    self.assertEqual(
-      'IronPython-2.77.777',
-      self._select_interpreter_and_get_version([self.tgt1], should_invalidate=True)
-    )
-
+    self._select_interpreter_and_get_version([self.tgt1], should_invalidate=True)
     self.set_options_for_scope(
       PythonSetup.options_scope,
       interpreter_constraints=RankedValue(RankedValue.CONFIG, ['IronPython>2.77.777'])
     )
-
     # After changing the global interpreter constraints, the task should invalidate.
-    self.assertEqual(
-      'IronPython-2.88.888',
-      self._select_interpreter_and_get_version([self.tgt1], should_invalidate=True)
-    )
-
+    self._select_interpreter_and_get_version([self.tgt1], should_invalidate=True)
     # If the global constraints don't change, the task should not invalidate.
-    self.assertEqual(
-      'IronPython-2.88.888',
-      self._select_interpreter_and_get_version([self.tgt1], should_invalidate=False)
-    )
+    self._select_interpreter_and_get_version([self.tgt1], should_invalidate=False)
 
   def test_compatibility_AND(self):
     tgt = self._fake_target('tgt5', compatibility=['IronPython>2.77.777,<2.99.999'])
