@@ -589,6 +589,8 @@ impl<N: Node> Entry<N> {
   ///
   /// Clears the state of this Node, forcing it to be recomputed.
   ///
+  /// TODO(DO NOT MERGE): Either avoid needing the graph_still_contains_edges argument, or document it.
+  ///
   pub(crate) fn clear(&mut self, graph_still_contains_edges: bool) {
     let mut state = self.state.lock();
 
