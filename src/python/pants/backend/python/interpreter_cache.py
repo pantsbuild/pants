@@ -46,7 +46,7 @@ class PythonInterpreterCache(Subsystem):
       if cls._matches(interpreter, filters=filters):
         yield interpreter
 
-  @memoized_property
+  @property
   def python_setup(self):
     return PythonSetup.global_instance()
 

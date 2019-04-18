@@ -19,7 +19,6 @@ from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, Fing
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir_for
-from pants.util.memo import memoized_property
 
 
 class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
@@ -56,7 +55,7 @@ class SelectInterpreter(Task):
   def product_types(cls):
     return [PythonInterpreter]
 
-  @memoized_property
+  @property
   def _interpreter_cache(self):
     return PythonInterpreterCache.global_instance()
 
