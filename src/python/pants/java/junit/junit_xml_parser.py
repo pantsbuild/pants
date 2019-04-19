@@ -83,7 +83,7 @@ class RegistryOfTests(object):
         continue
 
       non_fqcn = fqcn.split('.')[-1]
-      if non_fqcn == possible_test.classname and '.' not in possible_test.classname:
+      if non_fqcn == possible_test.classname:
         new_spec = Test(spec.classname, possible_test.methodname)
         matched_spec_to_target[new_spec] = target
 
