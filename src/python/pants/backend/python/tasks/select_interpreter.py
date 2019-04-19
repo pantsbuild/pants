@@ -23,12 +23,13 @@ from pants.util.dirutil import safe_mkdir_for
 
 class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
+  def __init__(self, python_setup):
+    self.python_setup = python_setup
+
   def compute_fingerprint(self, python_target):
-    # Only consider the compatibility requirements in the fingerprint, as only
-    # those can affect the selected interpreter.
-    hash_elements_for_target = []
-    if python_target.compatibility:
-      hash_elements_for_target.extend(sorted(python_target.compatibility))
+    # Consider the target's compatibility requirements, and if those are missing then fall back
+    # to the global interpreter constraints. Only these two values can affect the selected interpreter.
+    hash_elements_for_target = sorted(self.python_setup.compatibility_or_constraints(python_target))
     if not hash_elements_for_target:
       return None
     hasher = hashlib.sha1()
@@ -44,7 +45,7 @@ class SelectInterpreter(Task):
   def implementation_version(cls):
     # TODO(John Sirois): Fixup this task to use VTS results_dirs. Right now version bumps aren't
     # effective in dealing with workdir data format changes.
-    return super(SelectInterpreter, cls).implementation_version() + [('SelectInterpreter', 3)]
+    return super(SelectInterpreter, cls).implementation_version() + [('SelectInterpreter', 4)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -53,6 +54,10 @@ class SelectInterpreter(Task):
   @classmethod
   def product_types(cls):
     return [PythonInterpreter]
+
+  @property
+  def _interpreter_cache(self):
+    return PythonInterpreterCache.global_instance()
 
   def execute(self):
     # NB: Downstream product consumers may need the selected interpreter for use with
@@ -65,23 +70,23 @@ class SelectInterpreter(Task):
     if not python_tgts_and_reqs:
       return
     python_tgts = [tgt for tgt in python_tgts_and_reqs if isinstance(tgt, PythonTarget)]
-    fs = PythonInterpreterFingerprintStrategy()
+    fs = PythonInterpreterFingerprintStrategy(python_setup=self._interpreter_cache.python_setup)
     with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
-      # If there are no relevant targets, we still go through the motions of selecting
-      # an interpreter, to prevent downstream tasks from having to check for this special case.
-      if invalidation_check.all_vts:
-        target_set_id = VersionedTargetSet.from_versioned_targets(
-            invalidation_check.all_vts).cache_key.hash
-      else:
-        target_set_id = 'no_targets'
+      # If there are no constraints, meaning no global constraints nor compatibility requirements on
+      # the targets, we still go through the motions of selecting an interpreter, to prevent
+      # downstream tasks from having to check for this special case.
+      target_set_id = (
+        'no_constraints'
+        if not invalidation_check.all_vts else
+        VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts).cache_key.hash
+      )
       interpreter_path_file = self._interpreter_path_file(target_set_id)
       interpreter = self._get_interpreter(interpreter_path_file, python_tgts)
 
     self.context.products.register_data(PythonInterpreter, interpreter)
 
   def _select_interpreter(self, interpreter_path_file, targets):
-    interpreter_cache = PythonInterpreterCache.global_instance()
-    interpreter = interpreter_cache.select_interpreter_for_targets(targets)
+    interpreter = self._interpreter_cache.select_interpreter_for_targets(targets)
     safe_mkdir_for(interpreter_path_file)
     with open(interpreter_path_file, 'w') as outfile:
       outfile.write('{}\n'.format(interpreter.binary))
