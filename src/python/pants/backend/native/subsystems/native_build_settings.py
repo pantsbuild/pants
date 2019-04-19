@@ -4,8 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
-  MirroredTargetOptionMixin
+from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.subsystem.subsystem import Subsystem
 
 

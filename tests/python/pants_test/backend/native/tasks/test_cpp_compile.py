@@ -10,6 +10,7 @@ from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.native.targets.native_library import CppLibrary, NativeLibrary
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.native_compile import ObjectFiles
+from pants.option.ranked_value import RankedValue
 from pants_test.backend.native.tasks.native_task_test_base import (NativeCompileTestMixin,
                                                                    NativeTaskTestBase)
 
@@ -61,37 +62,37 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
     cpp_compile.execute()
     cpp_compile.execute()
 
+  def _assert_compiler_toolchain_variant(self, path_string, cpp_lib_target):
+
+    task = self.create_task(self.context(target_roots=[cpp_lib_target]))
+    compiler = task.get_compiler(cpp_lib_target)
+
+    # TODO(#6866): test specifically which compiler is selected, traversing the PATH if necessary.
+    self.assertIn(path_string, compiler.path_entries[0])
+
   def test_target_level_toolchain_variant_llvm(self):
-    self.set_options_for_scope('native-build-step', toolchain_variant=ToolchainVariant.gnu)
+    no_toolchain_variant_target = self.make_target(
+      '//:cpp_lib_no_toolchain_variant',
+      NativeLibrary,
+    )
+
+    # Test that a target-level toolchain_variant overrides a config.
+    self.set_options_for_scope('native-build-step', toolchain_variant=RankedValue(
+      rank=RankedValue.CONFIG,
+      value=ToolchainVariant.gnu))
+    self._assert_compiler_toolchain_variant('gcc', no_toolchain_variant_target)
+
+    # Test that a target-level toolchain_variant overrides a config.
     cpp_lib_target = self.make_target(
       '//:cpp_library',
       NativeLibrary,
       toolchain_variant=ToolchainVariant.llvm,
     )
+    self._assert_compiler_toolchain_variant('llvm', cpp_lib_target)
 
-    task = self.create_task(self.context(target_roots=[cpp_lib_target]))
-    compiler = task.get_compiler(cpp_lib_target)
-    # TODO(#6866): test specifically which compiler is selected, traversing the PATH if necessary.
-    self.assertIn('llvm', compiler.path_entries[0])
-
-  def test_target_level_toolchain_variant_default_llvm(self):
-    self.set_options_for_scope('native-build-step', toolchain_variant=ToolchainVariant.llvm)
-    cpp_lib_target = self.make_target(
-      '//:cpp_library',
-      NativeLibrary,
-    )
-
-    task = self.create_task(self.context(target_roots=[cpp_lib_target]))
-    compiler = task.get_compiler(cpp_lib_target)
-    self.assertIn('llvm', compiler.path_entries[0])
-
-  def test_target_level_toolchain_variant_default_gnu(self):
-    self.set_options_for_scope('native-build-step', toolchain_variant=ToolchainVariant.gnu)
-    cpp_lib_target = self.make_target(
-      '//:cpp_library',
-      NativeLibrary,
-    )
-
-    task = self.create_task(self.context(target_roots=[cpp_lib_target]))
-    compiler = task.get_compiler(cpp_lib_target)
-    self.assertIn('gcc', compiler.path_entries[0])
+    # Test that a toolchain_variant from the command line (a FLAG ranked value) overrides a target
+    # setting.
+    self.set_options_for_scope('native-build-step', toolchain_variant=RankedValue(
+      rank=RankedValue.FLAG,
+      value=ToolchainVariant.gnu))
+    self._assert_compiler_toolchain_variant('gcc', cpp_lib_target)

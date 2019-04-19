@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/backend/native/subsystems/binaries',
     'src/python/pants/backend/native/subsystems/utils',
     'src/python/pants/backend/python/subsystems',
+    'src/python/pants/build_graph',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/subsystem',

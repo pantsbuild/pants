@@ -6,8 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from abc import abstractmethod
 
-from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
-  MirroredTargetOptionMixin
+from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
