@@ -83,11 +83,10 @@ class RegistryOfTests(object):
         continue
 
       non_fqcn = fqcn.split('.')[-1]
-      if non_fqcn != possible_test.classname or '.' in possible_test.classname:
-        continue
+      if non_fqcn == possible_test.classname and '.' not in possible_test.classname:
+        new_spec = Test(spec.classname, possible_test.methodname)
+        matched_spec_to_target[new_spec] = target
 
-      new_spec = Test(spec.classname, possible_test.methodname)
-      matched_spec_to_target[new_spec] = target
     return matched_spec_to_target
 
   def get_owning_target(self, test):
