@@ -302,7 +302,7 @@ impl Scheduler {
       .roots
       .clone()
       .into_iter()
-      .map(|s| s.into())
+      .map(NodeKey::from)
       .collect();
 
     // Lock the display for the remainder of the execution, and grab a reference to it.

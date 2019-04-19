@@ -314,10 +314,12 @@ impl Store {
           expanding_futures.push(self.expand_directory(digest));
         }
         Ok(None) => {
-          return future::err(format!("Failed to upload digest {:?}: Not found", digest)).to_boxed();
+          return future::err(format!("Failed to upload digest {:?}: Not found", digest))
+            .to_boxed();
         }
         Err(err) => {
-          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err)).to_boxed();
+          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err))
+            .to_boxed();
         }
       };
     }
@@ -471,12 +473,7 @@ impl Store {
         future::ok(digest_types).to_boxed()
       })
       .map(|digest_pairs_per_directory| {
-        Iterator::flatten(
-          digest_pairs_per_directory
-            .into_iter()
-            .map(|v| v.into_iter()),
-        )
-        .collect()
+        Iterator::flatten(digest_pairs_per_directory.into_iter().map(Vec::into_iter)).collect()
       })
       .to_boxed()
   }
@@ -579,12 +576,9 @@ impl Store {
         .to_boxed()
       })
       .map(|file_contents_per_directory| {
-        let mut vec = Iterator::flatten(
-          file_contents_per_directory
-            .into_iter()
-            .map(|v| v.into_iter()),
-        )
-        .collect::<Vec<_>>();
+        let mut vec =
+          Iterator::flatten(file_contents_per_directory.into_iter().map(Vec::into_iter))
+            .collect::<Vec<_>>();
         vec.sort_by(|l, r| l.path.cmp(&r.path));
         vec
       })

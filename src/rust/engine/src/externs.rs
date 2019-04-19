@@ -608,7 +608,7 @@ pub struct Buffer {
 
 impl Buffer {
   pub fn to_bytes(&self) -> Vec<u8> {
-    with_vec(self.bytes_ptr, self.bytes_len as usize, |vec| vec.clone())
+    with_vec(self.bytes_ptr, self.bytes_len as usize, Vec::clone)
   }
 
   pub fn to_os_string(&self) -> OsString {
@@ -637,7 +637,7 @@ pub struct BufferBuffer {
 impl BufferBuffer {
   pub fn to_bytes_vecs(&self) -> Vec<Vec<u8>> {
     with_vec(self.bufs_ptr, self.bufs_len as usize, |vec| {
-      vec.iter().map(|b| b.to_bytes()).collect()
+      vec.iter().map(Buffer::to_bytes).collect()
     })
   }
 

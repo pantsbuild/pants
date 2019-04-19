@@ -14,8 +14,13 @@ pub fn verify_directory_canonical(directory: &remote_execution::Directory) -> Re
   let file_names: HashSet<&str> = directory
     .get_files()
     .iter()
-    .map(|file| file.get_name())
-    .chain(directory.get_directories().iter().map(|dir| dir.get_name()))
+    .map(remote_execution::FileNode::get_name)
+    .chain(
+      directory
+        .get_directories()
+        .iter()
+        .map(remote_execution::DirectoryNode::get_name),
+    )
     .collect();
   if file_names.len() != directory.get_files().len() + directory.get_directories().len() {
     return Err(format!(

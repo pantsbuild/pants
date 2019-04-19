@@ -35,7 +35,7 @@ pub mod data;
 pub mod file;
 
 pub fn owned_string_vec(args: &[&str]) -> Vec<String> {
-  args.iter().map(|s| s.to_string()).collect()
+  args.iter().map(<&str>::to_string).collect()
 }
 
 pub fn as_byte_owned_vec(str: &str) -> Vec<u8> {

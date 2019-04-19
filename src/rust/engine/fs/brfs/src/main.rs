@@ -601,7 +601,7 @@ pub fn mount<'a, P: AsRef<Path>>(
   // TODO: Work out how to disable caching in the filesystem
   let options = ["-o", "ro", "-o", "fsname=brfs", "-o", "noapplexattr"]
     .iter()
-    .map(|o| o.as_ref())
+    .map(<&str>::as_ref)
     .collect::<Vec<&OsStr>>();
 
   debug!("About to spawn_mount with options {:?}", options);

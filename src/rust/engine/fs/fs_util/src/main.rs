@@ -418,7 +418,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             &args
               .values_of("globs")
               .unwrap()
-              .map(|s| s.to_string())
+              .map(str::to_string)
               .collect::<Vec<String>>(),
             &[],
             // By using `Ignore`, we assume all elements of the globs will definitely expand to
@@ -467,7 +467,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
                   .collect::<Vec<String>>()
                   .join("")
               })
-              .map(|s| s.into_bytes())
+              .map(String::into_bytes)
           }),
           "recursive-file-list-with-digests" => expand_files(store, digest).map(|maybe_v| {
             maybe_v
@@ -477,7 +477,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
                   .collect::<Vec<String>>()
                   .join("")
               })
-              .map(|s| s.into_bytes())
+              .map(String::into_bytes)
           }),
           format => Err(format!(
             "Unexpected value of --output-format arg: {}",

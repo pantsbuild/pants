@@ -378,7 +378,7 @@ impl PathGlob {
       let mut symbolic_path_parent = symbolic_path;
       if !canonical_dir_parent.0.pop() {
         let mut symbolic_path = symbolic_path_parent;
-        symbolic_path.extend(parts.iter().map(|p| p.as_str()));
+        symbolic_path.extend(parts.iter().map(Pattern::as_str));
         return Err(format!(
           "Globs may not traverse outside of the buildroot: {:?}",
           symbolic_path,
@@ -648,7 +648,7 @@ impl PosixFS {
   }
 
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
-    let link_parent = link.0.parent().map(|p| p.to_owned());
+    let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path()).to_owned();
     self
       .pool
