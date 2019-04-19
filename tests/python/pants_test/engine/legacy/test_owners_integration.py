@@ -14,14 +14,17 @@ class ListOwnersIntegrationTest(PantsRunIntegrationTest):
                                 'list',
                                 success=True)
     self.assertEqual(
-      pants_run.stdout_data.strip(),
-      'testprojects/tests/python/pants/dummies:passing_target'
-    )
+      set([
+        'testprojects/tests/python/pants/dummies:passing_target',
+        'testprojects/tests/python/pants:secondary_source_file_owner',
+      ]),
+      set(pants_run.stdout_data.splitlines()))
 
   def test_owner_list_not_owned(self):
-    pants_run = self.do_command('--owner-of=testprojects/tests/python/pants/dummies/test_nonexistent.py',
-                                'list',
-                                success=True)
+    pants_run = self.do_command(
+      '--owner-of=testprojects/tests/python/pants/dummies/test_nonexistent.py',
+      'list',
+      success=True)
     self.assertIn('WARNING: No targets were matched in', pants_run.stderr_data)
 
   def test_owner_list_two_target_specs(self):
@@ -55,5 +58,4 @@ class ListOwnersIntegrationTest(PantsRunIntegrationTest):
         'testprojects/tests/python/pants/dummies:passing_target',
         'testprojects/tests/python/pants:secondary_source_file_owner'
       ]),
-      set(pants_run.stdout_data.splitlines()),
-    )
+      set(pants_run.stdout_data.splitlines()))
