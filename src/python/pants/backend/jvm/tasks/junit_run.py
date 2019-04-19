@@ -66,14 +66,10 @@ class _TestSpecification(AbstractClass):
     :rtype: :class:`_TestSpecification`
     """
     components = test_spec.split('#', 2)
-    classname_or_sourcefile = components[0]
+    classname = components[0]
     methodname = components[1] if len(components) == 2 else None
 
-    if os.path.exists(classname_or_sourcefile):
-      sourcefile = os.path.relpath(classname_or_sourcefile, buildroot)
-      return _SourcefileSpec(sourcefile=sourcefile, methodname=methodname)
-    else:
-      return _ClassnameSpec(classname=classname_or_sourcefile, methodname=methodname)
+    return _ClassnameSpec(classname=classname, methodname=methodname)
 
   @abstractmethod
   def iter_possible_tests(self, context):
@@ -143,8 +139,10 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--batch-size', advanced=True, type=int, default=cls._BATCH_ALL, fingerprint=True,
              help='Run at most this many tests in a single test process.')
     register('--test', type=list, fingerprint=True,
-             help='Force running of just these tests.  Tests can be specified using any of: '
-                  '[fully qualified classname], [fully qualified classname]#[methodname]')
+             help='Force running of just these tests. Tests can be specified using any of: '
+                  '[classname], [classname]#[methodname]. If classname is not fully qualified, '
+                  'all matching tests will be run. For example, if `foo.bar.TestClass` and '
+                  '`foo.baz.TestClass` exist, `TestClass` is supplied, then both will run.')
     register('--per-test-timer', type=bool, help='Show progress and timer for each test.')
     register('--default-concurrency', advanced=True, fingerprint=True,
              choices=JUnitTests.VALID_CONCURRENCY_OPTS, default=JUnitTests.CONCURRENCY_SERIAL,
@@ -342,12 +340,13 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       # test(s).
       possible_test_to_target = {}
       unknown_tests = []
+
       for possible_test in self._get_possible_tests_to_run():
-        target = test_registry.get_owning_target(possible_test)
-        if target is None:
-          unknown_tests.append(possible_test)
+        matched_spec_to_target = test_registry.fuzzy_match_test_spec(possible_test)
+        if matched_spec_to_target:
+          possible_test_to_target.update(matched_spec_to_target)
         else:
-          possible_test_to_target[possible_test] = target
+          unknown_tests.append(possible_test)
 
       if len(unknown_tests) > 0:
         raise TaskError("No target found for test specifier(s):\n\n  '{}'\n\nPlease change "

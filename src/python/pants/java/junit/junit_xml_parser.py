@@ -68,6 +68,28 @@ class RegistryOfTests(object):
     """
     return len(self._test_to_target) == 0
 
+  def fuzzy_match_test_spec(self, possible_test):
+    """
+    This match the user specified Test spec with what tests Pants knows.
+
+    :param possible_test: a user specified test spec
+    :return: dict test_spec -> target
+    """
+    matched_spec_to_target = {}
+    for spec, target in self._test_to_target.items():
+      fqcn = spec.classname
+      if fqcn == possible_test.classname:
+        matched_spec_to_target[possible_test] = target
+        continue
+
+      non_fqcn = fqcn.split('.')[-1]
+      if non_fqcn != possible_test.classname or '.' in possible_test.classname:
+        continue
+
+      new_spec = Test(spec.classname, possible_test.methodname)
+      matched_spec_to_target[new_spec] = target
+    return matched_spec_to_target
+
   def get_owning_target(self, test):
     """Return the target that owns the given test.
 
