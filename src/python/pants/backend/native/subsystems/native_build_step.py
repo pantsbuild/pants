@@ -42,10 +42,10 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                   "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 
   def get_compiler_option_sets_for_target(self, target):
-    return self.get_target_mirrored_option('compiler_option_sets', target)
+    return self.get_scalar_mirrored_target_option('compiler_option_sets', target)
 
   def get_toolchain_variant_for_target(self, target):
-    return self.get_target_mirrored_option('toolchain_variant', target)
+    return self.get_scalar_mirrored_target_option('toolchain_variant', target)
 
   @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):

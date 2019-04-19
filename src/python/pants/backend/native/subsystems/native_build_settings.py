@@ -28,4 +28,4 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
                   "this behavior with the strict_deps keyword argument as well.")
 
   def get_strict_deps_value_for_target(self, target):
-    return self.get_target_mirrored_option('strict_deps', target)
+    return self.get_scalar_mirrored_target_option('strict_deps', target)

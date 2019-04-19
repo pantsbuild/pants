@@ -908,8 +908,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
       dep_context = DependencyContext.global_instance()
       tgt, = vts.targets
-      compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
-      zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
+      compiler_option_sets = dep_context.defaulted_property(tgt, 'compiler_option_sets')
+      zinc_file_manager = dep_context.defaulted_property(tgt, 'zinc_file_manager')
       with Timer() as timer:
         directory_digest = self._compile_vts(vts,
                           ctx,

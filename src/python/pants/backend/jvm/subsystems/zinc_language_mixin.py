@@ -4,11 +4,17 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import object
+from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 
 
-class ZincLanguageMixin(object):
+class ZincLanguageMixin(MirroredTargetOptionMixin):
   """A mixin for subsystems for languages compiled with Zinc."""
+
+  mirrored_option_to_kwarg_map = {
+    'strict_deps': 'strict_deps',
+    'compiler_option_sets': 'compiler_option_sets',
+    'zinc_file_manager': 'zinc_file_manager',
+  }
 
   @classmethod
   def register_options(cls, register):

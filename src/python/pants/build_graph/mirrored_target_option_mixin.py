@@ -92,7 +92,7 @@ class MirroredTargetOptionMixin(AbstractClass):
       for option_name, target_field_name in self.mirrored_option_to_kwarg_map.items()
     }
 
-  def get_target_mirrored_option(self, option_name, target):
+  def get_scalar_mirrored_target_option(self, option_name, target):
     """Get the attribute `field_name` from `target` if set, else from this subsystem's options."""
     mirrored_option_declaration = self._mirrored_option_declarations[option_name]
     return mirrored_option_declaration.get_mirrored_scalar_option_value(target)
