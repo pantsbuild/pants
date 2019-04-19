@@ -21,10 +21,3 @@ python_library(
     'src/python/pants/util:strutil',
   ]
 )
-
-target(
-  name='migrate_config',
-  dependencies=[
-    'migrations/options/src/python:migrate_config'
-  ]
-)
