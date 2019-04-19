@@ -23,8 +23,8 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
   options_scope = 'native-build-step'
 
   mirrored_target_option_actions = {
-    'compiler_option_sets': 'compiler_option_sets',
-    'toolchain_variant': 'toolchain_variant'
+    'compiler_option_sets': lambda tgt: getattr(tgt, 'compiler_option_sets'),
+    'toolchain_variant': lambda tgt: getattr(tgt, 'toolchain_variant'),
   }
 
   @classmethod
