@@ -219,7 +219,9 @@ function build_pants_packages() {
   pants_version_set "${version}"
 
   start_travis_section "${NAME}" "Building packages"
-  packages=($(run_packages_script build_and_print "${version}"))
+  packages=(
+    $(run_packages_script build_and_print "${version}")
+  ) || die "Failed to build packages at ${version}!"
   for package in "${packages[@]}"
   do
     (
@@ -300,7 +302,9 @@ function install_and_test_packages() {
   export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
   trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
-  packages=($(run_packages_script list | grep '.' | awk '{print $1}'))
+  packages=(
+    $(run_packages_script list | grep '.' | awk '{print $1}')
+  ) || die "Failed to list packages!"
 
   export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
   for package in "${packages[@]}"
@@ -495,7 +499,9 @@ function fetch_and_check_prebuilt_wheels() {
   fetch_prebuilt_wheels "${check_dir}"
 
   local missing=()
-  RELEASE_PACKAGES=($(run_packages_script list | grep '.' | awk '{print $1}'))
+  RELEASE_PACKAGES=(
+    $(run_packages_script list | grep '.' | awk '{print $1}')
+  ) || die "Failed to get a list of packages to release!"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
