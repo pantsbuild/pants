@@ -42,22 +42,46 @@ class MirroredTargetOptionDeclaration(AbstractClass):
     return self.option_value
 
 
-class OptionableMirroredOptionDeclaration(datatype([
-    'options',
-    ('option_name', text_type),
-    'accessor',
-]), MirroredTargetOptionDeclaration):
+class OptionableMirroredOptionDeclaration(MirroredTargetOptionDeclaration):
+  """Partial implementation of MirroredTargetOptionDeclaration for an OptionValueContainer."""
+
+  @abstractproperty
+  def options(self):
+    """Return an instance of OptionValueContainer or something compatible with its API."""
+
+  @abstractproperty
+  def option_name(self):
+    """Return the option name to access `self.options` with."""
 
   @property
   def is_flagged(self):
     return self.options.is_flagged(self.option_name)
 
-  def extract_target_value(self, target):
-    return self.accessor(target)
-
   @property
   def option_value(self):
     return self.options.get(self.option_name)
+
+
+class OptionableTargetFieldDeclaration(datatype([
+    'options',
+    ('option_name', text_type),
+    'target_field_name',
+]), OptionableMirroredOptionDeclaration):
+  """A MirroredTargetOptionDeclaration which accesses the target by field name."""
+
+  def extract_target_value(self, target):
+    return getattr(target, self.target_field_name)
+
+
+class OptionableTargetAccessorDeclaration(datatype([
+    'options',
+    ('option_name', text_type),
+    'accessor',
+]), OptionableMirroredOptionDeclaration):
+  """A MirroredTargetOptionDeclaration which uses a custom accessor method for the target value."""
+
+  def extract_target_value(self, target):
+    return self.accessor(target)
 
 
 class MirroredTargetOptionMixin(AbstractClass):
@@ -81,13 +105,19 @@ class MirroredTargetOptionMixin(AbstractClass):
     ret = {}
     for option_name, accessor_spec in self.mirrored_target_option_actions.items():
       if isinstance(accessor_spec, text_type):
-        accessor = lambda t: getattr(t, accessor_spec)
+        # If the selector is a string, access the target by its field of that name.
+        declaration = OptionableTargetFieldDeclaration(
+          options=self.get_options(),
+          option_name=option_name,
+          target_field_name=accessor_spec,
+        )
       else:
-        accessor = accessor_spec
-      declaration = OptionableMirroredOptionDeclaration(
-        options=self.get_options(),
-        option_name=option_name,
-        accessor=accessor)
+        # If the selector is anything else, assume it's a unary method.
+        declaration = OptionableTargetAccessorDeclaration(
+          options=self.get_options(),
+          option_name=option_name,
+          accessor=accessor_spec,
+        )
       ret[option_name] = declaration
     return ret
 
