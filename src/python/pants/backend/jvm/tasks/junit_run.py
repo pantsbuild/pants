@@ -85,31 +85,6 @@ class _TestSpecification(AbstractClass):
     """
 
 
-class _SourcefileSpec(_TestSpecification):
-  """Models a test specification in [sourcefile]#[methodname] format."""
-
-  def __init__(self, sourcefile, methodname):
-    self._sourcefile = sourcefile
-    self._methodname = methodname
-
-  def iter_possible_tests(self, context):
-    for classname in self._classnames_from_source_file(context):
-      # Tack the methodname onto all classes in the source file, as we
-      # can't know which method the user intended.
-      yield Test(classname=classname, methodname=self._methodname)
-
-  def _classnames_from_source_file(self, context):
-    source_products = context.products.get_data('classes_by_source').get(self._sourcefile)
-    if not source_products:
-      # It's valid - if questionable - to have a source file with no classes when, for
-      # example, the source file has all its code commented out.
-      context.log.warn('Source file {0} generated no classes'.format(self._sourcefile))
-    else:
-      for _, classes in source_products.rel_paths():
-        for cls in classes:
-          yield ClasspathUtil.classname_for_rel_classfile(cls)
-
-
 class _ClassnameSpec(_TestSpecification):
   """Models a test specification in [classname]#[methodnme] format."""
 
@@ -189,24 +164,11 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return super(JUnitRun, cls).subsystem_dependencies() + (CodeCoverage, DistributionLocator, JUnit)
 
   @classmethod
-  def request_classes_by_source(cls, test_specs):
-    """Returns true if the given test specs require the `classes_by_source` product to satisfy."""
-    buildroot = get_buildroot()
-    for test_spec in test_specs:
-      if isinstance(_TestSpecification.parse(buildroot, test_spec), _SourcefileSpec):
-        return True
-    return False
-
-  @classmethod
   def prepare(cls, options, round_manager):
     super(JUnitRun, cls).prepare(options, round_manager)
 
     # Compilation and resource preparation must have completed.
     round_manager.require_data('runtime_classpath')
-
-    # If the given test specs require the classes_by_source product, request it.
-    if cls.request_classes_by_source(options.test or ()):
-      round_manager.require_data('classes_by_source')
 
   class OptionError(TaskError):
     """Indicates an invalid combination of options for this task."""

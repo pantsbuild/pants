@@ -209,19 +209,6 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.populate_runtime_classpath(context=context)
     self.execute(context)
 
-  def test_request_classes_by_source(self):
-    """`classes_by_source` is expensive to compute: confirm that it is only computed when needed."""
-
-    # Class names (with and without a method name) should not trigger.
-    self.assertFalse(JUnitRun.request_classes_by_source(['com.goo.ber']))
-    self.assertFalse(JUnitRun.request_classes_by_source(['com.goo.ber#method']))
-
-    # Existing files (with and without the method name) should trigger.
-    srcfile = os.path.join(self.test_workdir, 'this.is.a.source.file.scala')
-    safe_file_dump(srcfile, 'content!', mode='w')
-    self.assertTrue(JUnitRun.request_classes_by_source([srcfile]))
-    self.assertTrue(JUnitRun.request_classes_by_source(['{}#method'.format(srcfile)]))
-
   @ensure_cached(JUnitRun, expected_num_artifacts=1)
   def test_junit_runner_extra_jvm_options(self):
     self.make_target(
