@@ -13,7 +13,7 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
   options_scope = 'native-build-settings'
 
   mirrored_target_option_actions = {
-    'strict_deps': lambda tgt: getattr(tgt, 'strict_deps'),
+    'strict_deps': lambda tgt: tgt.strict_deps,
   }
 
   @classmethod

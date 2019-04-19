@@ -11,9 +11,9 @@ class ZincLanguageMixin(MirroredTargetOptionMixin):
   """A mixin for subsystems for languages compiled with Zinc."""
 
   mirrored_target_option_actions = {
-    'strict_deps': lambda tgt: getattr(tgt, 'strict_deps'),
-    'compiler_option_sets': lambda tgt: getattr(tgt, 'compiler_option_sets'),
-    'zinc_file_manager': lambda tgt: getattr(tgt, 'zinc_file_manager'),
+    'strict_deps': lambda tgt: tgt.strict_deps,
+    'compiler_option_sets': lambda tgt: tgt.compiler_option_sets,
+    'zinc_file_manager': lambda tgt: tgt.zinc_file_manager,
   }
 
   @classmethod

@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from abc import abstractmethod, abstractproperty
+from abc import abstractproperty
 
 from future.utils import text_type
 
@@ -13,21 +13,34 @@ from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class MirroredTargetOptionDeclaration(AbstractClass):
+class MirroredTargetOptionDeclaration(datatype([
+    'options',
+    ('option_name', text_type),
+    'accessor',
+])):
   """An interface for operations to perform on an option which may also be set on a target."""
 
-  @abstractproperty
+  @memoized_property
   def is_flagged(self):
     """Whether the option was specified on the command line."""
+    return self.options.is_flagged(self.option_name)
 
-  @abstractmethod
   def extract_target_value(self, target):
-    """Get the value of this option from target. May return None if not set on the target."""
+    """Get the value of this option from target.
 
-  @abstractproperty
+    NB: If this method returns None, that is interpreted as the target not having a value set for
+    the specified option, and the option value from `self.options` is used.
+    """
+    return self.accessor(target)
+
+  @memoized_property
   def option_value(self):
     """Get the value of this option, separate from any target."""
+    return self.options.get(self.option_name)
 
+  # TODO(#7183): support list/set options in addition to scalars! We should apply the same
+  # precedence order, but also provide some interface for allowing target fields to append or
+  # remove an item from a set-valued option instead of completely overwriting it!
   def get_mirrored_scalar_option_value(self, target):
     # Options specified on the command line take precedence over anything else.
     if self.is_flagged:
@@ -42,44 +55,42 @@ class MirroredTargetOptionDeclaration(AbstractClass):
     return self.option_value
 
 
-class OptionableMirroredOptionDeclaration(datatype([
-    'options',
-    ('option_name', text_type),
-    'accessor',
-]), MirroredTargetOptionDeclaration):
-
-  @property
-  def is_flagged(self):
-    return self.options.is_flagged(self.option_name)
-
-  def extract_target_value(self, target):
-    return self.accessor(target)
-
-  @property
-  def option_value(self):
-    return self.options.get(self.option_name)
-
-
 class MirroredTargetOptionMixin(AbstractClass):
-  """Get option values which may be set in this subsystem or in a Target's keyword argument."""
+  """Get option values which may be set in this subsystem or in a Target's keyword argument.
 
-  # TODO: support list/set options in addition to scalars!
+  A subsystem or task mixing in this class may set e.g.:
+
+      mirrored_target_option_actions = {
+        'some_option_name': lambda tgt: tgt.some_option_name,
+      }
+
+  which declares that '--some-option-name' can be set as a subsystem option which a target may
+  override, and that the target needs to have a field `.some_option_name` which this subsystem may
+  access.
+
+  The class mixing this in can then call:
+
+      some_option_value = self.get_scalar_mirrored_target_option('some_option_name', target)
+
+  which will apply the following precedence to obtain `some_option_value`:
+  1. If --some-option-name is "flagged" (provided on the command line), use the command-line value.
+  2. If `target.some_option_name` is non-None, use that target-level value.
+  3. Otherwise, return the option value from the environment, config, or hardcoded default.
+  """
+
   @abstractproperty
   def mirrored_target_option_actions(self):
-    """Subclasses should override and return a dict of (subsystem option name) -> "selector".
+    """Subclasses should override and return a dict of (subsystem option name) -> selector function.
 
-    A selector is either:
-    - a string => access that property on the target with getattr().
-    - a function => return the result of that function called on the target.
-
-    This property should return a dict mapping this subsystem's options attribute name (with
-    underscores) to the corresponding selector.
+    A selector is a 1-argument function accepting a target and returning a value, or None. This
+    property should return a dict mapping this subsystem's options attribute name (with underscores)
+    to the corresponding selector.
     """
 
   @memoized_property
   def _mirrored_option_declarations(self):
     return {
-      option_name: OptionableMirroredOptionDeclaration(
+      option_name: MirroredTargetOptionDeclaration(
         options=self.get_options(),
         option_name=option_name,
         accessor=accessor)
