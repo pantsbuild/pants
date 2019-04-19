@@ -15,9 +15,9 @@ from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import ExecutionGraph
-from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import (RscCompile, _CompileWorkflowChoice,
-                                                                 _create_desandboxify_fn)
+from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile, _create_desandboxify_fn
 from pants.java.jar.jar_dependency import JarDependency
+from pants.option.ranked_value import RankedValue
 from pants.util.contextutil import temporary_dir
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import TaskTestBase
@@ -75,6 +75,7 @@ class RscCompileTest(TaskTestBase):
 
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
       print(dependee_graph)
+      # TODO: remove the dep for zinc_against_rsc from rsc and fix these tests!!!
       self.assertEqual(dedent("""
                      rsc(java/classpath:java_lib) -> {
                        zinc_against_rsc(java/classpath:java_lib)
@@ -96,7 +97,8 @@ class RscCompileTest(TaskTestBase):
       'scala/classpath:scala_lib',
       target_type=ScalaLibrary,
       sources=['com/example/Foo.scala'],
-      dependencies=[]
+      dependencies=[],
+      tags={'use-compiler:rsc-then-zinc'},
     )
 
     with temporary_dir() as tmp_dir:
@@ -151,6 +153,10 @@ class RscCompileTest(TaskTestBase):
         dependee_graph)
 
   def test_rsc_dep_for_scala_java_and_test_targets(self):
+    self.set_options(workflow=RankedValue(
+      value=RscCompile.JvmCompileWorkflowType.rsc_then_zinc,
+      rank=RankedValue.CONFIG,
+    ))
     self.init_dependencies_for_scala_libraries()
 
     scala_dep = self.make_target(
@@ -162,7 +168,8 @@ class RscCompileTest(TaskTestBase):
       'java/classpath:java_lib',
       target_type=JavaLibrary,
       sources=['com/example/Foo.java'],
-      dependencies=[scala_dep]
+      dependencies=[scala_dep],
+      tags={'use-compiler:zinc-only'}
     )
     scala_target = self.make_target(
       'scala/classpath:scala_lib',
@@ -175,7 +182,8 @@ class RscCompileTest(TaskTestBase):
       'scala/classpath:scala_test',
       target_type=JUnitTests,
       sources=['com/example/Test.scala'],
-      dependencies=[scala_target]
+      dependencies=[scala_target],
+      tags={'use-compiler:zinc-only'}
     )
 
     with temporary_dir() as tmp_dir:
@@ -311,7 +319,7 @@ class RscCompileTest(TaskTestBase):
 
   def create_task_with_target_roots(self, target_roots, default_workflow=None):
     if default_workflow:
-      self.set_options(default_workflow=_CompileWorkflowChoice( default_workflow))
+      self.set_options(workflow=RscCompile.JvmCompileWorkflowType(default_workflow))
     context = self.context(target_roots=target_roots)
     self.init_products(context)
     task = self.create_task(context)

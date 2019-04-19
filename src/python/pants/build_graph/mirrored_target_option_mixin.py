@@ -8,26 +8,25 @@ from abc import abstractmethod, abstractproperty
 
 from future.utils import text_type
 
-from pants.option.optionable import Optionable
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass, classproperty
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 class MirroredTargetOptionDeclaration(AbstractClass):
-  """???"""
+  """An interface for operations to perform on an option which may also be set on a target."""
 
   @abstractproperty
   def is_flagged(self):
-    """???"""
+    """Whether the option was specified on the command line."""
 
   @abstractmethod
   def extract_target_value(self, target):
-    """???"""
+    """Get the value of this option from target. May return None if not set on the target."""
 
   @abstractproperty
   def option_value(self):
-    """???"""
+    """Get the value of this option, separate from any target."""
 
   def get_mirrored_scalar_option_value(self, target):
     # Options specified on the command line take precedence over anything else.
@@ -43,54 +42,54 @@ class MirroredTargetOptionDeclaration(AbstractClass):
     return self.option_value
 
 
-class BasicMirroredTargetOption(datatype([
-    ('optionable', SubclassesOf(Optionable)),
+class OptionableMirroredOptionDeclaration(datatype([
+    'options',
     ('option_name', text_type),
-    ('target_field_name', text_type),
+    'accessor',
 ]), MirroredTargetOptionDeclaration):
 
   @property
-  def _options(self):
-    return self.optionable.get_options()
-
-  @property
   def is_flagged(self):
-    # import pdb; pdb.set_trace()
-    return self._options.is_flagged(self.option_name)
+    return self.options.is_flagged(self.option_name)
 
   def extract_target_value(self, target):
-    return getattr(target, self.target_field_name)
+    return self.accessor(target)
 
   @property
   def option_value(self):
-    return self._options.get(self.option_name)
+    return self.options.get(self.option_name)
 
 
-# TODO: consider coalescing existing methods of mirroring options between a target and a subsystem
-# -- see pants.backend.jvm.subsystems.dependency_context.DependencyContext#defaulted_property()!
 class MirroredTargetOptionMixin(AbstractClass):
   """Get option values which may be set in this subsystem or in a Target's keyword argument."""
 
   # TODO: support list/set options in addition to scalars!
-  @classproperty
-  @abstractmethod
-  def mirrored_option_to_kwarg_map(cls):
-    """Subclasses should override and return a dict of (subsystem option name) -> (target kwarg).
+  @abstractproperty
+  def mirrored_target_option_actions(self):
+    """Subclasses should override and return a dict of (subsystem option name) -> "selector".
 
-    This classproperty should return a dict mapping this subsystem's options attribute name (with
-    underscores) to the corresponding target's keyword argument name.
+    A selector is either:
+    - a string => access that property on the target with getattr().
+    - a function => return the result of that function called on the target.
+
+    This property should return a dict mapping this subsystem's options attribute name (with
+    underscores) to the corresponding selector.
     """
 
   @memoized_property
   def _mirrored_option_declarations(self):
-    return {
-      option_name: BasicMirroredTargetOption(
-        optionable=self,
+    ret = {}
+    for option_name, accessor_spec in self.mirrored_target_option_actions.items():
+      if isinstance(accessor_spec, text_type):
+        accessor = lambda t: getattr(t, accessor_spec)
+      else:
+        accessor = accessor_spec
+      declaration = OptionableMirroredOptionDeclaration(
+        options=self.get_options(),
         option_name=option_name,
-        target_field_name=target_field_name,
-      )
-      for option_name, target_field_name in self.mirrored_option_to_kwarg_map.items()
-    }
+        accessor=accessor)
+      ret[option_name] = declaration
+    return ret
 
   def get_scalar_mirrored_target_option(self, option_name, target):
     """Get the attribute `field_name` from `target` if set, else from this subsystem's options."""

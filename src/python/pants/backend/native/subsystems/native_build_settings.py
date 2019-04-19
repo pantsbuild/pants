@@ -12,7 +12,7 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
   """Settings which affect both the compile and link phases."""
   options_scope = 'native-build-settings'
 
-  mirrored_option_to_kwarg_map = {
+  mirrored_target_option_actions = {
     'strict_deps': 'strict_deps',
   }
 

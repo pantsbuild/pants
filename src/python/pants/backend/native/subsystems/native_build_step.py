@@ -22,7 +22,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
 
   options_scope = 'native-build-step'
 
-  mirrored_option_to_kwarg_map = {
+  mirrored_target_option_actions = {
     'compiler_option_sets': 'compiler_option_sets',
     'toolchain_variant': 'toolchain_variant'
   }
