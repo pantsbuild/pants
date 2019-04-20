@@ -557,7 +557,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
     - *base_build_wheels_env
     - docker_image_name=travis_ci_py27_ucs2
     - docker_run_command="./build-support/bin/ci.sh -2b
-                          && ./build-support/bin/check_pants_pex_abi.py cp27m
+                          && \${PY} ./build-support/bin/check_pants_pex_abi.py cp27m
                           && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
     - CACHE_NAME=linuxwheelsbuild.ucs2
 
@@ -571,7 +571,7 @@ py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
     - *py27_linux_test_config_env
     - *base_build_wheels_env
     - docker_image_name=travis_ci
-    - docker_run_command="./build-support/bin/check_pants_pex_abi.py cp27mu
+    - docker_run_command="\${PY} ./build-support/bin/check_pants_pex_abi.py cp27mu
                           && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
     - CACHE_NAME=linuxwheelsbuild.ucs4
 
@@ -583,7 +583,7 @@ py36_linux_build_wheels: &py36_linux_build_wheels
     - *py36_linux_test_config_env
     - *base_build_wheels_env
     - docker_image_name=travis_ci
-    - docker_run_command="./build-support/bin/check_pants_pex_abi.py abi3 cp36m
+    - docker_run_command="\${PY} ./build-support/bin/check_pants_pex_abi.py abi3 cp36m
                           && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n"
     - CACHE_NAME=linuxwheelsbuild.abi3
 
@@ -600,13 +600,12 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs2
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs2
-    # We ensure selection of the the pyenv interpreter by the pants script and pants.pex with these
+    # We ensure selection of the the pyenv interpreter by PY aware scripts and pants.pex with these
     # env vars.
     - PY=${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin/python
-    - PEX_PYTHON_PATH=${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin/python
     - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY27_VERSION}']"
   script:
-    - ./build-support/bin/check_pants_pex_abi.py cp27m
+    - ${PY} ./build-support/bin/check_pants_pex_abi.py cp27m
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
@@ -619,14 +618,13 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs4
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
-    # We ensure selection of the the pyenv interpreter by the pants script and pants.pex with these
+    # We ensure selection of the the pyenv interpreter by PY aware scripts and pants.pex with these
     # env vars.
     - PY=${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin/python
-    - PEX_PYTHON_PATH=${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin/python
     - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY27_VERSION}']"
   script:
     - ./build-support/bin/ci.sh -2b
-    - ./build-support/bin/check_pants_pex_abi.py cp27mu
+    - ${PY} ./build-support/bin/check_pants_pex_abi.py cp27mu
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 py36_osx_build_wheels: &py36_osx_build_wheels
@@ -637,13 +635,12 @@ py36_osx_build_wheels: &py36_osx_build_wheels
     - *py36_osx_test_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.abi3
-    # We ensure selection of the the pyenv interpreter by the pants script and pants.pex with these
+    # We ensure selection of the the pyenv interpreter by PY aware scripts and pants.pex with these
     # env vars.
     - PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python
-    - PEX_PYTHON_PATH=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python
     - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY36_VERSION}']"
   script:
-    - ./build-support/bin/check_pants_pex_abi.py abi3 cp36m
+    - ${PY} ./build-support/bin/check_pants_pex_abi.py abi3 cp36m
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n
 
 # -------------------------------------------------------------------------

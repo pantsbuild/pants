@@ -90,7 +90,7 @@ function run_pex() {
 
     curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
     chmod +x "${pex}"
-    PEX_VERBOSE=9 "${pex}" -vvvvvvvvv "$@"
+    "${PY}" "${pex}" "$@"
   )
 }
 

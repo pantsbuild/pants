@@ -26,10 +26,9 @@ ENV PYTHON_CONFIGURE_OPTS --enable-unicode=ucs2
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION_UCS2}
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/bin:${PATH}"
 
-# We ensure selection of the the pyenv interpreter by the pants script and pants.pex with these
+# We ensure selection of the the pyenv interpreter by PY aware scripts and pants.pex with these
 # env vars.
 ENV PY "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/bin/python"
-ENV PEX_PYTHON_PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/python/bin/python"
 ENV PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYTHON_27_VERSION_UCS2}']"
 
 # Setup mount points for the travis ci user & workdir.
