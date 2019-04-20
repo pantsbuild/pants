@@ -45,11 +45,21 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name='help_integration',
   sources=[
     'test_help_integration.py',
+  ],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
+  name='list_goals_integration',
+  sources=[
+    'test_list_goals_integration.py',
   ],
   dependencies=[
     'tests/python/pants_test:int-test',

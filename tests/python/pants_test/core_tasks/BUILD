@@ -24,18 +24,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'list_goals',
-  sources = ['test_list_goals.py'],
-  dependencies = [
-    'src/python/pants/core_tasks',
-    'src/python/pants/goal',
-    'src/python/pants/goal:task_registrar',
-    'src/python/pants/task',
-    'tests/python/pants_test:task_test_base',
-  ],
-)
-
-python_tests(
   name = 'generate_pants_ini',
   sources = ['test_generate_pants_ini.py'],
   dependencies = [

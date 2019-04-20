@@ -9,7 +9,6 @@ from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.core_tasks.explain_options_task import ExplainOptionsTask
 from pants.core_tasks.generate_pants_ini import GeneratePantsIni
-from pants.core_tasks.list_goals import ListGoals
 from pants.core_tasks.login import Login
 from pants.core_tasks.noop import NoopCompile, NoopTest
 from pants.core_tasks.pantsd_kill import PantsDaemonKill
@@ -73,7 +72,6 @@ def register_goals():
   task(name='login', action=Login).install()
 
   # Getting help.
-  task(name='goals', action=ListGoals).install()
   task(name='options', action=ExplainOptionsTask).install()
   task(name='targets', action=TargetsHelp).install()
 
