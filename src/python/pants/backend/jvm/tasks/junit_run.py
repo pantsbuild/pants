@@ -8,7 +8,6 @@ import fnmatch
 import itertools
 import os
 import sys
-from abc import abstractmethod
 from builtins import object, range, str
 from contextlib import contextmanager
 
@@ -39,61 +38,7 @@ from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_rmtree, safe_walk
 from pants.util.memo import memoized_method
-from pants.util.meta import AbstractClass
 from pants.util.strutil import pluralize
-
-
-class _TestSpecification(AbstractClass):
-  """Models the string format used to specify which tests to run."""
-
-  @classmethod
-  def parse(cls, buildroot, test_spec):
-    """Parses a test specification string into an object that can yield corresponding tests.
-
-    Tests can be specified in one of four forms:
-
-    * [classname]
-    * [filename]
-    * [classname]#[methodname]
-    * [filename]#[methodname]
-
-    The first two forms target one or more individual tests contained within a class or file whereas
-    the final two forms specify an individual test method to execute.
-
-    :param string buildroot: The path of the current build root directory.
-    :param string test_spec: A test specification.
-    :returns: A test specification object.
-    :rtype: :class:`_TestSpecification`
-    """
-    components = test_spec.split('#', 2)
-    classname = components[0]
-    methodname = components[1] if len(components) == 2 else None
-
-    return _ClassnameSpec(classname=classname, methodname=methodname)
-
-  @abstractmethod
-  def iter_possible_tests(self, context):
-    """Return an iterator over the possible tests this test specification indicates.
-
-    NB: At least one test yielded by the returned iterator will correspond to an available test,
-    but other yielded tests may not exist.
-
-    :param context: The pants execution context.
-    :type context: :class:`pants.goal.context.Context`
-    :returns: An iterator over possible tests.
-    :rtype: iter of :class:`pants.java.junit.junit_xml_parser.Test`
-    """
-
-
-class _ClassnameSpec(_TestSpecification):
-  """Models a test specification in [classname]#[methodnme] format."""
-
-  def __init__(self, classname, methodname):
-    self._classname = classname
-    self._methodname = methodname
-
-  def iter_possible_tests(self, context):
-    yield Test(classname=self._classname, methodname=self._methodname)
 
 
 class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
@@ -464,11 +409,29 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       for i in range(0, len(sorted_tests), stride):
         yield properties, sorted_tests[i:i + stride]
 
+  def _parse(self, test_spec_str):
+    """Parses a test specification string into an object that can yield corresponding tests.
+
+    Tests can be specified in one of four forms:
+
+    * [classname]
+    * [classname]#[methodname]
+    * [fully qualified classname]#[methodname]
+    * [fully qualified classname]#[methodname]
+
+    :param string test_spec: A test specification.
+    :returns: A Test object.
+    :rtype: :class:`Test`
+    """
+    components = test_spec_str.split('#', 2)
+    classname = components[0]
+    methodname = components[1] if len(components) == 2 else None
+
+    return Test(classname=classname, methodname=methodname)
+
   def _get_possible_tests_to_run(self):
-    buildroot = get_buildroot()
-    for test_spec in self._tests_to_run:
-      for test in _TestSpecification.parse(buildroot, test_spec).iter_possible_tests(self.context):
-        yield test
+    for test_spec_str in self._tests_to_run:
+      yield self._parse(test_spec_str)
 
   def _calculate_tests_from_targets(self, targets):
     """
