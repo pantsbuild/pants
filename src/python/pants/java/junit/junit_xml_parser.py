@@ -11,6 +11,7 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_walk
 from pants.util.objects import datatype
 from pants.util.xml_parser import XmlParser
@@ -68,28 +69,41 @@ class RegistryOfTests(object):
     """
     return len(self._test_to_target) == 0
 
-  def fuzzy_match_test_spec(self, possible_test):
+  def fuzzy_match_test_spec(self, possible_test_specs):
     """
     This matches the user specified test spec with what tests Pants knows.
 
     Each test spec may get matched with multiple targets.
 
-    :param possible_test: a user specified test spec
+    :param possible_test_spec: a user specified test spec
     :return: dict test_spec -> target
     """
-    matched_spec_to_target = {}
-    for spec, target in self._test_to_target.items():
-      fqcn = spec.classname
-      if fqcn == possible_test.classname:
-        matched_spec_to_target[possible_test] = target
-        continue
+    # dict of non fully qualified classname to a list of fully qualified test specs
+    non_fqcn_to_specs = defaultdict(list)
+    fqcn_to_specs = {}
+    for test_spec in self._test_to_target.keys():
+      fqcn = test_spec.classname
+      if fqcn in fqcn_to_specs:
+        raise TaskError('Dup found: {}'.format(fqcn))
+      fqcn_to_specs[fqcn] = test_spec
 
       non_fqcn = fqcn.split('.')[-1]
-      if non_fqcn == possible_test.classname:
-        new_spec = Test(spec.classname, possible_test.methodname)
-        matched_spec_to_target[new_spec] = target
+      non_fqcn_to_specs[non_fqcn].append(test_spec)
 
-    return matched_spec_to_target
+    matched_spec_to_target = {}
+    unknown_tests = []
+    for possible_test_spec in possible_test_specs:
+      if possible_test_spec.classname in fqcn_to_specs:
+        matched_spec_to_target[possible_test_spec] = self._test_to_target[
+          fqcn_to_specs[possible_test_spec.classname]]
+      elif possible_test_spec.classname in non_fqcn_to_specs:
+        for full_spec in non_fqcn_to_specs[possible_test_spec.classname]:
+          new_fully_qualified_test_spec = Test(full_spec.classname, possible_test_spec.methodname)
+          matched_spec_to_target[new_fully_qualified_test_spec] = self._test_to_target[full_spec]
+      else:
+        unknown_tests.append(possible_test_spec)
+
+    return matched_spec_to_target, unknown_tests
 
   def get_owning_target(self, test):
     """Return the target that owns the given test.
