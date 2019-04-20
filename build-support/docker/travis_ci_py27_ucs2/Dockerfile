@@ -53,4 +53,4 @@ WORKDIR /travis/workdir
 
 # Execute any args passed to `docker run` in the context of the devtoolset-7 software collection
 # we used above to install requirements.
-ENTRYPOINT ["/usr/bin/scl", "enable" , "devtoolset-7"]
+ENTRYPOINT ["/usr/bin/scl", "enable" , "devtoolset-7", "--"]
