@@ -25,10 +25,10 @@ timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
-Exception caught: \\(pants\\.build_graph\\.address_lookup_error\\.AddressLookupError\\)
+Exception caught: \\([^)]*\\)
 (.|\n)*
 
-Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
+Exception message:.* 1 Exception encountered:
   ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
 """.format(pid=pid))
     # Ensure we write all output such as stderr and reporting files before closing any streams.
@@ -57,8 +57,8 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
       self.assert_failure(pants_run)
       assertRegex(self, pants_run.stderr_data, """\
 timestamp: ([^\n]+)
-Exception caught: \\(pants\\.build_graph\\.address_lookup_error\\.AddressLookupError\\) \\(backtrace omitted\\)
-Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
+Exception caught: \\(pants\\.engine\\.scheduler\\.ExecutionError\\) \\(backtrace omitted\\)
+Exception message: 1 Exception encountered:
   ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
 """)
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)

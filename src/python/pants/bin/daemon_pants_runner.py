@@ -340,9 +340,6 @@ class DaemonPantsRunner(ProcessManager):
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
-        # Re-raise any deferred exceptions, if present.
-        self._raise_deferred_exc()
-
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner.create(
           self._exiter,
@@ -353,6 +350,10 @@ class DaemonPantsRunner(ProcessManager):
           self._options_bootstrapper
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
+
+        # Re-raise any deferred exceptions, if present.
+        self._raise_deferred_exc()
+
         runner.run()
       except KeyboardInterrupt:
         self._exiter.exit_and_fail('Interrupted by user.\n')

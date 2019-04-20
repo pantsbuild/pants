@@ -5,7 +5,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-import traceback
 from builtins import object, str
 
 from pants.base.build_environment import get_buildroot
@@ -271,18 +270,11 @@ class LocalPantsRunner(object):
     if not goals:
       return PANTS_SUCCEEDED_EXIT_CODE
 
-    try:
-      return self._graph_session.run_console_rules(
-        self._options_bootstrapper,
-        goals,
-        self._target_roots,
-      )
-    except Exception:
-      logger.warning('Encountered unhandled exception during rule execution!')
-      logger.warning(traceback.format_exc())
-      return PANTS_FAILED_EXIT_CODE
-    else:
-      return PANTS_SUCCEEDED_EXIT_CODE
+    return self._graph_session.run_console_rules(
+      self._options_bootstrapper,
+      goals,
+      self._target_roots,
+    )
 
   @staticmethod
   def _compute_final_exit_code(*codes):

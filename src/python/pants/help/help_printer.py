@@ -54,11 +54,9 @@ class HelpPrinter(object):
     print('\nUse `pants help $goal` to get help for a particular goal.\n')
     goal_descriptions = {}
     for scope_info in self._options.known_scope_to_info.values():
-      if scope_info.category not in (ScopeInfo.GOAL,):
+      if scope_info.category not in (ScopeInfo.GOAL, ScopeInfo.GOAL_V1):
         continue
-      components = scope_info.scope.split('.', 1)
-      if len(components) == 1 and scope_info.description:
-        goal_descriptions[scope_info.scope] = scope_info.description
+      goal_descriptions[scope_info.scope] = scope_info.description
     goal_descriptions.update({goal.name: goal.description_first_line
                               for goal in Goal.all()
                               if goal.description})

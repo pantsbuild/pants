@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from abc import abstractmethod
 from contextlib import contextmanager
 
 from pants.cache.cache_setup import CacheSetup
@@ -29,13 +30,20 @@ class Goal(datatype([('exit_code', int)]), AbstractClass):
   class.
   """
 
-  # Subclasser-defined. See the class pydoc.
-  name = None
+  @classproperty
+  @abstractmethod
+  def name(cls):
+    """The name used to select this Goal on the commandline, and for its options."""
 
-  # If this Goal should have an associated deprecated instance of `CacheSetup` (which was implicitly
-  # required by all v1 Tasks), subclasses may set this to a valid deprecation version to create
-  # that association.
-  deprecated_cache_setup_removal_version = None
+  @classproperty
+  def deprecated_cache_setup_removal_version(cls):
+    """Optionally defines a deprecation version for a CacheSetup dependency.
+
+    If this Goal should have an associated deprecated instance of `CacheSetup` (which was implicitly
+    required by all v1 Tasks), subclasses may set this to a valid deprecation version to create
+    that association.
+    """
+    return None
 
   @classmethod
   def register_options(cls, register):
@@ -55,10 +63,6 @@ class Goal(datatype([('exit_code', int)]), AbstractClass):
     class _Options(SubsystemClientMixin, Optionable, _GoalOptions):
       @classproperty
       def options_scope(cls):
-        if not outer_cls.name:
-          # TODO: Would it be unnecessarily magical to have `outer_cls.__name__.lower()` always be
-          # the name?
-          raise AssertionError('{} must have a `Goal.name` defined.'.format(outer_cls.__name__))
         return outer_cls.name
 
       @classmethod
@@ -98,6 +102,7 @@ class Goal(datatype([('exit_code', int)]), AbstractClass):
       def values(self):
         """Returns the option values for these Goal.Options."""
         return self._scoped_options
+    _Options.__doc__ = outer_cls.__doc__
     return _Options
 
 
