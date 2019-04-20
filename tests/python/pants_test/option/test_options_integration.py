@@ -234,8 +234,8 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       self.assertIn("ERROR] Invalid scope [invalid_scope]", pants_run.stderr_data)
 
   def test_command_line_option_unused_by_goals(self):
-    self.assert_success(self.run_pants(['goals', '--bundle-jvm-archive=zip']))
-    self.assert_failure(self.run_pants(['goals', '--jvm-invalid=zip']))
+    self.assert_success(self.run_pants(['filter', '--bundle-jvm-archive=zip']))
+    self.assert_failure(self.run_pants(['filter', '--jvm-invalid=zip']))
 
   def test_non_recursive_quiet_no_output(self):
     pants_run = self.run_pants(['-q', 'compile'])

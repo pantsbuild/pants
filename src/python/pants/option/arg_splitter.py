@@ -54,6 +54,10 @@ class OptionsHelp(HelpRequest):
     self.all_scopes = all_scopes
 
 
+class GoalsHelp(HelpRequest):
+  """The user requested help for installed Goals."""
+
+
 class VersionHelp(HelpRequest):
   """The user asked for the version of this instance of pants."""
 
@@ -86,7 +90,8 @@ class ArgSplitter(object):
   _HELP_ADVANCED_ARGS = ('--help-advanced', 'help-advanced')
   _HELP_ALL_SCOPES_ARGS = ('--help-all', 'help-all')
   _HELP_VERSION_ARGS = ('-v', '-V', '--version')
-  _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS + _HELP_VERSION_ARGS
+  _HELP_GOALS_ARGS = ('goals',)
+  _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS + _HELP_VERSION_ARGS + _HELP_GOALS_ARGS
 
   def __init__(self, known_scope_infos):
     self._known_scope_infos = known_scope_infos
@@ -94,7 +99,7 @@ class ArgSplitter(object):
     # that we heuristically identify target specs based on it containing /, : or being
     # a top-level directory.
     self._known_scopes = ({si.scope for si in known_scope_infos} |
-                          {'help', 'help-advanced', 'help-all'})
+                          {'goals', 'help', 'help-advanced', 'help-all'})
     self._unknown_scopes = []
     self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
     self._help_request = None  # Will be set if we encounter any help flags.
@@ -119,6 +124,8 @@ class ArgSplitter(object):
       return False
     if arg in self._HELP_VERSION_ARGS:
       self._help_request = VersionHelp()
+    elif arg in self._HELP_GOALS_ARGS:
+      self._help_request = GoalsHelp()
     else:
       # First ensure that we have a basic OptionsHelp.
       if not self._help_request:

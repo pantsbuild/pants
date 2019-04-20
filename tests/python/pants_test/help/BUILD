@@ -45,7 +45,6 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name='help_integration',
   sources=[
