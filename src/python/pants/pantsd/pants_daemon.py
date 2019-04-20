@@ -207,7 +207,7 @@ class PantsDaemon(FingerprintedProcessManager):
         fs_event_service,
         legacy_graph_scheduler,
         build_root,
-        bootstrap_options.pantsd_invalidation_globs,
+        PantsDaemon.compute_invalidation_globs(bootstrap_options),
         pidfile,
       )
 
@@ -224,6 +224,31 @@ class PantsDaemon(FingerprintedProcessManager):
         services=(fs_event_service, scheduler_service, pailgun_service, store_gc_service),
         port_map=dict(pailgun=pailgun_service.pailgun_port),
       )
+
+  @staticmethod
+  def compute_invalidation_globs(bootstrap_options):
+    """
+    Combine --pythonpath and --pants_config_files(pants.ini) files that are in {buildroot} dir
+    with those invalidation_globs provided by users
+    :param bootstrap_options:
+    :return: A list of invalidation_globs
+    """
+    buildroot = get_buildroot()
+    invalidation_globs = []
+    globs = bootstrap_options.pythonpath + \
+      bootstrap_options.pants_config_files + \
+      bootstrap_options.pantsd_invalidation_globs
+
+    for glob in globs:
+      glob_relpath = os.path.relpath(glob, buildroot)
+      if glob_relpath:
+        invalidation_globs.extend([glob_relpath, glob_relpath + '/**'])
+      elif os.path.exists(buildroot, glob):
+        invalidation_globs.extend([glob, glob + '/**'])
+      else:
+        logging.getLogger(__name__).warning("Changes to {} will not be invalidated.".format(glob))
+
+    return invalidation_globs
 
   def __init__(self, native, build_root, work_dir, log_level, services,
                metadata_base_dir, bootstrap_options=None):
