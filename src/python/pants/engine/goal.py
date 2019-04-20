@@ -121,32 +121,31 @@ class LineOriented(object):
     register('--output-file', metavar='<path>',
              help='Write line-oriented output to this file instead.')
 
+  @classmethod
+  @contextmanager
+  def line_oriented(cls, line_oriented_options, console):
+    """Given Goal.Options and a Console, yields functions for writing to stdout and stderr, respectively.
 
-@contextmanager
-def line_oriented(line_oriented_options, console):
-  """Given options and a Console, yields functions for writing to stdout and stderr, respectively.
+    The passed options instance will generally be the `Goal.Options` of a `LineOriented` `Goal`.
+    """
+    if type(line_oriented_options) != cls.Options:
+      raise AssertionError(
+          'Expected Options for `{}`, got: {}'.format(cls.__name__, line_oriented_options))
 
-  The passed options instance will generally be the `Goal.Options` of a `LineOriented` `Goal`.
-  """
-  if not isinstance(line_oriented_options, _GoalOptions):
-    raise AssertionError(
-        'Expected a `Goal.Options` instance for a `LineOriented` `Goal`, got: {}'.format(
-          type(line_oriented_options)))
+    output_file = line_oriented_options.values.output_file
+    sep = line_oriented_options.values.sep.encode('utf-8').decode('unicode_escape')
 
-  output_file = line_oriented_options.values.output_file
-  sep = line_oriented_options.values.sep.encode('utf-8').decode('unicode_escape')
-
-  stdout, stderr = console.stdout, console.stderr
-  if output_file:
-    stdout = open(output_file, 'w')
-
-  try:
-    print_stdout = lambda msg: print(msg, file=stdout, end=sep)
-    print_stderr = lambda msg: print(msg, file=stderr)
-    yield print_stdout, print_stderr
-  finally:
+    stdout, stderr = console.stdout, console.stderr
     if output_file:
-      stdout.close()
-    else:
-      stdout.flush()
-    stderr.flush()
+      stdout = open(output_file, 'w')
+
+    try:
+      print_stdout = lambda msg: print(msg, file=stdout, end=sep)
+      print_stderr = lambda msg: print(msg, file=stderr)
+      yield print_stdout, print_stderr
+    finally:
+      if output_file:
+        stdout.close()
+      else:
+        stdout.flush()
+      stderr.flush()

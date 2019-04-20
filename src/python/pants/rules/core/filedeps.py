@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pex.orderedset import OrderedSet
 
 from pants.engine.console import Console
-from pants.engine.goal import Goal, LineOriented, line_oriented
+from pants.engine.goal import Goal, LineOriented
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import console_rule
 
@@ -34,7 +34,7 @@ def file_deps(console, filedeps_options, transitive_hydrated_targets):
     if hasattr(hydrated_target.adaptor, "sources"):
       uniq_set.update(hydrated_target.adaptor.sources.snapshot.files)
 
-  with line_oriented(filedeps_options, console) as (print_stdout, print_stderr):
+  with Filedeps.line_oriented(filedeps_options, console) as (print_stdout, print_stderr):
     for f_path in uniq_set:
       print_stdout(f_path)
 

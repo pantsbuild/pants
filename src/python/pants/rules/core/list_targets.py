@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.base.specs import Specs
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
-from pants.engine.goal import Goal, LineOriented, line_oriented
+from pants.engine.goal import Goal, LineOriented
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import console_rule
 from pants.engine.selectors import Get
@@ -73,7 +73,7 @@ def list_targets(console, list_options, specs):
     collection = yield Get(BuildFileAddresses, Specs, specs)
     print_fn = lambda address: address.spec
 
-  with line_oriented(list_options, console) as (print_stdout, print_stderr):
+  with List.line_oriented(list_options, console) as (print_stdout, print_stderr):
     if not collection.dependencies:
       print_stderr('WARNING: No targets were matched in goal `{}`.'.format('list'))
 
