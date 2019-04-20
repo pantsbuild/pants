@@ -210,7 +210,8 @@ base_osx_config: &base_osx_config
 
 py27_osx_config: &py27_osx_config
   <<: *base_osx_config
-  # NB: We ensure a python3 is available on the PATH for scripting against.
+  # NB: We ensure sane python2 and python3 interpreters are available on the PATH for scripting
+  # against.
   env:
     - &py27_osx_config_env >
       PATH="/usr/local/opt/openssl/bin:${PATH}"
@@ -232,11 +233,13 @@ py36_osx_config: &py36_osx_config
       PATH="/usr/local/opt/openssl/bin:${PATH}"
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
       PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}"
     - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
 
 py37_osx_config: &py37_osx_config
@@ -246,11 +249,13 @@ py37_osx_config: &py37_osx_config
       PATH="/usr/local/opt/openssl/bin:${PATH}"
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
       PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}"
     - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY37_VERSION}"
 
 base_osx_test_config: &base_osx_test_config
@@ -283,6 +288,7 @@ py36_osx_test_config: &py36_osx_test_config
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
       PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
 
 py37_osx_test_config: &py37_osx_test_config
@@ -295,6 +301,7 @@ py37_osx_test_config: &py37_osx_test_config
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
       PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
 
 linux_with_fuse: &linux_with_fuse
@@ -557,7 +564,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
     - *base_build_wheels_env
     - docker_image_name=travis_ci_py27_ucs2
     - docker_run_command="./build-support/bin/ci.sh -2b
-                          && \${PY} ./build-support/bin/check_pants_pex_abi.py cp27m
+                          && ./build-support/bin/check_pants_pex_abi.py cp27m
                           && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
     - CACHE_NAME=linuxwheelsbuild.ucs2
 
@@ -571,7 +578,7 @@ py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
     - *py27_linux_test_config_env
     - *base_build_wheels_env
     - docker_image_name=travis_ci
-    - docker_run_command="\${PY} ./build-support/bin/check_pants_pex_abi.py cp27mu
+    - docker_run_command="./build-support/bin/check_pants_pex_abi.py cp27mu
                           && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
     - CACHE_NAME=linuxwheelsbuild.ucs4
 
@@ -583,7 +590,7 @@ py36_linux_build_wheels: &py36_linux_build_wheels
     - *py36_linux_test_config_env
     - *base_build_wheels_env
     - docker_image_name=travis_ci
-    - docker_run_command="\${PY} ./build-support/bin/check_pants_pex_abi.py abi3 cp36m
+    - docker_run_command="./build-support/bin/check_pants_pex_abi.py abi3 cp36m
                           && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n"
     - CACHE_NAME=linuxwheelsbuild.abi3
 
@@ -605,7 +612,7 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
     - PY=${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin/python
     - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY27_VERSION}']"
   script:
-    - ${PY} ./build-support/bin/check_pants_pex_abi.py cp27m
+    - ./build-support/bin/check_pants_pex_abi.py cp27m
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
@@ -624,7 +631,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY27_VERSION}']"
   script:
     - ./build-support/bin/ci.sh -2b
-    - ${PY} ./build-support/bin/check_pants_pex_abi.py cp27mu
+    - ./build-support/bin/check_pants_pex_abi.py cp27mu
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 py36_osx_build_wheels: &py36_osx_build_wheels
@@ -640,7 +647,7 @@ py36_osx_build_wheels: &py36_osx_build_wheels
     - PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python
     - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY36_VERSION}']"
   script:
-    - ${PY} ./build-support/bin/check_pants_pex_abi.py abi3 cp36m
+    - ./build-support/bin/check_pants_pex_abi.py abi3 cp36m
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n
 
 # -------------------------------------------------------------------------

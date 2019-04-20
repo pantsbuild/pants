@@ -28,7 +28,8 @@ USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 # Our newly created user is unlikely to have a sane environment: set a locale at least.
 ENV LC_ALL="en_US.UTF-8"
 
-# Expose the installed gcc to the invoking shell.
-ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-7",  "--"]
-
 WORKDIR ${TRAVIS_WORK_DIR_PATH}
+
+# Execute any args passed to `docker run` in the context of the devtoolset-7 software collection
+# used in the base image to install requirements.
+ENTRYPOINT ["/usr/bin/scl", "enable" , "devtoolset-7", "--"]
