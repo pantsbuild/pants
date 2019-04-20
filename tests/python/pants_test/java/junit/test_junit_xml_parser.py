@@ -10,7 +10,7 @@ from builtins import object, open
 
 # NB: The Test -> JUnitTest import re-name above is needed to work around conflicts with pytest test
 # collection and a conflicting Test type in scope during that process.
-from pants.java.junit.junit_xml_parser import ParseError, RegistryOfTests
+from pants.java.junit.junit_xml_parser import ParseError, RegistryOfTests, Test
 from pants.java.junit.junit_xml_parser import Test as JUnitTest
 from pants.java.junit.junit_xml_parser import parse_failed_targets
 from pants.util.contextutil import temporary_dir
@@ -60,6 +60,46 @@ class TestTestRegistry(unittest.TestCase):
 
     self.assertIsNone(registry.get_owning_target(JUnitTest('class3')))
     self.assertEqual('Heidi', registry.get_owning_target(JUnitTest('class3', 'method1')))
+
+  def _get_sample_test_registry(self):
+    return RegistryOfTests(((JUnitTest('a.b.c1'), 'target_a'),
+                            (JUnitTest('x.y.c1', methodname='method1'), 'target_b'),
+                            (JUnitTest('a.b.c2'), 'target_c'),
+                            (JUnitTest('a.b.c3', 'method3'), 'target_d')))
+
+  def test_match_test_specs_fqcn(self):
+    registry = self._get_sample_test_registry()
+
+    test_specs = [JUnitTest(classname='a.b.c1', methodname=None)]
+    matched_specs, unknown_tests = registry.match_test_spec(test_specs)
+    self.assertEqual({JUnitTest('a.b.c1'): 'target_a', }, matched_specs)
+    self.assertEqual([], unknown_tests)
+
+  def test_match_test_specs_fqcn_with_methodname(self):
+    registry = self._get_sample_test_registry()
+
+    test_specs = [JUnitTest(classname='a.b.c1', methodname='method')]
+    matched_specs, unknown_tests = registry.match_test_spec(test_specs)
+    self.assertEqual({JUnitTest('a.b.c1', methodname='method'): 'target_a'}, matched_specs)
+    self.assertEqual([], unknown_tests)
+
+  def test_match_test_specs_non_fqcn(self):
+    registry = self._get_sample_test_registry()
+
+    spec, unknown_tests = registry.match_test_spec([JUnitTest(classname='c1', methodname=None)])
+    self.assertEqual({
+      JUnitTest('a.b.c1'): 'target_a',
+      JUnitTest('x.y.c1'): 'target_b',
+    }, spec)
+    self.assertEqual([], unknown_tests)
+
+  def test_match_test_specs_non_fqcn_no_match(self):
+    registry = self._get_sample_test_registry()
+
+    test_specs = [JUnitTest(classname='c4', methodname=None)]
+    spec, unknown_tests = registry.match_test_spec(test_specs)
+    self.assertEqual({}, spec)
+    self.assertEqual(test_specs, unknown_tests)
 
   def _assert_index(self, expected, actual):
     def sorted_values(index):

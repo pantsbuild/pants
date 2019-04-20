@@ -69,13 +69,13 @@ class RegistryOfTests(object):
     """
     return len(self._test_to_target) == 0
 
-  def fuzzy_match_test_spec(self, possible_test_specs):
+  def match_test_spec(self, possible_test_specs):
     """
     This matches the user specified test spec with what tests Pants knows.
 
-    Each test spec may get matched with multiple targets.
+    Each non fully qualified test spec may get matched with multiple targets.
 
-    :param possible_test_spec: a user specified test spec
+    :param possible_test_specs: an iterable of user specified test spec
     :return: dict test_spec -> target
     """
     # dict of non fully qualified classname to a list of fully qualified test specs
@@ -93,9 +93,11 @@ class RegistryOfTests(object):
     matched_spec_to_target = {}
     unknown_tests = []
     for possible_test_spec in possible_test_specs:
+      # Match for fully qualified test spec
       if possible_test_spec.classname in fqcn_to_specs:
         matched_spec_to_target[possible_test_spec] = self._test_to_target[
           fqcn_to_specs[possible_test_spec.classname]]
+      # Match for non fully qualified test specs
       elif possible_test_spec.classname in non_fqcn_to_specs:
         for full_spec in non_fqcn_to_specs[possible_test_spec.classname]:
           new_fully_qualified_test_spec = Test(full_spec.classname, possible_test_spec.methodname)

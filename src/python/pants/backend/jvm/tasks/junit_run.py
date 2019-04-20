@@ -298,7 +298,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     test_registry = RegistryOfTests(tuple(self._calculate_tests_from_targets(targets)))
 
     if targets and self._tests_to_run:
-      matched_spec_to_target, unknown_tests = test_registry.fuzzy_match_test_spec(
+      matched_spec_to_target, unknown_tests = test_registry.match_test_spec(
         self._get_possible_tests_to_run())
       if len(unknown_tests) > 0:
         raise TaskError("No target found for test specifier(s):\n\n  '{}'\n\nPlease change "
