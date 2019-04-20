@@ -17,63 +17,69 @@ Once the engine is instantiated with a valid set of `@rule`s, a caller can synch
 computation of any of the product types provided by those `@rule`s by calling:
 
 ```python
-# Request a ThingINeed (a `Product`) for the thing_i_have (a `Subject`).
+# Request a ThingINeed (a `Product`) for a thing_i_have (a `Param`).
 thing_i_need, = scheduler.product_request(ThingINeed, [thing_i_have])
 ```
 
 The engine then takes care of concurrently executing all dependencies of the matched `@rule`s to
 produce the requested value.
 
-### Products and Subjects
+### Products and Params
 
 The engine executes your `@rule`s in order to (recursively) compute a `Product` of the requested
-type for a given `Subject`. This recursive type search leads to a very loosely coupled (and yet
+type for a set of `Param`s. This recursive type search leads to a loosely coupled (and yet
 still statically checked) form of dependency injection.
 
-When an `@rule` runs, it runs for a particular `Subject` value, which is part of the unique
-identity for that instance of the `@rule`. An `@rule` can request dependencies for different
-`Subject` values as it runs (see the section on `Get` requests below). Because the subject for
-an `@rule` is chosen by callers, a `Subject` can be of any (hashable) type that a user might want
-to compute a product for.
+When an `@rule` runs, the set of `Param`s that it transitively consumes make up the unique identity
+for that instance of the `@rule`. Any hashable type with useful equality may be used as a `Param`,
+and additional `Params` can be provided to an `@rule`'s transitive dependencies via `Get`
+requests (see below). Each `Param` value in a set of `Params` is unique by type, so if `@rules`
+recursively introduce a particular `Param` type, there will still only be one value for that type in
+each `@rule`, but it will change as you move deeper into the dependency graph.
 
-The return value of an `@rule` for a particular `Subject` is known as a `Product`. At some level,
-you can think of (`subject_value`, `product_type`) as a "key" that uniquely identifies a particular
-Product value and `@rule` execution.
+The return value of an `@rule` is known as a `Product`. At some level, you can think
+of (`params_set`, `product_type`) as a "key" that uniquely identifies a particular `Product` value
+and `@rule` execution. And as expected, if an `@rule` is able to produce a `Product` without consuming
+any `Params`, then the `@rule` will run exactly once, and the value that it produces will be a singleton.
 
 #### Example
 
 As a very simple example, you might register the following `@rule` that can compute a `String`
-Product given a single `Int` input.
+Product given a single `Int` argument.
 
 ```python
-@rule(StringType, [IntType])
+@rule(str, [int])
 def int_to_str(an_int):
-  return '{}'.format(an_int)
+  return str(an_int)
 ```
 
-The first argument to the `@rule` decorator is the Product (ie, return) type for the `@rule`. The
-second argument is a list of parameter selectors that declare the types of the input parameters for
-the `@rule`. In this case, because the Product type is `StringType` and there is one parameter
-selector (for `IntType`), this `@rule` represents a conversion from `IntType` to `StrType`, with no
-other inputs.
+The first argument to the `@rule` decorator is the `Product` (ie, return) type for the `@rule`. The
+second argument is a list of "parameter selectors" that declare the types of the input parameters for
+the `@rule`. In this case, because the `Product` type is `str` and there is one parameter
+selector (for `int`), this `@rule` represents a conversion from `int` to `str`, with no other inputs.
 
-When the engine statically checks whether it can use this `@rule` to create a string for a
-Subject, it will first see whether there are any ways to get an IntType for that Subject. If
-the subject is already of `type(subject) == IntType`, then the `@rule` will be satisfiable without
-any other dependencies. On the other hand, if the type _doesn't_ match, the engine doesn't give up:
-it will next look for any other registered `@rule`s that can compute an IntType Product for the
-Subject (and so on, recursively).
+When the engine encounters this `@rule` while compiling the rule graph for `str`-producing-`@rules`,
+it will next go hunting for the dependency `@rule` that can produce an `int` using the fewest number
+of `Params`. For example, if there was an `@rule` that could produce an `int` without consuming any
+`Params` at all (ie, a singleton), then that `@rule` would always be chosen first. If all `@rules` to
+produce `int`s required at least one `Param`, then the engine would next see whether the input `Params`
+contained an `int`, or whether there were any `@rules` that required only one `Param`... then two
+`Params`, and etc.
+
+In cases where this search detects any ambiguity (generally because there are two or more `@rules` that
+can provide the same product with the same number of parameters), rule graph compilation will fail with
+a useful error message.
 
 ### Datatypes
 
-In practical use, using basic types like `StringType` or `IntType` does not provide enough
-information to disambiguate between various types of data. So declaring small `datatype`
-definitions to provide a unique and descriptive type is strongly recommended:
+In practical use, builtin types like `str` or `int` do not provide enough information to disambiguate
+between various types of data, so declaring small `datatype` definitions to provide a unique and
+descriptive type is highly recommended:
 
 ```python
 class FormattedInt(datatype(['content'])): pass
 
-@rule(FormattedInt, [IntType])
+@rule(FormattedInt, [int])
 def int_to_str(an_int):
   return FormattedInt('{}'.format(an_int))
 
@@ -105,29 +111,32 @@ class TypedDatatype(datatype([('field_name', Exactly(str, int))])):
 ```
 
 Assigning a specific type to a field can be somewhat unidiomatic in Python, and may be unexpected or
-unnatural to use. Additionally, the engine already applies a form of implicit type checking by
-ensuring there is a unique path from subject to product when a product request is made. However,
-regardless of whether the object is created directly with type-checked fields or whether it's
-produced from a set of rules by the engine's dependency injection, it is extremely useful to
-formalize the assumptions made about the value of an object into a specific type, even if the type
-just wraps a single field. The `datatype()` function makes it simple and efficient to apply that
-strategy.
+unnatural to use. However, regardless of whether the object is created directly with type-checked
+fields or whether it's produced from a set of rules by the engine's dependency injection, it is
+extremely useful to formalize the assumptions made about the value of an object into a specific type,
+even if the type just wraps a single field. The `datatype()` function makes it simple and efficient
+to apply that strategy.
 
-### Parameter selectors and Gets
+### Gets and RootRules
 
-As demonstrated above, parameter selectors select `@rule` inputs in the context of a particular
-`Subject` (and its `Variants`: discussed below). But it is frequently necessary to "change" the
-subject and request products for subjects other than the one that the `@rule` is running for.
+As demonstrated above, parameter selectors select `@rule` arguments in the context of a set of `Params`.
+But where do `Params` come from?
 
-In cases where this is necessary, `@rule`s may be written as coroutines (ie, using the python
-`yield` statement) that yield "`Get` requests" that request products for other subjects. Just like
-`@rule` parameter selectors, `Get` requests instantiated in the body of an `@rule` are statically
-checked to be satisfiable in the set of installed `@rule`s.
+One source of `Params` is the root of a request, where a `Param` type that may be provided by a caller
+of the engine can be declared using a `RootRule`. Installing a `RootRule` is sometimes necessary to
+seal the rule graph in cases where a `Param` could only possibly be computed outside of the rule graph
+and then passed in.
+
+The second case for introducing new `Params` occurs within the running graph when an `@rule` needs
+to pass values to its dependencies that are necessary to compute a product. In this case, `@rule`s may
+be written as coroutines (ie, using the python `yield` statement) that yield "`Get` requests" that request
+products for other `Params`. Just like `@rule` parameter selectors, `Get` requests instantiated in the
+body of an `@rule` are statically checked to be satisfiable in the set of installed `@rule`s.
 
 #### Example
 
 For example, you could declare an `@rule` that requests FileContent for each entry in a Files list,
-and then concatentates that content into a (typed) string:
+and then concatentates that content into a (datatype-wrapped) string:
 
 ```python
 @rule(ConcattedFiles, [Files])
@@ -136,27 +145,24 @@ def concat(files):
   yield ConcattedFiles(''.join(fc.content for fc in file_content_list))
 ```
 
-This `@rule` declares that: "for any Subject for which we can compute `Files`, we can also compute
-`ConcattedFiles`". Each yielded `Get` request results in FileContent for a different File Subject
-from the Files list.
+This `@rule` declares that: "for any `Params` for which we can compute `Files`, we can also compute
+`ConcattedFiles`". Each yielded `Get` request results in FileContent for a different File `Param`
+from the Files list. And, happily, all of these requests will proceed in parallel.
 
-### Variants
+### Advanced Param Usage
 
-Certain `@rule`s will also need parameters provided by their dependents in order to tailor their output
-Products to their consumers.  For example, a javac `@rule` might need to know the version of the java
-platform for a given dependent binary target (say Java 9), or an ivy `@rule` might need to identify a
-globally consistent ivy resolve for a test target.  To allow for this the engine introduces the
-concept of `Variants`, which are passed recursively from dependents to dependencies.
+Sometimes `@rule`s will need to consume multiple `Params` in order to tailor their output Products
+to their consumers.
 
-If a Rule uses a `SelectVariants` Selector to indicate that a variant is required, consumers can use
-a `@[type]=[name]` address syntax extension to pass a variant that matches a particular configuration
-for a `@rule`. A dependency declared as `src/java/com/example/lib:lib` specifies no particular variant, but
-`src/java/com/example/lib:lib@java=java8` asks for the configured variant of the lib named "java8".
+For example, a javac `@rule` might need to know the version of the java platform for a given
+dependent binary target, or an ivy `@rule` might need to identify a globally consistent ivy resolve
+for a test target. In both of these cases, the `@rule` requires two `Params` to be in scope. But
+due to the fact that `Params` are implicitly propagated from dependents to dependencies, it's possible
+for these `Params` to be provided much higher in the graph, without intermediate `@rules` needing to
+be aware of them.
 
-Additionally, it is possible to specify the "default" variants for an Address by installing an `@rule`
-function that can provide `Variants(default=..)`. Since the purpose of variants is to collect
-information from dependents, only default variant values which have not been set by a dependent
-will be used.
+The result would be that any subgraph that transitively consumed a `Param` to produce Java 11 (for
+example) would be safely isolated and distinct from one that produced Java 9.
 
 ## Internal API
 
@@ -168,34 +174,22 @@ To compute a value for a Node, the engine uses the `Node.run` method starting fr
 roots. If a Node needs more inputs, it requests them via `Context.get`, which will declare a
 dependency, and memoize the computation represented by the requested `Node`.
 
-The initial Nodes are [launched by the engine](https://github.com/pantsbuild/pants/blob/16d43a06ba3751e22fdc7f69f009faeb59a33930/src/rust/engine/src/scheduler.rs#L116-L126),
-but the rest of execution is driven by Nodes recursively calling `Context.get` to request their
-dependencies.
+This recorded `Graph` tracks all dependencies between `@rules` and builtin "intrinsic" rules that
+provide filesystem and network access. That dependency tracking allows for invalidation and dirtying
+of `Nodes` as their dependencies change.
 
 ### Registering Rules
 
-Currently, it is only possible to load rules into the pants scheduler in two ways: by importing and
-using them in `src/python/pants/bin/engine_initializer.py`, or by adding them to the list returned
-by a `rules()` method defined in `src/python/backend/<backend_name>/register.py`. Plugins cannot add
-new rules yet. Unit tests, however, can mix in `TestBase` from
-`tests/python/pants_test/test_base.py` to generate and execute a scheduler from a given set of
-rules.
+The recommended way to install `@rules` is to return them as a list from a `def rules()` definition
+in a plugin's `register.py` file. Unit tests can either invoke `@rules` with fully mocked
+dependencies via `pants_test.engine.util.run_rule`, or extend `pants_test.test_base.TestBase` to
+construct and execute a scheduler for a given set of rules.
 
 In general, there are two types of rules that you can define:
 
 1. an `@rule`, which has a single product type and selects its inputs as described above.
-2. a `RootRule`, which declares a type that can be used as a *subject*, which means it can be
-   provided as an input to a `product_request()`.
-
-In more depth, a `RootRule` for some type is required when no other rule might provide that
-type (i.e. it is not provided as the product of any `@rule`) in some context. In the absence of a
-`RootRule`, any subject type involved in a request "at runtime" (i.e. via `product_request()`),
-would show up as an an unused or impossible path in the rule graph. Another potential name for
-`RootRule` might be `ParamRule`, or something similar, as it can be thought of as saying that the
-type represents a sort of "public API entrypoint" via a `product_request()`.
-
-Note that `Get` requests do not require a `RootRule`, as their requests are statically verified when
-the `@rule` definition is parsed, so we know before runtime that they might be requested.
+2. a `RootRule`, which declares a type that a caller of the engine may provide as a `Param` in a
+   call to `Scheduler.product_request(..)` (ie, at the "root" of the graph).
 
 This interface is being actively developed at this time and this documentation may be out of
 date. Please feel free to file an issue or pull request if you notice any outdated or incorrect
@@ -203,9 +197,9 @@ information in this document!
 
 ## Execution
 
-The engine executes work concurrently wherever possible; to help visualize executions, a visualization
-tool is provided that, after executing a `Graph`, generates a `dot` file that can be rendered using
-Graphviz:
+To help visualize executions, the engine can render both the static rule graph that is compiled
+on startup, and also the content of the `Graph` that is produced while `@rules` run. This generate
+`dot` files that can be rendered using Graphviz:
 
 ```console
 $ mkdir viz
@@ -213,17 +207,6 @@ $ ./pants --native-engine-visualize-to=viz list some/example/directory:
 $ ls viz
 run.0.dot
 ```
-
-## Native Engine
-
-The native engine is integrated into the pants codebase via `native.py` in
-this directory along with `build-support/bin/native/bootstrap.sh` which ensures a
-pants native engine library is built and available for linking. The glue is the
-sha1 hash of the native engine source code used as its version by the `Native`
-class. This hash is maintained by `build-support/bin/native/bootstrap.sh` and
-output to the `native_engine_version` file in this directory. Any modification
-to this resource file's location will need adjustments in
-`build-support/bin/native/bootstrap.sh` to ensure the linking continues to work.
 
 ## History
 
