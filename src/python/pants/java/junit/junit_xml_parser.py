@@ -70,7 +70,9 @@ class RegistryOfTests(object):
 
   def fuzzy_match_test_spec(self, possible_test):
     """
-    This match the user specified Test spec with what tests Pants knows.
+    This matches the user specified test spec with what tests Pants knows.
+
+    Each test spec may get matched with multiple targets.
 
     :param possible_test: a user specified test spec
     :return: dict test_spec -> target
@@ -109,6 +111,7 @@ class RegistryOfTests(object):
     :return: An index of tests by shared properties.
     :rtype: dict from tuple of properties to a tuple of :class:`Test`.
     """
+
     def combined_indexer(tgt):
       return tuple(indexer(tgt) for indexer in indexers)
 
