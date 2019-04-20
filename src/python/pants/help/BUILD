@@ -14,3 +14,11 @@ python_library(
     'src/python/pants/util:memo',
   ]
 )
+
+python_tests(
+  name='integration',
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)

@@ -39,7 +39,6 @@ class HelpPrinter(object):
     elif isinstance(self._help_request, OptionsHelp):
       self._print_options_help()
     elif isinstance(self._help_request, GoalsHelp):
-      print('\nUse `pants help $goal` to get help for a particular goal.\n')
       self._print_goals_help()
     elif isinstance(self._help_request, UnknownGoalHelp):
       print('Unknown goals: {}'.format(', '.join(self._help_request.unknown_goals)))
@@ -52,9 +51,10 @@ class HelpPrinter(object):
     return 0
 
   def _print_goals_help(self):
+    print('\nUse `pants help $goal` to get help for a particular goal.\n')
     goal_descriptions = {}
     for scope_info in self._options.known_scope_to_info.values():
-      if scope_info.category not in (ScopeInfo.GOAL, ScopeInfo.TASK):
+      if scope_info.category not in (ScopeInfo.GOAL,):
         continue
       components = scope_info.scope.split('.', 1)
       if len(components) == 1 and scope_info.description:

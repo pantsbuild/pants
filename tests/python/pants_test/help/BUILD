@@ -55,14 +55,3 @@ python_tests(
   ],
   tags = {'integration'},
 )
-
-python_tests(
-  name='list_goals_integration',
-  sources=[
-    'test_list_goals_integration.py',
-  ],
-  dependencies=[
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-)
