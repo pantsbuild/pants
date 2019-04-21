@@ -30,17 +30,22 @@ The engine executes your `@rule`s in order to (recursively) compute a `Product` 
 type for a set of `Param`s. This recursive type search leads to a loosely coupled (and yet
 still statically checked) form of dependency injection.
 
-When an `@rule` runs, the set of `Param`s that it transitively consumes make up the unique identity
-for that instance of the `@rule`. Any hashable type with useful equality may be used as a `Param`,
-and additional `Params` can be provided to an `@rule`'s transitive dependencies via `Get`
-requests (see below). Each `Param` value in a set of `Params` is unique by type, so if `@rules`
-recursively introduce a particular `Param` type, there will still only be one value for that type in
-each `@rule`, but it will change as you move deeper into the dependency graph.
+When an `@rule` runs, it requires a set of `Param`s that the engine has determined are needed
+to compute its transitive `@rule` dependencies. So although an `@rule` might not have a particular
+`Param` type in its signature, it might depend on another `@rule` that does need that `Param`, and
+would thus need that `Param` in order to run. To see which `Params` the engine needs to run each
+`@rule`, refer to the `Visualization` section below.
+
+Any hashable type with useful equality may be used as a `Param`, and additional `Params` can be
+provided to an `@rule`'s dependencies via `Get` requests (see below). Each `Param` value in a set
+of `Params` is unique by type, so if `@rules` recursively introduce a particular `Param` type,
+there will still only be one value for that type in each `@rule`, but it will change as you move
+deeper into the dependency graph.
 
 The return value of an `@rule` is known as a `Product`. At some level, you can think
-of (`params_set`, `product_type`) as a "key" that uniquely identifies a particular `Product` value
-and `@rule` execution. And as expected, if an `@rule` is able to produce a `Product` without consuming
-any `Params`, then the `@rule` will run exactly once, and the value that it produces will be a singleton.
+of `(product_type, params_set)` as a "key" that uniquely identifies a particular `Product` value
+and `@rule` execution. If an `@rule` is able to produce a `Product` without consuming any `Params`,
+then the `@rule` will run exactly once, and the value that it produces will be a singleton.
 
 #### Example
 
@@ -63,8 +68,8 @@ it will next go hunting for the dependency `@rule` that can produce an `int` usi
 of `Params`. For example, if there was an `@rule` that could produce an `int` without consuming any
 `Params` at all (ie, a singleton), then that `@rule` would always be chosen first. If all `@rules` to
 produce `int`s required at least one `Param`, then the engine would next see whether the input `Params`
-contained an `int`, or whether there were any `@rules` that required only one `Param`... then two
-`Params`, and etc.
+contained an `int`, or whether there were any `@rules` that required only one `Param`, then two
+`Params`, and so on.
 
 In cases where this search detects any ambiguity (generally because there are two or more `@rules` that
 can provide the same product with the same number of parameters), rule graph compilation will fail with
@@ -73,8 +78,8 @@ a useful error message.
 ### Datatypes
 
 In practical use, builtin types like `str` or `int` do not provide enough information to disambiguate
-between various types of data, so declaring small `datatype` definitions to provide a unique and
-descriptive type is highly recommended:
+between various types of data in `@rule` signatures, so declaring small `datatype` definitions to
+provide a unique and descriptive type is highly recommended:
 
 ```python
 class FormattedInt(datatype(['content'])): pass
@@ -147,7 +152,7 @@ def concat(files):
 
 This `@rule` declares that: "for any `Params` for which we can compute `Files`, we can also compute
 `ConcattedFiles`". Each yielded `Get` request results in FileContent for a different File `Param`
-from the Files list. And, happily, all of these requests will proceed in parallel.
+from the Files list. And, happily, all of these requests can proceed in parallel.
 
 ### Advanced Param Usage
 
@@ -164,6 +169,9 @@ be aware of them.
 The result would be that any subgraph that transitively consumed a `Param` to produce Java 11 (for
 example) would be safely isolated and distinct from one that produced Java 9.
 
+_(This section needs an example, but that will have to wait for
+[#7490](https://github.com/pantsbuild/pants/issues/7490)!)_
+
 ## Internal API
 
 Internally, the engine uses end user `@rule`s to create private `Node` objects and
@@ -178,7 +186,7 @@ This recorded `Graph` tracks all dependencies between `@rules` and builtin "intr
 provide filesystem and network access. That dependency tracking allows for invalidation and dirtying
 of `Nodes` as their dependencies change.
 
-### Registering Rules
+## Registering Rules
 
 The recommended way to install `@rules` is to return them as a list from a `def rules()` definition
 in a plugin's `register.py` file. Unit tests can either invoke `@rules` with fully mocked
@@ -195,10 +203,10 @@ This interface is being actively developed at this time and this documentation m
 date. Please feel free to file an issue or pull request if you notice any outdated or incorrect
 information in this document!
 
-## Execution
+## Visualization
 
 To help visualize executions, the engine can render both the static rule graph that is compiled
-on startup, and also the content of the `Graph` that is produced while `@rules` run. This generate
+on startup, and also the content of the `Graph` that is produced while `@rules` run. This generates
 `dot` files that can be rendered using Graphviz:
 
 ```console
@@ -223,7 +231,7 @@ Work stalled on the later phases of the `RoundEngine` and talks re-booted about 
 it stood and proposed the idea of a "tuple-engine".  With some license taken in representation, this
 idea took the `RoundEngine` to the extreme of generating a round for each target-task pair.  The
 pair formed the tuple of schedulable work and this concept combined with others to form the design
-[here][tuple-design].
+[here][https://docs.google.com/document/d/1OARyIZSnw6XQiPlMydi57l_tS_JbFTJH6KLX61kPInI/edit?usp=sharing].
 
 Meanwhile, need for fine-grained parallelism was acute to help speed up jvm compilation, especially
 in the context of scala and mixed scala & java builds.  Twitter spiked on a project to implement
