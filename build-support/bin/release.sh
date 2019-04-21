@@ -89,8 +89,14 @@ function run_pex() {
     pex="${pexdir}/pex"
 
     curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
-    chmod +x "${pex}"
-    "${PY}" "${pex}" "$@"
+    # We use `PEX_PYTHON_PATH="${PY}" "${PY}" "${pex}"` instead of either of:
+    # 1. PEX_PYTHON_PATH="${PY}" "${pex}"
+    # 2. "${PY}" "${pex}"
+    # This works around Pex re-exec-ing when it need not and subsequently losing constraints when
+    # it need not. The fixes for these are tracked in:
+    #   1. https://github.com/pantsbuild/pex/issues/709
+    #   2. https://github.com/pantsbuild/pex/issues/710
+    PEX_PYTHON_PATH="${PY}" "${PY}" "${pex}" "$@"
   )
 }
 

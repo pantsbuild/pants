@@ -144,6 +144,8 @@ base_linux_config: &base_linux_config
   language: python
   before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
+    #   https://github.com/pantsbuild/pants/issues/7601
     - pyenv global 2.7.15 3.6.7 3.7.1
   after_failure:
     - ./build-support/bin/ci-failure.sh
@@ -208,8 +210,7 @@ py27_osx_config: &py27_osx_config
       PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
   before_install:
     {{>before_install_osx}}
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}"
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
 
 py36_osx_config: &py36_osx_config
   <<: *base_osx_config
@@ -220,8 +221,7 @@ py36_osx_config: &py36_osx_config
       PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
   before_install:
     {{>before_install_osx}}
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}"
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
 
 py37_osx_config: &py37_osx_config
   <<: *base_osx_config
@@ -232,8 +232,7 @@ py37_osx_config: &py37_osx_config
       PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
   before_install:
     {{>before_install_osx}}
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}"
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY37_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY37_VERSION}"
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
@@ -778,6 +777,8 @@ base_deploy: &base_deploy
     - "2.7"
     - "3.6"
   before_install:
+    # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
+    #   https://github.com/pantsbuild/pants/issues/7601
     - pyenv global 2.7.14 3.6.3
   env:
     - &base_deploy_env RUN_PANTS_FROM_PEX=1
