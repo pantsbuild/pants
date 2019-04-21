@@ -10,7 +10,7 @@ from builtins import object, open
 
 # NB: The Test -> JUnitTest import re-name above is needed to work around conflicts with pytest test
 # collection and a conflicting Test type in scope during that process.
-from pants.java.junit.junit_xml_parser import ParseError, RegistryOfTests, Test
+from pants.java.junit.junit_xml_parser import ParseError, RegistryOfTests
 from pants.java.junit.junit_xml_parser import Test as JUnitTest
 from pants.java.junit.junit_xml_parser import parse_failed_targets
 from pants.util.contextutil import temporary_dir
