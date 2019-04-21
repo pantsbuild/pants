@@ -241,7 +241,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
     for glob in globs:
       glob_relpath = os.path.relpath(glob, buildroot)
-      if glob_relpath and (not glob.startswith("../")):
+      if glob_relpath and (not glob_relpath.startswith("../")):
         invalidation_globs.extend([glob_relpath, glob_relpath + '/**'])
       else:
         logging.getLogger(__name__).warning("Changes to {}, outside of the buildroot"
