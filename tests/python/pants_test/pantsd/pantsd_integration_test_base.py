@@ -115,11 +115,6 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         self.assert_runner(workdir, pantsd_config, ['kill-pantsd'], expected_runs=1)
         try:
           yield workdir, pantsd_config, checker
-        finally:
-          banner('BEGIN pantsd.log')
-          for line in read_pantsd_log(workdir):
-            print(line)
-          banner('END pantsd.log')
           self.assert_runner(
             workdir,
             pantsd_config,
@@ -127,6 +122,11 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
             expected_runs=1,
           )
           checker.assert_stopped()
+        finally:
+          banner('BEGIN pantsd.log')
+          for line in read_pantsd_log(workdir):
+            print(line)
+          banner('END pantsd.log')
 
   @contextmanager
   def pantsd_successful_run_context(self, *args, **kwargs):

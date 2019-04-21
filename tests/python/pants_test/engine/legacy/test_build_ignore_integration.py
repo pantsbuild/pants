@@ -71,7 +71,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
 
   def test_build_ignore_dependency(self):
     run_result = self.run_pants(['-q',
-                                 'list',
+                                 'dependencies',
                                  'testprojects/tests/python/pants::'],
                                 config={
                                   'DEFAULT': {
@@ -87,7 +87,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
 
   def test_build_ignore_dependency_success(self):
     run_result = self.run_pants(['-q',
-                                 'list',
+                                 'dependencies',
                                  'testprojects/tests/python/pants::'],
                                 config={
                                   'DEFAULT': {

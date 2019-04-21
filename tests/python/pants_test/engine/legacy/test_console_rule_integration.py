@@ -51,14 +51,14 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
     result = self.do_command(
       '--no-v1',
       '--v2',
-      'lint',
+      'blah',
       '::',
       success=False
     )
 
     self.assertIn(
-      'could not satisfy the following goals with @console_rules: lint',
-      result.stderr_data
+      'Unknown goals: blah',
+      result.stdout_data
     )
 
   @ensure_daemon

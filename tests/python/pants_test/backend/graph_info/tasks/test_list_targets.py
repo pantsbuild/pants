@@ -8,7 +8,6 @@ import os
 from builtins import object
 from textwrap import dedent
 
-from pants.backend.graph_info.tasks.list_targets import ListTargets
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.scala_artifact import ScalaArtifact
@@ -16,25 +15,12 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
-from pants_test.task_test_base import ConsoleTaskTestBase
+from pants.rules.core import list_targets
+from pants_test.console_rule_test_base import ConsoleRuleTestBase
 
 
-class BaseListTargetsTest(ConsoleTaskTestBase):
-
-  @classmethod
-  def task_type(cls):
-    return ListTargets
-
-
-class ListTargetsTestEmpty(BaseListTargetsTest):
-
-  def test_list_all_empty(self):
-    # NB: Also renders a warning to stderr, which is challenging to detect here but confirmed in:
-    #   tests/python/pants_test/engine/legacy/test_list_integration.py
-    self.assertEqual('', self.execute_task())
-
-
-class ListTargetsTest(BaseListTargetsTest):
+class ListTargetsTest(ConsoleRuleTestBase):
+  goal_cls = list_targets.List
 
   @classmethod
   def alias_groups(cls):
@@ -53,6 +39,10 @@ class ListTargetsTest(BaseListTargetsTest):
                              push_db_basedir='/tmp'),
       }
     )
+
+  @classmethod
+  def rules(cls):
+    return super(ListTargetsTest, cls).rules() + list_targets.rules()
 
   def setUp(self):
     super(ListTargetsTest, self).setUp()
@@ -96,17 +86,22 @@ class ListTargetsTest(BaseListTargetsTest):
         )
         '''))
 
+  def test_list_all_empty(self):
+    # NB: Also renders a warning to stderr, which is challenging to detect here but confirmed in:
+    #   tests/python/pants_test/engine/legacy/test_list_integration.py
+    self.assert_console_output(args=[])
+
   def test_list_path(self):
-    self.assert_console_output('a/b:b', targets=[self.target('a/b')])
+    self.assert_console_output('a/b:b', args=['a/b'])
 
   def test_list_siblings(self):
-    self.assert_console_output('a/b:b', targets=self.targets('a/b:'))
+    self.assert_console_output('a/b:b', args=['a/b:'])
     self.assert_console_output('a/b/c:c', 'a/b/c:c2', 'a/b/c:c3',
-                               targets=self.targets('a/b/c/:'))
+                               args=['a/b/c/:'])
 
   def test_list_descendants(self):
     self.assert_console_output('a/b/c:c', 'a/b/c:c2', 'a/b/c:c3',
-                               targets=self.targets('a/b/c/::'))
+                               args=['a/b/c/::'])
 
     self.assert_console_output(
         'a/b:b',
@@ -115,7 +110,7 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/c:c3',
         'a/b/d:d',
         'a/b/e:e1',
-        targets=self.targets('a/b::'))
+        args=['a/b::'])
 
   def test_list_all(self):
     self.assert_entries('\n',
@@ -127,7 +122,7 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/d:d',
         'a/b/e:e1',
         'f:alias',
-        targets=self.targets('::'))
+        args=['::'])
 
     self.assert_entries(', ',
         'a:a',
@@ -138,8 +133,7 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/d:d',
         'a/b/e:e1',
         'f:alias',
-        options={'sep': ', '},
-        targets=self.targets('::'))
+        args=['--sep=, ', '::',])
 
     self.assert_console_output(
         'a:a',
@@ -150,48 +144,41 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/d:d',
         'a/b/e:e1',
         'f:alias',
-        targets=self.targets('::'))
+        args=['::'])
 
   def test_list_provides(self):
     self.assert_console_output(
         'a/b:b com.example#b',
         'a/b/c:c2 com.example#c2',
-        options={'provides': True},
-        targets=self.targets('::'))
+        args=['--provides', '::'])
 
   def test_list_provides_customcols(self):
     self.assert_console_output(
         '/tmp a/b:b http://maven.example.com public com.example#b',
         '/tmp a/b/c:c2 http://maven.example.com public com.example#c2',
-        options={'provides': True,
-                 'provides_columns': 'push_db_basedir,address,repo_url,repo_name,artifact_id'},
-        targets=self.targets('::')
+        args=[
+          '--provides',
+          '--provides-columns=push_db_basedir,address,repo_url,repo_name,artifact_id',
+          '::',
+        ],
     )
 
   def test_list_dedups(self):
-    targets = []
-    targets.extend(self.targets('a/b/d/::'))
-    targets.extend(self.target('f:alias').dependencies)
-    self.assertEqual(3, len(targets), "Expected a duplicate of a/b/d:d")
     self.assert_console_output(
       'a/b/c:c3',
       'a/b/d:d',
-      targets=targets
+      args=['a/b/d/::', 'a/b/c:c3', 'a/b/d:d']
     )
 
   def test_list_documented(self):
     self.assert_console_output(
       # Confirm empty listing
-      targets=[self.target('a/b')],
-      options={'documented': True}
+      args=['--documented', 'a/b'],
     )
 
-    self.assert_console_output(
-      dedent("""
-      f:alias
-        Exercises alias resolution.
-        Further description.
-      """).strip(),
-      options={'documented': True},
-      targets=self.targets('::')
+    self.assert_console_output_ordered(
+      'f:alias',
+      '  Exercises alias resolution.',
+      '  Further description.',
+      args=['--documented', '::'],
     )

@@ -10,7 +10,6 @@ from pants.backend.python.rules.python_test_runner import PyTestResult
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonTestsAdaptor
-from pants.rules.core.exceptions import GracefulTerminationException
 from pants.rules.core.test import Status, TestResult, coordinator_of_tests, fast_test
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
@@ -19,14 +18,15 @@ from pants_test.test_base import TestBase
 
 
 class TestTest(TestBase, SchedulerTestBase, AbstractClass):
-  def single_target_test(self, result, expected_console_output):
+  def single_target_test(self, result, expected_console_output, success=True):
     console = MockConsole()
 
-    run_rule(fast_test, console, (self.make_build_target_address("some/target"),), {
+    res = run_rule(fast_test, console, (self.make_build_target_address("some/target"),), {
       (TestResult, Address): lambda _: result,
     })
 
     self.assertEquals(console.stdout.getvalue(), expected_console_output)
+    self.assertEquals(0 if success else 1, res.exit_code)
 
   def make_build_target_address(self, spec):
     address = Address.parse(spec)
@@ -46,15 +46,14 @@ some/target                                                                     
     )
 
   def test_output_failure(self):
-    with self.assertRaises(GracefulTerminationException) as cm:
-      self.single_target_test(
-        TestResult(status=Status.FAILURE, stdout='Here is some output from a test'),
-        """Here is some output from a test
+    self.single_target_test(
+      TestResult(status=Status.FAILURE, stdout='Here is some output from a test'),
+      """Here is some output from a test
 
 some/target                                                                     .....   FAILURE
-"""
-      )
-    self.assertEqual(1, cm.exception.exit_code)
+""",
+      success=False,
+    )
 
   def test_output_no_trailing_newline(self):
     self.single_target_test(
@@ -87,12 +86,11 @@ some/target                                                                     
       else:
         raise Exception("Unrecognised target")
 
-    with self.assertRaises(GracefulTerminationException) as cm:
-      run_rule(fast_test, console, (target1, target2), {
-        (TestResult, Address): make_result,
-      })
+    res = run_rule(fast_test, console, (target1, target2), {
+      (TestResult, Address): make_result,
+    })
 
-    self.assertEqual(1, cm.exception.exit_code)
+    self.assertEqual(1, res.exit_code)
     self.assertEquals(console.stdout.getvalue(), """I passed
 I failed
 

@@ -77,7 +77,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/backend/python/targets:python',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
+    'tests/python/pants_test:console_rule_test_base',
   ],
 )
 

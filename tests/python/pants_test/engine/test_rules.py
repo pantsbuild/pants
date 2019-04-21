@@ -13,8 +13,9 @@ from textwrap import dedent
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
+from pants.engine.goal import Goal
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import RootRule, RuleIndex, _GoalProduct, _RuleVisitor, console_rule, rule
+from pants.engine.rules import RootRule, RuleIndex, _RuleVisitor, console_rule, rule
 from pants.engine.selectors import Get
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.util import (TARGET_TABLE, assert_equal_with_printing, create_scheduler,
@@ -62,10 +63,17 @@ _suba_root_rules = [RootRule(SubA)]
 _this_is_not_a_type = 3
 
 
-@console_rule('example', [Console])
+class Example(Goal):
+  """An example."""
+
+  name = 'example'
+
+
+@console_rule(Example, [Console])
 def a_console_rule_generator(console):
   a = yield Get(A, str('a str!'))
   console.print_stdout(str(a))
+  yield Example(exit_code=0)
 
 
 class RuleTest(unittest.TestCase):
@@ -73,7 +81,7 @@ class RuleTest(unittest.TestCase):
     res = run_rule(a_console_rule_generator, Console(), {
         (A, str): lambda _: A(),
       })
-    self.assertEquals(res, _GoalProduct.for_name('example')())
+    self.assertEquals(res, Example(0))
 
 
 class RuleIndexTest(TestBase):

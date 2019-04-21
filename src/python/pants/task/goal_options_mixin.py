@@ -19,7 +19,7 @@ class GoalOptionsRegistrar(Optionable):
   at once and/or setting them per-task. E.g., turning all linters on or off, or
   turning individual linters on or off selectively.
   """
-  options_scope_category = ScopeInfo.GOAL
+  options_scope_category = ScopeInfo.GOAL_V1
 
   @classmethod
   def registrar_for_scope(cls, goal):

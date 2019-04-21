@@ -16,12 +16,14 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
+from pants.engine.goal import Goal
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
@@ -154,14 +156,6 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
       )
       self.invalid_goals = invalid_goals
 
-  @staticmethod
-  def _determine_subjects(target_roots):
-    """A utility to determines the subjects for the request.
-
-    :param TargetRoots target_roots: The targets root of the request.
-    """
-    return target_roots.specs or []
-
   def warm_product_graph(self, target_roots):
     """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
 
@@ -171,18 +165,9 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    subjects = self._determine_subjects(target_roots)
+    subjects = [target_roots.specs]
     request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
     self.scheduler_session.execute(request)
-
-  def validate_goals(self, goals):
-    """Checks for @console_rules that satisfy requested goals.
-
-    :param list goals: The list of requested goal names as passed on the commandline.
-    """
-    invalid_goals = [goal for goal in goals if goal not in self.goal_map]
-    if invalid_goals:
-      raise self.InvalidGoals(invalid_goals)
 
   def run_console_rules(self, options_bootstrapper, goals, target_roots):
     """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
@@ -191,22 +176,23 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
 
     :param list goals: The list of requested goal names as passed on the commandline.
     :param TargetRoots target_roots: The targets root of the request.
+
+    :returns: An exit code.
     """
-    # Reduce to only applicable goals - with validation happening by way of `validate_goals()`.
-    goals = [goal for goal in goals if goal in self.goal_map]
-    subjects = self._determine_subjects(target_roots)
+    subject = target_roots.specs
     console = Console()
-    # Console rule can only have one subject.
-    # TODO: What about console_rules with no subjects (i.e., no target specs)?
-    assert len(subjects) == 1
     for goal in goals:
+      goal_product = self.goal_map[goal]
+      params = Params(subject, options_bootstrapper, console)
+      logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
       try:
-        goal_product = self.goal_map[goal]
-        params = Params(subjects[0], options_bootstrapper, console)
-        logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
-        self.scheduler_session.run_console_rule(goal_product, params)
+        exit_code = self.scheduler_session.run_console_rule(goal_product, params)
       finally:
         console.flush()
+
+      if exit_code != PANTS_SUCCEEDED_EXIT_CODE:
+        return exit_code
+    return PANTS_SUCCEEDED_EXIT_CODE
 
   def create_build_graph(self, target_roots, build_root=None):
     """Construct and return a `BuildGraph` given a set of input specs.
@@ -236,8 +222,11 @@ class EngineInitializer(object):
   @staticmethod
   def _make_goal_map_from_rules(rules):
     goal_map = {}
-    goal_to_rule = [(rule.goal, rule) for rule in rules if getattr(rule, 'goal', None) is not None]
-    for goal, r in goal_to_rule:
+    for r in rules:
+      output_type = getattr(r, 'output_type', None)
+      if not output_type or not issubclass(output_type, Goal):
+        continue
+      goal = r.output_type.name
       if goal in goal_map:
         raise EngineInitializer.GoalMappingError(
           'could not map goal `{}` to rule `{}`: already claimed by product `{}`'

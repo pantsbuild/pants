@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -7,25 +7,22 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pants.base.specs import Specs
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
+from pants.engine.goal import Goal, LineOriented
 from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.rules import console_rule, optionable_rule
+from pants.engine.rules import console_rule
 from pants.engine.selectors import Get
-from pants.subsystem.subsystem import Subsystem
 
 
-class ListOptions(Subsystem):
-  """Lists all targets matching the target specs.
+class List(LineOriented, Goal):
+  """Lists all targets matching the target specs."""
 
-  If no targets are specified, lists all targets in the workspace.
-  """
+  name = 'list'
 
-  # NB: This option scope is temporary: a followup to #6880 will replace the v1 list goal and rename
-  # this scope.
-  options_scope = 'fastlist'
+  deprecated_cache_setup_removal_version = '1.18.0.dev2'
 
   @classmethod
   def register_options(cls, register):
-    super(ListOptions, cls).register_options(register)
+    super(List, cls).register_options(register)
     register('--provides', type=bool,
              help='List only targets that provide an artifact, displaying the columns specified by '
                   '--provides-columns.')
@@ -36,13 +33,11 @@ class ListOptions(Subsystem):
              help='Print only targets that are documented with a description.')
 
 
-@console_rule('list', [Console, ListOptions, Specs])
-def fast_list(console, options, specs):
-  """A fast variant of `./pants list` with a reduced feature set."""
-
-  provides = options.get_options().provides
-  provides_columns = options.get_options().provides_columns
-  documented = options.get_options().documented
+@console_rule(List, [Console, List.Options, Specs])
+def list_targets(console, list_options, specs):
+  provides = list_options.values.provides
+  provides_columns = list_options.values.provides_columns
+  documented = list_options.values.documented
   if provides or documented:
     # To get provides clauses or documentation, we need hydrated targets.
     collection = yield Get(HydratedTargets, Specs, specs)
@@ -78,17 +73,19 @@ def fast_list(console, options, specs):
     collection = yield Get(BuildFileAddresses, Specs, specs)
     print_fn = lambda address: address.spec
 
-  if not collection.dependencies:
-    console.print_stderr('WARNING: No targets were matched in goal `{}`.'.format('list'))
+  with List.line_oriented(list_options, console) as (print_stdout, print_stderr):
+    if not collection.dependencies:
+      print_stderr('WARNING: No targets were matched in goal `{}`.'.format('list'))
 
-  for item in collection:
-    result = print_fn(item)
-    if result:
-      console.print_stdout(result)
+    for item in collection:
+      result = print_fn(item)
+      if result:
+        print_stdout(result)
+
+  yield List(exit_code=0)
 
 
 def rules():
   return [
-      optionable_rule(ListOptions),
-      fast_list
+      list_targets,
     ]

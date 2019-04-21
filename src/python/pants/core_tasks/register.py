@@ -37,7 +37,6 @@ def register_goals():
   Goal.register('binary', 'Create a runnable binary.')
   Goal.register('resources', 'Prepare resources.')
   Goal.register('bundle', 'Create a deployable application bundle.')
-  Goal.register('test', 'Run tests.')
   Goal.register('bench', 'Run benchmarks.')
   Goal.register('repl', 'Run a REPL.')
   Goal.register('repl-dirty', 'Run a REPL, skipping compilation.')
@@ -87,7 +86,7 @@ def register_goals():
   task(name='compile-prep-command', action=RunCompilePrepCommand).install('compile', first=True)
 
   # Stub for other goals to schedule 'test'. See noop_exec_task.py for why this is useful.
-  task(name='test', action=NoopTest).install('test')
+  task(name='legacy', action=NoopTest).install('test')
 
   # Workspace information.
   task(name='roots', action=ListRoots).install()
