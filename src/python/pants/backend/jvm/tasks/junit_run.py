@@ -60,9 +60,10 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Run at most this many tests in a single test process.')
     register('--test', type=list, fingerprint=True,
              help='Force running of just these tests. Tests can be specified using any of: '
-                  '[classname], [classname]#[methodname]. If classname is not fully qualified, '
+                  '[classname], [classname]#[methodname], [fully qualified classname], '
+                  '[fully qualified classname]#[methodname]. If classname is not fully qualified, '
                   'all matching tests will be run. For example, if `foo.bar.TestClass` and '
-                  '`foo.baz.TestClass` exist, `TestClass` is supplied, then both will run.')
+                  '`foo.baz.TestClass` exist and `TestClass` is supplied, then both will run.')
     register('--per-test-timer', type=bool, help='Show progress and timer for each test.')
     register('--default-concurrency', advanced=True, fingerprint=True,
              choices=JUnitTests.VALID_CONCURRENCY_OPTS, default=JUnitTests.CONCURRENCY_SERIAL,
