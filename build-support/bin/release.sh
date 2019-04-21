@@ -89,8 +89,14 @@ function run_pex() {
     pex="${pexdir}/pex"
 
     curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
-    chmod +x "${pex}"
-    "${pex}" "$@"
+    # We use `PEX_PYTHON_PATH="${PY}" "${PY}" "${pex}"` instead of either of:
+    # 1. PEX_PYTHON_PATH="${PY}" "${pex}"
+    # 2. "${PY}" "${pex}"
+    # This works around Pex re-exec-ing when it need not and subsequently losing constraints when
+    # it need not. The fixes for these are tracked in:
+    #   1. https://github.com/pantsbuild/pex/issues/709
+    #   2. https://github.com/pantsbuild/pex/issues/710
+    PEX_PYTHON_PATH="${PY}" "${PY}" "${pex}" "$@"
   )
 }
 
@@ -220,7 +226,9 @@ function build_pants_packages() {
   pants_version_set "${version}"
 
   start_travis_section "${NAME}" "Building packages"
-  packages=($(run_packages_script build_and_print "${version}"))
+  packages=(
+    $(run_packages_script build_and_print "${version}")
+  ) || die "Failed to build packages at ${version}!"
   for package in "${packages[@]}"
   do
     (
@@ -301,7 +309,9 @@ function install_and_test_packages() {
   export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
   trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
-  packages=($(run_packages_script list | grep '.' | awk '{print $1}'))
+  packages=(
+    $(run_packages_script list | grep '.' | awk '{print $1}')
+  ) || die "Failed to list packages!"
 
   export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
   for package in "${packages[@]}"
@@ -496,7 +506,9 @@ function fetch_and_check_prebuilt_wheels() {
   fetch_prebuilt_wheels "${check_dir}"
 
   local missing=()
-  RELEASE_PACKAGES=($(run_packages_script list | grep '.' | awk '{print $1}'))
+  RELEASE_PACKAGES=(
+    $(run_packages_script list | grep '.' | awk '{print $1}')
+  ) || die "Failed to get a list of packages to release!"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))

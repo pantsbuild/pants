@@ -24,13 +24,11 @@ RUN if [[ ! -d "${PYENV_ROOT}" ]]; then git clone https://github.com/pyenv/pyenv
 
 ENV PYTHON_CONFIGURE_OPTS --enable-unicode=ucs2
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION_UCS2}
-RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} global ${PYTHON_27_VERSION_UCS2}
-ENV PATH "${PYENV_ROOT}/shims:${PATH}"
+ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/bin:${PATH}"
 
-# We ensure selection of the the UCS4 interpreter by the pants script and pants.pex with these
+# We ensure selection of the the pyenv interpreter by PY aware scripts and pants.pex with these
 # env vars.
-ENV PY "${PYENV_ROOT}/shims/python2.7"
-ENV PEX_PYTHON_PATH "${PYENV_ROOT}/shims/python2.7"
+ENV PY "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/bin/python"
 ENV PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYTHON_27_VERSION_UCS2}']"
 
 # Setup mount points for the travis ci user & workdir.
@@ -51,3 +49,7 @@ USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 ENV LC_ALL="en_US.UTF-8"
 
 WORKDIR /travis/workdir
+
+# Execute any args passed to `docker run` in the context of the devtoolset-7 software collection
+# we used above to install requirements.
+ENTRYPOINT ["/usr/bin/scl", "enable" , "devtoolset-7", "--"]
