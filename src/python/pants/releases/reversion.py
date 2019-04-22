@@ -25,12 +25,14 @@ def replace_in_file(workspace, src_file_path, from_str, to_str):
   """
   from_bytes = from_str.encode('ascii')
   to_bytes = to_str.encode('ascii')
-  data = read_file(os.path.join(workspace, src_file_path))
+  data = read_file(os.path.join(workspace, src_file_path), binary_mode=True)
   if from_bytes not in data and from_str not in src_file_path:
     return None
 
   dst_file_path = src_file_path.replace(from_str, to_str)
-  safe_file_dump(os.path.join(workspace, dst_file_path), data.replace(from_bytes, to_bytes), mode='wb')
+  safe_file_dump(os.path.join(workspace, dst_file_path),
+                 data.replace(from_bytes, to_bytes),
+                 mode='wb')
   if src_file_path != dst_file_path:
     os.unlink(os.path.join(workspace, src_file_path))
   return dst_file_path
@@ -55,7 +57,7 @@ def fingerprint_file(workspace, filename):
 
   Returns a tuple of fingerprint string and size string.
   """
-  content = read_file(os.path.join(workspace, filename))
+  content = read_file(os.path.join(workspace, filename), binary_mode=True)
   fingerprint = hashlib.sha256(content)
   b64_encoded = base64.b64encode(fingerprint.digest())
   return 'sha256={}'.format(b64_encoded.decode('utf-8')), str(len(content))

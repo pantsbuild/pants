@@ -585,7 +585,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def _find_missing_deps(self, compile_logs, target):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
-      compile_failure_log = '\n'.join(read_file(log).decode('utf-8') for log in compile_logs)
+      compile_failure_log = '\n'.join(read_file(log, binary_mode=True).decode('utf-8')
+                                      for log in compile_logs)
 
       missing_dep_suggestions, no_suggestions = self._missing_deps_finder.find(
         compile_failure_log, target)
