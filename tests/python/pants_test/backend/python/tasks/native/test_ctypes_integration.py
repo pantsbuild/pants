@@ -132,7 +132,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # Replace strict_deps=False with nothing so we can override it (because target values for this
       # option take precedence over subsystem options).
-      orig_wrapped_math_build = read_file(self._wrapped_math_build_file, binary_mode=False)
+      orig_wrapped_math_build = read_file(self._wrapped_math_build_file)
       without_strict_deps_wrapped_math_build = re.sub(
         'strict_deps=False,', '', orig_wrapped_math_build)
       safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build)

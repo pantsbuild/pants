@@ -177,7 +177,7 @@ class ProcessMetadataManager(object):
     """
     file_path = self._metadata_file_path(name, metadata_key)
     try:
-      metadata = read_file(file_path, binary_mode=False).strip()
+      metadata = read_file(file_path).strip()
       return self._maybe_cast(metadata, caster)
     except (IOError, OSError):
       return None

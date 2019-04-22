@@ -99,7 +99,7 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
 
     :return: A Digest, or None if the Digest did not exist.
     """
-    read_file = maybe_read_file(cls._path(directory), binary_mode=False)
+    read_file = maybe_read_file(cls._path(directory))
     if read_file:
       fingerprint, length = read_file.split(':')
       return Digest(fingerprint, int(length))
