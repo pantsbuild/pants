@@ -114,7 +114,7 @@ def safe_file_dump(filename, payload='', mode='w'):
 
   :param string filename: The filename of the file to write to.
   :param string payload: The string to write to the file.
-  :param string mode: A mode argument for the python `open` builtin which should be a write mode'
+  :param string mode: A mode argument for the python `open` builtin which should be a write mode
                       variant. Defaults to 'w'.
   """
   with safe_open(filename, mode=mode) as f:
