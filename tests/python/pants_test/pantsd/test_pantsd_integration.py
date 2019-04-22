@@ -345,20 +345,20 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
   def test_pantsd_invalidation_pants_ini_file(self):
     # Test tmp_pants_ini (--pants-config-files=$tmp_pants_ini)'s removal
-    tmp_pants_ini = os.path.abspath(".pants.d/tmp/tmp_pants_{}.ini".format(time.time()))
+    tmp_pants_ini = os.path.abspath("testprojects/test_pants.ini")
+
     # Create tmp_pants_ini file
     with safe_open(tmp_pants_ini, 'w') as f:
-      f.write("import that\n")
+      f.write("[DEFAULT]\n")
 
     with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
       pantsd_run(['--pants-config-files={}'.format(tmp_pants_ini), 'help'])
       checker.assert_started()
-
       time.sleep(5)
 
       # Delete tmp_pants_ini
       os.unlink(tmp_pants_ini)
-      time.sleep(5)
+      time.sleep(10)
       checker.assert_stopped()
 
   def test_pantsd_pid_deleted(self):
