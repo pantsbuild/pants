@@ -79,27 +79,19 @@ class RegistryOfTests(object):
     :return: dict test_spec -> target
     """
     # dict of non fully qualified classname to a list of fully qualified test specs
-    non_fqcn_to_specs = defaultdict(list)
-    fqcn_to_specs = {}
+    cn_to_specs = defaultdict(list)
     for test_spec in self._test_to_target.keys():
       fqcn = test_spec.classname
-      if fqcn in fqcn_to_specs:
-        raise TaskError('Dup found: {}'.format(fqcn))
-      fqcn_to_specs[fqcn] = test_spec
+      cn_to_specs[test_spec.classname].append(test_spec)
 
       non_fqcn = fqcn.split('.')[-1]
-      non_fqcn_to_specs[non_fqcn].append(test_spec)
+      cn_to_specs[non_fqcn].append(test_spec)
 
     matched_spec_to_target = {}
     unknown_tests = []
     for possible_test_spec in possible_test_specs:
-      # Match for fully qualified test spec
-      if possible_test_spec.classname in fqcn_to_specs:
-        matched_spec_to_target[possible_test_spec] = self._test_to_target[
-          fqcn_to_specs[possible_test_spec.classname]]
-      # Match for non fully qualified test specs
-      elif possible_test_spec.classname in non_fqcn_to_specs:
-        for full_spec in non_fqcn_to_specs[possible_test_spec.classname]:
+      if possible_test_spec.classname in cn_to_specs:
+        for full_spec in cn_to_specs[possible_test_spec.classname]:
           new_fully_qualified_test_spec = Test(full_spec.classname, possible_test_spec.methodname)
           matched_spec_to_target[new_fully_qualified_test_spec] = self._test_to_target[full_spec]
       else:
