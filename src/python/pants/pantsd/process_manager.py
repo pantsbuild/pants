@@ -191,7 +191,7 @@ class ProcessMetadataManager(object):
     """
     self._maybe_init_metadata_dir_by_name(name)
     file_path = self._metadata_file_path(name, metadata_key)
-    safe_file_dump(file_path, metadata_value, mode='w')
+    safe_file_dump(file_path, metadata_value)
 
   def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
     """Block up to a timeout for process metadata to arrive on disk.

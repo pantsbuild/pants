@@ -90,7 +90,7 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
       output_line = line
     output_records.append(output_line)
 
-  safe_file_dump(file_name, '\r\n'.join(output_records) + '\r\n', mode='w')
+  safe_file_dump(file_name, '\r\n'.join(output_records) + '\r\n')
 
 
 # The wheel METADATA file will contain a line like: `Version: 1.11.0.dev3+7951ec01`.

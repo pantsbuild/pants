@@ -135,7 +135,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       orig_wrapped_math_build = read_file(self._wrapped_math_build_file, binary_mode=False)
       without_strict_deps_wrapped_math_build = re.sub(
         'strict_deps=False,', '', orig_wrapped_math_build)
-      safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build, mode='w')
+      safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build)
 
       # This should fail because it does not turn on strict_deps for a target which requires it.
       pants_binary_strict_deps_failure = self.run_pants_with_workdir(
