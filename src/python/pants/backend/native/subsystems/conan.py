@@ -21,20 +21,3 @@ class Conan(PythonToolBase):
   ]
   default_entry_point = 'conans.conan'
   default_interpreter_constraints = ['CPython>=2.7,<4']
-
-  @classmethod
-  def register_options(cls, register):
-    super(Conan, cls).register_options(register)
-    register('--conan-requirements', type=list,
-             default=Conan.default_requirements,
-             advanced=True, fingerprint=True,
-             help='The requirements used to build the conan client pex.',
-             removal_version='1.16.0.dev2',
-             removal_hint='Use --requirements instead.')
-
-  # TODO: Delete this method when the deprecated options are removed.
-  def get_requirement_specs(self):
-    opts = self.get_options()
-    if opts.is_default('conan_requirements'):
-      return super(Conan, self).get_requirement_specs()
-    return opts.conan_requirements
