@@ -15,7 +15,7 @@ import unittest
 from builtins import open, range, zip
 
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
-from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
+from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
 from pants_test.pants_run_integration_test import read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
@@ -342,6 +342,24 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         checker.assert_stopped()
 
       self.assertIn('saw file events covered by invalidation globs', full_pantsd_log())
+
+  def test_pantsd_invalidation_pants_ini_file(self):
+    # Test tmp_pants_ini (--pants-config-files=$tmp_pants_ini)'s removal
+    tmp_pants_ini = os.path.abspath("testprojects/test_pants.ini")
+
+    # Create tmp_pants_ini file
+    with safe_open(tmp_pants_ini, 'w') as f:
+      f.write("[DEFAULT]\n")
+
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
+      pantsd_run(['--pants-config-files={}'.format(tmp_pants_ini), 'help'])
+      checker.assert_started()
+      time.sleep(5)
+
+      # Delete tmp_pants_ini
+      os.unlink(tmp_pants_ini)
+      time.sleep(10)
+      checker.assert_stopped()
 
   def test_pantsd_pid_deleted(self):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
