@@ -630,10 +630,12 @@ osx_rust_tests: &osx_rust_tests
       - openssl
       - osxfuse
   before_install:
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
   env:
     - >
       {{>env_osx_with_pyenv}}
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - CACHE_NAME=macosrusttests
 
 # -------------------------------------------------------------------------
