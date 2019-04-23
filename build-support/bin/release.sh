@@ -9,42 +9,17 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-topleve
 # shellcheck source=build-support/common.sh
 source "${ROOT}/build-support/common.sh"
 
-# Note we parse some options here, but parse most at the bottom. This is due to execution order.
-# If the option must be used right away, we parse at the top of the script, whereas if it
-# depends on functions defined later in the script, we parse at the end.
-_OPTS="hdnftcloepqw2"
-
-while getopts "${_OPTS}"  opt; do
-  case ${opt} in
-    2) python_two="true" ;;
-    *) ;;  # skip over other args to be parsed later
-  esac
-done
-
-# Reset opt parsing's position to start
-OPTIND=0
-
-# Setup Python interpreter constraints and pick a suitable interpreter to be used for the
-# virtualenv.
-if [[ "${python_two:-false}" == "true" ]]; then
-  default_interpreter="python2.7"
-  interpreter_constraint="CPython==2.7.*"
-else
-  default_interpreter="python3.6"
-  interpreter_constraint="CPython==3.6.*"
-fi
-# Note we allow the user to predefine this value so that they may point to a specific interpreter,
-# e.g. 2.7.13 vs. 2.7.15.
-export PY="${PY:-${default_interpreter}}"
+# Note we allow the user to predefine this value so that they may point to a specific interpreter.
+export PY="${PY:-python3.6}"
 if ! command -v "${PY}" >/dev/null; then
   die "Python interpreter ${PY} not discoverable on your PATH."
 fi
 py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
-if [[ "${py_major_minor}" != "2.7" ]] && [[ "${py_major_minor}" != "3.6" ]]; then
-  die "Invalid interpreter. The release script requires Python 2.7 or 3.6 (you are using ${py_major_minor})."
+if [[ "${py_major_minor}" != "3.6" ]]; then
+  die "Invalid interpreter. The release script requires Python 3.6 (you are using ${py_major_minor})."
 fi
 
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==3.6.*']"
 
 function run_local_pants() {
   "${ROOT}/pants" "$@"
@@ -106,12 +81,7 @@ function run_pex() {
 function run_packages_script() {
   (
     cd "${ROOT}"
-    args=("$@")
-    if [[ "${python_two:-false}" == "true" ]]; then
-      args=("--py2" "${args[@]}")
-    fi
-    requirements=("$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)")
-    run_pex "${requirements[@]}" -- "${ROOT}/src/python/pants/releases/packages.py" "${args[@]}"
+    run_pex "$(requirement beautifulsoup4)" -- "${ROOT}/src/python/pants/releases/packages.py" "$@"
   )
 }
 
@@ -603,10 +573,6 @@ function build_pex() {
   local osx_platform_noabi="macosx_10.11_x86_64"
 
   dest_suffix="py36.pex"
-  if [[ "${python_two:-false}" == "true" ]]; then
-    dest_suffix="py27.pex"
-  fi
-
   case "${mode}" in
     build)
       case "$(uname)" in
@@ -632,9 +598,6 @@ function build_pex() {
       # TODO: once we add Python 3.7 PEX support, which requires first building Py37 wheels,
       # we'll want to release one big flexible Pex that works with Python 3.6+.
       abis=("cp-36-m")
-      if [[ "${python_two:-false}" == "true" ]]; then
-        abis=("cp-27-mu" "cp-27-m")
-      fi
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
           platforms=("${platforms[@]}" "${platform}-${abi}")
@@ -713,15 +676,16 @@ function publish_packages() {
   end_travis_section
 }
 
+_OPTS="hdnftcloepqw"
+
 function usage() {
   echo "With no options all packages are built, smoke tested and published to"
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] [-c] [-2] (-h|-n|-f|-t|-l|-o|-e|-p)"
+  echo "Usage: $0 [-d] [-c] (-h|-n|-f|-t|-l|-o|-e|-p)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
-  echo " -2  Release any non-universal wheels (i.e. pantsbuild.pants) as Python 2. Defaults to Python 3."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
   echo "       an ephemeral virtualenv and exercised to validate basic"
@@ -758,7 +722,6 @@ while getopts "${_OPTS}" opt; do
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;
     w) list_prebuilt_wheels ; exit $? ;;
-    2) ;;  # already parsed at top of file
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
