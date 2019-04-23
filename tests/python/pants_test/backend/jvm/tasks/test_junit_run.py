@@ -27,7 +27,7 @@ from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import safe_file_dump, touch
+from pants.util.dirutil import touch
 from pants.util.process_handler import subprocess
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystem
@@ -208,19 +208,6 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     context = self.context(target_roots=[self.target('foo:empty')])
     self.populate_runtime_classpath(context=context)
     self.execute(context)
-
-  def test_request_classes_by_source(self):
-    """`classes_by_source` is expensive to compute: confirm that it is only computed when needed."""
-
-    # Class names (with and without a method name) should not trigger.
-    self.assertFalse(JUnitRun.request_classes_by_source(['com.goo.ber']))
-    self.assertFalse(JUnitRun.request_classes_by_source(['com.goo.ber#method']))
-
-    # Existing files (with and without the method name) should trigger.
-    srcfile = os.path.join(self.test_workdir, 'this.is.a.source.file.scala')
-    safe_file_dump(srcfile, 'content!')
-    self.assertTrue(JUnitRun.request_classes_by_source([srcfile]))
-    self.assertTrue(JUnitRun.request_classes_by_source(['{}#method'.format(srcfile)]))
 
   @ensure_cached(JUnitRun, expected_num_artifacts=1)
   def test_junit_runner_extra_jvm_options(self):

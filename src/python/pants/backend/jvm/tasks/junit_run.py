@@ -8,7 +8,6 @@ import fnmatch
 import itertools
 import os
 import sys
-from abc import abstractmethod
 from builtins import object, range, str
 from contextlib import contextmanager
 
@@ -39,90 +38,7 @@ from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_rmtree, safe_walk
 from pants.util.memo import memoized_method
-from pants.util.meta import AbstractClass
 from pants.util.strutil import pluralize
-
-
-class _TestSpecification(AbstractClass):
-  """Models the string format used to specify which tests to run."""
-
-  @classmethod
-  def parse(cls, buildroot, test_spec):
-    """Parses a test specification string into an object that can yield corresponding tests.
-
-    Tests can be specified in one of four forms:
-
-    * [classname]
-    * [filename]
-    * [classname]#[methodname]
-    * [filename]#[methodname]
-
-    The first two forms target one or more individual tests contained within a class or file whereas
-    the final two forms specify an individual test method to execute.
-
-    :param string buildroot: The path of the current build root directory.
-    :param string test_spec: A test specification.
-    :returns: A test specification object.
-    :rtype: :class:`_TestSpecification`
-    """
-    components = test_spec.split('#', 2)
-    classname_or_sourcefile = components[0]
-    methodname = components[1] if len(components) == 2 else None
-
-    if os.path.exists(classname_or_sourcefile):
-      sourcefile = os.path.relpath(classname_or_sourcefile, buildroot)
-      return _SourcefileSpec(sourcefile=sourcefile, methodname=methodname)
-    else:
-      return _ClassnameSpec(classname=classname_or_sourcefile, methodname=methodname)
-
-  @abstractmethod
-  def iter_possible_tests(self, context):
-    """Return an iterator over the possible tests this test specification indicates.
-
-    NB: At least one test yielded by the returned iterator will correspond to an available test,
-    but other yielded tests may not exist.
-
-    :param context: The pants execution context.
-    :type context: :class:`pants.goal.context.Context`
-    :returns: An iterator over possible tests.
-    :rtype: iter of :class:`pants.java.junit.junit_xml_parser.Test`
-    """
-
-
-class _SourcefileSpec(_TestSpecification):
-  """Models a test specification in [sourcefile]#[methodname] format."""
-
-  def __init__(self, sourcefile, methodname):
-    self._sourcefile = sourcefile
-    self._methodname = methodname
-
-  def iter_possible_tests(self, context):
-    for classname in self._classnames_from_source_file(context):
-      # Tack the methodname onto all classes in the source file, as we
-      # can't know which method the user intended.
-      yield Test(classname=classname, methodname=self._methodname)
-
-  def _classnames_from_source_file(self, context):
-    source_products = context.products.get_data('classes_by_source').get(self._sourcefile)
-    if not source_products:
-      # It's valid - if questionable - to have a source file with no classes when, for
-      # example, the source file has all its code commented out.
-      context.log.warn('Source file {0} generated no classes'.format(self._sourcefile))
-    else:
-      for _, classes in source_products.rel_paths():
-        for cls in classes:
-          yield ClasspathUtil.classname_for_rel_classfile(cls)
-
-
-class _ClassnameSpec(_TestSpecification):
-  """Models a test specification in [classname]#[methodnme] format."""
-
-  def __init__(self, classname, methodname):
-    self._classname = classname
-    self._methodname = methodname
-
-  def iter_possible_tests(self, context):
-    yield Test(classname=self._classname, methodname=self._methodname)
 
 
 class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
@@ -143,8 +59,11 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--batch-size', advanced=True, type=int, default=cls._BATCH_ALL, fingerprint=True,
              help='Run at most this many tests in a single test process.')
     register('--test', type=list, fingerprint=True,
-             help='Force running of just these tests.  Tests can be specified using any of: '
-                  '[classname], [classname]#[methodname], [filename] or [filename]#[methodname]')
+             help='Force running of just these tests. Tests can be specified using any of: '
+                  '[classname], [classname]#[methodname], [fully qualified classname], '
+                  '[fully qualified classname]#[methodname]. If classname is not fully qualified, '
+                  'all matching tests will be run. For example, if `foo.bar.TestClass` and '
+                  '`foo.baz.TestClass` exist and `TestClass` is supplied, then both will run.')
     register('--per-test-timer', type=bool, help='Show progress and timer for each test.')
     register('--default-concurrency', advanced=True, fingerprint=True,
              choices=JUnitTests.VALID_CONCURRENCY_OPTS, default=JUnitTests.CONCURRENCY_SERIAL,
@@ -191,24 +110,11 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return super(JUnitRun, cls).subsystem_dependencies() + (CodeCoverage, DistributionLocator, JUnit)
 
   @classmethod
-  def request_classes_by_source(cls, test_specs):
-    """Returns true if the given test specs require the `classes_by_source` product to satisfy."""
-    buildroot = get_buildroot()
-    for test_spec in test_specs:
-      if isinstance(_TestSpecification.parse(buildroot, test_spec), _SourcefileSpec):
-        return True
-    return False
-
-  @classmethod
   def prepare(cls, options, round_manager):
     super(JUnitRun, cls).prepare(options, round_manager)
 
     # Compilation and resource preparation must have completed.
     round_manager.require_data('runtime_classpath')
-
-    # If the given test specs require the classes_by_source product, request it.
-    if cls.request_classes_by_source(options.test or ()):
-      round_manager.require_data('classes_by_source')
 
   class OptionError(TaskError):
     """Indicates an invalid combination of options for this task."""
@@ -338,23 +244,14 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     test_registry = RegistryOfTests(tuple(self._calculate_tests_from_targets(targets)))
 
     if targets and self._tests_to_run:
-      # If there are some junit_test targets in the graph, find ones that match the requested
-      # test(s).
-      possible_test_to_target = {}
-      unknown_tests = []
-      for possible_test in self._get_possible_tests_to_run():
-        target = test_registry.get_owning_target(possible_test)
-        if target is None:
-          unknown_tests.append(possible_test)
-        else:
-          possible_test_to_target[possible_test] = target
-
+      matched_spec_to_target, unknown_tests = test_registry.match_test_spec(
+        self._get_possible_tests_to_run())
       if len(unknown_tests) > 0:
         raise TaskError("No target found for test specifier(s):\n\n  '{}'\n\nPlease change "
                         "specifier or bring in the proper target(s)."
                         .format("'\n  '".join(t.render_test_spec() for t in unknown_tests)))
 
-      return RegistryOfTests(possible_test_to_target)
+      return RegistryOfTests(matched_spec_to_target)
     else:
       return test_registry
 
@@ -513,11 +410,29 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       for i in range(0, len(sorted_tests), stride):
         yield properties, sorted_tests[i:i + stride]
 
+  def _parse(self, test_spec_str):
+    """Parses a test specification string into an object that can yield corresponding tests.
+
+    Tests can be specified in one of four forms:
+
+    * [classname]
+    * [classname]#[methodname]
+    * [fully qualified classname]#[methodname]
+    * [fully qualified classname]#[methodname]
+
+    :param string test_spec: A test specification.
+    :returns: A Test object.
+    :rtype: :class:`Test`
+    """
+    components = test_spec_str.split('#', 2)
+    classname = components[0]
+    methodname = components[1] if len(components) == 2 else None
+
+    return Test(classname=classname, methodname=methodname)
+
   def _get_possible_tests_to_run(self):
-    buildroot = get_buildroot()
-    for test_spec in self._tests_to_run:
-      for test in _TestSpecification.parse(buildroot, test_spec).iter_possible_tests(self.context):
-        yield test
+    for test_spec_str in self._tests_to_run:
+      yield self._parse(test_spec_str)
 
   def _calculate_tests_from_targets(self, targets):
     """

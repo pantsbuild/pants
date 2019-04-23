@@ -68,6 +68,36 @@ class RegistryOfTests(object):
     """
     return len(self._test_to_target) == 0
 
+  def match_test_spec(self, possible_test_specs):
+    """
+    This matches the user specified test spec with what tests Pants knows.
+
+    Each non fully qualified test spec may get matched with multiple targets.
+
+    :param possible_test_specs: an iterable of user specified test spec
+    :return: dict test_spec -> target
+    """
+    # dict of non fully qualified classname to a list of fully qualified test specs
+    cn_to_specs = defaultdict(list)
+    for test_spec in self._test_to_target.keys():
+      fqcn = test_spec.classname
+      cn_to_specs[test_spec.classname].append(test_spec)
+
+      non_fqcn = fqcn.split('.')[-1]
+      cn_to_specs[non_fqcn].append(test_spec)
+
+    matched_spec_to_target = {}
+    unknown_tests = []
+    for possible_test_spec in possible_test_specs:
+      if possible_test_spec.classname in cn_to_specs:
+        for full_spec in cn_to_specs[possible_test_spec.classname]:
+          new_fully_qualified_test_spec = Test(full_spec.classname, possible_test_spec.methodname)
+          matched_spec_to_target[new_fully_qualified_test_spec] = self._test_to_target[full_spec]
+      else:
+        unknown_tests.append(possible_test_spec)
+
+    return matched_spec_to_target, unknown_tests
+
   def get_owning_target(self, test):
     """Return the target that owns the given test.
 
@@ -88,6 +118,7 @@ class RegistryOfTests(object):
     :return: An index of tests by shared properties.
     :rtype: dict from tuple of properties to a tuple of :class:`Test`.
     """
+
     def combined_indexer(tgt):
       return tuple(indexer(tgt) for indexer in indexers)
 
