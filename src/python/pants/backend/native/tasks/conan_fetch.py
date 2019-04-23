@@ -97,7 +97,7 @@ class ConanFetch(SimpleCodegenTask):
       with temporary_dir() as remotes_install_dir:
         # Create an artificial conan configuration dir containing just remotes.txt.
         remotes_txt_for_install = os.path.join(remotes_install_dir, 'remotes.txt')
-        safe_file_dump(remotes_txt_for_install, self._remotes_txt_content, mode='w')
+        safe_file_dump(remotes_txt_for_install, self._remotes_txt_content)
         # Configure the desired user home from this artificial config dir.
         argv = ['config', 'install', remotes_install_dir]
         workunit_factory = functools.partial(
@@ -115,7 +115,7 @@ class ConanFetch(SimpleCodegenTask):
             exit_code=exit_code)
       # Generate the sentinel file so that we know the remotes have been successfully configured for
       # this particular task fingerprint in successive pants runs.
-      safe_file_dump(remotes_txt_sentinel, self._remotes_txt_content, mode='w')
+      safe_file_dump(remotes_txt_sentinel, self._remotes_txt_content)
 
     return user_home
 

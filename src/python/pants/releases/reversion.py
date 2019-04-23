@@ -81,7 +81,7 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
 
   output_records = []
   file_name = os.path.join(workspace, dst_record_file)
-  for line in read_file(file_name, binary_mode=False).splitlines():
+  for line in read_file(file_name).splitlines():
     filename, fingerprint_str, size_str = line.rsplit(',', 3)
     if filename in mutated_files:
       fingerprint_str, size_str = fingerprint_file(workspace, filename)
@@ -90,7 +90,7 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
       output_line = line
     output_records.append(output_line)
 
-  safe_file_dump(file_name, '\r\n'.join(output_records) + '\r\n', mode='w')
+  safe_file_dump(file_name, '\r\n'.join(output_records) + '\r\n')
 
 
 # The wheel METADATA file will contain a line like: `Version: 1.11.0.dev3+7951ec01`.

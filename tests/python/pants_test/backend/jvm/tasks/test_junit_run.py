@@ -218,7 +218,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     # Existing files (with and without the method name) should trigger.
     srcfile = os.path.join(self.test_workdir, 'this.is.a.source.file.scala')
-    safe_file_dump(srcfile, 'content!', mode='w')
+    safe_file_dump(srcfile, 'content!')
     self.assertTrue(JUnitRun.request_classes_by_source([srcfile]))
     self.assertTrue(JUnitRun.request_classes_by_source(['{}#method'.format(srcfile)]))
 

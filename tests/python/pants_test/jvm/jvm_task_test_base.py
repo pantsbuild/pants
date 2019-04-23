@@ -53,7 +53,7 @@ class JvmTaskTestBase(TaskTestBase):
     safe_mkdir(target_dir)
     classpath_dir = safe_mkdtemp(dir=target_dir)
     for rel_path, content in files_dict.items():
-      safe_file_dump(os.path.join(classpath_dir, rel_path), content, mode='w')
+      safe_file_dump(os.path.join(classpath_dir, rel_path), content)
     # Add to the classpath.
     runtime_classpath.add_for_target(tgt, [('default', classpath_dir)])
 
