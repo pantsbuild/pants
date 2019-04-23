@@ -700,10 +700,10 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] [-c] [-3] (-h|-n|-f|-t|-l|-o|-e|-p)"
+  echo "Usage: $0 [-d] [-c] [-2] (-h|-n|-f|-t|-l|-o|-e|-p)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
-  echo " -3  Release any non-universal wheels (i.e. pantsbuild.pants) as Python 3. Defaults to Python 2."
+  echo " -2  Release any non-universal wheels (i.e. pantsbuild.pants) as Python 2. Defaults to Python 3."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
   echo "       an ephemeral virtualenv and exercised to validate basic"
