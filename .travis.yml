@@ -758,9 +758,9 @@ base_deploy: &base_deploy
   env:
     - &base_deploy_env RUN_PANTS_FROM_PEX=1
 
-py36_deploy_stable_multiplatform_pex: &py36_deploy_stable_multiplatform_pex
+py36_deploy_stable_pex: &py36_deploy_stable_pex
   <<: *base_deploy
-  name: "Deploy stable multiplatform pants.pex (Py3.6 PEX)"
+  name: "Deploy stable pants.pex (Py3.6 PEX)"
   stage: *build_stable
   env:
     - *base_deploy_env
@@ -782,9 +782,9 @@ py36_deploy_stable_multiplatform_pex: &py36_deploy_stable_multiplatform_pex
       tags: true
       repo: pantsbuild/pants
 
-py36_deploy_unstable_multiplatform_pex: &py36_deploy_unstable_multiplatform_pex
+py36_deploy_unstable_pex: &py36_deploy_unstable_pex
   <<: *base_deploy
-  name: "Deploy unstable multiplatform pants.pex (Py3.6 PEX)"
+  name: "Deploy unstable pants.pex (Py3.6 PEX)"
   stage: *build_unstable
   env:
     - *base_deploy_env
@@ -1780,8 +1780,8 @@ matrix:
     - <<: *py36_jvm_tests
     - <<: *py37_jvm_tests
 
-    - <<: *py36_deploy_stable_multiplatform_pex
-    - <<: *py36_deploy_unstable_multiplatform_pex
+    - <<: *py36_deploy_stable_pex
+    - <<: *py36_deploy_unstable_pex
 
 deploy:
   # Deploy whatever a previous stage has left in dist/deploy.
