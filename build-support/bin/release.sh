@@ -10,11 +10,11 @@ source ${ROOT}/build-support/common.sh
 # Note we parse some options here, but parse most at the bottom. This is due to execution order.
 # If the option must be used right away, we parse at the top of the script, whereas if it
 # depends on functions defined later in the script, we parse at the end.
-_OPTS="hdnftcloepqw3"
+_OPTS="hdnftcloepqw2"
 
 while getopts "${_OPTS}"  opt; do
   case ${opt} in
-    3) python_three="true" ;;
+    2) python_two="true" ;;
     *) ;;  # skip over other args to be parsed later
   esac
 done
@@ -24,12 +24,12 @@ OPTIND=0
 
 # Setup Python interpreter constraints and pick a suitable interpreter to be used for the
 # virtualenv.
-if [[ "${python_three:-false}" == "true" ]]; then
-  default_interpreter="python3.6"
-  interpreter_constraint="CPython==3.6.*"
-else
+if [[ "${python_two:-false}" == "true" ]]; then
   default_interpreter="python2.7"
   interpreter_constraint="CPython==2.7.*"
+else
+  default_interpreter="python3.6"
+  interpreter_constraint="CPython==3.6.*"
 fi
 # Note we allow the user to predefine this value so that they may point to a specific interpreter,
 # e.g. 2.7.13 vs. 2.7.15.
@@ -104,8 +104,8 @@ function run_packages_script() {
   (
     cd "${ROOT}"
     args=("$@")
-    if [[ "${python_three:-false}" == "true" ]]; then
-      args=("--py3" ${args[@]})
+    if [[ "${python_two:-false}" == "true" ]]; then
+      args=("--py2" ${args[@]})
     fi
     requirements=("$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)")
     run_pex "${requirements[@]}" -- "${ROOT}/src/python/pants/releases/packages.py" "${args[@]}"
@@ -584,9 +584,9 @@ function build_pex() {
   local linux_platform_noabi="linux_x86_64"
   local osx_platform_noabi="macosx_10.11_x86_64"
 
-  dest_suffix="py27.pex"
-  if [[ "${python_three:-false}" == "true" ]]; then
-    dest_suffix="py36.pex"
+  dest_suffix="py36.pex"
+  if [[ "${python_two:-false}" == "true" ]]; then
+    dest_suffix="py27.pex"
   fi
 
   case "${mode}" in
@@ -611,16 +611,11 @@ function build_pex() {
       ;;
     fetch)
       local platforms=()
-      # Note once Pex can release flexible binaries (#654), we could release Pants as one big flexible Pex
-      # by consolidating the below ABIs into one entry. At the moment, we do not want to do this, as we expect
-      # organizations to pin their Python version. We also do not want the Pex to default to Py27 when the user
-      # would rather use Py3, as it will default to using the minimum acceptable interpreter discoverable.
-      # This decision may be worth revisiting once we drop Py2 support so that we instead release one universal
-      # Pex that works with any Python 3.6+ version.
-      abis=("cp-27-mu" "cp-27-m")
-      if [[ "${python_three:-false}" == "true" ]]; then
-        # To add Py37 support to the Pex, we will need to ensure we have Py37 wheels built and then add "cp-37-m" here.
-        abis=("cp-36-m")
+      # TODO: once we add Python 3.7 PEX support, which requires first building Py37 wheels,
+      # we'll want to release one big flexible Pex that works with Python 3.6+.
+      abis=("cp-36-m")
+      if [[ "${python_two:-false}" == "true" ]]; then
+        abis=("cp-27-mu" "cp-27-m")
       fi
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
@@ -745,7 +740,7 @@ while getopts "${_OPTS}" opt; do
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;
     w) list_prebuilt_wheels ; exit $? ;;
-    3) ;;  # already parsed at top of file
+    2) ;;  # already parsed at top of file
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done

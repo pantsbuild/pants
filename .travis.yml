@@ -375,7 +375,7 @@ py27_linux_build_engine: &py27_linux_build_engine
     # TODO: While this image shouldn't have any cache to fetch anything from, it fails to find
     # libpython2.7.so.1 during the cargo build, despite the image being built with --enable-shared,
     # unless the -x argument is added. This isn't expected to affect build time too much.
-    - docker_run_command="./build-support/bin/ci.sh -2bx && ./build-support/bin/release.sh -f"
+    - docker_run_command="./build-support/bin/ci.sh -2bx && ./build-support/bin/release.sh -2f"
     - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
@@ -427,7 +427,7 @@ py27_osx_build_engine: &py27_osx_build_engine
   script:
     - ./build-support/bin/ci.sh -2b
     #  Also build fs_util.
-    - ./build-support/bin/release.sh -f
+    - ./build-support/bin/release.sh -2f
     - *aws_deploy_pants_pex
 
 py36_osx_build_engine: &py36_osx_build_engine
@@ -568,7 +568,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
     - docker_image_name=travis_ci_py27_ucs2
     - docker_run_command="./build-support/bin/ci.sh -2b
                           && ./build-support/bin/check_pants_pex_abi.py cp27m
-                          && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
+                          && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -2n"
     - CACHE_NAME=linuxwheelsbuild.ucs2
 
 py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
@@ -582,7 +582,7 @@ py27_linux_build_wheels_ucs4: &py27_linux_build_wheels_ucs4
     - *base_build_wheels_env
     - docker_image_name=travis_ci
     - docker_run_command="./build-support/bin/check_pants_pex_abi.py cp27mu
-                          && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
+                          && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -2n"
     - CACHE_NAME=linuxwheelsbuild.ucs4
 
 py36_linux_build_wheels: &py36_linux_build_wheels
@@ -594,7 +594,7 @@ py36_linux_build_wheels: &py36_linux_build_wheels
     - *base_build_wheels_env
     - docker_image_name=travis_ci
     - docker_run_command="./build-support/bin/check_pants_pex_abi.py abi3 cp36m
-                          && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n"
+                          && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
     - CACHE_NAME=linuxwheelsbuild.abi3
 
 base_osx_build_wheels: &base_osx_build_wheels
@@ -616,7 +616,7 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
     - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY27_VERSION}']"
   script:
     - ./build-support/bin/check_pants_pex_abi.py cp27m
-    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -2n
 
 py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   <<: *py27_osx_config
@@ -635,7 +635,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
   script:
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu
-    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -2n
 
 py36_osx_build_wheels: &py36_osx_build_wheels
   <<: *py36_osx_test_config
@@ -651,7 +651,7 @@ py36_osx_build_wheels: &py36_osx_build_wheels
     - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY36_VERSION}']"
   script:
     - ./build-support/bin/check_pants_pex_abi.py abi3 cp36m
-    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n
+    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
 
 # -------------------------------------------------------------------------
 # Rust tests
@@ -873,7 +873,7 @@ py27_deploy_stable_multiplatform_pex: &py27_deploy_stable_multiplatform_pex
   env:
     - *base_deploy_env
     - *base_deploy_stable_env
-    - RELEASE_ARGS=""
+    - RELEASE_ARGS="-2"
     - CACHE_NAME=linuxpexdeploystable.py27
 
 py36_deploy_stable_multiplatform_pex: &py36_deploy_stable_multiplatform_pex
@@ -882,7 +882,7 @@ py36_deploy_stable_multiplatform_pex: &py36_deploy_stable_multiplatform_pex
   env:
     - *base_deploy_env
     - *base_deploy_stable_env
-    - RELEASE_ARGS="-3"
+    - RELEASE_ARGS=""
     - CACHE_NAME=linuxpexdeploystable.py36
 
 base_deploy_unstable_multiplatform_pex: &base_deploy_unstable_multiplatform_pex
@@ -901,7 +901,7 @@ py27_deploy_unstable_multiplatform_pex: &py27_deploy_unstable_multiplatform_pex
   env:
     - *base_deploy_env
     - *base_deploy_unstable_env
-    - RELEASE_ARGS=""
+    - RELEASE_ARGS="-2"
     - CACHE_NAME=linuxpexdeployunstable.py27
 
 py36_deploy_unstable_multiplatform_pex: &py36_deploy_unstable_multiplatform_pex
@@ -910,7 +910,7 @@ py36_deploy_unstable_multiplatform_pex: &py36_deploy_unstable_multiplatform_pex
   env:
     - *base_deploy_env
     - *base_deploy_unstable_env
-    - RELEASE_ARGS="-3"
+    - RELEASE_ARGS=""
     - CACHE_NAME=linuxpexdeployunstable.py36
 
 # -------------------------------------------------------------------------

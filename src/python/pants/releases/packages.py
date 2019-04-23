@@ -91,7 +91,7 @@ def find_platform_name():
   return get_platform().replace("-", "_").replace(".", "_")
 
 
-def core_packages(py3):
+def core_packages(py2):
   # N.B. When releasing with Python 3, we constrain the ABI (Application Binary Interface) to cp36 to allow
   # pantsbuild.pants to work with any Python 3 version>= 3.6. We are able to get this future compatibility by
   # specifing `abi3`, which signifies any version >= 3.6 must work. This is possible to set because in
@@ -99,7 +99,7 @@ def core_packages(py3):
   # set ext_modules, which together allows us to mark the abi tag. See https://docs.python.org/3/c-api/stable.html
   # for documentation and https://bitbucket.org/pypa/wheel/commits/1f63b534d74b00e8c2e8809f07914f6da4502490?at=default#Ldocs/index.rstT121
   # for how to mark the ABI through bdist_wheel.
-  bdist_wheel_flags = ("--py-limited-api", "cp36") if py3 else ("--python-tag", "cp27", "--plat-name", find_platform_name())
+  bdist_wheel_flags = ("--py-limited-api", "cp36") if not py2 else ("--python-tag", "cp27", "--plat-name", find_platform_name())
   return {
     Package("pantsbuild.pants", "//src/python/pants:pants-packaged", bdist_wheel_flags=bdist_wheel_flags),
     Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
@@ -184,13 +184,13 @@ def contrib_packages():
   }
 
 
-def all_packages(py3):
-  return core_packages(py3).union(contrib_packages())
+def all_packages(py2):
+  return core_packages(py2).union(contrib_packages())
 
 
-def build_and_print_packages(version, py3=False):
+def build_and_print_packages(version, py2=False):
   packages_by_flags = defaultdict(list)
-  for package in sorted(all_packages(py3)):
+  for package in sorted(all_packages(py2)):
     packages_by_flags[package.bdist_wheel_flags].append(package)
 
   for (flags, packages) in packages_by_flags.items():
@@ -217,9 +217,9 @@ def get_pypi_config(section, option):
   return config.get(section, option)
 
 
-def check_ownership(users, minimum_owner_count=3, py3=False):
+def check_ownership(users, minimum_owner_count=3, py2=False):
   minimum_owner_count = max(len(users), minimum_owner_count)
-  packages = sorted(all_packages(py3))
+  packages = sorted(all_packages(py2))
   banner("Checking package ownership for {} packages".format(len(packages)))
   users = {user.lower() for user in users}
   insufficient = set()
@@ -255,9 +255,9 @@ def check_ownership(users, minimum_owner_count=3, py3=False):
 
 def _create_parser():
   parser = argparse.ArgumentParser()
-  # Note because of how argparse handles subparsers, the --py3 flag must be passed before any of the subparser
+  # Note because of how argparse handles subparsers, the --py2 flag must be passed before any of the subparser
   # flags to resolve properly.
-  parser.add_argument("-3", "--py3", action="store_true", default=False, help="Release any non-universal packages as Python 3.")
+  parser.add_argument("-2", "--py2", action="store_true", default=False, help="Release any non-universal packages as Python 2.")
   subparsers = parser.add_subparsers(dest="command")
   # list
   parser_list = subparsers.add_parser('list')
@@ -278,11 +278,11 @@ if args.command == "list":
   if args.with_packages:
     print('\n'.join(
       '{} {} {}'.format(package.name, package.target, " ".join(package.bdist_wheel_flags))
-      for package in sorted(all_packages(args.py3))))
+      for package in sorted(all_packages(args.py2))))
   else:
-    print('\n'.join(package.name for package in sorted(all_packages(args.py3))))
+    print('\n'.join(package.name for package in sorted(all_packages(args.py2))))
 elif args.command == "list-owners":
-  for package in sorted(all_packages(args.py3)):
+  for package in sorted(all_packages(args.py2)):
     if not package.exists():
       print("The {} package is new!  There are no owners yet.".format(package.name), file=sys.stderr)
       continue
@@ -291,8 +291,8 @@ elif args.command == "list-owners":
       print("{}".format(owner))
 elif args.command == "check-my-ownership":
   me = get_pypi_config('server-login', 'username')
-  check_ownership({me}, py3=args.py3)
+  check_ownership({me}, py2=args.py2)
 elif args.command == "build_and_print":
-  build_and_print_packages(args.version, py3=args.py3)
+  build_and_print_packages(args.version, py2=args.py2)
 else:
   raise argparse.ArgumentError("Didn't recognise arguments {}".format(args))
