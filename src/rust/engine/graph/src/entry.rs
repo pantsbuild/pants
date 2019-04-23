@@ -502,7 +502,7 @@ impl<N: Node> Entry<N> {
         } else {
           // If the new result does not match the previous result, the generation increments.
           let (generation, next_result) = if let Some(result) = result {
-            if Some(&result) == previous_result.as_ref().map(|v| v.as_ref()) {
+            if Some(&result) == previous_result.as_ref().map(EntryResult::as_ref) {
               // Node was re-executed, but had the same result value.
               (generation, EntryResult::Clean(result))
             } else {
