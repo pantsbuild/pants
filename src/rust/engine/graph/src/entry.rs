@@ -202,9 +202,10 @@ impl<N: Node> Entry<N> {
   pub fn peek(&self) -> Option<Result<N::Item, N::Error>> {
     let state = self.state.lock();
     match *state {
-      EntryState::Completed { ref result, .. } if !result.is_dirty() => {
-        Some(result.as_ref().clone())
-      }
+      EntryState::Completed {
+        result: EntryResult::Clean(ref result),
+        ..
+      } => Some(result.clone()),
       _ => None,
     }
   }
@@ -589,7 +590,12 @@ impl<N: Node> Entry<N> {
   ///
   /// Clears the state of this Node, forcing it to be recomputed.
   ///
-  /// TODO(DO NOT MERGE): Either avoid needing the graph_still_contains_edges argument, or document it.
+  /// # Arguments
+  ///
+  /// * `graph_still_contains_edges` - If the caller has guaranteed that all edges from this Node
+  ///   have been removed from the graph, they should pass false here, else true. We may want to
+  ///   remove this parameter, and force this method to remove the edges, but that would require
+  ///   acquiring the graph lock here, which we currently don't do.
   ///
   pub(crate) fn clear(&mut self, graph_still_contains_edges: bool) {
     let mut state = self.state.lock();
@@ -662,8 +668,8 @@ impl<N: Node> Entry<N> {
         ref previous_result,
         ..
       } => {
-        if let Some(previous_result) = previous_result {
-          previous_result.is_dirty()
+        if let Some(EntryResult::Dirty(..)) = previous_result {
+          true
         } else {
           false
         }
