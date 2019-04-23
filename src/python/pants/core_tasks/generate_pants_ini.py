@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os.path
+import sys
 from textwrap import dedent
 
 from pants.base.build_environment import get_default_pants_config_file
@@ -36,6 +37,15 @@ class GeneratePantsIni(ConsoleTask):
 
     with open(pants_ini_path, "w") as f:
       f.write(pants_ini_content)
+
+    # If the user is using our provided `./pants` script, we rename the venv folder to avoid
+    # a second bootstrap.
+    venv_folder = sys.exec_prefix
+    if os.path.basename(venv_folder).startswith("unspecified_py"):
+      py_version = venv_folder[-2:]
+      new_venv_folder = "{}/{}_py{}".format(os.path.dirname(venv_folder), pants_version, py_version)
+      os.rename(venv_folder, new_venv_folder)
+      yield "* Renaming the venv folder to `{}`.".format(new_venv_folder)
 
     yield ("You may modify these values directly in the file at any time. "
            "The ./pants script will detect any changes the next time you run it.")
