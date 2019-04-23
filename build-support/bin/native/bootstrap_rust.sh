@@ -7,11 +7,11 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # + fingerprint_data: Fingerprints the data on stdin.
 source "${REPO_ROOT}/build-support/common.sh"
 
-readonly rust_toolchain_root="${CACHE_ROOT}/rust"
+rust_toolchain_root="${CACHE_ROOT}/rust"
 export CARGO_HOME="${rust_toolchain_root}/cargo"
 export RUSTUP_HOME="${rust_toolchain_root}/rustup"
 
-readonly RUSTUP="${CARGO_HOME}/bin/rustup"
+RUSTUP="${CARGO_HOME}/bin/rustup"
 
 function cargo_bin() {
   "${RUSTUP}" which cargo
@@ -22,6 +22,7 @@ function cargo_bin() {
 # to use their recommend install, and downgrade to their workaround if necessary.
 function curl_rustup_init_script_while_maybe_downgrading() {
   if ! curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs; then
+    log "Initial 'curl' command failed, trying backup url..."
     case "$(uname)" in
       Darwin)
         host_triple='x86_64-apple-darwin'
@@ -50,11 +51,15 @@ function bootstrap_rust() {
   if [[ ! -x "${RUSTUP}" ]]; then
     log "A pants owned rustup installation could not be found, installing via the instructions at" \
         "https://www.rustup.rs ..."
-    local -r rustup_tmp=$(mktemp -t pants.rustup.XXXXXX)
-    curl_rustup_init_script_while_maybe_downgrading > ${rustup_tmp}
+    local -r rustup_tmp_dir="$(mktemp -d)"
+    trap "rm -rf ${rustup_tmp_dir}" EXIT
+    # NB: The downloaded file here *must* be named `rustup-init`, or the workaround binary fails
+    # with "info: caused by: No such file or directory (os error 2)".
+    local -r rustup_init_destination="${rustup_tmp_dir}/rustup-init"
     # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
-    sh ${rustup_tmp} -y --no-modify-path --default-toolchain none 1>&2
-    rm -f ${rustup_tmp}
+    curl_rustup_init_script_while_maybe_downgrading > "$rustup_init_destination"
+    chmod +x "$rustup_init_destination"
+    "$rustup_init_destination" -y --no-modify-path --default-toolchain none 1>&2
   fi
 
   local -r cargo="${CARGO_HOME}/bin/cargo"
