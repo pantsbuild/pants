@@ -119,7 +119,7 @@ and/or files which need to be edited will be dumped to: {}
                      .format(cm.exception.output_file))
     self.assertEqual(
       'src/py-thrift:no-py-namespace: [src/py-thrift/bad.thrift]\n',
-      read_file(cm.exception.output_file, binary_mode=False))
+      read_file(cm.exception.output_file))
 
   def test_clashing_namespace_same_target(self):
     clashing_same_target = self._target_dict()['clashing-namespace']

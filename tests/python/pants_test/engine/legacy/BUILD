@@ -181,16 +181,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'pants_engine_integration',
-  sources = ['test_pants_engine_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:py2_compat',
-  ],
-  tags = {'integration'}
-)
-
-python_tests(
   name = 'parser',
   sources = ['test_parser.py'],
   dependencies = [

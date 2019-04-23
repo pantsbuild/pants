@@ -11,6 +11,7 @@ import time
 from builtins import object, open, str, zip
 from types import GeneratorType
 
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
@@ -21,7 +22,6 @@ from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
 from pants.engine.rules import RuleIndex, TaskRule
 from pants.engine.selectors import Params
-from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.objects import datatype
@@ -484,8 +484,9 @@ class SchedulerSession(object):
 
   def run_console_rule(self, product, subject):
     """
-    :param product: product type for the request.
+    :param product: A Goal subtype.
     :param subject: subject for the request.
+    :returns: An exit_code for the given Goal.
     """
     request = self.execution_request([product], [subject])
     returns, throws = self.execute(request)
@@ -493,9 +494,10 @@ class SchedulerSession(object):
     if throws:
       _, state = throws[0]
       exc = state.exc
-      if isinstance(exc, GracefulTerminationException):
-        raise exc
       self._trace_on_error([exc], request)
+      return PANTS_FAILED_EXIT_CODE
+    _, state = returns[0]
+    return state.value.exit_code
 
   def product_request(self, product, subjects):
     """Executes a request for a single product for some subjects, and returns the products.

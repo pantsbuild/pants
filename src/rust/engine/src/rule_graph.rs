@@ -290,7 +290,7 @@ impl<'t> GraphMaker<'t> {
       .collect();
     let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules
       .keys()
-      .filter_map(|f| f.task_rule())
+      .filter_map(EntryWithDeps::task_rule)
       .cloned()
       .collect();
     self

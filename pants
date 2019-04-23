@@ -2,42 +2,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
-
-interpreter_constraints_sentinel_file_path='.python-interpreter-constraints'
-
-function clean_if_interpreter_constraints_changed() {
-  new_interpreter_constraints="$1"
-
-  if [[ -n "${recursive_pants_shell_script_invocation:-}" ]]; then
-    return 0
-  fi
-
-  interpreter_constraints_file="${REPO_ROOT}/${interpreter_constraints_sentinel_file_path}"
-
-  if [[ -f "${interpreter_constraints_file}" ]]; then
-    previous_interpreter_constraints="$(cat "${interpreter_constraints_file}")"
-    if [[ "${new_interpreter_constraints}" == "${previous_interpreter_constraints}" ]]; then
-      return 0
-    fi
-  else
-    cat >&2 <<EOF
-${interpreter_constraints_sentinel_file_path} not found in the buildroot.
-Forcing an initial clean-all.
-EOF
-  fi
-
-  export recursive_pants_shell_script_invocation='y'
-  cat >&2 <<EOF
-Different interpreter constraints were set than were used in the previous Pants run.
-Clearing the cache and preparing a Python environment with these interpreter constraints:
-${new_interpreter_constraints}
-EOF
-  ./pants clean-all
-  echo "${new_interpreter_constraints}" > "${interpreter_constraints_file}"
-  unset recursive_pants_shell_script_invocation
-}
-
 # This bootstrap script runs pants from the live sources in this repo.
 #
 # Further support is added for projects wrapping pants with custom external extensions.  In the
@@ -102,11 +66,6 @@ export PY="${PY:-python3}"
 # we could end up using a different Python minor version for subprocesses than we do for Pants.
 py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
-
-# We can currently assume the CI environment does not switch python versions within a shard.
-if [[ "${ONLY_USING_SINGLE_PYTHON_VERSION:-false}" != 'true' ]]; then
-  clean_if_interpreter_constraints_changed "${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}"
-fi
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 

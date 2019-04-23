@@ -35,19 +35,16 @@ class TargetRootsCalculator(object):
 
     :param iterable target_specs: An iterable of string specs.
     :param string build_root: The path to the build root.
-    :returns: An `OrderedSet` of `Spec` objects.
+    :returns: A `Specs` object.
     """
     build_root = build_root or get_buildroot()
     spec_parser = CmdLineSpecParser(build_root)
 
     dependencies = tuple(OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in target_specs))
-    if not dependencies:
-      return None
-    return [Specs(
+    return Specs(
       dependencies=dependencies,
       exclude_patterns=exclude_patterns if exclude_patterns else tuple(),
       tags=tags)
-    ]
 
   @classmethod
   def changed_files(cls, scm, changes_since=None, diffspec=None):
@@ -85,7 +82,7 @@ class TargetRootsCalculator(object):
     logger.debug('changed_request is: %s', changed_request)
     logger.debug('owned_files are: %s', owned_files)
     targets_specified = sum(1 for item
-                         in (changed_request.is_actionable(), owned_files, spec_roots)
+                         in (changed_request.is_actionable(), owned_files, spec_roots.dependencies)
                          if item)
 
     if targets_specified > 1:
@@ -112,7 +109,7 @@ class TargetRootsCalculator(object):
       changed_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('changed addresses: %s', changed_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
-      return TargetRoots([Specs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags)])
+      return TargetRoots(Specs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags))
 
     if owned_files:
       # We've been provided no spec roots (e.g. `./pants list`) AND a owner request. Compute
@@ -121,6 +118,6 @@ class TargetRootsCalculator(object):
       owner_addresses, = session.product_request(BuildFileAddresses, [request])
       logger.debug('owner addresses: %s', owner_addresses)
       dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in owner_addresses)
-      return TargetRoots([Specs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags)])
+      return TargetRoots(Specs(dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags))
 
     return TargetRoots(spec_roots)

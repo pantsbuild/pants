@@ -51,14 +51,14 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
     result = self.do_command(
       '--no-v1',
       '--v2',
-      'lint',
+      'blah',
       '::',
       success=False
     )
 
     self.assertIn(
-      'could not satisfy the following goals with @console_rules: lint',
-      result.stderr_data
+      'Unknown goals: blah',
+      result.stdout_data
     )
 
   @ensure_daemon
@@ -78,7 +78,7 @@ class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
       rel_tmpdir = fast_relpath(tmpdir, get_buildroot())
 
       def dump(content):
-        safe_file_dump(os.path.join(tmpdir, 'BUILD'), content, mode='w')
+        safe_file_dump(os.path.join(tmpdir, 'BUILD'), content)
 
       # Dump an initial target before starting the loop.
       dump('target(name="one")')

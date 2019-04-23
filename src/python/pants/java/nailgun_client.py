@@ -267,7 +267,7 @@ class NailgunClient(object):
   def _maybe_write_pid_file(self):
     if self._current_remote_pid and self._current_remote_pgrp:
       remote_pid_file_path = self._get_remote_pid_file_path(os.getpid())
-      safe_file_dump(remote_pid_file_path, str(self._current_remote_pid), mode='w')
+      safe_file_dump(remote_pid_file_path, str(self._current_remote_pid))
 
   def _receive_remote_pid(self, pid):
     self._current_remote_pid = pid

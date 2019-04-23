@@ -20,13 +20,10 @@ env:
   global:
     - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
     - LC_ALL="en_US.UTF-8"
-    # This tells the ./pants runner script to avoid trying to clean the workspace when changing
-    # python versions. CI starts off without the .python-interpreter-constraints file, so it would otherwise
-    # run a clean-all without this env var.
-    - ONLY_USING_SINGLE_PYTHON_VERSION='true'
     - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
     - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
     - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
+    - PYENV_PY27_VERSION=2.7.15
     - PYENV_PY36_VERSION=3.6.8
     - PYENV_PY37_VERSION=3.7.2
     # NB: Linux shards use Pyenv to pre-install Python. We must not override
@@ -154,6 +151,8 @@ base_linux_config: &base_linux_config
   language: python
   before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
+    # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
+    #   https://github.com/pantsbuild/pants/issues/7601
     - pyenv global 2.7.15 3.6.7 3.7.1
   after_failure:
     - ./build-support/bin/ci-failure.sh
@@ -210,40 +209,57 @@ base_osx_config: &base_osx_config
     brew:
       packages:
       - openssl
-  before_install:
-    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
-    - chmod 755 /usr/local/bin/jq
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
 
 py27_osx_config: &py27_osx_config
   <<: *base_osx_config
+  # NB: We ensure sane python2 and python3 interpreters are available on the PATH for scripting
+  # against.
   env:
     - &py27_osx_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
+      PATH="/usr/local/opt/openssl/bin:${PATH}"
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
-
-py36_osx_config: &py36_osx_config
-  <<: *base_osx_config
-  env:
-    - &py36_osx_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
-
-py37_osx_config: &py37_osx_config
-  <<: *base_osx_config
-  env:
-    - &py37_osx_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
   before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY37_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
+
+py36_osx_config: &py36_osx_config
+  <<: *base_osx_config
+  # NB: We ensure sane python2 and python3 interpreters are available on the PATH for scripting
+  # against.
+  env:
+    - &py36_osx_config_env >
+      PATH="/usr/local/opt/openssl/bin:${PATH}"
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CPPFLAGS="-I/usr/local/opt/openssl/include"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+  before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
+
+py37_osx_config: &py37_osx_config
+  <<: *base_osx_config
+  # NB: We ensure sane python2 and python3 interpreters are available on the PATH for scripting
+  # against.
+  env:
+    - &py37_osx_config_env >
+      PATH="/usr/local/opt/openssl/bin:${PATH}"
+      LDFLAGS="-L/usr/local/opt/openssl/lib"
+      CPPFLAGS="-I/usr/local/opt/openssl/include"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+  before_install:
+    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
+    - chmod 755 /usr/local/bin/jq
+    - ./build-support/bin/install_aws_cli_for_ci.sh
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY37_VERSION}"
 
 base_osx_test_config: &base_osx_test_config
   <<: *pants_run_cache_config
@@ -258,10 +274,12 @@ py27_osx_test_config: &py27_osx_test_config
   stage: *test_cron
   env:
     - &py27_osx_test_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
+      PATH="/usr/local/opt/openssl/bin:${PATH}"
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
 
 py36_osx_test_config: &py36_osx_test_config
   <<: *py36_osx_config
@@ -269,10 +287,12 @@ py36_osx_test_config: &py36_osx_test_config
   stage: *test
   env:
     - &py36_osx_test_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
+      PATH="/usr/local/opt/openssl/bin:${PATH}"
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
 
 py37_osx_test_config: &py37_osx_test_config
   <<: *py37_osx_config
@@ -280,10 +300,12 @@ py37_osx_test_config: &py37_osx_test_config
   stage: *test_cron
   env:
     - &py37_osx_test_config_env >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
+      PATH="/usr/local/opt/openssl/bin:${PATH}"
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
 
 linux_with_fuse: &linux_with_fuse
   os: linux
@@ -587,6 +609,11 @@ py27_osx_build_wheels_ucs2: &py27_osx_build_wheels_ucs2
     - *py27_osx_test_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs2
+    - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs2
+    # We ensure selection of the the pyenv interpreter by PY aware scripts and pants.pex with these
+    # env vars.
+    - PY=${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin/python
+    - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY27_VERSION}']"
   script:
     - ./build-support/bin/check_pants_pex_abi.py cp27m
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
@@ -601,17 +628,10 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.ucs4
     - PYTHON_CONFIGURE_OPTS=--enable-unicode=ucs4
-    # We ensure selection of the the UCS4 interpreter by the pants script and pants.pex with these
+    # We ensure selection of the the pyenv interpreter by PY aware scripts and pants.pex with these
     # env vars.
-    - PYTHON_27_VERSION_UCS4=2.7.13
-    - PY=${PYENV_ROOT}/shims/python2.7
-    - PEX_PYTHON_PATH=${PYENV_ROOT}/shims/python2.7
-    - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYTHON_27_VERSION_UCS4}']"
-  before_install:
-    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
-    - chmod 755 /usr/local/bin/jq
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYTHON_27_VERSION_UCS4} ${PYENV_PY36_VERSION}
+    - PY=${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin/python
+    - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY27_VERSION}']"
   script:
     - ./build-support/bin/ci.sh -2b
     - ./build-support/bin/check_pants_pex_abi.py cp27mu
@@ -625,6 +645,10 @@ py36_osx_build_wheels: &py36_osx_build_wheels
     - *py36_osx_test_config_env
     - *base_build_wheels_env
     - CACHE_NAME=osxwheelsbuild.abi3
+    # We ensure selection of the the pyenv interpreter by PY aware scripts and pants.pex with these
+    # env vars.
+    - PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python
+    - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY36_VERSION}']"
   script:
     - ./build-support/bin/check_pants_pex_abi.py abi3 cp36m
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -3n
@@ -661,12 +685,14 @@ osx_rust_tests: &osx_rust_tests
       - openssl
       - osxfuse
   before_install:
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
+    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
   env:
     - >
-      PATH="/usr/local/opt/openssl/bin:$PATH"
+      PATH="/usr/local/opt/openssl/bin:${PATH}"
       LDFLAGS="-L/usr/local/opt/openssl/lib"
       CPPFLAGS="-I/usr/local/opt/openssl/include"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
+      PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=macosrusttests
 
 # -------------------------------------------------------------------------
@@ -814,6 +840,8 @@ base_deploy: &base_deploy
     - "2.7"
     - "3.6"
   before_install:
+    # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
+    #   https://github.com/pantsbuild/pants/issues/7601
     - pyenv global 2.7.14 3.6.3
   env:
     - &base_deploy_env RUN_PANTS_FROM_PEX=1

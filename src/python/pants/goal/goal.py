@@ -157,10 +157,13 @@ class _Goal(object):
     namesake_task = self._task_type_by_name.get(self.name)
     if namesake_task and namesake_task.__doc__:
       # First line of docstring.
-      # TODO: This is repetitive of Optionable.get_description(). We should probably just
-      # make Goal an Optionable, for uniformity.
-      return namesake_task.__doc__.partition('\n')[0].strip()
+      return namesake_task.__doc__
     return ''
+
+  @property
+  def description_first_line(self):
+    # TODO: This is repetitive of Optionable.get_description(), which is used by v2 Goals.
+    return self.description.partition('\n')[0].strip()
 
   def register_options(self, options):
     if self._options_registrar_cls:

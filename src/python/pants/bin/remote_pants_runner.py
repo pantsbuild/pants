@@ -172,7 +172,7 @@ class RemotePantsRunner(object):
     exception_text = None
     for source in sources:
       log_path = ExceptionSink.exceptions_log_path(for_pid=source)
-      exception_text = maybe_read_file(log_path, binary_mode=False)
+      exception_text = maybe_read_file(log_path)
       if exception_text:
         break
 

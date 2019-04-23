@@ -25,10 +25,10 @@ timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
-Exception caught: \\(pants\\.build_graph\\.address_lookup_error\\.AddressLookupError\\)
+Exception caught: \\([^)]*\\)
 (.|\n)*
 
-Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
+Exception message:.* 1 Exception encountered:
   ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
 """.format(pid=pid))
     # Ensure we write all output such as stderr and reporting files before closing any streams.
@@ -57,15 +57,15 @@ Exception message: Build graph construction failed: ExecutionError 1 Exception e
       self.assert_failure(pants_run)
       assertRegex(self, pants_run.stderr_data, """\
 timestamp: ([^\n]+)
-Exception caught: \\(pants\\.build_graph\\.address_lookup_error\\.AddressLookupError\\) \\(backtrace omitted\\)
-Exception message: Build graph construction failed: ExecutionError 1 Exception encountered:
+Exception caught: \\(pants\\.engine\\.scheduler\\.ExecutionError\\) \\(backtrace omitted\\)
+Exception message: 1 Exception encountered:
   ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
 """)
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
       self._assert_unhandled_exception_log_matches(
-        pants_run.pid, read_file(pid_specific_log_file, binary_mode=False))
+        pants_run.pid, read_file(pid_specific_log_file))
       self._assert_unhandled_exception_log_matches(
-        pants_run.pid, read_file(shared_log_file, binary_mode=False))
+        pants_run.pid, read_file(shared_log_file))
 
   def _assert_graceful_signal_log_matches(self, pid, signum, signame, contents):
     assertRegex(self, contents, """\
@@ -130,9 +130,9 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
         # Check that the logs show a graceful exit by SIGTERM.
         pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
         self._assert_graceful_signal_log_matches(
-          waiter_run.pid, signum, signame, read_file(pid_specific_log_file, binary_mode=False))
+          waiter_run.pid, signum, signame, read_file(pid_specific_log_file))
         self._assert_graceful_signal_log_matches(
-          waiter_run.pid, signum, signame, read_file(shared_log_file, binary_mode=False))
+          waiter_run.pid, signum, signame, read_file(shared_log_file))
 
   def test_dumps_traceback_on_sigabrt(self):
     # SIGABRT sends a traceback to the log file for the current process thanks to
@@ -140,13 +140,13 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
     with self._send_signal_to_waiter_handle(signal.SIGABRT) as (workdir, waiter_run):
       # Check that the logs show an abort signal and the beginning of a traceback.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
-      assertRegex(self, read_file(pid_specific_log_file, binary_mode=False), """\
+      assertRegex(self, read_file(pid_specific_log_file), """\
 Fatal Python error: Aborted
 
 Thread [^\n]+ \\(most recent call first\\):
 """)
       # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
-      self.assertEqual('', read_file(shared_log_file, binary_mode=False))
+      self.assertEqual('', read_file(shared_log_file))
 
   def test_prints_traceback_on_sigusr2(self):
     with self._make_waiter_handle() as (workdir, pid, join):
@@ -209,7 +209,7 @@ Current thread [^\n]+ \\(most recent call first\\):
 
     with temporary_dir() as tmpdir:
       some_file = os.path.join(tmpdir, 'some_file')
-      safe_file_dump(some_file, b'', mode='wb')
+      safe_file_dump(some_file, '')
       redirected_pants_run = self.run_pants([
         "--lifecycle-stubs-new-interactive-stream-output-file={}".format(some_file),
       ] + lifecycle_stub_cmdline)
@@ -217,4 +217,4 @@ Current thread [^\n]+ \\(most recent call first\\):
       # The Exiter prints the final error message to whatever the interactive output stream is set
       # to, so when it's redirected it won't be in stderr.
       self.assertNotIn('erroneous!', redirected_pants_run.stderr_data)
-      self.assertIn('erroneous!', read_file(some_file, binary_mode=False))
+      self.assertIn('erroneous!', read_file(some_file))

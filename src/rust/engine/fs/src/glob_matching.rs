@@ -282,7 +282,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
       .and_then(move |path_globs| {
         let child_globs = path_globs
           .into_iter()
-          .flat_map(|path_globs| path_globs.into_iter())
+          .flat_map(Vec::into_iter)
           .map(|pg| context.expand_single(result.clone(), exclude.clone(), pg))
           .collect::<Vec<_>>();
         future::join_all(child_globs)

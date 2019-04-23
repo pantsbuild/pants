@@ -204,8 +204,7 @@ class LegacyBuildGraph(BuildGraph):
     if not addresses:
       return
     dependencies = tuple(SingleAddress(a.spec_path, a.target_name) for a in addresses)
-    specs = [Specs(dependencies=tuple(dependencies))]
-    for _ in self._inject_specs(specs):
+    for _ in self._inject_specs(Specs(dependencies=tuple(dependencies))):
       pass
 
   def inject_roots_closure(self, target_roots, fail_fast=None):
@@ -213,9 +212,8 @@ class LegacyBuildGraph(BuildGraph):
       yield address
 
   def inject_specs_closure(self, specs, fail_fast=None):
-    specs = [Specs(dependencies=tuple(specs))]
     # Request loading of these specs.
-    for address in self._inject_specs(specs):
+    for address in self._inject_specs(Specs(dependencies=tuple(specs))):
       yield address
 
   def resolve_address(self, address):
@@ -251,18 +249,18 @@ class LegacyBuildGraph(BuildGraph):
         yielded_addresses.add(address)
         yield address
 
-  def _inject_specs(self, subjects):
-    """Injects targets into the graph for each of the given `Spec` objects.
+  def _inject_specs(self, specs):
+    """Injects targets into the graph for the given `Specs` object.
 
     Yields the resulting addresses.
     """
-    if not subjects:
+    if not specs:
       return
 
-    logger.debug('Injecting specs to %s: %s', self, subjects)
+    logger.debug('Injecting specs to %s: %s', self, specs)
     with self._resolve_context():
       thts, = self._scheduler.product_request(TransitiveHydratedTargets,
-                                              subjects)
+                                              [specs])
 
     self._index(thts.closure)
 

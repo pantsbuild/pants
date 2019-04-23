@@ -96,7 +96,7 @@ thrift sources for python thrift library targets will soon become required.
 and/or files which need to be edited will be dumped to: {}
 """.format(len(failing_py_thrift_by_target), no_py_namespace_output_file))
 
-      safe_file_dump(no_py_namespace_output_file, '{}\n'.format(pretty_printed_failures), mode='w')
+      safe_file_dump(no_py_namespace_output_file, '{}\n'.format(pretty_printed_failures))
 
       if self.get_options().strict:
         raise error

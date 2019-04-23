@@ -28,12 +28,8 @@ USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 # Our newly created user is unlikely to have a sane environment: set a locale at least.
 ENV LC_ALL="en_US.UTF-8"
 
-# This tells the ./pants runner script to avoid trying to clean the workspace when changing python
-# versions. CI starts off without the .python-interpreter-constraints file, so it would otherwise run a
-# clean-all without this env var.
-ENV ONLY_USING_SINGLE_PYTHON_VERSION 'true'
-
-# Expose the installed gcc to the invoking shell.
-ENTRYPOINT ["/usr/bin/scl", "enable", "devtoolset-7",  "--"]
-
 WORKDIR ${TRAVIS_WORK_DIR_PATH}
+
+# Execute any args passed to `docker run` in the context of the devtoolset-7 software collection
+# used in the base image to install requirements.
+ENTRYPOINT ["/usr/bin/scl", "enable" , "devtoolset-7", "--"]

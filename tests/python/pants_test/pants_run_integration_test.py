@@ -345,11 +345,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     if extra_env:
       env.update(extra_env)
 
-    # This tells the ./pants runner script to avoid trying to clean the workspace when changing
-    # python versions. Since integration tests are run in a new buildroot, we don't need to do the
-    # clean-all.
-    env['ONLY_USING_SINGLE_PYTHON_VERSION'] = 'true'
-
     # Don't overwrite the profile of this process in the called process.
     # Instead, write the profile into a sibling file.
     if env.get('PANTS_PROFILE'):

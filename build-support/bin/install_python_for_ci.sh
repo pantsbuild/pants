@@ -28,5 +28,3 @@ for python_version in "${PYTHON_VERSIONS[@]}"; do
     "${PYENV_BIN}" install "${python_version}"
   fi
 done
-
-"${PYENV_BIN}" global "${PYTHON_VERSIONS[@]}"

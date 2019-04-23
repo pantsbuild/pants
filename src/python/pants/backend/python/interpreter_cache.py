@@ -46,13 +46,13 @@ class PythonInterpreterCache(Subsystem):
       if cls._matches(interpreter, filters=filters):
         yield interpreter
 
-  @memoized_property
-  def _python_setup(self):
+  @property
+  def python_setup(self):
     return PythonSetup.global_instance()
 
   @memoized_property
   def _cache_dir(self):
-    cache_dir = self._python_setup.interpreter_cache_dir
+    cache_dir = self.python_setup.interpreter_cache_dir
     safe_mkdir(cache_dir)
     return cache_dir
 
@@ -70,7 +70,7 @@ class PythonInterpreterCache(Subsystem):
 
     for target in targets:
       if isinstance(target, PythonTarget):
-        c = self._python_setup.compatibility_or_constraints(target)
+        c = self.python_setup.compatibility_or_constraints(target)
         tgts_by_compatibilities[c].append(target)
         filters.update(c)
     return tgts_by_compatibilities, filters
@@ -150,8 +150,8 @@ class PythonInterpreterCache(Subsystem):
     # We filter the interpreter cache itself (and not just the interpreters we pull from it)
     # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
     # an escape hatch.
-    filters = filters if any(filters) else self._python_setup.interpreter_constraints
-    setup_paths = self._python_setup.interpreter_search_paths
+    filters = filters if any(filters) else self.python_setup.interpreter_constraints
+    setup_paths = self.python_setup.interpreter_search_paths
     logger.debug(
       'Initializing Python interpreter cache matching filters `{}` from paths `{}`'.format(
         ':'.join(filters), ':'.join(setup_paths)))

@@ -13,6 +13,7 @@ from builtins import open
 
 from future.utils import PY3
 
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.pantsd.service.pants_service import PantsService
@@ -170,7 +171,7 @@ class SchedulerService(PantsService):
   def prefork(self, options, options_bootstrapper):
     """Runs all pre-fork logic in the process context of the daemon.
 
-    :returns: `(LegacyGraphSession, TargetRoots)`
+    :returns: `(LegacyGraphSession, TargetRoots, exit_code)`
     """
     # If any nodes exist in the product graph, wait for the initial watchman event to avoid
     # racing watchman startup vs invalidation events.
@@ -181,18 +182,23 @@ class SchedulerService(PantsService):
     v2_ui = options.for_global_scope().v2_ui
     zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
     session = self._graph_helper.new_session(zipkin_trace_v2, v2_ui)
+
     if options.for_global_scope().loop:
-      return session, self._prefork_loop(session, options, options_bootstrapper)
+      prefork_fn = self._prefork_loop
     else:
-      return session, self._prefork_body(session, options, options_bootstrapper)
+      prefork_fn = self._prefork_body
+
+    target_roots, exit_code = prefork_fn(session, options, options_bootstrapper)
+    return session, target_roots, exit_code
 
   def _prefork_loop(self, session, options, options_bootstrapper):
     # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
     iterations = options.for_global_scope().loop_max
     target_roots = None
+    exit_code = PANTS_SUCCEEDED_EXIT_CODE
     while iterations and not self._state.is_terminating:
       try:
-        target_roots = self._prefork_body(session, options, options_bootstrapper)
+        target_roots, exit_code = self._prefork_body(session, options, options_bootstrapper)
       except session.scheduler_session.execution_error_type as e:
         # Render retryable exceptions raised by the Scheduler.
         print(e, file=sys.stderr)
@@ -200,7 +206,7 @@ class SchedulerService(PantsService):
       iterations -= 1
       while iterations and not self._state.is_terminating and not self._loop_condition.wait(timeout=1):
         continue
-    return target_roots
+    return target_roots, exit_code
 
   def _prefork_body(self, session, options, options_bootstrapper):
     global_options = options.for_global_scope()
@@ -210,22 +216,24 @@ class SchedulerService(PantsService):
       exclude_patterns=tuple(global_options.exclude_target_regexp) if global_options.exclude_target_regexp else tuple(),
       tags=tuple(global_options.tag) if global_options.tag else tuple()
     )
+    exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
-    if global_options.v1:
+    v1_goals, ambiguous_goals, v2_goals = options.goals_by_version
+
+    if v1_goals or (ambiguous_goals and global_options.v1):
       session.warm_product_graph(target_roots)
 
-    if global_options.v2:
-      if not global_options.v1:
-        session.validate_goals(options.goals_and_possible_v2_goals)
+    if v2_goals or (ambiguous_goals and global_options.v2):
+      goals = v2_goals + (ambiguous_goals if global_options.v2 else tuple())
 
       # N.B. @console_rules run pre-fork in order to cache the products they request during execution.
-      session.run_console_rules(
+      exit_code = session.run_console_rules(
           options_bootstrapper,
-          options.goals_and_possible_v2_goals,
+          goals,
           target_roots,
         )
 
-    return target_roots
+    return target_roots, exit_code
 
   def run(self):
     """Main service entrypoint."""

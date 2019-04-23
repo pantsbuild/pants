@@ -61,6 +61,15 @@ python_library(
 )
 
 python_library(
+  name='goal',
+  sources=['goal.py'],
+  dependencies=[
+    'src/python/pants/option',
+    'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
   name='build_files',
   sources=['build_files.py'],
   dependencies=[
@@ -147,6 +156,7 @@ python_library(
     '3rdparty/python:asttokens',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':goal',
     ':selectors',
     'src/python/pants/base:specs',
     'src/python/pants/util:collections',

@@ -7,17 +7,24 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from pex.orderedset import OrderedSet
 
 from pants.engine.console import Console
+from pants.engine.goal import Goal, LineOriented
 from pants.engine.legacy.graph import TransitiveHydratedTargets
 from pants.engine.rules import console_rule
 
 
-@console_rule('filedeps', [Console, TransitiveHydratedTargets])
-def file_deps(console, transitive_hydrated_targets):
+class Filedeps(LineOriented, Goal):
   """List all source and BUILD files a target transitively depends on.
 
-  Files are listed with relative paths and any BUILD files implied in the transitive closure of
-  targets are also included.
+  Files may be listed with absolute or relative paths and any BUILD files implied in the transitive
+  closure of targets are also included.
   """
+
+  # TODO: Until this implements more of the options of `filedeps`, it can't claim the name!
+  name = 'fast-filedeps'
+
+
+@console_rule(Filedeps, [Console, Filedeps.Options, TransitiveHydratedTargets])
+def file_deps(console, filedeps_options, transitive_hydrated_targets):
 
   uniq_set = OrderedSet()
 
@@ -25,10 +32,13 @@ def file_deps(console, transitive_hydrated_targets):
     if hydrated_target.address.rel_path:
       uniq_set.add(hydrated_target.address.rel_path)
     if hasattr(hydrated_target.adaptor, "sources"):
-      uniq_set.update(f.path for f in hydrated_target.adaptor.sources.snapshot.files)
+      uniq_set.update(hydrated_target.adaptor.sources.snapshot.files)
 
-  for f_path in uniq_set:
-    console.print_stdout(f_path)
+  with Filedeps.line_oriented(filedeps_options, console) as (print_stdout, print_stderr):
+    for f_path in uniq_set:
+      print_stdout(f_path)
+
+  return Filedeps(exit_code=0)
 
 
 def rules():

@@ -50,6 +50,8 @@ class TestIntegrationTest(PantsRunIntegrationTest):
 
     pants_run = self.run_pants(args)
     self.assert_failure(pants_run)
+    self.assertEqual('Tests failed\n', pants_run.stderr_data)
+
     return pants_run
 
   def test_passing_python_test(self):

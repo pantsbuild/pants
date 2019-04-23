@@ -149,7 +149,7 @@ class TestProcessMetadataManager(TestBase):
   def test_wait_for_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
-      safe_file_dump(test_filename, 'test', mode='w')
+      safe_file_dump(test_filename, 'test')
       self.pmm._wait_for_file(test_filename, timeout=.1)
 
   def test_wait_for_file_timeout(self):

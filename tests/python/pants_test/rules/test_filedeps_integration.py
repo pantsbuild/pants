@@ -15,7 +15,7 @@ class FiledepsIntegrationTest(PantsRunIntegrationTest):
     args = [
       '--no-v1',
       '--v2',
-      'filedeps',
+      'fast-filedeps',
       'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
       'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome'
     ]
