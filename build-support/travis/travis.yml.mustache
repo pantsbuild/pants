@@ -303,11 +303,10 @@ travis_docker_image: &travis_docker_image
 # Bootstrap engine shards
 # -------------------------------------------------------------------------
 
-# Note for each platform, we have the Python 2.7 shard also create fs_util and
+# Note for each platform, we have the Python 3.6 shard also create fs_util and
 # upload to S3, to take advantage of the Rust code built during
-# bootstrapping. We must use the Python 2.7 shard, as it is the only Build Engine
-# shard to run during both daily and nightly CI. This requires setting
-# PREPARE_DEPLOY=1.
+# bootstrapping. We use the Python 3.6 shard, as it runs during both daily and
+# nightly CI. This requires setting PREPARE_DEPLOY=1.
 
 base_linux_build_engine: &base_linux_build_engine
   <<: *native_engine_cache_config
@@ -331,8 +330,7 @@ py27_linux_build_engine: &py27_linux_build_engine
     # TODO: While this image shouldn't have any cache to fetch anything from, it fails to find
     # libpython2.7.so.1 during the cargo build, despite the image being built with --enable-shared,
     # unless the -x argument is added. This isn't expected to affect build time too much.
-    - docker_run_command="./build-support/bin/ci.sh -2bx && ./build-support/bin/release.sh -2f"
-    - PREPARE_DEPLOY=1
+    - docker_run_command="./build-support/bin/ci.sh -2bx"
     - CACHE_NAME=linuxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
@@ -342,7 +340,8 @@ py36_linux_build_engine: &py36_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
     - docker_image_name=travis_ci
-    - docker_run_command="./build-support/bin/ci.sh -b"
+    - docker_run_command="./build-support/bin/ci.sh -b && ./build-support/bin/release.sh -f"
+    - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
@@ -377,13 +376,10 @@ py27_osx_build_engine: &py27_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py2.7 PEX)"
   env:
     - *py27_osx_config_env
-    - PREPARE_DEPLOY=1
     - CACHE_NAME=osxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
   script:
     - ./build-support/bin/ci.sh -2b
-    #  Also build fs_util.
-    - ./build-support/bin/release.sh -2f
     - *aws_deploy_pants_pex
 
 py36_osx_build_engine: &py36_osx_build_engine
@@ -392,10 +388,12 @@ py36_osx_build_engine: &py36_osx_build_engine
   name: "Build OSX native engine and pants.pex (Py3.6 PEX)"
   env:
     - *py36_osx_config_env
+    - PREPARE_DEPLOY=1
     - CACHE_NAME=osxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
   script:
     - ./build-support/bin/ci.sh -b
+    - ./build-support/bin/release.sh -f
     - *aws_deploy_pants_pex
 
 py37_osx_build_engine: &py37_osx_build_engine
