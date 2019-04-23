@@ -11,7 +11,6 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_walk
 from pants.util.objects import datatype
 from pants.util.xml_parser import XmlParser
