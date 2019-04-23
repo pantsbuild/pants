@@ -211,7 +211,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
             if pos:
               infile.seek(pos)
             content = infile.read()
-            ret[_id] = content
+            ret[_id] = content.decode("utf-8")
     content = json.dumps(ret).encode("utf-8")
     self._send_content(content, 'application/json')
 
