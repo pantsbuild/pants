@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 import unittest
 from textwrap import dedent
 
@@ -46,7 +45,7 @@ class FilesetRelPathWrapperTest(TestBase):
     self.create_file('y/morx.java')
     self.create_file('y/fleem.java')
     self.create_file('z/w/foo.java')
-    os.symlink('../../y', os.path.join(self.build_root, 'z/w/y'))
+    self.create_link('y', 'z/w/y')
 
   def test_no_dir_glob(self):
     self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("*"))')
