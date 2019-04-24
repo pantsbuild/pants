@@ -52,7 +52,7 @@ def run_python_test(transitive_hydrated_target, pytest):
 
   # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
   # TODO(#7061): This str() can be removed after we drop py2!
-  python_binary = str(sys.executable)
+  python_binary = text_type(sys.executable)
 
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
   # pex27, where it should be hermetically provided in some way.
