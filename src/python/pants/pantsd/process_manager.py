@@ -515,6 +515,7 @@ class ProcessManager(ProcessMetadataManager):
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
     if pid == 0:
+      # fork's child execution
       try:
         os.setsid()
         os.chdir(self._buildroot)
@@ -524,6 +525,7 @@ class ProcessManager(ProcessMetadataManager):
       finally:
         os._exit(0)
     else:
+      # fork's parent execution
       try:
         self.post_fork_parent(**post_fork_parent_opts or {})
       except Exception:

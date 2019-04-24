@@ -50,6 +50,11 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
+  def handle_help(self):
+    """Handle requests for `help` information."""
+    help_printer = HelpPrinter(self._options)
+    return help_printer.print_help()
+
   def _determine_v1_goals(self, address_mapper, options):
     """Check and populate the requested goals for a given run."""
     v1_goals, ambiguous_goals, _ = options.goals_by_version

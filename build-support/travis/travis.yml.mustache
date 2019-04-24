@@ -928,6 +928,17 @@ matrix:
 {{/integration_shards}}
 {{#integration_shards}}
     - <<: *py36_linux_test_config
+      name: "Integration tests WITH PANTSD shard {{.}} (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - *run_tests_under_pantsd
+        - CACHE_NAME=integrationshard{{.}}_pantsd
+      script:
+        - ./build-support/bin/ci.sh -c -i {{.}}/{{integration_shards_length}}
+
+{{/integration_shards}}
+{{#integration_shards}}
+    - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard {{.}} (Py3.6 PEX)"
       stage: *test_cron
       env:

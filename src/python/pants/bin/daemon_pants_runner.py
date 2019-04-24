@@ -12,13 +12,13 @@ import time
 from builtins import open, zip
 from contextlib import contextmanager
 
-from future.utils import PY3, raise_with_traceback
-from setproctitle import setproctitle as set_process_title
+from future.utils import raise_with_traceback
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
+from pants.init.logging import encapsulated_global_logger, setup_logging_from_options
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
@@ -30,11 +30,34 @@ from pants.util.socket import teardown_socket
 class DaemonSignalHandler(SignalHandler):
 
   def handle_sigint(self, signum, _frame):
+    write_to_file("DSH received sigint!")
+    self.daemon.shutdown()
     raise KeyboardInterrupt('remote client sent control-c!')
+
+  def handle_sigterm(self, signum, _frame):
+    try:
+      self.daemon.shutdown()
+    except Exception:
+      pass
+
+
+def write_to_file(msg):
+  with open('/tmp/logs', 'a') as f:
+    f.write('{}\n'.format(msg))
+
+
+class NoopExiter(Exiter):
+  def exit(self, result, *args, **kwargs):
+    if result != 0:
+      write_to_file("LPR, Exiting with code {}!".format(result))
+      raise _GracefulTerminationException(result)
 
 
 class DaemonExiter(Exiter):
-  """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
+  """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol.
+
+  TODO: This no longer really follows the Exiter API, per-se (or at least, it doesn't call super).
+  """
 
   def __init__(self, socket):
     # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
@@ -62,18 +85,17 @@ class DaemonExiter(Exiter):
         except Exception:
           pass
 
-    try:
-      # Write a final message to stderr if present.
-      if msg:
-        NailgunProtocol.send_stderr(self._socket, msg)
+    write_to_file("DPR, Exiting with code {} and msg {}".format(result, msg))
 
-      # Send an Exit chunk with the result.
-      NailgunProtocol.send_exit_with_code(self._socket, result)
+    # Write a final message to stderr if present.
+    if msg:
+      NailgunProtocol.send_stderr(self._socket, msg)
 
-      # Shutdown the connected socket.
-      teardown_socket(self._socket)
-    finally:
-      super(DaemonExiter, self).exit(result=result, *args, **kwargs)
+    # Send an Exit chunk with the result.
+    NailgunProtocol.send_exit_with_code(self._socket, result)
+
+    # Shutdown the connected socket.
+    teardown_socket(self._socket)
 
 
 class _GracefulTerminationException(Exception):
@@ -284,70 +306,37 @@ class DaemonPantsRunner(ProcessManager):
     when the pantsd-runner forks from pantsd, there is a working pool for any work that happens
     in that child process.
     """
-    fork_context = self._graph_helper.scheduler_session.with_fork_context if self._graph_helper else None
-    self.daemonize(write_pid=False, fork_context=fork_context)
-
-  def pre_fork(self):
-    # Mark all services pausing (to allow them to concurrently pause), and then wait for them
-    # to have paused.
-    # NB: PailgunServer ensures that the entire run occurs under the lifecycle_lock.
-    for service in self._services.services:
-      service.mark_pausing()
-    for service in self._services.services:
-      service.await_paused()
-
-  def post_fork_parent(self):
-    # NB: PailgunServer ensures that the entire run occurs under the lifecycle_lock.
-    for service in self._services.services:
-      service.resume()
-
-  def post_fork_child(self):
-    """Post-fork child process callback executed via ProcessManager.daemonize()."""
-    # Set the Exiter exception hook post-fork so as not to affect the pantsd processes exception
-    # hook with socket-specific behavior. Note that this intentionally points the faulthandler
-    # trace stream to sys.stderr, which at this point is still a _LoggerStream object writing to
-    # the `pantsd.log`. This ensures that in the event of e.g. a hung but detached pantsd-runner
-    # process that the stacktrace output lands deterministically in a known place vs to a stray
-    # terminal window.
-    # TODO: test the above!
-    ExceptionSink.reset_exiter(self._exiter)
-
-    ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
-    ExceptionSink.reset_signal_handler(DaemonSignalHandler())
-
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
-
-    # Set context in the process title.
-    set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
 
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
     NailgunProtocol.send_pid(self._socket, os.getpid())
     NailgunProtocol.send_pgrp(self._socket, os.getpgrp() * -1)
 
-    # Stop the services that were paused pre-fork.
-    for service in self._services.services:
-      service.terminate()
-
     # Invoke a Pants run with stdio redirected and a proxied environment.
-    with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
-         hermetic_environment_as(**self._env):
+    with self.nailgunned_stdio(self._socket, self._env) as finalizer, \
+      hermetic_environment_as(**self._env), \
+      encapsulated_global_logger():
       try:
-        # Setup the Exiter's finalizer.
-        self._exiter.set_finalizer(finalizer)
-
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
+        # Setup the Exiter's finalizer.
+        self._exiter.set_finalizer(finalizer)
+
+        # Re-raise any deferred exceptions, if present.
+        self._raise_deferred_exc()
+        bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
+        setup_logging_from_options(bootstrap_options)
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner.create(
-          self._exiter,
+          NoopExiter(),
           self._args,
           self._env,
           self._target_roots,
           self._graph_helper,
-          self._options_bootstrapper
+          self._options_bootstrapper,
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
 
@@ -355,17 +344,26 @@ class DaemonPantsRunner(ProcessManager):
         self._raise_deferred_exc()
 
         runner.run()
+        write_to_file("DPR, After the run has finished")
       except KeyboardInterrupt:
+        write_to_file("DPR, Keyboard interrupt in DPR")
         self._exiter.exit_and_fail('Interrupted by user.\n')
       except _GracefulTerminationException as e:
+        write_to_file("DPR, GracefulTerminationException")
         ExceptionSink.log_exception(
           'Encountered graceful termination exception {}; exiting'.format(e))
         self._exiter.exit(e.exit_code)
-      except Exception:
+      except Exception as e:
+        write_to_file("DPR, exception in DPR!")
+
+        # LocalPantsRunner.set_start_time resets the global exiter,
+        # which used to be okay, because it was process-local,
+        # but now we need to un-reset it here.
+        ExceptionSink.reset_exiter(self._exiter)
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
         # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
         # happening here, so something is probably overriding the excepthook. By catching Exception
         # and calling this method, we emulate the normal, expected sys.excepthook override.
-        ExceptionSink._log_unhandled_exception_and_exit()
+        self._exiter.exit(e.errno)
       else:
         self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)

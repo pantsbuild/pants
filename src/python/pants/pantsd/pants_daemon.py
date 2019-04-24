@@ -15,7 +15,7 @@ from future.utils import text_type
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink
+from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
@@ -80,6 +80,23 @@ class _LoggerStream(object):
   @property
   def buffer(self):
     return self
+
+
+def write_to_file(msg):
+  with open('/tmp/logs', 'a') as f:
+    f.write('{}\n'.format(msg))
+
+
+class PantsDaemonSignalHandler(SignalHandler):
+
+  def __init__(self, services):
+    super(PantsDaemonSignalHandler, self).__init__()
+    self._services = services
+
+  def handle_sigint(self, signum, _frame):
+    for service in self._services:
+      write_to_file('PD received sigint')
+      service.record_exception(KeyboardInterrupt('remote client sent control-c!'))
 
 
 class PantsDaemon(FingerprintedProcessManager):

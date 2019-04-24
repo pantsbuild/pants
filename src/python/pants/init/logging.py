@@ -4,10 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import copy
 import logging
 import os
 import sys
 from collections import namedtuple
+from contextlib import contextmanager
 from logging import StreamHandler
 
 from future.moves.http import client
@@ -83,6 +85,9 @@ class NativeHandler(StreamHandler):
   def flush(self):
     self.native.flush_log()
 
+  def __repr__(self):
+    return "NativeHandler(id={}, level={}, filename={}, stream={})".format(id(self), self.level, self.native_filename, self.stream)
+
 
 def create_native_pantsd_file_log_handler(level, native, native_filename):
   fd = native.setup_pantsd_logger(native_filename, get_numeric_level(level))
@@ -105,6 +110,25 @@ def create_native_stderr_log_handler(level, native, stream=None):
 # but if there is ever one, it may be worth changing this.
 def get_numeric_level(level):
   return logging._checkLevel(level)
+
+
+@contextmanager
+def encapsulated_global_logger():
+  """Record all the handlers of the current global logger, yield, and reset that logger.
+  This is useful in the case where we want to easily restore state after calling setup_logging.
+  For instance, when DaemonPantsRunner creates an instance of LocalPantsRunner it sets up specific
+  nailgunned logging, which we want to undo once the LocalPantsRunner has finished runnnig.
+  """
+  global_logger = logging.getLogger()
+  old_handlers = copy.copy(global_logger.handlers)
+  try:
+    yield
+  finally:
+    new_handlers = global_logger.handlers
+    for handler in new_handlers:
+      global_logger.removeHandler(handler)
+    for handler in old_handlers:
+      global_logger.addHandler(handler)
 
 
 def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None, native=None):
@@ -136,6 +160,11 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
 
   log_filename = None
   file_handler = None
+
+  with open('/tmp/logs', 'a') as f:
+    f.write("called setup_logging with level: {},\n console_stream: {} ({}),\n log_dir: {},\n scope: {},\n log_name: {},\n native: {}\n".format(
+      level, console_stream, id(console_stream), log_dir, scope, log_name, native
+    ))
 
   # A custom log handler for sub-debug trace logging.
   def trace(self, message, *args, **kwargs):

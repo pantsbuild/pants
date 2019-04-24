@@ -72,7 +72,11 @@ class Exiter(object):
         # If the file is already closed, or any other error occurs, just log it and continue to
         # exit.
         if msg:
-          logger.warning("Encountered error when trying to log this message: {}".format(msg))
+          # logger.warning("Encountered error when trying to log this message: {}".format(msg))
+          logger.warning("Encountered error when trying to log this message: {}, \n exception: {} \n out: {}".format(msg, e, out))
+          with open('/tmp/logs', 'a') as f:
+            f.write("ENCOUNTERED ERROR\n")
+            traceback.print_stack(file=f)
           # In pantsd, this won't go anywhere, because there's really nowhere for us to log if we
           # can't log :(
           # Not in pantsd, this will end up in sys.stderr.

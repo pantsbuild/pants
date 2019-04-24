@@ -173,6 +173,11 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
     return self._process_session()
 
 
+def write_to_file(msg):
+  with open('/tmp/logs', 'a') as f:
+    f.write('{}\n'.format(msg))
+
+
 class NailgunClient(object):
   """A python nailgun client (see http://martiansoftware.com/nailgun for more info)."""
 
@@ -318,6 +323,7 @@ class NailgunClient(object):
     """
     remote_pid = self._maybe_last_pid()
     if remote_pid is not None:
+      write_to_file("NailgunClient, Sending kill to pid {} with {}".format(remote_pid, signum))
       safe_kill(remote_pid, signum)
     if include_pgrp:
       remote_pgrp = self._maybe_last_pgrp()
