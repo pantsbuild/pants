@@ -269,7 +269,7 @@ if [[ "${test_platform_specific_behavior:-false}" == 'true' ]]; then
                        "Running platform-specific testing on platform: $(uname)"
   (
     ./pants.pex --tag='+platform_specific_behavior' test \
-                src/python/:: tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+                src/python/:: tests/python:: -- --setup-show ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants platform-specific test failure"
   end_travis_section
 fi
