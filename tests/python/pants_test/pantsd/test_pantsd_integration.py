@@ -13,7 +13,6 @@ import threading
 import time
 import unittest
 from builtins import open, range, zip
-from textwrap import dedent
 
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
@@ -639,42 +638,3 @@ Interrupted by user over pailgun client!
 
       for process in pantsd_runner_processes:
         self.assertFalse(process.is_running())
-
-  # This is a regression test for a bug where we would incorrectly detect a cycle if two targets swapped their
-  # dependency relationship (#7404).
-  def test_dependencies_swap(self):
-    template = dedent("""
-        python_library(
-          name = 'A',
-          source = 'A.py',
-          {a_deps}
-        )
-
-        python_library(
-          name = 'B',
-          source = 'B.py',
-          {b_deps}
-        )
-        """)
-    with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
-      with temporary_dir('.') as directory:
-        safe_file_dump(os.path.join(directory, 'A.py'), mode='w')
-        safe_file_dump(os.path.join(directory, 'B.py'), mode='w')
-
-        if directory.startswith('./'):
-          directory = directory[2:]
-
-        def list_and_verify():
-          result = pantsd_run(['list', '{}:'.format(directory)])
-          checker.assert_started()
-          self.assert_success(result)
-          expected_targets = {'{}:{}'.format(directory, target) for target in ('A', 'B')}
-          self.assertEqual(expected_targets, set(result.stdout_data.strip().split('\n')))
-
-        with open(os.path.join(directory, 'BUILD'), 'w') as f:
-          f.write(template.format(a_deps='dependencies = [":B"],', b_deps=''))
-        list_and_verify()
-
-        with open(os.path.join(directory, 'BUILD'), 'w') as f:
-          f.write(template.format(a_deps='', b_deps='dependencies = [":A"],'))
-        list_and_verify()
