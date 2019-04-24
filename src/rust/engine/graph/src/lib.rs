@@ -121,6 +121,9 @@ impl<N: Node> InnerGraph<N> {
   /// no cycle would be created.
   ///
   fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> Option<Vec<Entry<N>>> {
+    if src_id == dst_id {
+      return Some(vec![self.entry_for_id(src_id).unwrap().clone()]);
+    }
     Self::shortest_path(&self.pg, dst_id, src_id).map(|path| {
       path
         .into_iter()
