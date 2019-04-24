@@ -6,8 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import time
-from contextlib import contextmanager
-
 from builtins import object, str
 
 from pants.base.build_environment import get_buildroot
@@ -83,17 +81,6 @@ class LocalExiter(Exiter):
 
 class LocalPantsRunner(object):
   """Handles a single pants invocation running in the process-local context."""
-
-  @contextmanager
-  def set_exiter(self, exiter):
-    """A contextmanager which temporarily overrides the exiter."""
-    previous_exiter = self._exiter if self._exiter else exiter
-    try:
-      ExceptionSink.reset_exiter(exiter)
-      yield
-    finally:
-      self._exiter = previous_exiter
-      ExceptionSink.reset_exiter(self._exiter)
 
   @staticmethod
   def parse_options(args, env, setup_logging=False, options_bootstrapper=None):
@@ -296,21 +283,14 @@ class LocalPantsRunner(object):
     return max_code
 
   def _run(self):
-<<<<<<< HEAD
-    try:
-      self._maybe_handle_help()
-
-      engine_result = self._maybe_run_v2()
-      goal_runner_result = self._maybe_run_v1()
-    finally:
-=======
     self._set_start_time(time.time())
 
     # wrap the outer exiter
     local_exiter = LocalExiter(self._run_tracker, self._repro, exiter=self._exiter)
-    with self.set_exiter(local_exiter):
->>>>>>> 0ffa7ab... add contextmanager'd exiters and change return type of run()
+    with ExceptionSink.exiter_as(local_exiter):
       try:
+        self._maybe_handle_help()
+
         engine_result = self._maybe_run_v2()
         goal_runner_result = self._maybe_run_v1()
       finally:
@@ -321,9 +301,9 @@ class LocalPantsRunner(object):
           logger.exception(e)
           run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
 
-      final_exit_code = self._compute_final_exit_code(
-        engine_result,
-        goal_runner_result,
-        run_tracker_result
-      )
-      return final_exit_code
+        final_exit_code = self._compute_final_exit_code(
+          engine_result,
+          goal_runner_result,
+          run_tracker_result
+        )
+        return final_exit_code

@@ -433,6 +433,18 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
     # Exit, printing the output to the terminal.
     cls._exit_with_failure(terminal_log_entry)
 
+  @classmethod
+  @contextmanager
+  def exiter_as(cls, exiter):
+    """A contextmanager which temporarily overrides the exiter."""
+    try:
+      previous_exiter = cls._exiter if cls._exiter else exiter
+      cls._exiter = exiter
+      ExceptionSink.reset_exiter(cls._exiter)
+      yield cls._exiter
+    finally:
+      cls._exiter = previous_exiter
+      ExceptionSink.reset_exiter(cls._exiter)
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
