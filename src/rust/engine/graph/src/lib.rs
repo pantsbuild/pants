@@ -568,13 +568,18 @@ impl<N: Node> Graph<N> {
   ) -> Result<bool, N::Error> {
     let mut counter = 0;
     loop {
+      // Find one cycle if any cycles exist.
       if let Some(cycle_path) = inner.detect_cycle(src_id, potential_dst_id) {
+        // See if the cycle contains any dirty nodes. If there are dirty nodes, we can try clearing
+        // them, and then check if there are still any cycles in the graph.
         let dirty_nodes: HashSet<_> = cycle_path
           .iter()
           .filter(|n| n.may_have_dirty_edges())
           .map(|n| n.node().clone())
           .collect();
         if dirty_nodes.is_empty() {
+          // We detected a cycle with no dirty nodes - there's a cycle and there's nothing we can do
+          // to remove it.
           info!(
             "Detected cycle considering adding edge from {:?} to {:?}; existing path: {:?}",
             inner.entry_for_id(src_id).unwrap(),
@@ -602,6 +607,7 @@ impl<N: Node> Graph<N> {
           );
           return Err(N::Error::cyclic());
         }
+        // Clear the dirty nodes, removing the edges from them, and try again.
         inner.invalidate_from_roots(|node| dirty_nodes.contains(node));
       } else {
         return Ok(false);
