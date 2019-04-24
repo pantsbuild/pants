@@ -17,29 +17,9 @@ function cargo_bin() {
   "${RUSTUP}" which cargo
 }
 
-# TODO(7288): RustUp tries to use a more secure protocol to avoid downgrade attacks. This, however,
-# broke support for Centos6 (https://github.com/rust-lang/rustup.rs/issues/1794). So, we first try
-# to use their recommend install, and downgrade to their workaround if necessary.
-function curl_rustup_init_script_while_maybe_downgrading() {
-  if ! curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs; then
-    log "Initial 'curl' command failed, trying backup url..."
-    case "$(uname)" in
-      Darwin)
-        host_triple='x86_64-apple-darwin'
-      ;;
-      Linux)
-        host_triple='x86_64-unknown-linux-gnu'
-      ;;
-      *)
-        die "unrecognized platform $(uname) -- could not bootstrap rustup!"
-      ;;
-    esac
-    full_rustup_backup_url="https://static.rust-lang.org/rustup/dist/${host_triple}/rustup-init"
-    curl -sSf "$full_rustup_backup_url"
-  fi
-}
-
 function bootstrap_rust() {
+  set -x
+
   RUST_TOOLCHAIN="$(cat ${REPO_ROOT}/rust-toolchain)"
   RUST_COMPONENTS=(
     "rustfmt-preview"
@@ -57,7 +37,8 @@ function bootstrap_rust() {
     # with "info: caused by: No such file or directory (os error 2)".
     local -r rustup_init_destination="${rustup_tmp_dir}/rustup-init"
     # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
-    curl_rustup_init_script_while_maybe_downgrading > "$rustup_init_destination"
+    curl -sSf 'https://raw.githubusercontent.com/rust-lang/rustup.rs/615ed4e265c702cdc2ad025e944a92d8068abde2/rustup-init.sh' \
+         > "$rustup_init_destination"
     chmod +x "$rustup_init_destination"
     "$rustup_init_destination" -y --no-modify-path --default-toolchain none 1>&2
   fi
