@@ -29,8 +29,12 @@ python_tests(
   name = 'reporting',
   sources = ['test_reporting.py'],
   dependencies = [
+    '3rdparty/python:future',
+    '3rdparty/python:requests',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/reporting',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test:test_base',
   ],
 )
