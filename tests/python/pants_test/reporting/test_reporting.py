@@ -8,7 +8,7 @@ import json
 import os
 
 import requests
-from future.backports.urllib.parse import urlencode
+from future.moves.urllib.parse import urlencode
 
 from pants.goal.run_tracker import RunTracker
 from pants.reporting.reporting import Reporting
@@ -211,4 +211,4 @@ class ReportingTest(TestBase):
           port,
           urlencode({"q": json.dumps([{"id": "0", "path": "file"}])}),
         ))
-        self.assertEqual(response.json(), {"0": "hello"})
+      self.assertEqual(response.json(), {"0": "hello"})
