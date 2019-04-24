@@ -192,7 +192,7 @@ class ReportingTest(TestBase):
     with temporary_dir() as dir:
       class TestPantsHandler(PantsHandler):
         def __init__(self, request, client_address, server):
-          # Note: BaseHTTPServer.BaseHTTPRequestHandler is an old-style class, so we must
+          # TODO(6071): BaseHTTPServer.BaseHTTPRequestHandler is an old-style class, so we must
           # invoke its __init__ like this.
           # This will become unnecessary when we no longer support python2.
           PantsHandler.__init__(
