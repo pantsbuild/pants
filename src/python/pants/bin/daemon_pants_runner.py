@@ -261,6 +261,27 @@ class DaemonPantsRunner(ProcessManager):
       ) as finalizer:
         yield finalizer
 
+  @contextmanager
+  def daemon_exiter(cls, exiter):
+    """A contextmanager which temporarily overrides the exiter."""
+    try:
+      cls._exiter = exiter
+      yield exiter
+    finally:
+      pass
+
+  @contextmanager
+  def set_exiter(cls, exiter):
+    """A contextmanager which temporarily overrides the exiter."""
+    try:
+      previous_exiter = cls._exiter
+      cls._exiter = exiter
+      ExceptionSink.reset_exiter(exiter)
+      yield cls._exiter
+    finally:
+      cls._exiter = previous_exiter
+      ExceptionSink.reset_exiter(previous_exiter)
+
   # TODO: there's no testing for this method, and this caused a user-visible failure -- see #7008!
   def _raise_deferred_exc(self):
     """Raises deferred exceptions from the daemon's synchronous path in the post-fork client."""
@@ -272,10 +293,6 @@ class DaemonPantsRunner(ProcessManager):
         # If `_deferred_exception` isn't a 3-item tuple (raising a TypeError on the above
         # destructuring), treat it like a bare exception.
         raise self._deferred_exception
-
-  def _maybe_get_client_start_time_from_env(self, env):
-    client_start_time = env.pop('PANTSD_RUNTRACKER_CLIENT_START_TIME', None)
-    return None if client_start_time is None else float(client_start_time)
 
   def run(self):
     """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager).
@@ -331,8 +348,10 @@ class DaemonPantsRunner(ProcessManager):
       service.terminate()
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
+    daemonExiter = DaemonExiter(self._socket)
     with self.nailgunned_stdio(self._socket, self._env) as finalizer,\
-         hermetic_environment_as(**self._env):
+         hermetic_environment_as(**self._env),\
+         self.set_exiter(daemonExiter) as daemonExiter:
       try:
         # Setup the Exiter's finalizer.
         self._exiter.set_finalizer(finalizer)
@@ -340,6 +359,8 @@ class DaemonPantsRunner(ProcessManager):
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
+        # Re-raise any deferred exceptions, if present.
+        self._raise_deferred_exc()
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner.create(
           self._exiter,
@@ -349,18 +370,13 @@ class DaemonPantsRunner(ProcessManager):
           self._graph_helper,
           self._options_bootstrapper
         )
-        runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
-
-        # Re-raise any deferred exceptions, if present.
-        self._raise_deferred_exc()
-
         runner.run()
       except KeyboardInterrupt:
-        self._exiter.exit_and_fail('Interrupted by user.\n')
-      except _GracefulTerminationException as e:
+        daemonExiter.exit_and_fail('Interrupted by user.\n')
+      except GracefulTerminationException as e:
         ExceptionSink.log_exception(
           'Encountered graceful termination exception {}; exiting'.format(e))
-        self._exiter.exit(e.exit_code)
+        daemonExiter.exit(e.exit_code)
       except Exception:
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
         # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
@@ -368,4 +384,4 @@ class DaemonPantsRunner(ProcessManager):
         # and calling this method, we emulate the normal, expected sys.excepthook override.
         ExceptionSink._log_unhandled_exception_and_exit()
       else:
-        self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)
+        daemonExiter.exit(PANTS_SUCCEEDED_EXIT_CODE)

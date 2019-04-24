@@ -5,6 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import time
+from contextlib import contextmanager
+
 from builtins import object, str
 
 from pants.base.build_environment import get_buildroot
@@ -80,6 +83,17 @@ class LocalExiter(Exiter):
 
 class LocalPantsRunner(object):
   """Handles a single pants invocation running in the process-local context."""
+
+  @contextmanager
+  def set_exiter(self, exiter):
+    """A contextmanager which temporarily overrides the exiter."""
+    previous_exiter = self._exiter if self._exiter else exiter
+    try:
+      ExceptionSink.reset_exiter(exiter)
+      yield
+    finally:
+      self._exiter = previous_exiter
+      ExceptionSink.reset_exiter(self._exiter)
 
   @staticmethod
   def parse_options(args, env, setup_logging=False, options_bootstrapper=None):
@@ -213,7 +227,7 @@ class LocalPantsRunner(object):
     self._repro = None
     self._global_options = options.for_global_scope()
 
-  def set_start_time(self, start_time):
+  def _set_start_time(self, start_time):
     # Launch RunTracker as early as possible (before .run() is called).
     self._run_tracker = RunTracker.global_instance()
     self._reporting = Reporting.global_instance()
@@ -226,13 +240,9 @@ class LocalPantsRunner(object):
     if self._repro:
       self._repro.capture(self._run_tracker.run_info.get_as_dict())
 
-    # The __call__ method of the Exiter allows for the prototype pattern.
-    self._exiter = LocalExiter(self._run_tracker, self._repro, exiter=self._exiter)
-    ExceptionSink.reset_exiter(self._exiter)
-
   def run(self):
     with maybe_profiled(self._profile_path):
-      self._run()
+      return self._run()
 
   def _maybe_handle_help(self):
     """Handle requests for `help` information."""
@@ -286,22 +296,34 @@ class LocalPantsRunner(object):
     return max_code
 
   def _run(self):
+<<<<<<< HEAD
     try:
       self._maybe_handle_help()
 
       engine_result = self._maybe_run_v2()
       goal_runner_result = self._maybe_run_v1()
     finally:
-      try:
-        run_tracker_result = self._run_tracker.end()
-      except ValueError as e:
-        # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
-        logger.exception(e)
-        run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
+=======
+    self._set_start_time(time.time())
 
-    final_exit_code = self._compute_final_exit_code(
-      engine_result,
-      goal_runner_result,
-      run_tracker_result
-    )
-    self._exiter.exit(final_exit_code)
+    # wrap the outer exiter
+    local_exiter = LocalExiter(self._run_tracker, self._repro, exiter=self._exiter)
+    with self.set_exiter(local_exiter):
+>>>>>>> 0ffa7ab... add contextmanager'd exiters and change return type of run()
+      try:
+        engine_result = self._maybe_run_v2()
+        goal_runner_result = self._maybe_run_v1()
+      finally:
+        try:
+          run_tracker_result = self._run_tracker.end()
+        except ValueError as e:
+          # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
+          logger.exception(e)
+          run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
+
+      final_exit_code = self._compute_final_exit_code(
+        engine_result,
+        goal_runner_result,
+        run_tracker_result
+      )
+      return final_exit_code
