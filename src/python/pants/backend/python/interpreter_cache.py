@@ -9,6 +9,7 @@ import os
 import shutil
 from builtins import str
 from collections import defaultdict
+from textwrap import dedent
 
 from pex.interpreter import PythonInterpreter
 
@@ -91,10 +92,15 @@ class PythonInterpreterCache(Subsystem):
       unique_compatibilities = {tuple(c) for c in tgts_by_compatibilities.keys()}
       unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
       tgts_by_compatibilities_strs = [t[0].address.spec for t in tgts_by_compatibilities.values()]
-      raise self.UnsatisfiableInterpreterConstraintsError(
-        'Unable to detect a suitable interpreter for compatibilities: {} '
-        '(Conflicting targets: {})'.format(' && '.join(sorted(unique_compatibilities_strs)),
-                                           ', '.join(tgts_by_compatibilities_strs)))
+      raise self.UnsatisfiableInterpreterConstraintsError(dedent("""\
+        Unable to detect a suitable interpreter for compatibilities: {} (Conflicting targets: {})
+
+        To fix this, either modify your Python interpreter constraints by following
+        https://www.pantsbuild.org/python_readme.html#configure-the-python-version or install the
+        targeted interpreter on your system.""".format(
+          ' && '.join(sorted(unique_compatibilities_strs)),
+          ', '.join(tgts_by_compatibilities_strs)
+        )))
     # Return the lowest compatible interpreter.
     return min(allowed_interpreters)
 
