@@ -50,7 +50,7 @@ class DependencyContext(Subsystem, DependencyContextBase):
   def create_fingerprint_strategy(self, classpath_products):
     return ResolvedJarAwareFingerprintStrategy(classpath_products, self)
 
-  def defaulted_property(self, target, selector):
+  def defaulted_property(self, target, option_name):
     """Computes a language property setting for the given JvmTarget.
 
     :param selector A function that takes a target or platform and returns the boolean value of the
@@ -60,19 +60,17 @@ class DependencyContext(Subsystem, DependencyContextBase):
     If the target does not override the language property, returns true iff the property
     is true for any of the matched languages for the target.
     """
-    target_property_selected = selector(target)
-    if target_property_selected is not None:
-      return target_property_selected
-
-    prop = None
     if target.has_sources('.java'):
-      prop = prop or selector(Java.global_instance())
-    if target.has_sources('.scala'):
-      prop = prop or selector(ScalaPlatform.global_instance())
-    return prop
+      matching_subsystem = Java.global_instance()
+    elif target.has_sources('.scala'):
+      matching_subsystem = ScalaPlatform.global_instance()
+    else:
+      return getattr(target, option_name)
+
+    return matching_subsystem.get_scalar_mirrored_target_option(option_name, target)
 
   def dependencies_respecting_strict_deps(self, target):
-    if self.defaulted_property(target, lambda x: x.strict_deps):
+    if self.defaulted_property(target, 'strict_deps'):
       dependencies = target.strict_dependencies(self)
     else:
       dependencies = self.all_dependencies(target)
@@ -107,7 +105,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
     return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
   def direct(self, target):
-    return self._dep_context.defaulted_property(target, lambda x: x.strict_deps)
+    return self._dep_context.defaulted_property(target, 'strict_deps')
 
   def dependencies(self, target):
     if self.direct(target):

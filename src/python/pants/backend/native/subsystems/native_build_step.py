@@ -6,8 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from abc import abstractmethod
 
-from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
-  MirroredTargetOptionMixin
+from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -23,9 +22,9 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
 
   options_scope = 'native-build-step'
 
-  mirrored_option_to_kwarg_map = {
-    'compiler_option_sets': 'compiler_option_sets',
-    'toolchain_variant': 'toolchain_variant'
+  mirrored_target_option_actions = {
+    'compiler_option_sets': lambda tgt: tgt.compiler_option_sets,
+    'toolchain_variant': lambda tgt: tgt.toolchain_variant,
   }
 
   @classmethod
@@ -43,10 +42,10 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                   "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 
   def get_compiler_option_sets_for_target(self, target):
-    return self.get_target_mirrored_option('compiler_option_sets', target)
+    return self.get_scalar_mirrored_target_option('compiler_option_sets', target)
 
   def get_toolchain_variant_for_target(self, target):
-    return self.get_target_mirrored_option('toolchain_variant', target)
+    return self.get_scalar_mirrored_target_option('toolchain_variant', target)
 
   @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):

@@ -14,9 +14,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.shader import Shader
-from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import Job
@@ -24,11 +22,13 @@ from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize, PathGlobs,
                              PathGlobsAndRoot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
 from pants.util.memo import memoized_method, memoized_property
@@ -89,50 +89,6 @@ class CompositeProductAdder(object):
       product.add_for_target(*args, **kwargs)
 
 
-class _CompileWorkflowChoice(enum(['zinc-only', 'guess'])):
-  """Enum covering the values for the default workflow option.
-
-  guess - Try to classify compile targets based on whether they are Scala/Java or test targets.
-  zinc-only - Always use zinc."""
-
-
-class _JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
-  """Target classifications used to correctly schedule Zinc and Rsc jobs.
-
-  There are some limitations we have to work around before we can compile everything through Rsc
-  and followed by Zinc.
-  - rsc is not able to outline all scala code just yet (this is also being addressed through
-    automated rewrites).
-  - javac is unable to consume rsc's jars just yet.
-  - rsc is not able to outline all java code just yet (this is likely to *not* require rewrites,
-    just some more work on rsc).
-
-  As we work on improving our Rsc integration, we'll need to create more workflows to more closely
-  map the supported features of Rsc. This enum class allows us to do that.
-
-    - zinc-only: compiles targets just with Zinc and uses the Zinc products of their dependencies.
-    - rsc-then-zinc: compiles targets with Rsc to create "header" jars, then runs Zinc against the
-      Rsc products of their dependencies. The Rsc compile uses the Rsc products of Rsc compatible
-      targets and the Zinc products of zinc-only targets.
-  """
-
-  @classmethod
-  def classify_target(cls, target):
-    # NB: Java targets, Scala+Java targets, and some test targets are not currently supported for
-    # compile with Rsc.
-    # TODO: Rsc's produced header jars don't yet work with javac. Once this is resolved, we may add
-    #       additional workflow types.
-    if target.has_sources('.java') or \
-      isinstance(target, JUnitTests) or \
-      (isinstance(target, ScalaLibrary) and tuple(target.java_sources)):
-      target_type = _JvmCompileWorkflowType.zinc_only
-    elif target.has_sources('.scala'):
-      target_type = _JvmCompileWorkflowType.rsc_then_zinc
-    else:
-      target_type = None
-    return target_type
-
-
 class RscCompileContext(CompileContext):
   def __init__(self,
                target,
@@ -153,26 +109,50 @@ class RscCompileContext(CompileContext):
     safe_mkdir(os.path.dirname(self.rsc_jar_file))
 
 
-class RscCompile(ZincCompile):
+class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   """Compile Scala and Java code to classfiles using Rsc."""
 
   _name = 'mixed' # noqa
   compiler_name = 'rsc'
 
+  @memoized_property
+  def mirrored_target_option_actions(self):
+    return {
+      'workflow': self._identify_workflow_tags,
+    }
+
   @classmethod
   def implementation_version(cls):
     return super(RscCompile, cls).implementation_version() + [('RscCompile', 172)]
 
-  def __init__(self, *args, **kwargs):
-    super(RscCompile, self).__init__(*args, **kwargs)
+  class JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
+    """Target classifications used to correctly schedule Zinc and Rsc jobs.
 
-    self._rsc_compat_tag = self.get_options().force_compiler_tag_prefix
-    self._compiler_tags = {'{}:{}'.format(self._rsc_compat_tag, workflow.value): workflow
-      for workflow in _JvmCompileWorkflowType.all_variants}
-    self._default_workflow = self.get_options().default_workflow
+    There are some limitations we have to work around before we can compile everything through Rsc
+    and followed by Zinc.
+    - rsc is not able to outline all scala code just yet (this is also being addressed through
+      automated rewrites).
+    - javac is unable to consume rsc's jars just yet.
+    - rsc is not able to outline all java code just yet (this is likely to *not* require rewrites,
+      just some more work on rsc).
 
-    # If the default workflow is conveyed through a flag, override tag values.
-    self._ignore_tags_when_calculating_workflow = self.get_options().is_flagged('default_workflow')
+    As we work on improving our Rsc integration, we'll need to create more workflows to more closely
+    map the supported features of Rsc. This enum class allows us to do that.
+
+      - zinc-only: compiles targets just with Zinc and uses the Zinc products of their dependencies.
+      - rsc-then-zinc: compiles targets with Rsc to create "header" jars, then runs Zinc against the
+        Rsc products of their dependencies. The Rsc compile uses the Rsc products of Rsc compatible
+        targets and the Zinc products of zinc-only targets.
+    """
+
+  @memoized_property
+  def _compiler_tags(self):
+    return {
+      '{prefix}:{workflow_name}'.format(
+        prefix=self.get_options().force_compiler_tag_prefix,
+        workflow_name=workflow.value): workflow
+      for workflow in self.JvmCompileWorkflowType.all_variants
+    }
 
   @classmethod
   def register_options(cls, register):
@@ -180,9 +160,9 @@ class RscCompile(ZincCompile):
     register('--force-compiler-tag-prefix', default='use-compiler', metavar='<tag>',
       help='Always compile targets marked with this tag with rsc, unless the workflow is '
            'specified on the cli.')
-    register('--default-workflow', type=_CompileWorkflowChoice,
-      default=_CompileWorkflowChoice.guess, metavar='<workflow>',
-      help='Defines how a compile workflow is chosen when a tag is not present.')
+    register('--workflow', type=cls.JvmCompileWorkflowType,
+      default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
+      help='The workflow to use to compile JVM targets.')
 
     cls.register_jvm_tool(
       register,
@@ -278,22 +258,26 @@ class RscCompile(ZincCompile):
   def select(self, target):
     if not isinstance(target, JvmTarget):
       return False
-    return self._classify_compile_target(target) is not None
+    return self._classify_target_compile_workflow(target) is not None
 
-  def _classify_compile_target(self, target):
-    if not target.has_sources('.java') and not target.has_sources('.scala'):
+  @memoized_method
+  def _identify_workflow_tags(self, target):
+    try:
+      all_tags = [self._compiler_tags.get(tag) for tag in target.tags]
+      filtered_tags = filter(None, all_tags)
+      return assert_single_element(list(filtered_tags))
+    except StopIteration:
       return None
+    except ValueError as e:
+      raise ValueError('Multiple compile workflow tags specified for target {}: {}'
+                       .format(target, e))
 
-    if not self._ignore_tags_when_calculating_workflow:
-      for t in target.tags:
-        flow = self._compiler_tags.get(t)
-        if flow:
-          return _JvmCompileWorkflowType(flow)
-
-    return self._default_workflow.resolve_for_enum_variant({
-      'zinc-only': _JvmCompileWorkflowType.zinc_only,
-      'guess': _JvmCompileWorkflowType.classify_target(target)
-    })
+  @memoized_method
+  def _classify_target_compile_workflow(self, target):
+    """Return the compile workflow to use for this target."""
+    if target.has_sources('.java') or target.has_sources('.scala'):
+      return self.get_scalar_mirrored_target_option('workflow', target)
+    return None
 
   def _key_for_target_as_dep(self, target, workflow):
     # used for jobs that are either rsc jobs or zinc jobs run against rsc
@@ -489,6 +473,7 @@ class RscCompile(ZincCompile):
           output_products=[
             runtime_classpath_product,
           ],
+          # TODO: remove this dep and fix tests!!!
           dep_keys=[
             # TODO we could remove the dependency on the rsc target in favor of bumping
             # the cache separately. We would need to bring that dependency back for
@@ -526,7 +511,7 @@ class RscCompile(ZincCompile):
         rsc_jar_file=os.path.join(rsc_dir, 'm.jar'),
         log_dir=os.path.join(rsc_dir, 'logs'),
         sources=sources,
-        workflow=self._classify_compile_target(target),
+        workflow=self._classify_target_compile_workflow(target),
       ),
       CompileContext(
         target=target,
@@ -659,6 +644,6 @@ class RscCompile(ZincCompile):
     S1/2 are rsc-then-zinc targets and S2 must be on the classpath to compile J successfully.
     """
     return contexts[compile_target][0].workflow.resolve_for_enum_variant({
-      'zinc-only': lambda : contexts[dep][0].workflow == _JvmCompileWorkflowType.rsc_then_zinc,
+      'zinc-only': lambda : contexts[dep][0].workflow == self.JvmCompileWorkflowType.rsc_then_zinc,
       'rsc-then-zinc': lambda : False
     })()

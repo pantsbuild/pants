@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 from builtins import zip
 
 from future.utils import binary_type, text_type
@@ -228,11 +228,9 @@ class ChoicesMixin(AbstractClass):
   """A mixin which declares that the type has a fixed set of possible instances."""
 
   @classproperty
+  @abstractproperty
   def all_variants(cls):
     """Return an iterable containing a de-duplicated list of all possible instances of this type."""
-    raise NotImplementedError(
-      "The `all_variants` classproperty must be implemented for subclasses of {}!"
-      .format(cls.__name__))
 
 
 def enum(all_values):

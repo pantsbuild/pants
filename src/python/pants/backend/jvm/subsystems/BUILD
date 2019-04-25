@@ -149,6 +149,7 @@ python_library(
   sources = ['zinc_language_mixin.py'],
   dependencies = [
     '3rdparty/python:future',
+    'src/python/pants/build_graph',
     'src/python/pants/subsystem',
   ]
 )
