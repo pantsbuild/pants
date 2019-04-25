@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 import re
 from builtins import bytes, object, str
 
@@ -75,12 +76,25 @@ def target_list_option(s):
   return _convert(s, (list, tuple))
 
 
+def _normalize_directory_separators(s):
+  """Coalesce runs of consecutive instances of `os.sep` in `s`, e.g. '//' -> '/' on POSIX.
+
+  The engine will use paths or target addresses either to form globs or to string-match against, and
+  including the directory separator '/' multiple times in a row e.g. '//' produces an equivalent
+  glob as with a single '/', but produces a different actual string, which will cause the engine to
+  fail to glob file paths or target specs correctly.
+
+  TODO: give the engine more control over matching paths so we don't have to sanitize the input!
+  """
+  return os.path.normpath(s)
+
+
 def dir_option(s):
   """Same type as 'str', but indicates string represents a directory path.
 
   :API: public
   """
-  return s
+  return _normalize_directory_separators(s)
 
 
 def file_option(s):
@@ -88,7 +102,7 @@ def file_option(s):
 
   :API: public
   """
-  return s
+  return _normalize_directory_separators(s)
 
 
 def dict_with_files_option(s):
