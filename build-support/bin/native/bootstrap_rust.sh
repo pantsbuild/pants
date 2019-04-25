@@ -18,8 +18,6 @@ function cargo_bin() {
 }
 
 function bootstrap_rust() {
-  set -x
-
   RUST_TOOLCHAIN="$(cat ${REPO_ROOT}/rust-toolchain)"
   RUST_COMPONENTS=(
     "rustfmt-preview"
@@ -29,18 +27,12 @@ function bootstrap_rust() {
 
   # Control a pants-specific rust toolchain.
   if [[ ! -x "${RUSTUP}" ]]; then
+    # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
     log "A pants owned rustup installation could not be found, installing via the instructions at" \
         "https://www.rustup.rs ..."
-    local -r rustup_tmp_dir="$(mktemp -d)"
-    trap "rm -rf ${rustup_tmp_dir}" EXIT
-    # NB: The downloaded file here *must* be named `rustup-init`, or the workaround binary fails
-    # with "info: caused by: No such file or directory (os error 2)".
-    local -r rustup_init_destination="${rustup_tmp_dir}/rustup-init"
-    # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
-    curl -sSf 'https://raw.githubusercontent.com/rust-lang/rustup.rs/615ed4e265c702cdc2ad025e944a92d8068abde2/rustup-init.sh' \
-         > "$rustup_init_destination"
-    chmod +x "$rustup_init_destination"
-    "$rustup_init_destination" -y --no-modify-path --default-toolchain none 1>&2
+    # This is the recommended installation method for Unix when '--proto' is not available on curl
+    # (as in CentOS6), see # https://github.com/rust-lang/rustup.rs#other-installation-methods.
+    curl https://sh.rustup.rs -sSf | sh -s -- -y --no-modify-path --default-toolchain none 1>&2
   fi
 
   local -r cargo="${CARGO_HOME}/bin/cargo"
