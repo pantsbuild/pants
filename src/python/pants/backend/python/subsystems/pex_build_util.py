@@ -55,27 +55,25 @@ def has_python_requirements(tgt):
   return isinstance(tgt, PythonRequirementLibrary)
 
 
-def may_add_python_platform_to_resolve(tgt):
-  return isinstance(tgt, (PythonBinary, PythonDistribution, PythonTests))
+def always_uses_default_python_platform(tgt):
+  return isinstance(tgt, PythonTests)
+
+
+def may_have_explicit_python_platform(tgt):
+  return isinstance(tgt, (PythonBinary, PythonDistribution))
 
 
 def targets_by_platform(targets, python_setup):
   d = defaultdict(OrderedSet)
   for target in targets:
-    if may_add_python_platform_to_resolve(target):
-      # PythonTests doesn't have a platforms property, and should (currently) always run on the
-      # default configured platform, so we getattr and fall back to the configured value one if
-      # the target doesn't have a platforms property.
-      #
-      # If we don't do this, the default configured platform may not be resolved (specifically if a
-      # PythonBinary is also built at the same time, which explicitly defines platforms not
-      # including the default configured platforms), and tests will fail to run because they're
-      # missing dependencies for their platform.
-      #
-      # There are currently no tests for this because they're super platform specific and it's hard
-      # for us to express that on CI, but https://github.com/pantsbuild/pants/issues/7616 has an
-      # excellent repro case.
-      for platform in (target.platforms if getattr(target, "platforms", None) else python_setup.platforms):
+    if always_uses_default_python_platform(target):
+       # There are currently no tests for this because they're super platform specific and it's hard
+       # for us to express that on CI, but https://github.com/pantsbuild/pants/issues/7616 has an
+       # excellent repro case for why this is necessary.
+      for platform in python_setup.platforms:
+        d[platform].add(target)
+    elif may_have_explicit_python_platform(target):
+      for platform in target.platforms if target.platforms else python_setup.platforms:
         d[platform].add(target)
   return d
 
