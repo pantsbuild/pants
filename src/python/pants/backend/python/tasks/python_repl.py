@@ -5,15 +5,14 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import signal
 
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
+from pants.base.exception_sink import ExceptionSink
 from pants.task.repl_task_mixin import ReplTaskMixin
-from pants.util.contextutil import signal_handler_as
 
 
 class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
@@ -55,8 +54,6 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
     # While the repl subprocess is synchronously spawned, we rely on process group
     # signalling for a SIGINT to reach the repl subprocess directly - and want to
     # do nothing in response on the parent side.
-    def ignore_control_c(signum, frame): pass
-
-    with signal_handler_as(signal.SIGINT, ignore_control_c):
+    with ExceptionSink.ignoring_sigint():
       env = pex_run_kwargs.pop('env', os.environ).copy()
       pex.run(env=env, **pex_run_kwargs)
