@@ -57,6 +57,7 @@ source ${HERE}/build-support/bin/native/bootstrap_code.sh
 
 # Default to using Python 3 if not otherwise specified.
 export PY="${PY:-python3}"
+validate_executable "$PY"
 
 # Set interpreter constraints to exactly match the interpreter used for the venv, if not already set.
 # Note that $PY only impacts which virtualenv we use for the parent Pants process; we must also set

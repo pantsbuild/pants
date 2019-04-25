@@ -67,3 +67,13 @@ function git_merge_base() {
   git rev-parse --symbolic-full-name --abbrev-ref HEAD@{upstream} 2>/dev/null || echo 'master'
 
 }
+
+function validate_executable() {
+  local -r exe_name="$1"
+  if ! hash "$exe_name"; then
+    die "$(cat <<EOF
+Executable ${exe_name} must be discoverable on the PATH for pants to bootstrap itself in this repo.
+Exiting.
+EOF)"
+  fi
+}
