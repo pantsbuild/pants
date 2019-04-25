@@ -43,6 +43,16 @@ mod selectors;
 mod tasks;
 mod types;
 
+use fs;
+use futures;
+
+use hashing;
+
+use log;
+
+use tar_api;
+
+use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -50,7 +60,6 @@ use std::mem;
 use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::time::Duration;
 
 use crate::context::Core;
@@ -58,7 +67,7 @@ use crate::core::{Function, Key, Params, TypeId, Value};
 use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
   EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern,
-  HandleBuffer, IdentifyExtern, LogExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
+  HandleBuffer, IdentifyExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, RawBuffer,
   StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
   StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
@@ -67,10 +76,11 @@ use crate::rule_graph::{GraphMaker, RuleGraph};
 use crate::scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use crate::tasks::Tasks;
 use crate::types::Types;
-use fs::{GlobMatching, MemFS, PathStat};
 use futures::Future;
 use hashing::Digest;
-use log::error;
+use log::{error, Log};
+use logging::logger::LOGGER;
+use logging::Logger;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -98,7 +108,6 @@ impl RawNodes {
 #[no_mangle]
 pub extern "C" fn externs_set(
   context: *const ExternContext,
-  log: LogExtern,
   log_level: u8,
   call: CallExtern,
   generator_send: GeneratorSendExtern,
@@ -124,7 +133,6 @@ pub extern "C" fn externs_set(
 ) {
   externs::set_externs(Externs {
     context,
-    log,
     log_level,
     call,
     generator_send,
@@ -233,6 +241,7 @@ pub extern "C" fn scheduler_create(
     string: type_string,
     bytes: type_bytes,
   };
+  #[allow(clippy::redundant_closure)] // I couldn't find an easy way to remove this closure.
   let mut tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
   tasks.intrinsics_set(&types);
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
@@ -408,13 +417,6 @@ pub extern "C" fn execution_add_root_select(
 pub extern "C" fn tasks_create() -> *const Tasks {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(Box::new(Tasks::new()))
-}
-
-#[no_mangle]
-pub extern "C" fn tasks_singleton_add(tasks_ptr: *mut Tasks, handle: Handle, output_type: TypeId) {
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.singleton_add(handle.into(), output_type);
-  })
 }
 
 #[no_mangle]
@@ -681,24 +683,12 @@ pub extern "C" fn match_path_globs(path_globs: Handle, paths_buf: BufferBuffer) 
     }
   };
 
-  let static_fs = Arc::new(MemFS::new(
-    paths_buf
-      .to_os_strings()
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-  ));
-
-  static_fs
-    .expand(path_globs)
-    .wait()
-    .map(|path_stats| {
-      externs::store_bool(path_stats.iter().any(|p| match p {
-        PathStat::File { .. } => true,
-        PathStat::Dir { .. } => false,
-      }))
-    })
-    .into()
+  let paths = paths_buf
+    .to_os_strings()
+    .into_iter()
+    .map(PathBuf::from)
+    .collect::<Vec<_>>();
+  path_globs.matches(&paths).map(externs::store_bool).into()
 }
 
 #[no_mangle]
@@ -819,6 +809,46 @@ pub extern "C" fn materialize_directories(
   .map(|_| ())
   .wait()
   .into()
+}
+
+// This is called before externs are set up, so we cannot return a PyResult
+#[no_mangle]
+pub extern "C" fn init_logging(level: u64, show_rust_3rdparty_logs: bool) {
+  Logger::init(level, show_rust_3rdparty_logs);
+}
+
+#[no_mangle]
+pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u64) -> PyResult {
+  let path_str = unsafe { CStr::from_ptr(log_file_ptr).to_string_lossy().into_owned() };
+  let path = PathBuf::from(path_str);
+  LOGGER
+    .set_pantsd_logger(path, level)
+    .map(i64::from)
+    .map(externs::store_i64)
+    .into()
+}
+
+// Might be called before externs are set, therefore can't return a PyResult
+#[no_mangle]
+pub extern "C" fn setup_stderr_logger(level: u64) {
+  LOGGER
+    .set_stderr_logger(level)
+    .expect("Error setting up STDERR logger");
+}
+
+// Might be called before externs are set, therefore can't return a PyResult
+#[no_mangle]
+pub extern "C" fn write_log(msg: *const raw::c_char, level: u64, target: *const raw::c_char) {
+  let message_str = unsafe { CStr::from_ptr(msg).to_string_lossy() };
+  let target_str = unsafe { CStr::from_ptr(target).to_string_lossy() };
+  LOGGER
+    .log_from_python(message_str.borrow(), level, target_str.borrow())
+    .expect("Error logging message");
+}
+
+#[no_mangle]
+pub extern "C" fn flush_log() {
+  LOGGER.flush();
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

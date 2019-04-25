@@ -48,6 +48,7 @@ use fnv::FnvHasher;
 
 use futures::future::{self, Future};
 use indexmap::IndexSet;
+use log::{info, trace, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -58,7 +59,7 @@ use boxfuture::{BoxFuture, Boxable};
 
 type FNV = BuildHasherDefault<FnvHasher>;
 
-type PGraph<N> = DiGraph<Entry<N>, (), u32>;
+type PGraph<N> = DiGraph<Entry<N>, f32, u32>;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct InvalidationResult {
@@ -116,27 +117,39 @@ impl<N: Node> InnerGraph<N> {
   ///
   /// Detect whether adding an edge from src to dst would create a cycle.
   ///
-  /// Returns true if a cycle would be created by adding an edge from src->dst.
+  /// Returns a path which would cause the cycle if an edge were added from src to dst, or None if
+  /// no cycle would be created.
   ///
-  fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
-    // Search either forward from the dst, or backward from the src.
-    let (root, needle, direction) = {
-      let out_from_dst = self.pg.neighbors(dst_id).count();
-      let in_to_src = self
-        .pg
-        .neighbors_directed(src_id, Direction::Incoming)
-        .count();
-      if out_from_dst < in_to_src {
-        (dst_id, src_id, Direction::Outgoing)
-      } else {
-        (src_id, dst_id, Direction::Incoming)
-      }
-    };
+  fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> Option<Vec<Entry<N>>> {
+    if src_id == dst_id {
+      return Some(vec![self.entry_for_id(src_id).unwrap().clone()]);
+    }
+    Self::shortest_path(&self.pg, dst_id, src_id).map(|path| {
+      path
+        .into_iter()
+        .map(|index| self.entry_for_id(index).unwrap().clone())
+        .collect()
+    })
+  }
 
-    // Search for an existing path from dst to src.
-    let mut roots = VecDeque::new();
-    roots.push_back(root);
-    self.walk(roots, direction).any(|eid| eid == needle)
+  ///
+  /// Compute and return one shortest path from `src` to `dst`.
+  ///
+  fn shortest_path(graph: &PGraph<N>, src: EntryId, dst: EntryId) -> Option<Vec<EntryId>> {
+    let (_path_weights, paths) = petgraph::algo::bellman_ford(graph, src)
+      .expect("There should not be any negative edge weights");
+
+    let mut next = dst;
+    let mut path = Vec::new();
+    path.push(next);
+    while let Some(current) = paths[next.index()] {
+      path.push(current);
+      if current == src {
+        return Some(path);
+      }
+      next = current;
+    }
+    None
   }
 
   ///
@@ -154,7 +167,7 @@ impl<N: Node> InnerGraph<N> {
   fn clear(&mut self) {
     for eid in self.nodes.values() {
       if let Some(entry) = self.pg.node_weight_mut(*eid) {
-        entry.clear();
+        entry.clear(true);
       }
     }
   }
@@ -192,7 +205,7 @@ impl<N: Node> InnerGraph<N> {
     // Clear roots and remove their outbound edges.
     for id in &root_ids {
       if let Some(entry) = self.pg.node_weight_mut(*id) {
-        entry.clear();
+        entry.clear(false);
       }
     }
     self.pg.retain_edges(|pg, edge| {
@@ -513,15 +526,26 @@ impl<N: Node> Graph<N> {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
           let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
-          if inner.detect_cycle(src_id, potential_dst_id) {
-            // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-            inner.ensure_entry(EntryKey::Cyclic(dst_node))
-          } else {
-            // Valid dependency.
-            potential_dst_id
+          match Self::detect_cycle(src_id, potential_dst_id, &mut inner) {
+            Ok(true) => {
+              // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
+              inner.ensure_entry(EntryKey::Cyclic(dst_node))
+            }
+            Ok(false) => {
+              // Valid dependency.
+              trace!(
+                "Adding dependency from {:?} to {:?}",
+                inner.entry_for_id(src_id).unwrap().node(),
+                inner.entry_for_id(potential_dst_id).unwrap().node()
+              );
+              potential_dst_id
+            }
+            Err(err) => return futures::future::err(err).to_boxed(),
           }
         };
-        inner.pg.add_edge(src_id, dst_id, ());
+        // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
+        // edge as having equal weight.
+        inner.pg.add_edge(src_id, dst_id, 1.0);
         inner
           .entry_for_id(dst_id)
           .cloned()
@@ -534,6 +558,60 @@ impl<N: Node> Graph<N> {
       entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
     } else {
       future::err(N::Error::invalidated()).to_boxed()
+    }
+  }
+
+  fn detect_cycle(
+    src_id: EntryId,
+    potential_dst_id: EntryId,
+    inner: &mut InnerGraph<N>,
+  ) -> Result<bool, N::Error> {
+    let mut counter = 0;
+    loop {
+      // Find one cycle if any cycles exist.
+      if let Some(cycle_path) = inner.detect_cycle(src_id, potential_dst_id) {
+        // See if the cycle contains any dirty nodes. If there are dirty nodes, we can try clearing
+        // them, and then check if there are still any cycles in the graph.
+        let dirty_nodes: HashSet<_> = cycle_path
+          .iter()
+          .filter(|n| n.may_have_dirty_edges())
+          .map(|n| n.node().clone())
+          .collect();
+        if dirty_nodes.is_empty() {
+          // We detected a cycle with no dirty nodes - there's a cycle and there's nothing we can do
+          // to remove it.
+          info!(
+            "Detected cycle considering adding edge from {:?} to {:?}; existing path: {:?}",
+            inner.entry_for_id(src_id).unwrap(),
+            inner.entry_for_id(potential_dst_id).unwrap(),
+            cycle_path
+          );
+          return Ok(true);
+        }
+        counter += 1;
+        // Obsolete edges from a dirty node may cause fake cycles to be detected if there was a
+        // dirty dep from A to B, and we're trying to add a dep from B to A.
+        // If we detect a cycle that contains dirty nodes (and so potentially obsolete edges),
+        // we repeatedly cycle-detect, clearing (and re-running) and dirty nodes (and their edges)
+        // that we encounter.
+        //
+        // We do this repeatedly, because there may be multiple paths which would cause cycles,
+        // which contain dirty nodes. If we've cleared 10 separate paths which contain dirty nodes,
+        // and are still detecting cycle-causing paths containing dirty nodes, give up. 10 is a very
+        // arbitrary number, which we can increase if we find real graphs in the wild which hit this
+        // limit.
+        if counter > 10 {
+          warn!(
+            "Couldn't remove cycle containing dirty nodes after {} attempts; nodes in cycle: {:?}",
+            counter, cycle_path
+          );
+          return Err(N::Error::cyclic());
+        }
+        // Clear the dirty nodes, removing the edges from them, and try again.
+        inner.invalidate_from_roots(|node| dirty_nodes.contains(node));
+      } else {
+        return Ok(false);
+      }
     }
   }
 
@@ -633,6 +711,24 @@ impl<N: Node> Graph<N> {
   /// reliably the case because Entry happens to require a &mut InnerGraph reference; it would be
   /// great not to violate that in the future.
   ///
+  /// TODO: We don't track which generation actually added which edges, so over time nodes will end
+  /// up with spurious dependencies. This is mostly sound, but may lead to over-invalidation and
+  /// doing more work than is necessary.
+  /// As an example, if generation 0 or X depends on A and B, and generation 1 of X depends on C,
+  /// nothing will prune the dependencies from X onto A and B, so generation 1 of X will have
+  /// dependencies on A, B, and C in the graph, even though running it only depends on C.
+  /// At some point we should address this, but we must be careful with how we do so; anything which
+  /// ties together the generation of a node with specifics of edges would require careful
+  /// consideration of locking (probably it would require merging the EntryState locks and Graph
+  /// locks, or working out something clever).
+  ///
+  /// It would also require careful consideration of nodes in the Running EntryState - these may
+  /// have previous RunToken edges and next RunToken edges which collapse into the same Generation
+  /// edges; when working out whether a dirty node is really clean, care must be taken to avoid
+  /// spurious cycles. Currently we handle this as a special case by, if we detect a cycle that
+  /// contains dirty nodes, clearing those nodes (removing any edges from them). This is a little
+  /// hacky, but will tide us over until we fully solve this problem.
+  ///
   fn complete<C>(
     &self,
     context: &C,
@@ -650,7 +746,7 @@ impl<N: Node> Graph<N> {
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
         .filter_map(|dep_id| inner.entry_for_id(dep_id))
-        .map(|entry| entry.generation())
+        .map(Entry::generation)
         .collect();
       (
         inner.entry_for_id(entry_id).cloned(),
@@ -888,7 +984,11 @@ mod tests {
     );
 
     // Request with a new context that truncates execution at the middle Node.
-    let context = TContext::new_with_stop_at(0, TNode(1), graph.clone());
+    let context = TContext::new_with_dependencies(
+      0,
+      vec![(TNode(1), None)].into_iter().collect(),
+      graph.clone(),
+    );
     assert_eq!(
       graph.create(TNode(2), &context).wait(),
       Ok(vec![T(1, 0), T(2, 0)])
@@ -1015,6 +1115,56 @@ mod tests {
     );
   }
 
+  #[test]
+  fn cyclic_failure() {
+    // Confirms that an attempt to create a cycle fails.
+    let graph = Arc::new(Graph::new());
+    let top = TNode(2);
+    let context = TContext::new_with_dependencies(
+      0,
+      // Request creation of a cycle by sending the bottom most node to the top.
+      vec![(TNode(0), Some(top))].into_iter().collect(),
+      graph.clone(),
+    );
+
+    assert_eq!(graph.create(TNode(2), &context).wait(), Err(TError::Cyclic));
+  }
+
+  #[test]
+  fn cyclic_dirtying() {
+    // Confirms that a dirtied path between two nodes is able to reverse direction while being
+    // cleaned.
+    let graph = Arc::new(Graph::new());
+    let initial_top = TNode(2);
+    let initial_bot = TNode(0);
+
+    // Request with a context that creates a path downward.
+    let context_down = TContext::new(0, graph.clone());
+    assert_eq!(
+      graph.create(initial_top.clone(), &context_down).wait(),
+      Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+    );
+
+    // Clear the bottom node, and then clean it with a context that causes the path to reverse.
+    graph.invalidate_from_roots(|n| n == &initial_bot);
+    let context_up = TContext::new_with_dependencies(
+      1,
+      // Reverse the path from bottom to top.
+      vec![(TNode(1), None), (TNode(0), Some(TNode(1)))]
+        .into_iter()
+        .collect(),
+      graph.clone(),
+    );
+
+    let res = graph.create(initial_bot, &context_up).wait();
+
+    assert_eq!(res, Ok(vec![T(1, 1), T(0, 1)]));
+
+    let res = graph.create(initial_top, &context_up).wait();
+
+    assert_eq!(res, Ok(vec![T(1, 1), T(2, 1)]));
+  }
+
   ///
   /// A token containing the id of a Node and the id of a Context, respectively. Has a short name
   /// to minimize the verbosity of tests.
@@ -1035,12 +1185,11 @@ mod tests {
 
     fn run(self, context: TContext) -> BoxFuture<Vec<T>, TError> {
       context.ran(self.clone());
-      let depth = self.0;
-      let token = T(depth, context.id());
-      if depth > 0 && !context.stop_at(&self) {
+      let token = T(self.0, context.id());
+      if let Some(dep) = context.dependency_of(&self) {
         context.maybe_delay(&self);
         context
-          .get(TNode(depth - 1))
+          .get(dep)
           .map(move |mut v| {
             v.push(token);
             v
@@ -1119,7 +1268,11 @@ mod tests {
   #[derive(Clone)]
   struct TContext {
     id: usize,
-    stop_at: Option<TNode>,
+    // A mapping from source to optional destination that drives what values each TNode depends on.
+    // If there is no entry in this map for a node, then TNode::run will default to requesting
+    // the next smallest node. Finally, if a None entry is present, a node will have no
+    // dependencies.
+    edges: Arc<HashMap<TNode, Option<TNode>>>,
     delays: HashMap<TNode, Duration>,
     graph: Arc<Graph<TNode>>,
     runs: Arc<Mutex<Vec<TNode>>>,
@@ -1130,7 +1283,7 @@ mod tests {
     fn clone_for(&self, entry_id: EntryId) -> TContext {
       TContext {
         id: self.id,
-        stop_at: self.stop_at.clone(),
+        edges: self.edges.clone(),
         delays: self.delays.clone(),
         graph: self.graph.clone(),
         runs: self.runs.clone(),
@@ -1157,7 +1310,7 @@ mod tests {
     fn new(id: usize, graph: Arc<Graph<TNode>>) -> TContext {
       TContext {
         id,
-        stop_at: None,
+        edges: Arc::default(),
         delays: HashMap::default(),
         graph,
         runs: Arc::new(Mutex::new(Vec::new())),
@@ -1165,10 +1318,14 @@ mod tests {
       }
     }
 
-    fn new_with_stop_at(id: usize, stop_at: TNode, graph: Arc<Graph<TNode>>) -> TContext {
+    fn new_with_dependencies(
+      id: usize,
+      edges: HashMap<TNode, Option<TNode>>,
+      graph: Arc<Graph<TNode>>,
+    ) -> TContext {
       TContext {
         id,
-        stop_at: Some(stop_at),
+        edges: Arc::new(edges),
         delays: HashMap::default(),
         graph,
         runs: Arc::new(Mutex::new(Vec::new())),
@@ -1183,7 +1340,7 @@ mod tests {
     ) -> TContext {
       TContext {
         id,
-        stop_at: None,
+        edges: Arc::default(),
         delays,
         graph,
         runs: Arc::new(Mutex::new(Vec::new())),
@@ -1210,8 +1367,16 @@ mod tests {
       }
     }
 
-    fn stop_at(&self, node: &TNode) -> bool {
-      Some(node) == self.stop_at.as_ref()
+    ///
+    /// If the given TNode should declare a dependency on another TNode, returns that dependency.
+    ///
+    fn dependency_of(&self, node: &TNode) -> Option<TNode> {
+      match self.edges.get(node) {
+        Some(Some(ref dep)) => Some(dep.clone()),
+        Some(None) => None,
+        None if node.0 > 0 => Some(TNode(node.0 - 1)),
+        None => None,
+      }
     }
 
     fn runs(&self) -> Vec<TNode> {

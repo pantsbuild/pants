@@ -314,10 +314,12 @@ impl Store {
           expanding_futures.push(self.expand_directory(digest));
         }
         Ok(None) => {
-          return future::err(format!("Failed to upload digest {:?}: Not found", digest)).to_boxed();
+          return future::err(format!("Failed to upload digest {:?}: Not found", digest))
+            .to_boxed();
         }
         Err(err) => {
-          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err)).to_boxed();
+          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err))
+            .to_boxed();
         }
       };
     }
@@ -471,12 +473,7 @@ impl Store {
         future::ok(digest_types).to_boxed()
       })
       .map(|digest_pairs_per_directory| {
-        Iterator::flatten(
-          digest_pairs_per_directory
-            .into_iter()
-            .map(|v| v.into_iter()),
-        )
-        .collect()
+        Iterator::flatten(digest_pairs_per_directory.into_iter().map(Vec::into_iter)).collect()
       })
       .to_boxed()
   }
@@ -538,7 +535,13 @@ impl Store {
           .write(true)
           .mode(if is_executable { 0o755 } else { 0o644 })
           .open(&destination)
-          .and_then(|mut f| f.write_all(&bytes))
+          .and_then(|mut f| {
+            f.write_all(&bytes)?;
+            // See `materialize_directory`, but we fundamentally materialize files for other
+            // processes to read; as such, we must ensure data is flushed to disk and visible
+            // to them as opposed to just our process.
+            f.sync_all()
+          })
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
       })
       .and_then(move |write_result| match write_result {
@@ -573,12 +576,9 @@ impl Store {
         .to_boxed()
       })
       .map(|file_contents_per_directory| {
-        let mut vec = Iterator::flatten(
-          file_contents_per_directory
-            .into_iter()
-            .map(|v| v.into_iter()),
-        )
-        .collect::<Vec<_>>();
+        let mut vec =
+          Iterator::flatten(file_contents_per_directory.into_iter().map(Vec::into_iter))
+            .collect::<Vec<_>>();
         vec.sort_by(|l, r| l.path.cmp(&r.path));
         vec
       })
@@ -1872,7 +1872,7 @@ mod remote {
               digest, err
             ))
             .to_boxed(),
-            Ok(((sender, receiver), client)) => {
+            Ok(((sender, receiver), _client)) => {
               let chunk_size_bytes = store.chunk_size_bytes;
               let resource_name = resource_name.clone();
               let bytes = bytes.clone();
@@ -1898,11 +1898,30 @@ mod remote {
                 }
               });
 
-              future::ok(client)
-                .join(sender.send_all(stream).map_err(move |e| {
-                  format!("Error attempting to upload digest {:?}: {:?}", digest, e)
-                }))
-                .and_then(move |_| {
+              sender
+                .send_all(stream)
+                .map(|_| ())
+                .or_else(move |e| {
+                  match e {
+                    // Some implementations of the remote execution API early-return if the blob has
+                    // been concurrently uploaded by another client. In this case, they return a
+                    // WriteResponse with a committed_size equal to the digest's entire size before
+                    // closing the stream.
+                    // Because the server then closes the stream, the client gets an RpcFinished
+                    // error in this case. We ignore this, and will later on verify that the
+                    // committed_size we received from the server is equal to the expected one. If
+                    // these are not equal, the upload will be considered a failure at that point.
+                    // Whether this type of response will become part of the official API is up for
+                    // discussion: see
+                    // https://groups.google.com/d/topic/remote-execution-apis/NXUe3ItCw68/discussion.
+                    grpcio::Error::RpcFinished(None) => Ok(()),
+                    e => Err(format!(
+                      "Error attempting to upload digest {:?}: {:?}",
+                      digest, e
+                    )),
+                  }
+                })
+                .and_then(move |()| {
                   receiver.map_err(move |e| {
                     format!(
                       "Error from server when uploading digest {:?}: {:?}",

@@ -33,7 +33,9 @@ python_tests(
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info/tasks:depmap',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
+    'src/python/pants/subsystem',
     'tests/python/pants_test:task_test_base',
   ]
 )

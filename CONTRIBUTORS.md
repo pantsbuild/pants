@@ -150,6 +150,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Pall Valmundsson
 + Pankaj Gupta
 + Patrick Lawson
++ Patrick Liu
 + Paul Groudas
 + Paul Yau
 + Peiyu Wang

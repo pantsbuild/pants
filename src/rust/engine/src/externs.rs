@@ -13,8 +13,6 @@ use crate::core::{Failure, Function, Key, TypeId, Value};
 use crate::handles::{DroppingHandle, Handle};
 use crate::interning::Interns;
 use lazy_static::lazy_static;
-use log;
-use num_enum::CustomTryInto;
 use parking_lot::RwLock;
 
 pub fn eval(python: &str) -> Result<Value, Failure> {
@@ -209,46 +207,36 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
   .into()
 }
 
-///
-/// TODO: If we added support for inserting to the `Interns` using an `Ident`, `PyGeneratorResponse`
-/// could directly return `Idents` during `Get` calls. This would also require splitting its fields
-/// further to avoid needing to "identify" the result of a `PyGeneratorResponseType::Break`.
-///
 pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorResponse, Failure> {
   let response =
     with_externs(|e| (e.generator_send)(e.context, generator as &Handle, arg as &Handle));
-  match response.res_type {
-    PyGeneratorResponseType::Break => Ok(GeneratorResponse::Break(response.values.unwrap_one())),
-    PyGeneratorResponseType::Throw => Err(PyResult::failure_from(response.values.unwrap_one())),
-    PyGeneratorResponseType::Get => {
+  match response {
+    PyGeneratorResponse::Broke(h) => Ok(GeneratorResponse::Break(Value::new(h))),
+    PyGeneratorResponse::Throw(h) => Err(PyResult::failure_from(Value::new(h))),
+    PyGeneratorResponse::Get(product, handle, ident) => {
       let mut interns = INTERNS.write();
-      let p = response.products.unwrap_one();
-      let v = response.values.unwrap_one();
       let g = Get {
-        product: p,
-        subject: interns.insert(v),
+        product,
+        subject: interns.insert_with(Value::new(handle), ident),
       };
       Ok(GeneratorResponse::Get(g))
     }
-    PyGeneratorResponseType::GetMulti => {
+    PyGeneratorResponse::GetMulti(products, handles, identities) => {
       let mut interns = INTERNS.write();
-      let PyGeneratorResponse {
-        products: products_buf,
-        values: values_buf,
-        ..
-      } = response;
-      let products = products_buf.to_vec();
-      let values = values_buf.to_vec();
+      let products = products.to_vec();
+      let identities = identities.to_vec();
+      let values = handles.to_vec();
       assert_eq!(products.len(), values.len());
-      let continues: Vec<Get> = products
+      let gets: Vec<Get> = products
         .into_iter()
         .zip(values.into_iter())
-        .map(|(p, v)| Get {
+        .zip(identities.into_iter())
+        .map(|((p, v), i)| Get {
           product: p,
-          subject: interns.insert(v),
+          subject: interns.insert_with(v, i),
         })
         .collect();
-      Ok(GeneratorResponse::GetMulti(continues))
+      Ok(GeneratorResponse::GetMulti(gets))
     }
   }
 }
@@ -287,28 +275,13 @@ lazy_static! {
   static ref INTERNS: RwLock<Interns> = RwLock::new(Interns::new());
 }
 
-// This is mut so that the max level can be set via set_externs.
-// It should only be set exactly once, and nothing should ever read it (it is only defined to
-// prevent the FfiLogger from being dropped).
-// In order to avoid a performance hit, there is no lock guarding it (because if it had a lock, it
-// would need to be acquired for every single logging statement).
-// Please don't mutate it.
-// Please.
-static mut LOGGER: FfiLogger = FfiLogger {
-  level_filter: log::LevelFilter::Off,
-};
-
 ///
 /// Set the static Externs for this process. All other methods of this module will fail
 /// until this has been called.
 ///
 pub fn set_externs(externs: Externs) {
-  let log_level = externs.log_level;
   let mut externs_ref = EXTERNS.write();
   *externs_ref = Some(externs);
-  unsafe {
-    LOGGER.init(log_level);
-  }
 }
 
 fn with_externs<F, T>(f: F) -> T
@@ -339,7 +312,6 @@ pub type ExternContext = raw::c_void;
 pub struct Externs {
   pub context: *const ExternContext,
   pub log_level: u8,
-  pub log: LogExtern,
   pub call: CallExtern,
   pub generator_send: GeneratorSendExtern,
   pub eval: EvalExtern,
@@ -366,8 +338,6 @@ pub struct Externs {
 // The pointer to the context is safe for sharing between threads.
 unsafe impl Sync for Externs {}
 unsafe impl Send for Externs {}
-
-pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
 pub type GetTypeForExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
 
@@ -462,23 +432,18 @@ impl From<Result<(), String>> for PyResult {
   }
 }
 
-// Only constructed from the python side.
-// TODO: map this into a C enum with cbindgen and consume from python instead of using magic numbers
-// in extern_generator_send() in native.py!
-#[allow(dead_code)]
-#[repr(u8)]
-pub enum PyGeneratorResponseType {
-  Break = 0,
-  Throw = 1,
-  Get = 2,
-  GetMulti = 3,
-}
-
+///
+/// The response from a call to extern_generator_send. Gets include Idents for their Handles
+/// in order to avoid roundtripping to intern them, and to eagerly trigger errors for unhashable
+/// types on the python side where possible.
+///
 #[repr(C)]
-pub struct PyGeneratorResponse {
-  res_type: PyGeneratorResponseType,
-  values: HandleBuffer,
-  products: TypeIdBuffer,
+pub enum PyGeneratorResponse {
+  Get(TypeId, Handle, Ident),
+  GetMulti(TypeIdBuffer, HandleBuffer, IdentBuffer),
+  // NB: Broke not Break because C keyword.
+  Broke(Handle),
+  Throw(Handle),
 }
 
 #[derive(Debug)]
@@ -509,9 +474,41 @@ pub enum GeneratorResponse {
 /// the object's type.
 ///
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct Ident {
   pub hash: i64,
   pub type_id: TypeId,
+}
+
+pub trait RawBuffer<Raw, Output> {
+  fn ptr(&self) -> *mut Raw;
+  fn len(&self) -> u64;
+
+  ///
+  /// A buffer-specific shallow clone operation (possibly just implemented via clone).
+  ///
+  fn lift(t: &Raw) -> Output;
+
+  ///
+  /// Returns a Vec copy of the buffer contents.
+  ///
+  fn to_vec(&self) -> Vec<Output> {
+    with_vec(self.ptr(), self.len() as usize, |vec| {
+      vec.iter().map(Self::lift).collect()
+    })
+  }
+
+  ///
+  /// Asserts that the buffer contains one item, and returns a copy of it.
+  ///
+  fn unwrap_one(&self) -> Output {
+    assert!(
+      self.len() == 1,
+      "Expected exactly 1 item in Buffer, but had: {}",
+      self.len()
+    );
+    with_vec(self.ptr(), self.len() as usize, |vec| Self::lift(&vec[0]))
+  }
 }
 
 ///
@@ -529,34 +526,42 @@ pub struct HandleBuffer {
   handle_: Handle,
 }
 
-impl HandleBuffer {
-  pub fn to_vec(&self) -> Vec<Value> {
-    with_vec(self.handles_ptr, self.handles_len as usize, |handle_vec| {
-      handle_vec
-        .iter()
-        .map(|h| Value::new(unsafe { h.clone_shallow() }))
-        .collect()
-    })
+impl RawBuffer<Handle, Value> for HandleBuffer {
+  fn ptr(&self) -> *mut Handle {
+    self.handles_ptr
   }
 
-  ///
-  /// Asserts that the HandleBuffer contains one value, and returns it.
-  ///
-  /// NB: Consider making generic and merging with TypeIdBuffer if we get a third copy.
-  ///
-  pub fn unwrap_one(&self) -> Value {
-    assert!(
-      self.handles_len == 1,
-      "HandleBuffer contained more than one value: {}",
-      self.handles_len
-    );
-    with_vec(self.handles_ptr, self.handles_len as usize, |handle_vec| {
-      Value::new(unsafe { handle_vec.iter().next().unwrap().clone_shallow() })
-    })
+  fn len(&self) -> u64 {
+    self.handles_len
+  }
+
+  fn lift(t: &Handle) -> Value {
+    Value::new(unsafe { t.clone_shallow() })
   }
 }
 
-// Points to an array of TypeIds.
+#[repr(C)]
+pub struct IdentBuffer {
+  idents_ptr: *mut Ident,
+  idents_len: u64,
+  // A Handle to hold the underlying array alive.
+  handle_: Handle,
+}
+
+impl RawBuffer<Ident, Ident> for IdentBuffer {
+  fn ptr(&self) -> *mut Ident {
+    self.idents_ptr
+  }
+
+  fn len(&self) -> u64 {
+    self.idents_len
+  }
+
+  fn lift(t: &Ident) -> Ident {
+    *t
+  }
+}
+
 #[repr(C)]
 pub struct TypeIdBuffer {
   ids_ptr: *mut TypeId,
@@ -565,25 +570,17 @@ pub struct TypeIdBuffer {
   handle_: Handle,
 }
 
-impl TypeIdBuffer {
-  pub fn to_vec(&self) -> Vec<TypeId> {
-    with_vec(self.ids_ptr, self.ids_len as usize, |vec| vec.clone())
+impl RawBuffer<TypeId, TypeId> for TypeIdBuffer {
+  fn ptr(&self) -> *mut TypeId {
+    self.ids_ptr
   }
 
-  ///
-  /// Asserts that the TypeIdBuffer contains one TypeId, and returns it.
-  ///
-  /// NB: Consider making generic and merging with HandleBuffer if we get a third copy.
-  ///
-  pub fn unwrap_one(&self) -> TypeId {
-    assert!(
-      self.ids_len == 1,
-      "TypeIdBuffer contained more than one value: {}",
-      self.ids_len
-    );
-    with_vec(self.ids_ptr, self.ids_len as usize, |ids_vec| {
-      *ids_vec.iter().next().unwrap()
-    })
+  fn len(&self) -> u64 {
+    self.ids_len
+  }
+
+  fn lift(t: &TypeId) -> TypeId {
+    *t
   }
 }
 
@@ -611,7 +608,7 @@ pub struct Buffer {
 
 impl Buffer {
   pub fn to_bytes(&self) -> Vec<u8> {
-    with_vec(self.bytes_ptr, self.bytes_len as usize, |vec| vec.clone())
+    with_vec(self.bytes_ptr, self.bytes_len as usize, Vec::clone)
   }
 
   pub fn to_os_string(&self) -> OsString {
@@ -640,7 +637,7 @@ pub struct BufferBuffer {
 impl BufferBuffer {
   pub fn to_bytes_vecs(&self) -> Vec<Vec<u8>> {
     with_vec(self.bufs_ptr, self.bufs_len as usize, |vec| {
-      vec.iter().map(|b| b.to_bytes()).collect()
+      vec.iter().map(Buffer::to_bytes).collect()
     })
   }
 
@@ -685,98 +682,4 @@ where
   let output = f(&cs);
   mem::forget(cs);
   output
-}
-
-// This is a hard-coding of constants in the standard logging python package.
-// TODO: Switch from CustomTryInto to TryFromPrimitive when try_from is stable.
-#[derive(Debug, Eq, PartialEq, CustomTryInto)]
-#[repr(u8)]
-enum PythonLogLevel {
-  NotSet = 0,
-  // Trace doesn't exist in a Python world, so set it to "a bit lower than Debug".
-  Trace = 5,
-  Debug = 10,
-  Info = 20,
-  Warn = 30,
-  Error = 40,
-  Critical = 50,
-}
-
-impl From<log::Level> for PythonLogLevel {
-  fn from(level: log::Level) -> Self {
-    match level {
-      log::Level::Error => PythonLogLevel::Error,
-      log::Level::Warn => PythonLogLevel::Warn,
-      log::Level::Info => PythonLogLevel::Info,
-      log::Level::Debug => PythonLogLevel::Debug,
-      log::Level::Trace => PythonLogLevel::Trace,
-    }
-  }
-}
-
-impl From<PythonLogLevel> for log::LevelFilter {
-  fn from(level: PythonLogLevel) -> Self {
-    match level {
-      PythonLogLevel::NotSet => log::LevelFilter::Off,
-      PythonLogLevel::Trace => log::LevelFilter::Trace,
-      PythonLogLevel::Debug => log::LevelFilter::Debug,
-      PythonLogLevel::Info => log::LevelFilter::Info,
-      PythonLogLevel::Warn => log::LevelFilter::Warn,
-      PythonLogLevel::Error => log::LevelFilter::Error,
-      // Rust doesn't have a Critical, so treat them like Errors.
-      PythonLogLevel::Critical => log::LevelFilter::Error,
-    }
-  }
-}
-
-///
-/// FfiLogger is an implementation of log::Log which asks the Python logging system to log via cffi.
-///
-struct FfiLogger {
-  level_filter: log::LevelFilter,
-}
-
-impl FfiLogger {
-  // init must only be called once in the lifetime of the program. No other loggers may be init'd.
-  // If either of the above are violated, expect a panic.
-  pub fn init(&'static mut self, max_level: u8) {
-    let max_python_level = max_level.try_into_PythonLogLevel();
-    self.level_filter = {
-      match max_python_level {
-        Ok(python_level) => {
-          let level: log::LevelFilter = python_level.into();
-          level
-        }
-        Err(err) => panic!("Unrecognised log level from python: {}: {}", max_level, err),
-      }
-    };
-
-    log::set_max_level(self.level_filter);
-    log::set_logger(self)
-      .expect("Failed to set logger (maybe you tried to call init multiple times?)");
-  }
-}
-
-impl log::Log for FfiLogger {
-  fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
-    metadata.level() <= self.level_filter
-  }
-
-  fn log(&self, record: &log::Record<'_>) {
-    if !self.enabled(record.metadata()) {
-      return;
-    }
-    let level: PythonLogLevel = record.level().into();
-    let message = format!("{}", record.args());
-    with_externs(|e| {
-      (e.log)(
-        e.context,
-        level as u8,
-        message.as_ptr(),
-        message.len() as u64,
-      )
-    })
-  }
-
-  fn flush(&self) {}
 }

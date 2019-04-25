@@ -222,7 +222,7 @@ class JvmPlatformSettings(object):
   def __eq__(self, other):
     return tuple(self) == tuple(other)
 
-  # TODO(python3port): decide if this should raise NotImplemented on invalid comparisons
+  # TODO(#6071): decide if this should raise NotImplemented on invalid comparisons
   def __lt__(self, other):
     return tuple(self) < tuple(other)
 

@@ -99,18 +99,6 @@ class HelpInfoExtracterTest(unittest.TestCase):
     self.assertEqual('do not use this', ohi.removal_hint)
     self.assertIsNotNone(ohi.deprecated_message)
 
-  def test_fromfile(self):
-    ohi = HelpInfoExtracter('').get_option_help_info([], {})
-    self.assertFalse(ohi.fromfile)
-
-    kwargs = {'fromfile': False}
-    ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
-    self.assertFalse(ohi.fromfile)
-
-    kwargs = {'fromfile': True}
-    ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
-    self.assertTrue(ohi.fromfile)
-
   def test_grouping(self):
     def do_test(kwargs, expected_basic=False, expected_recursive=False, expected_advanced=False):
       def exp_to_len(exp):

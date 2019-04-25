@@ -517,10 +517,10 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       with self.context.new_workunit(name='run',
                                      cmd=' '.join(pex.cmdline(args)),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
-        rc = self._spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
+        rc = self.spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
         return PytestResult.rc(rc)
     except ErrorWhileTesting:
-      # _spawn_and_wait wraps the test runner in a timeout, so it could
+      # spawn_and_wait wraps the test runner in a timeout, so it could
       # fail with a ErrorWhileTesting. We can't just set PythonTestResult
       # to a failure because the resultslog doesn't have all the failures
       # when tests are killed with a timeout. Therefore we need to re-raise
@@ -563,7 +563,12 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
             pytest_relpath = testcase.getAttribute('file')
             relsrc = os.path.join(buildroot_relpath, pytest_relpath)
             failed_target = relsrc_to_target.get(relsrc)
-            failed_targets.add(failed_target)
+            if failed_target:
+              failed_targets.add(failed_target)
+            else:
+              # If test failure/error was not reported in junitxml, pick the first test target
+              # in targets as the failed target
+              failed_targets.add(targets[0])
     except (XmlParser.XmlError, ValueError) as e:
       raise TaskError('Error parsing xml file at {}: {}'.format(junitxml, e))
 

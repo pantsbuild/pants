@@ -50,7 +50,7 @@ class UnpackRemoteSourcesBase(Task, AbstractClass):
     """
 
   @abstractmethod
-  def unpack_target(unpackable_target, unpack_dir):
+  def unpack_target(self, unpackable_target, unpack_dir):
     """Unpack the remote resources indicated by `unpackable_target` into `unpack_dir`."""
 
   @property

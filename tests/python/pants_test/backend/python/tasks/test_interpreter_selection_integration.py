@@ -87,7 +87,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
   def _build_pex(self, binary_target, config=None, args=None, version=PY_27):
     # By default, Avoid some known-to-choke-on interpreters.
     if version == PY_3:
-      constraint = '["CPython>=3.4,<4"]'
+      constraint = '["CPython>=3.6,<4"]'
     else:
       constraint = '["CPython>=2.7,<3"]'
     args = list(args) if args is not None else [

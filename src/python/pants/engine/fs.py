@@ -99,7 +99,7 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
 
     :return: A Digest, or None if the Digest did not exist.
     """
-    read_file = maybe_read_file(cls._path(directory), binary_mode=False)
+    read_file = maybe_read_file(cls._path(directory))
     if read_file:
       fingerprint, length = read_file.split(':')
       return Digest(fingerprint, int(length))
@@ -109,7 +109,7 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
   def dump(self, directory):
     """Dump this Digest object adjacent to the given directory."""
     payload = '{}:{}'.format(self.fingerprint, self.serialized_bytes_length)
-    safe_file_dump(self._path(directory), payload=payload, mode='w')
+    safe_file_dump(self._path(directory), payload=payload)
 
   def __repr__(self):
     return '''Digest(fingerprint={}, serialized_bytes_length={})'''.format(

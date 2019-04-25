@@ -16,7 +16,6 @@ from builtins import open
 from collections import defaultdict
 from contextlib import contextmanager
 
-from pants.base.deprecated import deprecated_conditional
 from pants.util.strutil import ensure_text
 
 
@@ -104,7 +103,7 @@ def safe_mkdir_for_all(paths):
 # TODO(#6742): payload should be Union[str, bytes] in type hint syntax, but from
 # https://pythonhosted.org/an_example_pypi_project/sphinx.html#full-code-example it doesn't appear
 # that is possible to represent in docstring type syntax.
-def safe_file_dump(filename, payload='', binary_mode=None, mode=None):
+def safe_file_dump(filename, payload='', mode='w'):
   """Write a string to a file.
 
   This method is "safe" to the extent that `safe_open` is "safe". See the explanation on the method
@@ -115,34 +114,14 @@ def safe_file_dump(filename, payload='', binary_mode=None, mode=None):
 
   :param string filename: The filename of the file to write to.
   :param string payload: The string to write to the file.
-  :param bool binary_mode: Write to file as bytes or unicode. Mutually exclusive with mode.
-  :param string mode: A mode argument for the python `open` builtin. Mutually exclusive with
-    binary_mode.
+  :param string mode: A mode argument for the python `open` builtin which should be a write mode
+                      variant. Defaults to 'w'.
   """
-  deprecated_conditional(
-    lambda: binary_mode is not None,
-    removal_version='1.16.0.dev2',
-    entity_description='The binary_mode argument in safe_file_dump()',
-    hint_message='Use the mode argument instead!')
-  if binary_mode is not None and mode is not None:
-    raise AssertionError('Only one of `binary_mode` and `mode` may be specified.')
-
-  deprecated_conditional(
-    lambda: mode is None,
-    removal_version='1.16.0.dev2',
-    entity_description='Not specifying mode explicitly in safe_file_dump()',
-    hint_message="Function will default to unicode ('w') when pants migrates to python 3!")
-  if mode is None:
-    if binary_mode is False:
-      mode = 'w'
-    else:
-      mode = 'wb'
-
   with safe_open(filename, mode=mode) as f:
     f.write(payload)
 
 
-def maybe_read_file(filename, binary_mode=None):
+def maybe_read_file(filename, binary_mode=False):
   """Read and return the contents of a file in a single file.read().
 
   :param string filename: The filename of the file to read.
@@ -150,22 +129,13 @@ def maybe_read_file(filename, binary_mode=None):
   :returns: The contents of the file, or opening the file fails for any reason
   :rtype: string
   """
-  # TODO(#7121): Default binary_mode=False after the python 3 switchover!
-  deprecated_conditional(
-    lambda: binary_mode is None,
-    removal_version='1.16.0.dev2',
-    entity_description='Not specifying binary_mode explicitly in maybe_read_file()',
-    hint_message='Function will default to unicode when pants migrates to python 3!')
-  if binary_mode is None:
-    binary_mode = True
-
   try:
     return read_file(filename, binary_mode=binary_mode)
   except IOError:
     return None
 
 
-def read_file(filename, binary_mode=None):
+def read_file(filename, binary_mode=False):
   """Read and return the contents of a file in a single file.read().
 
   :param string filename: The filename of the file to read.
@@ -173,15 +143,6 @@ def read_file(filename, binary_mode=None):
   :returns: The contents of the file.
   :rtype: string
   """
-  # TODO(#7121): Default binary_mode=False after the python 3 switchover!
-  deprecated_conditional(
-    lambda: binary_mode is None,
-    removal_version='1.16.0.dev2',
-    entity_description='Not specifying binary_mode explicitly in read_file()',
-    hint_message='Function will default to unicode when pants migrates to python 3!')
-  if binary_mode is None:
-    binary_mode = True
-
   mode = 'rb' if binary_mode else 'r'
   with open(filename, mode) as f:
     return f.read()

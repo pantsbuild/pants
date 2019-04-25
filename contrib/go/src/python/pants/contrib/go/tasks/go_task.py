@@ -45,6 +45,10 @@ class GoTask(Task):
   def is_local_src(target):
     return isinstance(target, GoLocalSource)
 
+  @classmethod
+  def is_test_target(cls, target):
+    return cls.is_local_src(target) and target.has_tests
+
   @staticmethod
   def is_go(target):
     return isinstance(target, GoTarget)

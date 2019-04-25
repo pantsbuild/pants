@@ -17,6 +17,11 @@ class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
   pythonpath and backend_packages, should be able to declare new BUILD file
   objects."""
 
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """The test fails to run under pantsd because of a failure to initialize a subsystem"""
+    return False
+
   def run_with_testproject_backend_pkgs(self, cmd):
     testproject_backend_src_dir = os.path.join(
       get_buildroot(), 'testprojects/pants-plugins/src/python')

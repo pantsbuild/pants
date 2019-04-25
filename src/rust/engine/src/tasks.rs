@@ -3,8 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::core::{Function, Key, TypeId, Value, FNV};
-use crate::externs;
+use crate::core::{Function, TypeId, FNV};
 use crate::selectors::{Get, Select};
 use crate::types::Types;
 
@@ -18,14 +17,12 @@ pub struct Task {
 }
 
 ///
-/// Registry of native (rust) Intrinsic tasks, user (python) Tasks, and Singletons.
+/// Registry of native (rust) Intrinsic tasks and user (python) Tasks.
 ///
 #[derive(Clone, Debug)]
 pub struct Tasks {
   // output product type -> Intrinsic providing it
   intrinsics: HashMap<TypeId, Vec<Intrinsic>, FNV>,
-  // Singleton Values to be returned for a given TypeId.
-  singletons: HashMap<TypeId, (Key, Value), FNV>,
   // output product type -> list of tasks providing it
   tasks: HashMap<TypeId, Vec<Task>, FNV>,
   // Used during the construction of the tasks map.
@@ -38,16 +35,12 @@ pub struct Tasks {
 ///   2. add_*() - zero or more times per task to add input clauses
 ///   3. task_end() - once per task
 ///
-/// Also has a one-shot method for adding Singletons (which have no Selects):
-///   * singleton_add()
-///
 /// (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
 ///
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
       intrinsics: HashMap::default(),
-      singletons: HashMap::default(),
       tasks: HashMap::default(),
       preparing: None,
     }
@@ -55,9 +48,8 @@ impl Tasks {
 
   pub fn all_product_types(&self) -> HashSet<TypeId> {
     self
-      .singletons
+      .tasks
       .keys()
-      .chain(self.tasks.keys())
       .chain(self.intrinsics.keys())
       .cloned()
       .collect::<HashSet<_>>()
@@ -65,18 +57,6 @@ impl Tasks {
 
   pub fn all_tasks(&self) -> Vec<&Task> {
     self.tasks.values().flat_map(|tasks| tasks).collect()
-  }
-
-  pub fn singleton_types(&self) -> Vec<TypeId> {
-    self
-      .singletons
-      .values()
-      .map(|&(k, _)| *k.type_id())
-      .collect()
-  }
-
-  pub fn gen_singleton(&self, product: TypeId) -> Option<&(Key, Value)> {
-    self.singletons.get(&product)
   }
 
   pub fn gen_intrinsic(&self, product: TypeId) -> Option<&Vec<Intrinsic>> {
@@ -119,18 +99,6 @@ impl Tasks {
         .or_insert_with(Vec::new)
         .push(intrinsic)
     }
-  }
-
-  pub fn singleton_add(&mut self, value: Value, product: TypeId) {
-    if let Some(&(_, ref existing_value)) = self.singletons.get(&product) {
-      panic!(
-        "More than one Singleton rule was installed for the product {:?}: {:?} vs {:?}",
-        product, existing_value, value,
-      );
-    }
-    self
-      .singletons
-      .insert(product, (externs::key_for(value.clone()), value));
   }
 
   ///

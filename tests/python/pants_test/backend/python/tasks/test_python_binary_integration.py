@@ -22,6 +22,12 @@ _OSX_WHEEL_SUBSTRING = "macosx"
 
 
 class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
+
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """TODO(#7320): See the point about watchman."""
+    return False
+
   @staticmethod
   @contextmanager
   def caching_config():
@@ -93,7 +99,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
   def test_target_platform_overrides_config(self):
     self.platforms_test_impl(
       target_platforms=[_LINUX_PLATFORM],
-      config_platforms=[_OSX_WHEEL_SUBSTRING],
+      config_platforms=[_OSX_PLATFORM],
       want_present_platforms=[_LINUX_WHEEL_SUBSTRING],
       want_missing_platforms=[_OSX_WHEEL_SUBSTRING],
     )
@@ -101,7 +107,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
   def test_target_platform_narrows_config(self):
     self.platforms_test_impl(
       target_platforms=[_LINUX_PLATFORM],
-      config_platforms=[_LINUX_WHEEL_SUBSTRING, _OSX_WHEEL_SUBSTRING],
+      config_platforms=[_LINUX_PLATFORM, _OSX_PLATFORM],
       want_present_platforms=[_LINUX_WHEEL_SUBSTRING],
       want_missing_platforms=[_OSX_WHEEL_SUBSTRING],
     )
@@ -109,7 +115,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
   def test_target_platform_expands_config(self):
     self.platforms_test_impl(
       target_platforms=[_LINUX_PLATFORM, _OSX_PLATFORM],
-      config_platforms=[_LINUX_WHEEL_SUBSTRING],
+      config_platforms=[_LINUX_PLATFORM],
       want_present_platforms=[_LINUX_WHEEL_SUBSTRING, _OSX_WHEEL_SUBSTRING],
     )
 

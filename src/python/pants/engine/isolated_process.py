@@ -6,12 +6,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 
-from future.utils import binary_type, text_type
+from future.utils import binary_type
 
 from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Select
-from pants.util.objects import Exactly, TypeCheckError, datatype
+from pants.util.objects import Exactly, datatype, string_list, string_optional, string_type
 
 
 logger = logging.getLogger(__name__)
@@ -20,18 +19,20 @@ _default_timeout_seconds = 15 * 60
 
 
 class ExecuteProcessRequest(datatype([
-  ('argv', tuple),
+  ('argv', string_list),
   ('input_files', Digest),
-  ('description', text_type),
-  ('env', tuple),
-  ('output_files', tuple),
-  ('output_directories', tuple),
+  ('description', string_type),
+  ('env', string_list),
+  ('output_files', string_list),
+  ('output_directories', string_list),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
-  ('jdk_home', Exactly(text_type, type(None))),
+  ('jdk_home', string_optional),
 ])):
   """Request for execution with args and snapshots to extract."""
 
+  # TODO: add a method to hack together a `process_executor` invocation command line which
+  # reproduces this process execution request to make debugging remote executions effortless!
   def __new__(
     cls,
     argv,
@@ -47,13 +48,8 @@ class ExecuteProcessRequest(datatype([
       env = ()
     else:
       if not isinstance(env, dict):
-        raise TypeCheckError(
-          cls.__name__,
-          "arg 'env' was invalid: value {} (with type {}) must be a dict".format(
-            env,
-            type(env)
-          )
-        )
+        raise cls.make_type_error(
+          "arg 'env' was invalid: value {} (with type {}) must be a dict".format(env, type(env)))
       env = tuple(item for pair in env.items() for item in pair)
 
     return super(ExecuteProcessRequest, cls).__new__(
@@ -113,7 +109,7 @@ stderr:
     super(ProcessExecutionFailure, self).__init__(msg)
 
 
-@rule(ExecuteProcessResult, [Select(FallibleExecuteProcessResult), Select(ExecuteProcessRequest)])
+@rule(ExecuteProcessResult, [FallibleExecuteProcessResult, ExecuteProcessRequest])
 def fallible_to_exec_result_or_raise(fallible_result, request):
   """Converts a FallibleExecuteProcessResult to a ExecuteProcessResult or raises an error."""
 

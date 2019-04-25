@@ -6,6 +6,7 @@ use crate::node::{EntryId, Node, NodeContext, NodeError};
 
 use futures::future::{self, Future};
 use futures::sync::oneshot;
+use log::{self, trace};
 use parking_lot::Mutex;
 
 use boxfuture::{BoxFuture, Boxable};
@@ -51,6 +52,52 @@ impl Generation {
   }
 }
 
+///
+/// A result from running a Node.
+///
+/// If the value is Dirty, the consumer should check whether the dependencies of the Node have the
+/// same values as they did when this Node was last run; if so, the value can be re-used
+/// (and should be marked "Clean").
+///
+/// If the value is Clean, the consumer can simply use the value as-is.
+///
+#[derive(Clone, Debug)]
+pub(crate) enum EntryResult<N: Node> {
+  Clean(Result<N::Item, N::Error>),
+  Dirty(Result<N::Item, N::Error>),
+}
+
+impl<N: Node> EntryResult<N> {
+  fn is_dirty(&self) -> bool {
+    if let EntryResult::Dirty(..) = self {
+      true
+    } else {
+      false
+    }
+  }
+
+  fn dirty(&mut self) {
+    if let EntryResult::Clean(value) = self {
+      *self = EntryResult::Dirty(value.clone())
+    }
+  }
+
+  fn clean(&mut self) {
+    if let EntryResult::Dirty(value) = self {
+      *self = EntryResult::Clean(value.clone())
+    }
+  }
+}
+
+impl<N: Node> AsRef<Result<N::Item, N::Error>> for EntryResult<N> {
+  fn as_ref(&self) -> &Result<N::Item, N::Error> {
+    match self {
+      EntryResult::Clean(v) => v,
+      EntryResult::Dirty(v) => v,
+    }
+  }
+}
+
 #[allow(clippy::type_complexity)]
 #[derive(Debug)]
 pub(crate) enum EntryState<N: Node> {
@@ -64,7 +111,7 @@ pub(crate) enum EntryState<N: Node> {
   NotStarted {
     run_token: RunToken,
     generation: Generation,
-    previous_result: Option<Result<N::Item, N::Error>>,
+    previous_result: Option<EntryResult<N>>,
   },
   // A node that is running. A running node that has been marked dirty re-runs rather than
   // completing.
@@ -75,7 +122,7 @@ pub(crate) enum EntryState<N: Node> {
     generation: Generation,
     start_time: Instant,
     waiters: Vec<oneshot::Sender<Result<(N::Item, Generation), N::Error>>>,
-    previous_result: Option<Result<N::Item, N::Error>>,
+    previous_result: Option<EntryResult<N>>,
     dirty: bool,
   },
   // A node that has completed, and then possibly been marked dirty. Because marking a node
@@ -84,9 +131,8 @@ pub(crate) enum EntryState<N: Node> {
   Completed {
     run_token: RunToken,
     generation: Generation,
-    result: Result<N::Item, N::Error>,
+    result: EntryResult<N>,
     dep_generations: Vec<Generation>,
-    dirty: bool,
   },
 }
 
@@ -157,8 +203,9 @@ impl<N: Node> Entry<N> {
     let state = self.state.lock();
     match *state {
       EntryState::Completed {
-        ref result, dirty, ..
-      } if !dirty => Some(result.clone()),
+        result: EntryResult::Clean(ref result),
+        ..
+      } => Some(result.clone()),
       _ => None,
     }
   }
@@ -174,7 +221,7 @@ impl<N: Node> Entry<N> {
     run_token: RunToken,
     generation: Generation,
     previous_dep_generations: Option<Vec<Generation>>,
-    previous_result: Option<Result<N::Item, N::Error>>,
+    previous_result: Option<EntryResult<N>>,
   ) -> EntryState<N>
   where
     C: NodeContext<Node = N>,
@@ -242,16 +289,15 @@ impl<N: Node> Entry<N> {
           start_time: Instant::now(),
           run_token,
           generation,
-          previous_result: previous_result,
+          previous_result,
           dirty: false,
         }
       }
       &EntryKey::Cyclic(_) => EntryState::Completed {
-        result: Err(N::Error::cyclic()),
+        result: EntryResult::Clean(Err(N::Error::cyclic())),
         dep_generations: Vec::new(),
         run_token,
         generation,
-        dirty: false,
       },
     }
   }
@@ -283,6 +329,7 @@ impl<N: Node> Entry<N> {
         } => {
           let (send, recv) = oneshot::channel();
           waiters.push(send);
+          trace!("Adding waiter on {:?}", self.node);
           return recv
             .map_err(|_| N::Error::invalidated())
             .flatten()
@@ -291,10 +338,9 @@ impl<N: Node> Entry<N> {
         &mut EntryState::Completed {
           ref result,
           generation,
-          dirty,
           ..
-        } if !dirty && self.node.content().cacheable() => {
-          return future::result(result.clone())
+        } if self.node.content().cacheable() && !result.is_dirty() => {
+          return future::result(result.as_ref().clone())
             .map(move |res| (res, generation))
             .to_boxed();
         }
@@ -321,15 +367,21 @@ impl<N: Node> Entry<N> {
         EntryState::Completed {
           run_token,
           generation,
-          result,
+          mut result,
           dep_generations,
-          dirty,
         } => {
+          trace!(
+            "Re-starting node {:?}. It was: previous_result={:?}, cacheable={}",
+            self.node,
+            result,
+            self.node.content().cacheable()
+          );
           assert!(
-            dirty || !self.node.content().cacheable(),
+            result.is_dirty() || !self.node.content().cacheable(),
             "A clean Node should not reach this point: {:?}",
             result
           );
+          result.dirty();
           // The Node has already completed but is now marked dirty. This indicates that we are the
           // first caller to request it since it was marked dirty. We attempt to clean it (which will
           // cause it to re-run if the dep_generations mismatch).
@@ -398,6 +450,7 @@ impl<N: Node> Entry<N> {
       _ => {
         // We care about exactly one case: a Running state with the same run_token. All other states
         // represent various (legal) race conditions.
+        trace!("Not completing node {:?} because it was invalidated (different run_token) before completing.", self.node);
         return;
       }
     }
@@ -407,7 +460,7 @@ impl<N: Node> Entry<N> {
         waiters,
         run_token,
         generation,
-        previous_result,
+        mut previous_result,
         dirty,
         ..
       } => {
@@ -415,6 +468,13 @@ impl<N: Node> Entry<N> {
           // Because it is always ephemeral, invalidation is the only type of Err that we do not
           // persist in the Graph. Instead, swap the Node to NotStarted to drop all waiters,
           // causing them to also experience invalidation (transitively).
+          trace!(
+            "Not completing node {:?} because it was invalidated before completing.",
+            self.node
+          );
+          if let Some(previous_result) = previous_result.as_mut() {
+            previous_result.dirty();
+          }
           EntryState::NotStarted {
             run_token: run_token.next(),
             generation,
@@ -423,6 +483,13 @@ impl<N: Node> Entry<N> {
         } else if dirty {
           // The node was dirtied while it was running. The dep_generations and new result cannot
           // be trusted and were never published. We continue to use the previous result.
+          trace!(
+            "Not completing node {:?} because it was dirtied before completing.",
+            self.node
+          );
+          if let Some(previous_result) = previous_result.as_mut() {
+            previous_result.dirty();
+          }
           Self::run(
             context,
             &self.node,
@@ -435,33 +502,37 @@ impl<N: Node> Entry<N> {
         } else {
           // If the new result does not match the previous result, the generation increments.
           let (generation, next_result) = if let Some(result) = result {
-            if Some(&result) == previous_result.as_ref() {
+            if Some(&result) == previous_result.as_ref().map(EntryResult::as_ref) {
               // Node was re-executed, but had the same result value.
-              (generation, result)
+              (generation, EntryResult::Clean(result))
             } else {
-              (generation.next(), result)
+              (generation.next(), EntryResult::Clean(result))
             }
           } else {
             // Node was marked clean.
             // NB: The `expect` here avoids a clone and a comparison: see the method docs.
-            (
-              generation,
-              previous_result.expect("A Node cannot be marked clean without a previous result."),
-            )
+            let mut result =
+              previous_result.expect("A Node cannot be marked clean without a previous result.");
+            result.clean();
+            (generation, result)
           };
           // Notify all waiters (ignoring any that have gone away), and then store the value.
           // A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps
           // due to failure of another Future in a `join` or `join_all`, or due to a timeout at the
           // root of a request.
+          trace!(
+            "Completing node {:?} with {} waiters.",
+            self.node,
+            waiters.len()
+          );
           for waiter in waiters {
-            let _ = waiter.send(next_result.clone().map(|res| (res, generation)));
+            let _ = waiter.send(next_result.as_ref().clone().map(|res| (res, generation)));
           }
           EntryState::Completed {
             result: next_result,
             dep_generations,
             run_token,
             generation,
-            dirty: false,
           }
         }
       }
@@ -519,15 +590,23 @@ impl<N: Node> Entry<N> {
   ///
   /// Clears the state of this Node, forcing it to be recomputed.
   ///
-  pub(crate) fn clear(&mut self) {
+  /// # Arguments
+  ///
+  /// * `graph_still_contains_edges` - If the caller has guaranteed that all edges from this Node
+  ///   have been removed from the graph, they should pass false here, else true. We may want to
+  ///   remove this parameter, and force this method to remove the edges, but that would require
+  ///   acquiring the graph lock here, which we currently don't do.
+  ///
+  pub(crate) fn clear(&mut self, graph_still_contains_edges: bool) {
     let mut state = self.state.lock();
 
-    let (run_token, generation, previous_result) =
+    let (run_token, generation, mut previous_result) =
       match mem::replace(&mut *state, EntryState::initial()) {
         EntryState::NotStarted {
           run_token,
           generation,
           previous_result,
+          ..
         }
         | EntryState::Running {
           run_token,
@@ -542,6 +621,14 @@ impl<N: Node> Entry<N> {
           ..
         } => (run_token, generation, Some(result)),
       };
+
+    trace!("Clearing node {:?}", self.node);
+
+    if graph_still_contains_edges {
+      if let Some(previous_result) = previous_result.as_mut() {
+        previous_result.dirty();
+      }
+    }
 
     // Swap in a state with a new RunToken value, which invalidates any outstanding work.
     *state = EntryState::NotStarted {
@@ -558,13 +645,36 @@ impl<N: Node> Entry<N> {
   /// See comment on complete for information about _graph argument.
   ///
   pub(crate) fn dirty(&mut self, _graph: &mut super::InnerGraph<N>) {
-    match &mut *self.state.lock() {
-      &mut EntryState::Running { ref mut dirty, .. }
-      | &mut EntryState::Completed { ref mut dirty, .. } => {
-        // Mark dirty.
+    let state = &mut *self.state.lock();
+    trace!("Dirtying node {:?}", self.node);
+    match state {
+      &mut EntryState::Running { ref mut dirty, .. } => {
         *dirty = true;
       }
+      &mut EntryState::Completed { ref mut result, .. } => {
+        result.dirty();
+      }
       &mut EntryState::NotStarted { .. } => {}
+    }
+  }
+
+  pub fn may_have_dirty_edges(&self) -> bool {
+    match *self.state.lock() {
+      EntryState::NotStarted {
+        ref previous_result,
+        ..
+      }
+      | EntryState::Running {
+        ref previous_result,
+        ..
+      } => {
+        if let Some(EntryResult::Dirty(..)) = previous_result {
+          true
+        } else {
+          false
+        }
+      }
+      EntryState::Completed { ref result, .. } => result.is_dirty(),
     }
   }
 

@@ -16,16 +16,21 @@ from future.utils import PY3, raise_with_traceback
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import Exiter
+from pants.base.exception_sink import ExceptionSink, SignalHandler
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
-from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
+
+
+class DaemonSignalHandler(SignalHandler):
+
+  def handle_sigint(self, signum, _frame):
+    raise KeyboardInterrupt('remote client sent control-c!')
 
 
 class DaemonExiter(Exiter):
@@ -71,6 +76,31 @@ class DaemonExiter(Exiter):
       super(DaemonExiter, self).exit(result=result, *args, **kwargs)
 
 
+class _GracefulTerminationException(Exception):
+  """Allows for deferring the returning of the exit code of prefork work until post fork.
+
+  TODO: Once the fork boundary is removed in #7390, this class can be replaced by directly exiting
+  with the relevant exit code.
+  """
+
+  def __init__(self, exit_code=PANTS_FAILED_EXIT_CODE):
+    """
+    :param int exit_code: an optional exit code (defaults to PANTS_FAILED_EXIT_CODE)
+    """
+    super(_GracefulTerminationException, self).__init__('Terminated with {}'.format(exit_code))
+
+    if exit_code == PANTS_SUCCEEDED_EXIT_CODE:
+      raise ValueError(
+        "Cannot create _GracefulTerminationException with a successful exit code of {}"
+        .format(PANTS_SUCCEEDED_EXIT_CODE))
+
+    self._exit_code = exit_code
+
+  @property
+  def exit_code(self):
+    return self._exit_code
+
+
 class DaemonPantsRunner(ProcessManager):
   """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
 
@@ -86,8 +116,8 @@ class DaemonPantsRunner(ProcessManager):
       with cls.nailgunned_stdio(sock, env, handle_stdin=False):
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
         subprocess_dir = options.for_global_scope().pants_subprocessdir
-        graph_helper, target_roots = scheduler_service.prefork(options, options_bootstrapper)
-        deferred_exc = None
+        graph_helper, target_roots, exit_code = scheduler_service.prefork(options, options_bootstrapper)
+        deferred_exc = None if exit_code == PANTS_SUCCEEDED_EXIT_CODE else _GracefulTerminationException(exit_code)
     except Exception:
       deferred_exc = sys.exc_info()
       graph_helper = None
@@ -283,6 +313,7 @@ class DaemonPantsRunner(ProcessManager):
     ExceptionSink.reset_exiter(self._exiter)
 
     ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
+    ExceptionSink.reset_signal_handler(DaemonSignalHandler())
 
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
@@ -309,9 +340,6 @@ class DaemonPantsRunner(ProcessManager):
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
-        # Re-raise any deferred exceptions, if present.
-        self._raise_deferred_exc()
-
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner.create(
           self._exiter,
@@ -322,14 +350,22 @@ class DaemonPantsRunner(ProcessManager):
           self._options_bootstrapper
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
+
+        # Re-raise any deferred exceptions, if present.
+        self._raise_deferred_exc()
+
         runner.run()
       except KeyboardInterrupt:
         self._exiter.exit_and_fail('Interrupted by user.\n')
-      except GracefulTerminationException as e:
+      except _GracefulTerminationException as e:
         ExceptionSink.log_exception(
           'Encountered graceful termination exception {}; exiting'.format(e))
         self._exiter.exit(e.exit_code)
       except Exception:
+        # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
+        # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
+        # happening here, so something is probably overriding the excepthook. By catching Exception
+        # and calling this method, we emulate the normal, expected sys.excepthook override.
         ExceptionSink._log_unhandled_exception_and_exit()
       else:
-        self._exiter.exit(0)
+        self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)

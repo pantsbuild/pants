@@ -5,12 +5,16 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-from builtins import object
+from builtins import object, str
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exception_sink import ExceptionSink
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
+from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
+from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import setup_logging_from_options
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
@@ -18,11 +22,60 @@ from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
-from pants.rules.core.exceptions import GracefulTerminationException
 from pants.util.contextutil import maybe_profiled
 
 
 logger = logging.getLogger(__name__)
+
+
+class LocalExiter(Exiter):
+
+  def __init__(self, run_tracker, repro, *args, **kwargs):
+    self._run_tracker = run_tracker
+    self._repro = repro
+    super(LocalExiter, self).__init__(*args, **kwargs)
+
+  def exit(self, result=PANTS_SUCCEEDED_EXIT_CODE, msg=None, *args, **kwargs):
+    # These strings are prepended to the existing exit message when calling the superclass .exit().
+    additional_messages = []
+    try:
+      if not self._run_tracker.has_ended():
+        if result == PANTS_SUCCEEDED_EXIT_CODE:
+          outcome = WorkUnit.SUCCESS
+        elif result == PANTS_FAILED_EXIT_CODE:
+          outcome = WorkUnit.FAILURE
+        else:
+          run_tracker_msg = ("unrecognized exit code {} provided to {}.exit() -- "
+                             "interpreting as a failure in the run tracker"
+                             .format(result, type(self).__name__))
+          # Log the unrecognized exit code to the fatal exception log.
+          ExceptionSink.log_exception(run_tracker_msg)
+          # Ensure the unrecognized exit code message is also logged to the terminal.
+          additional_messages.push(run_tracker_msg)
+          outcome = WorkUnit.FAILURE
+
+        self._run_tracker.set_root_outcome(outcome)
+        run_tracker_result = self._run_tracker.end()
+        assert result == run_tracker_result, "pants exit code not correctly recorded by run tracker"
+    except ValueError as e:
+      # If we have been interrupted by a signal, calling .end() sometimes writes to a closed file,
+      # so we just log that fact here and keep going.
+      exception_string = str(e)
+      ExceptionSink.log_exception(exception_string)
+      additional_messages.push(exception_string)
+    finally:
+      if self._repro:
+        # TODO: Have Repro capture the 'after' state (as a diff) as well? (in reference to the below
+        # 'before' state comment)
+        # NB: this writes to the logger, which is expected to still be alive if we are exiting from
+        # a signal.
+        self._repro.log_location_of_repro_file()
+
+    if additional_messages:
+      msg = '{}\n\n{}'.format('\n'.join(additional_messages),
+                              msg or '')
+
+    super(LocalExiter, self).exit(result=result, msg=msg, *args, **kwargs)
 
 
 class LocalPantsRunner(object):
@@ -66,7 +119,6 @@ class LocalPantsRunner(object):
       options=options,
       build_root=build_root,
       session=graph_session.scheduler_session,
-      symbol_table=graph_session.symbol_table,
       exclude_patterns=tuple(global_options.exclude_target_regexp),
       tags=tuple(global_options.tag)
     )
@@ -88,8 +140,8 @@ class LocalPantsRunner(object):
     options, build_config, options_bootstrapper = cls.parse_options(
       args,
       env,
-      True,
-      options_bootstrapper
+      setup_logging=True,
+      options_bootstrapper=options_bootstrapper,
     )
     global_options = options.for_global_scope()
 
@@ -156,26 +208,51 @@ class LocalPantsRunner(object):
     self._profile_path = profile_path
 
     self._run_start_time = None
+    self._run_tracker = None
+    self._reporting = None
+    self._repro = None
     self._global_options = options.for_global_scope()
 
   def set_start_time(self, start_time):
+    # Launch RunTracker as early as possible (before .run() is called).
+    self._run_tracker = RunTracker.global_instance()
+    self._reporting = Reporting.global_instance()
+
     self._run_start_time = start_time
+    self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
+
+    # Capture a repro of the 'before' state for this build, if needed.
+    self._repro = Reproducer.global_instance().create_repro()
+    if self._repro:
+      self._repro.capture(self._run_tracker.run_info.get_as_dict())
+
+    # The __call__ method of the Exiter allows for the prototype pattern.
+    self._exiter = LocalExiter(self._run_tracker, self._repro, exiter=self._exiter)
+    ExceptionSink.reset_exiter(self._exiter)
 
   def run(self):
     with maybe_profiled(self._profile_path):
       self._run()
 
-  def _maybe_run_v1(self, run_tracker, reporting):
-    if not self._global_options.v1:
-      return 0
+  def _maybe_handle_help(self):
+    """Handle requests for `help` information."""
+    if self._options.help_request:
+      help_printer = HelpPrinter(self._options)
+      result = help_printer.print_help()
+      self._exiter(result)
+
+  def _maybe_run_v1(self):
+    v1_goals, ambiguous_goals, _ = self._options.goals_by_version
+    if not v1_goals and (not ambiguous_goals or not self._global_options.v1):
+      return PANTS_SUCCEEDED_EXIT_CODE
 
     # Setup and run GoalRunner.
     goal_runner_factory = GoalRunner.Factory(
       self._build_root,
       self._options,
       self._build_config,
-      run_tracker,
-      reporting,
+      self._run_tracker,
+      self._reporting,
       self._graph_session,
       self._target_roots,
       self._exiter
@@ -185,29 +262,19 @@ class LocalPantsRunner(object):
   def _maybe_run_v2(self):
     # N.B. For daemon runs, @console_rules are invoked pre-fork -
     # so this path only serves the non-daemon run mode.
-    if self._is_daemon or not self._global_options.v2:
-      return 0
+    if self._is_daemon:
+      return PANTS_SUCCEEDED_EXIT_CODE
 
-    # If we're a pure --v2 run, validate goals - otherwise some goals specified
-    # may be provided by the --v1 task paths.
-    if not self._global_options.v1:
-      self._graph_session.validate_goals(self._options.goals_and_possible_v2_goals)
+    _, ambiguous_goals, v2_goals = self._options.goals_by_version
+    goals = v2_goals + (ambiguous_goals if self._global_options.v2 else tuple())
+    if not goals:
+      return PANTS_SUCCEEDED_EXIT_CODE
 
-    try:
-      self._graph_session.run_console_rules(
-        self._options_bootstrapper,
-        self._options.goals_and_possible_v2_goals,
-        self._target_roots,
-      )
-    except GracefulTerminationException as e:
-      logger.debug('Encountered graceful termination exception {}; exiting'.format(e))
-      return e.exit_code
-    except Exception as e:
-      logger.warn('Encountered unhandled exception {} during rule execution!'
-                  .format(e))
-      return 1
-    else:
-      return 0
+    return self._graph_session.run_console_rules(
+      self._options_bootstrapper,
+      goals,
+      self._target_roots,
+    )
 
   @staticmethod
   def _compute_final_exit_code(*codes):
@@ -219,25 +286,18 @@ class LocalPantsRunner(object):
     return max_code
 
   def _run(self):
-    # Launch RunTracker as early as possible (just after Subsystem options are initialized).
-    run_tracker = RunTracker.global_instance()
-    reporting = Reporting.global_instance()
-    reporting.initialize(run_tracker, self._options, self._run_start_time)
-
     try:
-      # Capture a repro of the 'before' state for this build, if needed.
-      repro = Reproducer.global_instance().create_repro()
-      if repro:
-        repro.capture(run_tracker.run_info.get_as_dict())
+      self._maybe_handle_help()
 
       engine_result = self._maybe_run_v2()
-      goal_runner_result = self._maybe_run_v1(run_tracker, reporting)
-
-      if repro:
-        # TODO: Have Repro capture the 'after' state (as a diff) as well?
-        repro.log_location_of_repro_file()
+      goal_runner_result = self._maybe_run_v1()
     finally:
-      run_tracker_result = run_tracker.end()
+      try:
+        run_tracker_result = self._run_tracker.end()
+      except ValueError as e:
+        # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
+        logger.exception(e)
+        run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
 
     final_exit_code = self._compute_final_exit_code(
       engine_result,

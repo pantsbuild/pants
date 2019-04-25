@@ -7,11 +7,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import multiprocessing
 import os
 import sys
+from builtins import str
+from textwrap import dedent
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.custom_types import dir_option
+from pants.option.custom_types import dir_option, file_option
 from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
@@ -109,11 +111,20 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')
+    register('--log-show-rust-3rdparty', type=bool, default=False, advanced=True,
+             help='Whether to show/hide logging done by 3rdparty rust crates used by the pants '
+                  'engine.')
 
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
     register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
              help='Set whether log messages are displayed in color.')
+    # TODO(#7203): make a regexp option type!
+    register('--ignore-pants-warnings', type=list, member_type=str, default=[],
+             help='Regexps matching warning strings to ignore, e.g. '
+                  '["DEPRECATED: scope some_scope will be removed"]. The regexps will be matched '
+                  'from the start of the warning string, and will always be case-insensitive. '
+                  'See the `warnings` module documentation for more background on these are used.')
 
     register('--pants-version', advanced=True, default=pants_version(),
              help='Use this pants version. Note Pants code only uses this to verify that you are '
@@ -126,6 +137,17 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'version of the pants instance you are running using -v, -V, or --version.')
 
     register('--pants-runtime-python-version', advanced=True,
+             removal_version='1.19.0.dev0',
+             deprecation_start_version='1.17.0.dev0',
+             removal_hint=dedent("""
+                  This option was only used to help with Pants' migration to run on Python 3. \
+                  Pants will now correctly default to whichever Python versions are supported for \
+                  the current `pants_version` you are using. Please make sure you are using the \
+                  most up-to-date version of the `./pants` script with:
+
+                    curl -L -O https://pantsbuild.github.io/setup/pants
+
+                  and then unset this option."""),
              help='Use this Python version to run Pants. The option expects the major and minor '
                   'version, e.g. 2.7 or 3.6. Note Pants code only uses this to verify that you are '
                   'using the requested interpreter, as Pants cannot dynamically change the '
@@ -201,13 +223,13 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              advanced=True,
              help='Verify that all config file values correspond to known options.')
 
-    register('--build-ignore', advanced=True, type=list, fromfile=True,
+    register('--build-ignore', advanced=True, type=list,
              default=['.*/', default_rel_distdir, 'bower_components/',
                       'node_modules/', '*.egg-info/'],
              help='Paths to ignore when identifying BUILD files. '
                   'This does not affect any other filesystem operations. '
                   'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
-    register('--pants-ignore', advanced=True, type=list, fromfile=True,
+    register('--pants-ignore', advanced=True, type=list,
              default=['.*/', default_rel_distdir],
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
@@ -217,12 +239,13 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help="Raise an exception if any targets declaring source files "
                   "fail to match any glob provided in the 'sources' argument.")
 
+    # TODO(#7203): make a regexp option type!
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
              metavar='<regexp>', help='Exclude target roots that match these regexes.')
-    register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
+    register('--subproject-roots', type=list, advanced=True, default=[],
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
-    register('--owner-of', type=list, default=[], daemon=False, fromfile=True, metavar='<path>',
+    register('--owner-of', type=list, member_type=file_option, default=[], daemon=False, metavar='<path>',
              help='Select the targets that own these files. '
                   'This is the third target calculation strategy along with the --changed-* '
                   'options and specifying the targets directly. These three types of target '
@@ -276,9 +299,13 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='The host to bind the pants nailgun server to.')
     register('--pantsd-pailgun-port', advanced=True, type=int, default=0,
              help='The port to bind the pants nailgun server to. Defaults to a random port.')
+    # TODO(#7514): Make this default to 1.0 seconds if stdin is a tty!
+    register('--pantsd-pailgun-quit-timeout', advanced=True, type=float, default=5.0,
+             help='The length of time (in seconds) to wait for further output after sending a '
+                  'signal to the remote pantsd-runner process before killing it.')
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
-    register('--pantsd-invalidation-globs', advanced=True, type=list, fromfile=True, default=[],
+    register('--pantsd-invalidation-globs', advanced=True, type=list, default=[],
              help='Filesystem events matching any of these globs will trigger a daemon restart.')
 
     # Watchman options.

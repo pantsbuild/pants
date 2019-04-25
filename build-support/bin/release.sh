@@ -10,11 +10,11 @@ source ${ROOT}/build-support/common.sh
 # Note we parse some options here, but parse most at the bottom. This is due to execution order.
 # If the option must be used right away, we parse at the top of the script, whereas if it
 # depends on functions defined later in the script, we parse at the end.
-_OPTS="hdnftcloepqw3"
+_OPTS="hdnftcloepqw2"
 
 while getopts "${_OPTS}"  opt; do
   case ${opt} in
-    3) python_three="true" ;;
+    2) python_two="true" ;;
     *) ;;  # skip over other args to be parsed later
   esac
 done
@@ -22,12 +22,17 @@ done
 # Reset opt parsing's position to start
 OPTIND=0
 
-# Set the Python interpreter to be used for the virtualenv. Note we allow the user to
-# predefine this value so that they may point to a specific interpreter, e.g. 2.7.13 vs. 2.7.15.
-default_interpreter="python2.7";
-if [[ "${python_three:-false}" == "true" ]]; then
+# Setup Python interpreter constraints and pick a suitable interpreter to be used for the
+# virtualenv.
+if [[ "${python_two:-false}" == "true" ]]; then
+  default_interpreter="python2.7"
+  interpreter_constraint="CPython==2.7.*"
+else
   default_interpreter="python3.6"
+  interpreter_constraint="CPython==3.6.*"
 fi
+# Note we allow the user to predefine this value so that they may point to a specific interpreter,
+# e.g. 2.7.13 vs. 2.7.15.
 export PY="${PY:-${default_interpreter}}"
 if ! which "${PY}" >/dev/null; then
   die "Python interpreter ${PY} not discoverable on your PATH."
@@ -37,12 +42,7 @@ if [[ "${py_major_minor}" != "2.7" ]] && [[ "${py_major_minor}" != "3.6" ]]; the
   die "Invalid interpreter. The release script requires Python 2.7 or 3.6 (you are using ${py_major_minor})."
 fi
 
-# Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
-# to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
-# Python 2.7.13 vs. 2.7.15. We must also set this when running with Python 3 to ensure
-# that spawned subprocesses use Python 3.
-py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
 
 function run_local_pants() {
   ${ROOT}/pants "$@"
@@ -82,19 +82,21 @@ function run_pex() {
   # TODO: Cache this in case we run pex multiple times
   (
     PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
-    PEX_PEX=pex27
-    if [[ "${python_three:-false}" == "true" ]]; then
-      PEX_PEX=pex36
-    fi
 
     pexdir="$(mktemp -d -t build_pex.XXXXX)"
     trap "rm -rf ${pexdir}" EXIT
 
-    pex="${pexdir}/${PEX_PEX}"
+    pex="${pexdir}/pex"
 
-    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/${PEX_PEX}" > "${pex}"
-    chmod +x "${pex}"
-    "${pex}" "$@"
+    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
+    # We use `PEX_PYTHON_PATH="${PY}" "${PY}" "${pex}"` instead of either of:
+    # 1. PEX_PYTHON_PATH="${PY}" "${pex}"
+    # 2. "${PY}" "${pex}"
+    # This works around Pex re-exec-ing when it need not and subsequently losing constraints when
+    # it need not. The fixes for these are tracked in:
+    #   1. https://github.com/pantsbuild/pex/issues/709
+    #   2. https://github.com/pantsbuild/pex/issues/710
+    PEX_PYTHON_PATH="${PY}" "${PY}" "${pex}" "$@"
   )
 }
 
@@ -102,8 +104,8 @@ function run_packages_script() {
   (
     cd "${ROOT}"
     args=("$@")
-    if [[ "${python_three:-false}" == "true" ]]; then
-      args=("--py3" ${args[@]})
+    if [[ "${python_two:-false}" == "true" ]]; then
+      args=("--py2" ${args[@]})
     fi
     requirements=("$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)")
     run_pex "${requirements[@]}" -- "${ROOT}/src/python/pants/releases/packages.py" "${args[@]}"
@@ -159,6 +161,7 @@ function execute_packaged_pants_with_internal_backends() {
     --no-verify-config \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
+        'pants.rules.core',\
         'pants.backend.codegen',\
         'pants.backend.docgen',\
         'pants.backend.graph_info',\
@@ -223,7 +226,9 @@ function build_pants_packages() {
   pants_version_set "${version}"
 
   start_travis_section "${NAME}" "Building packages"
-  packages=($(run_packages_script build_and_print "${version}"))
+  packages=(
+    $(run_packages_script build_and_print "${version}")
+  ) || die "Failed to build packages at ${version}!"
   for package in "${packages[@]}"
   do
     (
@@ -304,7 +309,9 @@ function install_and_test_packages() {
   export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
   trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
-  packages=($(run_packages_script list | grep '.' | awk '{print $1}'))
+  packages=(
+    $(run_packages_script list | grep '.' | awk '{print $1}')
+  ) || die "Failed to list packages!"
 
   export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
   for package in "${packages[@]}"
@@ -499,7 +506,9 @@ function fetch_and_check_prebuilt_wheels() {
   fetch_prebuilt_wheels "${check_dir}"
 
   local missing=()
-  RELEASE_PACKAGES=($(run_packages_script list | grep '.' | awk '{print $1}'))
+  RELEASE_PACKAGES=(
+    $(run_packages_script list | grep '.' | awk '{print $1}')
+  ) || die "Failed to get a list of packages to release!"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
@@ -575,36 +584,46 @@ function build_pex() {
   local linux_platform_noabi="linux_x86_64"
   local osx_platform_noabi="macosx_10.11_x86_64"
 
+  dest_suffix="py36.pex"
+  if [[ "${python_two:-false}" == "true" ]]; then
+    dest_suffix="py27.pex"
+  fi
+
   case "${mode}" in
     build)
       case "$(uname)" in
         # NB: When building locally, we use a platform that does not refer to the ABI version, to
         # avoid needing to introspect the python ABI for this machine.
         Darwin)
-          local platforms=("${osx_platform_noabi}")
+          local platform=("${osx_platform_noabi}")
           ;;
         Linux)
-          local platforms=("${linux_platform_noabi}")
+          local platform=("${linux_platform_noabi}")
           ;;
         *)
           echo >&2 "Unknown uname"
           exit 1
           ;;
       esac
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.pex"
+      local platforms=("${platform}")
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
       ;;
     fetch)
-      # NB: We do not include Python 3 wheels, as we cannot release a Python 3 compatible PEX
-      # until https://github.com/pantsbuild/pex/issues/654 is fixed.
       local platforms=()
+      # TODO: once we add Python 3.7 PEX support, which requires first building Py37 wheels,
+      # we'll want to release one big flexible Pex that works with Python 3.6+.
+      abis=("cp-36-m")
+      if [[ "${python_two:-false}" == "true" ]]; then
+        abis=("cp-27-mu" "cp-27-m")
+      fi
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
-        for abi in "cp-27-mu" "cp-27-m"; do
+        for abi in "${abis[@]}"; do
           platforms=("${platforms[@]}" "${platform}-${abi}")
         done
       done
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${dest_suffix}"
       ;;
     *)
       echo >&2 "Bad build_pex mode ${mode}"
@@ -632,9 +651,14 @@ function build_pex() {
     platform_flags=("${platform_flags[@]}" "--platform=${platform}")
   done
 
+  # Pants depends on twitter.common libraries that trigger pex warnings for not properly declaring
+  # their dependency on setuptools (for namespace package support). To prevent these known warnings
+  # from polluting stderr we pass `--no-emit-warnings`.
   execute_pex \
     -o "${dest}" \
+    --no-emit-warnings \
     --script=pants \
+    --interpreter-constraint="${interpreter_constraint}" \
     "${platform_flags[@]}" \
     "${requirements[@]}"
 
@@ -676,10 +700,10 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] [-c] [-3] (-h|-n|-f|-t|-l|-o|-e|-p)"
+  echo "Usage: $0 [-d] [-c] [-2] (-h|-n|-f|-t|-l|-o|-e|-p)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
-  echo " -3  Release any non-universal wheels (i.e. pantsbuild.pants) as Python 3. Defaults to Python 2."
+  echo " -2  Release any non-universal wheels (i.e. pantsbuild.pants) as Python 2. Defaults to Python 3."
   echo " -n  Performs a release dry run."
   echo "       All package distributions will be built, installed locally in"
   echo "       an ephemeral virtualenv and exercised to validate basic"
@@ -716,7 +740,7 @@ while getopts "${_OPTS}" opt; do
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;
     w) list_prebuilt_wheels ; exit $? ;;
-    3) ;;  # already parsed at top of file
+    2) ;;  # already parsed at top of file
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done

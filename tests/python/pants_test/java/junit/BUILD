@@ -8,5 +8,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:xml_parser',
+    'tests/python/pants_test:test_base'
   ]
 )

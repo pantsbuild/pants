@@ -9,12 +9,20 @@ import unittest
 
 from future.utils import PY2
 
-from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class GraphIntegrationTest(PantsRunIntegrationTest):
+
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """
+    Some of the tests here expect to read the standard error after an intentional failure.
+    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
+    So stderr appears empty. (see #7320)
+    """
+    return False
 
   _SOURCES_TARGET_BASE = 'testprojects/src/python/sources'
 
@@ -23,13 +31,13 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     'missing-rglobs': ("rglobs('*.a')", ['**/*.a']),
     'missing-zglobs': ("zglobs('**/*.a')", ['**/*.a']),
     'missing-literal-files': (
-      "['nonexistent_test_file.txt', 'another_nonexistent_file.txt']", [
-      'nonexistent_test_file.txt',
+      "['another_nonexistent_file.txt', 'nonexistent_test_file.txt']", [
       'another_nonexistent_file.txt',
+      'nonexistent_test_file.txt',
     ]),
   }
 
-  _WARN_FMT = """WARN] Globs did not match. Excludes were: {excludes}. Unmatched globs were: {unmatched}.\n\n"""
+  _WARN_FMT = """[WARN] Globs did not match. Excludes were: {excludes}. Unmatched globs were: {unmatched}.\n\n"""
 
   _BUNDLE_ERR_MSGS = [
     ['*.aaaa'],
@@ -44,7 +52,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     target_full = '{}:{}'.format(self._SOURCES_TARGET_BASE, target_name)
     glob_str, expected_globs = self._SOURCES_ERR_MSGS[target_name]
 
-    pants_run = self.run_pants(['list', target_full], config={
+    pants_run = self.run_pants(['filedeps', target_full], config={
       GLOBAL_SCOPE_CONFIG_SECTION: {
         'glob_expansion_failure': 'warn',
       },
@@ -52,12 +60,12 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
     warning_msg = (
-      "WARN] Globs did not match. Excludes were: " +
-      '[]' +
-      ". Unmatched globs were: " +
-      "[{}]".format(', '.join('"{}"'.format(os.path.join(self._SOURCES_TARGET_BASE, g)) for g in expected_globs)) +
-      ".\n\n")
-    self.assertEqual(warning_msg, pants_run.stderr_data)
+      self._WARN_FMT.format(
+        excludes = "[]",
+        unmatched = "[{}]".format(', '.join('"{}"'.format(os.path.join(self._SOURCES_TARGET_BASE, g)) for g in expected_globs))
+      )
+    )
+    self.assertTrue(warning_msg in pants_run.stderr_data)
 
   _ERR_TARGETS = {
     'testprojects/src/python/sources:some-missing-some-not': [
@@ -84,14 +92,12 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
   def _list_target_check_error(self, target_name):
     expected_excerpts = self._ERR_TARGETS[target_name]
 
-    pants_run = self.run_pants(['list', target_name], config={
+    pants_run = self.run_pants(['filedeps', target_name], config={
       GLOBAL_SCOPE_CONFIG_SECTION: {
         'glob_expansion_failure': 'error',
       },
     })
     self.assert_failure(pants_run)
-
-    self.assertIn(AddressLookupError.__name__, pants_run.stderr_data)
 
     for excerpt in expected_excerpts:
       self.assertIn(excerpt, pants_run.stderr_data)
@@ -102,7 +108,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
 
   def test_existing_sources(self):
     target_full = '{}:text'.format(self._SOURCES_TARGET_BASE)
-    pants_run = self.run_pants(['list', target_full], config={
+    pants_run = self.run_pants(['filedeps', target_full], config={
       GLOBAL_SCOPE_CONFIG_SECTION: {
         'glob_expansion_failure': 'warn',
       },
@@ -112,7 +118,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
 
   def test_missing_bundles_warnings(self):
     target_full = '{}:missing-bundle-fileset'.format(self._BUNDLE_TARGET_BASE)
-    pants_run = self.run_pants(['list', target_full], config={
+    pants_run = self.run_pants(['filedeps', target_full], config={
       GLOBAL_SCOPE_CONFIG_SECTION: {
         'glob_expansion_failure': 'warn',
       },
@@ -131,7 +137,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
 
   def test_existing_bundles(self):
     target_full = '{}:mapper'.format(self._BUNDLE_TARGET_BASE)
-    pants_run = self.run_pants(['list', target_full], config={
+    pants_run = self.run_pants(['filedeps', target_full], config={
       GLOBAL_SCOPE_CONFIG_SECTION: {
         'glob_expansion_failure': 'warn',
       },

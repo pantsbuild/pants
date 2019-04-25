@@ -89,7 +89,8 @@ class RankedValue(object):
     return sorted(cls._RANK_NAMES.values(), key=cls.get_rank_value)
 
   @classmethod
-  def prioritized_iter(cls, flag_val, env_val, config_val, config_default_val, hardcoded_val, default):
+  def prioritized_iter(cls, flag_val, env_val, config_val, config_default_val,
+                       hardcoded_val, default):
     """Yield the non-None values from highest-ranked to lowest, wrapped in RankedValue instances."""
     if flag_val is not None:
       yield RankedValue(cls.FLAG, flag_val)

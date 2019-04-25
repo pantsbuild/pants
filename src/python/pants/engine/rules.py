@@ -5,24 +5,22 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
-import functools
 import inspect
 import itertools
 import logging
+import sys
 from abc import abstractproperty
-from builtins import bytes, str
-from types import GeneratorType
 
 import asttokens
-from future.utils import PY2
 from twitter.common.collections import OrderedSet
 
+from pants.engine.goal import Goal
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
 from pants.util.collections_abc_backport import Iterable, OrderedDict
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.objects import SubclassesOf, TypedCollection, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -34,14 +32,13 @@ _type_field = SubclassesOf(type)
 class _RuleVisitor(ast.NodeVisitor):
   """Pull `Get` calls out of an @rule body and validate `yield` statements."""
 
-  def __init__(self, func, func_node, func_source, orig_indent, frame, parents_table):
+  def __init__(self, func, func_node, func_source, orig_indent, parents_table):
     super(_RuleVisitor, self).__init__()
     self._gets = []
     self._func = func
     self._func_node = func_node
     self._func_source = func_source
     self._orig_indent = orig_indent
-    self._frame = frame
     self._parents_table = parents_table
     self._yields_in_assignments = set()
 
@@ -51,7 +48,8 @@ class _RuleVisitor(ast.NodeVisitor):
 
   def _generate_ast_error_message(self, node, msg):
     # This is the location info of the start of the decorated @rule.
-    filename, line_number, _, context_lines, _ = inspect.getframeinfo(self._frame, context=4)
+    filename = inspect.getsourcefile(self._func)
+    source_lines, line_number = inspect.getsourcelines(self._func)
 
     # The asttokens library is able to keep track of line numbers and column offsets for us -- the
     # stdlib ast library only provides these relative to each parent node.
@@ -82,14 +80,14 @@ The invalid statement was:
 
 The rule defined by function `{func_name}` begins at:
 {filename}:{line_number}:{orig_indent}
-{context_lines}
+{source_lines}
 """.format(func_name=self._func.__name__, msg=msg,
            filename=filename, line_number=line_number, orig_indent=self._orig_indent,
            node_line_number=node_file_line,
            node_col=fully_indented_node_col,
            node_text=indented_node_text,
            # Strip any leading or trailing newlines from the start of the rule body.
-           context_lines=''.join(context_lines).strip('\n')))
+           source_lines=''.join(source_lines).strip('\n')))
 
   class YieldVisitError(Exception): pass
 
@@ -173,42 +171,6 @@ Use `_ = yield Get(...)` if you wish to yield control to the engine and discard 
 """))
 
 
-class _GoalProduct(object):
-  """GoalProduct is a factory for anonymous singleton types representing the execution of goals.
-
-  The created types are returned by `@console_rule` instances, which may not have any outputs
-  of their own.
-  """
-  PRODUCT_MAP = {}
-
-  @staticmethod
-  def _synthesize_goal_product(name):
-    product_type_name = '{}GoalExecution'.format(name.capitalize())
-    if PY2:
-      product_type_name = product_type_name.encode('utf-8')
-    return type(product_type_name, (datatype([]),), {})
-
-  @classmethod
-  def for_name(cls, name):
-    assert isinstance(name, (bytes, str))
-    if name is bytes:
-      name = name.decode('utf-8')
-    if name not in cls.PRODUCT_MAP:
-      cls.PRODUCT_MAP[name] = cls._synthesize_goal_product(name)
-    return cls.PRODUCT_MAP[name]
-
-
-def _terminated(generator, terminator):
-  """A generator that "appends" the given terminator value to the given generator."""
-  gen_input = None
-  try:
-    while True:
-      res = generator.send(gen_input)
-      gen_input = yield res
-  except StopIteration:
-    yield terminator
-
-
 @memoized
 def optionable_rule(optionable_factory):
   """Returns a TaskRule that constructs an instance of the Optionable for the given OptionableFactory.
@@ -229,20 +191,27 @@ def _get_starting_indent(source):
   return 0
 
 
-def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
+def _make_rule(output_type, input_selectors, cacheable=True):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
+
+  As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
+  are registered as dependency Optionables.
 
   :param type output_type: The return/output type for the Rule. This must be a concrete Python type.
   :param list input_selectors: A list of Selector instances that matches the number of arguments
     to the @decorated function.
-  :param str for_goal: If this is a @console_rule, which goal string it's called for.
   """
+
+  is_goal_cls = isinstance(output_type, type) and issubclass(output_type, Goal)
+  if is_goal_cls == cacheable:
+    raise TypeError('An `@rule` that produces a `Goal` must be declared with @console_rule in order '
+                    'to signal that it is not cacheable.')
 
   def wrapper(func):
     if not inspect.isfunction(func):
       raise ValueError('The @rule decorator must be applied innermost of all decorators.')
 
-    caller_frame = inspect.stack()[1][0]
+    owning_module = sys.modules[func.__module__]
     source = inspect.getsource(func)
     beginning_indent = _get_starting_indent(source)
     if beginning_indent:
@@ -250,9 +219,13 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
     module_ast = ast.parse(source)
 
     def resolve_type(name):
-      resolved = caller_frame.f_globals.get(name) or caller_frame.f_builtins.get(name)
-      if not isinstance(resolved, type):
-        raise ValueError('Expected a `type` constructor, but got: {}'.format(name))
+      resolved = getattr(owning_module, name, None) or owning_module.__builtins__.get(name, None)
+      if resolved is None:
+        raise ValueError('Could not resolve type `{}` in top level of module {}'
+                         .format(name, owning_module.__name__))
+      elif not isinstance(resolved, type):
+        raise ValueError('Expected a `type` constructor for `{}`, but got: {} (type `{}`)'
+                         .format(name, resolved, type(resolved).__name__))
       return resolved
 
     gets = OrderedSet()
@@ -270,7 +243,6 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       func_node=rule_func_node,
       func_source=source,
       orig_indent=beginning_indent,
-      frame=caller_frame,
       parents_table=parents_table,
     )
     rule_visitor.visit(rule_func_node)
@@ -278,31 +250,22 @@ def _make_rule(output_type, input_selectors, for_goal=None, cacheable=True):
       Get.create_statically_for_rule_graph(resolve_type(p), resolve_type(s))
       for p, s in rule_visitor.gets)
 
-    # For @console_rule, redefine the function to avoid needing a literal return of the output type.
-    if for_goal:
-      def goal_and_return(*args, **kwargs):
-        res = func(*args, **kwargs)
-        if isinstance(res, GeneratorType):
-          # Return a generator with an output_type instance appended.
-          return _terminated(res, output_type())
-        elif res is not None:
-          raise Exception('A @console_rule should not have a return value.')
-        return output_type()
-      functools.update_wrapper(goal_and_return, func)
-      wrapped_func = goal_and_return
+    # Register dependencies for @console_rule/Goal.
+    if is_goal_cls:
+      dependency_rules = (optionable_rule(output_type.Options),)
     else:
-      wrapped_func = func
+      dependency_rules = None
 
-    wrapped_func.rule = TaskRule(
+    func.rule = TaskRule(
         output_type,
         tuple(input_selectors),
-        wrapped_func,
+        func,
         input_gets=tuple(gets),
-        goal=for_goal,
+        dependency_rules=dependency_rules,
         cacheable=cacheable,
       )
 
-    return wrapped_func
+    return func
   return wrapper
 
 
@@ -310,9 +273,8 @@ def rule(output_type, input_selectors):
   return _make_rule(output_type, input_selectors)
 
 
-def console_rule(goal_name, input_selectors):
-  output_type = _GoalProduct.for_name(goal_name)
-  return _make_rule(output_type, input_selectors, goal_name, False)
+def console_rule(goal_cls, input_selectors):
+  return _make_rule(goal_cls, input_selectors, False)
 
 
 def union(cls):
@@ -326,7 +288,7 @@ def union(cls):
   @union
   class UnionBase(object): pass
 
-  @rule(B, [Select(X)])
+  @rule(B, [X])
   def get_some_union_type(x):
     result = yield Get(ResultType, UnionBase, x.f())
     # ...
@@ -370,7 +332,15 @@ class Rule(AbstractClass):
   def output_type(self):
     """An output `type` for the rule."""
 
-  @property
+  @abstractproperty
+  def dependency_rules(self):
+    """A tuple of @rules that are known to be necessary to run this rule.
+
+    Note that installing @rules as flat lists is generally preferable, as Rules already implicitly
+    form a loosely coupled RuleGraph: this facility exists only to assist with boilerplate removal.
+    """
+
+  @abstractproperty
   def dependency_optionables(self):
     """A tuple of Optionable classes that are known to be necessary to run this rule."""
     return ()
@@ -378,10 +348,10 @@ class Rule(AbstractClass):
 
 class TaskRule(datatype([
   ('output_type', _type_field),
-  ('input_selectors', tuple),
+  ('input_selectors', TypedCollection(SubclassesOf(type))),
   ('input_gets', tuple),
   'func',
-  'goal',
+  ('dependency_rules', tuple),
   ('dependency_optionables', tuple),
   ('cacheable', bool),
 ]), Rule):
@@ -397,17 +367,18 @@ class TaskRule(datatype([
               input_selectors,
               func,
               input_gets,
-              goal=None,
               dependency_optionables=None,
+              dependency_rules=None,
               cacheable=True):
 
+    # Create.
     return super(TaskRule, cls).__new__(
         cls,
         output_type,
         input_selectors,
         input_gets,
         func,
-        goal,
+        dependency_rules or tuple(),
         dependency_optionables or tuple(),
         cacheable,
       )
@@ -421,14 +392,6 @@ class TaskRule(datatype([
                     self.dependency_optionables))
 
 
-class SingletonRule(datatype([('output_type', _type_field), 'value']), Rule):
-  """A default rule for a product, which is thus a singleton for that product."""
-
-  @classmethod
-  def from_instance(cls, obj):
-    return cls(type(obj), obj)
-
-
 class RootRule(datatype([('output_type', _type_field)]), Rule):
   """Represents a root input to an execution of a rule graph.
 
@@ -436,6 +399,14 @@ class RootRule(datatype([('output_type', _type_field)]), Rule):
   particular type might be when a value is provided as a root subject at the beginning
   of an execution.
   """
+
+  @property
+  def dependency_rules(self):
+    return tuple()
+
+  @property
+  def dependency_optionables(self):
+    return tuple()
 
 
 # TODO: add typechecking here -- would need to have a TypedCollection for dicts for `union_rules`.
@@ -463,6 +434,8 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
         add_root_rule(rule)
       else:
         add_task(rule.output_type, rule)
+      for dep_rule in rule.dependency_rules:
+        add_rule(dep_rule)
 
     def add_type_transition_rule(union_rule):
       # NB: This does not require that union bases be supplied to `def rules():`, as the union type

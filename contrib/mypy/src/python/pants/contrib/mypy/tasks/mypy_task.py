@@ -36,7 +36,7 @@ class MypyTask(ResolveRequirementsTaskBase):
 
   @classmethod
   def register_options(cls, register):
-    register('--mypy-version', default='0.550', help='The version of mypy to use.')
+    register('--mypy-version', default='0.670', help='The version of mypy to use.')
     register('--config-file', default=None,
              help='Path mypy configuration file, relative to buildroot.')
 

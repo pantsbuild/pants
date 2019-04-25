@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from test_pants_plugin.pants_infra_tests import PantsInfraTests
 from test_pants_plugin.subsystems.pants_test_infra import PantsTestInfra
+from test_pants_plugin.tasks.deprecation_warning_task import DeprecationWarningTask
 from test_pants_plugin.tasks.lifecycle_stub_task import LifecycleStubTask
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -20,6 +21,7 @@ def build_file_aliases():
   )
 
 def register_goals():
+  task(name='deprecation-warning-task', action=DeprecationWarningTask).install()
   task(name='lifecycle-stub-task', action=LifecycleStubTask).install('lifecycle-stub-goal')
 
 

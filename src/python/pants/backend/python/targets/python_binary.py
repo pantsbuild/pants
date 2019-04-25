@@ -14,6 +14,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.subsystem.subsystem import Subsystem
 
 
 class PythonBinary(PythonTarget):
@@ -31,6 +32,25 @@ class PythonBinary(PythonTarget):
   def alias(cls):
     return 'python_binary'
 
+  class Defaults(Subsystem):
+
+    options_scope = 'python-binary'
+
+    @classmethod
+    def register_options(cls, register):
+      register('--pex-emit-warnings', advanced=True, type=bool, default=True, fingerprint=True,
+               help='Whether built pex binaries should emit pex warnings at runtime by default. '
+                    'Can be over-ridden by specifying the `emit_warnings` parameter of individual '
+                    '`{}` targets'.format(PythonBinary.alias()))
+
+    @classmethod
+    def should_emit_warnings(cls, override=None):
+      return override if override is not None else cls.global_instance().options.pex_emit_warnings
+
+  @classmethod
+  def subsystems(cls):
+    return super(PythonBinary, cls).subsystems() + (cls.Defaults,)
+
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
   def __init__(self,
@@ -43,6 +63,7 @@ class PythonBinary(PythonTarget):
                indices=None,              # pex option
                ignore_errors=False,       # pex option
                shebang=None,              # pex option
+               emit_warnings=None,        # pex option
                platforms=(),
                **kwargs):
     """
@@ -60,14 +81,13 @@ class PythonBinary(PythonTarget):
     :param repositories: a list of repositories to query for dependencies.
     :param indices: a list of indices to use for packages.
     :param ignore_errors: should we ignore inability to resolve dependencies?
+    :param str shebang: Use this shebang for the generated pex.
+    :param bool emit_warnings: Whether or not to emit pex warnings.
     :param platforms: extra platforms to target when building this binary. If this is, e.g.,
       ``['current', 'linux-x86_64', 'macosx-10.4-x86_64']``, then when building the pex, then
       for any platform-dependent modules, Pants will include ``egg``\\s for Linux (64-bit Intel),
       Mac OS X (version 10.4 or newer), and the current platform (whatever is being used when
       making the PEX).
-    :param compatibility: either a string or list of strings that represents
-      interpreter compatibility for this target, using the Requirement-style format,
-      e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
     """
 
     if inherit_path is False:
@@ -84,6 +104,7 @@ class PythonBinary(PythonTarget):
       'ignore_errors': PrimitiveField(bool(ignore_errors)),
       'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
       'shebang': PrimitiveField(shebang),
+      'emit_warnings': PrimitiveField(self.Defaults.should_emit_warnings(emit_warnings)),
     })
 
     super(PythonBinary, self).__init__(sources=sources, payload=payload, **kwargs)
@@ -136,7 +157,7 @@ class PythonBinary(PythonTarget):
   @property
   def shebang(self):
     return self.payload.shebang
-    
+
   @property
   def pexinfo(self):
     info = PexInfo.default()
@@ -149,4 +170,5 @@ class PythonBinary(PythonTarget):
     info.inherit_path = self.payload.inherit_path
     info.entry_point = self.entry_point
     info.ignore_errors = self.payload.ignore_errors
+    info.emit_warnings = self.payload.emit_warnings
     return info

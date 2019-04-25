@@ -15,19 +15,21 @@ FROM pantsbuild/centos6:latest
 # interpreter to use when `ci.sh` and `release.sh` set the interpreter constraints for
 # Pants, and thus for the built ./pants.pex. We set $PY to the exact Python 2.7 version we want
 # to ensure the PEX is bootstrapped with UCS 2.
-ARG PYTHON_2_VERSION=2.7.15
+ARG PYTHON_27_VERSION_UCS2=2.7.15
 # TODO(7064): remove this yum install line once we update the base Centos6 image to include this dependency.
 RUN yum install sqlite-devel -y
-ENV PYENV_ROOT /pyenv-docker-build
-RUN mkdir ${PYENV_ROOT}
-RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
+ENV PYENV_ROOT "${PYENV_ROOT:-/pyenv-docker-build}"
+ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
+RUN if [[ ! -d "${PYENV_ROOT}" ]]; then git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}; fi
+
 ENV PYTHON_CONFIGURE_OPTS --enable-unicode=ucs2
-RUN /usr/bin/scl enable devtoolset-7 -- bash -c '\
-    ${PYENV_ROOT}/bin/pyenv install ${PYTHON_2_VERSION} \
-    && ${PYENV_ROOT}/bin/pyenv global ${PYTHON_2_VERSION}'
-ENV PATH "${PYENV_ROOT}/shims:${PATH}"
-ENV PY "${PYENV_ROOT}/shims/python2.7"
-ENV PEX_PYTHON_PATH "${PYENV_ROOT}/shims/python2.7"
+RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION_UCS2}
+ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/bin:${PATH}"
+
+# We ensure selection of the the pyenv interpreter by PY aware scripts and pants.pex with these
+# env vars.
+ENV PY "${PYENV_ROOT}/versions/${PYTHON_27_VERSION_UCS2}/bin/python"
+ENV PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYTHON_27_VERSION_UCS2}']"
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
@@ -46,9 +48,8 @@ USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 # Our newly created user is unlikely to have a sane environment: set a locale at least.
 ENV LC_ALL="en_US.UTF-8"
 
-# This tells the ./pants runner script to avoid trying to clean the workspace when changing python
-# versions. CI starts off without the .python-interpreter-constraints file, so it would otherwise run a
-# clean-all without this env var.
-ENV ONLY_USING_SINGLE_PYTHON_VERSION 'true'
-
 WORKDIR /travis/workdir
+
+# Execute any args passed to `docker run` in the context of the devtoolset-7 software collection
+# we used above to install requirements.
+ENTRYPOINT ["/usr/bin/scl", "enable" , "devtoolset-7", "--"]

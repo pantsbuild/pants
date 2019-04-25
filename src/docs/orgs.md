@@ -39,6 +39,7 @@ would only trigger it's direct tests, and a change to a low-level node
 
 For most users, the following script would work well for a pull-request builder type CI job:
 
+<!-- TODO(#7346): Update this script to use --query! -->
 ```bash
 #!/bin/bash
 
@@ -46,13 +47,20 @@ set -x
 set -o
 set -e
 
-# Disable Zinc incremental compilation to ensure no historical cruft pollutes the current build.
-export PANTS_COMPILE_ZINC_INCREMENTAL=false
+# Disable Zinc incremental compilation to ensure no historical cruft pollutes the build used for CI testing.
+export PANTS_COMPILE_ZINC_INCREMENTAL=False
 
-changed=$(./pants --changed-parent=origin/master list)
-dependees=$(./pants dependees --dependees-transitive --dependees-closed $changed)
-minimized=$(./pants minimize $dependees)
-./pants filter --filter-type=-jvm_binary $minimized | sort > minimized.txt
+changed=("$(./pants --changed-parent=origin/master list)")
+dependees=("$(./pants dependees --dependees-transitive --dependees-closed ${changed[@]})")
+minimized=("$(./pants minimize ${dependees[@]})")
+./pants filter --filter-type=-jvm_binary ${minimized[@]} | sort > minimized.txt
+
+# In other contexts we can use --target-spec-file to read the list of targets to operate on all at
+# once, but that would merge all the classpaths of all the test targets together, which may cause
+# errors. See https://www.pantsbuild.org/3rdparty_jvm.html#managing-transitive-dependencies.
+# TODO(#7480): Background cache activity when running in a loop can sometimes lead to race conditions which
+# cause pants to error. This can probably be worked around with --no-cache-compile-zinc-write. See
+# https://github.com/pantsbuild/pants/issues/7480.
 for target in $(cat minimized.txt); do
   ./pants test $target
 done

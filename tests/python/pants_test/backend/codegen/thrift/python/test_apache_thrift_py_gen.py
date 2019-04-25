@@ -147,14 +147,14 @@ class ApacheThriftPyGenTest(TaskTestBase):
     python_repos = PythonRepos.global_instance()
     interpreter = interpreter_cache.select_interpreter_for_targets(targets)
 
-    # We need setuptools to import namespace packages (via pkg_resources), so we prime the
-    # PYTHONPATH with interpreter extras, which Pants always populates with setuptools and wheel.
+    # We need setuptools to import namespace packages under python 2 (via pkg_resources), so we
+    # prime the PYTHONPATH with a known good version of setuptools.
     # TODO(John Sirois): We really should be emitting setuptools in a
     # `synthetic_target_extra_dependencies` override in `ApacheThriftPyGen`:
     #   https://github.com/pantsbuild/pants/issues/5975
-    pythonpath = list(interpreter.extras.values())
-    pythonpath.extend(os.path.join(get_buildroot(), t.target_base) for t in targets)
-    for resolved_dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen))],
+    pythonpath = [os.path.join(get_buildroot(), t.target_base) for t in targets]
+    for resolved_dist in resolve(['thrift=={}'.format(self.get_thrift_version(apache_thrift_gen)),
+                                  'setuptools==40.6.3'],
                                  interpreter=interpreter,
                                  context=python_repos.get_network_context(),
                                  fetchers=python_repos.get_fetchers()):

@@ -126,26 +126,27 @@ def precompute_pantsrefs(soups):
     existing_anchors = find_existing_anchors(soup)
     count = 100
     for tag in soup.find_all('a'):
-      if tag.has_attr('pantsmark'):
-        pantsmark = tag['pantsmark']
-        if pantsmark in accumulator:
-          raise TaskError('pantsmarks are unique but "{0}" appears in {1} and {2}'
-                          .format(pantsmark, page, accumulator[pantsmark]))
+      if not tag.has_attr('pantsmark'):
+        continue
+      pantsmark = tag['pantsmark']
+      if pantsmark in accumulator:
+        raise TaskError('pantsmarks are unique but "{}" appears in {} and {}'
+                        .format(pantsmark, page, accumulator[pantsmark]))
 
-        # To link to a place "mid-page", we need an HTML anchor.
-        # If this tag already has such an anchor, use it.
-        # Else, make one up.
-        anchor = tag.get('id') or tag.get('name')
-        if not anchor:
-          anchor = pantsmark
-          while anchor in existing_anchors:
-            count += 1
-            anchor = '{0}_{1}'.format(pantsmark, count)
-          tag['id'] = anchor
-          existing_anchors = find_existing_anchors(soup)
+      # To link to a place "mid-page", we need an HTML anchor.
+      # If this tag already has such an anchor, use it.
+      # Else, make one up.
+      anchor = tag.get('id') or tag.get('name')
+      if not anchor:
+        anchor = pantsmark
+        while anchor in existing_anchors:
+          count += 1
+          anchor = '{}_{}'.format(pantsmark, count)
+        tag['id'] = anchor
+        existing_anchors = find_existing_anchors(soup)
 
-        link = '{0}.html#{1}'.format(page, anchor)
-        accumulator[pantsmark] = link
+      link = '{}.html#{}'.format(page, anchor)
+      accumulator[pantsmark] = link
   return accumulator
 
 
@@ -174,17 +175,19 @@ def fixup_internal_links(config, soups):
   for name, soup in soups.items():
     old_src_dir = os.path.dirname(config['sources'][name])
     for tag in soup.find_all(True):
-      if not 'href' in tag.attrs: continue
+      if not 'href' in tag.attrs:
+        continue
       old_rel_path = tag['href'].split('#')[0]
       old_dst = os.path.normpath(os.path.join(old_src_dir, old_rel_path))
-      if not old_dst in reverse_directory: continue
+      if not old_dst in reverse_directory:
+        continue
       new_dst = reverse_directory[old_dst] + '.html'
       new_rel_path = rel_href(name, new_dst)
       # string replace instead of assign to not loose anchor in foo.html#anchor
       tag['href'] = tag['href'].replace(old_rel_path, new_rel_path, 1)
 
 
-_heading_re = re.compile('^h[1-6]$')  # match heading tag names h1,h2,h3,...
+_heading_re = re.compile(r'^h[1-6]$')  # match heading tag names h1,h2,h3,...
 
 
 def rel_href(src, dst):
@@ -223,7 +226,7 @@ def ensure_page_headings_linkable(soup):
       snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
       while True:
         count += 1
-        candidate_id = 'heading_{0}_{1}'.format(snippet, count).lower()
+        candidate_id = 'heading_{}_{}'.format(snippet, count).lower()
         if not candidate_id in existing_anchors:
           existing_anchors.add(candidate_id)
           tag['id'] = candidate_id
@@ -234,12 +237,13 @@ def link_pantsrefs(soups, precomputed):
   """Transorm soups: <a pantsref="foo"> becomes <a href="../foo_page.html#foo">"""
   for (page, soup) in soups.items():
     for a in soup.find_all('a'):
-      if a.has_attr('pantsref'):
-        pantsref = a['pantsref']
-        if not pantsref in precomputed.pantsref:
-          raise TaskError('Page {0} has pantsref "{1}" and I cannot find pantsmark for'
-                          ' it'.format(page, pantsref))
-        a['href'] = rel_href(page, precomputed.pantsref[pantsref])
+      if not a.has_attr('pantsref'):
+        continue
+      pantsref = a['pantsref']
+      if not pantsref in precomputed.pantsref:
+        raise TaskError('Page {} has pantsref "{}" and I cannot find pantsmark for'
+                        ' it'.format(page, pantsref))
+      a['href'] = rel_href(page, precomputed.pantsref[pantsref])
 
 
 def transform_soups(config, soups, precomputed):
@@ -254,8 +258,10 @@ def transform_soups(config, soups, precomputed):
 
 def get_title(soup):
   """Given a soup, pick out a title"""
-  if soup.title: return soup.title.string
-  if soup.h1: return soup.h1.string
+  if soup.title:
+    return soup.title.string
+  if soup.h1:
+    return soup.h1.string
   return ''
 
 
@@ -307,7 +313,7 @@ def hdepth(tag):
   E.g., h1 at top level is 1, h1 in a section is 2, h2 at top level is 2.
   """
   if not _heading_re.search(tag.name):
-    raise TaskError('Can\'t compute heading depth of non-heading {0}'.format(tag))
+    raise TaskError("Can't compute heading depth of non-heading {}".format(tag))
   depth = int(tag.name[1], 10)  # get the 2 from 'h2'
   cursor = tag
   while cursor:
@@ -346,19 +352,15 @@ def generate_page_toc(soup):
 
 
 def generate_generated(config, here):
-  return('{0} {1}'.format(config['sources'][here],
-                          datetime.now().isoformat()))
+  return '{} {}'.format(config['sources'][here], datetime.now().isoformat())
 
 
 def render_html(dst, config, soups, precomputed, template):
   soup = soups[dst]
   renderer = Renderer()
   title = precomputed.page[dst].title
-  topdots = ('../' * dst.count('/'))
-  if soup.body:
-    body_html = '{0}'.format(soup.body)
-  else:
-    body_html = '{0}'.format(soup)
+  topdots = '../' * dst.count('/')
+  body_html = '{}'.format(soup.body) if soup.body else '{}'.format(soup)
   html = renderer.render(template,
                          body_html=body_html,
                          generated=generate_generated(config, dst),
@@ -397,5 +399,4 @@ def copy_extras(config):
 def load_template(config):
   """Return text of template file specified in config"""
   with open(config['template'], 'r') as template_file:
-    template = template_file.read()
-  return template
+    return template_file.read()

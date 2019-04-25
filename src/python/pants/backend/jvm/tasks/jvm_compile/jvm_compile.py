@@ -585,7 +585,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def _find_missing_deps(self, compile_logs, target):
     with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
-      compile_failure_log = '\n'.join(read_file(log).decode('utf-8') for log in compile_logs)
+      compile_failure_log = '\n'.join(read_file(log) for log in compile_logs)
 
       missing_dep_suggestions, no_suggestions = self._missing_deps_finder.find(
         compile_failure_log, target)
@@ -908,8 +908,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
       dep_context = DependencyContext.global_instance()
       tgt, = vts.targets
-      compiler_option_sets = dep_context.defaulted_property(tgt, lambda x: x.compiler_option_sets)
-      zinc_file_manager = dep_context.defaulted_property(tgt, lambda x: x.zinc_file_manager)
+      compiler_option_sets = dep_context.defaulted_property(tgt, 'compiler_option_sets')
+      zinc_file_manager = dep_context.defaulted_property(tgt, 'zinc_file_manager')
       with Timer() as timer:
         directory_digest = self._compile_vts(vts,
                           ctx,

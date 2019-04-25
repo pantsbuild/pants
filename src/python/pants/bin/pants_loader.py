@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import importlib
 import locale
 import os
-import sys
 import warnings
 from builtins import object
 from textwrap import dedent
@@ -20,18 +19,9 @@ class PantsLoader(object):
   DEFAULT_ENTRYPOINT = 'pants.bin.pants_exe:main'
 
   ENCODING_IGNORE_ENV_VAR = 'PANTS_IGNORE_UNRECOGNIZED_ENCODING'
-  INTERPRETER_IGNORE_ENV_VAR = 'PANTS_IGNORE_UNSUPPORTED_PYTHON_INTERPRETER'
 
   class InvalidLocaleError(Exception):
     """Raised when a valid locale can't be found."""
-
-  class InvalidInterpreter(Exception):
-    """Raised when trying to run Pants with an unsupported Python version."""
-
-  @staticmethod
-  def is_supported_interpreter(major_version, minor_version):
-    return (major_version == 2 and minor_version == 7) \
-      or (major_version == 3 and minor_version >= 6)
 
   @staticmethod
   def setup_warnings():
@@ -49,8 +39,6 @@ class PantsLoader(object):
     # TODO: Eric-Arellano has emailed the author to see if he is willing to accept a PR fixing the deprecation warnings
     # and to release the fix. If he says yes, remove this once fixed.
     warnings.filterwarnings('ignore', category=DeprecationWarning, module="ansicolors")
-    # TODO(7186): remove as part of work to land this PR.
-    warnings.filterwarnings('ignore', category=DeprecationWarning, module="pex")
 
   @classmethod
   def ensure_locale(cls):
@@ -72,27 +60,6 @@ class PantsLoader(object):
         """.format(encoding, cls.ENCODING_IGNORE_ENV_VAR)
       ))
 
-  @classmethod
-  def ensure_valid_interpreter(cls):
-    """Runtime check that user is using a supported Python version."""
-    py_major, py_minor = sys.version_info[0:2]
-    if not PantsLoader.is_supported_interpreter(py_major, py_minor) and os.environ.get(cls.INTERPRETER_IGNORE_ENV_VAR, None) is None:
-      raise cls.InvalidInterpreter(dedent("""
-        You are trying to run Pants with Python {}.{}, which is unsupported.
-        Pants requires a Python 2.7 or a Python 3.6+ interpreter to be
-        discoverable on your PATH to run.
-
-        If you still get this error after ensuring at least one of these interpreters
-        is discoverable on your PATH, you may need to modify your build script
-        (e.g. `./pants`) to properly set up a virtual environment with the correct
-        interpreter. We recommend following our setup guide and using our setup script
-        as a starting point: https://www.pantsbuild.org/setup_repo.html.
-
-        Alternatively, you may bypass this error by setting the below environment variable.
-          {}=1
-        Note: we cannot guarantee consistent behavior with this bypass enabled.
-        """.format(py_major, py_minor, cls.INTERPRETER_IGNORE_ENV_VAR)))
-
   @staticmethod
   def determine_entrypoint(env_var, default):
     return os.environ.pop(env_var, default)
@@ -109,7 +76,6 @@ class PantsLoader(object):
   @classmethod
   def run(cls):
     cls.setup_warnings()
-    cls.ensure_valid_interpreter()
     cls.ensure_locale()
     entrypoint = cls.determine_entrypoint(cls.ENTRYPOINT_ENV_VAR, cls.DEFAULT_ENTRYPOINT)
     cls.load_and_execute(entrypoint)

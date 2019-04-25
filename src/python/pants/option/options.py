@@ -9,8 +9,6 @@ import re
 import sys
 from builtins import object, open, str
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -19,7 +17,7 @@ from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import ScopeInfo
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_method, memoized_property
 
 
 def make_flag_regex(long_name, short_name=None):
@@ -81,6 +79,9 @@ class Options(object):
   class FrozenOptionsError(Exception):
     """Options are frozen and can't be mutated."""
 
+  class DuplicateScopeError(Exception):
+    """More than one registration occurred for the same scope."""
+
   @classmethod
   def complete_scopes(cls, scope_infos):
     """Expand a set of scopes to include all enclosing scopes.
@@ -90,13 +91,17 @@ class Options(object):
     Also adds any deprecated scopes.
     """
     ret = {GlobalOptionsRegistrar.get_scope_info()}
-    original_scopes = set()
+    original_scopes = dict()
     for si in scope_infos:
       ret.add(si)
-      original_scopes.add(si.scope)
+      if si.scope in original_scopes:
+        raise cls.DuplicateScopeError('Scope `{}` claimed by {}, was also claimed by {}.'.format(
+            si.scope, si, original_scopes[si.scope]
+          ))
+      original_scopes[si.scope] = si
       if si.deprecated_scope:
         ret.add(ScopeInfo(si.deprecated_scope, si.category, si.optionable_cls))
-        original_scopes.add(si.deprecated_scope)
+        original_scopes[si.deprecated_scope] = si
 
     # TODO: Once scope name validation is enforced (so there can be no dots in scope name
     # components) we can replace this line with `for si in scope_infos:`, because it will
@@ -196,20 +201,28 @@ class Options(object):
     """
     return self._goals
 
-  # TODO: Replace this with a formal way of registering v2-only goals.
-  # See https://github.com/pantsbuild/pants/issues/6651
-  @property
-  def goals_and_possible_v2_goals(self):
-    """Goals, including any unrecognised scopes which may be v2-only goals.
+  @memoized_property
+  def goals_by_version(self):
+    """Goals organized into three tuples by whether they are v1, ambiguous, or v2 goals (respectively).
 
-    Experimental API which shouldn't be relied on outside of Pants itself.
+    It's possible for a goal to be implemented with both v1 and v2, in which case a consumer
+    should use the `--v1` and `--v2` global flags to disambiguate.
     """
-    if self._unknown_scopes:
-      r = OrderedSet(self.goals)
-      r.update(self._unknown_scopes)
-      return r
-    else:
-      return self.goals
+    v1, ambiguous, v2 = [], [], []
+    for goal in self._goals:
+      goal_dot = '{}.'.format(goal)
+      scope_categories = {s.category
+                          for s in self.known_scope_to_info.values()
+                          if s.scope == goal or s.scope.startswith(goal_dot)}
+      is_v1 = ScopeInfo.TASK in scope_categories
+      is_v2 = ScopeInfo.GOAL in scope_categories
+      if is_v1 and is_v2:
+        ambiguous.append(goal)
+      elif is_v1:
+        v1.append(goal)
+      else:
+        v2.append(goal)
+    return tuple(v1), tuple(ambiguous), tuple(v2)
 
   @property
   def known_scope_to_info(self):

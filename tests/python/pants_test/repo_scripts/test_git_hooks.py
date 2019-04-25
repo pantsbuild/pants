@@ -69,7 +69,7 @@ class PreCommitHookTest(unittest.TestCase):
       init_py_path = os.path.join(worktree, 'subdir/__init__.py')
 
       # Check that an invalid __init__.py errors.
-      safe_file_dump(init_py_path, 'asdf', mode='w')
+      safe_file_dump(init_py_path, 'asdf')
       self._assert_subprocess_error(worktree, [package_check_script, 'subdir'], """\
 ERROR: All '__init__.py' files should be empty or else only contain a namespace
 declaration, but the following contain code:
@@ -78,7 +78,7 @@ subdir/__init__.py
 """)
 
       # Check that a valid empty __init__.py succeeds.
-      safe_file_dump(init_py_path, '', mode='w')
+      safe_file_dump(init_py_path, '')
       self._assert_subprocess_success(worktree, [package_check_script, 'subdir'])
 
       # Check that a valid __init__.py with `pkg_resources` setup succeeds.
@@ -97,7 +97,7 @@ subdir/__init__.py
     with self._create_tiny_git_repo() as (git, worktree, _):
       # Create a new file.
       new_file = os.path.join(worktree, 'wow.txt')
-      safe_file_dump(new_file, '', mode='w')
+      safe_file_dump(new_file, '')
       # Stage the file.
       rel_new_file = os.path.relpath(new_file, worktree)
       git.add(rel_new_file)
@@ -122,13 +122,13 @@ subdir/__init__.py
           expected_excerpt=expected_excerpt)
 
       # Check that a file with an empty header fails.
-      safe_file_dump(new_py_path, '', mode='w')
+      safe_file_dump(new_py_path, '')
       assert_header_check(added_files=[], expected_excerpt="""\
 subdir/file.py: failed to parse header at all
 """)
 
       # Check that a file with a random header fails.
-      safe_file_dump(new_py_path, 'asdf', mode='w')
+      safe_file_dump(new_py_path, 'asdf')
       assert_header_check(added_files=[], expected_excerpt="""\
 subdir/file.py: failed to parse header at all
 """)
@@ -143,7 +143,7 @@ subdir/file.py: failed to parse header at all
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-""", mode='w')
+""")
       assert_header_check(added_files=[], expected_excerpt="""\
 subdir/file.py: copyright year must match '20\\d\\d' (was YYYY): current year is {}
 """.format(cur_year))

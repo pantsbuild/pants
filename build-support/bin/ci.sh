@@ -16,6 +16,7 @@ Runs commons tests for local or hosted CI.
 Usage: $0 (-h|-2fxbkmrjlpuneycitzsw)
  -h           print out this help message
  -2           Run using Python 2.7 (defaults to using Python 3.6).
+ -7           Run using Python 3.7 (defaults to using Python 3.6).
  -f           run python code formatting checks
  -x           run bootstrap clean-all (assume bootstrapping from a
               fresh clone)
@@ -45,7 +46,6 @@ Usage: $0 (-h|-2fxbkmrjlpuneycitzsw)
               to run only even tests: '-i 0/2', odd: '-i 1/2'
  -t           run lint
  -z           test platform-specific behavior
- -w           Run only blacklisted tests
 EOF
   if (( $# > 0 )); then
     die "$@"
@@ -59,10 +59,11 @@ python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "h2fxbmrjlpeasu:ny:ci:tzw" opt; do
+while getopts "h27fxbmrjlpeasu:ny:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
     2) python_two="true" ;;
+    7) python_three_seven="true" ;;
     f) run_pre_commit_checks="true" ;;
     x) run_bootstrap_clean="true" ;;
     b) run_bootstrap="true" ;;
@@ -81,7 +82,6 @@ while getopts "h2fxbmrjlpeasu:ny:ci:tzw" opt; do
     i) python_intg_shard=${OPTARG} ;;
     t) run_lint="true" ;;
     z) test_platform_specific_behavior="true" ;;
-    w) run_blacklisted_tests_only="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -104,29 +104,29 @@ esac
 # We're running against a Pants clone.
 export PANTS_DEV=1
 
+# We only want to output failures and skips.
+# See https://docs.pytest.org/en/latest/usage.html#detailed-summary-report.
+export PYTEST_PASSTHRU_ARGS="-q -rfa"
+
 # Determine the Python version to use for bootstrapping pants.pex. This would usually not be
 # necessary to set when developing locally, because the `./pants` and `./pants2` scripts set
 # these constraints for us already. However, we must set the values here because in
 # non-bootstrap shards we run CI using `./pants.pex` instead of the scripts `./pants`
 # and `./pants2`, so those scripts cannot set the relevant environment variables.
-if [[ "${python_two:-false}" == "false" ]]; then
-  py_major_minor="3.6"
-else
+if [[ "${python_two:-false}" == "true" ]]; then
   py_major_minor="2.7"
+elif [[ "${python_three_seven:-false}" == "true" ]]; then
+  py_major_minor="3.7"
+else
+  py_major_minor="3.6"
 fi
 export PY="${PY:-python${py_major_minor}}"
 
-# Also set PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS. We set this to the exact Python version
-# to resolve any potential ambiguity when multiple Python interpreters are discoverable, such as
-# Python 2.7.10 vs. 2.7.13. When running with Python 3, we must also set this constraint to ensure
-# all spawned subprocesses use Python 3 rather than the default of Python 2. This is in part
-# necessary to avoid the _Py_Dealloc error (#6985).
-py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor}.*']}"
 banner "Setting interpreter constraints to ${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}"
 
 if [[ "${run_bootstrap:-false}" == "true" ]]; then
-  start_travis_section "Bootstrap" "Bootstrapping pants as a Python ${py_major_minor_patch} PEX"
+  start_travis_section "Bootstrap" "Bootstrapping pants as a Python ${py_major_minor} PEX"
   (
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
@@ -147,7 +147,7 @@ export RUN_PANTS_FROM_PEX=1
 
 if [[ "${run_pre_commit_checks:-false}" == "true" ]]; then
   start_travis_section "PreCommit" "Running pre-commit checks"
-  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
+  ./build-support/githooks/pre-commit || exit 1
   end_travis_section
 fi
 
@@ -196,7 +196,7 @@ if [[ "${run_internal_backends:-false}" == "true" ]]; then
   start_travis_section "BackendTests" "Running internal backend python tests"
   (
     ./pants.pex test.pytest \
-    pants-plugins/tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+    pants-plugins/src/python:: pants-plugins/tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Internal backend python test failure"
   end_travis_section
 fi
@@ -209,7 +209,7 @@ if [[ "${run_python:-false}" == "true" ]]; then
   (
     ./pants.pex --tag='-integration' test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
-      tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+      src/python:: tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Core python test failure"
   end_travis_section
 fi
@@ -250,6 +250,7 @@ if [[ "${run_cargo_audit:-false}" == "true" ]]; then
     "${REPO_ROOT}/build-support/bin/native/cargo" ensure-installed --package=cargo-audit --version=0.5.2
     "${REPO_ROOT}/build-support/bin/native/cargo" audit -f "${REPO_ROOT}/src/rust/engine/Cargo.lock"
   ) || die "Cargo audit failure"
+  end_travis_section
 fi
 
 
@@ -258,6 +259,7 @@ if [[ "${run_rust_clippy:-false}" == "true" ]]; then
   (
     "${REPO_ROOT}/build-support/bin/check_clippy.sh"
   ) || die "Pants clippy failure"
+  end_travis_section
 fi
 
 # NB: this only tests python tests right now -- the command needs to be edited if test targets in
@@ -267,7 +269,7 @@ if [[ "${test_platform_specific_behavior:-false}" == 'true' ]]; then
                        "Running platform-specific testing on platform: $(uname)"
   (
     ./pants.pex --tag='+platform_specific_behavior' test \
-                tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+                src/python/:: tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants platform-specific test failure"
   end_travis_section
 fi
@@ -279,19 +281,9 @@ if [[ "${run_integration:-false}" == "true" ]]; then
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
-    known_py3_pex_failures_file="${REPO_ROOT}/build-support/known_py3_pex_failures.txt"
-    if [[ "${python_two:-false}" == "false" ]]; then
-      targets="$(comm -23 <(./pants.pex --tag='+integration' list tests/python:: | grep '.' | sort) <(sort "${known_py3_pex_failures_file}"))"
-    else
-      if [[ "${run_blacklisted_tests_only:-false}" == "true" ]]; then
-        targets="$(cat ${known_py3_pex_failures_file})"
-      else
-        targets="tests/python::"
-      fi
-    fi
     ./pants.pex --tag='+integration' test.pytest \
       --test-pytest-test-shard=${python_intg_shard} \
-      $targets -- ${PYTEST_PASSTHRU_ARGS}
+      src/python:: tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants Integration test failure"
   end_travis_section
 fi

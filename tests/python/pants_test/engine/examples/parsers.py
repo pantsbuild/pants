@@ -59,7 +59,7 @@ class JsonParser(Parser):
 
   @memoized_property
   def _decoder(self):
-    symbol_table = self.symbol_table.table()
+    symbol_table = self.symbol_table.table
     decoder = functools.partial(self._object_decoder,
                                 symbol_table=symbol_table.__getitem__ if symbol_table else self._as_type)
     kwargs = {
@@ -221,7 +221,7 @@ class PythonAssignmentsParser(Parser):
       return object_type(type_alias=type_alias, **kwargs)
 
     parse_globals = {}
-    for alias, symbol in self.symbol_table.table().items():
+    for alias, symbol in self.symbol_table.table.items():
       parse_globals[alias] = functools.partial(aliased, alias, symbol)
     return parse_globals
 
@@ -280,7 +280,7 @@ class PythonCallbacksParser(Parser):
         return object_type(type_alias=type_name, **kwargs)
 
     parse_globals = {}
-    for alias, symbol in self.symbol_table.table().items():
+    for alias, symbol in self.symbol_table.table.items():
       parse_globals[alias] = functools.partial(registered, alias, symbol)
     return objects, parse_globals
 

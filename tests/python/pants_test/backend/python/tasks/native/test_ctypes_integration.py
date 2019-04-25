@@ -35,6 +35,15 @@ def _toolchain_variants(func):
 
 class CTypesIntegrationTest(PantsRunIntegrationTest):
 
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """
+    Some of the tests here expect to read the standard error after an intentional failure.
+    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
+    So stderr appears empty. (see #7320)
+    """
+    return False
+
   _binary_target_dir = 'testprojects/src/python/python_distribution/ctypes'
   _binary_target = '{}:bin'.format(_binary_target_dir)
   _binary_interop_target_dir = 'testprojects/src/python/python_distribution/ctypes_interop'
@@ -123,10 +132,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       # Replace strict_deps=False with nothing so we can override it (because target values for this
       # option take precedence over subsystem options).
-      orig_wrapped_math_build = read_file(self._wrapped_math_build_file, binary_mode=False)
+      orig_wrapped_math_build = read_file(self._wrapped_math_build_file)
       without_strict_deps_wrapped_math_build = re.sub(
         'strict_deps=False,', '', orig_wrapped_math_build)
-      safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build, mode='w')
+      safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build)
 
       # This should fail because it does not turn on strict_deps for a target which requires it.
       pants_binary_strict_deps_failure = self.run_pants_with_workdir(
@@ -210,7 +219,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         'toolchain_variant': 'llvm',
       },
       'python-setup': {
-        'platforms': ['current', 'this-platform-does_not-exist']
+        'platforms': ['current', 'this_platform_does_not_exist']
       },
     })
     self.assert_success(pants_run)

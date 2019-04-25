@@ -211,3 +211,36 @@ class ClassPropertyTest(TestBase):
 
     del DeleteValue.static_property
     self.assertFalse(hasattr(DeleteValue, 'static_property'))
+
+  def test_abstract_classproperty(self):
+    class Abstract(AbstractClass):
+      @classproperty
+      @abstractproperty
+      def f(cls):
+        pass
+
+    with self.assertRaisesWithMessage(TypeError, """\
+The classproperty 'f' in type 'Abstract' was an abstractproperty, meaning that type \
+Abstract must override it by setting it as a variable in the class body or defining a method \
+with an @classproperty decorator."""):
+      Abstract.f
+
+    class WithoutOverriding(Abstract):
+      """Show that subclasses failing to override the abstract classproperty will raise."""
+      pass
+
+    with self.assertRaisesWithMessage(TypeError, """\
+The classproperty 'f' in type 'WithoutOverriding' was an abstractproperty, meaning that type \
+WithoutOverriding must override it by setting it as a variable in the class body or defining a method \
+with an @classproperty decorator."""):
+      WithoutOverriding.f
+
+    class Concrete(Abstract):
+      f = 3
+    self.assertEqual(Concrete.f, 3)
+
+    class Concrete2(Abstract):
+      @classproperty
+      def f(cls):
+        return 'hello'
+    self.assertEqual(Concrete2.f, 'hello')

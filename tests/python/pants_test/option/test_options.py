@@ -5,14 +5,17 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import io
+import json
 import os
 import shlex
-import warnings
 from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
 
+import mock
+import yaml
 from future.utils import text_type
+from packaging.version import Version
 
 from pants.base.deprecated import CodeRemovedError
 from pants.engine.fs import FileContent
@@ -36,6 +39,9 @@ from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.objects import enum
 from pants_test.test_base import TestBase
+
+
+_FAKE_CUR_VERSION = '1.0.0.dev0'
 
 
 def task(scope):
@@ -140,6 +146,12 @@ class OptionsTest(TestBase):
                       removal_hint='say no to crufty global options')
     register_global('--global-crufty-expired', removal_version='0.0.1.dev0',
                     removal_hint='use a less crufty global option')
+    register_global('--global-delayed-deprecated-option',
+                    removal_version='999.99.9.dev0',
+                    deprecation_start_version='500.0.0.dev0')
+    register_global('--global-delayed-but-already-passed-deprecated-option',
+                    removal_version='999.99.9.dev0',
+                    deprecation_start_version=_FAKE_CUR_VERSION)
 
     # Mutual Exclusive options
     register_global('--mutex-foo', mutually_exclusive_group='mutex')
@@ -178,11 +190,11 @@ class OptionsTest(TestBase):
     options.register('scoped.and-dashed', '--spam')
 
     # For fromfile test
-    options.register('fromfile', '--string', fromfile=True)
-    options.register('fromfile', '--intvalue', type=int, fromfile=True)
-    options.register('fromfile', '--dictvalue', type=dict, fromfile=True)
-    options.register('fromfile', '--listvalue', type=list, fromfile=True)
-    options.register('fromfile', '--appendvalue', type=list, member_type=int, fromfile=True)
+    options.register('fromfile', '--string')
+    options.register('fromfile', '--intvalue', type=int)
+    options.register('fromfile', '--dictvalue', type=dict)
+    options.register('fromfile', '--listvalue', type=list)
+    options.register('fromfile', '--appendvalue', type=list, member_type=int)
 
     # For fingerprint tests
     options.register('fingerprinting', '--inverted')  # Implicitly: daemon=True
@@ -835,13 +847,7 @@ class OptionsTest(TestBase):
     with self.assertRaises(CodeRemovedError):
       self._parse('./pants', config={'GLOBAL':{'global_crufty_expired':'way2crufty'}}).for_global_scope()
 
-  @contextmanager
-  def warnings_catcher(self):
-    with warnings.catch_warnings(record=True) as w:
-      warnings.simplefilter('always')
-      yield w
-
-  def assertWarning(self, w, option_string):
+  def assertOptionWarning(self, w, option_string):
     single_warning = assert_single_element(w)
     self.assertEqual(single_warning.category, DeprecationWarning)
     warning_message = single_warning.message
@@ -852,42 +858,42 @@ class OptionsTest(TestBase):
     with self.warnings_catcher() as w:
       options = self._parse('./pants --global-crufty=crufty1')
       self.assertEqual('crufty1', options.for_global_scope().global_crufty)
-      self.assertWarning(w, 'global_crufty')
+      self.assertOptionWarning(w, 'global_crufty')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --global-crufty-boolean')
       self.assertTrue(options.for_global_scope().global_crufty_boolean)
-      self.assertWarning(w, 'global_crufty_boolean')
+      self.assertOptionWarning(w, 'global_crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --no-global-crufty-boolean')
       self.assertFalse(options.for_global_scope().global_crufty_boolean)
-      self.assertWarning(w, 'global_crufty_boolean')
+      self.assertOptionWarning(w, 'global_crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants stale --crufty=stale_and_crufty')
       self.assertEqual('stale_and_crufty', options.for_scope('stale').crufty)
-      self.assertWarning(w, 'crufty')
+      self.assertOptionWarning(w, 'crufty')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants stale --crufty-boolean')
       self.assertTrue(options.for_scope('stale').crufty_boolean)
-      self.assertWarning(w, 'crufty_boolean')
+      self.assertOptionWarning(w, 'crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants stale --no-crufty-boolean')
       self.assertFalse(options.for_scope('stale').crufty_boolean)
-      self.assertWarning(w, 'crufty_boolean')
+      self.assertOptionWarning(w, 'crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --no-stale-crufty-boolean')
       self.assertFalse(options.for_scope('stale').crufty_boolean)
-      self.assertWarning(w, 'crufty_boolean')
+      self.assertOptionWarning(w, 'crufty_boolean')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants --stale-crufty-boolean')
       self.assertTrue(options.for_scope('stale').crufty_boolean)
-      self.assertWarning(w, 'crufty_boolean')
+      self.assertOptionWarning(w, 'crufty_boolean')
 
     # Make sure the warnings don't come out for regular options.
     with self.warnings_catcher() as w:
@@ -898,23 +904,43 @@ class OptionsTest(TestBase):
     with self.warnings_catcher() as w:
       options = self._parse('./pants', env={'PANTS_GLOBAL_CRUFTY':'crufty1'})
       self.assertEqual('crufty1', options.for_global_scope().global_crufty)
-      self.assertWarning(w, 'global_crufty')
+      self.assertOptionWarning(w, 'global_crufty')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants', env={'PANTS_STALE_CRUFTY':'stale_and_crufty'})
       self.assertEqual('stale_and_crufty', options.for_scope('stale').crufty)
-      self.assertWarning(w, 'crufty')
+      self.assertOptionWarning(w, 'crufty')
 
   def test_deprecated_options_config(self):
     with self.warnings_catcher() as w:
       options = self._parse('./pants', config={'GLOBAL':{'global_crufty':'crufty1'}})
       self.assertEqual('crufty1', options.for_global_scope().global_crufty)
-      self.assertWarning(w, 'global_crufty')
+      self.assertOptionWarning(w, 'global_crufty')
 
     with self.warnings_catcher() as w:
       options = self._parse('./pants', config={'stale':{'crufty':'stale_and_crufty'}})
       self.assertEqual('stale_and_crufty', options.for_scope('stale').crufty)
-      self.assertWarning(w, 'crufty')
+      self.assertOptionWarning(w, 'crufty')
+
+  @mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
+  def test_delayed_deprecated_option(self):
+    with self.warnings_catcher() as w:
+      delayed_deprecation_option_value = (
+        self._parse(
+          './pants --global-delayed-deprecated-option=xxx')
+        .for_global_scope()
+        .global_delayed_deprecated_option)
+      self.assertEqual(delayed_deprecation_option_value, 'xxx')
+      self.assertEqual(0, len(w))
+
+    with self.warnings_catcher() as w:
+      delayed_passed_option_value = (
+        self._parse(
+          './pants --global-delayed-but-already-passed-deprecated-option=xxx')
+        .for_global_scope()
+        .global_delayed_but_already_passed_deprecated_option)
+      self.assertEqual(delayed_passed_option_value, 'xxx')
+      self.assertOptionWarning(w, 'global_delayed_but_already_passed_deprecated_option')
 
   def test_mutually_exclusive_options_flags(self):
     """Ensure error is raised when mutual exclusive options are given together."""
@@ -1015,8 +1041,8 @@ class OptionsTest(TestBase):
 
     options = self._parse('./pants',
                           env={
-                            'PANTS_A': 100,
-                            'PANTS_COMPILE_A': 99})
+                            'PANTS_A': '100',
+                            'PANTS_COMPILE_A': '99'})
     self.assertEqual(100, options.for_global_scope().a)
     self.assertEqual(99, options.for_scope('compile').a)
     self.assertEqual(99, options.for_scope('compile.java').a)
@@ -1032,7 +1058,7 @@ class OptionsTest(TestBase):
 
     # Command line has precedence over environment.
     options = self._parse('./pants compile --a=99',
-                          env={'PANTS_A': 100}, )
+                          env={'PANTS_A': '100'}, )
     self.assertEqual(100, options.for_global_scope().a)
     self.assertEqual(99, options.for_scope('compile').a)
     self.assertEqual(99, options.for_scope('compile.java').a)
@@ -1042,14 +1068,14 @@ class OptionsTest(TestBase):
                           config={
                             'DEFAULT': {'a': 100},
                           },
-                          env={'PANTS_COMPILE_A': 99}, )
+                          env={'PANTS_COMPILE_A': '99'}, )
     self.assertEqual(100, options.for_global_scope().a)
     self.assertEqual(99, options.for_scope('compile').a)
     self.assertEqual(99, options.for_scope('compile.java').a)
 
     # Command line global overrides the middle scope setting in then env.
     options = self._parse('./pants --a=100',
-                          env={'PANTS_COMPILE_A': 99}, )
+                          env={'PANTS_COMPILE_A': '99'}, )
     self.assertEqual(100, options.for_global_scope().a)
     self.assertEqual(100, options.for_scope('compile').a)
     self.assertEqual(100, options.for_scope('compile.java').a)
@@ -1068,7 +1094,7 @@ class OptionsTest(TestBase):
                           config={
                             'compile': {'a': 99},
                           },
-                          env={'PANTS_A': 100}, )
+                          env={'PANTS_A': '100'}, )
     self.assertEqual(100, options.for_global_scope().a)
     self.assertEqual(100, options.for_scope('compile').a)
     self.assertEqual(100, options.for_scope('compile.java').a)
@@ -1200,6 +1226,28 @@ class OptionsTest(TestBase):
 
     self.assert_fromfile(parse_func)
 
+  def test_fromfile_json(self):
+    def parse_func(dest, fromfile):
+      return self._parse('./pants fromfile --{}=@{}'.format(dest.replace('_', '-'), fromfile))
+
+    val = {'a': {'b': 1}, 'c': [2, 3]}
+    with temporary_file(suffix='.json', binary_mode=False) as fp:
+      json.dump(val, fp)
+      fp.close()
+      options = self._parse('./pants fromfile --{}=@{}'.format('dictvalue', fp.name))
+      self.assertEqual(val, options.for_scope('fromfile')['dictvalue'])
+
+  def test_fromfile_yaml(self):
+    def parse_func(dest, fromfile):
+      return self._parse('./pants fromfile --{}=@{}'.format(dest.replace('_', '-'), fromfile))
+
+    val = {'a': {'b': 1}, 'c': [2, 3]}
+    with temporary_file(suffix='.yaml', binary_mode=False) as fp:
+      yaml.safe_dump(val, fp)
+      fp.close()
+      options = self._parse('./pants fromfile --{}=@{}'.format('dictvalue', fp.name))
+      self.assertEqual(val, options.for_scope('fromfile')['dictvalue'])
+
   def test_fromfile_error(self):
     options = self._parse('./pants fromfile --string=@/does/not/exist')
     with self.assertRaises(Parser.FromfileError):
@@ -1315,7 +1363,7 @@ class OptionsTest(TestBase):
     # Check that we got a warning, but not for the inherited option.
     single_warning_dummy1 = assert_single_element(w)
     self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
-    self.assertNotIn('inherited', single_warning_dummy1.message)
+    self.assertNotIn('inherited', str(single_warning_dummy1.message))
 
     # Check values.
     # Deprecated scope takes precedence at equal rank.
@@ -1330,7 +1378,7 @@ class OptionsTest(TestBase):
     # Check that we got a warning.
     single_warning_dummy2 = assert_single_element(w)
     self.assertEqual(single_warning_dummy2.category, DeprecationWarning)
-    self.assertNotIn('inherited', single_warning_dummy2.message)
+    self.assertNotIn('inherited', str(single_warning_dummy2.message))
 
     # Check values.
     self.assertEqual('uu', vals2.qux)

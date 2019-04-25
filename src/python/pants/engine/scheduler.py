@@ -11,6 +11,7 @@ import time
 from builtins import object, open, str, zip
 from types import GeneratorType
 
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
@@ -19,9 +20,8 @@ from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecute
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
-from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import Params, Select
-from pants.rules.core.exceptions import GracefulTerminationException
+from pants.engine.rules import RuleIndex, TaskRule
+from pants.engine.selectors import Params
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.objects import datatype
@@ -181,32 +181,17 @@ class Scheduler(object):
           continue
         registered.add(key)
 
-        if type(rule) is SingletonRule:
-          self._register_singleton(output_type, rule)
-        elif type(rule) is TaskRule:
+        if type(rule) is TaskRule:
           self._register_task(output_type, rule, rule_index.union_rules)
         else:
           raise ValueError('Unexpected Rule type: {}'.format(rule))
-
-  def _register_singleton(self, output_type, rule):
-    """Register the given SingletonRule.
-
-    A SingletonRule installed for a type will be the only provider for that type.
-    """
-    self._native.lib.tasks_singleton_add(self._tasks,
-                                         self._to_value(rule.value),
-                                         TypeId(self._to_id(output_type)))
 
   def _register_task(self, output_type, rule, union_rules):
     """Register the given TaskRule with the native scheduler."""
     func = Function(self._to_key(rule.func))
     self._native.lib.tasks_task_begin(self._tasks, func, self._to_type(output_type), rule.cacheable)
     for selector in rule.input_selectors:
-      selector_type = type(selector)
-      if selector_type is Select:
-        self._native.lib.tasks_add_select(self._tasks, self._to_type(selector.product))
-      else:
-        raise ValueError('Unrecognized Selector type: {}'.format(selector))
+      self._native.lib.tasks_add_select(self._tasks, self._to_type(selector))
 
     def add_get_edge(product, subject):
       self._native.lib.tasks_add_get(self._tasks, self._to_type(product), self._to_type(subject))
@@ -499,8 +484,9 @@ class SchedulerSession(object):
 
   def run_console_rule(self, product, subject):
     """
-    :param product: product type for the request.
+    :param product: A Goal subtype.
     :param subject: subject for the request.
+    :returns: An exit_code for the given Goal.
     """
     request = self.execution_request([product], [subject])
     returns, throws = self.execute(request)
@@ -508,9 +494,10 @@ class SchedulerSession(object):
     if throws:
       _, state = throws[0]
       exc = state.exc
-      if isinstance(exc, GracefulTerminationException):
-        raise exc
       self._trace_on_error([exc], request)
+      return PANTS_FAILED_EXIT_CODE
+    _, state = returns[0]
+    return state.value.exit_code
 
   def product_request(self, product, subjects):
     """Executes a request for a single product for some subjects, and returns the products.

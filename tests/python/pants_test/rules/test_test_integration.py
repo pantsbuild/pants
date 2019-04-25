@@ -38,11 +38,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
     ] + trailing_args
 
     pants_run = self.run_pants(args)
-
     self.assert_success(pants_run)
-    self.assertEqual("", pants_run.stderr_data)
-    self.assertEqual(pants_run.returncode, 0)
-
     return pants_run
 
   def run_failing_pants_test(self, trailing_args):
@@ -53,10 +49,8 @@ class TestIntegrationTest(PantsRunIntegrationTest):
     ] + trailing_args
 
     pants_run = self.run_pants(args)
-
     self.assert_failure(pants_run)
-    self.assertEqual("", pants_run.stderr_data)
-    self.assertEqual(pants_run.returncode, 1)
+    self.assertEqual('Tests failed\n', pants_run.stderr_data)
 
     return pants_run
 

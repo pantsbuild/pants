@@ -34,6 +34,7 @@ class ScopeInfo(datatype([
   # Symbolic constants for different categories of scope.
   GLOBAL = 'GLOBAL'
   GOAL = 'GOAL'
+  GOAL_V1 = 'GOAL_V1'
   TASK = 'TASK'
   SUBSYSTEM = 'SUBSYSTEM'
   INTERMEDIATE = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.

@@ -212,8 +212,13 @@ class JavacCompile(JvmCompile):
       os.path.relpath(f.replace('.java', '.class'), ctx.target.target_base)
       for f in input_snapshot.files if f.endswith('.java')
     )
+
+    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
+    # which py2 doesn't default to. This can be removed when we drop python 2.
+    argv = [text_type(arg) for arg in cmd]
+
     exec_process_request = ExecuteProcessRequest(
-      argv=tuple(cmd),
+      argv=tuple(argv),
       input_files=input_snapshot.directory_digest,
       output_files=output_files,
       description='Compiling {} with javac'.format(ctx.target.address.spec),

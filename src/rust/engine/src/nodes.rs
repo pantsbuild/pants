@@ -105,7 +105,6 @@ impl Select {
     params.retain(|k| match &entry {
       &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
       &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
-      &rule_graph::Entry::Singleton { .. } => false,
     });
     Select {
       params,
@@ -262,7 +261,6 @@ impl WrappedNode for Select {
           )))
         }
       }
-      &rule_graph::Entry::Singleton(ref key, _) => ok(externs::val_for(key)),
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Root(_)) => {
         panic!("Not a runtime-executable entry! {:?}", self.entry)
       }
@@ -607,8 +605,8 @@ impl DownloadedFile {
   ) -> BoxFuture<fs::Snapshot, String> {
     let file_name = try_future!(url
       .path_segments()
-      .and_then(|ps| ps.last())
-      .map(|f| f.to_owned())
+      .and_then(Iterator::last)
+      .map(str::to_owned)
       .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url)));
 
     core
@@ -1054,14 +1052,14 @@ impl Node for NodeKey {
     };
     let context2 = context.clone();
     match self {
-      NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::DownloadedFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::ExecuteProcess(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Select(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
+      NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
+      NodeKey::ExecuteProcess(n) => n.run(context).map(NodeResult::from).to_boxed(),
+      NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).to_boxed(),
+      NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
+      NodeKey::Select(n) => n.run(context).map(NodeResult::from).to_boxed(),
+      NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).to_boxed(),
+      NodeKey::Task(n) => n.run(context).map(NodeResult::from).to_boxed(),
     }
     .inspect(move |_: &NodeResult| {
       if let Some((node_name, start_timestamp)) = node_name_and_start_timestamp {

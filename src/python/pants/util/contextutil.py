@@ -306,7 +306,7 @@ def open_tar(path_or_file, *args, **kwargs):
     If path_or_file is a file, caller must close it separately.
   """
   (path, fileobj) = ((path_or_file, None) if isinstance(path_or_file, string_types)
-                     else (None, path_or_file))  # TODO(python3port): stop using six.string_types
+                     else (None, path_or_file))  # TODO(#6071): stop using six.string_types
                                                  # This should only accept python3 `str`, not byte strings.
   with closing(TarFile.open(path, *args, fileobj=fileobj, **kwargs)) as tar:
     yield tar
@@ -381,27 +381,6 @@ def maybe_profiled(profile_path):
     logging.getLogger().info(
       'Dumped profile data to: {}\nUse e.g. {} to render and view.'.format(profile_path, view_cmd)
     )
-
-
-@contextmanager
-def with_overwritten_file_content(file_path):
-  """A helper that resets a file after the method runs.
-
-   It will read a file, save the content, try to run the method passed to it, then write the
-   original content to the file.
-
-  :param file_path: Absolute path to the file to be reset after the method runs.
-  :param method_to_run: The method to run before resetting the file.
-  """
-  with open(file_path, 'r') as f:
-    file_original_content = f.read()
-
-  try:
-    yield
-
-  finally:
-    with open(file_path, 'w') as f:
-      f.write(file_original_content)
 
 
 @contextmanager

@@ -8,10 +8,11 @@ import sys
 from builtins import object
 
 from pants.base.build_environment import pants_release, pants_version
+from pants.goal.goal import Goal
 from pants.help.help_formatter import HelpFormatter
 from pants.help.scope_info_iterator import ScopeInfoIterator
-from pants.option.arg_splitter import (GLOBAL_SCOPE, NoGoalHelp, OptionsHelp, UnknownGoalHelp,
-                                       VersionHelp)
+from pants.option.arg_splitter import (GLOBAL_SCOPE, GoalsHelp, NoGoalHelp, OptionsHelp,
+                                       UnknownGoalHelp, VersionHelp)
 from pants.option.scope import ScopeInfo
 
 
@@ -37,6 +38,8 @@ class HelpPrinter(object):
       print(pants_version())
     elif isinstance(self._help_request, OptionsHelp):
       self._print_options_help()
+    elif isinstance(self._help_request, GoalsHelp):
+      self._print_goals_help()
     elif isinstance(self._help_request, UnknownGoalHelp):
       print('Unknown goals: {}'.format(', '.join(self._help_request.unknown_goals)))
       print_hint()
@@ -46,6 +49,22 @@ class HelpPrinter(object):
       print_hint()
       return 1
     return 0
+
+  def _print_goals_help(self):
+    print('\nUse `pants help $goal` to get help for a particular goal.\n')
+    goal_descriptions = {}
+    for scope_info in self._options.known_scope_to_info.values():
+      if scope_info.category not in (ScopeInfo.GOAL, ScopeInfo.GOAL_V1):
+        continue
+      goal_descriptions[scope_info.scope] = scope_info.description
+    goal_descriptions.update({goal.name: goal.description_first_line
+                              for goal in Goal.all()
+                              if goal.description})
+
+    max_width = max(len(name) for name in goal_descriptions.keys())
+    for name, description in sorted(goal_descriptions.items()):
+      print('  {}: {}'.format(name.rjust(max_width), description))
+    print()
 
   def _print_options_help(self):
     """Print a help screen.

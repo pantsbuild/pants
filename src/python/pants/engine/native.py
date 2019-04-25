@@ -144,7 +144,7 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     env_script = '{}.cflags'.format(real_output_prefix)
 
     # Preprocessor directives won't parse in the .cdef calls, so we have to hide them for now.
-    scheduler_bindings_content = read_file(scheduler_bindings_path, binary_mode=False)
+    scheduler_bindings_content = read_file(scheduler_bindings_path)
     scheduler_bindings = _hackily_rewrite_scheduler_bindings(scheduler_bindings_content)
 
     ffibuilder = cffi.FFI()
@@ -166,7 +166,7 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     # to define a module that is loadable by either 2 or 3.
     # TODO: Because PyPy uses the same `init` function name regardless of the python version, this
     # trick does not work there: we leave its conditional in place.
-    file_content = read_file(temp_c_file, binary_mode=False)
+    file_content = read_file(temp_c_file)
     if CFFI_C_PATCH_BEFORE not in file_content:
       raise Exception('The patch for the CFFI generated code will not apply cleanly.')
     file_content = file_content.replace(CFFI_C_PATCH_BEFORE, CFFI_C_PATCH_AFTER)
@@ -226,8 +226,9 @@ def _extern_decl(return_type, arg_types):
 
 class _FFISpecification(object):
 
-  def __init__(self, ffi):
+  def __init__(self, ffi, lib):
     self._ffi = ffi
+    self._lib = lib
 
   @memoized_classproperty
   def _extern_fields(cls):
@@ -270,12 +271,6 @@ class _FFISpecification(object):
 
     return PyResult(is_throw, c.to_value(val))
 
-  @_extern_decl('void', ['ExternContext*', 'uint8_t', 'uint8_t*', 'uint64_t'])
-  def extern_log(self, context_handle, level, msg_ptr, msg_len):
-    """Given a log level and utf8 message string, log it."""
-    msg = bytes(self._ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
-    logger.log(level, msg)
-
   @_extern_decl('TypeId', ['ExternContext*', 'Handle*'])
   def extern_get_type_for(self, context_handle, val):
     """Return a representation of the object's type."""
@@ -295,9 +290,7 @@ class _FFISpecification(object):
     """
     c = self._ffi.from_handle(context_handle)
     obj = self._ffi.from_handle(val[0])
-    hash_ = hash(obj)
-    type_id = c.to_id(type(obj))
-    return (hash_, TypeId(type_id))
+    return c.identify(obj)
 
   @_extern_decl('_Bool', ['ExternContext*', 'Handle*', 'Handle*'])
   def extern_equals(self, context_handle, val1, val2):
@@ -419,36 +412,37 @@ class _FFISpecification(object):
   def extern_generator_send(self, context_handle, func, arg):
     """Given a generator, send it the given value and return a response."""
     c = self._ffi.from_handle(context_handle)
+    response = self._ffi.new('PyGeneratorResponse*')
     try:
       res = c.from_value(func[0]).send(c.from_value(arg[0]))
       if isinstance(res, Get):
         # Get.
-        values = [res.subject]
-        products = [res.product]
-        tag = 2
+        response.tag = self._lib.Get
+        response.get = (
+            TypeId(c.to_id(res.product)),
+            c.to_value(res.subject),
+            c.identify(res.subject),
+          )
       elif type(res) in (tuple, list):
         # GetMulti.
-        values = [g.subject for g in res]
-        products = [g.product for g in res]
-        tag = 3
+        response.tag = self._lib.GetMulti
+        response.get_multi = (
+            c.type_ids_buf([TypeId(c.to_id(g.product)) for g in res]),
+            c.vals_buf([c.to_value(g.subject) for g in res]),
+            c.identities_buf([c.identify(g.subject) for g in res]),
+          )
       else:
         # Break.
-        values = [res]
-        products = []
-        tag = 0
+        response.tag = self._lib.Broke
+        response.broke = (c.to_value(res),)
     except Exception as e:
       # Throw.
+      response.tag = self._lib.Throw
       val = e
       val._formatted_exc = traceback.format_exc()
-      values = [val]
-      products = []
-      tag = 1
+      response.throw = (c.to_value(val),)
 
-    return (
-        tag,
-        c.vals_buf([c.to_value(v) for v in values]),
-        c.type_ids_buf([TypeId(c.to_id(t)) for t in products])
-      )
+    return response[0]
 
   @_extern_decl('PyResult', ['ExternContext*', 'Handle*', 'Handle**', 'uint64_t'])
   def extern_call(self, context_handle, func, args_ptr, args_len):
@@ -521,6 +515,10 @@ class ExternContext(object):
     buf = self._ffi.new('Handle[]', vals)
     return (buf, len(vals), self.to_value(buf))
 
+  def identities_buf(self, idents):
+    buf = self._ffi.new('Ident[]', idents)
+    return (buf, len(idents), self.to_value(buf))
+
   def type_ids_buf(self, types):
     buf = self._ffi.new('TypeId[]', types)
     return (buf, len(types), self.to_value(buf))
@@ -544,6 +542,12 @@ class ExternContext(object):
 
   def drop_handles(self, handles):
     self._handles -= set(handles)
+
+  def identify(self, obj):
+    """Return an Ident-shaped tuple for the given object."""
+    hash_ = hash(obj)
+    type_id = self.to_id(type(obj))
+    return (hash_, TypeId(type_id))
 
   def to_id(self, typ):
     type_id = id(typ)
@@ -589,14 +593,14 @@ class Native(Singleton):
   @memoized_property
   def lib(self):
     """Load and return the native engine module."""
-    return self.ffi.dlopen(self.binary)
+    lib = self.ffi.dlopen(self.binary)
+    _FFISpecification(self.ffi, lib).register_cffi_externs()
+    return lib
 
   @memoized_property
   def ffi(self):
     """A CompiledCFFI handle as imported from the native engine python module."""
-    ffi = getattr(self._ffi_module, 'ffi')
-    _FFISpecification(ffi).register_cffi_externs()
-    return ffi
+    return getattr(self._ffi_module, 'ffi')
 
   @memoized_property
   def ffi_lib(self):
@@ -618,7 +622,6 @@ class Native(Singleton):
     def init_externs():
       context = ExternContext(self.ffi, self.lib)
       self.lib.externs_set(context._handle,
-                           self.ffi_lib.extern_log,
                            logger.getEffectiveLevel(),
                            self.ffi_lib.extern_call,
                            self.ffi_lib.extern_generator_send,
@@ -668,6 +671,25 @@ class Native(Singleton):
   def decompress_tarball(self, tarfile_path, dest_dir):
     result = self.lib.decompress_tarball(tarfile_path, dest_dir)
     return self.context.raise_or_return(result)
+
+  def init_rust_logging(self, level, log_show_rust_3rdparty):
+    return self.lib.init_logging(level, log_show_rust_3rdparty)
+
+  def setup_pantsd_logger(self, log_file_path, level):
+    log_file_path = log_file_path.encode("utf-8")
+    result = self.lib.setup_pantsd_logger(log_file_path, level)
+    return self.context.raise_or_return(result)
+
+  def setup_stderr_logger(self, level):
+    return self.lib.setup_stderr_logger(level)
+
+  def write_log(self, msg, level, target):
+    msg = msg.encode("utf-8")
+    target = target.encode("utf-8")
+    return self.lib.write_log(msg, level, target)
+
+  def flush_log(self):
+    return self.lib.flush_log()
 
   def match_path_globs(self, path_globs, paths):
     path_globs = self.context.to_value(path_globs)

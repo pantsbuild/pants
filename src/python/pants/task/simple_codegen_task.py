@@ -13,7 +13,6 @@ from future.utils import text_type
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
@@ -132,18 +131,6 @@ class SimpleCodegenTask(Task):
     :return: a list of exported targets.
     """
     return []
-
-  @deprecated('1.16.0.dev1', hint_message='Use synthetic_target_type instead!')
-  def synthetic_target_type_by_target(self, target):
-    """The type of target this codegen task generates.
-
-    For example, the target type for JaxbGen would simply be JavaLibrary.
-
-    :API: public
-
-    :return: a type (class) that inherits from Target.
-    """
-    raise NotImplementedError
 
   def synthetic_target_type(self, target):
     """The type of target this codegen task generates.

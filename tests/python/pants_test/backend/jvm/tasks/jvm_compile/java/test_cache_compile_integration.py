@@ -21,6 +21,11 @@ class Compile(namedtuple('Compile', ['srcfiles', 'config', 'artifact_count'])):
 
 class CacheCompileIntegrationTest(BaseCompileIT):
 
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """TODO(#7320): See the point about watchman."""
+    return False
+
   def run_compile(self, target_spec, config, workdir):
     args = ['compile', target_spec]
     pants_run = self.run_pants_with_workdir(args, workdir, config)

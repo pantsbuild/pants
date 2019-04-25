@@ -9,6 +9,7 @@ import os
 import time
 from contextlib import contextmanager
 
+import psutil
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
@@ -37,16 +38,35 @@ class PantsDaemonMonitor(ProcessManager):
       'PantsDaemonMonitor: pid is {} is_alive={}'.format(self._pid, self.is_alive()))
     )
 
-  def assert_started(self, timeout=.1):
+  # TODO(#7330): Determine why pantsd takes so long to start! Waiting for
+  # 'testprojects/src/python/coordinated_runs:waiter' specifically seems to require this 16-second
+  # timeout.
+  def assert_started(self, timeout=16):
     self._process = None
     self._pid = self.await_pid(timeout)
     self._check_pantsd_is_alive()
     return self._pid
 
+  def assert_pantsd_runner_started(self, client_pid, timeout=4):
+    return self.await_metadata_by_name(
+      name='nailgun-client',
+      metadata_key=str(client_pid),
+      timeout=timeout,
+      caster=int,
+    )
+
   def _check_pantsd_is_alive(self):
     self._log()
     assert self._pid is not None and self.is_alive(), 'cannot assert that pantsd is running. Try calling assert_started before calling this method.'
     return self._pid
+
+  def current_memory_usage(self):
+    """Return the current memory usage of the pantsd process (which must be running)
+
+    :return: memory usage in bytes
+    """
+    self.assert_running()
+    return psutil.Process(self._pid).memory_info()[0]
 
   def assert_running(self):
     if not self._pid:
@@ -62,8 +82,14 @@ class PantsDaemonMonitor(ProcessManager):
 
 
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
+
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """We set our own ad-hoc pantsd configuration in most of these tests"""
+    return False
+
   @contextmanager
-  def pantsd_test_context(self, log_level='info', extra_config=None, expected_runs=1):
+  def pantsd_test_context(self, log_level='info', extra_config=None):
     with no_lingering_process_by_command('pantsd-runner') as runner_process_context:
       with self.temporary_workdir() as workdir_base:
         pid_dir = os.path.join(workdir_base, '.pids')
@@ -72,6 +98,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
         pantsd_config = {
           'GLOBAL': {
             'enable_pantsd': True,
+            'shutdown_pantsd_after_run': False,
             # The absolute paths in CI can exceed the UNIX socket path limitation
             # (>104-108 characters), so we override that here with a shorter path.
             'watchman_socket_path': '/tmp/watchman.{}.sock'.format(os.getpid()),
@@ -79,29 +106,27 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
             'pants_subprocessdir': pid_dir,
           }
         }
+
         if extra_config:
           recursively_update(pantsd_config, extra_config)
         print('>>> config: \n{}\n'.format(pantsd_config))
+
         checker = PantsDaemonMonitor(runner_process_context, pid_dir)
-        # TODO(#6574): this should be 1, but when we kill pantsd with a signal it doesn't make sure
-        # to close the run tracker -- we can easily address this by moving that cleanup into the
-        # Exiter.
         self.assert_runner(workdir, pantsd_config, ['kill-pantsd'], expected_runs=1)
         try:
           yield workdir, pantsd_config, checker
+          self.assert_runner(
+            workdir,
+            pantsd_config,
+            ['kill-pantsd'],
+            expected_runs=1,
+          )
+          checker.assert_stopped()
         finally:
           banner('BEGIN pantsd.log')
           for line in read_pantsd_log(workdir):
             print(line)
           banner('END pantsd.log')
-          self.assert_runner(
-            workdir,
-            pantsd_config,
-            ['kill-pantsd'],
-            # TODO(#6574): this should be 1, see above.
-            expected_runs=1,
-          )
-          checker.assert_stopped()
 
   @contextmanager
   def pantsd_successful_run_context(self, *args, **kwargs):
@@ -155,7 +180,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     self.assertEqual(
         runs_created,
         expected_runs,
-        'Expected {} RunTracker run to be created per pantsd run: was {}'.format(
+        'Expected {} RunTracker run(s) to be created per pantsd run: was {}'.format(
           expected_runs,
           runs_created,
         )

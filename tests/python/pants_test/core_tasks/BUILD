@@ -24,14 +24,15 @@ python_tests(
 )
 
 python_tests(
-  name = 'list_goals',
-  sources = ['test_list_goals.py'],
+  name = 'generate_pants_ini',
+  sources = ['test_generate_pants_ini.py'],
   dependencies = [
+    'src/python/pants:version',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
     'src/python/pants/core_tasks',
-    'src/python/pants/goal',
-    'src/python/pants/goal:task_registrar',
-    'src/python/pants/task',
     'tests/python/pants_test:task_test_base',
+    '3rdparty/python:configparser',
   ],
 )
 

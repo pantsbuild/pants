@@ -208,7 +208,7 @@ If your pull request fails in travis, you can look at the shard logs to see the
 failure cause. From that log, you can figure out what tests you need to run to reproduce the failure
 locally. If you cannot reproduce the failure locally and it looks unrelated to your change, please
 open an issue for it with the label
-(`flaky-test`)[https://github.com/pantsbuild/pants/labels/flaky-test]. You can also ping slack to
+[`flaky-test`](https://github.com/pantsbuild/pants/labels/flaky-test). You can also ping slack to
 ask for someone to restart the failing shard.
 (<a pantsref="dev_run_all_tests">More on checking CI test runs here</a>)
 

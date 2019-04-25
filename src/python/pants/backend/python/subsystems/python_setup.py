@@ -8,7 +8,6 @@ import logging
 import os
 
 from pex.variables import Variables
-from pkg_resources import Requirement
 
 from pants.option.custom_types import UnsetBool
 from pants.subsystem.subsystem import Subsystem
@@ -27,16 +26,20 @@ class PythonSetup(Subsystem):
   def register_options(cls, register):
     super(PythonSetup, cls).register_options(register)
     register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3', 'CPython>=3.6,<4'], type=list,
-             metavar='<requirement>',
+             metavar='<requirement>', fingerprint=True,
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
                   "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
                   "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
                   "be ORed together. These constraints are applied in addition to any "
                   "compatibilities required by the relevant targets.")
     register('--setuptools-version', advanced=True, default='40.4.3',
-             help='The setuptools version for this python environment.')
+             help='The setuptools version for this python environment.',
+             removal_version='1.17.0.dev2',
+             removal_hint='This option is now unused and can be removed from pants configuration.')
     register('--wheel-version', advanced=True, default='0.31.1',
-             help='The wheel version for this python environment.')
+             help='The wheel version for this python environment.',
+             removal_version='1.17.0.dev2',
+             removal_hint='This option is now unused and can be removed from pants configuration.')
     register('--platforms', advanced=True, type=list, metavar='<platform>', default=['current'],
              fingerprint=True,
              help='A list of platforms to be supported by this python environment. Each platform'
@@ -77,14 +80,6 @@ class PythonSetup(Subsystem):
   @memoized_property
   def interpreter_search_paths(self):
     return self.expand_interpreter_search_paths(self.get_options().interpreter_search_paths)
-
-  @property
-  def setuptools_version(self):
-    return self.get_options().setuptools_version
-
-  @property
-  def wheel_version(self):
-    return self.get_options().wheel_version
 
   @property
   def platforms(self):
@@ -135,24 +130,6 @@ class PythonSetup(Subsystem):
     if self.get_options().is_flagged('interpreter_constraints'):
       return tuple(self.interpreter_constraints)
     return tuple(target.compatibility or self.interpreter_constraints)
-
-  def setuptools_requirement(self):
-    return self._failsafe_parse('setuptools=={0}'.format(self.setuptools_version))
-
-  def wheel_requirement(self):
-    return self._failsafe_parse('wheel=={0}'.format(self.wheel_version))
-
-  # This is a setuptools <1 and >1 compatible version of Requirement.parse.
-  # For setuptools <1, if you did Requirement.parse('setuptools'), it would
-  # return 'distribute' which of course is not desirable for us.  So they
-  # added a replacement=False keyword arg.  Sadly, they removed this keyword
-  # arg in setuptools >= 1 so we have to simply failover using TypeError as a
-  # catch for 'Invalid Keyword Argument'.
-  def _failsafe_parse(self, requirement):
-    try:
-      return Requirement.parse(requirement, replacement=False)
-    except TypeError:
-      return Requirement.parse(requirement)
 
   @classmethod
   def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):

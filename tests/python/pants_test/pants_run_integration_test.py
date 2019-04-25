@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import glob
 import os
+import re
 import shutil
 import unittest
 from builtins import open
@@ -17,6 +18,7 @@ from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
@@ -51,7 +53,7 @@ class PantsJoinHandle(datatype(['command', 'process', 'workdir'])):
       stdin_data = ensure_binary(stdin_data)
     (stdout_data, stderr_data) = communicate_fn(stdin_data)
 
-    if self.process.returncode != PantsRunIntegrationTest.PANTS_SUCCESS_CODE:
+    if self.process.returncode != PANTS_SUCCEEDED_EXIT_CODE:
       render_logs(self.workdir)
 
     return PantsResult(
@@ -160,8 +162,25 @@ def _read_log(filename):
 class PantsRunIntegrationTest(unittest.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
-  PANTS_SUCCESS_CODE = 0
   PANTS_SCRIPT_NAME = 'pants'
+
+  @classmethod
+  def use_pantsd_env_var(cls):
+    """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled,
+    or they want to configure pantsd themselves.
+
+    In those cases, --enable-pantsd will not be added to their configuration.
+    This approach is coarsely grained, meaning we disable pantsd in some tests that actually run
+    when pantsd is enabled. However:
+      - The number of mislabeled tests is currently small (~20 tests).
+      - Those tests will still run, just with pantsd disabled.
+
+    N.B. Currently, this doesn't interact with test hermeticity.
+    This means that, if the test coordinator has set PANTS_ENABLE_PANTSD, and a test is not marked
+    as hermetic, it will run under pantsd regardless of the value of this function.
+    """
+    should_pantsd = os.getenv("USE_PANTSD_FOR_INTEGRATION_TESTS")
+    return should_pantsd in ["True", "true", "1"]
 
   @classmethod
   def hermetic(cls):
@@ -183,10 +202,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
         # Ensure that the underlying ./pants invocation doesn't run from sources
         # (and therefore bootstrap) if we don't want it to.
         'RUN_PANTS_FROM_PEX',
-        # This tells the ./pants runner script to avoid trying to clean the workspace when changing
-        # python versions. CI starts off without the .python-interpreter-constraints file, so it
-        # would otherwise run a clean-all without this env var.
-        'ONLY_USING_SINGLE_PYTHON_VERSION',
       ]
 
   def setUp(self):
@@ -284,9 +299,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
                    '--cache-bootstrap-read', '--cache-bootstrap-write'
                    ])
 
+    if self.use_pantsd_env_var():
+      args.append("--enable-pantsd=True")
+      args.append("--no-shutdown-pantsd-after-run")
+
     if config:
       config_data = config.copy()
-      # TODO(python3port): RawConfigParser is legacy. Investigate updating to modern API.
+      # TODO(#6071): RawConfigParser is legacy. Investigate updating to modern API.
       ini = configparser.RawConfigParser(defaults=config_data.pop('DEFAULT', None))
       for section, section_config in config_data.items():
         ini.add_section(section)
@@ -453,10 +472,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return stdout.decode('utf-8')
 
   def assert_success(self, pants_run, msg=None):
-    self.assert_result(pants_run, self.PANTS_SUCCESS_CODE, expected=True, msg=msg)
+    self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=True, msg=msg)
 
   def assert_failure(self, pants_run, msg=None):
-    self.assert_result(pants_run, self.PANTS_SUCCESS_CODE, expected=False, msg=msg)
+    self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=False, msg=msg)
 
   def assert_result(self, pants_run, value, expected=True, msg=None):
     check, assertion = (eq, self.assertEqual) if expected else (ne, self.assertNotEqual)
@@ -475,6 +494,24 @@ class PantsRunIntegrationTest(unittest.TestCase):
     error_msg = '\n'.join(details)
 
     assertion(value, pants_run.returncode, error_msg)
+
+  def assert_run_contains_log(self, msg, level, module, pants_run):
+    """Asserts that the passed run's stderr contained the log message."""
+    self.assert_contains_log(msg, level, module, pants_run.stderr_data, pants_run.pid)
+
+  def assert_contains_log(self, msg, level, module, log, pid=None):
+    """
+    Asserts that the passed log contains the message logged by the module at the level.
+
+    If pid is specified, performs an exact match including the pid of the pants process.
+    Otherwise performs a regex match asserting that some pid is present.
+    """
+    prefix = "[{}] {}:pid=".format(level, module)
+    suffix = ": {}".format(msg)
+    if pid is None:
+      self.assertRegexpMatches(log, re.escape(prefix) + "\\d+" + re.escape(suffix))
+    else:
+      self.assertIn("{}{}{}".format(prefix, pid, suffix), log)
 
   def normalize(self, s):
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
@@ -504,6 +541,29 @@ class PantsRunIntegrationTest(unittest.TestCase):
       yield
     finally:
       os.unlink(path)
+
+  @contextmanager
+  def with_overwritten_file_content(self, file_path, temporary_content=None):
+    """A helper that resets a file after the method runs.
+
+     It will read a file, save the content, maybe write temporary_content to it, yield, then write the
+     original content to the file.
+
+    :param file_path: Absolute path to the file to be reset after the method runs.
+    :param temporary_content: Optional content to write into the file.
+    """
+    with open(file_path, 'r') as f:
+      file_original_content = f.read()
+
+    try:
+      if temporary_content is not None:
+        with open(file_path, 'w') as f:
+          f.write(temporary_content)
+      yield
+
+    finally:
+      with open(file_path, 'w') as f:
+        f.write(file_original_content)
 
   @contextmanager
   def mock_buildroot(self, dirs_to_copy=None):

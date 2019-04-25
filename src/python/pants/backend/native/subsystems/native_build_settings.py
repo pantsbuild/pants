@@ -4,8 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.subsystems.utils.mirrored_target_option_mixin import \
-  MirroredTargetOptionMixin
+from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -13,8 +12,8 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
   """Settings which affect both the compile and link phases."""
   options_scope = 'native-build-settings'
 
-  mirrored_option_to_kwarg_map = {
-    'strict_deps': 'strict_deps',
+  mirrored_target_option_actions = {
+    'strict_deps': lambda tgt: tgt.strict_deps,
   }
 
   @classmethod
@@ -29,4 +28,4 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
                   "this behavior with the strict_deps keyword argument as well.")
 
   def get_strict_deps_value_for_target(self, target):
-    return self.get_target_mirrored_option('strict_deps', target)
+    return self.get_scalar_mirrored_target_option('strict_deps', target)

@@ -108,6 +108,8 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/python/python_distribution/ctypes:ctypes_test',
       'testprojects/src/python/python_distribution/ctypes_with_third_party:ctypes_test',
       'testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin',
+      # Requires non-standard settings, and already tested by `ProtobufIntegrationTest.test_import_from_buildroot`
+      'testprojects/src/protobuf/org/pantsbuild/testproject/import_from_buildroot.*',
     ]
 
     targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 + python2_only +
@@ -130,8 +132,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
   @ensure_resolver
   def run_shard(self, shard):
     targets = self.targets_for_shard(shard)
-    pants_run = self.pants_test(targets + ['--jvm-platform-default-platform=java7',
-                                           '--gen-protoc-import-from-root'])
+    pants_run = self.pants_test(targets + ['--jvm-platform-default-platform=java7'])
     self.assert_success(pants_run)
 
   def test_self(self):

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+COMMIT_MSG_FILEPATH=$1
+COMMIT_MSG_SRC=$2
+
+# Note that xargs with no args just returns the string with surrounding whitespace trimmed.
+NUM_NON_MD_FILES=$(git status -s --porcelain | grep -v ".\md$" | wc -l | xargs)
+
+# The msg source will be "commit" if we were called with --amend.
+if [ "${COMMIT_MSG_SRC}" != "commit" ] && [ "${NUM_NON_MD_FILES}" == "0" ]; then
+cat <<EOF >> ${COMMIT_MSG_FILEPATH}
+
+# Delete this line to force a full CI run for documentation-only changes.
+SKIP_FULL_CI  # Documentation-only change.
+EOF
+fi

@@ -4,9 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os.path
 import sys
 from builtins import str
+
+from future.utils import text_type
 
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
@@ -14,7 +15,7 @@ from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcess
                                            FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import TransitiveHydratedTarget
 from pants.engine.rules import optionable_rule, rule
-from pants.engine.selectors import Get, Select
+from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult
 
 
@@ -27,22 +28,14 @@ class PyTestResult(TestResult):
 
 # TODO: Support deps
 # TODO: Support resources
-@rule(PyTestResult, [Select(TransitiveHydratedTarget), Select(PyTest)])
+@rule(PyTestResult, [TransitiveHydratedTarget, PyTest])
 def run_python_test(transitive_hydrated_target, pytest):
   target_root = transitive_hydrated_target.root
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
-  interpreter_major, interpreter_minor = sys.version_info[0:2]
-  pex_name, digest = {
-    (2, 7): ("pex27", Digest('0ecbf48e3e240a413189194a9f829aec10446705c84db310affe36e23e741dbc', 1812737)),
-    (3, 6): ("pex36", Digest('ba865e7ce7a840070d58b7ba24e7a67aff058435cfa34202abdd878e7b5d351d', 1812158)),
-    (3, 7): ("pex37", Digest('51bf8e84d5290fe5ff43d45be78d58eaf88cf2a5e995101c8ff9e6a73a73343d', 1813189))
-  }.get((interpreter_major, interpreter_minor), (None, None))
-  if pex_name is None:
-    raise ValueError("Current interpreter {}.{} is not supported, as there is no corresponding PEX to download.".format(interpreter_major, interpreter_minor))
-
-  pex_snapshot = yield Get(Snapshot,
-    UrlToFetch("https://github.com/pantsbuild/pex/releases/download/v1.6.1/{}".format(pex_name), digest))
+  url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.6/pex'
+  digest = Digest('61bb79384db0da8c844678440bd368bcbfac17bbdb865721ad3f9cb0ab29b629', 1826945)
+  pex_snapshot = yield Get(Snapshot, UrlToFetch(url, digest))
 
   all_targets = [target_root] + [dep.root for dep in transitive_hydrated_target.dependencies]
 
@@ -58,24 +51,31 @@ def run_python_test(transitive_hydrated_target, pytest):
         all_requirements.append(str(py_req.requirement))
 
   # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
-  python_binary = sys.executable
+  # TODO(#7061): This str() can be removed after we drop py2!
+  python_binary = text_type(sys.executable)
 
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
   # pex27, where it should be hermetically provided in some way.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   requirements_pex_argv = [
+    python_binary,
     './{}'.format(pex_snapshot.files[0]),
-    '--python', python_binary,
+    # TODO(#7061): This text_type() can be removed after we drop py2!
+    '--python', text_type(python_binary),
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
     # Sort all user requirement strings to increase the chance of cache hits across invocations.
-  ] + list(pytest.get_requirement_strings()) + sorted(all_requirements)
+  ] + [
+    # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
+    text_type(req)
+    for req in sorted(
+        list(pytest.get_requirement_strings())
+        + list(all_requirements))
+  ]
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
     input_files=pex_snapshot.directory_digest,
     description='Resolve requirements for {}'.format(target_root.address.reference()),
-    # TODO: This should not be necessary
-    env={'PATH': os.path.dirname(python_binary)},
     output_files=(output_pytest_requirements_pex_filename,),
   )
   requirements_pex_response = yield Get(
@@ -100,11 +100,9 @@ def run_python_test(transitive_hydrated_target, pytest):
   )
 
   request = ExecuteProcessRequest(
-    argv=('./pytest-with-requirements.pex',),
+    argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
     input_files=merged_input_files,
     description='Run pytest for {}'.format(target_root.address.reference()),
-    # TODO: This should not be necessary
-    env={'PATH': os.path.dirname(python_binary)}
   )
 
   result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)

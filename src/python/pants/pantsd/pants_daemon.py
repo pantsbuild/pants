@@ -11,6 +11,7 @@ import threading
 from builtins import object
 from contextlib import contextmanager
 
+from future.utils import text_type
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
@@ -19,7 +20,7 @@ from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.logging import setup_logging
+from pants.init.logging import init_rust_logger, setup_logging
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -62,6 +63,9 @@ class _LoggerStream(object):
   def write(self, msg):
     msg = ensure_text(msg)
     for line in msg.rstrip().splitlines():
+      # The log only accepts text, and will raise a decoding error if the default encoding is ascii
+      # if provided a bytes input for unicode text.
+      line = ensure_text(line)
       self._logger.log(self._log_level, line.rstrip())
 
   def flush(self):
@@ -90,7 +94,7 @@ class PantsDaemon(FingerprintedProcessManager):
   class RuntimeFailure(Exception):
     """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
-  class Handle(datatype([('pid', int), ('port', int)])):
+  class Handle(datatype([('pid', int), ('port', int), ('metadata_base_dir', text_type)])):
     """A handle to a "probably running" pantsd instance.
 
     We attempt to verify that the pantsd instance is still running when we create a Handle, but
@@ -116,8 +120,9 @@ class PantsDaemon(FingerprintedProcessManager):
           # We're already launched.
           return PantsDaemon.Handle(
               stub_pantsd.await_pid(10),
-              stub_pantsd.read_named_socket('pailgun', int)
-            )
+              stub_pantsd.read_named_socket('pailgun', int),
+              text_type(stub_pantsd._metadata_base_dir),
+          )
 
     @classmethod
     def restart(cls, options_bootstrapper):
@@ -202,7 +207,7 @@ class PantsDaemon(FingerprintedProcessManager):
         fs_event_service,
         legacy_graph_scheduler,
         build_root,
-        bootstrap_options.pantsd_invalidation_globs,
+        PantsDaemon.compute_invalidation_globs(bootstrap_options),
         pidfile,
       )
 
@@ -219,6 +224,30 @@ class PantsDaemon(FingerprintedProcessManager):
         services=(fs_event_service, scheduler_service, pailgun_service, store_gc_service),
         port_map=dict(pailgun=pailgun_service.pailgun_port),
       )
+
+  @staticmethod
+  def compute_invalidation_globs(bootstrap_options):
+    """
+    Combine --pythonpath and --pants_config_files(pants.ini) files that are in {buildroot} dir
+    with those invalidation_globs provided by users
+    :param bootstrap_options:
+    :return: A list of invalidation_globs
+    """
+    buildroot = get_buildroot()
+    invalidation_globs = []
+    globs = bootstrap_options.pythonpath + \
+      bootstrap_options.pants_config_files + \
+      bootstrap_options.pantsd_invalidation_globs
+
+    for glob in globs:
+      glob_relpath = os.path.relpath(glob, buildroot)
+      if glob_relpath and (not glob_relpath.startswith("../")):
+        invalidation_globs.extend([glob_relpath, glob_relpath + '/**'])
+      else:
+        logging.getLogger(__name__).warning("Changes to {}, outside of the buildroot"
+                                            ", will not be invalidated.".format(glob))
+
+    return invalidation_globs
 
   def __init__(self, native, build_root, work_dir, log_level, services,
                metadata_base_dir, bootstrap_options=None):
@@ -238,6 +267,7 @@ class PantsDaemon(FingerprintedProcessManager):
     self._log_level = log_level
     self._services = services
     self._bootstrap_options = bootstrap_options
+    self._log_show_rust_3rdparty = bootstrap_options.for_global_scope().log_show_rust_3rdparty if bootstrap_options else True
 
     self._log_dir = os.path.join(work_dir, self.name)
     self._logger = logging.getLogger(__name__)
@@ -301,7 +331,8 @@ class PantsDaemon(FingerprintedProcessManager):
     # for further forks.
     with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
       # Reinitialize logging for the daemon context.
-      result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME)
+      init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
+      result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME, native=self._native)
 
       # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
       # TODO: Consider giving these pipes/actual fds, in order to make them "deep" replacements
@@ -310,7 +341,7 @@ class PantsDaemon(FingerprintedProcessManager):
       sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_handler)
 
       self._logger.debug('logging initialized')
-      yield result.log_handler.stream
+      yield (result.log_handler.stream, result.log_handler.native_filename)
 
   def _setup_services(self, pants_services):
     for service in pants_services.services:
@@ -364,21 +395,29 @@ class PantsDaemon(FingerprintedProcessManager):
     """Synchronously run pantsd."""
     # Switch log output to the daemon's log stream from here forward.
     self._close_stdio()
-    with self._pantsd_logging() as log_stream:
+    with self._pantsd_logging() as (log_stream, log_filename):
+
       # Register an exiter using os._exit to ensure we only close stdio streams once.
       ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
 
-      # We don't have any stdio streams to log to anymore, but we can get tracebacks of the pantsd
-      # process by tailing the pantsd log and sending it SIGUSR2.
-      ExceptionSink.reset_interactive_output_stream(log_stream)
+      # We don't have any stdio streams to log to anymore, so we log to a file.
+      # We don't override the faulthandler destination because the stream we get will proxy things
+      # via the rust logging code, and faulthandler needs to be writing directly to a real file
+      # descriptor. When pantsd logging was originally initialised, we already set up faulthandler
+      # to log to the correct file descriptor, so don't override it.
+      #
+      # We can get tracebacks of the pantsd process by tailing the pantsd log and sending it
+      # SIGUSR2.
+      ExceptionSink.reset_interactive_output_stream(
+        log_stream,
+        override_faulthandler_destination=False,
+      )
 
       # Reset the log location and the backtrace preference from the global bootstrap options.
       global_bootstrap_options = self._bootstrap_options.for_global_scope()
       ExceptionSink.reset_should_print_backtrace_to_terminal(
         global_bootstrap_options.print_exception_stacktrace)
       ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
-
-      self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
       self._native.set_panic_handler()
 
@@ -432,7 +471,7 @@ class PantsDaemon(FingerprintedProcessManager):
     listening_port = self.read_named_socket('pailgun', int)
     self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
                        .format(self.pid, listening_port))
-    return self.Handle(pantsd_pid, listening_port)
+    return self.Handle(pantsd_pid, listening_port, text_type(self._metadata_base_dir))
 
   def terminate(self, include_watchman=True):
     """Terminates pantsd and watchman.

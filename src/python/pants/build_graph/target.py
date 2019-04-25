@@ -100,25 +100,24 @@ class Target(AbstractTarget):
                     'in BUILD files that are not yet available in the current version of pants.')
 
     @classmethod
-    def check(cls, target, kwargs, payload):
+    def check(cls, target, kwargs):
       """
       :API: public
       """
-      cls.global_instance().check_unknown(target, kwargs, payload)
+      cls.global_instance().check_unknown(target, kwargs)
 
-    def check_unknown(self, target, kwargs, payload):
+    def check_unknown(self, target, kwargs):
       """
       :API: public
       """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
+      # The source argument is automatically promoted to the sources argument, and rules should
+      # always use the sources argument; don't error if people used source in their BUILD file.
+      # There doesn't appear to be an easy way to error if a Target subclass explicitly takes
+      # `source` as a named kwarg; it would be nice to error rather than silently swallow the value,
+      # if there were such a way.
+      ignore_params.add('source')
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
-      # TODO(#7357) Remove these checks once test issues are resolved.
-      if 'sources' in payload.as_dict():
-        if 'source' in unknown_args:
-          unknown_args.pop('source')
-        if 'sources' in unknown_args:
-          unknown_args.pop('sources')
-          kwargs.pop('sources')
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
       if ignored_args:
         logger.debug('{target} ignoring the unimplemented arguments: {args}'
@@ -139,7 +138,7 @@ class Target(AbstractTarget):
 
     @classmethod
     def register_options(cls, register):
-      register('--tag-targets-mappings', type=dict, default=None, fromfile=True, fingerprint=True,
+      register('--tag-targets-mappings', type=dict, default=None, fingerprint=True,
                help='Dict with tag assignments for targets. Ex: { "tag1": ["path/to/target:foo"] }')
 
     @classmethod
@@ -338,7 +337,7 @@ class Target(AbstractTarget):
     self._cached_exports_addresses = None
     self._no_cache = no_cache
     if kwargs:
-      self.Arguments.check(self, kwargs, self.payload)
+      self.Arguments.check(self, kwargs)
 
   @property
   def scope(self):

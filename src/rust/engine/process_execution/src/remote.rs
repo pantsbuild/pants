@@ -242,7 +242,7 @@ impl super::CommandRunner for CommandRunner {
                         // maybe the delay here should be the min of remaining time and the backoff period
                         Delay::new_handle(
                           Instant::now() + Duration::from_millis(backoff_period),
-                          futures_timer_thread.with(|thread| thread.handle()),
+                          futures_timer_thread.with(futures_timer::HelperThread::handle),
                         )
                         .map_err(move |e| {
                           format!(
@@ -501,18 +501,17 @@ impl CommandRunner {
             )))
             .to_boxed();
           }
-          let digest =
-            Digest(
-              try_future!(Fingerprint::from_hex_string(parts[1]).map_err(|e| {
-                ExecutionError::Fatal(format!("Bad digest in missing blob: {}: {}", parts[1], e))
-              })),
-              try_future!(parts[2]
-                .parse::<usize>()
-                .map_err(|e| ExecutionError::Fatal(format!(
-                  "Missing blob had bad size: {}: {}",
-                  parts[2], e
-                )))),
-            );
+          let digest = Digest(
+            try_future!(Fingerprint::from_hex_string(parts[1]).map_err(|e| {
+              ExecutionError::Fatal(format!("Bad digest in missing blob: {}: {}", parts[1], e))
+            })),
+            try_future!(parts[2]
+              .parse::<usize>()
+              .map_err(|e| ExecutionError::Fatal(format!(
+                "Missing blob had bad size: {}: {}",
+                parts[2], e
+              )))),
+          );
           missing_digests.push(digest);
         }
         if missing_digests.is_empty() {
@@ -763,7 +762,7 @@ fn make_execute_request(
     .iter()
     .map(|p| {
       p.to_str()
-        .map(|s| s.to_owned())
+        .map(str::to_owned)
         .ok_or_else(|| format!("Non-UTF8 output file path: {:?}", p))
     })
     .collect::<Result<Vec<String>, String>>()?;
@@ -775,7 +774,7 @@ fn make_execute_request(
     .iter()
     .map(|p| {
       p.to_str()
-        .map(|s| s.to_owned())
+        .map(str::to_owned)
         .ok_or_else(|| format!("Non-UTF8 output directory path: {:?}", p))
     })
     .collect::<Result<Vec<String>, String>>()?;

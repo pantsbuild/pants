@@ -169,7 +169,7 @@ class GoBuildgen(GoTask):
                   'memory, (re-)generate them on disk using the installed Go BUILD file template.')
 
     # TODO(John Sirois): Add docs for the template parameters.
-    register('--template', metavar='<template>', fromfile=True,
+    register('--template', metavar='<template>',
              default=cls._default_template(),
              advanced=True, fingerprint=True,
              help='A Go BUILD file mustache template to use with --materialize.')

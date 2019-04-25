@@ -62,8 +62,10 @@ class IsortRun(FmtTaskMixin, Task):
                                              labels=[WorkUnitLabel.TOOL, WorkUnitLabel.LINT])
         cmdline, exit_code = isort.run(workunit_factory, args)
         if exit_code != 0:
-          raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
-                          exit_code=exit_code)
+          raise TaskError(
+            "Exited with return code {} while running `{}`.".format(exit_code, cmdline),
+            exit_code=exit_code
+          )
 
   def _calculate_isortable_python_sources(self, targets):
     """Generate a set of source files from the given targets."""

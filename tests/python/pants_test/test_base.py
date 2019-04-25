@@ -8,6 +8,7 @@ import itertools
 import logging
 import os
 import unittest
+import warnings
 from builtins import object, open, str
 from collections import defaultdict
 from contextlib import contextmanager
@@ -409,7 +410,12 @@ class TestBase(unittest.TestCase, AbstractClass):
   def scheduler(self):
     if self._scheduler is None:
       self._init_engine()
+      self.post_scheduler_init()
     return self._scheduler
+
+  def post_scheduler_init(self):
+    """Run after initializing the Scheduler, it will have the same lifetime"""
+    pass
 
   @property
   def address_mapper(self):
@@ -655,7 +661,7 @@ class TestBase(unittest.TestCase, AbstractClass):
     """
     with temporary_dir() as temp_dir:
       for file_name, content in files.items():
-        safe_file_dump(os.path.join(temp_dir, file_name), content, mode='w')
+        safe_file_dump(os.path.join(temp_dir, file_name), content)
       return self.scheduler.capture_snapshots((
         PathGlobsAndRoot(PathGlobs(('**',)), text_type(temp_dir)),
       ))[0]
@@ -697,6 +703,18 @@ class TestBase(unittest.TestCase, AbstractClass):
     finally:
       root_logger.setLevel(old_level)
       root_logger.removeHandler(handler)
+
+  @contextmanager
+  def warnings_catcher(self):
+    with warnings.catch_warnings(record=True) as w:
+      warnings.simplefilter('always')
+      yield w
+
+  def assertWarning(self, w, category, warning_text):
+    single_warning = assert_single_element(w)
+    self.assertEqual(single_warning.category, category)
+    warning_message = single_warning.message
+    self.assertEqual(warning_text, text_type(warning_message))
 
   def retrieve_single_product_at_target_base(self, product_mapping, target):
     mapping_for_target = product_mapping.get(target)
@@ -740,7 +758,8 @@ class TestBase(unittest.TestCase, AbstractClass):
       # Ensure any dependencies exist in the target dict (`target_map` must then be an
       # OrderedDict).
       # The 'key' is used to access the target in `target_dict`, and defaults to `target_spec`.
-      key = unprocessed_kwargs.pop('key', target_spec)
+      target_address = Address.parse(target_spec)
+      key = unprocessed_kwargs.pop('key', target_address.target_name)
       dep_targets = []
       for dep_spec in unprocessed_kwargs.pop('dependencies', []):
         existing_tgt_key = target_map[dep_spec]['key']

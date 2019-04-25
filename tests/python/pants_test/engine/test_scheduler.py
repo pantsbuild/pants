@@ -11,7 +11,7 @@ from textwrap import dedent
 
 from pants.engine.rules import RootRule, UnionRule, rule, union
 from pants.engine.scheduler import ExecutionError
-from pants.engine.selectors import Get, Params, Select
+from pants.engine.selectors import Get, Params
 from pants.util.objects import datatype
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.test_base import TestBase
@@ -29,12 +29,12 @@ def fn_raises(x):
   raise Exception('An exception for {}'.format(type(x).__name__))
 
 
-@rule(A, [Select(B)])
+@rule(A, [B])
 def nested_raise(x):
   fn_raises(x)
 
 
-@rule(str, [Select(A), Select(B)])
+@rule(str, [A, B])
 def consumes_a_and_b(a, b):
   return str('{} and {}'.format(a, b))
 
@@ -43,7 +43,7 @@ class C(object):
   pass
 
 
-@rule(B, [Select(C)])
+@rule(B, [C])
 def transitive_b_c(c):
   return B()
 
@@ -52,7 +52,7 @@ class D(datatype([('b', B)])):
   pass
 
 
-@rule(D, [Select(C)])
+@rule(D, [C])
 def transitive_coroutine_rule(c):
   b = yield Get(B, C, c)
   yield D(b)
@@ -73,7 +73,7 @@ class UnionA(object):
     return A()
 
 
-@rule(A, [Select(UnionA)])
+@rule(A, [UnionA])
 def select_union_a(union_a):
   return union_a.a()
 
@@ -84,13 +84,13 @@ class UnionB(object):
     return A()
 
 
-@rule(A, [Select(UnionB)])
+@rule(A, [UnionB])
 def select_union_b(union_b):
   return union_b.a()
 
 
 # TODO: add GetMulti testing for unions!
-@rule(A, [Select(UnionWrapper)])
+@rule(A, [UnionWrapper])
 def a_union_test(union_wrapper):
   union_a = yield Get(A, UnionBase, union_wrapper.inner)
   yield union_a
@@ -106,12 +106,20 @@ class TypeCheckFailWrapper(object):
     self.inner = inner
 
 
-@rule(A, [Select(TypeCheckFailWrapper)])
+@rule(A, [TypeCheckFailWrapper])
 def a_typecheck_fail_test(wrapper):
-  # This `yield Get(A, B, ...)` will use the `nested_raise` rule defined above, but it won't get to
-  # the point of raising since the type check will fail at the Get.
-  supposedly_a = yield Get(A, B, wrapper.inner)
-  yield supposedly_a
+  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+  # the type check will fail at the Get.
+  _ = yield Get(A, B, wrapper.inner) # noqa: F841
+  yield A()
+
+
+@rule(C, [TypeCheckFailWrapper])
+def c_unhashable(_):
+  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+  # the hashability check will fail.
+  _ = yield Get(A, B, list()) # noqa: F841
+  yield C()
 
 
 @contextmanager
@@ -201,6 +209,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
       RootRule(B),
       RootRule(TypeCheckFailWrapper),
       a_typecheck_fail_test,
+      c_unhashable,
       nested_raise,
     ]
 
@@ -212,6 +221,12 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
     with assert_execution_error(self, expected_msg):
       # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
       self.scheduler.product_request(A, [Params(TypeCheckFailWrapper(A()))])
+
+  def test_unhashable_failure(self):
+    """Test that unhashable Get(...) params result in a structured error."""
+    expected_msg = """TypeError: unhashable type: 'list'"""
+    with assert_execution_error(self, expected_msg):
+      self.scheduler.product_request(C, [Params(TypeCheckFailWrapper(A()))])
 
   def test_trace_includes_rule_exception_traceback(self):
     # Execute a request that will trigger the nested raise, and then directly inspect its trace.

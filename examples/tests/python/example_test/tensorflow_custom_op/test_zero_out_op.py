@@ -13,6 +13,6 @@ from example.tensorflow_custom_op.zero_out_custom_op import zero_out_module
 class ZeroOutTest(tf.test.TestCase):
 
   def test_zero_out(self):
-    with self.test_session():
+    with self.cached_session():
       result = zero_out_module().zero_out([5, 4, 3, 2, 1])
       self.assertAllEqual(result.eval(), [5, 0, 0, 0, 0])

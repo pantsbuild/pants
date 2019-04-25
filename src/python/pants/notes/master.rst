@@ -4,6 +4,402 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.16.0.dev2 (4/22/2019)
+-----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add support for v2-only goals, and replace list with a @console_rule (#6880)
+  `PR #6880 <https://github.com/pantsbuild/pants/pull/6880>`_
+
+* make deprecations respect warnings filters and add --ignore-pants-warnings option (#7496)
+  `PR #7496 <https://github.com/pantsbuild/pants/pull/7496>`_
+
+Bugfixes
+~~~~~~~~
+
+* Rerun `select-interpreter` if global Python interpreter constraints have changed  (#7586)
+  `PR #7586 <https://github.com/pantsbuild/pants/pull/7586>`_
+
+* Fix help info output for option choices (#7569)
+  `PR #7569 <https://github.com/pantsbuild/pants/pull/7569>`_
+
+* Directory materialization is visible to others. (#7562)
+  `PR #7562 <https://github.com/pantsbuild/pants/pull/7562>`_
+
+* Coerce argv for JavacCompile to text_type. (#7560)
+  `PR #7560 <https://github.com/pantsbuild/pants/pull/7560>`_
+
+* Fix doc generation rendering byte literals with Python 3 (#7556)
+  `PR #7556 <https://github.com/pantsbuild/pants/pull/7556>`_
+
+* fix go test flags bug and add integration test (#7539)
+  `PR #7539 <https://github.com/pantsbuild/pants/pull/7539>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix link for common_task/target_aggregate (#7574)
+  `PR #7574 <https://github.com/pantsbuild/pants/pull/7574>`_
+
+* Update install guide to use `./pants generate-pants-ini` and `pants_runtime_python_version` (#7453)
+  `PR #7453 <https://github.com/pantsbuild/pants/pull/7453>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Hotfix #7591 breaking OSX Rust tests shard due to Pyenv global issue (#7602)
+  `PR #7602 <https://github.com/pantsbuild/pants/pull/7602>`_
+  `PR #7591 <https://github.com/pantsbuild/pants/pull/7591>`_
+
+* Pin OSX wheel release shards to pyenv. (#7591)
+  `PR #7591 <https://github.com/pantsbuild/pants/pull/7591>`_
+
+* Replace the `goals` goal with a `help` plugin which supports both v1 and v2 (#7598)
+  `PR #7598 <https://github.com/pantsbuild/pants/pull/7598>`_
+
+* Remove unused migrations folder (#7592)
+  `PR #7592 <https://github.com/pantsbuild/pants/pull/7592>`_
+
+* Collection subclasses correctly coerce to bools (#7584)
+  `PR #7584 <https://github.com/pantsbuild/pants/pull/7584>`_
+
+* Use ci.sh instead of travis-ci.sh (#7582)
+  `PR #7582 <https://github.com/pantsbuild/pants/pull/7582>`_
+
+* Cleanup run_python_test rule. (#7577)
+  `PR #7577 <https://github.com/pantsbuild/pants/pull/7577>`_
+
+* Improve `--pantsd-invalidation-globs` using Snapshot fingerprints (#7531)
+  `Issue #5567 <https://github.com/pantsbuild/pants/issues/5567>`_
+  `PR #7531 <https://github.com/pantsbuild/pants/pull/7531>`_
+
+* Restore support for pantsbuild.pants wheel using Python 3.7+ by removing abi3 workaround (#7578)
+  `Issue #7459 <https://github.com/pantsbuild/pants/issues/7459>`_
+  `PR #7578 <https://github.com/pantsbuild/pants/pull/7578>`_
+
+* Bootstrap py36 in cron as well (#7579)
+  `PR #7579 <https://github.com/pantsbuild/pants/pull/7579>`_
+
+* protobuf gen triggers less often (#7565)
+  `PR #7565 <https://github.com/pantsbuild/pants/pull/7565>`_
+
+* Skip more flaky tests in TestPantsDaemonIntegration. (#7575)
+  `PR #7575 <https://github.com/pantsbuild/pants/pull/7575>`_
+
+* Allow 3rdparty rust crate logging to be hidden (#7530)
+  `PR #7530 <https://github.com/pantsbuild/pants/pull/7530>`_
+
+* Add debug_log macro for one-off debugging (#7566)
+  `PR #7566 <https://github.com/pantsbuild/pants/pull/7566>`_
+
+* Enable pantsd in Travis (#7440)
+  `PR #7440 <https://github.com/pantsbuild/pants/pull/7440>`_
+
+* Skip flaky tests in TestPantsDaemonIntegration. (#7558)
+  `PR #7558 <https://github.com/pantsbuild/pants/pull/7558>`_
+
+* Don't assume a local `master` branch point. (#7557)
+  `PR #7557 <https://github.com/pantsbuild/pants/pull/7557>`_
+
+* Kill unused env vars in our pre-commit hook. (#7555)
+  `PR #7555 <https://github.com/pantsbuild/pants/pull/7555>`_
+
+* Remove un-needed `travis-ci.sh` ci wrapper. (#7548)
+  `PR #7548 <https://github.com/pantsbuild/pants/pull/7548>`_
+
+* Build pexes that work on all Python patch versions. (#7550)
+  `PR #7550 <https://github.com/pantsbuild/pants/pull/7550>`_
+
+* Fix abi3 pex check to allow abi3 wheels. (#7549)
+  `PR #7549 <https://github.com/pantsbuild/pants/pull/7549>`_
+
+* Only add the CI skipping label on initial commit. (#7545)
+  `PR #7545 <https://github.com/pantsbuild/pants/pull/7545>`_
+
+* Prepare 1.15.0 (#7544)
+  `PR #7544 <https://github.com/pantsbuild/pants/pull/7544>`_
+
+* Don't run CI for doc-only changes. (#7537)
+  `PR #7537 <https://github.com/pantsbuild/pants/pull/7537>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+
+* Update to rust 1.34.0 (#7541)
+  `PR #7541 <https://github.com/pantsbuild/pants/pull/7541>`_
+
+* Upgrade to pex 1.6.6. (#7186)
+  `PR #7186 <https://github.com/pantsbuild/pants/pull/7186>`_
+
+
+1.16.0.dev1 (4/12/2019)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Set the fromfile option arg's default to True (#7513)
+  `PR #7513 <https://github.com/pantsbuild/pants/pull/7513>`_
+
+* Bump cffi (1.11.1 => 1.11.5) (#7484)
+  `PR #7484 <https://github.com/pantsbuild/pants/pull/7484>`_
+
+* Add run tracker option for versioning stats (#7481)
+  `PR #7481 <https://github.com/pantsbuild/pants/pull/7481>`_
+
+* Replace SingletonRule with zero-parameter @rules (#7479)
+  `PR #7479 <https://github.com/pantsbuild/pants/pull/7479>`_
+
+* Remove @rule Select syntax (#7477)
+  `PR #7477 <https://github.com/pantsbuild/pants/pull/7477>`_
+
+* Switch to twitter.common 0.3.11 to fix DeprecationWarning when using Pants as a PEX (#7461)
+  `PR #7461 <https://github.com/pantsbuild/pants/pull/7461>`_
+
+New features
+~~~~~~~~~~~~
+
+* A @console_rule for validating source files against regexes. (#7515)
+  `PR #7515 <https://github.com/pantsbuild/pants/pull/7515>`_
+
+* Support JSON and YAML option fromfiles. (#7500)
+  `PR #7500 <https://github.com/pantsbuild/pants/pull/7500>`_
+
+* add a deprecation_start_version argument to warn_or_error() (#7494)
+  `PR #7494 <https://github.com/pantsbuild/pants/pull/7494>`_
+
+* Add more pants run information to the json reporter (#7474)
+  `PR #7474 <https://github.com/pantsbuild/pants/pull/7474>`_
+
+* unrevert go test upgrades to test transitively after fixing issues (#7326)
+  `PR #7326 <https://github.com/pantsbuild/pants/pull/7326>`_
+
+* Improve error message for isort failure in IsortRun (#7462)
+  `PR #7462 <https://github.com/pantsbuild/pants/pull/7462>`_
+
+Bugfixes
+~~~~~~~~
+
+* Increase strictness of type checking for ExecuteProcessRequest args (#7529)
+  `PR #7529 <https://github.com/pantsbuild/pants/pull/7529>`_
+
+* Improve Get errors for unhashable or mismatched types (#7502)
+  `PR #7502 <https://github.com/pantsbuild/pants/pull/7502>`_
+
+* Don't consider strings as collections for TypedCollection (#7521)
+  `PR #7521 <https://github.com/pantsbuild/pants/pull/7521>`_
+
+* Invalidate dependency targets for jvmdoc if --combined. (#7455)
+  `PR #7455 <https://github.com/pantsbuild/pants/pull/7455>`_
+
+* allow python tools to specify a noop predicate and use it for conan (#7498)
+  `PR #7498 <https://github.com/pantsbuild/pants/pull/7498>`_
+
+* Remove console_rule_integration.py from Python 3 CI blacklist (#7466)
+  `PR #7466 <https://github.com/pantsbuild/pants/pull/7466>`_
+
+* Fix flaky `./pants idea-plugin` when using Python 3 by properly using ConsoleTask interface (#7460)
+  `PR #7460 <https://github.com/pantsbuild/pants/pull/7460>`_
+
+* Fix `./pants server` not working with Python 3 (#7458)
+  `PR #7458 <https://github.com/pantsbuild/pants/pull/7458>`_
+
+* Fix crash if pants.ini is missing in the buildroot (#7452)
+  `PR #7452 <https://github.com/pantsbuild/pants/pull/7452>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* fix TestPantsDaemonIntegration.test_signal_pailgun_stream_timeout flakiness (#7533)
+  `PR #7533 <https://github.com/pantsbuild/pants/pull/7533>`_
+
+* Restore cron CI run from #7534 to adjust the time it starts (#7538)
+  `PR #7538 <https://github.com/pantsbuild/pants/pull/7538>`_
+
+* Temporarily turn off cron CI run to adjust the time it starts (#7534)
+  `PR #7534 <https://github.com/pantsbuild/pants/pull/7534>`_
+
+* Label messages of docs-only commits with SKIP_FULL_CI (#7526)
+  `PR #7526 <https://github.com/pantsbuild/pants/pull/7526>`_
+
+* Fuse hydrated and unhydrated Struct parsing (#7523)
+  `PR #7523 <https://github.com/pantsbuild/pants/pull/7523>`_
+
+* Move logging to Rust (#6817)
+  `PR #6817 <https://github.com/pantsbuild/pants/pull/6817>`_
+
+* Run tests in src dirs in ci. (#7524)
+  `PR #7524 <https://github.com/pantsbuild/pants/pull/7524>`_
+
+* avoid running a clean-all in integration tests, which are in a new buildroot (#7522)
+  `PR #7522 <https://github.com/pantsbuild/pants/pull/7522>`_
+
+* make pantsd signal integration tests more reliable by setting the timeout (#7504)
+  `PR #7504 <https://github.com/pantsbuild/pants/pull/7504>`_
+
+* add some comments to the example CI script in orgs.md (#7478)
+  `PR #7478 <https://github.com/pantsbuild/pants/pull/7478>`_
+
+* Pass interpreter constraints to the Pex we release (#7511)
+  `PR #7511 <https://github.com/pantsbuild/pants/pull/7511>`_
+
+* remove pyenv bootstrapping from travis_ci/Dockerfile (#7505)
+  `PR #7505 <https://github.com/pantsbuild/pants/pull/7505>`_
+
+* Improve logging of build-support/isort.sh helper script (#7503)
+  `PR #7503 <https://github.com/pantsbuild/pants/pull/7503>`_
+
+* Tweak Pytest logging in CI for less overwhelming logging of successful tests (#7501)
+  `PR #7501 <https://github.com/pantsbuild/pants/pull/7501>`_
+
+* Install Python 2.7 and 3.6 on Centos6 base image through Pyenv (#7064)
+  `PR #7064 <https://github.com/pantsbuild/pants/pull/7064>`_
+
+* Add a basic test for pantsd memory leaks. (#7488)
+  `PR #7488 <https://github.com/pantsbuild/pants/pull/7488>`_
+
+* convert --skip to --strict in py thrift namespace clash check task (#7493)
+  `PR #7493 <https://github.com/pantsbuild/pants/pull/7493>`_
+
+* Ensure Python 3.6 or 3.7 is installed on all CI shards (#7483)
+  `PR #7483 <https://github.com/pantsbuild/pants/pull/7483>`_
+
+* Prepare Linux UCS2 shard for upgrade to Centos6 base image in #7064 (#7418)
+  `PR #7418 <https://github.com/pantsbuild/pants/pull/7418>`_
+
+* Cache AWS CLI install in CI (#7472)
+  `PR #7472 <https://github.com/pantsbuild/pants/pull/7472>`_
+
+* Remove StatsDb / Timing stats views (#7475)
+  `PR #7475 <https://github.com/pantsbuild/pants/pull/7475>`_
+
+* Cache pyenv in CI (#7470)
+  `PR #7470 <https://github.com/pantsbuild/pants/pull/7470>`_
+
+* Consolidate JSON stats recording in RunTracker (#7446)
+  `PR #7446 <https://github.com/pantsbuild/pants/pull/7446>`_
+
+* Fix issues with deploy shards not properly setting Python version (#7471)
+  `PR #7471 <https://github.com/pantsbuild/pants/pull/7471>`_
+
+* No longer pin `pants_runtime_python_version` with `./pants generate-pants-ini` (#7469)
+  `PR #7469 <https://github.com/pantsbuild/pants/pull/7469>`_
+  `PR #49 <https://github.com/pantsbuild/setup/pull/49>`_
+
+* Remove Python 3 CI blacklist mechanism (#7468)
+  `PR #7468 <https://github.com/pantsbuild/pants/pull/7468>`_
+
+* Remove backend/python/tasks tests from Python 3 CI blacklist and refactor their BUILD entries to be more granular (#7463)
+  `PR #7463 <https://github.com/pantsbuild/pants/pull/7463>`_
+
+* Fix typo from #7424 to properly fix TensorFlow test during Python 3.7 cron job (#7464)
+  `PR #7464 <https://github.com/pantsbuild/pants/pull/7464>`_
+
+* hack default compiler option sets to fix tensorflow 1.13.1 on python 3.7 (#7424)
+  `PR #7424 <https://github.com/pantsbuild/pants/pull/7424>`_
+
+
+1.16.0.dev0 (3/29/2019)
+-----------------------
+
+New features
+~~~~~~~~~~~~
+
+* Add `./pants generate-pants-ini` for first time users to generate pants.ini with sensible defaults (#7448)
+  `PR #7448 <https://github.com/pantsbuild/pants/pull/7448>`_
+
+* Allow alternate nodejs binaries (#7405)
+  `PR #7405 <https://github.com/pantsbuild/pants/pull/7405>`_
+
+* Add JSON Reporter for more detailed workunit stats (#7392)
+  `PR #7392 <https://github.com/pantsbuild/pants/pull/7392>`_
+
+* Collect Zipkin spans for v2 engine (#7342)
+  `PR #7342 <https://github.com/pantsbuild/pants/pull/7342>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Revert unnecessary runtime check for valid Python interpreter (#7451)
+  `PR #7451 <https://github.com/pantsbuild/pants/pull/7451>`_
+
+* Make abstract classproperty error message nicer (#7429)
+  `PR #7429 <https://github.com/pantsbuild/pants/pull/7429>`_
+
+* remove inspect.stack() from @rule parsing to fix import time regression in py3 (#7447)
+  `PR #7447 <https://github.com/pantsbuild/pants/pull/7447>`_
+
+* Just ignore source arg (with a comment) (#7430)
+  `PR #7430 <https://github.com/pantsbuild/pants/pull/7430>`_
+
+* Cache resolution of Node targets via fingerprinting lockfiles. (#7414)
+  `PR #7414 <https://github.com/pantsbuild/pants/pull/7414>`_
+
+* Handle signals gracefully (#6574)
+  `PR #6574 <https://github.com/pantsbuild/pants/pull/6574>`_
+
+* Fix resolve test failing on Python 3.7 due to test using outdated cffi version (#7413)
+  `PR #7413 <https://github.com/pantsbuild/pants/pull/7413>`_
+
+* Loosen constraints for TensorFlow used in example code to work with Python 3.7 (#7410)
+  `PR #7410 <https://github.com/pantsbuild/pants/pull/7410>`_
+
+* Allow usage of pants2 script from other directories (#7409)
+  `PR #7409 <https://github.com/pantsbuild/pants/pull/7409>`_
+
+* Specify the python version to use in the unstable pex deploy shard. (#7411)
+  `PR #7411 <https://github.com/pantsbuild/pants/pull/7411>`_
+
+* Bump default MyPy version to 0.670 (#7407)
+  `PR #7407 <https://github.com/pantsbuild/pants/pull/7407>`_
+
+* Release pants as both a Python 2.7 PEX and a Python 3.6 PEX (#7401)
+  `PR #7401 <https://github.com/pantsbuild/pants/pull/7401>`_
+
+* add a non-numeric prefix before the unstable version to avoid getting parsed and truncated as a number (#7400)
+  `PR #7400 <https://github.com/pantsbuild/pants/pull/7400>`_
+
+* Refactor travis.yml to deduplicate Pyenv and AWS pex code (#7397)
+  `PR #7397 <https://github.com/pantsbuild/pants/pull/7397>`_
+
+Bugfixes
+~~~~~~~~
+
+* nailgun connect timeout error message fix (#7437)
+  `PR #7437 <https://github.com/pantsbuild/pants/pull/7437>`_
+
+* Add Python 3.7 tests to nightly cron CI run (#7261)
+  `PR #7261 <https://github.com/pantsbuild/pants/pull/7261>`_
+
+* Better message on tool interpreter selection failure. (#7438)
+  `PR #7438 <https://github.com/pantsbuild/pants/pull/7438>`_
+
+* fix for pantsrc-files option (#7427)
+  `PR #7427 <https://github.com/pantsbuild/pants/pull/7427>`_
+
+* Move with_overwritten_file_context to PantsRunIntegrationTest (#7408)
+  `PR #7408 <https://github.com/pantsbuild/pants/pull/7408>`_
+
+* Fix locale test failing on Python 3.7 due to forced UTF-8 mode (#7412)
+  `PR #7412 <https://github.com/pantsbuild/pants/pull/7412>`_
+
+* Simplify glob matching and directly match in-memory globs as Patterns. (#7402)
+  `PR #7402 <https://github.com/pantsbuild/pants/pull/7402>`_
+
+* Allow reporters to see the correct end_time for a workunit (#7389)
+  `PR #7389 <https://github.com/pantsbuild/pants/pull/7389>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Document pantsd startup and Pailgun behaviours (#7376)
+  `PR #7376 <https://github.com/pantsbuild/pants/pull/7376>`_
+
+* Explain in contributing doc that macOS users must brew install OpenSSL (#7396)
+  `PR #7396 <https://github.com/pantsbuild/pants/pull/7396>`_
+
 
 1.15.0rc0 (3/18/2019)
 ---------------------

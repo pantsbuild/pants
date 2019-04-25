@@ -6,8 +6,7 @@ use std::io;
 
 use itertools::Itertools;
 
-use crate::core::{Key, Params, TypeId};
-use crate::externs;
+use crate::core::{Params, TypeId};
 use crate::selectors::{Get, Select};
 use crate::tasks::{Intrinsic, Task, Tasks};
 
@@ -116,7 +115,6 @@ impl EntryWithDeps {
 pub enum Entry {
   Param(TypeId),
   WithDeps(EntryWithDeps),
-  Singleton(Key, TypeId),
 }
 
 impl Entry {
@@ -124,7 +122,6 @@ impl Entry {
     match self {
       &Entry::WithDeps(ref e) => e.params().iter().cloned().collect(),
       &Entry::Param(ref type_id) => vec![*type_id],
-      &Entry::Singleton { .. } => vec![],
     }
   }
 }
@@ -192,7 +189,7 @@ impl Diagnostic {
     Diagnostic {
       params: available_params.clone(),
       reason: format!(
-        "ambiguous rules for {}{}{}",
+        "Ambiguous rules to compute {}{}{}",
         select_key_str(&key),
         params_clause,
         params_str(&available_params),
@@ -293,7 +290,7 @@ impl<'t> GraphMaker<'t> {
       .collect();
     let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules
       .keys()
-      .filter_map(|f| f.task_rule())
+      .filter_map(EntryWithDeps::task_rule)
       .cloned()
       .collect();
     self
@@ -454,9 +451,6 @@ impl<'t> GraphMaker<'t> {
           },
           p @ Entry::Param(_) => {
             fulfillable_candidates.push(vec![p]);
-          }
-          s @ Entry::Singleton { .. } => {
-            fulfillable_candidates.push(vec![s]);
           }
         };
       }
@@ -682,16 +676,10 @@ impl<'t> GraphMaker<'t> {
       return vec![];
     }
 
-    // Prefer a Singleton, then a Param, then the non-ambiguous rule with the smallest set of
-    // input Params.
+    // Prefer a Param, then the non-ambiguous rule with the smallest set of input Params.
     // TODO: We should likely prefer Rules to Params.
     if satisfiable_entries.len() == 1 {
       satisfiable_entries
-    } else if let Some(singleton) = satisfiable_entries.iter().find(|e| match e {
-      &Entry::Singleton { .. } => true,
-      _ => false,
-    }) {
-      vec![*singleton]
     } else if let Some(param) = satisfiable_entries.iter().find(|e| match e {
       &Entry::Param(_) => true,
       _ => false,
@@ -792,13 +780,13 @@ pub fn params_str(params: &ParamTypes) -> String {
 
 pub fn select_key_str(select_key: &SelectKey) -> String {
   match select_key {
-    &SelectKey::JustSelect(ref s) => select_str(s),
+    &SelectKey::JustSelect(ref s) => s.product.to_string(),
     &SelectKey::JustGet(ref g) => get_str(g),
   }
 }
 
-pub fn select_str(select: &Select) -> String {
-  format!("Select({})", select.product).to_string() // TODO variant key
+pub fn select_root_str(select: &Select) -> String {
+  format!("Select({})", select.product)
 }
 
 fn get_str(get: &Get) -> String {
@@ -812,9 +800,6 @@ pub fn entry_str(entry: &Entry) -> String {
   match entry {
     &Entry::WithDeps(ref e) => entry_with_deps_str(e),
     &Entry::Param(type_id) => format!("Param({})", type_id),
-    &Entry::Singleton(value, product) => {
-      format!("Singleton({}, {})", externs::key_to_str(&value), product)
-    }
   }
 }
 
@@ -828,7 +813,7 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
       rule: Rule::Intrinsic(ref intrinsic),
       ref params,
     }) => format!(
-      "({}, ({},) for {}",
+      "({}, [{}], <intrinsic>) for {}",
       intrinsic.product,
       intrinsic.input,
       params_str(params)
@@ -838,7 +823,7 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
       root
         .clause
         .iter()
-        .map(|s| select_str(s))
+        .map(|s| select_root_str(s))
         .collect::<Vec<_>>()
         .join(", "),
       params_str(&root.params)
@@ -851,7 +836,7 @@ fn task_display(task: &Task) -> String {
   let mut clause_portion = task
     .clause
     .iter()
-    .map(|c| select_str(c))
+    .map(|c| c.product.to_string())
     .collect::<Vec<_>>()
     .join(", ");
   clause_portion = format!("[{}]", clause_portion);
@@ -915,7 +900,7 @@ impl RuleGraph {
       1 => Ok(subset_matches[0].1.clone()),
       0 => Err(format!(
         "No installed @rules can satisfy {} for input Params({}).",
-        select_str(&select),
+        select_root_str(&select),
         params_str(&params),
       )),
       _ => {
@@ -925,7 +910,7 @@ impl RuleGraph {
           .collect::<Vec<_>>();
         Err(format!(
           "More than one set of @rules can satisfy {} for input Params({}):\n  {}",
-          select_str(&select),
+          select_root_str(&select),
           params_str(&params),
           match_strs.join("\n  "),
         ))
@@ -1116,10 +1101,6 @@ impl RuleEdges {
 /// Select Entries that can provide the given product type with the given parameters.
 ///
 fn rhs(tasks: &Tasks, params: &ParamTypes, product_type: TypeId) -> Vec<Entry> {
-  if let Some(&(ref key, _)) = tasks.gen_singleton(product_type) {
-    return vec![Entry::Singleton(*key, product_type)];
-  }
-
   let mut entries = Vec::new();
   // If the params can provide the type directly, add that.
   if let Some(type_id) = params.get(&product_type) {
