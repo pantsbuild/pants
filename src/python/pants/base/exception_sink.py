@@ -51,26 +51,30 @@ class SignalHandler(object):
 
   def __init__(self):
     self._ignore_sigint_lock = threading.Lock()
-    self._ignore_sigint = False
+    self._ignore_sigint = 0
+
+  def _check_sigint_gate_is_correct(self):
+    assert self._ignore_sigint >= 0, \
+      "This should never happen, someone must have modified the counter outside of SignalHandler."
 
   def _handle_sigint_if_enabled(self, signum, _frame):
-    self._ignore_sigint_lock.acquire()
-    should_ignore_sigint = self._ignore_sigint
-    self._ignore_sigint_lock.release()
-    if not should_ignore_sigint:
+    with self._ignore_sigint_lock:
+      self._check_sigint_gate_is_correct()
+      should_ignore_sigint = self._ignore_sigint
+    if should_ignore_sigint == 0:
       self.handle_sigint(signum, _frame)
 
   @contextmanager
   def ignoring_sigint(self):
-    self._ignore_sigint_lock.acquire()
-    self._ignore_sigint = True
-    self._ignore_sigint_lock.release()
+    with self._ignore_sigint_lock:
+      self._check_sigint_gate_is_correct()
+      self._ignore_sigint += 1
     try:
       yield
     finally:
-      self._ignore_sigint_lock.acquire()
-      self._ignore_sigint = False
-      self._ignore_sigint_lock.release()
+      with self._ignore_sigint_lock:
+        self._ignore_sigint -= 1
+        self._check_sigint_gate_is_correct()
 
   def handle_sigint(self, signum, _frame):
     raise KeyboardInterrupt('User interrupted execution with control-c!')
