@@ -269,7 +269,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   def synthetic_target_extra_exports(self, target, target_workdir):
     dep_info = self._resolved_export_info
-    target_declares_service = any(self._declares_service(source)
+    target_declares_service = any(self._declares_service(source) # or self._declares_exception(source)
                                   for source in target.sources_relative_to_buildroot())
     language = self._thrift_defaults.language(target)
 

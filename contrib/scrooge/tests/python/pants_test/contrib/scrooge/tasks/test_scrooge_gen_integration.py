@@ -108,3 +108,8 @@ class ScroogeGenTest(PantsRunIntegrationTest):
     cmd = ['gen', self.thrift_test_target('include-paths-thrift')]
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
+    
+  def test_service_exports(self):
+    # scrooge_gen should export anything listed in the service_exports
+    target = self.make_target()
+    cmd = ['compile', '']
