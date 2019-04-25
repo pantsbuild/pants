@@ -111,5 +111,56 @@ class ScroogeGenTest(PantsRunIntegrationTest):
     
   def test_service_exports(self):
     # scrooge_gen should export anything listed in the service_exports
-    target = self.make_target()
-    cmd = ['compile', '']
+    updated_scrooge_config = {
+      'gen.scrooge': {
+        'service_deps': {
+          'java': [
+            '3rdparty:slf4j-api',
+            '3rdparty:thrift',
+            '3rdparty/jvm/com/twitter:finagle-thrift',
+            '3rdparty/jvm/com/twitter:scrooge-core',
+          ],
+          'scala': [
+            '3rdparty:thrift',
+            '3rdparty/jvm/com/twitter:finagle-thrift',
+            '3rdparty/jvm/com/twitter:scrooge-core',
+            'examples/src/scala/org/pantsbuild/example/scala_with_java_sources',
+          ],
+        },
+        'service_exports': {
+          'java': [
+            '3rdparty:thrift',
+          ],
+          'scala': [
+            '3rdparty:thrift',
+            '3rdparty/jvm/com/twitter:finagle-thrift',
+            '3rdparty/jvm/com/twitter:scrooge-core',
+            'examples/src/scala/org/pantsbuild/example/scala_with_java_sources',
+          ]
+        },
+        'structs_deps': {
+          'java': [
+            '3rdparty:thrift',
+            '3rdparty/jvm/com/twitter:scrooge-core',
+          ],
+          'scala': [
+            '3rdparty:thrift',
+            '3rdparty/jvm/com/twitter:scrooge-core',
+          ],
+        },
+        'structs_exports': {
+          'java': [
+            '3rdparty:thrift',
+            '3rdparty/jvm/com/twitter:scrooge-core',
+          ],
+          'scala': [
+            '3rdparty:thrift',
+            '3rdparty/jvm/com/twitter:scrooge-core',
+          ],
+        }
+      }
+    }
+
+    cmd = ['compile', 'contrib/scrooge/tests/scala/org/pantsbuild/contrib/scrooge/scrooge_gen/service_export_example']
+    pants_run = self.run_pants(cmd, config=updated_scrooge_config)
+    self.assert_success(pants_run)
