@@ -328,7 +328,6 @@ class DaemonPantsRunner(ProcessManager):
         # Re-raise any deferred exceptions, if present.
         self._raise_deferred_exc()
         bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
-        setup_logging_from_options(bootstrap_options)
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner.create(
           NoopExiter(),

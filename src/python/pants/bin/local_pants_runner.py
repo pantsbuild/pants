@@ -16,6 +16,7 @@ from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer
+from pants.init.logging import setup_logging_from_options
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.repro import Reproducer
 from pants.init.target_roots_calculator import TargetRootsCalculator
@@ -138,6 +139,7 @@ class LocalPantsRunner(object):
       options_bootstrapper=options_bootstrapper,
     )
     global_options = options.for_global_scope()
+    setup_logging_from_options(global_options)
 
     # Option values are usually computed lazily on demand,
     # but command line options are eagerly computed for validation.
