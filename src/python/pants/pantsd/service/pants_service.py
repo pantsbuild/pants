@@ -94,15 +94,6 @@ class PantsService(AbstractClass):
     """
     self._state.mark_terminating()
 
-  def record_exception(self, exception):
-    """Record an exception to be raised later.
-    Subclasses may override this to record it however they please."""
-
-  def raise_deferred_exceptions(self):
-    """Raise the recorded exceptions, if any."""
-    if self._deferred_exception:
-      raise self._deferred_exception
-
 
 class _ServiceState(object):
   """A threadsafe state machine for controlling a service running in another thread.
