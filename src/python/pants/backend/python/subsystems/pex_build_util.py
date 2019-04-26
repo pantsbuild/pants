@@ -55,14 +55,24 @@ def has_python_requirements(tgt):
   return isinstance(tgt, PythonRequirementLibrary)
 
 
-def can_have_python_platform(tgt):
+def always_uses_default_python_platform(tgt):
+  return isinstance(tgt, PythonTests)
+
+
+def may_have_explicit_python_platform(tgt):
   return isinstance(tgt, (PythonBinary, PythonDistribution))
 
 
 def targets_by_platform(targets, python_setup):
   d = defaultdict(OrderedSet)
   for target in targets:
-    if can_have_python_platform(target):
+    if always_uses_default_python_platform(target):
+       # There are currently no tests for this because they're super platform specific and it's hard
+       # for us to express that on CI, but https://github.com/pantsbuild/pants/issues/7616 has an
+       # excellent repro case for why this is necessary.
+      for platform in python_setup.platforms:
+        d[platform].add(target)
+    elif may_have_explicit_python_platform(target):
       for platform in target.platforms if target.platforms else python_setup.platforms:
         d[platform].add(target)
   return d
