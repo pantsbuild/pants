@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
+use std::convert::TryInto;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
@@ -13,7 +14,7 @@ use futures::Future;
 
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
-use crate::nodes::{NodeKey, TryInto, WrappedNode};
+use crate::nodes::{NodeKey, WrappedNode};
 use crate::rule_graph::RuleGraph;
 use crate::scheduler::Session;
 use crate::tasks::Tasks;

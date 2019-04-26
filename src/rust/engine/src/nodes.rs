@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashMap};
+use std::convert::TryFrom;
 use std::fmt::Display;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -1186,39 +1187,8 @@ impl From<Arc<DirectoryListing>> for NodeResult {
   }
 }
 
-// TODO: These traits exist in the stdlib, but are marked unstable.
-//   see https://github.com/rust-lang/rust/issues/33417
-pub trait TryFrom<T>: Sized {
-  type Err;
-  fn try_from(t: T) -> Result<Self, Self::Err>;
-}
-
-pub trait TryInto<T>: Sized {
-  type Err;
-  fn try_into(self) -> Result<T, Self::Err>;
-}
-
-impl<T, U> TryInto<U> for T
-where
-  U: TryFrom<T>,
-{
-  type Err = U::Err;
-
-  fn try_into(self) -> Result<U, U::Err> {
-    U::try_from(self)
-  }
-}
-
-impl TryFrom<NodeResult> for NodeResult {
-  type Err = ();
-
-  fn try_from(nr: NodeResult) -> Result<Self, ()> {
-    Ok(nr)
-  }
-}
-
 impl TryFrom<NodeResult> for Value {
-  type Err = ();
+  type Error = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
@@ -1229,7 +1199,7 @@ impl TryFrom<NodeResult> for Value {
 }
 
 impl TryFrom<NodeResult> for Arc<fs::Snapshot> {
-  type Err = ();
+  type Error = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
@@ -1240,7 +1210,7 @@ impl TryFrom<NodeResult> for Arc<fs::Snapshot> {
 }
 
 impl TryFrom<NodeResult> for hashing::Digest {
-  type Err = ();
+  type Error = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
@@ -1251,7 +1221,7 @@ impl TryFrom<NodeResult> for hashing::Digest {
 }
 
 impl TryFrom<NodeResult> for ProcessResult {
-  type Err = ();
+  type Error = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
@@ -1262,7 +1232,7 @@ impl TryFrom<NodeResult> for ProcessResult {
 }
 
 impl TryFrom<NodeResult> for LinkDest {
-  type Err = ();
+  type Error = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
@@ -1273,7 +1243,7 @@ impl TryFrom<NodeResult> for LinkDest {
 }
 
 impl TryFrom<NodeResult> for Arc<DirectoryListing> {
-  type Err = ();
+  type Error = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
