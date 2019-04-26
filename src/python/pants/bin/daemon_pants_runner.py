@@ -21,7 +21,7 @@ from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.logging import encapsulated_global_logger, setup_logging_from_options
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
-from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
@@ -49,7 +49,7 @@ def write_to_file(msg):
 class NoopExiter(Exiter):
   def exit(self, result, *args, **kwargs):
     if result != 0:
-      write_to_file("LPR, Exiting with code {}!".format(result))
+      # TODO this exception was not designed for this, but it happens to do what we want.
       raise _GracefulTerminationException(result)
 
 
@@ -59,12 +59,12 @@ class DaemonExiter(Exiter):
   TODO: This no longer really follows the Exiter API, per-se (or at least, it doesn't call super).
   """
 
-  def __init__(self, socket):
+  def __init__(self, maybe_shutdown_socket):
     # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
     # sys.exit behavior.
     # TODO: The behavior we're avoiding with the use of os._exit should be described and tested.
     super(DaemonExiter, self).__init__(exiter=os._exit)
-    self._socket = socket
+    self._maybe_shutdown_socket = maybe_shutdown_socket
     self._finalizer = None
 
   def set_finalizer(self, finalizer):
@@ -78,24 +78,28 @@ class DaemonExiter(Exiter):
         self._finalizer()
       except Exception as e:
         try:
-          NailgunProtocol.send_stderr(
-            self._socket,
-            '\nUnexpected exception in finalizer: {!r}\n'.format(e)
-          )
+          with self._maybe_shutdown_socket.lock:
+            NailgunProtocol.send_stderr(
+              self._maybe_shutdown_socket.socket,
+              '\nUnexpected exception in finalizer: {!r}\n'.format(e)
+            )
         except Exception:
           pass
 
     write_to_file("DPR, Exiting with code {} and msg {}".format(result, msg))
 
-    # Write a final message to stderr if present.
-    if msg:
-      NailgunProtocol.send_stderr(self._socket, msg)
+    with self._maybe_shutdown_socket.lock:
+      # Write a final message to stderr if present.
+      if msg:
+        NailgunProtocol.send_stderr(self._maybe_shutdown_socket.socket, msg)
 
-    # Send an Exit chunk with the result.
-    NailgunProtocol.send_exit_with_code(self._socket, result)
+      # Send an Exit chunk with the result.
+      # This will cause the client to disconnect from the socket.
+      NailgunProtocol.send_exit_with_code(self._maybe_shutdown_socket.socket, result)
 
-    # Shutdown the connected socket.
-    teardown_socket(self._socket)
+      # Shutdown the connected socket.
+      teardown_socket(self._maybe_shutdown_socket.socket)
+      self._maybe_shutdown_socket.is_shutdown = True
 
 
 class _GracefulTerminationException(Exception):
@@ -131,11 +135,13 @@ class DaemonPantsRunner(ProcessManager):
 
   @classmethod
   def create(cls, sock, args, env, services, scheduler_service):
+    maybe_shutdown_socket = MaybeShutdownSocket(sock)
+
     try:
       # N.B. This will temporarily redirect stdio in the daemon's pre-fork context
       # to the nailgun session. We'll later do this a second time post-fork, because
       # threads.
-      with cls.nailgunned_stdio(sock, env, handle_stdin=False):
+      with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False):
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
         subprocess_dir = options.for_global_scope().pants_subprocessdir
         graph_helper, target_roots, exit_code = scheduler_service.prefork(options, options_bootstrapper)
@@ -151,7 +157,7 @@ class DaemonPantsRunner(ProcessManager):
       subprocess_dir = os.path.join(get_buildroot(), '.pids')
 
     return cls(
-      sock,
+      maybe_shutdown_socket,
       args,
       env,
       graph_helper,
@@ -162,7 +168,7 @@ class DaemonPantsRunner(ProcessManager):
       deferred_exc
     )
 
-  def __init__(self, socket, args, env, graph_helper, target_roots, services,
+  def __init__(self, maybe_shutdown_socket, args, env, graph_helper, target_roots, services,
                metadata_base_dir, options_bootstrapper, deferred_exc):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
@@ -182,7 +188,7 @@ class DaemonPantsRunner(ProcessManager):
       name=self._make_identity(),
       metadata_base_dir=metadata_base_dir
     )
-    self._socket = socket
+    self._maybe_shutdown_socket = maybe_shutdown_socket
     self._args = args
     self._env = env
     self._graph_helper = graph_helper
@@ -191,7 +197,7 @@ class DaemonPantsRunner(ProcessManager):
     self._options_bootstrapper = options_bootstrapper
     self._deferred_exception = deferred_exc
 
-    self._exiter = DaemonExiter(socket)
+    self._exiter = DaemonExiter(maybe_shutdown_socket)
 
   def _make_identity(self):
     """Generate a ProcessManager identity for a given pants run.
@@ -224,7 +230,7 @@ class DaemonPantsRunner(ProcessManager):
 
   @classmethod
   @contextmanager
-  def _pipe_stdio(cls, sock, stdin_isatty, stdout_isatty, stderr_isatty, handle_stdin):
+  def _pipe_stdio(cls, maybe_shutdown_socket, stdin_isatty, stdout_isatty, stderr_isatty, handle_stdin):
     """Handles stdio redirection in the case of pipes and/or mixed pipes and ttys."""
     stdio_writers = (
       (ChunkType.STDOUT, stdout_isatty),
@@ -238,26 +244,30 @@ class DaemonPantsRunner(ProcessManager):
         # TODO: Launching this thread pre-fork to handle @rule input currently results
         # in an unhandled SIGILL in `src/python/pants/engine/scheduler.py, line 313 in pre_fork`.
         # More work to be done here in https://github.com/pantsbuild/pants/issues/6005
-        with NailgunStreamStdinReader.open(sock, stdin_isatty) as fd:
+        with NailgunStreamStdinReader.open(maybe_shutdown_socket, stdin_isatty) as fd:
           yield fd
       else:
         with open('/dev/null', 'rb') as fh:
           yield fh.fileno()
 
+    # The NailgunStreamWriter probably shouldn't grab the socket without a lock...
     with maybe_handle_stdin(handle_stdin) as stdin_fd,\
-         NailgunStreamWriter.open_multi(sock, types, ttys) as ((stdout_fd, stderr_fd), writer),\
-         stdio_as(stdout_fd=stdout_fd, stderr_fd=stderr_fd, stdin_fd=stdin_fd):
+      NailgunStreamWriter.open_multi(maybe_shutdown_socket.socket, types, ttys) as ((stdout_fd, stderr_fd), writer),\
+      stdio_as(stdout_fd=stdout_fd, stderr_fd=stderr_fd, stdin_fd=stdin_fd):
       # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
       # exit chunk, to avoid any socket shutdown vs write races.
       stdout, stderr = sys.stdout, sys.stderr
       def finalizer():
+        write_to_file("_pipe_stdio, enter finalizer")
         try:
           stdout.flush()
           stderr.flush()
         finally:
           time.sleep(.001)  # HACK: Sleep 1ms in the main thread to free the GIL.
           writer.stop()
+          write_to_file("_pipe_stdio, before writer.join()")
           writer.join()
+          write_to_file("_pipe_stdio, after writer.join()")
           stdout.close()
           stderr.close()
       yield finalizer
@@ -282,6 +292,7 @@ class DaemonPantsRunner(ProcessManager):
         handle_stdin
       ) as finalizer:
         yield finalizer
+      write_to_file("DPR, nailgunned_stdio after yielding the finalizer")
 
   # TODO: there's no testing for this method, and this caused a user-visible failure -- see #7008!
   def _raise_deferred_exc(self):
@@ -311,11 +322,12 @@ class DaemonPantsRunner(ProcessManager):
 
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
     # they can send signals (e.g. SIGINT) to all processes in the runners process group.
-    NailgunProtocol.send_pid(self._socket, os.getpid())
-    NailgunProtocol.send_pgrp(self._socket, os.getpgrp() * -1)
+    with self._maybe_shutdown_socket.lock:
+      NailgunProtocol.send_pid(self._maybe_shutdown_socket.socket, os.getpid())
+      NailgunProtocol.send_pgrp(self._maybe_shutdown_socket.socket, os.getpgrp() * -1)
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
-    with self.nailgunned_stdio(self._socket, self._env) as finalizer, \
+    with self.nailgunned_stdio(self._maybe_shutdown_socket, self._env) as finalizer, \
       hermetic_environment_as(**self._env), \
       encapsulated_global_logger():
       try:

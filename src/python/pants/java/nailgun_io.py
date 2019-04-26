@@ -84,19 +84,19 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
   Runs until the socket is closed.
   """
 
-  def __init__(self, sock, write_handle):
+  def __init__(self, maybe_shutdown_socket, write_handle):
     """
     :param socket sock: the socket to read nailgun protocol chunks from.
     :param file write_handle: A file-like (usually the write end of a pipe/pty) onto which
       to write data decoded from the chunks.
     """
     super(NailgunStreamStdinReader, self).__init__(name=self.__class__.__name__)
-    self._socket = sock
+    self._maybe_shutdown_socket = maybe_shutdown_socket
     self._write_handle = write_handle
 
   @classmethod
   @contextmanager
-  def open(cls, sock, isatty=False):
+  def open(cls, maybe_shutdown_socket, isatty=False):
     # We use a plain pipe here (as opposed to a self-closing pipe), because
     # NailgunStreamStdinReader will close the file descriptor it's writing to when it's done.
     # Therefore, when _self_closing_pipe tries to clean up, it will try to close an already closed fd.
@@ -104,10 +104,11 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
     # _self_closing_pipe doens't close the write_fd until the pants run is done, and that generates
     # issues around piping stdin to interactive processes such as REPLs.
     with _pipe(isatty) as (read_fd, write_fd):
-      reader = NailgunStreamStdinReader(sock, os.fdopen(os.dup(write_fd), 'wb'))
+      reader = NailgunStreamStdinReader(maybe_shutdown_socket, os.fdopen(write_fd, 'wb'))
       with reader.running():
         # Instruct the thin client to begin reading and sending stdin.
-        NailgunProtocol.send_start_reading_input(sock)
+        with maybe_shutdown_socket.lock:
+          NailgunProtocol.send_start_reading_input(maybe_shutdown_socket.socket)
         try:
           yield read_fd
         finally:
@@ -115,9 +116,12 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
       write_to_file("BL: after reader.running()")
     write_to_file("BL: after _pipe()")
 
+  # TODO: The error is that when the client finishes (and presumably closes the socket),
+  # the server might still want to read stdin, since this is in another thread.
+
   def run(self):
     try:
-      for chunk_type, payload in NailgunProtocol.iter_chunks(self._socket, return_bytes=True):
+      for chunk_type, payload in NailgunProtocol.iter_chunks(self._maybe_shutdown_socket, return_bytes=True):
         if self.is_stopped:
           return
 
@@ -157,6 +161,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
     """
     super(NailgunStreamWriter, self).__init__(name=self.__class__.__name__)
     # Validates that we've received file descriptor numbers.
+    write_to_file("NSW(in_fds = {}, socket = {})".format(in_fds, sock))
     self._in_fds = [int(f) for f in in_fds]
     self._socket = sock
     self._chunk_eof_type = chunk_eof_type
@@ -214,10 +219,12 @@ class NailgunStreamWriter(_StoppableDaemonThread):
       if readable:
         for fileno in readable:
           data = os.read(fileno, self._buf_size)
+          # write_to_file("NSW, read data from stdin (fd={}) {}".format(fileno, data))
 
           if not data:
             # We've reached EOF.
             try:
+              write_to_file("NSW, We have reached EOF, chunk type is {}".format(self._chunk_eof_type))
               if self._chunk_eof_type is not None:
                 NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
             finally:
