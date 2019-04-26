@@ -16,14 +16,29 @@ from contextlib2 import ExitStack
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
+def write_to_file(msg):
+  with open('/tmp/logs', 'a') as f:
+    f.write('{}\n'.format(msg))
+
+
 @contextmanager
 def _pipe(isatty):
   r_fd, w_fd = os.openpty() if isatty else os.pipe()
-  try:
-    yield (r_fd, w_fd)
-  finally:
-    os.close(r_fd)
-    os.close(w_fd)
+  write_to_file("BL: _pipe(isatty = {}, r_fd = {}, w_fd = {})".format(isatty, r_fd, w_fd))
+  yield (r_fd, w_fd)
+
+
+@contextmanager
+def _self_closing_pipe(isatty):
+  with _pipe(isatty) as (r_fd, w_fd):
+    try:
+      yield (r_fd, w_fd)
+    finally:
+      os.close(r_fd)
+      write_to_file("BL: _self_closing_pipe, after os.close(r_fd), r_fd = {}".format(r_fd))
+      write_to_file("BL: _self_closing_pipe, before os.close(w_fd), w_fd = {}".format(w_fd))
+      os.close(w_fd)
+      write_to_file("BL: _self_closing_pipe, after os.close(w_fd), w_fd = {}".format(w_fd))
 
 
 class _StoppableDaemonThread(threading.Thread):
@@ -82,12 +97,23 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
   @classmethod
   @contextmanager
   def open(cls, sock, isatty=False):
+    # We use a plain pipe here (as opposed to a self-closing pipe), because
+    # NailgunStreamStdinReader will close the file descriptor it's writing to when it's done.
+    # Therefore, when _self_closing_pipe tries to clean up, it will try to close an already closed fd.
+    # The alternative is passing an os.dup(write_fd) to NSSR, but then we have the problem where
+    # _self_closing_pipe doens't close the write_fd until the pants run is done, and that generates
+    # issues around piping stdin to interactive processes such as REPLs.
     with _pipe(isatty) as (read_fd, write_fd):
       reader = NailgunStreamStdinReader(sock, os.fdopen(os.dup(write_fd), 'wb'))
       with reader.running():
         # Instruct the thin client to begin reading and sending stdin.
         NailgunProtocol.send_start_reading_input(sock)
-        yield read_fd
+        try:
+          yield read_fd
+        finally:
+          os.close(read_fd)
+      write_to_file("BL: after reader.running()")
+    write_to_file("BL: after _pipe()")
 
   def run(self):
     try:
@@ -162,11 +188,13 @@ class NailgunStreamWriter(_StoppableDaemonThread):
     """Yields the write sides of pipes that will copy appropriately chunked values to the socket."""
     cls._assert_aligned(chunk_types, isattys)
 
+    write_to_file("NSW.open_multi(sock = {}, isattys = {})".format(sock, isattys))
+
     # N.B. This is purely to permit safe handling of a dynamic number of contextmanagers.
     with ExitStack() as stack:
       read_fds, write_fds = list(zip(
         # Allocate one pipe pair per chunk type provided.
-        *(stack.enter_context(_pipe(isatty)) for isatty in isattys)
+        *(stack.enter_context(_self_closing_pipe(isatty)) for isatty in isattys)
       ))
       writer = NailgunStreamWriter(
         read_fds,
