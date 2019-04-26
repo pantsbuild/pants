@@ -74,7 +74,7 @@ class ScaladocGen(JvmdocGen):
     # - The total length of the command must be less than the OS's `getconf ARG_MAX`
     #   value.
     #
-    #   This value will vary by system. For exmaple, on my MacOS 10.13.6 Twitter-issued
+    #   This value will vary by system. For example, on my MacOS 10.13.6 Twitter-issued
     #   developer laptop this value is currently 262144. Doing some research on the
     #   internet shows a wide range of default values for this ranging from 131072 to
     #   2097152 (2MB). Unfortunately, there doesn't seem to be an easy way to query the
