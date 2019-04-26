@@ -9,6 +9,7 @@ import os
 import shutil
 from builtins import str
 from collections import defaultdict
+from textwrap import dedent
 
 from pex.interpreter import PythonInterpreter
 
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: Move under subsystems/ .
 class PythonInterpreterCache(Subsystem):
-  """Finds python interpreters on the local system."""
+  """Finds Python interpreters on the local system."""
   options_scope = 'python-interpreter-cache'
 
   @classmethod
@@ -34,7 +35,7 @@ class PythonInterpreterCache(Subsystem):
     return super(PythonInterpreterCache, cls).subsystem_dependencies() + (PythonSetup,)
 
   class UnsatisfiableInterpreterConstraintsError(TaskError):
-    """Indicates a python interpreter matching given constraints could not be located."""
+    """Indicates a Python interpreter matching given constraints could not be located."""
 
   @staticmethod
   def _matches(interpreter, filters=()):
@@ -88,13 +89,29 @@ class PythonInterpreterCache(Subsystem):
 
     if not allowed_interpreters:
       # Create a helpful error message.
+      all_interpreter_version_strings = sorted({
+        interpreter.version_string
+        # NB: self.setup() requires filters to be passed, or else it will use the global interpreter
+        # constraints. We allow any interpreter other than CPython 3.0-3.3, which is known to choke
+        # with Pants.
+        for interpreter in self.setup(filters=("CPython<3", "CPython>=3.3", "PyPy"))
+      })
       unique_compatibilities = {tuple(c) for c in tgts_by_compatibilities.keys()}
       unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
       tgts_by_compatibilities_strs = [t[0].address.spec for t in tgts_by_compatibilities.values()]
-      raise self.UnsatisfiableInterpreterConstraintsError(
-        'Unable to detect a suitable interpreter for compatibilities: {} '
-        '(Conflicting targets: {})'.format(' && '.join(sorted(unique_compatibilities_strs)),
-                                           ', '.join(tgts_by_compatibilities_strs)))
+      raise self.UnsatisfiableInterpreterConstraintsError(dedent("""\
+        Unable to detect a suitable interpreter for compatibilities: {} (Conflicting targets: {})
+
+        Pants detected these interpreter versions on your system: {}
+
+        Possible ways to fix this:
+        * Modify your Python interpreter constraints by following https://www.pantsbuild.org/python_readme.html#configure-the-python-version.
+        * Ensure the targeted Python version is installed and discoverable.
+        * Modify Pants' interpreter search paths via --pants-setup-interpreter-search-paths.""".format(
+          ' && '.join(sorted(unique_compatibilities_strs)),
+          ', '.join(tgts_by_compatibilities_strs),
+          ', '.join(all_interpreter_version_strings)
+        )))
     # Return the lowest compatible interpreter.
     return min(allowed_interpreters)
 
