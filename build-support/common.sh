@@ -1,3 +1,4 @@
+# shellcheck disable=SC2034
 CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 
 TRAVIS_FOLD_STATE="/tmp/.travis_fold_current"
@@ -23,12 +24,12 @@ function green() {
 }
 
 # Initialization for elapsed()
-: ${elapsed_start_time:=$(date +'%s')}
+: "${elapsed_start_time:=$(date +'%s')}"
 export elapsed_start_time
 
 function elapsed() {
   now=$(date '+%s')
-  elapsed_secs=$(( $now - $elapsed_start_time ))
+  elapsed_secs=$(( now - elapsed_start_time ))
   echo $elapsed_secs | awk '{printf "%02d:%02d\n",int($1/60), int($1%60)}'
 }
 
@@ -64,6 +65,6 @@ function fingerprint_data() {
 
 function git_merge_base() {
   # This prints the tracking branch if set and otherwise falls back to local "master".
-  git rev-parse --symbolic-full-name --abbrev-ref HEAD@{upstream} 2>/dev/null || echo 'master'
+  git rev-parse --symbolic-full-name --abbrev-ref HEAD@\{upstream\} 2>/dev/null || echo 'master'
 
 }
