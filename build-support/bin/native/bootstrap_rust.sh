@@ -5,6 +5,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # Exposes:
 # + log: Log a message to the console.
 # + fingerprint_data: Fingerprints the data on stdin.
+
+# shellcheck source=build-support/common.sh
 source "${REPO_ROOT}/build-support/common.sh"
 
 rust_toolchain_root="${CACHE_ROOT}/rust"

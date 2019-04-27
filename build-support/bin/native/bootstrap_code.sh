@@ -5,7 +5,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 # Exposes:
 # + die: Exit in a failure state and optionally log an error message to the console.
 # + fingerprint_data: Fingerprints the data on stdin.
-source ${REPO_ROOT}/build-support/common.sh
+
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
 
 KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "${KERNEL}" in
@@ -40,7 +42,7 @@ function calculate_current_hash() {
   #
   # Assumes we're in the venv that will be used to build the native engine.
   (
-   cd ${REPO_ROOT}
+   cd "${REPO_ROOT}" || exit
    (echo "${MODE_FLAG}"
     echo "${RUST_TOOLCHAIN}"
     uname
@@ -69,7 +71,8 @@ function _build_native_code() {
 
 function bootstrap_native_code() {
   # Bootstraps the native code only if needed.
-  local native_engine_version="$(calculate_current_hash)"
+  local native_engine_version
+  native_engine_version="$(calculate_current_hash)"
   local engine_version_hdr="engine_version: ${native_engine_version}"
   local target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   local target_binary_metadata="${target_binary}.metadata"
@@ -90,7 +93,7 @@ function bootstrap_native_code() {
     target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
     target_binary_metadata="${target_binary}.metadata"
 
-    mkdir -p "$(dirname ${target_binary})"
+    mkdir -p "$(dirname "${target_binary}")"
     cp "${native_binary}" "${target_binary}"
 
     local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
