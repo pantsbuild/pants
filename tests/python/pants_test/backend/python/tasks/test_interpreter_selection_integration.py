@@ -30,6 +30,43 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     # in the below tests.
     return True
 
+  def _build_pex(self, binary_target, config=None, args=None, version=PY_27):
+    # By default, Avoid some known-to-choke-on interpreters.
+    if version == PY_3:
+      constraint = '["CPython>=3.6,<4"]'
+    else:
+      constraint = '["CPython>=2.7,<3"]'
+    args = list(args) if args is not None else [
+          '--python-setup-interpreter-constraints={}'.format(constraint)
+        ]
+    command = ['binary', binary_target] + args
+    return self.run_pants(command=command, config=config)
+
+  def _echo_version(self, version):
+    with temporary_dir() as distdir:
+      config = {
+        'GLOBAL': {
+          'pants_distdir': distdir
+        }
+      }
+      binary_name = 'echo_interpreter_version_{}'.format(version)
+      binary_target = '{}:{}'.format(self.testproject, binary_name)
+      pants_run = self._build_pex(binary_target, config, version=version)
+      self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
+
+      # Run the built pex.
+      exe = os.path.join(distdir, binary_name + '.pex')
+      proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
+      (stdout_data, _) = proc.communicate()
+      return stdout_data.decode('utf-8')
+
+  def _test_version(self, version):
+    echo = self._echo_version(version)
+    v = echo.split('.')  # E.g., 2.7.13.
+    self.assertTrue(len(v) > 2, 'Not a valid version string: {}'.format(v))
+    expected_components = version.split('.')
+    self.assertEqual(expected_components, v[:len(expected_components)])
+
   def test_cli_option_wins_compatibility_conflict(self):
     # Tests that targets with compatibility conflicts collide.
     binary_target = '{}:deliberately_conficting_compatibility'.format(self.testproject)
@@ -58,43 +95,6 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
   @skip_unless_python27_present
   def test_select_27(self):
     self._test_version(PY_27)
-
-  def _test_version(self, version):
-    echo = self._echo_version(version)
-    v = echo.split('.')  # E.g., 2.7.13.
-    self.assertTrue(len(v) > 2, 'Not a valid version string: {}'.format(v))
-    expected_components = version.split('.')
-    self.assertEqual(expected_components, v[:len(expected_components)])
-
-  def _echo_version(self, version):
-    with temporary_dir() as distdir:
-      config = {
-        'GLOBAL': {
-          'pants_distdir': distdir
-        }
-      }
-      binary_name = 'echo_interpreter_version_{}'.format(version)
-      binary_target = '{}:{}'.format(self.testproject, binary_name)
-      pants_run = self._build_pex(binary_target, config, version=version)
-      self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
-
-      # Run the built pex.
-      exe = os.path.join(distdir, binary_name + '.pex')
-      proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
-      (stdout_data, _) = proc.communicate()
-      return stdout_data.decode('utf-8')
-
-  def _build_pex(self, binary_target, config=None, args=None, version=PY_27):
-    # By default, Avoid some known-to-choke-on interpreters.
-    if version == PY_3:
-      constraint = '["CPython>=3.6,<4"]'
-    else:
-      constraint = '["CPython>=2.7,<3"]'
-    args = list(args) if args is not None else [
-          '--python-setup-interpreter-constraints={}'.format(constraint)
-        ]
-    command = ['binary', binary_target] + args
-    return self.run_pants(command=command, config=config)
 
   def test_stale_interpreter_purge_integration(self):
     target = '{}:{}'.format(self.testproject, 'echo_interpreter_version')
