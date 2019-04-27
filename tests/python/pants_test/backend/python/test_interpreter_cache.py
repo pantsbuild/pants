@@ -29,10 +29,11 @@ class TestInterpreterCache(TestBase):
 
     E.g. 'CPython==2.7.5' becomes 'CPython==99.7.5'
     """
-    if PY3:
-      return str(requirement).replace('==3', '==99')
-    else:
-      return str(requirement).replace('==2.', '==99')
+    return (
+      str(requirement).replace('==3', '==99')
+      if PY3
+      else str(requirement).replace('==2.', '==99')
+    )
 
   def setUp(self):
     super(TestInterpreterCache, self).setUp()
