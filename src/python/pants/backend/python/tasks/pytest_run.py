@@ -70,6 +70,7 @@ class _Workdirs(datatype(['root_dir', 'partition'])):
     return list(files_iter())
 
 
+# TODO: convert this into an enum!
 class PytestResult(TestResult):
   _SUCCESS_EXIT_CODES = (
     0,
@@ -482,6 +483,21 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                                           pytest_binary.pex) as coverage_args:
         yield pytest_binary, [conftest] + coverage_args, get_pytest_rootdir
 
+  def _constrain_pytest_interpreter_search_path(self):
+    """Return an environment for invoking a pex which ensures the use of the selected interpreter.
+
+    When creating the merged pytest pex, we already have an interpreter, and we only invoke that pex
+    within a pants run, so we can be sure the selected interpreter will be available. Constraining
+    the interpreter search path at pex runtime ensures that any resolved requirements will be
+    compatible with the interpreter being used to invoke the merged pytest pex.
+    """
+    pytest_prep_binary_product = self.context.products.get_data(PytestPrep.PytestBinary)
+    chosen_interpreter_binary_path = pytest_prep_binary_product.interpreter.binary
+    return {
+      'PEX_PYTHON': chosen_interpreter_binary_path,
+      'PEX_PYTHON_PATH': chosen_interpreter_binary_path,
+    }
+
   def _do_run_tests_with_args(self, pex, args):
     try:
       env = dict(os.environ)
@@ -517,6 +533,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       with self.context.new_workunit(name='run',
                                      cmd=' '.join(pex.cmdline(args)),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
+        # NB: Constrain the pex environment to ensure the use of the selected interpreter!
+        env.update(self._constrain_pytest_interpreter_search_path())
         rc = self.spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
         return PytestResult.rc(rc)
     except ErrorWhileTesting:
@@ -736,6 +754,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     with self.context.new_workunit(name=workunit_name,
                                    cmd=' '.join(pex.cmdline(args)),
                                    labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
+      # NB: Constrain the pex environment to ensure the use of the selected interpreter!
+      env.update(self._constrain_pytest_interpreter_search_path())
       process = self._spawn(pex, workunit, args, setsid=False, env=env)
       return process.wait()
 

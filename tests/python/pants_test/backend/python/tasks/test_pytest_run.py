@@ -274,6 +274,18 @@ python_tests(
   dependencies = ["lib:core"],
   coverage = ["core"],
 )
+
+python_tests(
+  name = "py23-tests",
+  sources = ["py23_test_source.py"],
+  compatibility = ['CPython>=2.7,<4'],
+)
+
+python_tests(
+  name = "py3-and-more-tests",
+  sources = ["py3_and_more_test_source.py"],
+  compatibility = ['CPython>=3.6'],
+)
 '''
     )
 
@@ -359,6 +371,9 @@ python_tests(
         assert(False)
         """))
 
+    self.create_file('tests/py23_test_source.py', '')
+    self.create_file('tests/py3_and_more_test_source.py', '')
+
     self.create_file('tests/conftest.py', self._CONFTEST_CONTENT)
 
     self.app = self.target('tests:app')
@@ -375,6 +390,9 @@ python_tests(
     self.all = self.target('tests:all')
     self.all_with_cov = self.target('tests:all-with-coverage')
 
+    self.py23 = self.target('tests:py23-tests')
+    self.py3_and_more = self.target('tests:py3-and-more-tests')
+
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_error(self):
     """Test that a test that errors rather than fails shows up in ErrorWhileTesting."""
@@ -386,6 +404,10 @@ python_tests(
   def test_error_outside_function(self):
     self.run_failing_tests(targets=[self.red, self.green, self.failure_outside_function],
                            failed_targets=[self.red, self.failure_outside_function])
+
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
+  def test_succeeds_for_intersecting_unique_constraints(self):
+    self.run_tests(targets=[self.py23, self.py3_and_more])
 
   @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_green(self):
