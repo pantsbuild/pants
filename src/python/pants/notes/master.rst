@@ -25,6 +25,9 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Modernize `check_pants_pex_abi.py` script to Python 3 (#7631)
+  `PR #7631 <https://github.com/pantsbuild/pants/pull/7631>`_
+
 * unify precedence logic for options which may be overridden on targets (#7594)
   `PR #7594 <https://github.com/pantsbuild/pants/pull/7594>`_
 
