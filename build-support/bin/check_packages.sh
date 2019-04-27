@@ -4,19 +4,19 @@ set -euo pipefail
 IFS=$'\n\t'
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-cd ${REPO_ROOT}
+cd "${REPO_ROOT}"
 
 DIRS_TO_CHECK=("$@")
 
-non_empty_files=$(find ${DIRS_TO_CHECK[@]} -type f -name "__init__.py" -not -empty)
+non_empty_files=$(find "${DIRS_TO_CHECK[@]}" -type f -name "__init__.py" -not -empty)
 
 bad_files=()
 for package_file in ${non_empty_files}
 do
-  if [[ "$(sed -E -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//' ${package_file})" != \
+  if [[ "$(sed -E -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//' "${package_file}")" != \
         "__import__('pkg_resources').declare_namespace(__name__)" ]]
   then
-    bad_files+=(${package_file})
+    bad_files+=("${package_file}")
   fi
 done
 
