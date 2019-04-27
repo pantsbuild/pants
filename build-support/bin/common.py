@@ -8,6 +8,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Tuple
 
+# NB: We intentionally do not use the colors library, because that would bring
+# in a third party dependency, meaning that none of the scripts could be
+# executed directly and would all require `./pants run` to run. We want to ensure
+# that scripts can run without any dependency on Pants itself. So, we can only
+# depend on the standard library in this file.
 
 # --------------------------------------------------------
 # Logging utils
