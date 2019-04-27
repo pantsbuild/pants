@@ -11,12 +11,12 @@ mkdir -p logs/jobs
 curl=(curl -s -S -H 'Travis-API-Version: 3')
 
 "${curl[@]}" 'https://api.travis-ci.org/repo/pantsbuild%2Fpants/builds?event_type=pull_request&limit=100&sort_by=finished_at:desc' > logs/search
-jobs="$(cat logs/search | jq "[ .builds[] | select(.pull_request_number == ${pull}) ][0] | .jobs[].id")"
+jobs="$(jq "[ .builds[] | select(.pull_request_number == ${pull}) ][0] | .jobs[].id" logs/search)"
 targets=()
 for job in ${jobs}; do
   mkdir -p "logs/jobs/${job}"
   "${curl[@]}" "https://api.travis-ci.org/job/${job}" >"logs/jobs/${job}/info"
-  state="$(cat logs/jobs/${job}/info | jq -r '.state')"
+  state="$(jq -r '.state' "logs/jobs/${job}/info")"
   case "${state}" in
     "passed")
       continue

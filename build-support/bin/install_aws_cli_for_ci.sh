@@ -21,7 +21,7 @@ if [[ ! -x "${AWS_CLI_BIN}" ]]; then
 
   TMPDIR=$(mktemp -d)
 
-  pushd ${TMPDIR}
+  pushd "${TMPDIR}"
 
   curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
   unzip awscli-bundle.zip
