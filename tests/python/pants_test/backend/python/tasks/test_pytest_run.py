@@ -25,7 +25,7 @@ from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants.util.py2_compat import configparser
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import ensure_cached
+from pants_test.task_test_base import DeclarativeTaskTestMixin, ensure_cached
 
 
 # NB: Our production code depends on `pytest-cov` which indirectly depends on `coverage`, but in
@@ -43,24 +43,52 @@ class PytestPrepCoverageVersionPinned(PytestPrep):
     return extra_reqs
 
 
-class PytestTestBase(PythonTaskTestBase):
+class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
   @classmethod
   def task_type(cls):
     return PytestRun
 
+  run_before_task_types = [
+    SelectInterpreter,
+    ResolveRequirements,
+    GatherSources,
+    PytestPrepCoverageVersionPinned,
+  ]
+
   _CONFTEST_CONTENT = '# I am an existing root-level conftest file.'
+
+  _default_test_options = {
+    'colors': False,
+    'level': 'info'  # When debugging a test failure it may be helpful to set this to 'debug'.
+  }
+
+  def _augment_options(self, options):
+    new_options = self._default_test_options.copy()
+    new_options.update(options)
+    return new_options
 
   def run_tests(self, targets, *passthru_args, **options):
     """Run the tests in the specified targets, with the specified PytestRun task options."""
-    context = self._prepare_test_run(targets, *passthru_args, **options)
-    self._do_run_tests(context)
-    return context
+    self.set_options(**self._augment_options(options))
+    with pushd(self.build_root):
+      result = self.invoke_tasks(
+        target_roots=targets,
+        passthru_args=list(passthru_args),
+      )
+      return result.context
 
   def run_failing_tests(self, targets, failed_targets, *passthru_args, **options):
-    context = self._prepare_test_run(targets, *passthru_args, **options)
+    self.set_options(**self._augment_options(options))
     with self.assertRaises(ErrorWhileTesting) as cm:
-      self._do_run_tests(context)
-    self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
+      with pushd(self.build_root):
+        self.invoke_tasks(
+          target_roots=targets,
+          passthru_args=list(passthru_args),
+        )
+    exc = cm.exception
+    # NB: self.invoke_tasks() will attach the tasks' context to the raised exception as ._context!
+    context = exc._context
+    self.assertEqual(set(failed_targets), set(exc.failed_targets))
     return context
 
   def try_run_tests(self, targets, *passthru_args, **options):
@@ -69,34 +97,6 @@ class PytestTestBase(PythonTaskTestBase):
       return []
     except ErrorWhileTesting as e:
       return e.failed_targets
-
-  def _prepare_test_run(self, targets, *passthru_args, **options):
-    test_options = {
-      'colors': False,
-      'level': 'info'  # When debugging a test failure it may be helpful to set this to 'debug'.
-    }
-    test_options.update(options)
-    self.set_options(**test_options)
-
-    # The easiest way to create products required by the PythonTest task is to
-    # execute the relevant tasks.
-    si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
-    rr_task_type = self.synthesize_task_subtype(ResolveRequirements, 'rr_scope')
-    gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
-    pp_task_type = self.synthesize_task_subtype(PytestPrepCoverageVersionPinned, 'pp_scope')
-    context = self.context(for_task_types=[si_task_type, rr_task_type, gs_task_type, pp_task_type],
-                           target_roots=targets,
-                           passthru_args=list(passthru_args))
-    si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
-    rr_task_type(context, os.path.join(self.pants_workdir, 'rr')).execute()
-    gs_task_type(context, os.path.join(self.pants_workdir, 'gs')).execute()
-    pp_task_type(context, os.path.join(self.pants_workdir, 'pp')).execute()
-    return context
-
-  def _do_run_tests(self, context):
-    pytest_run_task = self.create_task(context)
-    with pushd(self.build_root):
-      pytest_run_task.execute()
 
 
 class PytestTestEmpty(PytestTestBase):
@@ -137,12 +137,10 @@ class PytestTestFailedPexRun(PytestTestBase):
     self.addCleanup(self.AlwaysFailingPexRunPytestRun.set_up())
 
   def do_test_failed_pex_run(self):
-    with self.assertRaises(TaskError) as cm:
-      self.run_tests(targets=[self.tests])
-
     # We expect a `TaskError` as opposed to an `ErrorWhileTesting` since execution fails outside
     # the actual test run.
-    self.assertEqual(TaskError, type(cm.exception))
+    with self.assertRaises(TaskError):
+      self.run_tests(targets=[self.tests])
 
   def test_failed_pex_run(self):
     self.do_test_failed_pex_run()
@@ -744,40 +742,40 @@ python_tests(
             import os
             import pytest
             import unittest
-  
-  
+
+
             class PassthruTest(unittest.TestCase):
               def touch(self, path):
                 with open(path, 'wb') as fp:
                   fp.close()
-                  
+
               def mark_test_run(self):
                 caller_frame_record = inspect.stack()[1]
-                
+
                 # For the slot breakdown of a frame record tuple, see:
                 #   https://docs.python.org/2/library/inspect.html#the-interpreter-stack
                 _, _, _, caller_func_name, _, _ = caller_frame_record
-                
+
                 marker_file = os.path.join({marker_dir!r}, caller_func_name)
                 self.touch(marker_file)
-  
+
               def test_one(self):
                 self.mark_test_run()
-  
+
               @pytest.mark.purple
               def test_two(self):
                 self.mark_test_run()
-  
+
               def test_three(self):
                 self.mark_test_run()
-                
+
               @pytest.mark.red
               def test_four(self):
                 self.mark_test_run()
-              
+
               @pytest.mark.green
               def test_five(self):
-                self.mark_test_run()                
+                self.mark_test_run()
           """.format(marker_dir=marker_dir)))
 
       def assert_mark(exists, name):
