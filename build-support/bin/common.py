@@ -6,7 +6,7 @@
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Tuple
+from typing import Iterator, Tuple
 
 
 # NB: We intentionally do not use the colors library, because that would bring
@@ -45,7 +45,7 @@ def elapsed_time() -> Tuple[int, int]:
 
 
 @contextmanager
-def travis_section(slug: str, message: str):
+def travis_section(slug: str, message: str) -> Iterator[None]:
   travis_fold_state = "/tmp/.travis_fold_current"
 
   def travis_fold(action: str, target: str) -> None:
