@@ -23,7 +23,7 @@ def main() -> None:
   expected_abis = frozenset(create_parser().parse_args().abis)
   with zipfile.ZipFile("pants.pex", "r") as pex:
     with pex.open("PEX-INFO", "r") as pex_info:
-      pex_info_content = str(pex_info.readline())
+      pex_info_content = pex_info.readline().decode()
   parsed_abis = frozenset(
     parse_abi_from_filename(filename)
     for filename in json.loads(pex_info_content)["distributions"].keys()
