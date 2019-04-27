@@ -83,10 +83,25 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       }
     binary_target = '{}:echo_interpreter_version'.format(self.testproject)
     pants_run = self._build_pex(binary_target, config=config, args=[])
-    self.assert_failure(pants_run,
-                        'Unexpected successful build of {binary}.'.format(binary=binary_target))
-    self.assertIn('Unable to detect a suitable interpreter for compatibilities',
-                  pants_run.stdout_data)
+    self.assert_failure(
+      pants_run,
+      'Unexpected successful build of {binary}.'.format(binary=binary_target)
+    )
+    self.assertIn(
+      "Unable to detect a suitable interpreter for compatibilities",
+      pants_run.stdout_data
+    )
+    self.assertIn(
+      "CPython<2.7",
+      pants_run.stdout_data,
+      "Did not output requested compatibiility."
+    )
+    self.assertIn("Conflicting targets: {}".format(binary_target), pants_run.stdout_data)
+    self.assertIn(
+      PythonInterpreter.get().version_string,
+      pants_run.stdout_data,
+      "Did not output interpreters discoved by Pants."
+    )
 
   @skip_unless_python3_present
   def test_select_3(self):
