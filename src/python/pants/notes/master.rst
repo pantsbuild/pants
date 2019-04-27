@@ -4,6 +4,64 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.16.0.dev3 (4/27/2019)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+
+* PythonTests force default platform resolves (#7618)
+  `PR #7618 <https://github.com/pantsbuild/pants/pull/7618>`_
+
+* Fix to decode bytes to unicode in server when reading file from disk (#7610)
+  `PR #7610 <https://github.com/pantsbuild/pants/pull/7610>`_
+
+* Two targets can swap positions with pantsd (#7583) (#7617)
+  `PR #7583 <https://github.com/pantsbuild/pants/pull/7583>`_
+
+* Fix empty failed target to ensure pants raises the error if python test fails (#7570)
+  `PR #7570 <https://github.com/pantsbuild/pants/pull/7570>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* unify precedence logic for options which may be overridden on targets (#7594)
+  `PR #7594 <https://github.com/pantsbuild/pants/pull/7594>`_
+
+* fix --owner-of path matching to remove repeated directory separators (#7588)
+  `PR #7588 <https://github.com/pantsbuild/pants/pull/7588>`_
+
+* fix cron job by wrapping the python binary in text_type() (#7611)
+  `PR #7611 <https://github.com/pantsbuild/pants/pull/7611>`_
+
+* download rustup-init without --proto to work around outdated centos6 curl version (#7615)
+  `PR #7615 <https://github.com/pantsbuild/pants/pull/7615>`_
+
+* Default release script to use Python 3 in preparation for dropping Python 2 release (#7608)
+  `PR #7608 <https://github.com/pantsbuild/pants/pull/7608>`_
+
+* Better support --test-junit-test with classname, remove support for file path (#7589)
+  `PR #7589 <https://github.com/pantsbuild/pants/pull/7589>`_
+
+* Refactor uses of dirutil.py to use the new default Unicode semantics (#7604)
+  `PR #7604 <https://github.com/pantsbuild/pants/pull/7604>`_
+
+* Ensure test symlink is always seen by engine. (#7605)
+  `PR #7605 <https://github.com/pantsbuild/pants/pull/7605>`_
+
+* pantsd auto invalidates pants.ini and all pythonpath of pants (#7599)
+  `PR #7599 <https://github.com/pantsbuild/pants/pull/7599>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Improve error message when no valid Python interpreter can be resolved (#7628)
+  `PR #7628 <https://github.com/pantsbuild/pants/pull/7628>`_
+
+* Fix typo in How to Contribute docs (#7614)
+  `PR #7614 <https://github.com/pantsbuild/pants/pull/7614>`_
+
+
 1.16.0.dev2 (4/22/2019)
 -----------------------
 
