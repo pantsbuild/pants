@@ -32,6 +32,7 @@ function bootstrap_rust() {
         "https://www.rustup.rs ..."
     # This is the recommended installation method for Unix when '--proto' is not available on curl
     # (as in CentOS6), see # https://github.com/rust-lang/rustup.rs#other-installation-methods.
+    # The workaround was added in https://github.com/rust-lang/rustup.rs/pull/1803.
     curl https://sh.rustup.rs -sSf | sh -s -- -y --no-modify-path --default-toolchain none 1>&2
   fi
 
