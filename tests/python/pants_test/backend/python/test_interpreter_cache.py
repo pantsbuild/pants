@@ -29,10 +29,9 @@ class TestInterpreterCache(TestBase):
 
     E.g. 'CPython==2.7.5' becomes 'CPython==99.7.5'
     """
-    return (
-      str(requirement).replace('==3', '==99')
-      if PY3
-      else str(requirement).replace('==2.', '==99')
+    requirement_major_version = '3' if PY3 else '2'
+    return str(requirement).replace(
+      '=={}'.format(requirement_major_version), '==99'
     )
 
   def setUp(self):

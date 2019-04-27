@@ -96,7 +96,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     self.assertIn("Conflicting targets: {}".format(binary_target), pants_run.stdout_data)
     # NB: we expect the error message to print *all* interpreters resolved by Pants. However,
     # to simplify the tests and for hermicity, here we only test that the current interpreter
-    # gets printed as a prxoy for the overall behavior.
+    # gets printed as a proxy for the overall behavior.
     self.assertIn(
       PythonInterpreter.get().version_string,
       pants_run.stdout_data,
