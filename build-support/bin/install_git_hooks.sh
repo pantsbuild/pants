@@ -44,7 +44,7 @@ function ensure_hook() {
     then
       echo "${HOOK} hook up to date."
     else
-      read -rp "A ${HOOK} hook already exists, replace with ${HOOK_SRC}? [Y/n]" ok
+      read -rp "A ${HOOK} hook already exists, replace with ${HOOK_SRC}? [Yn]" ok
       if [[ "${ok:-Y}" =~ ^[yY]([eE][sS])?$ ]]
       then
         install_hook "${HOOK}"
