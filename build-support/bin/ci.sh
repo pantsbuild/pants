@@ -4,8 +4,8 @@
 # fails the build.
 set -o pipefail
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
-cd ${REPO_ROOT}
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
+cd "${REPO_ROOT}" || exit 1
 
 source build-support/common.sh
 
@@ -85,11 +85,11 @@ while getopts "h27fxbmrjlpeasu:ny:ci:tz" opt; do
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
-shift $((${OPTIND} - 1))
+shift $((OPTIND - 1))
 
 echo
-if [[ $# > 0 ]]; then
-  banner "CI BEGINS: $@"
+if [[ $# -gt 0 ]]; then
+  banner "CI BEGINS: $*"
 else
   banner "CI BEGINS"
 fi
@@ -122,6 +122,7 @@ else
 fi
 export PY="${PY:-python${py_major_minor}}"
 
+# shellcheck disable=SC2016
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor}.*']}"
 banner "Setting interpreter constraints to ${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}"
 
@@ -196,7 +197,7 @@ if [[ "${run_internal_backends:-false}" == "true" ]]; then
   start_travis_section "BackendTests" "Running internal backend python tests"
   (
     ./pants.pex test.pytest \
-    pants-plugins/src/python:: pants-plugins/tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+    pants-plugins/src/python:: pants-plugins/tests/python:: -- "${PYTEST_PASSTHRU_ARGS}"
   ) || die "Internal backend python test failure"
   end_travis_section
 fi
@@ -208,8 +209,8 @@ if [[ "${run_python:-false}" == "true" ]]; then
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
     ./pants.pex --tag='-integration' test.pytest --chroot \
-      --test-pytest-test-shard=${python_unit_shard} \
-      src/python:: tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+      "--test-pytest-test-shard=${python_unit_shard}" \
+      src/python:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS}"
   ) || die "Core python test failure"
   end_travis_section
 fi
@@ -221,8 +222,8 @@ if [[ "${run_contrib:-false}" == "true" ]]; then
   start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
   (
     ./pants.pex --exclude-target-regexp='.*/testprojects/.*' test.pytest \
-    --test-pytest-test-shard=${python_contrib_shard} \
-    contrib:: -- ${PYTEST_PASSTHRU_ARGS}
+    "--test-pytest-test-shard=${python_contrib_shard}" \
+    contrib:: -- "${PYTEST_PASSTHRU_ARGS}"
   ) || die "Contrib python test failure"
   end_travis_section
 fi
@@ -269,7 +270,7 @@ if [[ "${test_platform_specific_behavior:-false}" == 'true' ]]; then
                        "Running platform-specific testing on platform: $(uname)"
   (
     ./pants.pex --tag='+platform_specific_behavior' test \
-                src/python/:: tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+                src/python/:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS}"
   ) || die "Pants platform-specific test failure"
   end_travis_section
 fi
@@ -282,8 +283,8 @@ if [[ "${run_integration:-false}" == "true" ]]; then
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
     ./pants.pex --tag='+integration' test.pytest \
-      --test-pytest-test-shard=${python_intg_shard} \
-      src/python:: tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+      "--test-pytest-test-shard=${python_intg_shard}" \
+      src/python:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS}"
   ) || die "Pants Integration test failure"
   end_travis_section
 fi
