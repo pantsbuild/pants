@@ -108,7 +108,7 @@ subdir/__init__.py
 
   def test_check_headers(self):
     header_check_script = os.path.join(self.pants_repo_root,
-                                       'build-support/bin/check_header_helper.py')
+                                       'build-support/bin/check_header.py')
     with self._create_tiny_git_repo() as (_, worktree, _):
       new_py_path = os.path.join(worktree, 'subdir/file.py')
 

@@ -5,7 +5,7 @@
 # Helper for check_headers.sh to check .py files in the repo to see if they start with the
 # appropriate headers.
 #
-# usage: check_header_helper.py dir1 [ dir2 [ ... ] ]
+# usage: check_header.py dir1 [ dir2 [ ... ] ]
 
 
 import datetime
