@@ -70,7 +70,9 @@ function git_merge_base() {
 
 function validate_executable() {
   local -r exe_name="$1"
-  if ! hash "$exe_name"; then
+  # `command -v` is the POSIX way to check for a command's existence -- see
+  # https://stackoverflow.com/a/677212/2518889.
+  if ! command -v "$exe_name" &>/dev/null; then
     die "$(cat <<EOF
 Executable ${exe_name} must be discoverable on the PATH for pants to bootstrap itself in this repo.
 Exiting.

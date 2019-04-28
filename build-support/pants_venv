@@ -34,13 +34,15 @@ function create_venv() {
 }
 
 function ensure_gcc() {
-  if ! gcc -v &>/dev/null; then
+  if ! GCC_VERSION="$(gcc -v 2>&1)"; then
     # The output was swallowed last time to avoid output in the success case, so we repeat the
     # command's output again to stderr if it fails.
-    gcc -v >&2
     die "$(cat << MESSAGE
+Output was:
+${GCC_VERSION}
+
 ERROR: unable to execute 'gcc'. Please verify that your compiler is installed, in your
-       \$PATH and functional.
+\$PATH and functional.
 
 Hint: on Mac OS X, you may need to accept the XCode EULA: 'sudo xcodebuild -license accept'.
 Alternatively, if gcc was not found at all, you may need to run 'sudo xcode-select --install'.
@@ -49,7 +51,7 @@ MESSAGE
   fi
   # Prevent bootstrapping failure due to unrecognized flag:
   # https://github.com/pantsbuild/pants/issues/78
-  if [[ "$(gcc -v 2>&1)" == *503.0.38* ]]; then
+  if [[ "$GCC_VERSION" == *503.0.38* ]]; then
     # Required for clang version 503.0.38
     export ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future
   fi

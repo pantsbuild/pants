@@ -48,8 +48,13 @@ fi
 # Otherwise, run directly from sources, bootstrapping if needed.
 
 # Exposes:
+# + ensure_gcc: Attempt to invoke gcc to ensure one exists on the PATH.
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
 source ${HERE}/build-support/pants_venv
+# gcc is only necessary for compiling 3rdparty python requirements that pants itself depends on (not
+# for rust compilation), but
+# we validate it here in order to fail early.
+ensure_gcc
 
 # Exposes:
 # + bootstrap_native_code: Builds target-specific native engine binaries.
