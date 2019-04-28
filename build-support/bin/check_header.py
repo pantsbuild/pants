@@ -39,9 +39,6 @@ ERROR: All .py files other than __init__.py should start with the following head
 {EXPECTED_HEADER}
 ---
 
-Some additional checking is performed on newly added files, such as validating the
-copyright year. You can export PANTS_IGNORE_ADDED_FILES to disable this check.
-
 The following {len(header_parse_failures)} file(s) do not conform:
 {failures}""")
 
@@ -68,6 +65,10 @@ def check_header(filename: str, *, is_newly_created: bool = False) -> None:
   # If a shebang line is included, remove it. Otherwise, we will have conservatively grabbed
   # one extra line at the end for the shebang case that is no longer necessary because.
   first_lines.pop(0 if first_lines[0].startswith("#!") else - 1)
+  # Check first lines even exist. Note that first_lines will always have an entry for each line,
+  # even if the file is completely empty.
+  if len([line for line in first_lines if line]) < 4:
+    raise HeaderCheckFailure(f"{filename}: missing the expected header")
   # Check copyright year. If a new file, it should be the current year. Else, it should be parsed
   # as within the current century
   copyright_line = first_lines[1]
@@ -82,7 +83,7 @@ def check_header(filename: str, *, is_newly_created: bool = False) -> None:
   # Replace copyright_line with sanitized year.
   first_lines[1] = "# Copyright YYYY" + copyright_line[16:]
   if "".join(first_lines) != EXPECTED_HEADER:
-    raise HeaderCheckFailure(f"{filename}: header does not match expected header")
+    raise HeaderCheckFailure(f"{filename}: header does not match the expected header")
 
 
 def check_dir(directory: str, newly_created_files: Iterable[str]) -> List[str]:
