@@ -15,6 +15,7 @@ from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.parser import Parser
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import ScopeInfo
 from pants.util.memo import memoized_method, memoized_property
@@ -367,6 +368,39 @@ class Options(object):
             hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys))
           )
 
+  @memoized_property
+  def _all_scoped_flag_names_for_fuzzy_matching(self):
+    """A list of all registered flags in all their registered scopes.
+
+    This list is used for fuzzy matching against unrecognized option names across registered
+    scopes on the command line.
+    """
+    all_scoped_flag_names = []
+    def register_all_scoped_names(parser):
+      scope = parser.scope
+      known_args = parser.known_args
+      for arg in known_args:
+        if scope == GLOBAL_SCOPE:
+          scoped_arg = arg
+        else:
+          arg_minus_leading_dashes = re.sub(r'^-+', '', arg)
+          scoped_arg = '--{}-{}'.format(scope, arg_minus_leading_dashes)
+        all_scoped_flag_names.append(scoped_arg)
+    self.walk_parsers(register_all_scoped_names)
+    return all_scoped_flag_names
+
+  def _make_parse_args_request(self, flags_in_scope, namespace):
+    if self._bootstrap_option_values:
+      levenshtein_max_distance = self._bootstrap_option_values.option_name_check_distance
+    else:
+      levenshtein_max_distance = 0
+    return Parser.ParseArgsRequest(
+      flags_in_scope=flags_in_scope,
+      namespace=namespace,
+      get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
+      levenshtein_max_distance=levenshtein_max_distance,
+    )
+
   # TODO: Eagerly precompute backing data for this?
   @memoized_method
   def for_scope(self, scope, inherit_from_enclosing_scope=True):
@@ -386,7 +420,8 @@ class Options(object):
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
-    self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
+    parse_args_request = self._make_parse_args_request(flags_in_scope, values)
+    self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 
     # Check for any deprecation conditions, which are evaluated using `self._flag_matchers`.
     if inherit_from_enclosing_scope:

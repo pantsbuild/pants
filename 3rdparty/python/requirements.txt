@@ -26,6 +26,7 @@ pyopenssl==17.3.0
 pystache==0.5.3
 pytest-cov>=2.5,<2.6
 pytest>=3.4,<4.0
+python-Levenshtein==0.12.0
 pywatchman==1.4.1
 PyYAML==5.1
 py_zipkin==0.17.0

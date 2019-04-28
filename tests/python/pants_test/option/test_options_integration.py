@@ -233,6 +233,38 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       self.assertIn("ERROR] Invalid option 'bad_option' under [test.junit]", pants_run.stderr_data)
       self.assertIn("ERROR] Invalid scope [invalid_scope]", pants_run.stderr_data)
 
+  def test_invalid_command_line_option_shows_suggestions_in_error(self):
+    pants_run = self.run_pants([
+      # A nonexistent short-form option -- other short-form options should be displayed.
+      '-vd',
+      # A misspelling of `--level=debug` should show the correct option name.
+      '--lebel=debug',
+      # An option name without the correct prefix scope should match all options of the same name.
+      '--interpreter-search-paths=[]',
+      # A dummy goal to ensure options are parsed.
+      'goals',
+    ])
+    self.assert_failure(pants_run)
+    self.assertIn(dedent("""
+      Exception message: Unrecognized command line flags on global scope: -v, --lebel, --interpreter-search-paths. Suggestions:
+      -v: [--v1, --v2, -d, -e, -k, -l, -q, -t, -x]
+      --lebel: [--level]
+      --interpreter-search-paths: [--python-setup-interpreter-search-paths]
+      """),
+                  pants_run.stderr_data)
+
+    # Verify that misspelling searches work for options in non-global scopes.
+    pants_run = self.run_pants([
+      '--python-setup-interpreter-search-path=[]',
+      'goals',
+    ])
+    self.assert_failure(pants_run)
+    self.assertIn(dedent("""
+      Exception message: Unrecognized command line flags on scope 'python-setup': --interpreter-search-path. Suggestions:
+      --interpreter-search-path: [--python-setup-interpreter-search-paths]
+      """),
+                  pants_run.stderr_data)
+
   def test_command_line_option_unused_by_goals(self):
     self.assert_success(self.run_pants(['filter', '--bundle-jvm-archive=zip']))
     self.assert_failure(self.run_pants(['filter', '--jvm-invalid=zip']))
