@@ -9,7 +9,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 HOOK_DIR="${GIT_DIR:-${REPO_ROOT}/.git}/hooks"
 HOOK_SRC_DIR="${REPO_ROOT}/build-support/githooks"
-HOOK_NAMES="$(ls ${HOOK_SRC_DIR})"
+HOOK_NAMES="$(ls "${HOOK_SRC_DIR}")"
 
 RELPATH_PREFIX="$(cat << EOF | python
 import os
@@ -24,8 +24,8 @@ function install_hook() {
   RELPATH="${RELPATH_PREFIX}/${HOOK}"
   (
     cd "${HOOK_DIR}" && \
-    rm -f ${HOOK} && \
-    ln -s "${RELPATH}" ${HOOK} && \
+    rm -f "${HOOK}" && \
+    ln -s "${RELPATH}" "${HOOK}" && \
     echo "${HOOK} hook linked to $(pwd)/${HOOK}";
   )
 }
@@ -38,16 +38,16 @@ function ensure_hook() {
 
   if [[ ! -e "${HOOK_DST}" ]]
   then
-    install_hook ${HOOK}
+    install_hook "${HOOK}"
   else
     if cmp --quiet "${HOOK_SRC}" "${HOOK_DST}"
     then
       echo "${HOOK} hook up to date."
     else
-      read -p "A ${HOOK} hook already exists, replace with ${HOOK_SRC}? [Yn]" ok
+      read -rp "A ${HOOK} hook already exists, replace with ${HOOK_SRC}? [Y/n]" ok
       if [[ "${ok:-Y}" =~ ^[yY]([eE][sS])?$ ]]
       then
-        install_hook ${HOOK}
+        install_hook "${HOOK}"
       else
         echo "${HOOK} hook not installed"
         exit 1
@@ -58,5 +58,5 @@ function ensure_hook() {
 
 
 for HOOK in ${HOOK_NAMES}; do
-  ensure_hook ${HOOK}
+  ensure_hook "${HOOK}"
 done
