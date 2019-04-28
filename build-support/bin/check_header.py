@@ -2,16 +2,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# Helper for check_headers.sh to check .py files in the repo to see if they start with the
-# appropriate headers.
-#
-# usage: check_header.py dir1 [ dir2 [ ... ] ]
-
-
+import argparse
 import datetime
 import os
 import re
-import sys
 from textwrap import dedent
 from typing import Iterable, List
 
@@ -32,6 +26,37 @@ _current_century_regex = re.compile(r'20\d\d')
 class HeaderCheckFailure(Exception):
   """This is only used for control flow and to propagate the `.message` field."""
 
+def main() -> None:
+  args = create_parser().parse_args()
+  header_parse_failures = []
+  for directory in args.dirs:
+    header_parse_failures.extend(check_dir(directory, args.files_added))
+  if header_parse_failures:
+    failures = '\n  '.join(header_parse_failures)
+    raise SystemExit(f"""\
+ERROR: All .py files other than __init__.py should start with the following header:
+
+{EXPECTED_HEADER}
+---
+
+Some additional checking is performed on newly added files, such as validating the
+copyright year. You can export PANTS_IGNORE_ADDED_FILES to disable this check.
+
+The following {len(header_parse_failures)} file(s) do not conform:
+{failures}""")
+
+
+def create_parser() -> argparse.ArgumentParser:
+  parser = argparse.ArgumentParser(
+    description="Check all .py files start with the appropriate header."
+  )
+  parser.add_argument("dirs", nargs="+",
+    help="The directories to check. Will recursively check subdirectories."
+  )
+  parser.add_argument("-a", "--files-added", nargs="*", default=[],
+    help="Any newly created files that should be check for a valid copyright year."
+  )
+  return parser
 
 def check_header(filename: str, *, is_newly_created: bool = False) -> None:
   """Raises `HeaderCheckFailure` if the header doesn't match."""
@@ -73,31 +98,6 @@ def check_dir(directory: str, newly_created_files: Iterable[str]) -> List[str]:
       except HeaderCheckFailure as e:
         header_parse_failures.append(str(e))
   return header_parse_failures
-
-
-def main() -> None:
-  dirs = sys.argv
-  header_parse_failures = []
-  # Input lines denote file paths relative to the repo root and are assumed to all end in \n.
-  newly_created_files = frozenset((line[0:-1] for line in sys.stdin)
-                                  if 'PANTS_IGNORE_ADDED_FILES' not in os.environ
-                                  else [])
-
-  for directory in dirs:
-    header_parse_failures.extend(check_dir(directory, newly_created_files))
-  if header_parse_failures:
-    failures = '\n  '.join(header_parse_failures)
-    raise SystemExit(f"""\
-ERROR: All .py files other than __init__.py should start with the following header:
-
-{EXPECTED_HEADER}
----
-
-Some additional checking is performed on newly added files, such as validating the
-copyright year. You can export PANTS_IGNORE_ADDED_FILES to disable this check.
-
-The following {len(header_parse_failures)} file(s) do not conform:
-{failures}""")
 
 
 if __name__ == '__main__':
