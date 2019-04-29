@@ -8,14 +8,14 @@ python_library(
 )
 
 python_binary(
-  name='check_header_helper',
-  sources='check_header_helper.py',
+  name = 'check_header_helper',
+  sources = 'check_header_helper.py',
 )
 
 python_binary(
-  name='check_pants_pex_abi',
-  sources='check_pants_pex_abi.py',
-  dependencies=[
+  name = 'check_pants_pex_abi',
+  sources = 'check_pants_pex_abi.py',
+  dependencies = [
     ':common',
   ],
   compatibility = ['CPython>=3.6'],
