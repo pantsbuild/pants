@@ -38,6 +38,8 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.objects import enum
+from pants.util.strutil import safe_shlex_join
+from pants_test.option.util.fakes import create_options
 from pants_test.test_base import TestBase
 
 
@@ -84,6 +86,7 @@ class OptionsTest(TestBase):
   _known_scope_infos = [intermediate('compile'),
                         task('compile.java'),
                         task('compile.scala'),
+                        task('cache.compile.scala'),
                         intermediate('stale'),
                         intermediate('test'),
                         task('test.junit'),
@@ -105,6 +108,8 @@ class OptionsTest(TestBase):
     register_global('-z', '--verbose', type=bool, help='Verbose output.', recursive=True)
     register_global('-n', '--num', type=int, default=99, recursive=True, fingerprint=True)
     register_global('--y', type=list, member_type=int)
+    register_global('--v2',
+                    help='Two-letter long-form option, used to test option name suggestions.')
     register_global('--config-override', type=list)
 
     register_global('--pants-foo')
@@ -1294,6 +1299,62 @@ class OptionsTest(TestBase):
     self.assertEqual(3, options.for_scope('compile.java').a)
     self.assertEqual(2, options.for_scope('compile.java').b)
     self.assertEqual(4, options.for_scope('compile.java').c)
+
+  def test_invalid_option_errors(self):
+    def parse_joined_command_line(*args):
+      bootstrap_options = create_options({
+        GLOBAL_SCOPE: {
+          # Set the Levenshtein edit distance to search for misspelled options.
+        'option_name_check_distance': 2,
+          # If bootstrap option values are provided, this option is accessed and must be provided.
+        'target_spec_files': [],
+        },
+      })
+      return self._parse(safe_shlex_join(['./pants'] + list(args)),
+                         bootstrap_option_values=bootstrap_options.for_global_scope())
+
+    with self.assertRaisesWithMessage(ParseError, 'Unrecognized command line flags on global scope: --aaaaaaaaaasdf.'):
+      parse_joined_command_line('--aaaaaaaaaasdf').for_global_scope()
+
+    with self.assertRaisesWithMessage(ParseError, dedent("""\
+      Unrecognized command line flags on global scope: -v, --config-overide, --c. Suggestions:
+      -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
+      --config-overide: [--config-override]
+      --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --config-override, --a, --b, --y, -n, -z, --v2]""")):
+      parse_joined_command_line(
+        # A nonexistent short-form option -- other short-form options should be displayed.
+        '-vd',
+        # A misspelling of `--config-override=val` (without the second r) should show the correct
+        # option name.
+        '--config-overide=val',
+        # An option name without the correct prefix scope should match all flags with the same or
+        # similar unscoped option names.
+        '--c=[]',
+      ).for_global_scope()
+
+    with self.assertRaisesWithMessage(ParseError, dedent("""\
+      Unrecognized command line flags on scope 'simple': --sam. Suggestions:
+      --sam: [--simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam]""")):
+      parse_joined_command_line(
+        # Verify that misspelling searches work for options in non-global scopes.
+        '--simple-sam=val',
+      ).for_scope('simple')
+
+    with self.assertRaisesWithMessage(ParseError, dedent("""\
+      Unrecognized command line flags on scope 'compile': --modifylogs. Suggestions:
+      --modifylogs: [--compile-scala-modifylogs]""")):
+      parse_joined_command_line(
+        # Verify that options with too shallow scoping match the correct option.
+        '--compile-modifylogs=val',
+      ).for_scope('compile')
+
+    with self.assertRaisesWithMessage(ParseError, dedent("""\
+      Unrecognized command line flags on scope 'cache.compile.scala': --modifylogs. Suggestions:
+      --modifylogs: [--compile-scala-modifylogs]""")):
+      parse_joined_command_line(
+        # Verify that options with too deep scoping match the correct option.
+        '--cache-compile-scala-modifylogs=val',
+      ).for_scope('cache.compile.scala')
 
   def test_pants_global_with_default(self):
     """

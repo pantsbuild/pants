@@ -281,28 +281,39 @@ class Parser(object):
     for flag_name in flag_value_map.keys():
       # We will be matching option names without their leading hyphens, in order to capture both
       # short and long-form options.
-      flag_minus_leading_dashes = re.sub(r'^-+', '', flag_name)
-      scoped_name = (
-        '{}-{}'.format(self.scope, flag_minus_leading_dashes)
+      flag_normalized_unscoped_name = re.sub(r'^-+', '', flag_name)
+      flag_normalized_scoped_name = (
+        '{}-{}'.format(self.scope.replace('.', '-'), flag_normalized_unscoped_name)
         if self.scope != GLOBAL_SCOPE
-        else flag_minus_leading_dashes)
-      suffix_matching_option_names = []
+        else flag_normalized_unscoped_name)
+
+      substring_matching_option_names = []
       levenshtein_matching_option_names = defaultdict(list)
-      for other_name in all_scoped_flag_names:
-        other_name_no_dashes = re.sub(r'^-+', '', other_name)
-        # If the invalid option on the command line is the ending of another option, display
-        # that. This can occur when an option is used without the appropriate prefix scope.
-        if other_name_no_dashes.endswith(scoped_name):
-          suffix_matching_option_names.append(other_name)
+      for other_scoped_flag in all_scoped_flag_names:
+        other_complete_flag_name = other_scoped_flag.scoped_arg
+        other_normalized_scoped_name = other_scoped_flag.normalized_scoped_arg
+        other_normalized_unscoped_name = other_scoped_flag.normalized_arg
+        if flag_normalized_unscoped_name == other_normalized_unscoped_name:
+          # If the unscoped option name itself matches, but the scope doesn't, display it.
+          substring_matching_option_names.append(other_complete_flag_name)
+        elif other_normalized_scoped_name.startswith(flag_normalized_scoped_name):
+          # If the invalid scoped option name is the beginning of another scoped option name,
+          # display it. This will also suggest long-form options such as --verbose for an attempted
+          # -v (if -v isn't defined as an option).
+          substring_matching_option_names.append(other_complete_flag_name)
         else:
-          # If an option name is similar to the one entered, according to
-          # --option-name-check-distance, display that. This covers misspellings!
-          levenshtein_distance = Levenshtein.distance(scoped_name, other_name_no_dashes)
-          if levenshtein_distance <= levenshtein_max_distance:
-            levenshtein_matching_option_names[levenshtein_distance].append(other_name)
-      # If any option name's suffix matched the invalid flag, put those first. Then, display the
-      # option names matching via edit distance in a deterministic way.
-      all_matching_scoped_option_names = suffix_matching_option_names + [
+          # If an unscoped option name is similar to the unscoped option from the command line
+          # according to --option-name-check-distance, display the matching scoped option name. This
+          # covers misspellings!
+          unscoped_option_levenshtein_distance = Levenshtein.distance(flag_normalized_unscoped_name, other_normalized_unscoped_name)
+          if unscoped_option_levenshtein_distance <= levenshtein_max_distance:
+            # NB: We order the matched flags by Levenshtein distance compared to the entire option string!
+            fully_scoped_levenshtein_distance = Levenshtein.distance(flag_normalized_scoped_name, other_normalized_scoped_name)
+            levenshtein_matching_option_names[fully_scoped_levenshtein_distance].append(other_complete_flag_name)
+
+      # If any option name matched or started with the invalid flag in any scope, put that
+      # first. Then, display the option names matching in order of overall edit distance, in a deterministic way.
+      all_matching_scoped_option_names = substring_matching_option_names + [
         flag
         for distance in sorted(levenshtein_matching_option_names.keys())
         for flag in sorted(levenshtein_matching_option_names[distance])
@@ -311,17 +322,17 @@ class Parser(object):
         matching_flags[flag_name] = all_matching_scoped_option_names
 
     if matching_flags:
-      suggestions_message = '\n{}'.format('\n'.join(
+      suggestions_message = ' Suggestions:\n{}'.format('\n'.join(
         '{}: [{}]'.format(flag_name, ', '.join(matches))
         for flag_name, matches in matching_flags.items()
       ))
     else:
-      suggestions_message = ' <none>'
+      suggestions_message = ''
     raise ParseError(
-      'Unrecognized command line flags on {scope}: {flags}. Suggestions:{suggestions}'
+      'Unrecognized command line flags on {scope}: {flags}.{suggestions_message}'
       .format(scope=self._scope_str(),
               flags=', '.join(flag_value_map.keys()),
-              suggestions=suggestions_message))
+              suggestions_message=suggestions_message))
 
   def option_registrations_iter(self):
     """Returns an iterator over the normalized registration arguments of each option in this parser.

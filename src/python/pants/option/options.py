@@ -9,6 +9,8 @@ import re
 import sys
 from builtins import object, open, str
 
+from future.utils import text_type
+
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -19,6 +21,7 @@ from pants.option.parser import Parser
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import ScopeInfo
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.objects import datatype
 
 
 def make_flag_regex(long_name, short_name=None):
@@ -368,6 +371,41 @@ class Options(object):
             hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys))
           )
 
+  class _ScopedFlagNameForFuzzyMatching(datatype([
+      ('scope', text_type),
+      ('arg', text_type),
+      ('normalized_arg', text_type),
+      ('scoped_arg', text_type),
+  ])):
+    """Specify how a registered option would look like on the command line.
+
+    This information enables fuzzy matching to suggest correct option names when a user specifies an
+    unregistered option on the command line.
+
+    :param scope: the 'scope' component of a command-line flag.
+    :param arg: the unscoped flag name as it would appear on the command line.
+    :param normalized_arg: the fully-scoped option name, without any leading dashes.
+    :param scoped_arg: the fully-scoped option as it would appear on the command line.
+    """
+
+    def __new__(cls, scope, arg):
+      normalized_arg = re.sub('^-+', '', arg)
+      if scope == GLOBAL_SCOPE:
+        scoped_arg = arg
+      else:
+        dashed_scope = scope.replace('.', '-')
+        scoped_arg = '--{}-{}'.format(dashed_scope, normalized_arg)
+      return super(Options._ScopedFlagNameForFuzzyMatching, cls).__new__(
+        cls,
+        scope=scope,
+        arg=arg,
+        normalized_arg=normalized_arg,
+        scoped_arg=scoped_arg)
+
+    @property
+    def normalized_scoped_arg(self):
+      return re.sub(r'^-+', '', self.scoped_arg)
+
   @memoized_property
   def _all_scoped_flag_names_for_fuzzy_matching(self):
     """A list of all registered flags in all their registered scopes.
@@ -380,20 +418,17 @@ class Options(object):
       scope = parser.scope
       known_args = parser.known_args
       for arg in known_args:
-        if scope == GLOBAL_SCOPE:
-          scoped_arg = arg
-        else:
-          arg_minus_leading_dashes = re.sub(r'^-+', '', arg)
-          scoped_arg = '--{}-{}'.format(scope, arg_minus_leading_dashes)
-        all_scoped_flag_names.append(scoped_arg)
+        scoped_flag = self._ScopedFlagNameForFuzzyMatching(scope=scope, arg=arg)
+        all_scoped_flag_names.append(scoped_flag)
     self.walk_parsers(register_all_scoped_names)
-    return all_scoped_flag_names
+    return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
 
   def _make_parse_args_request(self, flags_in_scope, namespace):
-    if self._bootstrap_option_values:
-      levenshtein_max_distance = self._bootstrap_option_values.option_name_check_distance
-    else:
-      levenshtein_max_distance = 0
+    levenshtein_max_distance = (
+      self._bootstrap_option_values.option_name_check_distance
+      if self._bootstrap_option_values
+      else 0
+    )
     return Parser.ParseArgsRequest(
       flags_in_scope=flags_in_scope,
       namespace=namespace,
