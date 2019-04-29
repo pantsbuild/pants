@@ -51,29 +51,29 @@ class SignalHandler(object):
 
   def __init__(self):
     self._ignore_sigint_lock = threading.Lock()
-    self._ignore_sigint = 0
+    self._threads_ignoring_sigint = 0
 
   def _check_sigint_gate_is_correct(self):
-    assert self._ignore_sigint >= 0, \
+    assert self._threads_ignoring_sigint >= 0, \
       "This should never happen, someone must have modified the counter outside of SignalHandler."
 
   def _handle_sigint_if_enabled(self, signum, _frame):
     with self._ignore_sigint_lock:
       self._check_sigint_gate_is_correct()
-      should_ignore_sigint = self._ignore_sigint
-    if should_ignore_sigint == 0:
+      threads_ignoring_sigint = self._threads_ignoring_sigint
+    if threads_ignoring_sigint == 0:
       self.handle_sigint(signum, _frame)
 
   @contextmanager
-  def ignoring_sigint(self):
+  def _ignoring_sigint(self):
     with self._ignore_sigint_lock:
       self._check_sigint_gate_is_correct()
-      self._ignore_sigint += 1
+      self._threads_ignoring_sigint += 1
     try:
       yield
     finally:
       with self._ignore_sigint_lock:
-        self._ignore_sigint -= 1
+        self._threads_ignoring_sigint -= 1
         self._check_sigint_gate_is_correct()
 
   def handle_sigint(self, signum, _frame):
@@ -311,6 +311,8 @@ class ExceptionSink(object):
     OS state:
     - Overwrites signal handlers for SIGINT, SIGQUIT, and SIGTERM.
 
+    NB: This method calls signal.signal(), which will crash if not called from the main thread!
+
     :returns: The :class:`SignalHandler` that was previously registered, or None if this is
               the first time this method was called.
     """
@@ -331,7 +333,11 @@ class ExceptionSink(object):
   @classmethod
   @contextmanager
   def trapped_signals(cls, new_signal_handler):
-    """A contextmanager which temporarily overrides signal handling."""
+    """
+    A contextmanager which temporarily overrides signal handling.
+
+    NB: This method calls signal.signal(), which will crash if not called from the main thread!
+    """
     try:
       previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
       yield
@@ -344,10 +350,13 @@ class ExceptionSink(object):
     """
     A contextmanager which disables handling sigint in the current signal handler.
     This allows threads that are not the main thread to ignore sigint.
+
+    NB: Only use this if you can't use ExceptionSink.trapped_signals().
+
     Class state:
     - Toggles `self._ignore_sigint` in `cls._signal_handler`.
     """
-    with cls._signal_handler.ignoring_sigint():
+    with cls._signal_handler._ignoring_sigint():
       yield
 
   @classmethod
