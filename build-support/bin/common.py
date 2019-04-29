@@ -1,19 +1,28 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-"""Utils for scripts to interface with the outside world."""
+"""Utils for scripts to interface with the outside world.
+
+NB: We intentionally only use the standard library here, rather than using
+Pants code and/or 3rd-party dependencies like `colors`, to ensure that all
+scripts that import this file may still be invoked directly, rather than having
+to run via `./pants run`.
+
+We want to allow direct invocation of scripts for these reasons:
+1) Consistency with how we invoke Bash scripts, which notably may _not_ be ran via `./pants run`.
+2) More ergonomic command line arguments, e.g. `./build-support/bin/check_header.py src tests`,
+   rather than `./pants run build-support/bin:check_header -- src tests`.
+3) Avoid undesired dependencies on Pants for certain scripts. For example, `shellcheck.py`
+   lints the `./pants` script, and we would like the script to still work even if `./pants`
+   breaks. If we had to rely on invoking via `./pants run`, this would not be possible.
+
+Callers of this file, however, are free to dogfood Pants as they'd like, and any script
+may be called via `./pants run` instead of direct invocation if desired."""
 
 import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Tuple
-
-
-# NB: We intentionally do not use the colors library, because that would bring
-# in a third party dependency, meaning that none of the scripts could be
-# executed directly and would all require `./pants run` to run. We want to ensure
-# that scripts can run without any dependency on Pants itself. So, we can only
-# depend on the standard library in this file.
 
 
 _SCRIPT_START_TIME = time.time()
