@@ -227,6 +227,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     for run_pairs in zip(non_daemon_runs, daemon_runs):
       self.assertEqual(*(run.stdout_data for run in run_pairs))
 
+  @unittest.skip('Flaky as described in: https://github.com/pantsbuild/pants/issues/7622')
   def test_pantsd_filesystem_invalidation(self):
     """Runs with pantsd enabled, in a loop, while another thread invalidates files."""
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, _):
