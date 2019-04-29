@@ -1,12 +1,13 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::TryIntoPythonLogLevel;
+use crate::PythonLogLevel;
 use lazy_static::lazy_static;
 use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
 use simplelog::Config;
 use simplelog::WriteLogger;
+use std::convert::TryInto;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{stderr, Stderr, Write};
@@ -33,7 +34,7 @@ impl Logger {
   }
 
   pub fn init(max_level: u64, show_rust_3rdparty_logs: bool) {
-    let max_python_level = (max_level).try_into_PythonLogLevel();
+    let max_python_level: Result<PythonLogLevel, _> = max_level.try_into();
     match max_python_level {
       Ok(python_level) => {
         let level: log::LevelFilter = python_level.into();
@@ -54,7 +55,7 @@ impl Logger {
   }
 
   pub fn set_stderr_logger(&self, python_level: u64) -> Result<(), String> {
-    python_level.try_into_PythonLogLevel().map(|level| {
+    python_level.try_into().map(|level: PythonLogLevel| {
       self.maybe_increase_global_verbosity(level.into());
       *self.stderr_log.lock() = MaybeWriteLogger::new(
         stderr(),
@@ -75,7 +76,7 @@ impl Logger {
     python_level: u64,
   ) -> Result<std::os::unix::io::RawFd, String> {
     use std::os::unix::io::AsRawFd;
-    python_level.try_into_PythonLogLevel().and_then(|level| {
+    python_level.try_into().and_then(|level: PythonLogLevel| {
       {
         // Maybe close open file by dropping the existing logger
         *self.pantsd_log.lock() = MaybeWriteLogger::empty();
@@ -104,7 +105,7 @@ impl Logger {
     python_level: u64,
     target: &str,
   ) -> Result<(), String> {
-    python_level.try_into_PythonLogLevel().map(|level| {
+    python_level.try_into().map(|level: PythonLogLevel| {
       log!(target: target, level.into(), "{}", message);
     })
   }
