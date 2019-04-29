@@ -349,8 +349,9 @@ class PantsDaemon(FingerprintedProcessManager):
       service.setup(self._services)
 
   @staticmethod
-  def _make_thread(target):
-    t = threading.Thread(target=target)
+  def _make_thread(service):
+    name = "{}Thread".format(service.__class__.__name__)
+    t = threading.Thread(target=service.run, name=name)
     t.daemon = True
     return t
 
@@ -360,7 +361,7 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.critical('no services to run, bailing!')
       return
 
-    service_thread_map = {service: self._make_thread(service.run)
+    service_thread_map = {service: self._make_thread(service)
                           for service in pants_services.services}
 
     # Start services.
