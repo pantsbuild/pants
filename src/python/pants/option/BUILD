@@ -6,6 +6,7 @@ python_library(
     'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:ansicolors',
     '3rdparty/python:future',
+    '3rdparty/python:python-Levenshtein',
     '3rdparty/python:PyYAML',
     '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
