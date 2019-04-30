@@ -161,11 +161,6 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   log_filename = None
   file_handler = None
 
-  with open('/tmp/logs', 'a') as f:
-    f.write("called setup_logging with level: {},\n console_stream: {} ({}),\n log_dir: {},\n scope: {},\n log_name: {},\n native: {}\n".format(
-      level, console_stream, id(console_stream), log_dir, scope, log_name, native
-    ))
-
   # A custom log handler for sub-debug trace logging.
   def trace(self, message, *args, **kwargs):
     if self.isEnabledFor(TRACE):

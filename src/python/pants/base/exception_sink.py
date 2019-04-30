@@ -426,11 +426,6 @@ timestamp: {timestamp}
   def _log_unhandled_exception_and_exit(cls, exc_class=None, exc=None, tb=None, add_newline=False):
     """A sys.excepthook implementation which logs the error and exits with failure."""
 
-    with open('/tmp/logs', 'a') as f:
-      f.write("Log unhandled exception and exit\n")
-      #import traceback
-      #traceback.print_stack(file=f, limit=8)
-
     exc_class = exc_class or sys.exc_info()[0]
     exc = exc or sys.exc_info()[1]
     tb = tb or sys.exc_info()[2]

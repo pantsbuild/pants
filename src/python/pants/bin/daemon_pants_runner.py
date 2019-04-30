@@ -27,7 +27,6 @@ from pants.util.socket import teardown_socket
 class DaemonSignalHandler(SignalHandler):
 
   def handle_sigint(self, signum, _frame):
-    write_to_file("DSH received sigint!")
     self.daemon.shutdown()
     raise KeyboardInterrupt('remote client sent control-c!')
 
@@ -36,11 +35,6 @@ class DaemonSignalHandler(SignalHandler):
       self.daemon.shutdown()
     except Exception:
       pass
-
-
-def write_to_file(msg):
-  with open('/tmp/logs', 'a') as f:
-    f.write('{}\n'.format(msg))
 
 
 class NoopExiter(Exiter):
@@ -82,8 +76,6 @@ class DaemonExiter(Exiter):
             )
         except Exception:
           pass
-
-    write_to_file("DPR, Exiting with code {} and msg {}".format(result, msg))
 
     with self._maybe_shutdown_socket.lock:
       # Write a final message to stderr if present.
@@ -214,16 +206,13 @@ class DaemonPantsRunner(object):
       # exit chunk, to avoid any socket shutdown vs write races.
       stdout, stderr = sys.stdout, sys.stderr
       def finalizer():
-        write_to_file("_pipe_stdio, enter finalizer")
         try:
           stdout.flush()
           stderr.flush()
         finally:
           time.sleep(.001)  # HACK: Sleep 1ms in the main thread to free the GIL.
           writer.stop()
-          write_to_file("_pipe_stdio, before writer.join()")
           writer.join()
-          write_to_file("_pipe_stdio, after writer.join()")
           stdout.close()
           stderr.close()
       yield finalizer
@@ -248,7 +237,6 @@ class DaemonPantsRunner(object):
         handle_stdin
       ) as finalizer:
         yield finalizer
-      write_to_file("DPR, nailgunned_stdio after yielding the finalizer")
 
   def _maybe_get_client_start_time_from_env(self, env):
     client_start_time = env.pop('PANTSD_RUNTRACKER_CLIENT_START_TIME', None)
@@ -287,13 +275,9 @@ class DaemonPantsRunner(object):
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
 
         runner.run()
-        write_to_file("DPR, After the run has finished")
       except KeyboardInterrupt:
-        write_to_file("DPR, Keyboard interrupt in DPR")
         self._exiter.exit_and_fail('Interrupted by user.\n')
       except Exception as e:
-        write_to_file("DPR, exception in DPR!")
-
         # LocalPantsRunner.set_start_time resets the global exiter,
         # which used to be okay, because it was process-local,
         # but now we need to un-reset it here.

@@ -16,15 +16,9 @@ from contextlib2 import ExitStack
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
-def write_to_file(msg):
-  with open('/tmp/logs', 'a') as f:
-    f.write('{}\n'.format(msg))
-
-
 @contextmanager
 def _pipe(isatty):
   r_fd, w_fd = os.openpty() if isatty else os.pipe()
-  write_to_file("BL: _pipe(isatty = {}, r_fd = {}, w_fd = {})".format(isatty, r_fd, w_fd))
   yield (r_fd, w_fd)
 
 
@@ -35,10 +29,7 @@ def _self_closing_pipe(isatty):
       yield (r_fd, w_fd)
     finally:
       os.close(r_fd)
-      write_to_file("BL: _self_closing_pipe, after os.close(r_fd), r_fd = {}".format(r_fd))
-      write_to_file("BL: _self_closing_pipe, before os.close(w_fd), w_fd = {}".format(w_fd))
       os.close(w_fd)
-      write_to_file("BL: _self_closing_pipe, after os.close(w_fd), w_fd = {}".format(w_fd))
 
 
 class _StoppableDaemonThread(threading.Thread):
@@ -113,8 +104,6 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
           yield read_fd
         finally:
           os.close(read_fd)
-      write_to_file("BL: after reader.running()")
-    write_to_file("BL: after _pipe()")
 
   # TODO: The error is that when the client finishes (and presumably closes the socket),
   # the server might still want to read stdin, since this is in another thread.
@@ -160,7 +149,6 @@ class NailgunStreamWriter(_StoppableDaemonThread):
     """
     super(NailgunStreamWriter, self).__init__(name=self.__class__.__name__)
     # Validates that we've received file descriptor numbers.
-    write_to_file("NSW(in_fds = {}, socket = {})".format(in_fds, sock))
     self._in_fds = [int(f) for f in in_fds]
     self._socket = sock
     self._chunk_eof_type = chunk_eof_type
@@ -192,7 +180,6 @@ class NailgunStreamWriter(_StoppableDaemonThread):
     """Yields the write sides of pipes that will copy appropriately chunked values to the socket."""
     cls._assert_aligned(chunk_types, isattys)
 
-    write_to_file("NSW.open_multi(sock = {}, isattys = {})".format(sock, isattys))
 
     # N.B. This is purely to permit safe handling of a dynamic number of contextmanagers.
     with ExitStack() as stack:
@@ -218,12 +205,9 @@ class NailgunStreamWriter(_StoppableDaemonThread):
       if readable:
         for fileno in readable:
           data = os.read(fileno, self._buf_size)
-          # write_to_file("NSW, read data from stdin (fd={}) {}".format(fileno, data))
-
           if not data:
             # We've reached EOF.
             try:
-              write_to_file("NSW, We have reached EOF, chunk type is {}".format(self._chunk_eof_type))
               if self._chunk_eof_type is not None:
                 NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
             finally:

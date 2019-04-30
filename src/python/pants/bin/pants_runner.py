@@ -78,7 +78,7 @@ class PantsRunner(object):
     from pants.bin.local_pants_runner import LocalPantsRunner
 
     if self.will_terminate_pantsd():
-      logger.info("BL: Pantsd terminating goal detected: {}".format(self._args))
+      logger.debug("Pantsd terminating goal detected: {}".format(self._args))
 
     runner = LocalPantsRunner.create(
         self._exiter,

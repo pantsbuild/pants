@@ -146,7 +146,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
           raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
     except NailgunProtocol.ProcessStreamTimeout as e:
       assert(self.remote_pid is not None)
-      # NB: We overwrite the process title in the pantsd-runner process, which causes it to have an
+      # NB: We overwrite the process title in the pantsd process, which causes it to have an
       # argv with lots of empty spaces for some reason. We filter those out and pretty-print the
       # rest here.
       filtered_remote_cmdline = safe_shlex_join(
@@ -174,11 +174,6 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
 
     # Process the remainder of the nailgun session.
     return self._process_session()
-
-
-def write_to_file(msg):
-  with open('/tmp/logs', 'a') as f:
-    f.write('{}\n'.format(msg))
 
 
 class NailgunClient(object):
@@ -326,7 +321,6 @@ class NailgunClient(object):
     """
     remote_pid = self._maybe_last_pid()
     if remote_pid is not None:
-      write_to_file("NailgunClient, Sending kill to pid {} with {}".format(remote_pid, signum))
       safe_kill(remote_pid, signum)
     if include_pgrp:
       remote_pgrp = self._maybe_last_pgrp()

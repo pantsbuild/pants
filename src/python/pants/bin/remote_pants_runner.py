@@ -42,7 +42,6 @@ class PailgunClientSignalHandler(SignalHandler):
     self._pailgun_client.maybe_send_signal(signum)
 
   def handle_sigint(self, signum, _frame):
-    write_to_file("PailgunClientSignalHandler, receiving/handling sigint")
     self._forward_signal_with_timeout(signum, 'SIGINT')
 
   def handle_sigquit(self, signum, _frame):
@@ -50,11 +49,6 @@ class PailgunClientSignalHandler(SignalHandler):
 
   def handle_sigterm(self, signum, _frame):
     self._forward_signal_with_timeout(signum, 'SIGTERM')
-
-
-def write_to_file(msg):
-  with open('/tmp/logs', 'a') as f:
-    f.write('{}\n'.format(msg))
 
 
 class RemotePantsRunner(object):

@@ -82,11 +82,6 @@ class _LoggerStream(object):
     return self
 
 
-def write_to_file(msg):
-  with open('/tmp/logs', 'a') as f:
-    f.write('{}\n'.format(msg))
-
-
 class PantsDaemonSignalHandler(SignalHandler):
 
   def __init__(self, services):
@@ -95,7 +90,6 @@ class PantsDaemonSignalHandler(SignalHandler):
 
   def handle_sigint(self, signum, _frame):
     for service in self._services:
-      write_to_file('PD received sigint')
       service.record_exception(KeyboardInterrupt('remote client sent control-c!'))
 
 
