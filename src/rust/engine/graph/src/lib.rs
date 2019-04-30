@@ -120,9 +120,15 @@ impl<N: Node> InnerGraph<N> {
   /// Returns a path which would cause the cycle if an edge were added from src to dst, or None if
   /// no cycle would be created.
   ///
-  fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> Option<Vec<Entry<N>>> {
+  /// This strongly optimizes for the case of no cycles. If cycles are detected, this is very
+  /// expensive to call.
+  ///
+  fn report_cycle(&self, src_id: EntryId, dst_id: EntryId) -> Option<Vec<Entry<N>>> {
     if src_id == dst_id {
       return Some(vec![self.entry_for_id(src_id).unwrap().clone()]);
+    }
+    if !self.detect_cycle(src_id, dst_id) {
+      return None;
     }
     Self::shortest_path(&self.pg, dst_id, src_id).map(|path| {
       path
@@ -133,7 +139,37 @@ impl<N: Node> InnerGraph<N> {
   }
 
   ///
+  /// Detect whether adding an edge from src to dst would create a cycle.
+  ///
+  /// Uses Dijkstra's algorithm, which is significantly cheaper than the Bellman-Ford, but keeps
+  /// less context around paths on the way.
+  ///
+  fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
+    // Search either forward from the dst, or backward from the src.
+    let (root, needle, direction) = {
+      let out_from_dst = self.pg.neighbors(dst_id).count();
+      let in_to_src = self
+        .pg
+        .neighbors_directed(src_id, Direction::Incoming)
+        .count();
+      if out_from_dst < in_to_src {
+        (dst_id, src_id, Direction::Outgoing)
+      } else {
+        (src_id, dst_id, Direction::Incoming)
+      }
+    };
+
+    // Search for an existing path from dst to src.
+    let mut roots = VecDeque::new();
+    roots.push_back(root);
+    self.walk(roots, direction).any(|eid| eid == needle)
+  }
+
+  ///
   /// Compute and return one shortest path from `src` to `dst`.
+  ///
+  /// Uses Bellman-Ford, which is pretty expensive O(VE) as it has to traverse the whole graph and
+  /// keeping a lot of state on the way.
   ///
   fn shortest_path(graph: &PGraph<N>, src: EntryId, dst: EntryId) -> Option<Vec<EntryId>> {
     let (_path_weights, paths) = petgraph::algo::bellman_ford(graph, src)
@@ -569,7 +605,7 @@ impl<N: Node> Graph<N> {
     let mut counter = 0;
     loop {
       // Find one cycle if any cycles exist.
-      if let Some(cycle_path) = inner.detect_cycle(src_id, potential_dst_id) {
+      if let Some(cycle_path) = inner.report_cycle(src_id, potential_dst_id) {
         // See if the cycle contains any dirty nodes. If there are dirty nodes, we can try clearing
         // them, and then check if there are still any cycles in the graph.
         let dirty_nodes: HashSet<_> = cycle_path
