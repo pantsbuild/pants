@@ -4,8 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import str
-
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.build_graph.target_scopes import Scope
 from pants.subsystem.subsystem import Subsystem

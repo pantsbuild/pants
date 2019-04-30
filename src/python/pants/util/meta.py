@@ -12,7 +12,6 @@ class SingletonMetaclass(type):
   """Singleton metaclass."""
 
   def __call__(cls, *args, **kwargs):
-    # TODO: convert this into an `@memoized_classproperty`!
     if not hasattr(cls, 'instance'):
       cls.instance = super(SingletonMetaclass, cls).__call__(*args, **kwargs)
     return cls.instance
@@ -21,10 +20,12 @@ class SingletonMetaclass(type):
 class ClassPropertyDescriptor(object):
   """Define a readable attribute on a class, given a function."""
 
-  # The current solution is preferred as it doesn't require any modifications to the class
-  # definition beyond declaring a @classproperty.  It seems overriding __set__ and __delete__ would
-  # require defining a metaclass or overriding __setattr__/__delattr__ (see
-  # https://stackoverflow.com/questions/5189699/how-to-make-a-class-property).
+  # TODO: it seems overriding __set__ and __delete__ would require defining a metaclass or
+  # overriding __setattr__/__delattr__ (see
+  # https://stackoverflow.com/questions/5189699/how-to-make-a-class-property). The current solution
+  # doesn't require any modifications to the class definition beyond declaring a @classproperty.  If
+  # we can set __delete__ and have it work, we can use that e.g. to clear the cache for a new
+  # `@memoized_classproperty` decorator.
   def __init__(self, fget, doc):
     self.fget = fget
     self.__doc__ = doc
@@ -93,8 +94,6 @@ def staticproperty(func):
   return ClassPropertyDescriptor(func, doc)
 
 
-# TODO: look into merging this with `enum` and `ChoicesMixin`, which describe a fixed set of
-# singletons, to decouple the enum interface from the implementation as a `datatype`.
 # Extend Singleton and your class becomes a singleton, each construction returns the same instance.
 try:  # Python3
   Singleton = SingletonMetaclass(u'Singleton', (object,), {})

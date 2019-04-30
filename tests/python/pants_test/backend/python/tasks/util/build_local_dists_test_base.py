@@ -10,7 +10,6 @@ from builtins import next, str
 
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.libc_dev import LibcDev
-from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
@@ -83,7 +82,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
       # TODO(#6848): we should be testing all of these with both of our toolchains.
       options={
         'native-build-step': {
-          'toolchain_variant': ToolchainVariant.llvm,
+          'toolchain_variant': 'llvm',
         },
       })
     context = result.context

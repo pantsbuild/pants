@@ -311,7 +311,7 @@ class RscCompileTest(TaskTestBase):
 
   def create_task_with_target_roots(self, target_roots, default_workflow=None):
     if default_workflow:
-      self.set_options(default_workflow=_CompileWorkflowChoice( default_workflow))
+      self.set_options(default_workflow=_CompileWorkflowChoice(default_workflow))
     context = self.context(target_roots=target_roots)
     self.init_products(context)
     task = self.create_task(context)

@@ -20,7 +20,6 @@ from pants.backend.jvm.ivy_utils import (FrozenResolution, IvyFetchStep, IvyInfo
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
@@ -402,7 +401,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def test_missing_ivy_report(self):
     self.set_options_for_scope(IvySubsystem.options_scope,
                                cache_dir='DOES_NOT_EXIST',
-                               execution_strategy=NailgunTask.ExecutionStrategy.subprocess)
+                               execution_strategy='subprocess')
 
     with self.assertRaises(IvyUtils.IvyResolveReportError):
       IvyUtils.parse_xml_report('default', IvyUtils.xml_report_path('INVALID_CACHE_DIR',

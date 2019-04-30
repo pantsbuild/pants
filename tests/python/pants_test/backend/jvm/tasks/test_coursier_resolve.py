@@ -22,7 +22,6 @@ from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDepende
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import (CoursierResolve,
                                                       CoursierResolveFingerprintStrategy)
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.jar.exclude import Exclude
@@ -44,7 +43,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(CoursierResolveTest, self).setUp()
-    self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.subprocess)
+    self.set_options(execution_strategy='subprocess')
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)

@@ -12,7 +12,7 @@ from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
-from pants.util.objects import enum
+from pants.util.objects import enum, register_enum_option
 
 
 class ToolchainVariant(enum(['gnu', 'llvm'])): pass
@@ -37,16 +37,22 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
              help='The default for the "compiler_option_sets" argument '
                   'for targets of this language.')
 
-    register('--toolchain-variant', advanced=True,
-             default=ToolchainVariant.gnu, type=ToolchainVariant,
-             help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
-                  "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
+    register_enum_option(
+      register, ToolchainVariant, '--toolchain-variant', advanced=True, default='gnu',
+      help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
+           "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
 
   def get_compiler_option_sets_for_target(self, target):
     return self.get_target_mirrored_option('compiler_option_sets', target)
 
   def get_toolchain_variant_for_target(self, target):
-    return self.get_target_mirrored_option('toolchain_variant', target)
+    # TODO(#7233): convert this option into an enum instance using the `type` argument in option
+    # registration!
+    enum_or_value = self.get_target_mirrored_option('toolchain_variant', target)
+    if isinstance(enum_or_value, ToolchainVariant):
+      return enum_or_value
+    else:
+      return ToolchainVariant(enum_or_value)
 
   @classproperty
   def get_compiler_option_sets_enabled_default_value(cls):

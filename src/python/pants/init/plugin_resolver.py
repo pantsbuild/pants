@@ -10,6 +10,7 @@ import os
 import site
 from builtins import object, open
 
+from future.utils import PY3
 from pex import resolver
 from pex.base import requirement_is_exact
 from pkg_resources import Requirement
@@ -21,7 +22,6 @@ from pants.option.global_options import GlobalOptionsRegistrar
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property
-from pants.util.strutil import ensure_text
 from pants.version import PANTS_SEMVER
 
 
@@ -99,7 +99,7 @@ class PluginResolver(object):
       tmp_plugins_list = resolved_plugins_list + '~'
       with safe_open(tmp_plugins_list, 'w') as fp:
         for plugin in self._resolve_plugins():
-          fp.write(ensure_text(plugin.location))
+          fp.write(plugin.location if PY3 else plugin.location.decode('utf-8'))
           fp.write('\n')
       os.rename(tmp_plugins_list, resolved_plugins_list)
     with open(resolved_plugins_list, 'r') as fp:

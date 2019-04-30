@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import re
 from abc import abstractmethod
 from builtins import zip
 from collections import namedtuple
@@ -30,30 +29,9 @@ class TypedDatatypeInstanceConstructionError(TypeCheckError):
   """Raised when a datatype()'s fields fail a type check upon construction."""
 
 
-class DatatypeMixin(AbstractClass):
-  """Decouple datatype logic from the way it's created to ease migration to python 3 dataclasses."""
-
-  @classproperty
-  @abstractmethod
-  def type_check_error_type(cls):
-    """The exception type to use in make_type_error()."""
-
-  @classmethod
-  def make_type_error(cls, msg, *args, **kwargs):
-    """A helper method to generate an exception type for type checking errors.
-
-    This method uses `cls.type_check_error_type` to ensure that type checking errors can be caught
-    with a reliable exception type. The type returned by `cls.type_check_error_type` should ensure
-    that the exception messages are prefixed with enough context to be useful and *not* confusing.
-    """
-    return cls.type_check_error_type(cls.__name__, msg, *args, **kwargs)
-
-  @abstractmethod
-  def copy(self, **kwargs):
-    """Return a new object of the same type, replacing specified fields with new values"""
-
-
-# TODO(#7074): Migrate to python 3 dataclasses!
+# TODO: create a mixin which declares/implements the methods we define on the generated class in
+# datatype() and enum() to decouple the class's logic from the way it's created. This may also make
+# migration to python 3 dataclasses as per #7074 easier.
 def datatype(field_decls, superclass_name=None, **kwargs):
   """A wrapper for `namedtuple` that accounts for the type of the object in equality.
 
@@ -94,8 +72,21 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   namedtuple_cls = namedtuple(superclass_name, field_names, **kwargs)
 
-  class DataType(namedtuple_cls, DatatypeMixin):
-    type_check_error_type = TypedDatatypeInstanceConstructionError
+  class DataType(namedtuple_cls):
+    @classproperty
+    def type_check_error_type(cls):
+      """The exception type to use in make_type_error()."""
+      return TypedDatatypeInstanceConstructionError
+
+    @classmethod
+    def make_type_error(cls, msg, *args, **kwargs):
+      """A helper method to generate an exception type for type checking errors.
+
+      This method uses `cls.type_check_error_type` to ensure that type checking errors can be caught
+      with a reliable exception type. The type returned by `cls.type_check_error_type` should ensure
+      that the exception messages are prefixed with enough context to be useful and *not* confusing.
+      """
+      return cls.type_check_error_type(cls.__name__, msg, *args, **kwargs)
 
     def __new__(cls, *args, **kwargs):
       # TODO: Ideally we could execute this exactly once per `cls` but it should be a
@@ -157,27 +148,20 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       return super(DataType, self).__iter__()
 
     def _asdict(self):
-      """Return a new OrderedDict which maps field names to their values.
-
-      Overrides a namedtuple() method which calls __iter__.
-      """
+      '''Return a new OrderedDict which maps field names to their values'''
       return OrderedDict(zip(self._fields, self._super_iter()))
 
-    def _replace(self, **kwargs):
-      """Return a new datatype object replacing specified fields with new values.
+    def _replace(_self, **kwds):
+      '''Return a new datatype object replacing specified fields with new values'''
+      field_dict = _self._asdict()
+      field_dict.update(**kwds)
+      return type(_self)(**field_dict)
 
-      Overrides a namedtuple() method which calls __iter__.
-      """
-      field_dict = self._asdict()
-      field_dict.update(**kwargs)
-      return type(self)(**field_dict)
-
-    def copy(self, **kwargs):
-      return self._replace(**kwargs)
+    copy = _replace
 
     # NB: it is *not* recommended to rely on the ordering of the tuple returned by this method.
     def __getnewargs__(self):
-      """Return self as a plain tuple.  Used by copy and pickle."""
+      '''Return self as a plain tuple.  Used by copy and pickle.'''
       return tuple(self._super_iter())
 
     def __repr__(self):
@@ -222,18 +206,6 @@ class EnumVariantSelectionError(TypeCheckError):
   """Raised when an invalid variant for an enum() is constructed or matched against."""
 
 
-# TODO: look into merging this with pants.util.meta.Singleton!
-class ChoicesMixin(AbstractClass):
-  """A mixin which declares that the type has a fixed set of possible instances."""
-
-  @classproperty
-  def all_variants(cls):
-    """Return an iterable containing a de-duplicated list of all possible instances of this type."""
-    raise NotImplementedError(
-      "The `all_variants` classproperty must be implemented for subclasses of {}!"
-      .format(cls.__name__))
-
-
 def enum(all_values):
   """A datatype which can take on a finite set of values. This method is experimental and unstable.
 
@@ -244,14 +216,11 @@ def enum(all_values):
   If `all_values` contains only strings, then each variant is made into an attribute on the
   generated enum class object. This allows code such as the following:
 
-  class MyResult(enum(['success', 'not-success'])):
+  class MyResult(enum(['success', 'failure'])):
     pass
 
   MyResult.success # The same as: MyResult('success')
-  MyResult.not_success # The same as: MyResult('not-success')
-
-  Note that like with option names, hyphenated ('-') enum values are converted into attribute names
-  with underscores ('_').
+  MyResult.failure # The same as: MyResult('failure')
 
   :param Iterable all_values: A nonempty iterable of objects representing all possible values for
                               the enum.  This argument must be a finite, non-empty iterable with
@@ -273,7 +242,7 @@ def enum(all_values):
                      "was detected. The unique elements of all_values were: {}."
                      .format(all_values_realized, list(unique_values)))
 
-  class ChoiceDatatype(datatype([field_name]), ChoicesMixin):
+  class ChoiceDatatype(datatype([field_name])):
     # Overriden from datatype() so providing an invalid variant is catchable as a TypeCheckError,
     # but more specific.
     type_check_error_type = EnumVariantSelectionError
@@ -306,24 +275,16 @@ def enum(all_values):
       :param value: Use this as the enum value. If `value` is an instance of this class, return it,
                     otherwise it is checked against the enum's allowed values.
       """
-      if isinstance(value, cls):
-        return value
-
       if value not in cls._singletons:
         raise cls.make_type_error(
           "Value {!r} must be one of: {!r}."
           .format(value, cls._allowed_values))
-
       return cls._singletons[value]
 
     # TODO: figure out if this will always trigger on primitives like strings, and what situations
-    # won't call this __eq__ (and therefore won't raise like we want). Also look into whether there
-    # is a way to return something more conventional like `NotImplemented` here that maintains the
-    # extra caution we're looking for.
+    # won't call this __eq__ (and therefore won't raise like we want).
     def __eq__(self, other):
       """Redefine equality to avoid accidentally comparing against a non-enum."""
-      if other is None:
-        return False
       if type(self) != type(other):
         raise self.make_type_error(
           "when comparing {!r} against {!r} with type '{}': "
@@ -352,15 +313,23 @@ def enum(all_values):
         raise self.make_type_error(
           "pattern matching must have exactly the keys {} (was: {})"
           .format(self._allowed_values, list(keys)))
-      match_for_variant = mapping[self.value]
+      match_for_variant = mapping[self.underlying()]
       return match_for_variant
 
-    @classproperty
-    def all_variants(cls):
+    def underlying(self):
+      """Get the element of `all_values` corresponding to this enum instance.
+
+      This should be used only for generating option values in tests. In general, it is less
+      error-prone to deal with enum objects directly.
+      """
+      return getattr(self, field_name)
+
+    @classmethod
+    def iterate_enum_variants(cls):
       """Iterate over all instances of this enum, in the declared order.
 
-      NB: resolve_for_enum_variant() should be used instead of this method for performing
-      conditional logic based on an enum instance's value.
+      NB: This method is exposed for testing enum variants easily. resolve_for_enum_variant() should
+      be used for performing conditional logic based on an enum instance's value.
       """
       return cls._singletons.values()
 
@@ -369,10 +338,15 @@ def enum(all_values):
   for case in all_values_realized:
     if isinstance(case, six.string_types):
       accessor = classproperty(accessor_generator(case))
-      attr_name = re.sub(r'-', '_', case)
-      setattr(ChoiceDatatype, attr_name, accessor)
+      setattr(ChoiceDatatype, case, accessor)
 
   return ChoiceDatatype
+
+
+# TODO(#7233): allow usage of the normal register() by using an enum class as the `type` argument!
+def register_enum_option(register, enum_cls, *args, **kwargs):
+  """A helper method for declaring a pants option from an `enum()`."""
+  register(*args, choices=enum_cls._allowed_values, **kwargs)
 
 
 # TODO: make these members of the `TypeConstraint` class!

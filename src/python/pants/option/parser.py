@@ -8,7 +8,7 @@ import copy
 import os
 import re
 import traceback
-from builtins import next, object, open, str
+from builtins import next, object, open
 from collections import defaultdict
 
 import six
@@ -442,13 +442,7 @@ class Parser(object):
       elif kwargs.get('type') == bool:
         return self._ensure_bool(val_str)
       else:
-        type_arg = kwargs.get('type', str)
-        try:
-          return self._wrap_type(type_arg)(val_str)
-        except TypeError as e:
-          raise ParseError(
-            "Error applying type '{}' to option value '{}', for option '--{}' in {}: {}"
-            .format(type_arg.__name__, val_str, dest, self._scope_str(), e))
+        return self._wrap_type(kwargs.get('type', str))(val_str)
 
     # Helper function to expand a fromfile=True value string, if needed.
     def expand(val_str):
@@ -557,13 +551,6 @@ class Parser(object):
     def check(val):
       if val is not None:
         choices = kwargs.get('choices')
-        # If the `type` argument has an `all_variants` attribute, use that as `choices` if not
-        # already set. Using an attribute instead of checking a subclass allows `type` arguments
-        # which are functions to have an implicit fallback `choices` set as well.
-        if choices is None and 'type' in kwargs:
-          type_arg = kwargs.get('type')
-          if hasattr(type_arg, 'all_variants'):
-            choices = list(type_arg.all_variants)
         if choices is not None and val not in choices:
           raise ParseError('`{}` is not an allowed value for option {} in {}. '
                            'Must be one of: {}'.format(val, dest, self._scope_str(), choices))

@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.jvm.tasks.nailgun_task import NailgunProcessGroup, NailgunTask
+from pants.backend.jvm.tasks.nailgun_task import NailgunProcessGroup
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
@@ -18,7 +18,7 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
     :API: public
     """
     super(NailgunTaskTestBase, self).setUp()
-    self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.nailgun)
+    self.set_options(execution_strategy='nailgun')
 
   def tearDown(self):
     """

@@ -125,9 +125,9 @@ class _JvmCompileWorkflowType(enum(['zinc-only', 'rsc-then-zinc'])):
     if target.has_sources('.java') or \
       isinstance(target, JUnitTests) or \
       (isinstance(target, ScalaLibrary) and tuple(target.java_sources)):
-      target_type = _JvmCompileWorkflowType.zinc_only
+      target_type = _JvmCompileWorkflowType('zinc-only')
     elif target.has_sources('.scala'):
-      target_type = _JvmCompileWorkflowType.rsc_then_zinc
+      target_type = _JvmCompileWorkflowType('rsc-then-zinc')
     else:
       target_type = None
     return target_type
@@ -180,7 +180,7 @@ class RscCompile(ZincCompile):
     register('--force-compiler-tag-prefix', default='use-compiler', metavar='<tag>',
       help='Always compile targets marked with this tag with rsc, unless the workflow is '
            'specified on the cli.')
-    register('--default-workflow', type=_CompileWorkflowChoice,
+    register('--default-workflow',
       default=_CompileWorkflowChoice.guess, metavar='<workflow>',
       help='Defines how a compile workflow is chosen when a tag is not present.')
 

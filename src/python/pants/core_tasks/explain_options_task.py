@@ -11,7 +11,6 @@ from colors import black, blue, cyan, green, magenta, red, white
 from packaging.version import Version
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.ranked_value import RankedValue
 from pants.task.console_task import ConsoleTask
 from pants.version import PANTS_SEMVER
@@ -175,4 +174,4 @@ class ExplainOptionsTask(ConsoleTask):
           if self.is_json():
             inner_map["history"] = history_list
     if self.is_json():
-      yield json.dumps(output_map, indent=2, sort_keys=True, cls=CoercingOptionEncoder)
+      yield json.dumps(output_map, indent=2, sort_keys=True)

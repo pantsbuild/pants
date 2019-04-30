@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from textwrap import dedent
 
-from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.native.targets.native_library import CppLibrary, NativeLibrary
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.native_compile import ObjectFiles
@@ -62,11 +61,11 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
     cpp_compile.execute()
 
   def test_target_level_toolchain_variant_llvm(self):
-    self.set_options_for_scope('native-build-step', toolchain_variant=ToolchainVariant.gnu)
+    self.set_options_for_scope('native-build-step', toolchain_variant='gnu')
     cpp_lib_target = self.make_target(
       '//:cpp_library',
       NativeLibrary,
-      toolchain_variant=ToolchainVariant.llvm,
+      toolchain_variant='llvm'
     )
 
     task = self.create_task(self.context(target_roots=[cpp_lib_target]))
@@ -75,7 +74,7 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
     self.assertIn('llvm', compiler.path_entries[0])
 
   def test_target_level_toolchain_variant_default_llvm(self):
-    self.set_options_for_scope('native-build-step', toolchain_variant=ToolchainVariant.llvm)
+    self.set_options_for_scope('native-build-step', toolchain_variant='llvm')
     cpp_lib_target = self.make_target(
       '//:cpp_library',
       NativeLibrary,
@@ -86,7 +85,7 @@ class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):
     self.assertIn('llvm', compiler.path_entries[0])
 
   def test_target_level_toolchain_variant_default_gnu(self):
-    self.set_options_for_scope('native-build-step', toolchain_variant=ToolchainVariant.gnu)
+    self.set_options_for_scope('native-build-step', toolchain_variant='gnu')
     cpp_lib_target = self.make_target(
       '//:cpp_library',
       NativeLibrary,
