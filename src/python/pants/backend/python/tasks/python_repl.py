@@ -19,6 +19,7 @@ class PythonReplSignalHandler(SignalHandler):
   def handle_sigint(self, signum, _frame):
     pass
 
+
 class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
   """Launch an interactive Python interpreter session."""
 

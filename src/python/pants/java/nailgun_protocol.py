@@ -410,6 +410,7 @@ class MaybeShutdownSocket(object):
   lock guards access to is_shutdown, shutting down the socket, and any calls which need to guarantee
   they don't race a shutdown call.
   """
+
   def __init__(self, sock):
     self.socket = sock
     self.lock = threading.Lock()

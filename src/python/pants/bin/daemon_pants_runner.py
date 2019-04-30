@@ -12,17 +12,14 @@ import time
 from builtins import open, zip
 from contextlib import contextmanager
 
-from future.utils import raise_with_traceback
-
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
-from pants.init.logging import encapsulated_global_logger, setup_logging_from_options
+from pants.init.logging import encapsulated_global_logger
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
-from pants.pantsd.process_manager import ProcessManager
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
@@ -50,7 +47,7 @@ class NoopExiter(Exiter):
   def exit(self, result, *args, **kwargs):
     if result != 0:
       # TODO this exception was not designed for this, but it happens to do what we want.
-      raise _GracefulTerminationException(result)
+      raise Exception(result)
 
 
 class DaemonExiter(Exiter):
@@ -102,32 +99,7 @@ class DaemonExiter(Exiter):
       self._maybe_shutdown_socket.is_shutdown = True
 
 
-class _GracefulTerminationException(Exception):
-  """Allows for deferring the returning of the exit code of prefork work until post fork.
-
-  TODO: Once the fork boundary is removed in #7390, this class can be replaced by directly exiting
-  with the relevant exit code.
-  """
-
-  def __init__(self, exit_code=PANTS_FAILED_EXIT_CODE):
-    """
-    :param int exit_code: an optional exit code (defaults to PANTS_FAILED_EXIT_CODE)
-    """
-    super(_GracefulTerminationException, self).__init__('Terminated with {}'.format(exit_code))
-
-    if exit_code == PANTS_SUCCEEDED_EXIT_CODE:
-      raise ValueError(
-        "Cannot create _GracefulTerminationException with a successful exit code of {}"
-        .format(PANTS_SUCCEEDED_EXIT_CODE))
-
-    self._exit_code = exit_code
-
-  @property
-  def exit_code(self):
-    return self._exit_code
-
-
-class DaemonPantsRunner(ProcessManager):
+class DaemonPantsRunner(object):
   """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
 
   N.B. this class is primarily used by the PailgunService in pantsd.
@@ -138,22 +110,15 @@ class DaemonPantsRunner(ProcessManager):
     maybe_shutdown_socket = MaybeShutdownSocket(sock)
 
     try:
-      # N.B. This will temporarily redirect stdio in the daemon's pre-fork context
-      # to the nailgun session. We'll later do this a second time post-fork, because
-      # threads.
+      # N.B. This will redirect stdio in the daemon's context to the nailgun session.
       with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False):
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
         subprocess_dir = options.for_global_scope().pants_subprocessdir
         graph_helper, target_roots, exit_code = scheduler_service.prefork(options, options_bootstrapper)
-        deferred_exc = None if exit_code == PANTS_SUCCEEDED_EXIT_CODE else _GracefulTerminationException(exit_code)
     except Exception:
-      deferred_exc = sys.exc_info()
       graph_helper = None
       target_roots = None
       options_bootstrapper = None
-      # N.B. This will be overridden with the correct value if options
-      # parsing is successful - otherwise it permits us to run just far
-      # enough to raise the deferred exception.
       subprocess_dir = os.path.join(get_buildroot(), '.pids')
 
     return cls(
@@ -165,11 +130,10 @@ class DaemonPantsRunner(ProcessManager):
       services,
       subprocess_dir,
       options_bootstrapper,
-      deferred_exc
     )
 
   def __init__(self, maybe_shutdown_socket, args, env, graph_helper, target_roots, services,
-               metadata_base_dir, options_bootstrapper, deferred_exc):
+               metadata_base_dir, options_bootstrapper):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param list args: The arguments (i.e. sys.argv) for this run.
@@ -181,13 +145,9 @@ class DaemonPantsRunner(ProcessManager):
     :param PantsServices services: The PantsServices that are currently running.
     :param str metadata_base_dir: The ProcessManager metadata_base_dir from options.
     :param OptionsBootstrapper options_bootstrapper: An OptionsBootstrapper to reuse.
-    :param Exception deferred_exception: A deferred exception from the daemon's pre-fork context.
-                                         If present, this will be re-raised in the client context.
     """
-    super(DaemonPantsRunner, self).__init__(
-      name=self._make_identity(),
-      metadata_base_dir=metadata_base_dir
-    )
+    self._name = self._make_identity()
+    self._metadata_base_dir = metadata_base_dir
     self._maybe_shutdown_socket = maybe_shutdown_socket
     self._args = args
     self._env = env
@@ -195,7 +155,6 @@ class DaemonPantsRunner(ProcessManager):
     self._target_roots = target_roots
     self._services = services
     self._options_bootstrapper = options_bootstrapper
-    self._deferred_exception = deferred_exc
 
     self._exiter = DaemonExiter(maybe_shutdown_socket)
 
@@ -241,9 +200,6 @@ class DaemonPantsRunner(ProcessManager):
     @contextmanager
     def maybe_handle_stdin(want):
       if want:
-        # TODO: Launching this thread pre-fork to handle @rule input currently results
-        # in an unhandled SIGILL in `src/python/pants/engine/scheduler.py, line 313 in pre_fork`.
-        # More work to be done here in https://github.com/pantsbuild/pants/issues/6005
         with NailgunStreamStdinReader.open(maybe_shutdown_socket, stdin_isatty) as fd:
           yield fd
       else:
@@ -294,29 +250,11 @@ class DaemonPantsRunner(ProcessManager):
         yield finalizer
       write_to_file("DPR, nailgunned_stdio after yielding the finalizer")
 
-  # TODO: there's no testing for this method, and this caused a user-visible failure -- see #7008!
-  def _raise_deferred_exc(self):
-    """Raises deferred exceptions from the daemon's synchronous path in the post-fork client."""
-    if self._deferred_exception:
-      try:
-        exc_type, exc_value, exc_traceback = self._deferred_exception
-        raise_with_traceback(exc_value, exc_traceback)
-      except TypeError:
-        # If `_deferred_exception` isn't a 3-item tuple (raising a TypeError on the above
-        # destructuring), treat it like a bare exception.
-        raise self._deferred_exception
-
   def _maybe_get_client_start_time_from_env(self, env):
     client_start_time = env.pop('PANTSD_RUNTRACKER_CLIENT_START_TIME', None)
     return None if client_start_time is None else float(client_start_time)
 
   def run(self):
-    """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager).
-
-    The scheduler has thread pools which need to be re-initialized after a fork: this ensures that
-    when the pantsd-runner forks from pantsd, there is a working pool for any work that happens
-    in that child process.
-    """
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
 
@@ -337,9 +275,6 @@ class DaemonPantsRunner(ProcessManager):
         # Setup the Exiter's finalizer.
         self._exiter.set_finalizer(finalizer)
 
-        # Re-raise any deferred exceptions, if present.
-        self._raise_deferred_exc()
-        bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner.create(
           NoopExiter(),
@@ -351,19 +286,11 @@ class DaemonPantsRunner(ProcessManager):
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
 
-        # Re-raise any deferred exceptions, if present.
-        self._raise_deferred_exc()
-
         runner.run()
         write_to_file("DPR, After the run has finished")
       except KeyboardInterrupt:
         write_to_file("DPR, Keyboard interrupt in DPR")
         self._exiter.exit_and_fail('Interrupted by user.\n')
-      except _GracefulTerminationException as e:
-        write_to_file("DPR, GracefulTerminationException")
-        ExceptionSink.log_exception(
-          'Encountered graceful termination exception {}; exiting'.format(e))
-        self._exiter.exit(e.exit_code)
       except Exception as e:
         write_to_file("DPR, exception in DPR!")
 
@@ -371,10 +298,14 @@ class DaemonPantsRunner(ProcessManager):
         # which used to be okay, because it was process-local,
         # but now we need to un-reset it here.
         ExceptionSink.reset_exiter(self._exiter)
+        
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
         # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
         # happening here, so something is probably overriding the excepthook. By catching Exception
         # and calling this method, we emulate the normal, expected sys.excepthook override.
-        self._exiter.exit(e.errno)
+        ExceptionSink.log_exception(
+          'Encountered exception running pants {}; exiting'.format(e))
+
+        self._exiter.exit(PANTS_FAILED_EXIT_CODE)
       else:
         self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)
