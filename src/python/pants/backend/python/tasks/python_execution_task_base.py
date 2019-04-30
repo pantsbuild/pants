@@ -11,7 +11,6 @@ from future.utils import binary_type, text_type
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 
-from pants.backend.python.subsystems.pex_build_util import is_python_target
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -83,8 +82,19 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return ()
 
-  def create_pex(self, pex_info=None, pin_selected_interpreter=False):
-    """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
+  def create_pex(self, pex_info=None):
+    """Returns a wrapped pex that "merges" other pexes produced in previous tasks via PEX_PATH.
+
+    The produced pex will have a single == interpreter constraint applied to it, for the
+    global interpreter selected by the SelectInterpreter task. The returned pex will have the
+    pexes from the ResolveRequirements and GatherSources tasks mixed into it via PEX_PATH. Any
+    3rdparty requirements declared with self.extra_requirements() will also be resolved for the
+    global interpreter, and added to the returned pex via PEX_PATH.
+
+    :param pex_info: An optional PexInfo instance to provide to self.merged_pex().
+    :type pex_info: :class:`pex.pex_info.PexInfo`, or None
+    :rtype: :class:`pex.pex.PEX`
+    """
     relevant_targets = self.context.targets(
       lambda tgt: isinstance(tgt, (
         PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)))
@@ -117,16 +127,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # in the target set's dependency closure.
           pexes = [extra_requirements_pex] + pexes
 
-        unique_constraints = {
-          constraint for rt in relevant_targets if is_python_target(rt)
-          for constraint in PythonSetup.global_instance().compatibility_or_constraints(rt)
-        }
-        self.context.log.debug('unique_constraints:\n{}'.format(unique_constraints))
-
-        if pin_selected_interpreter:
-          constraints = {str(interpreter.identity.requirement)}
-        else:
-          constraints = unique_constraints
+        constraints = {str(interpreter.identity.requirement)}
 
         with self.merged_pex(path, pex_info, interpreter, pexes, constraints) as builder:
           for extra_file in self.extra_files():
