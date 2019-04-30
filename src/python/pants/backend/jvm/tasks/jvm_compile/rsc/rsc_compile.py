@@ -168,7 +168,7 @@ class RscCompile(ZincCompile):
 
     self._rsc_compat_tag = self.get_options().force_compiler_tag_prefix
     self._compiler_tags = {'{}:{}'.format(self._rsc_compat_tag, workflow.value): workflow
-      for workflow in _JvmCompileWorkflowType.all_variants}
+      for workflow in _JvmCompileWorkflowType.iterate_enum_variants()}
     self._default_workflow = self.get_options().default_workflow
 
     # If the default workflow is conveyed through a flag, override tag values.
