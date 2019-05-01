@@ -22,6 +22,7 @@ class CoercingOptionEncoder(CoercingEncoder):
 
 
 def stable_option_fingerprint(obj):
+  print("BL: THIS IS A STABLE")
   return json_hash(obj, encoder=CoercingOptionEncoder)
 
 

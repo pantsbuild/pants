@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 import os
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
@@ -73,6 +74,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   # TODO: eventually deprecate this when we can move all subclasses to use the enum!
   @property
   def execution_strategy(self):
+    logging.getLogger(__name__).info("BL: Accessing execution_strategy")
     return self.execution_strategy_enum.value
 
   def create_java_executor(self, dist=None):
