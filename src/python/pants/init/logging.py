@@ -8,7 +8,7 @@ import logging
 import os
 import sys
 from collections import namedtuple
-from logging import StreamHandler
+from logging import Handler
 
 from future.moves.http import client
 
@@ -56,7 +56,7 @@ def setup_logging_to_stderr(python_logger, level):
   """
   native = Native()
   levelno = get_numeric_level(level)
-  handler = create_native_stderr_log_handler(levelno, native, stream=sys.stderr)
+  handler = create_native_stderr_log_handler(levelno, native)
   python_logger.addHandler(handler)
   # Let the rust side filter levels; try to have the python side send everything to the rust logger.
   python_logger.setLevel("TRACE")
@@ -69,10 +69,10 @@ def setup_logging_from_options(bootstrap_options):
   return setup_logging(level, console_stream=sys.stderr, log_dir=bootstrap_options.logdir, native=native)
 
 
-class NativeHandler(StreamHandler):
+class NativeHandler(Handler):
 
-  def __init__(self, level, native=None, stream=None, native_filename=None):
-    super(NativeHandler, self).__init__(stream)
+  def __init__(self, level, native=None, native_filename=None):
+    super(NativeHandler, self).__init__()
     self.native = native
     self.native_filename = native_filename
     self.setLevel(level)
@@ -90,14 +90,14 @@ def create_native_pantsd_file_log_handler(level, native, native_filename):
   return NativeHandler(level, native, native_filename=native_filename)
 
 
-def create_native_stderr_log_handler(level, native, stream=None):
+def create_native_stderr_log_handler(level, native):
   try:
     native.setup_stderr_logger(get_numeric_level(level))
   except Exception as e:
     print("Error setting up pantsd logger: {}".format(e), file=sys.stderr)
     raise e
 
-  return NativeHandler(level, native, stream)
+  return NativeHandler(level, native)
 
 
 # TODO This function relies on logging._checkLevel, which is private.
@@ -150,7 +150,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
 
 
   if console_stream:
-    native_handler = create_native_stderr_log_handler(level, native, stream=console_stream)
+    native_handler = create_native_stderr_log_handler(level, native)
     logger.addHandler(native_handler)
 
   if log_dir:
