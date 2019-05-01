@@ -491,8 +491,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     the interpreter search path at pex runtime ensures that any resolved requirements will be
     compatible with the interpreter being used to invoke the merged pytest pex.
     """
-    pytest_prep_binary_product = self.context.products.get_data(PytestPrep.PytestBinary)
-    chosen_interpreter_binary_path = pytest_prep_binary_product.interpreter.binary
+    pytest_binary = self.context.products.get_data(PytestPrep.PytestBinary)
+    chosen_interpreter_binary_path = pytest_binary.interpreter.binary
     return {
       'PEX_IGNORE_RCFILES': '1',
       'PEX_PYTHON': chosen_interpreter_binary_path,

@@ -386,6 +386,7 @@ class DeclarativeTaskTestMixin(object):
       for tsk in all_task_instances:
         tsk.execute()
     except Exception as e:
+      # TODO(#7644): Remove this hack before anything more starts relying on it!
       setattr(e, '_context', context)
       raise e
 
