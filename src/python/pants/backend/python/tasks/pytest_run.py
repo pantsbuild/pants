@@ -34,7 +34,7 @@ from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.py2_compat import configparser
-from pants.util.strutil import safe_shlex_split
+from pants.util.strutil import safe_shlex_join, safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
@@ -494,6 +494,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     pytest_prep_binary_product = self.context.products.get_data(PytestPrep.PytestBinary)
     chosen_interpreter_binary_path = pytest_prep_binary_product.interpreter.binary
     return {
+      'PEX_IGNORE_RCFILES': '1',
       'PEX_PYTHON': chosen_interpreter_binary_path,
       'PEX_PYTHON_PATH': chosen_interpreter_binary_path,
     }
@@ -531,7 +532,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
 
       with self.context.new_workunit(name='run',
-                                     cmd=' '.join(pex.cmdline(args)),
+                                     cmd=safe_shlex_join(pex.cmdline(args)),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
         # NB: Constrain the pex environment to ensure the use of the selected interpreter!
         env.update(self._constrain_pytest_interpreter_search_path())
