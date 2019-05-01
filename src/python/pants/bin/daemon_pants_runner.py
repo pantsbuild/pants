@@ -147,10 +147,11 @@ class DaemonPantsRunner(object):
       services,
       subprocess_dir,
       options_bootstrapper,
+      exit_code
     )
 
   def __init__(self, maybe_shutdown_socket, args, env, graph_helper, target_roots, services,
-               metadata_base_dir, options_bootstrapper):
+               metadata_base_dir, options_bootstrapper, exit_code):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param list args: The arguments (i.e. sys.argv) for this run.
@@ -172,7 +173,7 @@ class DaemonPantsRunner(object):
     self._target_roots = target_roots
     self._services = services
     self._options_bootstrapper = options_bootstrapper
-
+    self.exit_code = exit_code
     self._exiter = DaemonExiter(maybe_shutdown_socket)
 
   def _make_identity(self):
@@ -306,11 +307,11 @@ class DaemonPantsRunner(object):
         ExceptionSink.log_exception(
           'Encountered graceful termination exception {}; exiting'.format(e))
         self._exiter.exit(e.exit_code)
-      except Exception:
+      except Exception as e:
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
         # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
         # happening here, so something is probably overriding the excepthook. By catching Exception
         # and calling this method, we emulate the normal, expected sys.excepthook override.
-        ExceptionSink._log_unhandled_exception_and_exit()
+        ExceptionSink._log_unhandled_exception_and_exit(exc=e)
       else:
-        self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)
+        self._exiter.exit(self.exit_code if self.exit_code else PANTS_SUCCEEDED_EXIT_CODE)
