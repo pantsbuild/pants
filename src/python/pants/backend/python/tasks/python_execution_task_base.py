@@ -83,8 +83,25 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return ()
 
+  # TODO: remove `pin_selected_interpreter` arg and constrain all resulting pexes to a single ==
+  # interpreter constraint for the globally selected interpreter! This also requries porting
+  # `PythonRun` to set 'PEX_PYTHON_PATH' and 'PEX_PYTHON' when invoking the resulting pex, see
+  # https://github.com/pantsbuild/pants/pull/7563.
   def create_pex(self, pex_info=None, pin_selected_interpreter=False):
-    """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
+    """Returns a wrapped pex that "merges" other pexes produced in previous tasks via PEX_PATH.
+
+    The returned pex will have the pexes from the ResolveRequirements and GatherSources tasks mixed
+    into it via PEX_PATH. Any 3rdparty requirements declared with self.extra_requirements() will
+    also be resolved for the global interpreter, and added to the returned pex via PEX_PATH.
+
+    :param pex_info: An optional PexInfo instance to provide to self.merged_pex().
+    :type pex_info: :class:`pex.pex_info.PexInfo`, or None
+    :param bool pin_selected_interpreter: If True, the produced pex will have a single ==
+                                          interpreter constraint applied to it, for the global
+                                          interpreter selected by the SelectInterpreter
+    task. Otherwise, all of the interpreter constraints from all python targets will applied.
+    :rtype: :class:`pex.pex.PEX`
+    """
     relevant_targets = self.context.targets(
       lambda tgt: isinstance(tgt, (
         PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)))
@@ -117,16 +134,16 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # in the target set's dependency closure.
           pexes = [extra_requirements_pex] + pexes
 
-        unique_constraints = {
-          constraint for rt in relevant_targets if is_python_target(rt)
-          for constraint in PythonSetup.global_instance().compatibility_or_constraints(rt)
-        }
-        self.context.log.debug('unique_constraints:\n{}'.format(unique_constraints))
-
         if pin_selected_interpreter:
           constraints = {str(interpreter.identity.requirement)}
         else:
-          constraints = unique_constraints
+          constraints = {
+            constraint for rt in relevant_targets if is_python_target(rt)
+            for constraint in PythonSetup.global_instance().compatibility_or_constraints(rt)
+          }
+          self.context.log.debug('target set {} has constraints: {}'
+                                 .format(relevant_targets, constraints))
+
 
         with self.merged_pex(path, pex_info, interpreter, pexes, constraints) as builder:
           for extra_file in self.extra_files():
