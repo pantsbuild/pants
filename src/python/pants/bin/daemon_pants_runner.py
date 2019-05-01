@@ -41,7 +41,7 @@ class NoopExiter(Exiter):
   def exit(self, result, *args, **kwargs):
     if result != 0:
       # TODO this exception was not designed for this, but it happens to do what we want.
-      raise Exception(result)
+      raise _GracefulTerminationException(result)
 
 
 class DaemonExiter(Exiter):
@@ -89,6 +89,31 @@ class DaemonExiter(Exiter):
       # Shutdown the connected socket.
       teardown_socket(self._maybe_shutdown_socket.socket)
       self._maybe_shutdown_socket.is_shutdown = True
+
+
+class _GracefulTerminationException(Exception):
+  """Allows for deferring the returning of the exit code of prefork work until post fork.
+
+  TODO: Once the fork boundary is removed in #7390, this class can be replaced by directly exiting
+  with the relevant exit code.
+  """
+
+  def __init__(self, exit_code=PANTS_FAILED_EXIT_CODE):
+    """
+    :param int exit_code: an optional exit code (defaults to PANTS_FAILED_EXIT_CODE)
+    """
+    super(_GracefulTerminationException, self).__init__('Terminated with {}'.format(exit_code))
+
+    if exit_code == PANTS_SUCCEEDED_EXIT_CODE:
+      raise ValueError(
+        "Cannot create _GracefulTerminationException with a successful exit code of {}"
+        .format(PANTS_SUCCEEDED_EXIT_CODE))
+
+    self._exit_code = exit_code
+
+  @property
+  def exit_code(self):
+    return self._exit_code
 
 
 class DaemonPantsRunner(object):
@@ -277,19 +302,15 @@ class DaemonPantsRunner(object):
         runner.run()
       except KeyboardInterrupt:
         self._exiter.exit_and_fail('Interrupted by user.\n')
-      except Exception as e:
-        # LocalPantsRunner.set_start_time resets the global exiter,
-        # which used to be okay, because it was process-local,
-        # but now we need to un-reset it here.
-        ExceptionSink.reset_exiter(self._exiter)
-        
+      except _GracefulTerminationException as e:
+        ExceptionSink.log_exception(
+          'Encountered graceful termination exception {}; exiting'.format(e))
+        self._exiter.exit(e.exit_code)
+      except Exception:
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
         # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
         # happening here, so something is probably overriding the excepthook. By catching Exception
         # and calling this method, we emulate the normal, expected sys.excepthook override.
-        ExceptionSink.log_exception(
-          'Encountered exception running pants {}; exiting'.format(e))
-
-        self._exiter.exit(PANTS_FAILED_EXIT_CODE)
+        ExceptionSink._log_unhandled_exception_and_exit()
       else:
         self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)
