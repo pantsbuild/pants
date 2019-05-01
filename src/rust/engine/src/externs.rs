@@ -15,8 +15,9 @@ use crate::interning::Interns;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 
-pub fn eval(python: &str) -> Result<Value, Failure> {
-  with_externs(|e| (e.eval)(e.context, python.as_ptr(), python.len() as u64)).into()
+/// Return the Python value None.
+pub fn none() -> Handle {
+  with_externs(|e| (e.clone_val)(e.context, &e.none))
 }
 
 pub fn get_type_for(val: &Value) -> TypeId {
@@ -312,9 +313,9 @@ pub type ExternContext = raw::c_void;
 pub struct Externs {
   pub context: *const ExternContext,
   pub log_level: u8,
+  pub none: Handle,
   pub call: CallExtern,
   pub generator_send: GeneratorSendExtern,
-  pub eval: EvalExtern,
   pub get_type_for: GetTypeForExtern,
   pub identify: IdentifyExtern,
   pub equals: EqualsExtern,
@@ -428,7 +429,7 @@ impl From<Result<Value, String>> for PyResult {
 
 impl From<Result<(), String>> for PyResult {
   fn from(res: Result<(), String>) -> Self {
-    PyResult::from(res.map(|()| eval("None").unwrap()))
+    PyResult::from(res.map(|()| Value::from(none())))
   }
 }
 
@@ -670,9 +671,6 @@ pub type CallExtern =
 
 pub type GeneratorSendExtern =
   extern "C" fn(*const ExternContext, *const Handle, *const Handle) -> PyGeneratorResponse;
-
-pub type EvalExtern =
-  extern "C" fn(*const ExternContext, python_ptr: *const u8, python_len: u64) -> PyResult;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
 where

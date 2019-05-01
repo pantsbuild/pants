@@ -452,12 +452,6 @@ class _FFISpecification(object):
     args = tuple(c.from_value(arg[0]) for arg in self._ffi.unpack(args_ptr, args_len))
     return self.call(c, runnable, args)
 
-  @_extern_decl('PyResult', ['ExternContext*', 'uint8_t*', 'uint64_t'])
-  def extern_eval(self, context_handle, python_code_str_ptr, python_code_str_len):
-    """Given an evalable string, eval it and return a Handle for its result."""
-    c = self._ffi.from_handle(context_handle)
-    return self.call(c, eval, [self.to_py_str(python_code_str_ptr, python_code_str_len)])
-
 
 class Key(datatype(['tup_0', 'type_id'])):
   """Corresponds to the native object of the same name."""
@@ -621,11 +615,12 @@ class Native(Singleton):
     # Handles that the native code maintains.
     def init_externs():
       context = ExternContext(self.ffi, self.lib)
+      none = self.ffi.from_handle(context._handle).to_value(None)
       self.lib.externs_set(context._handle,
                            logger.getEffectiveLevel(),
+                           none,
                            self.ffi_lib.extern_call,
                            self.ffi_lib.extern_generator_send,
-                           self.ffi_lib.extern_eval,
                            self.ffi_lib.extern_get_type_for,
                            self.ffi_lib.extern_identify,
                            self.ffi_lib.extern_equals,

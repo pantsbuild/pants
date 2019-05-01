@@ -839,7 +839,7 @@ impl Task {
     entry: Arc<rule_graph::Entry>,
     generator: Value,
   ) -> NodeFuture<Value> {
-    future::loop_fn(externs::eval("None").unwrap(), move |input| {
+    future::loop_fn(Value::from(externs::none()), move |input| {
       let context = context.clone();
       let params = params.clone();
       let entry = entry.clone();

@@ -66,8 +66,8 @@ use crate::context::Core;
 use crate::core::{Function, Key, Params, TypeId, Value};
 use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
-  EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern,
-  HandleBuffer, IdentifyExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, RawBuffer,
+  EqualsExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern, HandleBuffer,
+  IdentifyExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, RawBuffer,
   StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
   StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
@@ -109,9 +109,9 @@ impl RawNodes {
 pub extern "C" fn externs_set(
   context: *const ExternContext,
   log_level: u8,
+  none: Handle,
   call: CallExtern,
   generator_send: GeneratorSendExtern,
-  eval: EvalExtern,
   get_type_for: GetTypeForExtern,
   identify: IdentifyExtern,
   equals: EqualsExtern,
@@ -134,9 +134,9 @@ pub extern "C" fn externs_set(
   externs::set_externs(Externs {
     context,
     log_level,
+    none,
     call,
     generator_send,
-    eval,
     get_type_for,
     identify,
     equals,
@@ -705,8 +705,7 @@ pub extern "C" fn capture_snapshots(
         nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
       let digest_hint = {
         let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
-        // TODO: Extract a singleton Key for None.
-        if maybe_digest == externs::eval("None").unwrap() {
+        if maybe_digest == Value::from(externs::none()) {
           None
         } else {
           Some(nodes::lift_digest(&maybe_digest)?)
