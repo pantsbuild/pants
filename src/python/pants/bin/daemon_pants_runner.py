@@ -13,7 +13,7 @@ from builtins import open, zip
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink, SignalHandler
+from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.logging import encapsulated_global_logger
@@ -24,30 +24,17 @@ from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
 
-class DaemonSignalHandler(SignalHandler):
-
-  def handle_sigint(self, signum, _frame):
-    self.daemon.shutdown()
-    raise KeyboardInterrupt('remote client sent control-c!')
-
-  def handle_sigterm(self, signum, _frame):
-    try:
-      self.daemon.shutdown()
-    except Exception:
-      pass
-
-
 class NoopExiter(Exiter):
   def exit(self, result, *args, **kwargs):
     if result != 0:
-      # TODO this exception was not designed for this, but it happens to do what we want.
+      # TODO: https://github.com/pantsbuild/pants/issues/7652
       raise _GracefulTerminationException(result)
 
 
 class DaemonExiter(Exiter):
   """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol.
 
-  TODO: This no longer really follows the Exiter API, per-se (or at least, it doesn't call super).
+  TODO: https://github.com/pantsbuild/pants/pull/7606
   """
 
   def __init__(self, maybe_shutdown_socket):
@@ -136,6 +123,7 @@ class DaemonPantsRunner(object):
       graph_helper = None
       target_roots = None
       options_bootstrapper = None
+      # TODO: this should no longer be necessary, remove the creation of subprocess_dir
       subprocess_dir = os.path.join(get_buildroot(), '.pids')
       exit_code = 1
 
@@ -177,6 +165,7 @@ class DaemonPantsRunner(object):
     self.exit_code = exit_code
     self._exiter = DaemonExiter(maybe_shutdown_socket)
 
+  # TODO: this should probably no longer be necesary, remove.
   def _make_identity(self):
     """Generate a ProcessManager identity for a given pants run.
 
@@ -225,7 +214,7 @@ class DaemonPantsRunner(object):
         with open('/dev/null', 'rb') as fh:
           yield fh.fileno()
 
-    # The NailgunStreamWriter probably shouldn't grab the socket without a lock...
+    # TODO https://github.com/pantsbuild/pants/issues/7653
     with maybe_handle_stdin(handle_stdin) as stdin_fd,\
       NailgunStreamWriter.open_multi(maybe_shutdown_socket.socket, types, ttys) as ((stdout_fd, stderr_fd), writer),\
       stdio_as(stdout_fd=stdout_fd, stderr_fd=stderr_fd, stdin_fd=stdin_fd):

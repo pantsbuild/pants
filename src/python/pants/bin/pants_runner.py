@@ -65,9 +65,7 @@ class PantsRunner(object):
     for message_regexp in global_bootstrap_options.ignore_pants_warnings:
       warnings.filterwarnings(action='ignore', message=message_regexp)
 
-    # TODO For kill-pantsd and clean-all, we cannot run them in the daemon itself, because
-    # when we send a termination signal it will end before the DaemonPantsRunner exiter has had
-    # time to properly close out the nailgun stream.
+    # TODO https://github.com/pantsbuild/pants/issues/7205
     if global_bootstrap_options.enable_pantsd and not self.will_terminate_pantsd():
       try:
         return RemotePantsRunner(self._exiter, self._args, self._env, options_bootstrapper).run()

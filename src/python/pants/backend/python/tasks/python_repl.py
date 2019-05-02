@@ -73,5 +73,5 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
       # so we can't override signal handling here.
       # That said, this means that under pantsd,
       # Ctrl-C will simply crash the repl (and the daemon).
-      # TODO(#7623) Potential more robust (but more invasive) fix.
-      self._run_repl(pex, **pex_run_kwargs)
+      with ExceptionSink.ignoring_signint():
+        self._run_repl(pex, **pex_run_kwargs)

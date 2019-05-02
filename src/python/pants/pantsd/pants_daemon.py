@@ -84,13 +84,12 @@ class _LoggerStream(object):
 
 class PantsDaemonSignalHandler(SignalHandler):
 
-  def __init__(self, services):
+  def __init__(self, daemon):
     super(PantsDaemonSignalHandler, self).__init__()
-    self._services = services
+    self._daemon = daemon
 
   def handle_sigint(self, signum, _frame):
-    for service in self._services:
-      service.record_exception(KeyboardInterrupt('remote client sent control-c!'))
+    self._daemon.terminate(include_watchman=False)
 
 
 class PantsDaemon(FingerprintedProcessManager):
