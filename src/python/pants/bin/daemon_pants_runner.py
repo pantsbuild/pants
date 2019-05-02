@@ -137,6 +137,7 @@ class DaemonPantsRunner(object):
       target_roots = None
       options_bootstrapper = None
       subprocess_dir = os.path.join(get_buildroot(), '.pids')
+      exit_code = 1
 
     return cls(
       maybe_shutdown_socket,
