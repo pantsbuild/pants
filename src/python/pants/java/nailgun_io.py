@@ -105,8 +105,6 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
         finally:
           os.close(read_fd)
 
-  # TODO: The error is that when the client finishes (and presumably closes the socket),
-  # the server might still want to read stdin, since this is in another thread.
   def run(self):
     try:
       for chunk_type, payload in NailgunProtocol.iter_chunks(self._maybe_shutdown_socket, return_bytes=True):
