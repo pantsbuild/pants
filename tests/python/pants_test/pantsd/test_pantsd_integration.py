@@ -640,11 +640,14 @@ Interrupted by user over pailgun client!
 
       # TODO(#6574, #7330): We might have a new default timeout after these are resolved.
       checker.assert_started(timeout=16)
-      pantsd_runner_processes = checker.runner_process_context.current_processes()
+      pantsd_processes = checker.runner_process_context.current_processes()
       pants_run = wait_handle.join()
       self.assert_success(pants_run)
 
-      for process in pantsd_runner_processes:
+      # Permit enough time for the process to terminate in CI
+      time.sleep(5)
+
+      for process in pantsd_processes:
         self.assertFalse(process.is_running())
 
   # This is a regression test for a bug where we would incorrectly detect a cycle if two targets swapped their
