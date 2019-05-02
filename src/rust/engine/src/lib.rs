@@ -53,6 +53,7 @@ use log;
 use tar_api;
 
 use std::borrow::Borrow;
+use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -212,6 +213,7 @@ pub extern "C" fn scheduler_create(
   remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
   remote_store_rpc_retries: u64,
+  remote_execution_extra_platform_properties_buf: BufferBuffer,
   process_execution_parallelism: u64,
   process_execution_cleanup_local_dirs: bool,
 ) -> *const Scheduler {
@@ -257,6 +259,16 @@ pub extern "C" fn scheduler_create(
   let remote_instance_name_string = remote_instance_name
     .to_string()
     .expect("remote_instance_name was not valid UTF8");
+  let remote_execution_extra_platform_properties_map: BTreeMap<_, _> = remote_execution_extra_platform_properties_buf
+      .to_strings()
+      .expect("Failed to decode remote_execution_extra_platform_properties")
+      .into_iter()
+      .map(|s| {
+        let mut parts: Vec<_> = s.splitn(2, '=').collect();
+        assert_eq!(parts.len(), 2, "Got invalid remote_execution_extra_platform_properties - must be of format key=value but got {}", s);
+        let (value, key) = (parts.pop().unwrap().to_owned(), parts.pop().unwrap().to_owned());
+        (key, value)
+      }).collect();
 
   let remote_root_ca_certs_path = {
     let path = remote_root_ca_certs_path_buffer.to_os_string();
@@ -306,6 +318,7 @@ pub extern "C" fn scheduler_create(
     remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     remote_store_rpc_retries as usize,
+    remote_execution_extra_platform_properties_map,
     process_execution_parallelism as usize,
     process_execution_cleanup_local_dirs as bool,
   ))))

@@ -28,6 +28,7 @@ use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;
 use resettable::Resettable;
+use std::collections::btree_map::BTreeMap;
 
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -70,6 +71,7 @@ impl Core {
     remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
     remote_store_rpc_retries: usize,
+    remote_execution_extra_platform_properties: BTreeMap<String, String>,
     process_execution_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
   ) -> Core {
@@ -139,6 +141,7 @@ impl Core {
           remote_instance_name.clone(),
           root_ca_certs.clone(),
           oauth_bearer_token.clone(),
+          remote_execution_extra_platform_properties.clone(),
           // Allow for some overhead for bookkeeping threads (if any).
           process_execution_parallelism + 2,
           store.clone(),
