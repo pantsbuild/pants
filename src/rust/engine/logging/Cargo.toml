@@ -6,6 +6,9 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+enumflags2 = "0.5"
+enumflags2_derive = "0.5"
+futures = "0.1.26"
 lazy_static = "1"
 log = "0.4"
 num_enum = "0.1.1"

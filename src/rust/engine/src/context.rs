@@ -44,7 +44,7 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph,
   pub types: Types,
-  pub runtime: Resettable<Arc<RwLock<Runtime>>>,
+  runtime: Resettable<Arc<RwLock<Runtime>>>,
   pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
   store_and_command_runner_and_http_client:
     Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
@@ -221,6 +221,47 @@ impl Core {
 
   pub fn http_client(&self) -> reqwest::r#async::Client {
     self.store_and_command_runner_and_http_client.get().2
+  }
+
+  ///
+  /// Start running a Future on a tokio Runtime.
+  ///
+  pub fn spawn<F: Future<Item = (), Error = ()> + Send + 'static>(&self, future: F) {
+    let logging_destination = logging::destination_for_current_thread();
+    self
+      .runtime
+      .get()
+      .read()
+      .executor()
+      .spawn(futures::future::ok(()).and_then(move |()| {
+        logging::set_task_logging_destination(logging_destination);
+        future
+      }))
+  }
+
+  ///
+  /// Run a Future and return its resolved Result.
+  ///
+  /// This should never be called from in a Future context, or any context where anyone may want to
+  /// spawn something on the runtime using Core::spawn.
+  ///
+  pub fn block_on<
+    Item: Send + 'static,
+    Error: Send + 'static,
+    F: Future<Item = Item, Error = Error> + Send + 'static,
+  >(
+    &self,
+    future: F,
+  ) -> Result<Item, Error> {
+    let logging_destination = logging::destination_for_current_thread();
+    self
+      .runtime
+      .get()
+      .write()
+      .block_on(futures::future::ok(()).and_then(move |()| {
+        logging::set_task_logging_destination(logging_destination);
+        future
+      }))
   }
 }
 

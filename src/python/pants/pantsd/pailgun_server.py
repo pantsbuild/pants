@@ -11,6 +11,7 @@ import traceback
 
 from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
+from pants.engine.native import Native
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
 from pants.util.socket import RecvBufferedSocket, safe_select
@@ -180,6 +181,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
   def process_request_thread(self, request, client_address):
     """Override of ThreadingMixIn.process_request_thread() that delegates to the request handler."""
     # Instantiate the request handler.
+    Native().override_thread_logging_destination_to_just_stderr()
     handler = self.RequestHandlerClass(request, client_address, self)
     try:
       # Attempt to handle a request with the handler.

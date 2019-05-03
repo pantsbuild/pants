@@ -1,7 +1,8 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::PythonLogLevel;
+use crate::{Destination, PythonLogLevel};
+use enumflags2::BitFlags;
 use lazy_static::lazy_static;
 use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
@@ -120,8 +121,13 @@ impl Log for Logger {
   }
 
   fn log(&self, record: &Record) {
-    self.stderr_log.lock().log(record);
-    self.pantsd_log.lock().log(record);
+    let destination = destination_for_current_thread();
+    if destination.contains(Destination::Stderr) {
+      self.stderr_log.lock().log(record);
+    }
+    if destination.contains(Destination::Pantsd) {
+      self.pantsd_log.lock().log(record);
+    }
   }
 
   fn flush(&self) {
@@ -203,5 +209,29 @@ impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
     if let Some(ref logger) = self.inner {
       logger.flush();
     }
+  }
+}
+
+pub fn destination_for_current_thread() -> BitFlags<Destination> {
+  let ret = {
+    if futures::task::is_in_task() {
+      super::TASK_DESTINATION.with(|destination| {
+        let destination = destination.lock();
+        if let Some(destination) = destination.as_ref() {
+          Some(*destination)
+        } else {
+          None
+        }
+      })
+    } else {
+      None
+    }
+  };
+  if let Some(ret) = ret {
+    ret
+  } else {
+    super::THREAD_DESTINATION.with(|destination| {
+      *destination.lock()
+    })
   }
 }

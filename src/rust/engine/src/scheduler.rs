@@ -235,7 +235,7 @@ impl Scheduler {
     roots: Vec<Root>,
     count: usize,
   ) {
-    let executor = context.core.runtime.get().read().executor();
+    let core = context.core.clone();
     // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
     let roots_res = future::join_all(
       roots
@@ -271,7 +271,7 @@ impl Scheduler {
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    executor.spawn(roots_res.then(move |res| {
+    core.spawn(roots_res.then(move |res| {
       if let Ok(res) = res {
         sender.send(res).map_err(|_| ())
       } else {
@@ -408,6 +408,6 @@ impl NodeContext for RootContext {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.runtime.get().read().executor().spawn(future);
+    self.core.spawn(future);
   }
 }

@@ -81,7 +81,7 @@ use futures::Future;
 use hashing::Digest;
 use log::{error, Log};
 use logging::logger::LOGGER;
-use logging::Logger;
+use logging::{Destination, Logger};
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -738,7 +738,7 @@ pub extern "C" fn capture_snapshots(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
-    core.runtime.get().write().block_on(
+    core.block_on(
       futures::future::join_all(
         path_globs_and_roots
           .into_iter()
@@ -781,9 +781,6 @@ pub extern "C" fn merge_directories(
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler
       .core
-      .runtime
-      .get()
-      .write()
       .block_on(fs::Snapshot::merge_directories(
         scheduler.core.store(),
         digests,
@@ -818,7 +815,7 @@ pub extern "C" fn materialize_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.core.runtime.get().write().block_on(
+    scheduler.core.block_on(
       futures::future::join_all(
         dir_and_digests
           .into_iter()
@@ -839,6 +836,10 @@ pub extern "C" fn init_logging(level: u64, show_rust_3rdparty_logs: bool) {
 
 #[no_mangle]
 pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u64) -> PyResult {
+  logging::THREAD_DESTINATION.with(|destination| {
+    *destination.lock() |= Destination::Pantsd;
+  });
+
   let path_str = unsafe { CStr::from_ptr(log_file_ptr).to_string_lossy().into_owned() };
   let path = PathBuf::from(path_str);
   LOGGER
@@ -851,6 +852,9 @@ pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u
 // Might be called before externs are set, therefore can't return a PyResult
 #[no_mangle]
 pub extern "C" fn setup_stderr_logger(level: u64) {
+  logging::THREAD_DESTINATION.with(|destination| {
+    *destination.lock() |= Destination::Stderr;
+  });
   LOGGER
     .set_stderr_logger(level)
     .expect("Error setting up STDERR logger");
@@ -869,6 +873,14 @@ pub extern "C" fn write_log(msg: *const raw::c_char, level: u64, target: *const 
 #[no_mangle]
 pub extern "C" fn flush_log() {
   LOGGER.flush();
+}
+
+#[no_mangle]
+pub extern "C" fn override_thread_logging_destination(new_destination: u8) {
+  logging::THREAD_DESTINATION.with(|destination| {
+    let flags = enumflags2::BitFlags::from_bits(new_destination);
+    *destination.lock() = flags.expect("Bad logging destination bitflags");
+  });
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

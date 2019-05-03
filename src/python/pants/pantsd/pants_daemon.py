@@ -343,6 +343,7 @@ class PantsDaemon(FingerprintedProcessManager):
       # Reinitialize logging for the daemon context.
       init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
       result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME, native=self._native)
+      self._native.override_thread_logging_destination_to_just_pantsd()
 
       # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
       # TODO: Consider giving these pipes/actual fds, in order to make them "deep" replacements
@@ -361,7 +362,12 @@ class PantsDaemon(FingerprintedProcessManager):
   @staticmethod
   def _make_thread(service):
     name = "{}Thread".format(service.__class__.__name__)
-    t = threading.Thread(target=service.run, name=name)
+
+    def target():
+      Native().override_thread_logging_destination_to_just_pantsd()
+      service.run()
+
+    t = threading.Thread(target=target, name=name)
     t.daemon = True
     return t
 
