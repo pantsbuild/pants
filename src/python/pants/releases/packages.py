@@ -196,7 +196,7 @@ def build_and_print_packages(version, py2=False):
   for (flags, packages) in packages_by_flags.items():
     args = ("./pants", "setup-py", "--run=bdist_wheel {}".format(" ".join(flags))) + tuple(package.target for package in packages)
     try:
-      subprocess.check_call(args)
+      subprocess.check_call(args, stdout=sys.stderr)
       for package in packages:
         print(package.name)
     except subprocess.CalledProcessError:
