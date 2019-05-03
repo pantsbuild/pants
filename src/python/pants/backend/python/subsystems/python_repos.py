@@ -8,6 +8,7 @@ from pex.fetcher import Fetcher, PyPIFetcher
 from pex.http import Context
 
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_method
 
 
 class PythonRepos(Subsystem):
@@ -30,12 +31,14 @@ class PythonRepos(Subsystem):
   def indexes(self):
     return self.get_options().indexes
 
+  @memoized_method
   def get_fetchers(self):
     fetchers = []
     fetchers.extend(Fetcher([url]) for url in self.repos)
     fetchers.extend(PyPIFetcher(url) for url in self.indexes)
     return fetchers
 
+  @memoized_method
   def get_network_context(self):
     # TODO(wickman): Add retry, conn_timeout, threads, etc configuration here.
     return Context.get()
