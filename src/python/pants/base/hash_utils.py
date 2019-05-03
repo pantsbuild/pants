@@ -16,6 +16,7 @@ from pants.util.collections_abc_backport import Iterable, Mapping, OrderedDict, 
 from pants.util.objects import DatatypeMixin
 from pants.util.strutil import ensure_binary
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,14 +67,12 @@ class CoercingEncoder(json.JSONEncoder):
       return self.encode(key_obj)
 
   def _is_primitive(self, o):
-    if PY3:
-      return isinstance(o, (type(None), bool, int, list, str))
-    else:
-      return isinstance(o, (type(None), bool, int, list, str, unicode, basestring))
+      return (isinstance(o, (type(None), bool, int, list, str, bytes)) if PY3 else
+              isinstance(o, (type(None), bool, int, list, str, unicode, basestring)))
 
   def default(self, o):
     if self._is_primitive(o):
-      # isinstance() checks are expensive, particularly isinstance(o, Mapping):
+      # isinstance() checks are expensive, particularly for abstract base classes such as Mapping:
       # https://stackoverflow.com/questions/42378726/why-is-checking-isinstancesomething-mapping-so-slow
       # This means that, if we let primitives fall through, we incur a performance hit, since
       # we call this function very often.
@@ -117,7 +116,7 @@ class CoercingEncoder(json.JSONEncoder):
       logger.debug("Our custom Encoder is trying to hash a primitive type, but has gone through"
                    "checking every other data type before. These checks are expensive,"
                    "so you should consider adding the type of your primitive {} to the top"
-                   "of this function".format(type(o)))
+                   "of this function (CoercingEncoder.default)".format(type(o)))
     return o
 
   def encode(self, o):
