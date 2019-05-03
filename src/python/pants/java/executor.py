@@ -256,5 +256,4 @@ class SubprocessExecutor(Executor):
         return subprocess.Popen(cmd, cwd=cwd, stdin=stdin, stdout=stdout, stderr=stderr,
                                 **subprocess_args)
       except OSError as e:
-        raise self.Error('Problem executing {0} at cwd={1}: {2}'
-                         .format(self._distribution.java, cwd, e))
+        raise self.Error('Problem executing {0}: {1}'.format(self._distribution.java, e))

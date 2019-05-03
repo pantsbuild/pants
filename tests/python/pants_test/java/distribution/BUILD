@@ -21,11 +21,11 @@ python_tests(
   sources = ['test_distribution_integration.py'],
   dependencies = [
     '3rdparty/python:future',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/java/distribution',
     'src/python/pants/util:osutil',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
   ],
   tags = {'integration'},
   timeout = 120,
