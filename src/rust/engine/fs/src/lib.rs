@@ -641,31 +641,26 @@ impl PosixFS {
       })
   }
 
-  pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
+  pub fn read_link(&self, link: &Link) -> impl Future<Item = PathBuf, Error = io::Error> {
     let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path()).to_owned();
-    self
-      .pool
-      .spawn_fn(move || {
-        link_abs.read_link().and_then(|path_buf| {
-          if path_buf.is_absolute() {
-            Err(io::Error::new(
+    tokio_fs::read_link(link_abs.clone()).and_then(move |path_buf| {
+      if path_buf.is_absolute() {
+        Err(io::Error::new(
+          io::ErrorKind::InvalidData,
+          format!("Absolute symlink: {:?}", link_abs),
+        ))
+      } else {
+        link_parent
+          .map(|parent| parent.join(path_buf))
+          .ok_or_else(|| {
+            io::Error::new(
               io::ErrorKind::InvalidData,
-              format!("Absolute symlink: {:?}", link_abs),
-            ))
-          } else {
-            link_parent
-              .map(|parent| parent.join(path_buf))
-              .ok_or_else(|| {
-                io::Error::new(
-                  io::ErrorKind::InvalidData,
-                  format!("Symlink without a parent?: {:?}", link_abs),
-                )
-              })
-          }
-        })
-      })
-      .to_boxed()
+              format!("Symlink without a parent?: {:?}", link_abs),
+            )
+          })
+      }
+    })
   }
 
   ///
@@ -742,7 +737,7 @@ impl PosixFS {
 
 impl VFS<io::Error> for Arc<PosixFS> {
   fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
-    PosixFS::read_link(self, link)
+    PosixFS::read_link(self, link).to_boxed()
   }
 
   fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, io::Error> {
@@ -1097,8 +1092,9 @@ mod posixfs_test {
     std::os::unix::fs::symlink("doesnotexist", &root_path.join("symlink_to_nothing")).unwrap();
 
     let posix_fs = Arc::new(new_posixfs(&root_path));
-    let path_stats = posix_fs
-      .path_stats(vec![
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let path_stats = runtime
+      .block_on(posix_fs.path_stats(vec![
         PathBuf::from("executable_file"),
         PathBuf::from("regular_file"),
         PathBuf::from("dir"),
@@ -1107,8 +1103,7 @@ mod posixfs_test {
         PathBuf::from("dir_symlink"),
         PathBuf::from("symlink_to_nothing"),
         PathBuf::from("doesnotexist"),
-      ])
-      .wait()
+      ]))
       .unwrap();
     let v: Vec<Option<PathStat>> = vec![
       Some(PathStat::file(
