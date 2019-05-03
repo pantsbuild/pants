@@ -509,7 +509,7 @@ mod tests {
     let file_name = PathBuf::from("roland");
     make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs);
+    let path_stats = expand_all_sorted(posix_fs, &mut runtime);
     let snapshot = runtime
       .block_on(Snapshot::from_path_stats(
         store,
@@ -541,7 +541,7 @@ mod tests {
     std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs);
+    let path_stats = expand_all_sorted(posix_fs, &mut runtime);
     let snapshot = runtime
       .block_on(Snapshot::from_path_stats(
         store,
@@ -573,7 +573,7 @@ mod tests {
     std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs);
+    let path_stats = expand_all_sorted(posix_fs, &mut runtime);
     let expected_snapshot = runtime
       .block_on(Snapshot::from_path_stats(
         store.clone(),
@@ -602,7 +602,7 @@ mod tests {
     std::fs::create_dir_all(&dir.path().join(&llamas)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let sorted_path_stats = expand_all_sorted(posix_fs);
+    let sorted_path_stats = expand_all_sorted(posix_fs, &mut runtime);
     let mut unsorted_path_stats = sorted_path_stats.clone();
     unsorted_path_stats.reverse();
     assert_eq!(
@@ -839,19 +839,23 @@ mod tests {
     )
   }
 
-  fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
-    let mut v = posix_fs
-      .expand(
-        // Don't error or warn if there are no paths matched -- that is a valid state.
-        PathGlobs::create(
-          &["**".to_owned()],
-          &[],
-          StrictGlobMatching::Ignore,
-          GlobExpansionConjunction::AllMatch,
-        )
-        .unwrap(),
+  fn expand_all_sorted(
+    posix_fs: Arc<PosixFS>,
+    runtime: &mut tokio::runtime::Runtime,
+  ) -> Vec<PathStat> {
+    let mut v = runtime
+      .block_on(
+        posix_fs.expand(
+          // Don't error or warn if there are no paths matched -- that is a valid state.
+          PathGlobs::create(
+            &["**".to_owned()],
+            &[],
+            StrictGlobMatching::Ignore,
+            GlobExpansionConjunction::AllMatch,
+          )
+          .unwrap(),
+        ),
       )
-      .wait()
       .unwrap();
     v.sort_by(|a, b| a.path().cmp(b.path()));
     v
