@@ -21,6 +21,7 @@ use time;
 use super::{ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult};
 use std;
 use std::cmp::min;
+use std::collections::btree_map::BTreeMap;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an ExecuteProcessRequest, and may be populated only by the
@@ -38,6 +39,7 @@ pub struct CommandRunner {
   cache_key_gen_version: Option<String>,
   instance_name: Option<String>,
   authorization_header: Option<String>,
+  platform_properties: BTreeMap<String, String>,
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
@@ -128,8 +130,12 @@ impl super::CommandRunner for CommandRunner {
     let operations_client = self.operations_client.clone();
 
     let store = self.store.clone();
-    let execute_request_result =
-      make_execute_request(&req, &self.instance_name, &self.cache_key_gen_version);
+    let execute_request_result = make_execute_request(
+      &req,
+      &self.instance_name,
+      &self.cache_key_gen_version,
+      self.platform_properties.clone(),
+    );
 
     let ExecuteProcessRequest {
       description,
@@ -303,6 +309,7 @@ impl CommandRunner {
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
+    platform_properties: BTreeMap<String, String>,
     thread_count: usize,
     store: Store,
     futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
@@ -330,6 +337,7 @@ impl CommandRunner {
       cache_key_gen_version,
       instance_name,
       authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
+      platform_properties,
       channel,
       env,
       execution_client,
@@ -729,6 +737,7 @@ fn make_execute_request(
   req: &ExecuteProcessRequest,
   instance_name: &Option<String>,
   cache_key_gen_version: &Option<String>,
+  mut platform_properties: BTreeMap<String, String>,
 ) -> Result<
   (
     bazel_protos::remote_execution::Action,
@@ -781,20 +790,22 @@ fn make_execute_request(
   output_directories.sort();
   command.set_output_directories(protobuf::RepeatedField::from_vec(output_directories));
 
-  // Ideally, the JDK would be brought along as part of the input directory, but we don't currently
-  // have support for that. The platform with which we're experimenting for remote execution
-  // supports this property, and will symlink .jdk to a system-installed JDK:
-  // https://github.com/twitter/scoot/pull/391
   if req.jdk_home.is_some() {
-    command.set_platform({
-      let mut platform = bazel_protos::remote_execution::Platform::new();
-      platform.mut_properties().push({
-        let mut property = bazel_protos::remote_execution::Platform_Property::new();
-        property.set_name("JDK_SYMLINK".to_owned());
-        property.set_value(".jdk".to_owned());
-        property
-      });
-      platform
+    // Ideally, the JDK would be brought along as part of the input directory, but we don't
+    // currently have support for that. Scoot supports this property, and will symlink .jdk to a
+    // system-installed JDK https://github.com/twitter/scoot/pull/391 - we should probably come to
+    // some kind of consensus across tools as to how this should work; RBE appears to work by
+    // allowing you to specify a jdk-version platform property, and it will put a JDK at a
+    // well-known path in the docker container you specify in which to run.
+    platform_properties.insert("JDK_SYMLINK".to_owned(), ".jdk".to_owned());
+  }
+
+  for (name, value) in platform_properties {
+    command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name(name.clone());
+      property.set_value(value.clone());
+      property
     });
   }
 
@@ -998,7 +1009,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &None),
+      super::make_execute_request(&req, &None, &None, BTreeMap::new()),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1072,7 +1083,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &Some("dark-tower".to_owned()), &None),
+      super::make_execute_request(&req, &Some("dark-tower".to_owned()), &None, BTreeMap::new()),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1151,7 +1162,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &Some("meep".to_owned())),
+      super::make_execute_request(&req, &None, &Some("meep".to_owned()), BTreeMap::new()),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1206,7 +1217,84 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &None),
+      super::make_execute_request(&req, &None, &None, BTreeMap::new()),
+      Ok((want_action, want_command, want_execute_request))
+    );
+  }
+
+  #[test]
+  fn make_execute_request_with_jdk_and_extra_platform_properties() {
+    let input_directory = TestDirectory::containing_roland();
+    let req = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "yo"]),
+      env: BTreeMap::new(),
+      input_files: input_directory.digest(),
+      output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "some description".to_owned(),
+      jdk_home: Some(PathBuf::from("/tmp")),
+    };
+
+    let mut want_command = bazel_protos::remote_execution::Command::new();
+    want_command.mut_arguments().push("/bin/echo".to_owned());
+    want_command.mut_arguments().push("yo".to_owned());
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("FIRST".to_owned());
+      property.set_value("foo".to_owned());
+      property
+    });
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("JDK_SYMLINK".to_owned());
+      property.set_value(".jdk".to_owned());
+      property
+    });
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("last".to_owned());
+      property.set_value("bar".to_owned());
+      property
+    });
+
+    let mut want_action = bazel_protos::remote_execution::Action::new();
+    want_action.set_command_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "a809e7c54a105e7d98cc61558ac13ca3c05a5e1cb33326dfde189c72887dac29",
+        )
+        .unwrap(),
+        65,
+      ))
+        .into(),
+    );
+    want_action.set_input_root_digest((&input_directory.digest()).into());
+
+    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
+    want_execute_request.set_action_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "3d8d2a0282cb45b365b338f80ddab039dfa461dadde053e12bd5c3ab3329d928",
+        )
+        .unwrap(),
+        140,
+      ))
+        .into(),
+    );
+
+    assert_eq!(
+      super::make_execute_request(
+        &req,
+        &None,
+        &None,
+        vec![
+          ("FIRST".to_owned(), "foo".to_owned()),
+          ("last".to_owned(), "bar".to_owned())
+        ]
+        .into_iter()
+        .collect()
+      ),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1231,6 +1319,7 @@ mod tests {
           },
           &None,
           &None,
+          BTreeMap::new(),
         )
         .unwrap()
         .2,
@@ -1254,7 +1343,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1351,7 +1440,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&echo_roland_request(), &None, &None)
+        super::make_execute_request(&echo_roland_request(), &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![make_successful_operation(
@@ -1390,6 +1479,7 @@ mod tests {
       None,
       None,
       None,
+      BTreeMap::new(),
       1,
       store,
       timer_thread,
@@ -1438,7 +1528,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         Vec::from_iter(
@@ -1489,7 +1579,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1514,7 +1604,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1553,7 +1643,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1591,7 +1681,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![MockOperation::new({
@@ -1623,7 +1713,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1658,7 +1748,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![MockOperation::new({
@@ -1684,7 +1774,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1713,7 +1803,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None)
+        super::make_execute_request(&cat_roland_request(), &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1766,6 +1856,7 @@ mod tests {
       None,
       None,
       None,
+      BTreeMap::new(),
       1,
       store,
       timer_thread,
@@ -1812,7 +1903,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None)
+        super::make_execute_request(&cat_roland_request(), &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1862,6 +1953,7 @@ mod tests {
       None,
       None,
       None,
+      BTreeMap::new(),
       1,
       store,
       timer_thread,
@@ -1893,7 +1985,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None)
+        super::make_execute_request(&cat_roland_request(), &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         // We won't get as far as trying to run the operation, so don't expect any requests whose
@@ -1930,6 +2022,7 @@ mod tests {
       None,
       None,
       None,
+      BTreeMap::new(),
       1,
       store,
       timer_thread,
@@ -2151,7 +2244,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, &None, &None)
+          super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
             .unwrap()
             .2,
           vec![
@@ -2189,7 +2282,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, &None, &None)
+          super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
             .unwrap()
             .2,
           vec![
@@ -2531,7 +2624,17 @@ mod tests {
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, None, 1, store, timer_thread)
+    CommandRunner::new(
+      &address,
+      None,
+      None,
+      None,
+      None,
+      BTreeMap::new(),
+      1,
+      store,
+      timer_thread,
+    )
   }
 
   fn timer_thread() -> resettable::Resettable<futures_timer::HelperThread> {

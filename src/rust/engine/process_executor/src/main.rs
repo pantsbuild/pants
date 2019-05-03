@@ -139,6 +139,13 @@ fn main() {
             .default_value("3145728") // 3MB
       )
     .arg(
+      Arg::with_name("extra-platform-property")
+        .long("extra-platform-property")
+        .takes_value(true)
+        .multiple(true)
+        .help("Extra platform properties to set on the execution request."),
+    )
+    .arg(
       Arg::with_name("env")
         .long("env")
         .takes_value(true)
@@ -189,18 +196,14 @@ fn main() {
     .unwrap()
     .map(str::to_string)
     .collect();
-  let env: BTreeMap<String, String> = match args.values_of("env") {
-    Some(values) => values
-      .map(|v| {
-        let mut parts = v.splitn(2, '=');
-        (
-          parts.next().unwrap().to_string(),
-          parts.next().unwrap_or_default().to_string(),
-        )
-      })
-      .collect(),
-    None => BTreeMap::new(),
-  };
+  let env = args
+    .values_of("env")
+    .map(btreemap_from_keyvalues)
+    .unwrap_or_default();
+  let platform_properties = args
+    .values_of("extra-platform-property")
+    .map(btreemap_from_keyvalues)
+    .unwrap_or_default();
   let work_dir = args
     .value_of("work-dir")
     .map(PathBuf::from)
@@ -305,6 +308,7 @@ fn main() {
         remote_instance_arg,
         root_ca_certs,
         oauth_bearer_token,
+        platform_properties,
         1,
         store.clone(),
         timer_thread,
@@ -330,4 +334,18 @@ fn main() {
   print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
   eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
   exit(result.exit_code);
+}
+
+fn btreemap_from_keyvalues<'a, It: Iterator<Item = &'a str>>(
+  keyvalues: It,
+) -> BTreeMap<String, String> {
+  keyvalues
+    .map(|kv| {
+      let mut parts = kv.splitn(2, '=');
+      (
+        parts.next().unwrap().to_string(),
+        parts.next().unwrap_or_default().to_string(),
+      )
+    })
+    .collect()
 }
