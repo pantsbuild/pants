@@ -41,7 +41,7 @@ pub use serverset::BackoffConfig;
 
 use std::cmp::min;
 use std::ffi::OsStr;
-use std::io::{self, Read};
+use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -51,6 +51,7 @@ use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::future::{self, Future};
+use futures::Stream;
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 
@@ -629,22 +630,15 @@ impl PosixFS {
     self.ignore.is_ignored(stat)
   }
 
-  pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
+  pub fn read_file(&self, file: &File) -> impl Future<Item = FileContent, Error = io::Error> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
-    self
-      .pool
-      .spawn_fn(move || {
-        std::fs::File::open(&path_abs).and_then(|mut f| {
-          let mut content = Vec::new();
-          f.read_to_end(&mut content)?;
-          Ok(FileContent {
-            path: path,
-            content: Bytes::from(content),
-          })
-        })
+    tokio_fs::File::open(path_abs)
+      .and_then(|file| tokio_codec::FramedRead::new(file, tokio_codec::BytesCodec::new()).concat2())
+      .map(|content| FileContent {
+        path,
+        content: content.freeze(),
       })
-      .to_boxed()
   }
 
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
@@ -907,12 +901,12 @@ mod posixfs_test {
       0o600,
     );
     let fs = new_posixfs(&dir.path());
-    let file_content = fs
-      .read_file(&File {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let file_content = rt
+      .block_on(fs.read_file(&File {
         path: path.clone(),
         is_executable: false,
-      })
-      .wait()
+      }))
       .unwrap();
     assert_eq!(file_content.path, path);
     assert_eq!(file_content.content, content);

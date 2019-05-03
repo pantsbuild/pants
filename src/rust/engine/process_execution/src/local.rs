@@ -338,7 +338,6 @@ mod tests {
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
   use fs;
-  use futures::Future;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
   use std::env;
@@ -910,7 +909,9 @@ mod tests {
       work_dir: dir,
       cleanup_local_dirs: cleanup,
     };
-    runner.run(req).wait()
+    tokio::runtime::Runtime::new()
+      .unwrap()
+      .block_on(runner.run(req))
   }
 
   fn find_bash() -> String {

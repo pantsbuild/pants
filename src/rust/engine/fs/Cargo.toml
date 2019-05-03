@@ -31,9 +31,12 @@ sha2 = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
 tempfile = "3"
+tokio-codec = "0.1"
+tokio-fs = "0.1.6"
 uuid = { version = "0.7.1", features = ["v4"] }
 
 [dev-dependencies]
 mock = { path = "../testutil/mock" }
 testutil = { path = "../testutil" }
+tokio = "0.1"
 walkdir = "2"
