@@ -16,7 +16,7 @@ use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
 use crate::selectors;
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use indexmap::IndexMap;
-use log::{debug, info, warn};
+use log::{trace, info, warn};
 use parking_lot::Mutex;
 use ui::EngineDisplay;
 
@@ -256,7 +256,7 @@ impl Scheduler {
                   // Otherwise (if it is a success, some other type of Failure, or if we've run
                   // out of retries) recover to complete the join, which will cause the results to
                   // propagate to the user.
-                  debug!("Root {} completed.", NodeKey::Select(Box::new(root)));
+                  trace!("Root {} completed.", NodeKey::Select(Box::new(root)));
                   Ok(other.map(|res| {
                     res
                       .try_into()
@@ -286,7 +286,7 @@ impl Scheduler {
   ///
   pub fn execute(&self, request: &ExecutionRequest, session: &Session) -> Vec<RootResult> {
     // Bootstrap tasks for the roots, and then wait for all of them.
-    debug!("Launching {} roots.", request.roots.len());
+    trace!("Launching {} roots.", request.roots.len());
 
     session.extend(&request.roots);
 

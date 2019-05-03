@@ -455,13 +455,6 @@ class SchedulerSession(object):
 
     self._maybe_visualize()
 
-    logger.debug(
-      'computed %s nodes in %f seconds. there are %s total nodes.',
-      len(roots),
-      time.time() - start_time,
-      self._scheduler.graph_len()
-    )
-
     returns = tuple((root, state) for root, state in roots if type(state) is Return)
     throws = tuple((root, state) for root, state in roots if type(state) is Throw)
     return returns, throws

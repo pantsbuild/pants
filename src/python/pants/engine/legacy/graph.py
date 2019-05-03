@@ -257,7 +257,6 @@ class LegacyBuildGraph(BuildGraph):
     if not specs:
       return
 
-    logger.debug('Injecting specs to %s: %s', self, specs)
     with self._resolve_context():
       thts, = self._scheduler.product_request(TransitiveHydratedTargets,
                                               [specs])
