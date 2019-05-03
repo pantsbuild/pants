@@ -108,7 +108,8 @@ function run_packages_script() {
       args=("--py2" ${args[@]})
     fi
     requirements=("$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)")
-    run_pex "${requirements[@]}" -- "${ROOT}/src/python/pants/releases/packages.py" "${args[@]}"
+
+    PEX_VERBOSE=9 run_pex "${requirements[@]}" -- "${ROOT}/src/python/pants/releases/packages.py" "${args[@]}"
   )
 }
 
