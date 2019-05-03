@@ -159,6 +159,7 @@ function execute_packaged_pants_with_internal_backends() {
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   pants \
     --no-verify-config \
+    -ldebug \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
         'pants.rules.core',\

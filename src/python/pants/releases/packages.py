@@ -193,10 +193,12 @@ def build_and_print_packages(version, py2=False):
   for package in sorted(all_packages(py2)):
     packages_by_flags[package.bdist_wheel_flags].append(package)
 
+  env = dict(os.environ.copy())
+  env['PEX_VERBOSE'] = '9'
   for (flags, packages) in packages_by_flags.items():
-    args = ("./pants", "setup-py", "--run=bdist_wheel {}".format(" ".join(flags))) + tuple(package.target for package in packages)
+    args = ("./pants", "-ldebug", "setup-py", "--run=bdist_wheel {}".format(" ".join(flags))) + tuple(package.target for package in packages)
     try:
-      subprocess.check_call(args, stdout=sys.stderr)
+      subprocess.check_call(args, stdout=sys.stderr, env=env)
       for package in packages:
         print(package.name)
     except subprocess.CalledProcessError:
