@@ -308,7 +308,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # TODO(#7514): Make this default to 1.0 seconds if stdin is a tty!
     register('--pantsd-pailgun-quit-timeout', advanced=True, type=float, default=5.0,
              help='The length of time (in seconds) to wait for further output after sending a '
-                  'signal to the remote pantsd-runner process before killing it.')
+                  'signal to the remote pantsd process before killing it.')
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
     register('--pantsd-invalidation-globs', advanced=True, type=list, default=[],

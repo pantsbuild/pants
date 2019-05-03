@@ -32,7 +32,7 @@ class PailgunService(PantsService):
 
     self._logger = logging.getLogger(__name__)
     self._pailgun = None
-    self._shutdown_after_run = shutdown_after_run
+    self._shutdown_after_run = shutdown_after_run if shutdown_after_run else False
 
   @property
   def pailgun(self):

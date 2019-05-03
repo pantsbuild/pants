@@ -9,7 +9,7 @@ import unittest
 
 import mock
 
-from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
 
 
 class TestChunkType(unittest.TestCase):
@@ -93,7 +93,7 @@ class TestNailgunProtocol(unittest.TestCase):
     for chunk_type, payload in expected_chunks:
       NailgunProtocol.write_chunk(self.server_sock, chunk_type, payload)
 
-    for i, chunk in enumerate(NailgunProtocol.iter_chunks(self.client_sock)):
+    for i, chunk in enumerate(NailgunProtocol.iter_chunks(MaybeShutdownSocket(self.client_sock))):
       self.assertEqual(chunk, expected_chunks[i])
 
   def test_read_and_write_chunk(self):
