@@ -32,6 +32,9 @@ env:
     - PATH="${PYENV_ROOT}/shims:${PATH}"
     - AWS_CLI_ROOT="${HOME}/.aws_cli"
 
+stages:
+  - name: &test Test Pants
+
 # -------------------------------------------------------------------------
 # Cache config
 # -------------------------------------------------------------------------
@@ -333,6 +336,7 @@ base_linux_build_wheels: &base_linux_build_wheels
   # Similar to the bootstrap shard, we build Linux wheels in a docker image to maximize compatibility.
   <<: *travis_docker_image
   <<: *base_build_wheels
+  stage: *test
   # Callers of this anchor are expected to provide values in their `env` for
   # `docker_image_name` and `docker_run_command` (i.e. the bash command(s) to run).
   script:
