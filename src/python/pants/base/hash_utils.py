@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import hashlib
 import json
+import logging
 from builtins import bytes, object, open, str
 
 from future.utils import PY3
@@ -14,6 +15,8 @@ from twitter.common.collections import OrderedSet
 from pants.util.collections_abc_backport import Iterable, Mapping, OrderedDict, Set
 from pants.util.objects import DatatypeMixin
 from pants.util.strutil import ensure_binary
+
+logger = logging.getLogger(__name__)
 
 
 def hash_all(strs, digest=None):
@@ -63,6 +66,12 @@ class CoercingEncoder(json.JSONEncoder):
       return self.encode(key_obj)
 
   def default(self, o):
+    if isinstance(o, (type(None), bool, int, list, str, unicode, basestring)):
+      # isinstance() checks are expensive, particularly isinstance(o, Mapping):
+      # https://stackoverflow.com/questions/42378726/why-is-checking-isinstancesomething-mapping-so-slow
+      # This means that, if we let primitives fall through, we incur a performance hit, since
+      # we call this function very often.
+      return o
     if isinstance(o, Mapping):
       # Preserve order to avoid collisions for OrderedDict inputs to json.dumps(). We don't do this
       # for general mappings because dicts have an arbitrary key ordering in some versions of python
@@ -98,6 +107,11 @@ class CoercingEncoder(json.JSONEncoder):
       return self.default(repr(o))
     elif isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
       return list(self.default(i) for i in o)
+    else:
+      logger.debug("Our custom Encoder is trying to hash a primitive type, but has gone through"
+                   "checking every other data type before. These checks are expensive,"
+                   "so you should consider adding the type of your primitive {} to the top"
+                   "of this function".format(type(o)))
     return o
 
   def encode(self, o):
