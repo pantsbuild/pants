@@ -4,11 +4,15 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
+
 from pex.fetcher import Fetcher, PyPIFetcher
 from pex.http import Context
 
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
+
+logger = logging.getLogger(__name__)
 
 
 class PythonRepos(Subsystem):
@@ -41,4 +45,6 @@ class PythonRepos(Subsystem):
   @memoized_method
   def get_network_context(self):
     # TODO(wickman): Add retry, conn_timeout, threads, etc configuration here.
-    return Context.get()
+    context = Context.get()
+    logger.debug('PEX HTTP Context is: {} (choices were {})'.format(type(context), Context._REGISTRY))
+    return context
