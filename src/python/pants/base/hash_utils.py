@@ -9,7 +9,7 @@ import json
 import logging
 from builtins import bytes, object, open, str
 
-from future.utils import PY3
+from future.utils import PY3, binary_type, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.util.collections_abc_backport import Iterable, Mapping, OrderedDict, Set
@@ -67,8 +67,7 @@ class CoercingEncoder(json.JSONEncoder):
       return self.encode(key_obj)
 
   def _is_primitive(self, o):
-      return (isinstance(o, (type(None), bool, int, list, str, bytes)) if PY3 else
-              isinstance(o, (type(None), bool, int, list, str, unicode, basestring)))
+    return isinstance(o, (type(None), bool, int, list, text_type, binary_type)
 
   def default(self, o):
     if self._is_primitive(o):
