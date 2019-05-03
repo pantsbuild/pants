@@ -66,11 +66,11 @@ class CoercingEncoder(json.JSONEncoder):
     else:
       return self.encode(key_obj)
 
-  def _is_primitive(self, o):
-    return isinstance(o, (type(None), bool, int, list, text_type, binary_type)
+  def _is_natively_encodable(self, o):
+    return isinstance(o, (type(None), bool, int, list, text_type, binary_type))
 
   def default(self, o):
-    if self._is_primitive(o):
+    if self._is_natively_encodable(o):
       # isinstance() checks are expensive, particularly for abstract base classes such as Mapping:
       # https://stackoverflow.com/questions/42378726/why-is-checking-isinstancesomething-mapping-so-slow
       # This means that, if we let primitives fall through, we incur a performance hit, since
