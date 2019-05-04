@@ -135,7 +135,11 @@ class RuleGraphTest(TestBase):
       create_scheduler(rules)
 
     self.assert_equal_with_printing(dedent("""
-                     Rules with errors: 1
+                     Rules with errors: 3
+                       (A, [B, C], a_from_b_and_c()):
+                         Was not usable by any other @rule.
+                       (A, [C, B], a_from_c_and_b()):
+                         Was not usable by any other @rule.
                        (D, [A], d_from_a()):
                          Ambiguous rules to compute A with parameter types (B+C):
                            (A, [B, C], a_from_b_and_c()) for (B+C)
@@ -246,13 +250,42 @@ class RuleGraphTest(TestBase):
       create_scheduler(rules)
 
     self.assert_equal_with_printing(dedent("""
-                      Rules with errors: 2
+                      Rules with errors: 3
+                        (A, [C], a_from_c()):
+                          Was not usable by any other @rule.
                         (B, [D], b_from_d()):
                           No rule was available to compute D with parameter type SubA
                         (D, [A, SubA], [Get(A, C)], d_from_a_and_suba()):
                           No rule was available to compute A with parameter type SubA
                       """).strip(),
         str(cm.exception))
+
+  def test_unreachable_rule(self):
+    """Test that when one rule "shadows" another, we get an error."""
+    @rule(D, [])
+    def d_singleton():
+      yield D()
+
+    @rule(D, [B])
+    def d_for_b(b):
+      yield D()
+
+    rules = [
+      d_singleton,
+      d_for_b,
+      RootRule(B),
+    ]
+
+    with self.assertRaises(Exception) as cm:
+      create_scheduler(rules)
+
+    self.assert_equal_with_printing(dedent("""
+        Rules with errors: 1
+          (D, [B], d_for_b()):
+            Was not usable by any other @rule.
+        """).strip(),
+        str(cm.exception)
+      )
 
   def test_smallest_full_test(self):
     @rule(A, [SubA])
