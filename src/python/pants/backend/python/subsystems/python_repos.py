@@ -45,4 +45,10 @@ class PythonRepos(Subsystem):
   @memoized_method
   def get_network_context(self):
     # TODO(wickman): Add retry, conn_timeout, threads, etc configuration here.
+    try: # for Python 3
+      from http.client import HTTPConnection
+    except ImportError:
+      from httplib import HTTPConnection
+    HTTPConnection.debuglevel = 1
+
     return RequestsContext()
