@@ -1224,10 +1224,7 @@ mod local {
       let dir = TempDir::new().unwrap();
 
       let store = new_store(dir.path());
-      let hash = store
-        .store_bytes(EntryType::File, testdata.bytes(), false)
-        .wait()
-        .unwrap();
+      let hash = prime_store_with_file_bytes(&store, testdata.bytes());
       assert_eq!(load_file_bytes(&store, hash), Ok(Some(testdata.bytes())));
     }
 
@@ -1606,10 +1603,7 @@ mod local {
         .store_bytes(EntryType::Directory, testdir.bytes(), false)
         .wait()
         .expect("Error storing");
-      store
-        .store_bytes(EntryType::File, testdata.bytes(), false)
-        .wait()
-        .expect("Error storing");
+      prime_store_with_file_bytes(&store, testdata.bytes());
       assert_eq!(
         store.entry_type(&testdata.fingerprint()),
         Ok(Some(EntryType::File))
@@ -1626,10 +1620,7 @@ mod local {
         .store_bytes(EntryType::Directory, testdir.bytes(), false)
         .wait()
         .expect("Error storing");
-      store
-        .store_bytes(EntryType::File, testdata.bytes(), false)
-        .wait()
-        .expect("Error storing");
+      prime_store_with_file_bytes(&store, testdata.bytes());
       assert_eq!(
         store.entry_type(&testdir.fingerprint()),
         Ok(Some(EntryType::Directory))
@@ -1646,10 +1637,7 @@ mod local {
         .store_bytes(EntryType::Directory, testdir.bytes(), false)
         .wait()
         .expect("Error storing");
-      store
-        .store_bytes(EntryType::File, testdata.bytes(), false)
-        .wait()
-        .expect("Error storing");
+      prime_store_with_file_bytes(&store, testdata.bytes());
       assert_eq!(
         store.entry_type(&TestDirectory::recursive().fingerprint()),
         Ok(None)
@@ -1703,6 +1691,13 @@ mod local {
       digest: Digest,
     ) -> Result<Option<Bytes>, String> {
       store.load_bytes_with(entry_type, digest, |b| b).wait()
+    }
+
+    fn prime_store_with_file_bytes(store: &ByteStore, bytes: Bytes) -> Digest {
+      store
+        .store_bytes(EntryType::File, bytes, false)
+        .wait()
+        .expect("Storing file bytes")
     }
 
     fn get_directory_size(path: &Path) -> usize {
