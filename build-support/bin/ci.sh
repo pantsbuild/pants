@@ -131,7 +131,7 @@ if [[ "${run_bootstrap:-false}" == "true" ]]; then
     if [[ "${run_bootstrap_clean:-false}" == "true" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
     fi
-    ./pants binary \
+    ./pants -ldebug binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
     ./pants.pex -V
