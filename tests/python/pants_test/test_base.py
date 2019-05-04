@@ -40,7 +40,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_file_dump, safe_mkdir,
                                 safe_mkdtemp, safe_open, safe_rmtree)
 from pants.util.memo import memoized_method
-from pants.util.meta import AbstractClass
+from pants.util.meta import AbstractClass, classproperty
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
@@ -516,9 +516,13 @@ class TestBase(unittest.TestCase, AbstractClass):
     super(TestBase, self).tearDown()
     Subsystem.reset()
 
+  @classproperty
+  def target_class_for_subsystems(cls):
+    return Target
+
   def _init_target_subsystem(self):
     if not self._inited_target:
-      subsystem_util.init_subsystems(Target.subsystems())
+      subsystem_util.init_subsystems(self.target_class_for_subsystems.subsystems())
       self._inited_target = True
 
   def target(self, spec):
