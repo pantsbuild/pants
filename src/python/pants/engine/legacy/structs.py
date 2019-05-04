@@ -126,17 +126,13 @@ class TargetAdaptor(StructWithDeps):
     pass
 
 
-class Field(object):
+@union
+class HydrateableField(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-@union
-class HydrateableField(object): pass
-
-
 class SourcesField(
-  datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_globs', 'validate_fn']),
-  Field
+  datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_globs', 'validate_fn'])
 ):
   """Represents the `sources` argument for a particular Target.
 
@@ -188,7 +184,7 @@ class PageAdaptor(TargetAdaptor):
       )
 
 
-class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
+class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list'])):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
 
   def __hash__(self):

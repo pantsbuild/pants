@@ -107,7 +107,11 @@ def load_build_configuration_from_source(build_configuration, backends=None):
   # pants.build_graph and pants.core_task must always be loaded, and before any other backends.
   # TODO: Consider replacing the "backend" nomenclature here. pants.build_graph and
   # pants.core_tasks aren't really backends.
-  backend_packages = OrderedSet(['pants.build_graph', 'pants.core_tasks'] + (backends or []))
+  backend_packages = OrderedSet([
+      'pants.build_graph',
+      'pants.core_tasks',
+      'pants.rules.core',
+    ] + (backends or []))
   for backend_package in backend_packages:
     load_backend(build_configuration, backend_package)
 
