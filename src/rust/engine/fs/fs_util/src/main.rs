@@ -258,6 +258,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
+  let mut runtime = tokio::runtime::Runtime::new().unwrap();
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.values_of("server-address") {
       Some(cas_address) => {
@@ -362,8 +363,8 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .ok_or_else(|| format!("File being saved must have parent but {:?} did not", path))?,
             pool,
           );
-          let file = posix_fs
-            .stat(PathBuf::from(path.file_name().unwrap()))
+          let file = runtime
+            .block_on(posix_fs.stat(PathBuf::from(path.file_name().unwrap())))
             .unwrap();
           match file {
             fs::Stat::File(f) => {
