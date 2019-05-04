@@ -16,6 +16,8 @@ from pants.util.memo import memoized_method
 logger = logging.getLogger(__name__)
 
 
+# TODO: These methods of RequestsContext are monkey-patched out to work around
+# https://github.com/pantsbuild/pex/issues/26: we should upstream a fix for this.
 _REQUESTS_TIMEOUTS = (15, 30)
 
 
