@@ -16,7 +16,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::pool::ResettablePool;
 use parking_lot::Mutex;
 
 // This is the maximum size any particular local LMDB store file is allowed to grow to.
@@ -85,9 +84,9 @@ impl Store {
   ///
   /// Make a store which only uses its local storage.
   ///
-  pub fn local_only<P: AsRef<Path>>(path: P, pool: Arc<ResettablePool>) -> Result<Store, String> {
+  pub fn local_only<P: AsRef<Path>>(path: P) -> Result<Store, String> {
     Ok(Store {
-      local: local::ByteStore::new(path, pool)?,
+      local: local::ByteStore::new(path)?,
       remote: None,
     })
   }
@@ -98,7 +97,6 @@ impl Store {
   ///
   pub fn with_remote<P: AsRef<Path>>(
     path: P,
-    pool: Arc<ResettablePool>,
     cas_addresses: &[String],
     instance_name: Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
@@ -111,7 +109,7 @@ impl Store {
     futures_timer_thread: futures_timer::TimerHandle,
   ) -> Result<Store, String> {
     Ok(Store {
-      local: local::ByteStore::new(path, pool)?,
+      local: local::ByteStore::new(path)?,
       remote: Some(remote::ByteStore::new(
         cas_addresses,
         instance_name,
@@ -684,7 +682,7 @@ mod local {
   use boxfuture::{BoxFuture, Boxable};
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
-  use futures::future;
+  use futures::future::{self, Future};
   use hashing::{Digest, Fingerprint};
   use lmdb::Error::{KeyExist, NotFound};
   use lmdb::{
@@ -703,7 +701,6 @@ mod local {
 
   use super::super::EMPTY_DIGEST;
   use super::MAX_LOCAL_STORE_SIZE_BYTES;
-  use crate::pool::ResettablePool;
 
   #[derive(Clone)]
   pub struct ByteStore {
@@ -711,7 +708,6 @@ mod local {
   }
 
   struct InnerStore {
-    pool: Arc<ResettablePool>,
     // Store directories separately from files because:
     //  1. They may have different lifetimes.
     //  2. It's nice to know whether we should be able to parse something as a proto.
@@ -720,13 +716,12 @@ mod local {
   }
 
   impl ByteStore {
-    pub fn new<P: AsRef<Path>>(path: P, pool: Arc<ResettablePool>) -> Result<ByteStore, String> {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<ByteStore, String> {
       let root = path.as_ref();
       let files_root = root.join("files");
       let directories_root = root.join("directories");
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
-          pool: pool,
           file_dbs: ShardedLmdb::new(files_root.clone()).map(Arc::new),
           directory_dbs: ShardedLmdb::new(directories_root.clone()).map(Arc::new),
         }),
@@ -946,10 +941,8 @@ mod local {
       };
 
       let bytestore = self.clone();
-      self
-        .inner
-        .pool
-        .spawn_fn(move || {
+      futures::future::poll_fn(move || {
+        tokio_threadpool::blocking(|| {
           let fingerprint = {
             let mut hasher = Sha256::default();
             hasher.input(&bytes);
@@ -982,7 +975,12 @@ mod local {
             Err(err) => Err(format!("Error storing digest {:?}: {}", digest, err)),
           }
         })
-        .to_boxed()
+      })
+      .then(|blocking_result| match blocking_result {
+        Ok(v) => v,
+        Err(blocking_err) => panic!("TODO: {}", blocking_err),
+      })
+      .to_boxed()
     }
 
     pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
@@ -1003,10 +1001,7 @@ mod local {
         EntryType::File => self.inner.file_dbs.clone(),
       };
 
-      self
-        .inner
-        .pool
-        .spawn_fn(move || {
+      futures::future::poll_fn(move || tokio_threadpool::blocking( || {
           let (env, db, _) = dbs.clone()?.get(&digest.0);
           let ro_txn = env
             .begin_ro_txn()
@@ -1023,7 +1018,12 @@ mod local {
             Err(NotFound) => Ok(None),
             Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err,)),
           })
-        }).to_boxed()
+        })).then(|blocking_result| {
+        match blocking_result {
+          Ok(v) => v,
+          Err(blocking_err) => panic!("TODO: {}", blocking_err),
+        }
+      }).to_boxed()
     }
   }
 
@@ -1179,11 +1179,10 @@ mod local {
   #[cfg(test)]
   pub mod tests {
     use super::super::tests::block_on;
-    use super::{ByteStore, EntryType, ResettablePool, ShrinkBehavior};
+    use super::{ByteStore, EntryType, ShrinkBehavior};
     use bytes::{BufMut, Bytes, BytesMut};
     use hashing::{Digest, Fingerprint};
     use std::path::Path;
-    use std::sync::Arc;
     use tempfile::TempDir;
     use testutil::data::{TestData, TestDirectory};
     use walkdir::WalkDir;
@@ -1611,7 +1610,7 @@ mod local {
     }
 
     pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
-      ByteStore::new(dir, Arc::new(ResettablePool::new("test-pool-".to_string()))).unwrap()
+      ByteStore::new(dir).unwrap()
     }
 
     pub fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
@@ -2357,7 +2356,6 @@ mod remote {
 mod tests {
   use super::{local, EntryType, FileContent, Store, UploadSummary};
 
-  use crate::pool::ResettablePool;
   use bazel_protos;
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
@@ -2374,7 +2372,6 @@ mod tests {
   use std::io::Read;
   use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
-  use std::sync::Arc;
   use std::time::Duration;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
@@ -2435,8 +2432,7 @@ mod tests {
   /// Create a new local store with whatever was already serialized in dir.
   ///
   fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
-    Store::local_only(dir, Arc::new(ResettablePool::new("test-pool-".to_string())))
-      .expect("Error creating local store")
+    Store::local_only(dir).expect("Error creating local store")
   }
 
   ///
@@ -2445,7 +2441,6 @@ mod tests {
   fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
     Store::with_remote(
       dir,
-      Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[cas_address],
       None,
       &None,
@@ -3115,7 +3110,6 @@ mod tests {
 
     let store_with_remote = Store::with_remote(
       dir.path(),
-      Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[cas.address()],
       Some("dark-tower".to_owned()),
       &None,
@@ -3143,7 +3137,6 @@ mod tests {
 
     let store_with_remote = Store::with_remote(
       dir.path(),
-      Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[cas.address()],
       Some("dark-tower".to_owned()),
       &None,
@@ -3182,7 +3175,6 @@ mod tests {
 
     let store_with_remote = Store::with_remote(
       dir.path(),
-      Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[cas.address()],
       None,
       &None,
@@ -3210,7 +3202,6 @@ mod tests {
 
     let store_with_remote = Store::with_remote(
       dir.path(),
-      Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[cas.address()],
       None,
       &None,

@@ -21,7 +21,7 @@ use crate::tasks::Tasks;
 use crate::types::Types;
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
-use fs::{self, safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
+use fs::{self, safe_create_dir_all_ioerror, PosixFS, Store};
 use graph::{EntryId, Graph, NodeContext};
 use log::debug;
 use parking_lot::RwLock;
@@ -44,7 +44,6 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph,
   pub types: Types,
-  pub fs_pool: Arc<ResettablePool>,
   pub runtime: Resettable<Arc<RwLock<Runtime>>>,
   pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
   store_and_command_runner_and_http_client:
@@ -80,7 +79,6 @@ impl Core {
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
     let runtime = Resettable::new(|| {
       Arc::new(RwLock::new(Runtime::new().unwrap_or_else(|e| {
         panic!("Could not initialize Runtime: {:?}", e)
@@ -106,7 +104,6 @@ impl Core {
       None
     };
 
-    let fs_pool2 = fs_pool.clone();
     let futures_timer_thread = Resettable::new(|| futures_timer::HelperThread::new().unwrap());
     let futures_timer_thread2 = futures_timer_thread.clone();
     let store_and_command_runner_and_http_client = Resettable::new(move || {
@@ -115,11 +112,10 @@ impl Core {
         .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
         .and_then(|()| {
           if remote_store_servers.is_empty() {
-            Store::local_only(local_store_dir, fs_pool2.clone())
+            Store::local_only(local_store_dir)
           } else {
             Store::with_remote(
               local_store_dir,
-              fs_pool2.clone(),
               &remote_store_servers,
               remote_instance_name.clone(),
               &root_ca_certs,
@@ -172,7 +168,6 @@ impl Core {
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
-      fs_pool: fs_pool,
       runtime: runtime,
       futures_timer_thread: futures_timer_thread,
       store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
@@ -204,11 +199,9 @@ impl Core {
     }
     let t = self.futures_timer_thread.with_reset(|| {
       self.runtime.with_reset(|| {
-        self.graph.with_exclusive(|| {
-          self
-            .fs_pool
-            .with_shutdown(|| self.store_and_command_runner_and_http_client.with_reset(f))
-        })
+        self
+          .graph
+          .with_exclusive(|| self.store_and_command_runner_and_http_client.with_reset(f))
       })
     });
     self

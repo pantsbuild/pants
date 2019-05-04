@@ -686,11 +686,9 @@ fn main() {
     None
   };
 
-  let pool = Arc::new(fs::ResettablePool::new("brfs-".to_owned()));
   let store = match args.value_of("server-address") {
     Some(address) => fs::Store::with_remote(
       &store_path,
-      pool,
       &[address.to_owned()],
       args.value_of("remote-instance-name").map(str::to_owned),
       &root_ca_certs,
@@ -708,7 +706,7 @@ fn main() {
       1,
       futures_timer::TimerHandle::default(),
     ),
-    None => fs::Store::local_only(&store_path, pool),
+    None => fs::Store::local_only(&store_path),
   }
   .expect("Error making store");
 
@@ -743,7 +741,6 @@ mod test {
   use super::mount;
   use fs;
   use hashing;
-  use std::sync::Arc;
   use testutil::{
     data::{TestData, TestDirectory},
     file,
@@ -753,11 +750,7 @@ mod test {
   fn missing_digest() {
     let (store_dir, mount_dir) = make_dirs();
 
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -774,11 +767,7 @@ mod test {
     let (store_dir, mount_dir) = make_dirs();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
 
@@ -800,11 +789,7 @@ mod test {
     let (store_dir, mount_dir) = make_dirs();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let test_directory = TestDirectory::containing_roland();
@@ -829,11 +814,7 @@ mod test {
     let (store_dir, mount_dir) = make_dirs();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let test_directory = TestDirectory::containing_roland();
@@ -860,11 +841,7 @@ mod test {
     let (store_dir, mount_dir) = make_dirs();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let treat_bytes = TestData::catnip();
@@ -898,11 +875,7 @@ mod test {
     let (store_dir, mount_dir) = make_dirs();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let treat_bytes = TestData::catnip();
@@ -941,11 +914,7 @@ mod test {
     let (store_dir, mount_dir) = make_dirs();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
 
     let treat_bytes = TestData::catnip();
     let directory = TestDirectory::with_mixed_executable_files();
@@ -989,7 +958,6 @@ mod syscall_tests {
   use libc;
   use std::ffi::CString;
   use std::path::Path;
-  use std::sync::Arc;
   use testutil::data::TestData;
 
   #[test]
@@ -997,11 +965,7 @@ mod syscall_tests {
     let (store_dir, mount_dir) = make_dirs();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(
-      store_dir.path(),
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
 

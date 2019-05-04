@@ -39,7 +39,7 @@ use serde_json;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
-use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, UploadSummary};
+use fs::{GlobMatching, Snapshot, Store, StoreFileByDigest, UploadSummary};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
@@ -257,7 +257,6 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
-  let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
   let mut runtime = tokio::runtime::Runtime::new().unwrap();
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.values_of("server-address") {
@@ -290,7 +289,6 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         (
           Store::with_remote(
             &store_dir,
-            pool,
             &cas_addresses,
             top_match
               .value_of("remote-instance-name")
@@ -320,7 +318,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           true,
         )
       }
-      None => (Store::local_only(&store_dir, pool), false),
+      None => (Store::local_only(&store_dir), false),
     };
     let store = store_result.map_err(|e| {
       format!(

@@ -926,7 +926,6 @@ mod tests {
   use std::iter::{self, FromIterator};
   use std::ops::Sub;
   use std::path::PathBuf;
-  use std::sync::Arc;
   use std::time::Duration;
 
   #[derive(Debug, PartialEq)]
@@ -1461,7 +1460,6 @@ mod tests {
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       &store_dir_path,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1500,11 +1498,7 @@ mod tests {
       }
     );
 
-    let local_store = fs::Store::local_only(
-      &store_dir_path,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let local_store = fs::Store::local_only(&store_dir_path).expect("Error creating local store");
     {
       assert_eq!(
         runtime
@@ -1832,7 +1826,6 @@ mod tests {
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1931,7 +1924,6 @@ mod tests {
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -2004,7 +1996,6 @@ mod tests {
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -2018,7 +2009,8 @@ mod tests {
     )
     .expect("Failed to make store");
 
-    let error = CommandRunner::new(
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runner = CommandRunner::new(
       &mock_server.address(),
       None,
       None,
@@ -2028,10 +2020,11 @@ mod tests {
       1,
       store,
       timer_thread,
-    )
-    .run(cat_roland_request())
-    .wait()
-    .expect_err("Want error");
+    );
+
+    let error = runtime
+      .block_on(runner.run(cat_roland_request()))
+      .expect_err("Want error");
     assert_contains(&error, &format!("{}", missing_digest.0));
   }
 
@@ -2613,7 +2606,6 @@ mod tests {
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,

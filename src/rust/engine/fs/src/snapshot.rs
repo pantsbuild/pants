@@ -466,7 +466,7 @@ mod tests {
 
   use super::super::{
     Dir, File, GlobExpansionConjunction, GlobMatching, Path, PathGlobs, PathStat, PosixFS,
-    ResettablePool, Snapshot, Store, StrictGlobMatching,
+    Snapshot, Store, StrictGlobMatching,
   };
   use super::OneOffStoreFileByDigest;
 
@@ -483,14 +483,12 @@ mod tests {
     OneOffStoreFileByDigest,
     tokio::runtime::Runtime,
   ) {
-    let pool = Arc::new(ResettablePool::new("test-pool-".to_string()));
     // TODO: Pass a remote CAS address through.
     let store = Store::local_only(
       tempfile::Builder::new()
         .prefix("lmdb_store")
         .tempdir()
         .unwrap(),
-      pool.clone(),
     )
     .unwrap();
     let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
