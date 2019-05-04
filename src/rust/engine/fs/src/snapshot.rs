@@ -626,25 +626,22 @@ mod tests {
 
   #[test]
   fn merge_directories_two_files() {
-    let (store, _, _, _, _) = setup();
+    let (store, _, _, _, mut runtime) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_treats = TestDirectory::containing_treats();
 
-    store
-      .record_directory(&containing_roland.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_roland.directory(), false))
       .expect("Storing roland directory");
-    store
-      .record_directory(&containing_treats.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_treats.directory(), false))
       .expect("Storing treats directory");
 
-    let result = Snapshot::merge_directories(
+    let result = runtime.block_on(Snapshot::merge_directories(
       store,
       vec![containing_treats.digest(), containing_roland.digest()],
-    )
-    .wait();
+    ));
 
     assert_eq!(
       result,
@@ -654,26 +651,24 @@ mod tests {
 
   #[test]
   fn merge_directories_clashing_files() {
-    let (store, _, _, _, _) = setup();
+    let (store, _, _, _, mut runtime) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_wrong_roland = TestDirectory::containing_wrong_roland();
 
-    store
-      .record_directory(&containing_roland.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_roland.directory(), false))
       .expect("Storing roland directory");
-    store
-      .record_directory(&containing_wrong_roland.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_wrong_roland.directory(), false))
       .expect("Storing wrong roland directory");
 
-    let err = Snapshot::merge_directories(
-      store,
-      vec![containing_roland.digest(), containing_wrong_roland.digest()],
-    )
-    .wait()
-    .expect_err("Want error merging");
+    let err = runtime
+      .block_on(Snapshot::merge_directories(
+        store,
+        vec![containing_roland.digest(), containing_wrong_roland.digest()],
+      ))
+      .expect_err("Want error merging");
 
     assert!(
       err.contains("roland"),
@@ -684,28 +679,25 @@ mod tests {
 
   #[test]
   fn merge_directories_same_files() {
-    let (store, _, _, _, _) = setup();
+    let (store, _, _, _, mut runtime) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_roland_and_treats = TestDirectory::containing_roland_and_treats();
 
-    store
-      .record_directory(&containing_roland.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_roland.directory(), false))
       .expect("Storing roland directory");
-    store
-      .record_directory(&containing_roland_and_treats.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_roland_and_treats.directory(), false))
       .expect("Storing treats directory");
 
-    let result = Snapshot::merge_directories(
+    let result = runtime.block_on(Snapshot::merge_directories(
       store,
       vec![
         containing_roland.digest(),
         containing_roland_and_treats.digest(),
       ],
-    )
-    .wait();
+    ));
 
     assert_eq!(
       result,
@@ -750,10 +742,13 @@ mod tests {
       ))
       .unwrap();
 
-    let merged = Snapshot::merge(store.clone(), &[snapshot1, snapshot2])
-      .wait()
+    let merged = runtime
+      .block_on(Snapshot::merge(store.clone(), &[snapshot1, snapshot2]))
       .unwrap();
-    let merged_root_directory = store.load_directory(merged.digest).wait().unwrap().unwrap();
+    let merged_root_directory = runtime
+      .block_on(store.load_directory(merged.digest))
+      .unwrap()
+      .unwrap();
 
     assert_eq!(merged.path_stats, vec![dir, file1, file2]);
     assert_eq!(merged_root_directory.files.len(), 0);
@@ -762,9 +757,8 @@ mod tests {
     let merged_child_dirnode = merged_root_directory.directories[0].clone();
     let merged_child_dirnode_digest: Result<Digest, String> =
       merged_child_dirnode.get_digest().into();
-    let merged_child_directory = store
-      .load_directory(merged_child_dirnode_digest.unwrap())
-      .wait()
+    let merged_child_directory = runtime
+      .block_on(store.load_directory(merged_child_dirnode_digest.unwrap()))
       .unwrap()
       .unwrap();
 

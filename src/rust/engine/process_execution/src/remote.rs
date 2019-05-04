@@ -1432,6 +1432,8 @@ mod tests {
 
   #[test]
   fn ensure_inline_stdio_is_stored() {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
     let test_stdout = TestData::roland();
     let test_stderr = TestData::catnip();
 
@@ -1484,7 +1486,9 @@ mod tests {
       store,
       timer_thread,
     );
-    let result = cmd_runner.run(echo_roland_request()).wait().unwrap();
+    let result = runtime
+      .block_on(cmd_runner.run(echo_roland_request()))
+      .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
@@ -1503,16 +1507,14 @@ mod tests {
     .expect("Error creating local store");
     {
       assert_eq!(
-        local_store
-          .load_file_bytes_with(test_stdout.digest(), |v| v)
-          .wait()
+        runtime
+          .block_on(local_store.load_file_bytes_with(test_stdout.digest(), |v| v))
           .unwrap(),
         Some(test_stdout.bytes())
       );
       assert_eq!(
-        local_store
-          .load_file_bytes_with(test_stderr.digest(), |v| v)
-          .wait()
+        runtime
+          .block_on(local_store.load_file_bytes_with(test_stderr.digest(), |v| v))
           .unwrap(),
         Some(test_stderr.bytes())
       );
@@ -1796,6 +1798,8 @@ mod tests {
 
   #[test]
   fn execute_missing_file_uploads_if_known() {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
     let roland = TestData::roland();
 
     let mock_server = {
@@ -1841,16 +1845,13 @@ mod tests {
       timer_thread.with(|t| t.handle()),
     )
     .expect("Failed to make store");
-    store
-      .store_file_bytes(roland.bytes(), false)
-      .wait()
+    runtime
+      .block_on(store.store_file_bytes(roland.bytes(), false))
       .expect("Saving file bytes to store");
-    store
-      .record_directory(&TestDirectory::containing_roland().directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), false))
       .expect("Saving directory bytes to store");
-
-    let result = CommandRunner::new(
+    let command_runner = CommandRunner::new(
       &mock_server.address(),
       None,
       None,
@@ -1860,10 +1861,11 @@ mod tests {
       1,
       store,
       timer_thread,
-    )
-    .run(cat_roland_request())
-    .wait()
-    .unwrap();
+    );
+
+    let result = runtime
+      .block_on(command_runner.run(cat_roland_request()))
+      .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
@@ -2602,7 +2604,8 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner(address, &cas);
-    command_runner.run(request).wait()
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(command_runner.run(request))
   }
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
@@ -2649,12 +2652,13 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
-    command_runner
-      .extract_execute_response(
-        super::OperationOrStatus::Operation(operation),
-        &mut ExecutionHistory::default(),
-      )
-      .wait()
+
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
+    runtime.block_on(command_runner.extract_execute_response(
+      super::OperationOrStatus::Operation(operation),
+      &mut ExecutionHistory::default(),
+    ))
   }
 
   fn extract_output_files_from_response(
@@ -2665,9 +2669,9 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
-    command_runner
-      .extract_output_files(&execute_response)
-      .wait()
+
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(command_runner.extract_output_files(&execute_response))
   }
 
   fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
