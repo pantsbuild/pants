@@ -94,8 +94,11 @@ struct B {}
   def _target_dict(self):
     return self.populate_target_dict(self._target_specs)
 
-  def _run_tasks(self, target_roots):
-    self.set_options(strict=True)
+  def _run_tasks(self, target_roots, dump_invalid_thrift_source_errors_inline=True):
+    self.set_options(
+      strict=True,
+      dump_invalid_thrift_source_errors_inline=dump_invalid_thrift_source_errors_inline,
+    )
     return self.invoke_tasks(target_roots=target_roots)
 
   _exception_prelude = """\
@@ -113,8 +116,23 @@ Errors:"""
 Python namespaces could not be extracted from some thrift sources. Declaring a `namespace py` in
 thrift sources for python thrift library targets will soon become required.
 
-1 python library target(s) contained thrift sources not declaring a python namespace. The targets
-and/or files which need to be edited will be dumped to: {}
+1 python_library() target contained thrift sources not declaring a python namespace:
+(This output can be silenced with --no-test_scope-dump-invalid-thrift-source-errors-inline):
+src/py-thrift:no-py-namespace: [src/py-thrift/bad.thrift]
+"""
+                     .format(cm.exception))
+
+  def test_no_py_namespace_error_to_output_file(self):
+    no_py_namespace_target = self._target_dict()['no-py-namespace']
+    with self.assertRaises(PyThriftNamespaceClashCheck.NamespaceExtractionError) as cm:
+      self._run_tasks(target_roots=[no_py_namespace_target],
+                      dump_invalid_thrift_source_errors_inline=False)
+    self.assertEqual(str(cm.exception), """\
+Python namespaces could not be extracted from some thrift sources. Declaring a `namespace py` in
+thrift sources for python thrift library targets will soon become required.
+
+1 python_library() target contained thrift sources not declaring a python namespace:
+The targets and/or files which need to be edited have been dumped to: {}.
 """
                      .format(cm.exception.output_file))
     self.assertEqual(

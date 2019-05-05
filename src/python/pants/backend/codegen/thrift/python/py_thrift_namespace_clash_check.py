@@ -14,6 +14,7 @@ from pants.engine.fs import FilesContent
 from pants.task.task import Task
 from pants.util.collections_abc_backport import OrderedDict, defaultdict
 from pants.util.dirutil import safe_file_dump
+from pants.util.strutil import pluralize
 
 
 class PyThriftNamespaceClashCheck(Task):
@@ -33,6 +34,9 @@ class PyThriftNamespaceClashCheck(Task):
     # TODO: deprecate the --strict option in a future release!
     register('--strict', type=bool, default=False, fingerprint=True,
              help='Whether to fail the build if thrift sources have invalid python namespaces.')
+    register('--dump-invalid-thrift-source-errors-inline', type=bool, default=True,
+             help='Whether to print all errors detecting namespaces in thrift sources to the '
+                  'terminal. IF this is False, the errors will be written to a file instead.')
 
   @classmethod
   def product_types(cls):
@@ -82,21 +86,34 @@ class PyThriftNamespaceClashCheck(Task):
           failing_py_thrift_by_target[t].append(path)
 
     if failing_py_thrift_by_target:
-      # We dump the output to a file here because the output can be very long in some repos.
-      no_py_namespace_output_file = os.path.join(self.workdir, 'no-python-namespace-output.txt')
-
       pretty_printed_failures = '\n'.join(
         '{}: [{}]'.format(t.address.spec, ', '.join(paths))
         for t, paths in failing_py_thrift_by_target.items())
+
+      # We dump the output to a file because the output can be very long in some repos.
+      no_py_namespace_output_file = os.path.join(self.workdir, 'no-python-namespace-output.txt')
+      safe_file_dump(no_py_namespace_output_file, '{}\n'.format(pretty_printed_failures))
+      # If the output gets too long, this option will display just the path to the file with error
+      # output. The file will be created regardless of this option's value.
+      if self.get_options().dump_invalid_thrift_source_errors_inline:
+        errors_description = (
+          '(This output can be silenced with --no-{}-dump-invalid-thrift-source-errors-inline):\n{}'
+          .format(self.get_options_scope_equivalent_flag_component(), pretty_printed_failures))
+      else:
+        errors_description = (
+          "The targets and/or files which need to be edited have been dumped to: {}."
+          .format(no_py_namespace_output_file))
+
       error = self.NamespaceExtractionError(no_py_namespace_output_file, """\
 Python namespaces could not be extracted from some thrift sources. Declaring a `namespace py` in
 thrift sources for python thrift library targets will soon become required.
 
-{} python library target(s) contained thrift sources not declaring a python namespace. The targets
-and/or files which need to be edited will be dumped to: {}
-""".format(len(failing_py_thrift_by_target), no_py_namespace_output_file))
-
-      safe_file_dump(no_py_namespace_output_file, '{}\n'.format(pretty_printed_failures))
+{pluralized_target_description} contained thrift sources not declaring a python namespace:
+{errors_description}
+""".format(
+  pluralized_target_description=pluralize(len(failing_py_thrift_by_target),
+                                          'python_library() target'),
+  errors_description=errors_description))
 
       if self.get_options().strict:
         raise error
