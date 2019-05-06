@@ -32,9 +32,6 @@ Bugfixes
 * Two targets can swap positions with pantsd (again) (#7642)
   `PR #7642 <https://github.com/pantsbuild/pants/pull/7642>`_
 
-* use upstream rustup init script download workaround for old curl version on CentOS6 (#7619)
-  `PR #7619 <https://github.com/pantsbuild/pants/pull/7619>`_
-
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -61,6 +58,9 @@ Refactoring, Improvements, and Tooling
 
 * Use TryInto instead of custom types (#7542)
   `PR #7542 <https://github.com/pantsbuild/pants/pull/7542>`_
+
+* use upstream rustup init script download workaround for old curl version on CentOS6 (#7619)
+  `PR #7619 <https://github.com/pantsbuild/pants/pull/7619>`_
 
 1.16.0.dev3 (4/27/2019)
 -----------------------
