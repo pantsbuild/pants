@@ -4,6 +4,64 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.16.0.dev4 (5/06/2019)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Remote Execution allows extra platform properties to be set (#7650)
+  `PR #7650 <https://github.com/pantsbuild/pants/pull/7650>`_
+
+* add suffix and Levenshtein matching for invalid option names (#7637)
+  `PR #7637 <https://github.com/pantsbuild/pants/pull/7637>`_
+
+Bugfixes
+~~~~~~~~
+
+* Apply timeouts to pex resolves (#7659)
+  `Issue #26 <http://github.com/pantsbuild/pex/issues/26>`_
+  `PR #7659 <https://github.com/pantsbuild/pants/pull/7659>`_
+
+* pin the PEX_PYTHON{,_PATH} running the pytest pex to avoid using incompatible pytest requirements (#7563)
+  `PR #7563 <https://github.com/pantsbuild/pants/pull/7563>`_
+
+* Fix hasattr on Payload (#7432)
+  `PR #7432 <https://github.com/pantsbuild/pants/pull/7432>`_
+
+* Two targets can swap positions with pantsd (again) (#7642)
+  `PR #7642 <https://github.com/pantsbuild/pants/pull/7642>`_
+
+* use upstream rustup init script download workaround for old curl version on CentOS6 (#7619)
+  `PR #7619 <https://github.com/pantsbuild/pants/pull/7619>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* pantsd runs no longer fork (#7596)
+  `PR #7596 <https://github.com/pantsbuild/pants/pull/7596>`_
+
+* Replace externs::eval with externs::none (#7646)
+  `PR #7646 <https://github.com/pantsbuild/pants/pull/7646>`_
+
+* Add the possibility to ignore sigint from other threads (#7623)
+  `PR #7623 <https://github.com/pantsbuild/pants/pull/7623>`_
+
+* Name threads that the daemon starts (#7639)
+  `PR #7639 <https://github.com/pantsbuild/pants/pull/7639>`_
+
+* Add testing for improved error message from #7628 when no valid interpreter can be resolved (#7630)
+  `PR #7630 <https://github.com/pantsbuild/pants/pull/7630>`_
+
+* Extend pantsd test timeout (#7527)
+  `PR #7527 <https://github.com/pantsbuild/pants/pull/7527>`_
+
+* Skip flaky test (#7638)
+  `PR #7638 <https://github.com/pantsbuild/pants/pull/7638>`_
+
+* Use TryInto instead of custom types (#7542)
+  `PR #7542 <https://github.com/pantsbuild/pants/pull/7542>`_
+
 1.16.0.dev3 (4/27/2019)
 -----------------------
 
