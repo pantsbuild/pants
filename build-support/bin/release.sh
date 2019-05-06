@@ -513,7 +513,7 @@ function fetch_and_check_prebuilt_wheels() {
   do
     packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
     if [ ${#packages[@]} -eq 0 ]; then
-      missing+=("${NAME}")
+      missing+=("${PACKAGE}")
       continue
     fi
 
@@ -529,7 +529,7 @@ function fetch_and_check_prebuilt_wheels() {
 
     # N.B. For platform-specific wheels, we expect 6 wheels: {linux,osx} * {cp27m,cp27mu,abi3}.
     if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 6 ]; then
-      missing+=("${NAME} (expected whls for each platform: had only ${packages[@]})")
+      missing+=("${PACKAGE} (expected whls for each platform: had only ${packages[@]})")
       continue
     fi
   done
