@@ -20,7 +20,7 @@ Bugfixes
 ~~~~~~~~
 
 * Apply timeouts to pex resolves (#7659)
-  `Issue #26 <http://github.com/pantsbuild/pex/issues/26>`_
+  `PEX Issue #26 <http://github.com/pantsbuild/pex/issues/26>`_
   `PR #7659 <https://github.com/pantsbuild/pants/pull/7659>`_
 
 * pin the PEX_PYTHON{,_PATH} running the pytest pex to avoid using incompatible pytest requirements (#7563)
