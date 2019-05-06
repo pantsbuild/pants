@@ -518,6 +518,12 @@ class TestBase(unittest.TestCase, AbstractClass):
 
   @classproperty
   def target_class_for_subsystems(cls):
+    """The Target subclass to call .subsystems() on.
+
+    If your test instantiates a target type that depends on any subsystems, those subsystems need to
+    be initialized in your test. If you only have one target type with subsystems to initialize, you
+    can override this property with your target type to have its subsystems initialized.
+    """
     return Target
 
   def _init_target_subsystem(self):

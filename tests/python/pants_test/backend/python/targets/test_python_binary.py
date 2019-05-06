@@ -18,6 +18,8 @@ class PythonBinaryTest(TestBase):
       },
     )
 
+  target_class_for_subsystems = PythonBinary
+
   def test_python_binary(self):
     # Set up and run
     self.create_file('some/path/to/python/path/to/py.py')
