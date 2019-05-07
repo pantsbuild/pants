@@ -24,7 +24,7 @@ impl UnreachableError {
       task_rule: task_rule,
       diagnostic: Diagnostic {
         params: ParamTypes::default(),
-        reason: "Unreachable".to_string(),
+        reason: "Was not usable by any other @rule.".to_string(),
         details: vec![],
       },
     }
@@ -42,16 +42,6 @@ impl EntryWithDeps {
     match self {
       &EntryWithDeps::Inner(ref ie) => &ie.params,
       &EntryWithDeps::Root(ref re) => &re.params,
-    }
-  }
-
-  fn task_rule(&self) -> Option<&Task> {
-    match self {
-      &EntryWithDeps::Inner(InnerEntry {
-        rule: Rule::Task(ref task_rule),
-        ..
-      }) => Some(task_rule),
-      _ => None,
     }
   }
 
@@ -263,7 +253,7 @@ impl<'t> GraphMaker<'t> {
       );
     }
 
-    let unreachable_rules = self.unreachable_rules(&dependency_edges, &unfulfillable_rules);
+    let unreachable_rules = self.unreachable_rules(&dependency_edges);
 
     RuleGraph {
       root_param_types: self.root_param_types.clone(),
@@ -273,13 +263,38 @@ impl<'t> GraphMaker<'t> {
     }
   }
 
+  ///
+  /// Compute input TaskRules that are unreachable from root entries.
+  ///
   fn unreachable_rules(
     &self,
     full_dependency_edges: &RuleDependencyEdges,
-    full_unfulfillable_rules: &UnfulfillableRuleMap,
   ) -> Vec<UnreachableError> {
-    let rules_in_graph: HashSet<_> = full_dependency_edges
+    // Walk the graph, starting from root entries.
+    let mut entry_stack: Vec<_> = full_dependency_edges
       .keys()
+      .filter(|entry| match entry {
+        &EntryWithDeps::Root(_) => true,
+        _ => false,
+      })
+      .collect();
+    let mut visited = HashSet::new();
+    while let Some(entry) = entry_stack.pop() {
+      if visited.contains(&entry) {
+        continue;
+      }
+      visited.insert(entry);
+
+      if let Some(edges) = full_dependency_edges.get(entry) {
+        entry_stack.extend(edges.all_dependencies().filter_map(|e| match e {
+          &Entry::WithDeps(ref e) => Some(e),
+          _ => None,
+        }));
+      }
+    }
+
+    let reachable_rules: HashSet<_> = visited
+      .into_iter()
       .filter_map(|entry| match entry {
         &EntryWithDeps::Inner(InnerEntry {
           rule: Rule::Task(ref task_rule),
@@ -288,17 +303,12 @@ impl<'t> GraphMaker<'t> {
         _ => None,
       })
       .collect();
-    let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules
-      .keys()
-      .filter_map(EntryWithDeps::task_rule)
-      .cloned()
-      .collect();
+
     self
       .tasks
       .all_tasks()
       .iter()
-      .filter(|r| !rules_in_graph.contains(r))
-      .filter(|r| !unfulfillable_discovered_during_construction.contains(r))
+      .filter(|r| !reachable_rules.contains(r))
       .map(|&r| UnreachableError::new(r.clone()))
       .collect()
   }
@@ -674,38 +684,30 @@ impl<'t> GraphMaker<'t> {
     if satisfiable_entries.is_empty() {
       // No source of this dependency was satisfiable with these Params.
       return vec![];
+    } else if satisfiable_entries.len() == 1 {
+      return satisfiable_entries;
     }
 
-    // Prefer a Param, then the non-ambiguous rule with the smallest set of input Params.
-    // TODO: We should likely prefer Rules to Params.
-    if satisfiable_entries.len() == 1 {
-      satisfiable_entries
-    } else if let Some(param) = satisfiable_entries.iter().find(|e| match e {
-      &Entry::Param(_) => true,
-      _ => false,
-    }) {
-      vec![*param]
-    } else {
-      // We prefer the non-ambiguous rule with the smallest set of Params, as that minimizes Node
-      // identities in the graph and biases toward receiving values from dependencies (which do not
-      // affect our identity) rather than dependents.
-      let mut minimum_param_set_size = ::std::usize::MAX;
-      let mut rules = Vec::new();
-      for satisfiable_entry in satisfiable_entries {
-        if let &Entry::WithDeps(ref wd) = satisfiable_entry {
-          let param_set_size = wd.params().len();
-          if param_set_size < minimum_param_set_size {
-            rules.clear();
-            rules.push(satisfiable_entry);
-            minimum_param_set_size = param_set_size;
-          } else if param_set_size == minimum_param_set_size {
-            rules.push(satisfiable_entry);
-          }
-        }
+    // We prefer the non-ambiguous entry with the smallest set of Params, as that minimizes Node
+    // identities in the graph and biases toward receiving values from dependencies (which do not
+    // affect our identity) rather than dependents.
+    let mut minimum_param_set_size = ::std::usize::MAX;
+    let mut rules = Vec::new();
+    for satisfiable_entry in satisfiable_entries {
+      let param_set_size = match satisfiable_entry {
+        &Entry::WithDeps(ref wd) => wd.params().len(),
+        &Entry::Param(_) => 1,
+      };
+      if param_set_size < minimum_param_set_size {
+        rules.clear();
+        rules.push(satisfiable_entry);
+        minimum_param_set_size = param_set_size;
+      } else if param_set_size == minimum_param_set_size {
+        rules.push(satisfiable_entry);
       }
-
-      rules
     }
+
+    rules
   }
 
   fn powerset<'a, T: Clone>(slice: &'a [T]) -> impl Iterator<Item = Vec<T>> + 'a {
@@ -945,29 +947,25 @@ impl RuleGraph {
       })
       .collect();
 
-    let rule_diagnostics = self
-      .unfulfillable_rules
+    // Collect and dedupe rule diagnostics, preferring to render an unfulfillable error for a rule
+    // over an unreachable error.
+    let mut rule_diagnostics: HashMap<_, _> = self
+      .unreachable_rules
       .iter()
-      .filter_map(|(e, diagnostics)| match e {
+      .map(|u| (&u.task_rule, vec![u.diagnostic.clone()]))
+      .collect();
+    for (e, diagnostics) in &self.unfulfillable_rules {
+      match e {
         &EntryWithDeps::Inner(InnerEntry {
           rule: Rule::Task(ref task_rule),
           ..
-        }) => Some((task_rule, diagnostics.clone())),
-        _ => {
-          // We're only checking rule usage not entry usage generally, so we ignore intrinsics.
-          None
+        }) if !used_rules.contains(&task_rule) && !diagnostics.is_empty() => {
+          rule_diagnostics.insert(task_rule, diagnostics.clone());
         }
-      })
-      .chain(
-        self
-          .unreachable_rules
-          .iter()
-          .map(|u| (&u.task_rule, vec![u.diagnostic.clone()])),
-      );
-    for (task_rule, diagnostics) in rule_diagnostics {
-      if used_rules.contains(&task_rule) {
-        continue;
+        _ => {}
       }
+    }
+    for (task_rule, diagnostics) in rule_diagnostics {
       for d in diagnostics {
         collated_errors
           .entry(task_rule.clone())
