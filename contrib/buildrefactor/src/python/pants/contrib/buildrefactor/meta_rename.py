@@ -48,9 +48,8 @@ class MetaRename(Task):
 
   def update_dependee_references(self):
     dependee_targets = self.dependency_graph()[
-      # TODO: Target() expects build_graph to be an instance of BuildGraph, not a list.
       # TODO: The **{} seems unnecessary.
-      Target(name=self._from_address.target_name, address=self._from_address, build_graph=[], **{})
+      Target(name=self._from_address.target_name, address=self._from_address, build_graph=self.context.build_graph, **{})
     ]
 
     logging.disable(logging.WARNING)
