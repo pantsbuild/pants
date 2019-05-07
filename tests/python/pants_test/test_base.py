@@ -517,18 +517,20 @@ class TestBase(unittest.TestCase, AbstractClass):
     Subsystem.reset()
 
   @classproperty
-  def target_class_for_subsystems(cls):
-    """The Target subclass to call .subsystems() on.
+  def subsystems(cls):
+    """Initialize these subsystems when running your test.
 
     If your test instantiates a target type that depends on any subsystems, those subsystems need to
-    be initialized in your test. If you only have one target type with subsystems to initialize, you
-    can override this property with your target type to have its subsystems initialized.
+    be initialized in your test. You can override this property to return the necessary subsystem
+    classes.
+
+    :rtype: list of type objects, all subclasses of Subsystem
     """
-    return Target
+    return Target.subsystems()
 
   def _init_target_subsystem(self):
     if not self._inited_target:
-      subsystem_util.init_subsystems(self.target_class_for_subsystems.subsystems())
+      subsystem_util.init_subsystems(self.subsystems)
       self._inited_target = True
 
   def target(self, spec):

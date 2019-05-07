@@ -18,7 +18,7 @@ class PythonBinaryTest(TestBase):
       },
     )
 
-  target_class_for_subsystems = PythonBinary
+  subsystems = PythonBinary.subsystems()
 
   def test_python_binary(self):
     # Set up and run
