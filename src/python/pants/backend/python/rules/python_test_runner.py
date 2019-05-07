@@ -106,10 +106,13 @@ def run_python_test(transitive_hydrated_target, pytest):
   )
 
   result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
-  # TODO: Do something with stderr?
   status = Status.SUCCESS if result.exit_code == 0 else Status.FAILURE
 
-  yield PyTestResult(status=status, stdout=result.stdout.decode('utf-8'))
+  yield PyTestResult(
+    status=status,
+    stdout=result.stdout.decode('utf-8'),
+    stderr=result.stderr.decode('utf-8'),
+  )
 
 
 def rules():

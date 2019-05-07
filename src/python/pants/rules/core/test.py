@@ -58,7 +58,7 @@ def coordinator_of_tests(target):
   # See https://github.com/pantsbuild/pants/issues/4535
   if target.adaptor.type_alias == 'python_tests':
     result = yield Get(PyTestResult, HydratedTarget, target)
-    yield TestResult(status=result.status, stdout=result.stdout)
+    yield TestResult(status=result.status, stdout=result.stdout, stderr=result.stderr)
   else:
     raise Exception("Didn't know how to run tests for type {}".format(target.adaptor.type_alias))
 
