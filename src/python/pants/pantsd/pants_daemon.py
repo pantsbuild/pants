@@ -406,7 +406,8 @@ class PantsDaemon(FingerprintedProcessManager):
     """Synchronously run pantsd."""
     # Switch log output to the daemon's log stream from here forward.
     self._close_stdio()
-    with self._pantsd_logging() as (log_stream, log_filename):
+    with self._pantsd_logging() as (log_stream, log_filename), \
+          ExceptionSink.trapped_signals(PantsDaemonSignalHandler(self)):
 
       # Register an exiter using os._exit to ensure we only close stdio streams once.
       ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
