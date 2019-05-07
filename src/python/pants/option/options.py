@@ -418,7 +418,10 @@ class Options(object):
       scope = parser.scope
       known_args = parser.known_args
       for arg in known_args:
-        scoped_flag = self._ScopedFlagNameForFuzzyMatching(scope=scope, arg=arg)
+        scoped_flag = self._ScopedFlagNameForFuzzyMatching(
+          scope=text_type(scope),
+          arg=text_type(arg),
+        )
         all_scoped_flag_names.append(scoped_flag)
     self.walk_parsers(register_all_scoped_names)
     return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
