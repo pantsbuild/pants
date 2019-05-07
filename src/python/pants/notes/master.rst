@@ -4,6 +4,40 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.16.0rc0 (5/7/2019)
+--------------------
+
+API Changes
+~~~~~~~~~~~
+
+* allow configuration of the subsystems to initialize in a test (#7665)
+  `PR #7665 <https://github.com/pantsbuild/pants/pull/7665>`_
+
+* Replace GracefulTerminationException with PantsRunFinishedWithFailureException (#7671)
+  `PR #7671 <https://github.com/pantsbuild/pants/pull/7671>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix for reference cycle from Target to BuildGraph (#7666)
+  `PR #7666 <https://github.com/pantsbuild/pants/pull/7666>`_
+
+* Put all arguments to javac in safe_args not just the source paths (#7651)
+  `PR #7651 <https://github.com/pantsbuild/pants/pull/7651>`_
+
+* convert to text_type() for external repos running pants py2 (#7664)
+  `PR #7664 <https://github.com/pantsbuild/pants/pull/7664>`_
+
+* Small logging update to java executor and fix undefined var in release.sh (#7667)
+  `PR #7667 <https://github.com/pantsbuild/pants/pull/7667>`_
+  `PR #7370 <https://github.com/pantsbuild/pants/pull/7370>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Short-circuit primitive encoding on CoercingEncoder (#7655)
+  `PR #7655 <https://github.com/pantsbuild/pants/pull/7655>`_
+
 1.16.0.dev4 (5/06/2019)
 -----------------------
 
@@ -1173,7 +1207,7 @@ Refactoring, Improvements, and Tooling
 
 * Allow Pants to run with Python 3 via `./pants3` script (#6959)
   `PR #6959 <https://github.com/pantsbuild/pants/pull/6959>`_
-  
+
 * Properly render \n in exceptions with Py3 (#7073)
   `PR #7073 <https://github.com/pantsbuild/pants/pull/7073>`_
 
