@@ -199,8 +199,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
       return self
 
     # Filter out the attributes that we will consume below for inheritance.
-    attributes = {k: v for k, v in self._asdict().items()
-                  if k not in self._INHERITANCE_FIELDS and v is not None}
+    attributes = {k: v for k, v in self._asdict().items() if k not in self._INHERITANCE_FIELDS}
 
     if self.extends:
       for k, v in self._extract_inheritable_attributes(self.extends).items():
