@@ -54,9 +54,17 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup):
   # TODO(#7061): This str() can be removed after we drop py2!
   python_binary = text_type(sys.executable)
 
-  # TODO(EA): go from HydratedTarget to PythonTarget
-  # constraints = {python_setup.compatibility_or_constraints(tgt) for tgt in all_targets}
-  constraints = {"CPython==2.7.*"}
+  # TODO(7680): TargetAdaptors should populate Target attributes with a None value, meaning when
+  # they are not specified in the BUILD file. Here, we need every target adaptor to have
+  # its `.compatibility` defined, so we hackily monkey patch it for now.
+  for target in all_targets:
+    if not hasattr(target.adaptor, 'compatibility'):
+      target.adaptor.compatibility = None
+  constraints = {
+    constraint
+    for target in all_targets
+    for constraint in python_setup.compatibility_or_constraints(target.adaptor)
+  }
   constraints_args = []
   for constraint in constraints:
     constraints_args.extend(["--interpreter-constraint", constraint])
