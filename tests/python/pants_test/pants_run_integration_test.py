@@ -616,9 +616,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
       success - indicate whether to expect pants run to succeed or fail.
     :return: a PantsResult object
     """
-    success = kwargs.get('success', True)
-    cmd = []
-    cmd.extend(list(args))
+    success = kwargs.pop('success', True)
+    cmd = list(args)
     pants_run = self.run_pants(cmd, **kwargs)
     if success:
       self.assert_success(pants_run)
