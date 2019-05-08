@@ -6,19 +6,17 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from future.utils import text_type
 
-from pants.util.objects import datatype
+from pants.util.objects import datatype, enum
 
 
-class Status(object):
-  SUCCESS = 'SUCCESS'
-  FAILURE = 'FAILURE'
+class Status(enum(['SUCCESS', 'FAILURE'])): pass
 
 
 class TestResult(datatype([
-  # One of the Status pseudo-enum values capturing whether the run was successful.
-  ('status', text_type),
+  ('status', Status),
   # The stdout of the test runner (which may or may not include actual testcase output).
   ('stdout', text_type)
 ])):
+
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
