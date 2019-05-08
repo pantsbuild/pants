@@ -929,7 +929,7 @@ matrix:
 {{#integration_shards}}
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard {{.}} (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd

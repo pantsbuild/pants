@@ -1135,7 +1135,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 0 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1145,7 +1145,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 1 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1155,7 +1155,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 2 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1165,7 +1165,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 3 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1175,7 +1175,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 4 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1185,7 +1185,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 5 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1195,7 +1195,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 6 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1205,7 +1205,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 7 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1215,7 +1215,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 8 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1225,7 +1225,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 9 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1235,7 +1235,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 10 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1245,7 +1245,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 11 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1255,7 +1255,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 12 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1265,7 +1265,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 13 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1275,7 +1275,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 14 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1285,7 +1285,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 15 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1295,7 +1295,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 16 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1305,7 +1305,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 17 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1315,7 +1315,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 18 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1325,7 +1325,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Integration tests with Pantsd - shard 19 (Py3.6 PEX)"
-      stage: *test_cron
+      #stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
