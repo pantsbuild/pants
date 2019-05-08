@@ -619,7 +619,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     success = kwargs.get('success', True)
     cmd = []
     cmd.extend(list(args))
-    pants_run = self.run_pants(cmd)
+    pants_run = self.run_pants(cmd, **kwargs)
     if success:
       self.assert_success(pants_run)
     else:
