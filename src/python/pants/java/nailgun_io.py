@@ -173,11 +173,10 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
   @classmethod
   @contextmanager
-  def open_multi(cls, sock, chunk_types, isattys, chunk_eof_type=None, buf_size=None,
+  def open_multi(cls, maybe_shutdown_socket, chunk_types, isattys, chunk_eof_type=None, buf_size=None,
                  select_timeout=None):
     """Yields the write sides of pipes that will copy appropriately chunked values to the socket."""
     cls._assert_aligned(chunk_types, isattys)
-
 
     # N.B. This is purely to permit safe handling of a dynamic number of contextmanagers.
     with ExitStack() as stack:
@@ -185,14 +184,15 @@ class NailgunStreamWriter(_StoppableDaemonThread):
         # Allocate one pipe pair per chunk type provided.
         *(stack.enter_context(_self_closing_pipe(isatty)) for isatty in isattys)
       ))
-      writer = NailgunStreamWriter(
-        read_fds,
-        sock,
-        chunk_types,
-        chunk_eof_type,
-        buf_size=buf_size,
-        select_timeout=select_timeout
-      )
+      with maybe_shutdown_socket.lock:
+        writer = NailgunStreamWriter(
+          read_fds,
+          maybe_shutdown_socket.socket,
+          chunk_types,
+          chunk_eof_type,
+          buf_size=buf_size,
+          select_timeout=select_timeout
+        )
       with writer.running():
         yield write_fds, writer
 

@@ -216,9 +216,8 @@ class DaemonPantsRunner(object):
         with open('/dev/null', 'rb') as fh:
           yield fh.fileno()
 
-    # TODO https://github.com/pantsbuild/pants/issues/7653
     with maybe_handle_stdin(handle_stdin) as stdin_fd,\
-      NailgunStreamWriter.open_multi(maybe_shutdown_socket.socket, types, ttys) as ((stdout_fd, stderr_fd), writer),\
+      NailgunStreamWriter.open_multi(maybe_shutdown_socket, types, ttys) as ((stdout_fd, stderr_fd), writer),\
       stdio_as(stdout_fd=stdout_fd, stderr_fd=stderr_fd, stdin_fd=stdin_fd):
       # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
       # exit chunk, to avoid any socket shutdown vs write races.
