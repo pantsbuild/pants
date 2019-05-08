@@ -5,6 +5,9 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import str
+from textwrap import dedent
+
+from colors import red
 
 from pants.backend.python.rules.python_test_runner import PyTestResult
 from pants.build_graph.address import Address, BuildFileAddress
@@ -38,39 +41,23 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
 
   def test_outputs_success(self):
     self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
-      """Here is some output from a test
+      result=TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
+      expected_console_output=dedent("""\
 
-some/target                                                                     .....   SUCCESS
-"""
+        some/target                                                                     .....   SUCCESS
+      """),
     )
 
   def test_output_failure(self):
     self.single_target_test(
-      TestResult(status=Status.FAILURE, stdout='Here is some output from a test'),
-      """Here is some output from a test
+      result=TestResult(status=Status.FAILURE, stdout='Here is some output from a test'),
+      expected_console_output=dedent("""\
+        some/target stdout:
+        {}
 
-some/target                                                                     .....   FAILURE
-""",
+        some/target                                                                     .....   FAILURE
+        """.format(red("Here is some output from a test"))),
       success=False,
-    )
-
-  def test_output_no_trailing_newline(self):
-    self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
-      """Here is some output from a test
-
-some/target                                                                     .....   SUCCESS
-"""
-    )
-
-  def test_output_trailing_newline(self):
-    self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test\n'),
-      """Here is some output from a test
-
-some/target                                                                     .....   SUCCESS
-"""
     )
 
   def test_output_mixed(self):
@@ -91,12 +78,13 @@ some/target                                                                     
     })
 
     self.assertEqual(1, res.exit_code)
-    self.assertEquals(console.stdout.getvalue(), """I passed
-I failed
+    self.assertEquals(console.stdout.getvalue(), dedent("""\
+      testprojects/tests/python/pants/fails stdout:
+      {}
 
-testprojects/tests/python/pants/passes                                          .....   SUCCESS
-testprojects/tests/python/pants/fails                                           .....   FAILURE
-""")
+      testprojects/tests/python/pants/passes                                          .....   SUCCESS
+      testprojects/tests/python/pants/fails                                           .....   FAILURE
+      """.format(red("I failed"))))
 
   def test_coordinator_python_test(self):
     target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
