@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import str
 from textwrap import dedent
 
-from colors import red
+from colors import red, strip_color
 
 from pants.backend.python.rules.python_test_runner import PyTestResult
 from pants.build_graph.address import Address, BuildFileAddress
@@ -43,6 +43,8 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
     self.single_target_test(
       result=TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
       expected_console_output=dedent("""\
+        some/target stdout:
+        Here is some output from a test
 
         some/target                                                                     .....   SUCCESS
       """),
@@ -67,9 +69,9 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
 
     def make_result(target):
       if target == target1:
-        return TestResult(status=Status.SUCCESS, stdout='I passed')
+        return TestResult(status=Status.SUCCESS, stdout='I passed\n')
       elif target == target2:
-        return TestResult(status=Status.FAILURE, stdout='I failed')
+        return TestResult(status=Status.FAILURE, stdout='I failed\n')
       else:
         raise Exception("Unrecognised target")
 
@@ -78,13 +80,17 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
     })
 
     self.assertEqual(1, res.exit_code)
-    self.assertEquals(console.stdout.getvalue(), dedent("""\
+    self.assertEquals(strip_color(console.stdout.getvalue()), dedent("""\
+      testprojects/tests/python/pants/passes stdout:
+      I passed
+
       testprojects/tests/python/pants/fails stdout:
-      {}
+      I failed
+
 
       testprojects/tests/python/pants/passes                                          .....   SUCCESS
       testprojects/tests/python/pants/fails                                           .....   FAILURE
-      """.format(red("I failed"))))
+      """))
 
   def test_coordinator_python_test(self):
     target_adaptor = PythonTestsAdaptor(type_alias='python_tests')

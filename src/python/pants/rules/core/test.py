@@ -29,14 +29,14 @@ def fast_test(console, addresses):
   test_results = yield [Get(TestResult, Address, address.to_address()) for address in addresses]
   did_any_fail = False
   for address, test_result in zip(addresses, test_results):
-    if test_result.status == Status.SUCCESS:
-      continue
     if test_result.stdout:
       console.write_stdout(
         "{} stdout:\n{}\n".format(
           address.reference(),
-          red(test_result.stdout))
+          red(test_result.stdout) if test_result.status == Status.FAILURE else test_result.stdout
+        )
       )
+    if test_result.status == Status.FAILURE:
       did_any_fail = True
 
   console.write_stdout("\n")
@@ -45,7 +45,7 @@ def fast_test(console, addresses):
     console.print_stdout('{0:80}.....{1:>10}'.format(address.reference(), test_result.status.value))
 
   if did_any_fail:
-    console.print_stderr('Tests failed')
+    console.print_stderr(red('Tests failed'))
     exit_code = PANTS_FAILED_EXIT_CODE
   else:
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
