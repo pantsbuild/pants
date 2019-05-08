@@ -9,8 +9,12 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
+from pants.base.deprecated import deprecated_module
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_executable, safe_concurrent_creation
+
+
+deprecated_module('1.19.0.dev0', 'Use PythonToolBase and PythonToolPrepBase instead!')
 
 
 class ExecutablePexTool(Subsystem):

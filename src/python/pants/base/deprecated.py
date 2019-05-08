@@ -270,4 +270,4 @@ def deprecated_module(removal_version, hint_message=None):
 
   Arguments are as for deprecated(), above.
   """
-  warn_or_error(removal_version, 'module', hint_message)
+  warn_or_error(removal_version, 'module', hint_message, stacklevel=4)

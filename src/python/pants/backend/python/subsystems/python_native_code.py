@@ -5,16 +5,19 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import str
+from pex.pex import PEX
+from pex.pex_builder import PEXBuilder
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems import pex_build_util
+from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
-from pants.binaries.executable_pex_tool import ExecutablePexTool
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import is_executable, safe_concurrent_creation
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf
 
@@ -121,8 +124,13 @@ class PythonNativeCode(Subsystem):
       .format(str(platforms_with_sources)))
 
 
-class BuildSetupRequiresPex(ExecutablePexTool):
+# TODO: Convert this to a PythonTool{,Prep}Base like we do with Conan!
+class BuildSetupRequiresPex(Subsystem):
   options_scope = 'build-setup-requires-pex'
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(BuildSetupRequiresPex, cls).subsystem_dependencies() + (PexBuilderWrapper.Factory,)
 
   @classmethod
   def register_options(cls, register):
@@ -138,3 +146,15 @@ class BuildSetupRequiresPex(ExecutablePexTool):
       PythonRequirement('setuptools=={}'.format(self.get_options().setuptools_version)),
       PythonRequirement('wheel=={}'.format(self.get_options().wheel_version)),
     ]
+
+  def bootstrap(self, interpreter, pex_file_path, extra_reqs=None):
+    # Caching is done just by checking if the file at the specified path is already executable.
+    if not is_executable(pex_file_path):
+      with safe_concurrent_creation(pex_file_path) as safe_path:
+        all_reqs = list(self.base_requirements) + list(extra_reqs or [])
+        pex_builder = PexBuilderWrapper.Factory.create(
+          builder=PEXBuilder(interpreter=interpreter))
+        pex_builder.add_resolved_requirements(all_reqs, platforms=['current'])
+        pex_builder.build(safe_path)
+
+    return PEX(pex_file_path, interpreter)
