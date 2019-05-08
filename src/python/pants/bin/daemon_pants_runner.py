@@ -24,11 +24,12 @@ from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
 
-class NoopExiter(Exiter):
+class PantsRunFailCheckerExiter(Exiter):
+  """Passed to pants runs triggered from this class, will raise an exception if the pants run failed."""
+
   def exit(self, result, *args, **kwargs):
     if result != 0:
-      # TODO: https://github.com/pantsbuild/pants/issues/7652
-      raise _GracefulTerminationException(result)
+      raise _PantsRunFinishedWithFailureException(result)
 
 
 class DaemonExiter(Exiter):
@@ -78,23 +79,24 @@ class DaemonExiter(Exiter):
       self._maybe_shutdown_socket.is_shutdown = True
 
 
-class _GracefulTerminationException(Exception):
-  """Allows for deferring the returning of the exit code of prefork work until post fork.
+class _PantsRunFinishedWithFailureException(Exception):
+  """
+  Allows representing a pants run that failed for legitimate reasons
+  (e.g. the target failed to compile).
 
-  TODO: Once the fork boundary is removed in #7390, this class can be replaced by directly exiting
-  with the relevant exit code.
+  Will be raised by the exiter passed to LocalPantsRunner.
   """
 
   def __init__(self, exit_code=PANTS_FAILED_EXIT_CODE):
     """
     :param int exit_code: an optional exit code (defaults to PANTS_FAILED_EXIT_CODE)
     """
-    super(_GracefulTerminationException, self).__init__('Terminated with {}'.format(exit_code))
+    super(_PantsRunFinishedWithFailureException, self).__init__('Terminated with {}'.format(exit_code))
 
     if exit_code == PANTS_SUCCEEDED_EXIT_CODE:
       raise ValueError(
-        "Cannot create _GracefulTerminationException with a successful exit code of {}"
-        .format(PANTS_SUCCEEDED_EXIT_CODE))
+        "Cannot create {} with a successful exit code of {}"
+        .format(type(self).__name__, PANTS_SUCCEEDED_EXIT_CODE))
 
     self._exit_code = exit_code
 
@@ -281,7 +283,7 @@ class DaemonPantsRunner(object):
 
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner.create(
-          NoopExiter(),
+          PantsRunFailCheckerExiter(),
           self._args,
           self._env,
           self._target_roots,
@@ -293,9 +295,9 @@ class DaemonPantsRunner(object):
         runner.run()
       except KeyboardInterrupt:
         self._exiter.exit_and_fail('Interrupted by user.\n')
-      except _GracefulTerminationException as e:
+      except _PantsRunFinishedWithFailureException as e:
         ExceptionSink.log_exception(
-          'Encountered graceful termination exception {}; exiting'.format(e))
+          'Pants run failed with exception: {}; exiting'.format(e))
         self._exiter.exit(e.exit_code)
       except Exception as e:
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
