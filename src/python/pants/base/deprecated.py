@@ -270,4 +270,7 @@ def deprecated_module(removal_version, hint_message=None):
 
   Arguments are as for deprecated(), above.
   """
+  # stacklevel=4 ensures we don't show the of code invoking deprecated_module(), but rather the line
+  # of code which *imports* the deprecated module, which is more useful for debugging how to remove
+  # uses of the deprecated module.
   warn_or_error(removal_version, 'module', hint_message, stacklevel=4)
