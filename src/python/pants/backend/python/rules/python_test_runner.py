@@ -10,6 +10,7 @@ from builtins import str
 from future.utils import text_type
 
 from pants.backend.python.subsystems.pytest import PyTest
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
@@ -28,8 +29,8 @@ class PyTestResult(TestResult):
 
 # TODO: Support deps
 # TODO: Support resources
-@rule(PyTestResult, [TransitiveHydratedTarget, PyTest])
-def run_python_test(transitive_hydrated_target, pytest):
+@rule(PyTestResult, [TransitiveHydratedTarget, PyTest, PythonSetup])
+def run_python_test(transitive_hydrated_target, pytest, python_setup):
   target_root = transitive_hydrated_target.root
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
@@ -50,9 +51,15 @@ def run_python_test(transitive_hydrated_target, pytest):
       for py_req in maybe_python_req_lib.adaptor.requirements:
         all_requirements.append(str(py_req.requirement))
 
-  # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
   # TODO(#7061): This str() can be removed after we drop py2!
   python_binary = text_type(sys.executable)
+
+  # TODO(EA): go from HydratedTarget to PythonTarget
+  # constraints = {python_setup.compatibility_or_constraints(tgt) for tgt in all_targets}
+  constraints = {"CPython==2.7.*"}
+  constraints_args = []
+  for constraint in constraints:
+    constraints_args.extend(["--interpreter-constraint", constraint])
 
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
   # pex27, where it should be hermetically provided in some way.
@@ -60,14 +67,12 @@ def run_python_test(transitive_hydrated_target, pytest):
   requirements_pex_argv = [
     python_binary,
     './{}'.format(pex_snapshot.files[0]),
-    # TODO(#7061): This text_type() can be removed after we drop py2!
-    '--python', text_type(python_binary),
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
-    # Sort all user requirement strings to increase the chance of cache hits across invocations.
-  ] + [
+  ] + constraints_args + [
     # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
     text_type(req)
+    # Sort all user requirement strings to increase the chance of cache hits across invocations.
     for req in sorted(
         list(pytest.get_requirement_strings())
         + list(all_requirements))
@@ -116,4 +121,5 @@ def rules():
   return [
       run_python_test,
       optionable_rule(PyTest),
+      optionable_rule(PythonSetup),
     ]
