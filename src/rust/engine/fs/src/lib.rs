@@ -558,16 +558,11 @@ pub struct GlobWithSource {
 #[derive(Clone)]
 pub struct PosixFS {
   root: Dir,
-  pool: Arc<ResettablePool>,
   ignore: Arc<GitignoreStyleExcludes>,
 }
 
 impl PosixFS {
-  pub fn new<P: AsRef<Path>>(
-    root: P,
-    pool: Arc<ResettablePool>,
-    ignore_patterns: &[String],
-  ) -> Result<PosixFS, String> {
+  pub fn new<P: AsRef<Path>>(root: P, ignore_patterns: &[String]) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
       .canonicalize()
@@ -593,7 +588,6 @@ impl PosixFS {
     })?;
     Ok(PosixFS {
       root: canonical_root,
-      pool: pool,
       ignore: ignore,
     })
   }
@@ -838,7 +832,7 @@ mod posixfs_test {
 
   use super::{
     Dir, DirectoryListing, File, GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat,
-    PathStatGetter, PosixFS, ResettablePool, Stat, StrictGlobMatching, VFS,
+    PathStatGetter, PosixFS, Stat, StrictGlobMatching, VFS,
   };
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::{self, Future};
@@ -1179,12 +1173,7 @@ mod posixfs_test {
   }
 
   fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
-    PosixFS::new(
-      dir.as_ref(),
-      Arc::new(ResettablePool::new("test-pool-".to_string())),
-      &[],
-    )
-    .unwrap()
+    PosixFS::new(dir.as_ref(), &[]).unwrap()
   }
 
   ///

@@ -246,7 +246,7 @@ fn main() {
 
       fs::Store::with_remote(
         local_store_path,
-        pool.clone(),
+        pool,
         &[cas_server.to_owned()],
         remote_instance_arg.clone(),
         &root_ca_certs,
@@ -316,7 +316,6 @@ fn main() {
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
-      pool,
       work_dir,
       true,
     )) as Box<dyn process_execution::CommandRunner>,

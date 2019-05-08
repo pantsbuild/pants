@@ -745,7 +745,6 @@ pub extern "C" fn capture_snapshots(
           let core = core.clone();
           fs::Snapshot::capture_snapshot_from_arbitrary_root(
             core.store(),
-            core.fs_pool.clone(),
             root,
             path_globs,
             digest_hint,

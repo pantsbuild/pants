@@ -149,7 +149,6 @@ impl Core {
         )),
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
-          fs_pool2.clone(),
           work_dir.clone(),
           process_execution_cleanup_local_dirs,
         )),
@@ -170,13 +169,13 @@ impl Core {
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
-      fs_pool: fs_pool.clone(),
+      fs_pool: fs_pool,
       runtime: runtime,
       futures_timer_thread: futures_timer_thread,
       store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
+      vfs: PosixFS::new(&build_root, &ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
       build_root: build_root,
