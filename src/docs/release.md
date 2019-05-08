@@ -98,24 +98,27 @@ the release manager may also need to do a release from a stable branch.*
 1. Edit the version number in `src/python/pants/VERSION`
 2. Update `src/python/pants/notes/master.rst` to reflect the changes for this week (can use
    `build-support/bin/release-changelog-helper.sh` to get a head start).
-3. If this release is also a release candidate then:
-     * Create the corresponding notes file for that release, initialized with notes for all
+3. If this release is also a release candidate, then:
+     1. Create the corresponding notes file for that release, initialized with notes for all
        `dev` releases in the series. <br/>
        _For example if you were releasing `1.2.0rc0` you would need to
        create `src/python/pants/notes/1.2.x.rst` and include all `1.2.0devX` release notes._
-     * Add the file to pants.ini in the branch_notes section.
-     * Add the new notes file to `src/docs/docsite.json`.
-     * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
-   For additional information on generating documentation see the
+     2. Add the file to pants.ini in the branch_notes section.
+     3. Add the new notes file to `src/docs/docsite.json`.
+     4. Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
+   For additional information on generating documentation, see the
    [docs reference](http://www.pantsbuild.org/docs#generating-the-site)
+     5. Create the stable branch from the commit in master for your release. For example if you were
+        releasing `1.2.0rc0`, create the branch `1.2.x` from your release commit. Don't push it upstream
+        yet -- wait until after you've executed `release.sh`!
 4. Bring the CONTRIBUTORS roster in
    [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
    up to date by running `./build-support/bin/contributors.sh`.
 5. Create and land a review for changes in the master branch.
-6. Execute the release as described later on this page.
-7. Finally, if creating a release candidate, create the stable branch from the commit in
-   master for your release. For example if you were releasing `1.2.0rc0`, create the branch
-   `1.2.x` from your release commit.
+6. Execute the `release.sh` script as described later on this page.
+7. Finally, if creating a release candidate, push the stable branch you created earlier upstream. If
+   the release branch is named `1.2.x`, this should take the form of `git push --set-upstream
+   git@github.com:pantsbuild/pants 1.2.x`.
 
 #### Preparing a release from a stable branch
 
